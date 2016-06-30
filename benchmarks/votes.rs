@@ -211,7 +211,7 @@ fn main() {
         .collect();
 
     // run puts
-    let mut put_count = 0;
+    let mut put_count = 0u64;
     let mut last_reported = start;
 
     let mut t_rng = rand::thread_rng();
