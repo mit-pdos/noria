@@ -129,7 +129,7 @@ fn main() {
 
     // add vote count
     let q = Query::new(&[true, true], Vec::new());
-    let vc = g.incorporate(new(&["id", "votes"], true, Aggregation::COUNT.new(0, 2)),
+    let vc = g.incorporate(new(&["id", "votes"], true, Aggregation::COUNT.new(vote, 0, 2)),
                            vec![(q, vote)]);
 
     // add final join
