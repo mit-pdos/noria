@@ -39,7 +39,8 @@ Number of articles to prepopulate (no runtime article PUTs) [default: 0]
   --runtime=<seconds>             Runtime for benchmark, in seconds [default: 60]
   --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]";
 
-type Getter = Box<Fn(Option<distributary::Query>, i64) -> Box<Iterator<Item = Vec<distributary::DataType>>> + Send + Sync>;
+type Getter =
+    Box<Fn(Option<distributary::Query>, i64) -> Vec<Vec<distributary::DataType>> + Send + Sync>;
 
 fn getter_client(client_id: usize,
                  start: time::Instant,
@@ -78,7 +79,7 @@ fn getter_client(client_id: usize,
                                  cmp:
                                      shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
                              }]);
-                let res: Vec<_> = getter(Some(q), i64::max_value()).collect();
+                let res: Vec<_> = getter(Some(q), i64::max_value());
                 if res.len() >= 2 {
                     println!("Got {} records, but expected zero or one!", res.len());
                     for r in res.into_iter() {
