@@ -92,8 +92,8 @@ fn getter_client(client_id: usize,
             if last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
                 let throughput = get_count as f64 /
-                                 (ts.as_secs() as f64 * 1_000f64 +
-                                  ts.subsec_nanos() as f64 / 1_000_000f64);
+                                 (ts.as_secs() as f64 +
+                                  ts.subsec_nanos() as f64 / 1_000_000_000f64);
                 println!("{:?} GET{}: {:.2}", start.elapsed(), client_id, throughput);
 
                 last_reported = time::Instant::now();
@@ -255,8 +255,7 @@ fn main() {
         if last_reported.elapsed() > time::Duration::from_secs(1) {
             let ts = last_reported.elapsed();
             let throughput = put_count as f64 /
-                             (ts.as_secs() as f64 * 1_000f64 +
-                              ts.subsec_nanos() as f64 / 1_000_000f64);
+                             (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
             println!("{:?} PUT: {:.2}", start.elapsed(), throughput);
 
             last_reported = time::Instant::now();
