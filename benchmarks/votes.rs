@@ -18,6 +18,14 @@ use std::sync;
 use std::thread;
 use std::time;
 
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+macro_rules! dur_to_ns {
+    ($d:expr) => {{
+        let d = $d;
+        d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
+    }}
+}
+
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const BENCH_USAGE: &'static str = "
 Benchmarks distributary put-get performance using article votes.
@@ -94,7 +102,10 @@ fn getter_client(client_id: usize,
                 let throughput = get_count as f64 /
                                  (ts.as_secs() as f64 +
                                   ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                println!("{:?} GET{}: {:.2}", start.elapsed(), client_id, throughput);
+                println!("{:?} GET{}: {:.2}",
+                         dur_to_ns!(start.elapsed()),
+                         client_id,
+                         throughput);
 
                 last_reported = time::Instant::now();
                 get_count = 0;
@@ -256,7 +267,7 @@ fn main() {
             let ts = last_reported.elapsed();
             let throughput = put_count as f64 /
                              (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
-            println!("{:?} PUT: {:.2}", start.elapsed(), throughput);
+            println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
 
             last_reported = time::Instant::now();
             put_count = 0;
