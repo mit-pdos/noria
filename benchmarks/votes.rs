@@ -32,6 +32,7 @@ Benchmarks distributary put-get performance using article votes.
 
 Usage:
   votes [\
+--staged \
 --num-getters=<num> \
 --prepopulate-articles=<num> \
 --prepopulate-votes=<num> \
@@ -45,6 +46,7 @@ Options:
 Number of articles to prepopulate (no runtime article PUTs) [default: 0]
   --prepopulate-votes=<num>       Number of votes to prepopulate [default: 0]
   --runtime=<seconds>             Runtime for benchmark, in seconds [default: 60]
+  --staged                        Run all puts first, then all gets
   --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]";
 
 type Getter =
@@ -114,6 +116,67 @@ fn getter_client(client_id: usize,
     }
 }
 
+fn putter_client(start: time::Instant,
+                 distribution: &str,
+                 runtime: usize,
+                 max_art_id: sync::Arc<sync::atomic::AtomicIsize>,
+                 prepopulated_articles: bool,
+                 put: HashMap<NodeIndex, clocked_dispatch::ClockedSender<Update>>,
+                 article: NodeIndex,
+                 vote: NodeIndex) {
+    let mut put_count = 0u64;
+    let mut last_reported = start;
+
+    let mut t_rng = rand::thread_rng();
+    let mut v_rng = Rng::from_seed(42);
+
+    let zipf_dist = Zipf::new(1.07).unwrap();
+
+    println!("Starting putter...");
+    while start.elapsed() < time::Duration::from_secs(runtime as u64) {
+        // create an article if we don't have article prepopulation
+        if !prepopulated_articles {
+            let article_id = max_art_id.load(sync::atomic::Ordering::Relaxed) as i64;
+            put[&article]
+                .send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
+                         article_id.into(), format!("Article #{}", article_id).into()
+                      ])]));
+
+            put_count += 1;
+            max_art_id.fetch_add(1, sync::atomic::Ordering::Relaxed);
+        }
+
+        // create a bunch of random votes
+        let max_id = max_art_id.load(sync::atomic::Ordering::Relaxed);
+        let uniform_dist = Uniform::new(1.0, max_id as f64).unwrap();
+        for _ in 0..9 {
+            let vote_user = t_rng.gen::<i64>();
+            let vote_rnd_id = match distribution {
+                "uniform" => uniform_dist.sample(&mut v_rng) as i64,
+                "zipf" => std::cmp::min(zipf_dist.sample(&mut v_rng) as isize, max_id) as i64,
+                _ => panic!("unknown vote distribution {}!", distribution),
+            };
+            assert!(vote_rnd_id > 0);
+
+            put[&vote].send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
+                             vote_user.into(), vote_rnd_id.into()
+                      ])]));
+            put_count += 1;
+        }
+
+        // check if we should report
+        if last_reported.elapsed() > time::Duration::from_secs(1) {
+            let ts = last_reported.elapsed();
+            let throughput = put_count as f64 /
+                             (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
+            println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
+
+            last_reported = time::Instant::now();
+            put_count = 0;
+        }
+    }
+}
+
 fn main() {
     let args = Docopt::new(BENCH_USAGE)
         .and_then(|dopt| dopt.parse())
@@ -124,6 +187,7 @@ fn main() {
     let prepopulate_articles = args.get_str("--prepopulate-articles").parse::<usize>().unwrap();
     let prepopulate_votes = args.get_str("--prepopulate-votes").parse::<usize>().unwrap();
     let vote_distribution = args.get_str("--vote-distribution").to_owned();
+    let staged = args.get_bool("--staged");
 
     assert!(num_getters > 0);
 
@@ -206,82 +270,61 @@ fn main() {
 
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
-
-    // start getters
     let start = time::Instant::now();
+
+    // prepare getters
+    let mut getters = Vec::new();
     let getter = sync::Arc::new(get.remove(&end).unwrap());
-    let getters: Vec<_> = (0..num_getters)
-        .into_iter()
-        .map(|i| {
-            let getter = getter.clone();
-            let max_art_id = max_art_id.clone();
-            let vote_distribution = vote_distribution.clone();
-            thread::spawn(move || {
-                getter_client(i, start, getter, &*vote_distribution, runtime, max_art_id)
-            })
-        })
-        .collect();
 
-    // run puts
-    let mut put_count = 0u64;
-    let mut last_reported = start;
+    // need this scope so we can move getters beneath
+    // otherwise it'd be held by the run-getters closure
+    {
+        let mut run_getters = Some(|start: time::Instant| {
+            getters.extend((0..num_getters)
+                .into_iter()
+                .map(|i| {
+                    let getter = getter.clone();
+                    let max_art_id = max_art_id.clone();
+                    let vote_distribution = vote_distribution.clone();
+                    thread::spawn(move || {
+                        // and then run the getter client
+                        getter_client(i, start, getter, &*vote_distribution, runtime, max_art_id)
+                    })
+                }))
+        });
 
-    let mut t_rng = rand::thread_rng();
-    let mut v_rng = Rng::from_seed(42);
-
-    let zipf_dist = Zipf::new(1.07).unwrap();
-
-    while start.elapsed() < time::Duration::from_secs(runtime as u64) {
-        // create an article if we don't have article prepopulation
-        if prepopulate_articles == 0 {
-            let article_id = max_art_id.load(sync::atomic::Ordering::Relaxed) as i64;
-            put[&article]
-                .send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                         article_id.into(), format!("Article #{}", article_id).into()
-                      ])]));
-
-            put_count += 1;
-            max_art_id.fetch_add(1, sync::atomic::Ordering::Relaxed);
+        // if execution isn't staged, we want to run the getters while the putter is active
+        if !staged {
+            println!("Starting getters...");
+            run_getters.take().unwrap()(start);
         }
 
-        // create a bunch of random votes
-        let max_id = max_art_id.load(sync::atomic::Ordering::Relaxed);
-        let uniform_dist = Uniform::new(1.0, max_id as f64).unwrap();
-        for _ in 0..9 {
-            let vote_user = t_rng.gen::<i64>();
-            let vote_rnd_id = match &*vote_distribution {
-                "uniform" => uniform_dist.sample(&mut v_rng) as i64,
-                "zipf" => std::cmp::min(zipf_dist.sample(&mut v_rng) as isize, max_id) as i64,
-                _ => panic!("unknown vote distribution {}!", vote_distribution),
-            };
-            assert!(vote_rnd_id > 0);
+        // run puts
+        putter_client(start,
+                      &*vote_distribution,
+                      runtime,
+                      max_art_id.clone(),
+                      prepopulate_articles != 0,
+                      put,
+                      article,
+                      vote);
 
-            put[&vote].send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                             vote_user.into(), vote_rnd_id.into()
-                      ])]));
-            put_count += 1;
-        }
-
-        // check if we should report
-        if last_reported.elapsed() > time::Duration::from_secs(1) {
-            let ts = last_reported.elapsed();
-            let throughput = put_count as f64 /
-                             (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
-            println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
-
-            last_reported = time::Instant::now();
-            put_count = 0;
+        if let Some(mut run_getters) = run_getters {
+            // we didn't start the getters, so run them now
+            println!("Done, now running getters...");
+            // let system settle first
+            thread::sleep(time::Duration::new(1, 0));
+            // then run getters for same time as putter
+            run_getters(time::Instant::now());
+        } else {
+            println!("Done, waiting for getters to join...");
         }
     }
-
-    println!("Done, waiting for getters to join\n");
 
     for g in getters.into_iter() {
         g.join().unwrap();
     }
 
-    println!("Done!");
-
-    drop(put);
+    println!("All done!");
     drop(get);
 }
