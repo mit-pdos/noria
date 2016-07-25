@@ -2,7 +2,6 @@
 
 extern crate clocked_dispatch;
 extern crate distributary;
-extern crate criterion;
 extern crate shortcut;
 extern crate docopt;
 extern crate rand;
