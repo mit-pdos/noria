@@ -120,7 +120,8 @@ fn putter_client(start: time::Instant,
                  runtime: usize,
                  max_art_id: sync::Arc<sync::atomic::AtomicIsize>,
                  prepopulated_articles: bool,
-                 put: HashMap<NodeIndex, clocked_dispatch::ClockedSender<Update>>,
+                 put: HashMap<NodeIndex,
+                              clocked_dispatch::ClockedSender<Vec<distributary::DataType>>>,
                  article: NodeIndex,
                  vote: NodeIndex) {
     let mut put_count = 0u64;
@@ -136,10 +137,7 @@ fn putter_client(start: time::Instant,
         // create an article if we don't have article prepopulation
         if !prepopulated_articles {
             let article_id = max_art_id.load(sync::atomic::Ordering::Relaxed) as i64;
-            put[&article]
-                .send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                         article_id.into(), format!("Article #{}", article_id).into()
-                      ])]));
+            put[&article].send(vec![article_id.into(), format!("Article #{}", article_id).into()]);
 
             put_count += 1;
             max_art_id.fetch_add(1, sync::atomic::Ordering::Relaxed);
@@ -157,9 +155,7 @@ fn putter_client(start: time::Instant,
             };
             assert!(vote_rnd_id > 0);
 
-            put[&vote].send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                             vote_user.into(), vote_rnd_id.into()
-                      ])]));
+            put[&vote].send(vec![vote_user.into(), vote_rnd_id.into()]);
             put_count += 1;
         }
 
@@ -236,10 +232,7 @@ fn main() {
         let start = time::Instant::now();
         for i in 1..prepopulate_articles {
             let i = i as i64;
-            put[&article]
-                .send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                       i.into(), format!("Article #{}", i).into()
-                    ])]));
+            put[&article].send(vec![i.into(), format!("Article #{}", i).into()]);
         }
         let took = start.elapsed();
         println!(" ... took {} µs",
@@ -257,10 +250,7 @@ fn main() {
         let start = time::Instant::now();
         for i in 0..prepopulate_votes {
             let i = i as i64;
-            put[&article]
-                .send(distributary::Update::Records(vec![distributary::Record::Positive(vec![
-                     0.into(), (i % prepopulate_articles as i64).into()
-                  ])]));
+            put[&article].send(vec![0.into(), (i % prepopulate_articles as i64).into()]);
         }
         let took = start.elapsed();
         println!(" ... took {} µs",
