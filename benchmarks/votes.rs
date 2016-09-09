@@ -193,14 +193,17 @@ fn main() {
     let mut g = distributary::FlowGraph::new();
 
     // add article base node
-    let article = g.incorporate(new(&["id", "title"], true, Base {}), vec![]);
+    let article = g.incorporate(new("article", &["id", "title"], true, Base {}), vec![]);
 
     // add vote base table
-    let vote = g.incorporate(new(&["user", "id"], true, Base {}), vec![]);
+    let vote = g.incorporate(new("vote", &["user", "id"], true, Base {}), vec![]);
 
     // add vote count
     let q = Query::new(&[true, true], Vec::new());
-    let vc = g.incorporate(new(&["id", "votes"], true, Aggregation::COUNT.new(vote, 0, 2)),
+    let vc = g.incorporate(new("votecount",
+                               &["id", "votes"],
+                               true,
+                               Aggregation::COUNT.new(vote, 0, 2)),
                            vec![(q, vote)]);
 
     // add final join
@@ -220,7 +223,7 @@ fn main() {
                                 cmp:
                                     shortcut::Comparison::Equal(shortcut::Value::Const(distributary::DataType::None)),
                             }]);
-    let end = g.incorporate(new(&["id", "title", "votes"], true, j),
+    let end = g.incorporate(new("awvc", &["id", "title", "votes"], true, j),
                             vec![(q.clone(), article), (q, vc)]);
 
 
