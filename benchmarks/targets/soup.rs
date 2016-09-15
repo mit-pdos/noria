@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync;
 
+use distributary;
 use distributary::{FlowGraph, new, Query, Base, Aggregation, Joiner, DataType};
 use clocked_dispatch;
 use shortcut;
@@ -11,11 +12,16 @@ use Getter;
 
 type Put = clocked_dispatch::ClockedSender<Vec<DataType>>;
 type Get = Box<Fn(Option<Query>) -> Vec<Vec<DataType>> + Send + Sync>;
+type FG = FlowGraph<Query,
+                    distributary::Update,
+                    Vec<distributary::DataType>,
+                    Vec<shortcut::Value<distributary::DataType>>>;
 
 pub struct SoupTarget {
     vote: Option<Put>,
     article: Option<Put>,
     end: sync::Arc<Get>,
+    _g: FG,
 }
 
 pub fn make(_: &str, _: usize) -> Box<Backend> {
@@ -61,6 +67,7 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
         vote: put.remove(&vote),
         article: put.remove(&article),
         end: sync::Arc::new(get.remove(&end).unwrap()),
+        _g: g, // so it's not dropped and waits for threads
     })
 }
 
@@ -89,7 +96,7 @@ impl Putter for (Put, Put) {
 }
 
 impl Getter for sync::Arc<Get> {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> (i64, String, i64) + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
             let q = Query::new(&[true, true, true],
                                vec![shortcut::Condition {
@@ -100,12 +107,12 @@ impl Getter for sync::Arc<Get> {
             for row in self(Some(q)).into_iter() {
                 match row[1] {
                     DataType::Text(ref s) => {
-                        return (row[0].clone().into(), (**s).clone(), row[2].clone().into());
+                        return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));
                     }
                     _ => unreachable!(),
                 }
             }
-            unreachable!()
+            None
         })
     }
 }

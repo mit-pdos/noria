@@ -1,17 +1,31 @@
-use bmemcached::MemcachedClient;
+use memcache;
+
+struct Memcache(memcache::Memcache);
+unsafe impl Send for Memcache {}
+
+use std::ops::Deref;
+impl Deref for Memcache {
+    type Target = memcache::Memcache;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 use Backend;
 use Putter;
 use Getter;
 
 pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
+    let mut dbn = dbn.splitn(2, ':');
+    let host = dbn.next().unwrap();
+    let port: u64 = dbn.next().unwrap().parse().unwrap();
     Box::new((0..(getters + 1))
         .into_iter()
-        .map(|_| MemcachedClient::new(vec![dbn], 1).unwrap())
+        .map(|_| Memcache(memcache::connect(&(host, port)).unwrap()))
         .collect::<Vec<_>>())
 }
 
-impl Backend for Vec<MemcachedClient> {
+impl Backend for Vec<Memcache> {
     fn getter(&mut self) -> Box<Getter> {
         Box::new(self.pop().unwrap())
     }
@@ -21,34 +35,29 @@ impl Backend for Vec<MemcachedClient> {
     }
 }
 
-impl Putter for MemcachedClient {
+impl Putter for Memcache {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
-            println!("setting article_{} to {} and article_{}_vc to {}",
-                     id,
-                     title,
-                     id,
-                     0);
-            self.set(&format!("article_{}", id), &title, 0).unwrap();
-            self.set(&format!("article_{}_vc", id), 0u32, 0).unwrap();
+            self.set_raw(&format!("article_{}", id), title.as_bytes(), 0, 0).unwrap();
+            self.set_raw(&format!("article_{}_vc", id), b"0", 0, 0).unwrap();
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
         Box::new(move |user, id| {
-            self.set(&format!("voted_{}_{}", user, id), 1u8, 0).unwrap();
-            self.increment(&format!("article_{}_vc", id), 1, 0, 0).unwrap();
+            self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
+            self.increment(&format!("article_{}_vc", id), 1).unwrap();
         })
     }
 }
 
-impl Getter for MemcachedClient {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> (i64, String, i64) + 'a> {
+impl Getter for Memcache {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
-            println!("getting article_{} and article_{}_vc", id, id);
-            let title = MemcachedClient::get(self, &format!("article_{}", id)).unwrap();
-            let vc: u64 = MemcachedClient::get(self, &format!("article_{}_vc", id)).unwrap();
-            (id, title, vc as i64)
+            let title = self.get_raw(&format!("article_{}", id)).unwrap();
+            let vc = self.get_raw(&format!("article_{}_vc", id)).unwrap();
+            let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
+            Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc))
         })
     }
 }

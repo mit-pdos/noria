@@ -11,7 +11,7 @@ extern crate clocked_dispatch;
 extern crate distributary;
 extern crate shortcut;
 
-extern crate bmemcached;
+extern crate memcache;
 
 mod targets;
 
@@ -33,7 +33,7 @@ pub trait Putter {
 }
 
 pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> (i64, String, i64) + 'a>;
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a>;
 }
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -84,7 +84,12 @@ fn main() {
         // memcached://127.0.0.11211
         "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
         // soup://
-        "soup" => targets::soup::make(dbn.next().unwrap(), num_getters),
+        "soup" => {
+            println!("soup first");
+            let x = targets::soup::make(dbn.next().unwrap(), num_getters);
+            println!("soup after");
+            x
+        }
         // garbage
         _ => unimplemented!(),
     };

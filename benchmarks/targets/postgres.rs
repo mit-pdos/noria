@@ -31,7 +31,7 @@ pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
     let config = r2d2::Config::builder()
         .error_handler(Box::new(r2d2::LoggingErrorHandler))
         .pool_size((getters + 1) as u32 /* putter */)
-        .connection_timeout(time::Duration::new(0, 10000))
+        .connection_timeout(time::Duration::new(1000, 0))
         .build();
 
     let pool = r2d2::Pool::new(config,
@@ -41,10 +41,10 @@ pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
     let conn = pool.get().unwrap();
 
     // create tables
-    conn.execute("CREATE TABLE art (id integer, title varchar(255), votes integer)",
+    conn.execute("CREATE TABLE art (id bigint, title varchar(255), votes bigint)",
                  &[])
         .unwrap();
-    conn.execute("CREATE TABLE vt (u varchar(255), id integer)", &[]).unwrap();
+    conn.execute("CREATE TABLE vt (u bigint, id bigint)", &[]).unwrap();
 
     // create indices
     conn.execute("CREATE INDEX ON art (id)", &[]).unwrap();
@@ -75,20 +75,20 @@ impl Putter for PC {
         let pv = self.prepare("INSERT INTO vt (u, id) VALUES ($1, $2)").unwrap();
         let pa = self.prepare("UPDATE art SET votes = votes + 1 WHERE id = $1").unwrap();
         Box::new(move |user, id| {
-            pv.execute(&[&format!("{}", user), &id]).unwrap();
+            pv.execute(&[&user, &id]).unwrap();
             pa.execute(&[&id]).unwrap();
         })
     }
 }
 
 impl Getter for PC {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> (i64, String, i64) + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         let prep = self.prepare("SELECT id, title, votes FROM art WHERE id = $1").unwrap();
         Box::new(move |id| {
             for row in prep.query(&[&id]).unwrap().iter() {
-                return (row.get(0), row.get(1), row.get(2));
+                return Some((row.get(0), row.get(1), row.get(2)));
             }
-            unreachable!()
+            None
         })
     }
 }
