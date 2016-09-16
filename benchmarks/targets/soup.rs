@@ -1,42 +1,38 @@
 use std::collections::HashMap;
-use std::sync;
 
-use distributary;
+use distributary::srv;
 use distributary::{FlowGraph, new, Query, Base, Aggregation, Joiner, DataType};
-use clocked_dispatch;
 use shortcut;
+use tarpc;
 
 use Backend;
 use Putter;
 use Getter;
 
-type Put = clocked_dispatch::ClockedSender<Vec<DataType>>;
-type Get = Box<Fn(Option<Query>) -> Vec<Vec<DataType>> + Send + Sync>;
-type FG = FlowGraph<Query,
-                    distributary::Update,
-                    Vec<distributary::DataType>,
-                    Vec<shortcut::Value<distributary::DataType>>>;
-
-pub struct SoupTarget {
-    vote: Option<Put>,
-    article: Option<Put>,
-    end: sync::Arc<Get>,
-    _g: FG,
+pub struct SoupTarget<D: tarpc::transport::Dialer> {
+    vote: usize,
+    article: usize,
+    end: usize,
+    addr: String,
+    _srv: tarpc::ServeHandle<D>, // so the server won't quit
 }
 
-pub fn make(_: &str, _: usize) -> Box<Backend> {
+pub fn make(addr: &str, _: usize) -> Box<Backend> {
     // set up graph
     let mut g = FlowGraph::new();
 
     // add article base node
-    let article = g.incorporate(new(&["id", "title"], true, Base {}), vec![]);
+    let article = g.incorporate(new("article", &["id", "title"], true, Base {}), vec![]);
 
     // add vote base table
-    let vote = g.incorporate(new(&["user", "id"], true, Base {}), vec![]);
+    let vote = g.incorporate(new("vote", &["user", "id"], true, Base {}), vec![]);
 
     // add vote count
     let q = Query::new(&[true, true], Vec::new());
-    let vc = g.incorporate(new(&["id", "votes"], true, Aggregation::COUNT.new(vote, 0, 2)),
+    let vc = g.incorporate(new("vc",
+                               &["id", "votes"],
+                               true,
+                               Aggregation::COUNT.new(vote, 0, 2)),
                            vec![(q, vote)]);
 
     // add final join
@@ -56,55 +52,48 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
                             cmp:
                                 shortcut::Comparison::Equal(shortcut::Value::Const(DataType::None)),
                         }]);
-    let end = g.incorporate(new(&["id", "title", "votes"], true, j),
+    let end = g.incorporate(new("awvc", &["id", "title", "votes"], true, j),
                             vec![(q.clone(), article), (q, vc)]);
 
 
     // start processing
-    let (mut put, mut get) = g.run(10);
-
     Box::new(SoupTarget {
-        vote: put.remove(&vote),
-        article: put.remove(&article),
-        end: sync::Arc::new(get.remove(&end).unwrap()),
-        _g: g, // so it's not dropped and waits for threads
+        vote: vote.index(),
+        article: article.index(),
+        end: end.index(),
+        addr: addr.to_owned(),
+        _srv: srv::run(g, addr),
     })
 }
 
-impl Backend for SoupTarget {
+impl<D: tarpc::transport::Dialer> Backend for SoupTarget<D> {
     fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.end.clone())
+        Box::new((srv::ext::Client::new(&self.addr).unwrap(), self.end))
     }
 
     fn putter(&mut self) -> Box<Putter> {
-        Box::new((self.vote.take().unwrap(), self.article.take().unwrap()))
+        Box::new((srv::ext::Client::new(&self.addr).unwrap(), self.vote, self.article))
     }
 }
 
-impl Putter for (Put, Put) {
+impl Putter for (srv::ext::Client, usize, usize) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
-            self.1.send(vec![id.into(), title.into()]);
+            self.0.insert(self.2, vec![id.into(), title.into()]).unwrap();
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
         Box::new(move |user, id| {
-            self.0.send(vec![user.into(), id.into()]);
+            self.0.insert(self.1, vec![user.into(), id.into()]).unwrap();
         })
     }
 }
 
-impl Getter for sync::Arc<Get> {
+impl Getter for (srv::ext::Client, usize) {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
-            let q = Query::new(&[true, true, true],
-                               vec![shortcut::Condition {
-                             column: 0,
-                             cmp:
-                                 shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
-                         }]);
-            for row in self(Some(q)).into_iter() {
+            for row in self.0.query(self.1, Some(vec![Some(id.into())])).unwrap().into_iter() {
                 match row[1] {
                     DataType::Text(ref s) => {
                         return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));

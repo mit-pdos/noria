@@ -7,9 +7,9 @@ extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
 
-extern crate clocked_dispatch;
 extern crate distributary;
 extern crate shortcut;
+extern crate tarpc;
 
 extern crate memcache;
 
@@ -81,9 +81,9 @@ fn main() {
     let mut target = match dbn.next().unwrap() {
         // postgresql://soup@127.0.0.1/bench_psql
         "postgresql" => targets::postgres::make(dbn.next().unwrap(), num_getters),
-        // memcached://127.0.0.11211
+        // memcached://127.0.0.1:11211
         "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
-        // soup://
+        // soup://127.0.0.1:7777
         "soup" => {
             println!("soup first");
             let x = targets::soup::make(dbn.next().unwrap(), num_getters);
