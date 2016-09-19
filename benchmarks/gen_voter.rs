@@ -46,34 +46,42 @@ macro_rules! dur_to_ns {
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const BENCH_USAGE: &'static str = "
-Benchmarks PostgreSQL materialization performance.
+Benchmarks news aggregator throughput against Soup, MySQL, and PostgreSQL backends.
 
 Usage:
   gen_voter [\
+    -h --help \
     --num-getters=<num> \
     --prepopulate-articles=<num> \
     --runtime=<seconds> \
-    --vote-distribution=<dist>\
-    <dbn>\
+    --vote-distribution=<dist> \
+    <backend>\
 ]
 
 Options:
+  -h --help                          Show this message
   --num-getters=<num>             Number of GET clients to start [default: 1]
   --prepopulate-articles=<num>    Number of articles to prepopulate (no runtime article PUTs) [default: 0]
   --runtime=<seconds>             Runtime for benchmark, in seconds [default: 60]
-  --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]";
+  --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]
+
+Examples:
+  gen_voter soup://127.0.0.1:3333
+  gen_voter memcached://127.0.0.1:11211
+  gen_voter postgresql://user@127.0.0.1/database";
 
 fn main() {
     let args = Docopt::new(BENCH_USAGE)
         .and_then(|dopt| dopt.parse())
         .unwrap_or_else(|e| e.exit());
 
-    let dbn = args.get_str("<dbn>");
+    let dbn = args.get_str("<backend>");
     let runtime = time::Duration::from_secs(args.get_str("--runtime").parse::<u64>().unwrap());
     let num_getters = args.get_str("--num-getters").parse::<usize>().unwrap();
     let num_articles = args.get_str("--prepopulate-articles").parse::<isize>().unwrap();
     let distribution = args.get_str("--vote-distribution");
     assert!(num_getters > 0);
+    assert!(!dbn.is_empty());
 
     // setup db
     println!("Connecting to database using {}", dbn);
