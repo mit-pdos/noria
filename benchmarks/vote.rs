@@ -55,7 +55,7 @@ const BENCH_USAGE: &'static str = "
 Benchmarks news aggregator throughput against Soup, MySQL, and PostgreSQL backends.
 
 Usage:
-  gen_voter [\
+  vote [\
     -h --help \
     --num-getters=<num> \
     --prepopulate-articles=<num> \
@@ -72,9 +72,9 @@ Options:
   --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]
 
 Examples:
-  gen_voter soup://127.0.0.1:3333
-  gen_voter memcached://127.0.0.1:11211
-  gen_voter postgresql://user@127.0.0.1/database";
+  vote soup://127.0.0.1:3333
+  vote memcached://127.0.0.1:11211
+  vote postgresql://user@127.0.0.1/database";
 
 fn main() {
     let args = Docopt::new(BENCH_USAGE)
