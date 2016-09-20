@@ -1,5 +1,6 @@
-#![feature(plugin)]
-extern crate docopt;
+#[macro_use]
+extern crate clap;
+
 extern crate rand;
 extern crate randomkit;
 
@@ -22,7 +23,6 @@ extern crate memcache;
 
 mod targets;
 
-use docopt::Docopt;
 use rand::Rng as StdRng;
 use randomkit::{Rng, Sample};
 use randomkit::dist::{Uniform, Zipf};
@@ -52,60 +52,87 @@ macro_rules! dur_to_ns {
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
-const BENCH_USAGE: &'static str = "
-Benchmarks news aggregator throughput against Soup, MySQL, and PostgreSQL backends.
-
-Usage:
-  vote [\
-    -h --help \
-    --num-getters=<num> \
-    --prepopulate-articles=<num> \
-    --runtime=<seconds> \
-    --vote-distribution=<dist> \
-    <backend>\
-]
-
-Options:
-  -h --help                          Show this message
-  --num-getters=<num>             Number of GET clients to start [default: 1]
-  --prepopulate-articles=<num>    Number of articles to prepopulate (no runtime article PUTs) [default: 0]
-  --runtime=<seconds>             Runtime for benchmark, in seconds [default: 60]
-  --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]
-
-Examples:
+const BENCH_USAGE: &'static str = "\
+EXAMPLES:
   vote soup://
   vote netsoup://127.0.0.1:7777
   vote memcached://127.0.0.1:11211
   vote postgresql://user@127.0.0.1/database";
 
 fn main() {
-    let args = Docopt::new(BENCH_USAGE)
-        .and_then(|dopt| dopt.parse())
-        .unwrap_or_else(|e| e.exit());
+    use clap::{Arg, App};
+    let mut backends = vec!["soup"];
+    if cfg!(feature = "b_postgresql") {
+        backends.push("postgresql");
+    }
+    if cfg!(feature = "b_memcached") {
+        backends.push("memcached");
+    }
+    if cfg!(feature = "b_netsoup") {
+        backends.push("netsoup");
+    }
+    let backends = format!("Which database backend to use [{}]://<params>",
+                           backends.join(", "));
 
-    let dbn = args.get_str("<backend>");
-    let runtime = time::Duration::from_secs(args.get_str("--runtime").parse::<u64>().unwrap());
-    let num_getters = args.get_str("--num-getters").parse::<usize>().unwrap();
-    let num_articles = args.get_str("--prepopulate-articles").parse::<isize>().unwrap();
-    let distribution = args.get_str("--vote-distribution");
-    assert!(num_getters > 0);
+    let args = App::new("vote")
+        .version("0.1")
+        .about("Benchmarks user-curated news aggregator throughput for different storage \
+                backends.")
+        .arg(Arg::with_name("ngetters")
+            .short("g")
+            .long("getters")
+            .value_name("N")
+            .default_value("1")
+            .help("Number of GET clients to start"))
+        .arg(Arg::with_name("narticles")
+            .short("a")
+            .long("articles")
+            .value_name("N")
+            .default_value("100000")
+            .help("Number of articles to prepopulate the database with"))
+        .arg(Arg::with_name("runtime")
+            .short("r")
+            .long("runtime")
+            .value_name("N")
+            .default_value("60")
+            .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("distribution")
+            .short("d")
+            .long("distribution")
+            .value_name("D")
+            .possible_values(&["zipf", "uniform"])
+            .default_value("zipf")
+            .help("Vote to article distribution for reads and writes"))
+        .arg(Arg::with_name("BACKEND")
+            .index(1)
+            .help(&backends)
+            .required(true))
+        .after_help(BENCH_USAGE)
+        .get_matches();
+
+    let dbn = args.value_of("BACKEND").unwrap();
+    let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let ngetters = value_t_or_exit!(args, "ngetters", usize);
+    let narticles = value_t_or_exit!(args, "narticles", isize);
+    let distribution = args.value_of("distribution").unwrap();
+    assert!(ngetters > 0);
     assert!(!dbn.is_empty());
 
     // setup db
-    println!("Connecting to database using {}", dbn);
+    println!("Attempting to connect to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
     let mut target: Box<Backend> = match dbn.next().unwrap() {
         // soup://
-        "soup" => targets::soup::make(dbn.next().unwrap(), num_getters),
+        "soup" => targets::soup::make(dbn.next().unwrap(), ngetters),
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_postgresql")]
-        "postgresql" => targets::postgres::make(dbn.next().unwrap(), num_getters),
+        "postgresql" => targets::postgres::make(dbn.next().unwrap(), ngetters),
         // memcached://127.0.0.1:11211
         #[cfg(feature="b_memcached")]
-        "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
+        "memcached" => targets::memcached::make(dbn.next().unwrap(), ngetters),
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
-        "netsoup" => targets::netsoup::make(dbn.next().unwrap(), num_getters),
+        "netsoup" => targets::netsoup::make(dbn.next().unwrap(), ngetters),
         // garbage
         t => {
             panic!("backend not supported -- make sure you compiled with --features b_{}",
@@ -120,10 +147,10 @@ fn main() {
         let mut article = putter.article();
 
         // prepopulate
-        println!("Prepopulating with {} articles", num_articles);
+        println!("Prepopulating with {} articles", narticles);
         {
             // let t = putter.transaction().unwrap();
-            for i in 0..num_articles {
+            for i in 0..narticles {
                 article(i as i64, format!("Article #{}", i));
             }
             // t.commit().unwrap();
@@ -138,8 +165,8 @@ fn main() {
     // benchmark
     // TODO: support staging?
     // start getters
-    println!("Starting {} getters", num_getters);
-    let getters = (0..num_getters)
+    println!("Starting {} getters", ngetters);
+    let getters = (0..ngetters)
         .into_iter()
         .map(|i| (i, target.getter()))
         .map(|(i, g)| {
@@ -153,7 +180,7 @@ fn main() {
                 let mut v_rng = Rng::from_seed(42);
 
                 let zipf_dist = Zipf::new(1.07).unwrap();
-                let uniform_dist = Uniform::new(1.0, num_articles as f64).unwrap();
+                let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
 
                 {
                     let mut get = g.get();
@@ -164,7 +191,7 @@ fn main() {
                             "zipf" => zipf_dist.sample(&mut v_rng) as isize,
                             _ => panic!("unknown vote distribution {}!", distribution),
                         };
-                        let id = std::cmp::min(id as isize, num_articles - 1) as i64;
+                        let id = std::cmp::min(id, narticles - 1) as i64;
 
                         get(id);
                         count += 1;
@@ -200,14 +227,14 @@ fn main() {
     {
         let mut vote = putter.vote();
         while start.elapsed() < runtime {
-            let uniform_dist = Uniform::new(1.0, num_articles as f64).unwrap();
+            let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
             let vote_user = t_rng.gen::<i64>();
             let vote_rnd_id = match distribution {
                 "uniform" => uniform_dist.sample(&mut v_rng) as isize,
                 "zipf" => zipf_dist.sample(&mut v_rng) as isize,
                 _ => panic!("unknown vote distribution {}!", distribution),
             };
-            let vote_rnd_id = std::cmp::min(vote_rnd_id, num_articles - 1) as i64;
+            let vote_rnd_id = std::cmp::min(vote_rnd_id, narticles - 1) as i64;
             assert!(vote_rnd_id > 0);
 
             vote(vote_user, vote_rnd_id);
