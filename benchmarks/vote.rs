@@ -10,10 +10,11 @@ extern crate r2d2;
 #[cfg(feature="b_psql")]
 extern crate r2d2_postgres;
 
+extern crate clocked_dispatch;
 extern crate distributary;
 extern crate shortcut;
 
-#[cfg(feature="b_binsoup")]
+#[cfg(feature="b_netsoup")]
 extern crate tarpc;
 
 #[cfg(feature="b_mc")]
@@ -72,7 +73,8 @@ Options:
   --vote-distribution=<dist>      Vote distribution: \"zipf\" or \"uniform\" [default: zipf]
 
 Examples:
-  vote soup://127.0.0.1:3333
+  vote soup://
+  vote netsoup://127.0.0.1:7777
   vote memcached://127.0.0.1:11211
   vote postgresql://user@127.0.0.1/database";
 
@@ -93,20 +95,17 @@ fn main() {
     println!("Connecting to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
     let mut target: Box<Backend> = match dbn.next().unwrap() {
+        // soup://
+        "soup" => targets::soup::make(dbn.next().unwrap(), num_getters),
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_psql")]
         "postgresql" => targets::postgres::make(dbn.next().unwrap(), num_getters),
         // memcached://127.0.0.1:11211
         #[cfg(feature="b_mc")]
         "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
-        // soup://127.0.0.1:7777
-        #[cfg(feature="b_binsoup")]
-        "soup" => {
-            println!("soup first");
-            let x = targets::soup::make(dbn.next().unwrap(), num_getters);
-            println!("soup after");
-            x
-        }
+        // netsoup://127.0.0.1:7777
+        #[cfg(feature="b_netsoup")]
+        "netsoup" => targets::netsoup::make(dbn.next().unwrap(), num_getters),
         // garbage
         _ => panic!("backend not supported -- make sure you compiled with --features b_*"),
     };
