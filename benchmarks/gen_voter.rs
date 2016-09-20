@@ -3,14 +3,20 @@ extern crate docopt;
 extern crate rand;
 extern crate randomkit;
 
+#[cfg(feature="b_psql")]
 extern crate postgres;
+#[cfg(feature="b_psql")]
 extern crate r2d2;
+#[cfg(feature="b_psql")]
 extern crate r2d2_postgres;
 
 extern crate distributary;
 extern crate shortcut;
+
+#[cfg(feature="b_binsoup")]
 extern crate tarpc;
 
+#[cfg(feature="b_mc")]
 extern crate memcache;
 
 mod targets;
@@ -86,12 +92,15 @@ fn main() {
     // setup db
     println!("Connecting to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
-    let mut target = match dbn.next().unwrap() {
+    let mut target: Box<Backend> = match dbn.next().unwrap() {
         // postgresql://soup@127.0.0.1/bench_psql
+        #[cfg(feature="b_psql")]
         "postgresql" => targets::postgres::make(dbn.next().unwrap(), num_getters),
         // memcached://127.0.0.1:11211
+        #[cfg(feature="b_mc")]
         "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
         // soup://127.0.0.1:7777
+        #[cfg(feature="b_binsoup")]
         "soup" => {
             println!("soup first");
             let x = targets::soup::make(dbn.next().unwrap(), num_getters);
@@ -99,7 +108,7 @@ fn main() {
             x
         }
         // garbage
-        _ => unimplemented!(),
+        _ => panic!("backend not supported -- make sure you compiled with --features b_*"),
     };
 
     // prepopulate
