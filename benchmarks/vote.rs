@@ -3,11 +3,11 @@ extern crate docopt;
 extern crate rand;
 extern crate randomkit;
 
-#[cfg(feature="b_psql")]
+#[cfg(feature="b_postgresql")]
 extern crate postgres;
-#[cfg(feature="b_psql")]
+#[cfg(feature="b_postgresql")]
 extern crate r2d2;
-#[cfg(feature="b_psql")]
+#[cfg(feature="b_postgresql")]
 extern crate r2d2_postgres;
 
 extern crate clocked_dispatch;
@@ -17,7 +17,7 @@ extern crate shortcut;
 #[cfg(feature="b_netsoup")]
 extern crate tarpc;
 
-#[cfg(feature="b_mc")]
+#[cfg(feature="b_memcached")]
 extern crate memcache;
 
 mod targets;
@@ -98,16 +98,19 @@ fn main() {
         // soup://
         "soup" => targets::soup::make(dbn.next().unwrap(), num_getters),
         // postgresql://soup@127.0.0.1/bench_psql
-        #[cfg(feature="b_psql")]
+        #[cfg(feature="b_postgresql")]
         "postgresql" => targets::postgres::make(dbn.next().unwrap(), num_getters),
         // memcached://127.0.0.1:11211
-        #[cfg(feature="b_mc")]
+        #[cfg(feature="b_memcached")]
         "memcached" => targets::memcached::make(dbn.next().unwrap(), num_getters),
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
         "netsoup" => targets::netsoup::make(dbn.next().unwrap(), num_getters),
         // garbage
-        _ => panic!("backend not supported -- make sure you compiled with --features b_*"),
+        t => {
+            panic!("backend not supported -- make sure you compiled with --features b_{}",
+                   t)
+        }
     };
 
     // prepopulate
