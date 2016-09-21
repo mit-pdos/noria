@@ -240,7 +240,7 @@ fn main() {
 
     // start putting
     let mut count = 0;
-    let mut samples = Histogram::<u64>::new_with_bounds(1, 10000000, 4).unwrap();
+    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000000, 4).unwrap();
     let mut last_reported = start;
 
     let mut t_rng = rand::thread_rng();
