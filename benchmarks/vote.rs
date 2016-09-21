@@ -29,6 +29,9 @@ use randomkit::dist::{Uniform, Zipf};
 use std::thread;
 use std::time;
 
+extern crate hdrsample;
+use hdrsample::Histogram;
+
 pub trait Backend {
     fn putter(&mut self) -> Box<Putter>;
     fn getter(&mut self) -> Box<Getter>;
@@ -78,6 +81,11 @@ fn main() {
         .version("0.1")
         .about("Benchmarks user-curated news aggregator throughput for different storage \
                 backends.")
+        .arg(Arg::with_name("cdf")
+            .short("c")
+            .long("cdf")
+            .takes_value(false)
+            .help("produce a CDF of recorded latencies for each client at the end"))
         .arg(Arg::with_name("ngetters")
             .short("g")
             .long("getters")
@@ -110,6 +118,7 @@ fn main() {
         .after_help(BENCH_USAGE)
         .get_matches();
 
+    let cdf = args.is_present("cdf");
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
@@ -175,6 +184,7 @@ fn main() {
             let start = start.clone();
             thread::spawn(move || {
                 let mut count = 0 as u64;
+                let mut samples = Histogram::<u64>::new_with_bounds(1, 10000000, 4).unwrap();
                 let mut last_reported = start;
 
                 let mut v_rng = Rng::from_seed(42);
@@ -193,7 +203,13 @@ fn main() {
                         };
                         let id = std::cmp::min(id, narticles - 1) as i64;
 
-                        get(id);
+                        if cdf {
+                            let t = time::Instant::now();
+                            get(id);
+                            samples += dur_to_ns!(t.elapsed()) as i64;
+                        } else {
+                            get(id);
+                        }
                         count += 1;
 
                         if last_reported.elapsed() > time::Duration::from_secs(1) {
@@ -211,6 +227,12 @@ fn main() {
                         }
                     }
                 }
+
+                if cdf {
+                    for (v, p, _, _) in samples.iter_percentiles(2) {
+                        println!("percentile GET{} {:.2} {:.2}", i, v, p);
+                    }
+                }
             })
         })
         .collect::<Vec<_>>();
@@ -218,6 +240,7 @@ fn main() {
 
     // start putting
     let mut count = 0;
+    let mut samples = Histogram::<u64>::new_with_bounds(1, 10000000, 4).unwrap();
     let mut last_reported = start;
 
     let mut t_rng = rand::thread_rng();
@@ -237,7 +260,13 @@ fn main() {
             let vote_rnd_id = std::cmp::min(vote_rnd_id, narticles - 1) as i64;
             assert!(vote_rnd_id > 0);
 
-            vote(vote_user, vote_rnd_id);
+            if cdf {
+                let t = time::Instant::now();
+                vote(vote_user, vote_rnd_id);
+                samples += dur_to_ns!(t.elapsed()) as i64;
+            } else {
+                vote(vote_user, vote_rnd_id);
+            }
             count += 1;
 
             // check if we should report
@@ -251,6 +280,12 @@ fn main() {
                 last_reported = time::Instant::now();
                 count = 0;
             }
+        }
+    }
+
+    if cdf {
+        for (v, p, _, _) in samples.iter_percentiles(2) {
+            println!("percentile PUT {:.2} {:.2}", v, p);
         }
     }
 
