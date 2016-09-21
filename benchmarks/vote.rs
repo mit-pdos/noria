@@ -32,20 +32,6 @@ use std::time;
 extern crate hdrsample;
 use hdrsample::Histogram;
 
-pub trait Backend {
-    fn putter(&mut self) -> Box<Putter>;
-    fn getter(&mut self) -> Box<Getter>;
-}
-
-pub trait Putter: Send {
-    fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a>;
-    fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a>;
-}
-
-pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a>;
-}
-
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
     ($d:expr) => {{
@@ -136,7 +122,7 @@ fn main() {
     // setup db
     println!("Attempting to connect to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
-    let mut target: Box<Backend> = match dbn.next().unwrap() {
+    let mut target: Box<targets::Backend> = match dbn.next().unwrap() {
         // soup://
         "soup" => targets::soup::make(dbn.next().unwrap(), ngetters),
         // postgresql://soup@127.0.0.1/bench_psql

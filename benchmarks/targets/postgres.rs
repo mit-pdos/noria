@@ -2,9 +2,9 @@ use r2d2;
 use postgres;
 use r2d2_postgres::{SslMode, PostgresConnectionManager};
 
-use Backend;
-use Putter;
-use Getter;
+use targets::Backend;
+use targets::Putter;
+use targets::Getter;
 
 type PCM = PostgresConnectionManager;
 type PC = r2d2::PooledConnection<PCM>;

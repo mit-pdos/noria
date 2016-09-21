@@ -5,9 +5,9 @@ use distributary::{FlowGraph, new, Query, Base, Aggregation, Joiner, DataType};
 use clocked_dispatch;
 use shortcut;
 
-use Backend;
-use Putter;
-use Getter;
+use targets::Backend;
+use targets::Putter;
+use targets::Getter;
 
 type Put = clocked_dispatch::ClockedSender<Vec<DataType>>;
 type Get = Box<Fn(Option<Query>) -> Vec<Vec<DataType>> + Send + Sync>;

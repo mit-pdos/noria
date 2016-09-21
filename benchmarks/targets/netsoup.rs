@@ -5,9 +5,9 @@ use distributary::{FlowGraph, new, Query, Base, Aggregation, Joiner, DataType};
 use shortcut;
 use tarpc;
 
-use Backend;
-use Putter;
-use Getter;
+use targets::Backend;
+use targets::Putter;
+use targets::Getter;
 
 pub struct SoupTarget<D: tarpc::transport::Dialer> {
     vote: usize,

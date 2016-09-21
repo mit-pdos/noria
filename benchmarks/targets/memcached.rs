@@ -11,9 +11,9 @@ impl Deref for Memcache {
     }
 }
 
-use Backend;
-use Putter;
-use Getter;
+use targets::Backend;
+use targets::Putter;
+use targets::Getter;
 
 pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
     let mut dbn = dbn.splitn(2, ':');
