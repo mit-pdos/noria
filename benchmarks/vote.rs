@@ -184,7 +184,7 @@ fn main() {
             let start = start.clone();
             thread::spawn(move || {
                 let mut count = 0 as u64;
-                let mut samples = Histogram::<u64>::new_with_bounds(1, 10000000, 4).unwrap();
+                let mut samples = Histogram::<u64>::new_with_bounds(1, 10000, 3).unwrap();
                 let mut last_reported = start;
 
                 let mut v_rng = Rng::from_seed(42);
@@ -206,7 +206,7 @@ fn main() {
                         if cdf {
                             let t = time::Instant::now();
                             get(id);
-                            samples += dur_to_ns!(t.elapsed()) as i64;
+                            samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
                         } else {
                             get(id);
                         }
@@ -229,7 +229,7 @@ fn main() {
                 }
 
                 if cdf {
-                    for (v, p, _, _) in samples.iter_percentiles(2) {
+                    for (v, p, _, _) in samples.iter_percentiles(1) {
                         println!("percentile GET{} {:.2} {:.2}", i, v, p);
                     }
                 }
@@ -240,7 +240,7 @@ fn main() {
 
     // start putting
     let mut count = 0;
-    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000000, 4).unwrap();
+    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
     let mut last_reported = start;
 
     let mut t_rng = rand::thread_rng();
@@ -263,7 +263,7 @@ fn main() {
             if cdf {
                 let t = time::Instant::now();
                 vote(vote_user, vote_rnd_id);
-                samples += dur_to_ns!(t.elapsed()) as i64;
+                samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
             } else {
                 vote(vote_user, vote_rnd_id);
             }
@@ -284,7 +284,7 @@ fn main() {
     }
 
     if cdf {
-        for (v, p, _, _) in samples.iter_percentiles(2) {
+        for (v, p, _, _) in samples.iter_percentiles(1) {
             println!("percentile PUT {:.2} {:.2}", v, p);
         }
     }
