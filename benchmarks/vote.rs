@@ -37,7 +37,7 @@ pub trait Backend {
     fn getter(&mut self) -> Box<Getter>;
 }
 
-pub trait Putter {
+pub trait Putter: Send {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a>;
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a>;
 }
@@ -86,6 +86,11 @@ fn main() {
             .long("cdf")
             .takes_value(false)
             .help("produce a CDF of recorded latencies for each client at the end"))
+        .arg(Arg::with_name("stage")
+            .short("s")
+            .long("stage")
+            .takes_value(false)
+            .help("stage execution such that all writes are performed before all reads"))
         .arg(Arg::with_name("ngetters")
             .short("g")
             .long("getters")
@@ -119,8 +124,9 @@ fn main() {
         .get_matches();
 
     let cdf = args.is_present("cdf");
+    let stage = args.is_present("stage");
     let dbn = args.value_of("BACKEND").unwrap();
-    let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let mut runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let distribution = args.value_of("distribution").unwrap();
@@ -172,7 +178,70 @@ fn main() {
     let start = time::Instant::now();
 
     // benchmark
-    // TODO: support staging?
+    // start putting
+    let mut putter = Some({
+        let distribution = distribution.to_owned();
+        let start = start.clone();
+        thread::spawn(move || {
+            let mut count = 0;
+            let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
+            let mut last_reported = start;
+
+            let mut t_rng = rand::thread_rng();
+            let mut v_rng = Rng::from_seed(42);
+            let zipf_dist = Zipf::new(1.07).unwrap();
+
+            {
+                let mut vote = putter.vote();
+                while start.elapsed() < runtime {
+                    let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
+                    let vote_user = t_rng.gen::<i64>();
+                    let vote_rnd_id = match &*distribution {
+                        "uniform" => uniform_dist.sample(&mut v_rng) as isize,
+                        "zipf" => zipf_dist.sample(&mut v_rng) as isize,
+                        _ => panic!("unknown vote distribution {}!", distribution),
+                    };
+                    let vote_rnd_id = std::cmp::min(vote_rnd_id, narticles - 1) as i64;
+                    assert!(vote_rnd_id > 0);
+
+                    if cdf {
+                        let t = time::Instant::now();
+                        vote(vote_user, vote_rnd_id);
+                        samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                    } else {
+                        vote(vote_user, vote_rnd_id);
+                    }
+                    count += 1;
+
+                    // check if we should report
+                    if last_reported.elapsed() > time::Duration::from_secs(1) {
+                        let ts = last_reported.elapsed();
+                        let throughput = count as f64 /
+                                         (ts.as_secs() as f64 +
+                                          ts.subsec_nanos() as f64 / 1_000_000_000f64);
+                        println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
+
+                        last_reported = time::Instant::now();
+                        count = 0;
+                    }
+                }
+            }
+
+            if cdf {
+                for (v, p, _, _) in samples.iter_percentiles(1) {
+                    println!("percentile PUT {:.2} {:.2}", v, p);
+                }
+            }
+        })
+    });
+
+    if stage {
+        println!("Waiting for putter before starting getters");
+        putter.take().unwrap().join().unwrap();
+        // avoid getters stopping immediately
+        runtime *= 2;
+    }
+
     // start getters
     println!("Starting {} getters", ngetters);
     let getters = (0..ngetters)
@@ -238,59 +307,11 @@ fn main() {
         .collect::<Vec<_>>();
     println!("Started {} getters", getters.len());
 
-    // start putting
-    let mut count = 0;
-    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
-    let mut last_reported = start;
-
-    let mut t_rng = rand::thread_rng();
-    let mut v_rng = Rng::from_seed(42);
-    let zipf_dist = Zipf::new(1.07).unwrap();
-
-    {
-        let mut vote = putter.vote();
-        while start.elapsed() < runtime {
-            let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
-            let vote_user = t_rng.gen::<i64>();
-            let vote_rnd_id = match distribution {
-                "uniform" => uniform_dist.sample(&mut v_rng) as isize,
-                "zipf" => zipf_dist.sample(&mut v_rng) as isize,
-                _ => panic!("unknown vote distribution {}!", distribution),
-            };
-            let vote_rnd_id = std::cmp::min(vote_rnd_id, narticles - 1) as i64;
-            assert!(vote_rnd_id > 0);
-
-            if cdf {
-                let t = time::Instant::now();
-                vote(vote_user, vote_rnd_id);
-                samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
-            } else {
-                vote(vote_user, vote_rnd_id);
-            }
-            count += 1;
-
-            // check if we should report
-            if last_reported.elapsed() > time::Duration::from_secs(1) {
-                let ts = last_reported.elapsed();
-                let throughput = count as f64 /
-                                 (ts.as_secs() as f64 +
-                                  ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
-
-                last_reported = time::Instant::now();
-                count = 0;
-            }
-        }
-    }
-
-    if cdf {
-        for (v, p, _, _) in samples.iter_percentiles(1) {
-            println!("percentile PUT {:.2} {:.2}", v, p);
-        }
-    }
-
     // clean
-    drop(putter);
+    if let Some(putter) = putter {
+        // is putter also running?
+        putter.join().unwrap();
+    }
     for g in getters.into_iter() {
         g.join().unwrap();
     }
