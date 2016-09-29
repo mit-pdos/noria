@@ -31,7 +31,10 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     let vote = g.incorporate(new("vote", &["user", "id"], true, Base {}));
 
     // add vote count
-    let vc = g.incorporate(new("votecount", &["id", "votes"], true, Aggregation::COUNT.new(vote, 0)));
+    let vc = g.incorporate(new("votecount",
+                               &["id", "votes"],
+                               true,
+                               Aggregation::COUNT.new(vote, 0)));
 
     // add final join using first field from article and first from vc
     let mut join = HashMap::new();
