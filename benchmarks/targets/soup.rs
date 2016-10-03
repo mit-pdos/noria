@@ -10,7 +10,7 @@ use targets::Putter;
 use targets::Getter;
 
 type Put = clocked_dispatch::ClockedSender<Vec<DataType>>;
-type Get = Box<Fn(Option<Query>) -> Vec<Vec<DataType>> + Send + Sync>;
+type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
 type FG<U> = FlowGraph<Query, U, Vec<DataType>>;
 
 pub struct SoupTarget<U: Send + Clone> {
@@ -90,7 +90,7 @@ impl Getter for sync::Arc<Get> {
                              cmp:
                                  shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
                          }]);
-            for row in self(Some(q)).into_iter() {
+            for row in self(Some(&q)).into_iter() {
                 match row[1] {
                     DataType::Text(ref s) => {
                         return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));
