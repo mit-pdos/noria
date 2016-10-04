@@ -239,7 +239,7 @@ fn main() {
             let start = start.clone();
             thread::spawn(move || {
                 let mut count = 0 as u64;
-                let mut samples = Histogram::<u64>::new_with_bounds(1, 10000, 3).unwrap();
+                let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
                 let mut last_reported = start;
 
                 let mut v_rng = Rng::from_seed(42);
