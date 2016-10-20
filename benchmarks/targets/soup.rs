@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::sync;
 
-use distributary::{FlowGraph, new, Query, Base, Aggregation, Joiner, DataType};
+use distributary::{FlowGraph, new, Query, Base, Aggregation, JoinBuilder, DataType};
 use clocked_dispatch;
 use shortcut;
 
@@ -37,13 +36,9 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
                                Aggregation::COUNT.new(vote, 0)));
 
     // add final join using first field from article and first from vc
-    let mut join = HashMap::new();
-    join.insert(article, vec![1, 0]);
-    join.insert(vc, vec![1, 0]);
-    // emit first and second field from article (id + title)
-    // and second field from right (votes)
-    let emit = vec![(article, 0), (article, 1), (vc, 1)];
-    let j = Joiner::new(emit, join);
+    let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
+        .from(article, vec![1, 0])
+        .join(vc, vec![1, 0]);
     let end = g.incorporate(new("awvc", &["id", "title", "votes"], true, j));
 
     // start processing
