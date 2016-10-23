@@ -28,7 +28,7 @@ pub fn make(addr: &str, _: usize) -> Box<Backend> {
     let vc = g.incorporate(new("vc",
                                &["id", "votes"],
                                true,
-                               Aggregation::COUNT.new(vote, 0)));
+                               Aggregation::COUNT.over(vote, 0)));
 
     // add final join -- joins on first field of each input
     let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])

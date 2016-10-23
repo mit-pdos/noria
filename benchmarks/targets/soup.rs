@@ -33,7 +33,7 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     let vc = g.incorporate(new("votecount",
                                &["id", "votes"],
                                true,
-                               Aggregation::COUNT.new(vote, 0, &[1])));
+                               Aggregation::COUNT.over(vote, 0, &[1])));
 
     // add final join using first field from article and first from vc
     let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
@@ -85,7 +85,7 @@ impl Getter for sync::Arc<Get> {
                              cmp:
                                  shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
                          }]);
-            for row in self(Some(&q)).into_iter() {
+            for row in self(Some(&q)) {
                 match row[1] {
                     DataType::Text(ref s) => {
                         return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));

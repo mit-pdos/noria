@@ -167,7 +167,6 @@ fn main() {
     // start putting
     let mut putter = Some({
         let distribution = distribution.to_owned();
-        let start = start.clone();
         thread::spawn(move || {
             let mut count = 0;
             let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
@@ -236,7 +235,6 @@ fn main() {
         .map(|(i, g)| {
             println!("Starting getter #{}", i);
             let distribution = distribution.to_owned();
-            let start = start.clone();
             thread::spawn(move || {
                 let mut count = 0 as u64;
                 let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
@@ -298,7 +296,7 @@ fn main() {
         // is putter also running?
         putter.join().unwrap();
     }
-    for g in getters.into_iter() {
+    for g in getters {
         g.join().unwrap();
     }
 }
