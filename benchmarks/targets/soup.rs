@@ -1,14 +1,13 @@
 use std::sync;
 
 use distributary::{FlowGraph, new, Query, Base, Aggregation, JoinBuilder, DataType};
-use clocked_dispatch;
 use shortcut;
 
 use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
-type Put = clocked_dispatch::ClockedSender<Vec<DataType>>;
+type Put = Box<Fn(Vec<DataType>) -> i64 + Send + 'static>;
 type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
 type FG<U> = FlowGraph<Query, U, Vec<DataType>>;
 
@@ -65,13 +64,13 @@ impl<U: Send + Clone> Backend for SoupTarget<U> {
 impl Putter for (Put, Put) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
-            self.1.send(vec![id.into(), title.into()]);
+            self.1(vec![id.into(), title.into()]);
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
         Box::new(move |user, id| {
-            self.0.send(vec![user.into(), id.into()]);
+            self.0(vec![user.into(), id.into()]);
         })
     }
 }
