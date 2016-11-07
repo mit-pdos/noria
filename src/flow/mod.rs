@@ -298,6 +298,7 @@ pub struct FlowGraph<Q, U, D>
 
     contexts: HashMap<petgraph::graph::NodeIndex, SharedContext<U>>,
     ts_src: sync::Arc<sync::atomic::AtomicUsize>,
+    named: HashMap<String, petgraph::graph::NodeIndex>,
 }
 
 impl<Q, U, D> FlowGraph<Q, U, D>
@@ -318,12 +319,18 @@ impl<Q, U, D> FlowGraph<Q, U, D>
 
             contexts: HashMap::default(),
             ts_src: sync::Arc::new(sync::atomic::AtomicUsize::new(1)),
+            named: HashMap::default(),
         }
     }
 
     /// Return a reference to the internal graph, as well as the identifier for the root node.
     pub fn graph(&self) -> (&Graph<Q, U, D>, NodeIndex) {
         (&self.graph, self.source)
+    }
+
+    /// Lookup a node index by the node name.
+    pub fn lookup_node(&self, vn: &str) -> petgraph::graph::NodeIndex {
+        self.named[vn]
     }
 
     /// Query all nodes for what indices they believe should be maintained, and apply those to the
@@ -937,9 +944,10 @@ impl<Q, U, D> FlowGraph<Q, U, D>
     pub fn incorporate<V: View<Q, Update = U, Data = D>>(&mut self,
                                                          mut node: V)
                                                          -> petgraph::graph::NodeIndex {
-
         let ancestors = node.prime(&self.graph);
+        let name = String::from(node.name());
         let idx = self.graph.add_node(Some(sync::Arc::new(node)));
+        self.named.insert(String::from(name), idx);
         if ancestors.is_empty() {
             // base record node
             self.graph.add_edge(self.source, idx, ());
