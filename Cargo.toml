@@ -49,6 +49,10 @@ name = "distributary"
 path = "src/lib.rs"
 
 [[bin]]
+name = "jdl2dot"
+path = "src/jdl/jdl2dot.rs"
+
+[[bin]]
 name = "web"
 path = "src/web/main.rs"
 
