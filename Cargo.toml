@@ -8,6 +8,7 @@ web = ["rustful", "rustc-serialize"]
 b_memcached = ["memcache"]
 b_postgresql = ["postgres", "r2d2", "r2d2_postgres"]
 b_netsoup = ["tarpc", "serde", "serde_derive"]
+jdl = ["serde", "serde_derive", "serde_json"]
 
 [dependencies]
 petgraph = "0.2"
@@ -36,6 +37,9 @@ serde_derive = { version = "0.8", optional = true }
 # for web
 rustful = { version = "0.9", optional = true }
 rustc-serialize = { version = "0.3", optional = true }
+
+# for jdl
+serde_json = { version = "0.8", optional = true }
 
 [profile.release]
 debug=true

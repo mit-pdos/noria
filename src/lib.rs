@@ -356,7 +356,7 @@
 #![feature(proc_macro)]
 #![deny(missing_docs)]
 
-#[cfg(feature="b_netsoup")]
+#[cfg(any(feature="b_netsoup", feature="jdl"))]
 #[macro_use]
 extern crate serde_derive;
 
@@ -393,6 +393,10 @@ pub use ops::union::Union;
 pub use ops::latest::Latest;
 pub use query::Query;
 pub use query::DataType;
+
+#[cfg(feature="jdl")]
+/// jdl constructs a Soup graph from a JSON description.
+pub mod jdl;
 
 #[cfg(feature="web")]
 /// web provides a simple REST HTTP server for reading from and writing to the data flow graph.
