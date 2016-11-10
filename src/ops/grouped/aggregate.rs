@@ -64,8 +64,11 @@ impl GroupedOperation for Aggregator {
     type Diff = i64;
 
     fn setup(&mut self, parent: &ops::V) {
-        assert!(self.over < parent.args().len(),
-                "cannot aggregate over non-existing column");
+        match self.op {
+            Aggregation::COUNT => (),
+            _ => assert!(self.over < parent.args().len(),
+                         "cannot aggregate over non-existing column"),
+        }
     }
 
     fn group_by(&self) -> &[usize] {
