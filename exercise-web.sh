@@ -1,18 +1,30 @@
-#!/bin/sh
+#!/usr/bin/env dash
+
+bin=web
+
+while getopts ":j" opt; do
+  case "$opt" in
+    j) bin=web-jdl ;;
+    *) echo "Invalid option '$OPTARG'." >&2; exit 1 ;;
+  esac
+done
+shift $((OPTIND-1))
+
 echo "Build"
-cargo build --bin web --features=web
+cargo build --bin="$bin" --features=web
 res=$?
 if [ "$res" -ne 0 ]; then
 	exit "$res"
 fi
 
 echo "Start"
-cargo run --bin web --features=web >/dev/null &
+cargo run --bin="$bin" --features=web -- "$@" >/dev/null &
 sleep 1
 pid=$(pgrep -f target/debug/web)
-
-# wait for server to be ready
-sleep 1
+if [ $? -ne 0 ]; then
+  echo "unable to find server; assuming it died" >&2
+  exit 1
+fi
 
 echo "Seed"
 put() {
