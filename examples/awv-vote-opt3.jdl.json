@@ -1,0 +1,23 @@
+[
+  { "Base": { "name": "vote", "outputs": [ "user", "id" ] } },
+  {
+    "Group": {
+      "name": "query-0",
+      "from": "vote",
+      "func": "COUNT",
+      "over": null,
+      "by": [ 1 ],
+      "outputs": [ "id", "Count" ]
+    }
+  },
+  { "Base": { "name": "article", "outputs": [ "id", "title" ] } },
+  {
+    "Join": {
+      "name": "awvc",
+      "from": [ "query-0", "article" ],
+      "emit": [ [ 0, 0 ], [ 1, 1 ], [ 0, 1 ] ],
+      "on": [ [ 1 ], [ 1 ] ],
+      "outputs": [ "id", "title", "votes" ]
+    }
+  }
+]

@@ -12,10 +12,10 @@ type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
 type FG<U> = FlowGraph<Query, U, Vec<DataType>>;
 
 pub struct SoupTarget<U: Send + Clone> {
-    vote: Option<Put>,
-    article: Option<Put>,
-    end: sync::Arc<Get>,
-    _g: FG<U>,
+    pub vote: Option<Put>,
+    pub article: Option<Put>,
+    pub end: sync::Arc<Get>,
+    pub _g: FG<U>,
 }
 
 pub fn make(_: &str, _: usize) -> Box<Backend> {

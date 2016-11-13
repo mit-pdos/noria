@@ -51,6 +51,9 @@ EXAMPLES:
 fn main() {
     use clap::{Arg, App};
     let mut backends = vec!["soup"];
+    if cfg!(feature = "jdl") {
+        backends.push("jdl");
+    }
     if cfg!(feature = "b_postgresql") {
         backends.push("postgresql");
     }
@@ -125,6 +128,9 @@ fn main() {
     let mut target: Box<targets::Backend> = match dbn.next().unwrap() {
         // soup://
         "soup" => targets::soup::make(dbn.next().unwrap(), ngetters),
+        // jdl://path.jdl.json
+        #[cfg(feature="jdl")]
+        "jdl" => targets::jdl::make(dbn.next().unwrap(), ngetters),
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_postgresql")]
         "postgresql" => targets::postgres::make(dbn.next().unwrap(), ngetters),

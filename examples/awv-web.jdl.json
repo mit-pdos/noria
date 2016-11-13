@@ -1,0 +1,78 @@
+[
+  { "Base": { "name": "vote", "outputs": [ "id", "user" ] } },
+  {
+    "Group": {
+      "name": "query-0",
+      "from": "vote",
+      "func": "COUNT",
+      "over": null,
+      "by": [ 0 ],
+      "outputs": [ "id", "Count" ]
+    }
+  },
+  {
+    "Identity": {
+      "name": "query-1",
+      "from": "query-0",
+      "emit": [ 1, 0 ],
+      "outputs": [ "votes", "id" ]
+    }
+  },
+  {
+    "Base": {
+      "name": "article",
+      "outputs": [ "id", "user", "title", "url" ]
+    }
+  },
+  {
+    "Join": {
+      "name": "query-2",
+      "from": [ "query-1", "article" ],
+      "emit": [ [ 0, 0 ], [ 0, 1 ], [ 1, 1 ], [ 1, 2 ], [ 1, 3 ] ],
+      "on": [ [ 0, 1 ], [ 1 ] ],
+      "outputs": [ "votes", "id", "user", "title", "url" ]
+    }
+  },
+  {
+    "Group": {
+      "name": "query-3",
+      "from": "query-2",
+      "func": "SUM",
+      "over": 0,
+      "by": [ 2 ],
+      "outputs": [ "user", "Sum(votes)" ]
+    }
+  },
+  {
+    "Identity": {
+      "name": "query-4",
+      "from": "query-3",
+      "emit": [ 0, 1 ],
+      "outputs": [ "user", "votes" ]
+    }
+  },
+  {
+    "Identity": {
+      "name": "karma",
+      "debug_info": "(alias)",
+      "outputs": [ "user", "votes" ],
+      "from": "query-4"
+    }
+  },
+  {
+    "Identity": {
+      "name": "query-5",
+      "from": "query-2",
+      "emit": [ 0, 1, 2, 3, 4 ],
+      "outputs": [ "votes", "id", "user", "title", "url" ]
+    }
+  },
+  {
+    "Identity": {
+      "name": "awvc",
+      "debug_info": "(alias)",
+      "outputs": [ "votes", "id", "user", "title", "url" ],
+      "from": "query-5"
+    }
+  }
+]

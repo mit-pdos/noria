@@ -1,0 +1,39 @@
+[
+  { "Base": { "name": "vote", "outputs": [ "user", "id" ] } },
+  {
+    "Group": {
+      "name": "query-0",
+      "from": "vote",
+      "func": "COUNT",
+      "over": null,
+      "by": [ 1 ],
+      "outputs": [ "id", "Count" ]
+    }
+  },
+  {
+    "Permute": {
+      "name": "query-1",
+      "from": "query-0",
+      "emit": [ 0, 1 ],
+      "outputs": [ "id", "votes" ]
+    }
+  },
+  { "Base": { "name": "article", "outputs": [ "id", "title" ] } },
+  {
+    "Join": {
+      "name": "query-2",
+      "from": [ "query-1", "article" ],
+      "emit": [ [ 0, 0 ], [ 0, 1 ], [ 1, 1 ] ],
+      "on": [ [ 1 ], [ 1 ] ],
+      "outputs": [ "id", "votes", "title" ]
+    }
+  },
+  {
+    "Permute": {
+      "name": "awvc",
+      "from": "query-2",
+      "emit": [ 0, 2, 1 ],
+      "outputs": [ "id", "title", "votes" ]
+    }
+  }
+]
