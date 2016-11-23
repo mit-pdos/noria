@@ -21,10 +21,10 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     // set up graph
     let mut g = Blender::new();
 
-    let mut article = 0.into();
-    let mut vote = 0.into();
-    let mut vc = 0.into();
-    let mut end = 0.into();
+    let article;
+    let vote;
+    let vc;
+    let end;
     let (mut put, mut get) = {
         // migrate
         let mut mig = g.start_migration();
