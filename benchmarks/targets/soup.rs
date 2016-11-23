@@ -1,57 +1,64 @@
 use std::sync;
 
-use distributary::{FlowGraph, new, Query, Base, Aggregation, JoinBuilder, DataType};
+use distributary::{Blender, Query, Base, Aggregation, JoinBuilder, DataType};
 use shortcut;
 
 use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
-type Put = Box<Fn(Vec<DataType>) -> i64 + Send + 'static>;
+type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
-type FG<U> = FlowGraph<Query, U, Vec<DataType>>;
 
-pub struct SoupTarget<U: Send + Clone> {
+pub struct SoupTarget {
     vote: Option<Put>,
     article: Option<Put>,
-    end: sync::Arc<Get>,
-    _g: FG<U>,
+    end: sync::Arc<Option<Get>>,
+    _g: Blender,
 }
 
 pub fn make(_: &str, _: usize) -> Box<Backend> {
     // set up graph
-    let mut g = FlowGraph::new();
+    let mut g = Blender::new();
 
-    // add article base node
-    let article = g.incorporate(new("article", &["id", "title"], true, Base {}));
+    let mut article = 0.into();
+    let mut vote = 0.into();
+    let mut vc = 0.into();
+    let mut end = 0.into();
+    let (mut put, mut get) = {
+        // migrate
+        let mut mig = g.start_migration();
 
-    // add vote base table
-    let vote = g.incorporate(new("vote", &["user", "id"], true, Base {}));
+        // add article base node
+        article = mig.add_ingredient("article", &["id", "title"], Base {});
 
-    // add vote count
-    let vc = g.incorporate(new("votecount",
-                               &["id", "votes"],
-                               true,
-                               Aggregation::COUNT.over(vote, 0, &[1])));
+        // add vote base table
+        vote = mig.add_ingredient("vote", &["user", "id"], Base {});
 
-    // add final join using first field from article and first from vc
-    let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
-        .from(article, vec![1, 0])
-        .join(vc, vec![1, 0]);
-    let end = g.incorporate(new("awvc", &["id", "title", "votes"], true, j));
+        // add vote count
+        vc = mig.add_ingredient("votecount",
+                                &["id", "votes"],
+                                Aggregation::COUNT.over(vote, 0, &[1]));
 
-    // start processing
-    let (mut put, mut get) = g.run(10);
+        // add final join using first field from article and first from vc
+        let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
+            .from(article, vec![1, 0])
+            .join(vc, vec![1, 0]);
+        end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
+
+        // start processing
+        mig.commit()
+    };
 
     Box::new(SoupTarget {
         vote: put.remove(&vote),
         article: put.remove(&article),
-        end: sync::Arc::new(get.remove(&end).unwrap()),
+        end: sync::Arc::new(get.remove(&end)),
         _g: g, // so it's not dropped and waits for threads
     })
 }
 
-impl<U: Send + Clone> Backend for SoupTarget<U> {
+impl Backend for SoupTarget {
     fn getter(&mut self) -> Box<Getter> {
         Box::new(self.end.clone())
     }
@@ -63,33 +70,33 @@ impl<U: Send + Clone> Backend for SoupTarget<U> {
 
 impl Putter for (Put, Put) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
-        Box::new(move |id, title| {
-            self.1(vec![id.into(), title.into()]);
-        })
+        Box::new(move |id, title| { self.1(vec![id.into(), title.into()]); })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| {
-            self.0(vec![user.into(), id.into()]);
-        })
+        Box::new(move |user, id| { self.0(vec![user.into(), id.into()]); })
     }
 }
 
-impl Getter for sync::Arc<Get> {
+impl Getter for sync::Arc<Option<Get>> {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
-            let q = Query::new(&[true, true, true],
-                               vec![shortcut::Condition {
+            if let Some(ref g) = *self.as_ref() {
+                let q = Query::new(&[true, true, true],
+                                   vec![shortcut::Condition {
                              column: 0,
                              cmp:
                                  shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
                          }]);
-            for row in self(Some(&q)) {
-                match row[1] {
-                    DataType::Text(ref s) => {
-                        return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));
+                for row in g(Some(&q)) {
+                    match row[1] {
+                        DataType::Text(ref s) => {
+                            return Some((row[0].clone().into(),
+                                         (**s).clone(),
+                                         row[2].clone().into()));
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
             }
             None
