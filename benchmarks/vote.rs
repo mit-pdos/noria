@@ -256,14 +256,13 @@ fn main() {
                         };
                         let id = std::cmp::min(id, narticles - 1) as i64;
 
-                        if cdf {
-                            let t = time::Instant::now();
-                            get(id);
-                            samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                        } else {
-                            get(id);
+                        let t = time::Instant::now();
+                        if let Some(..) = get(id) {
+                            if cdf {
+                                samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                            }
+                            count += 1;
                         }
-                        count += 1;
 
                         if last_reported.elapsed() > time::Duration::from_secs(1) {
                             let ts = last_reported.elapsed();
