@@ -67,6 +67,10 @@ fn main() {
         .version("0.1")
         .about("Benchmarks user-curated news aggregator throughput for different storage \
                 backends.")
+        .arg(Arg::with_name("avg")
+            .long("avg")
+            .takes_value(false)
+            .help("compute average throughput at the end of benchmark"))
         .arg(Arg::with_name("cdf")
             .short("c")
             .long("cdf")
@@ -109,6 +113,7 @@ fn main() {
         .after_help(BENCH_USAGE)
         .get_matches();
 
+    let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
     let dbn = args.value_of("BACKEND").unwrap();
@@ -167,10 +172,11 @@ fn main() {
     // start putting
     let mut putter = Some({
         let distribution = distribution.to_owned();
-        thread::spawn(move || {
+        thread::spawn(move || -> Vec<f64> {
             let mut count = 0;
             let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
             let mut last_reported = start;
+            let mut throughputs = Vec::new();
 
             let mut t_rng = rand::thread_rng();
             let mut v_rng = Rng::from_seed(42);
@@ -205,6 +211,7 @@ fn main() {
                                          (ts.as_secs() as f64 +
                                           ts.subsec_nanos() as f64 / 1_000_000_000f64);
                         println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
+                        throughputs.push(throughput);
 
                         last_reported = time::Instant::now();
                         count = 0;
@@ -217,6 +224,7 @@ fn main() {
                     println!("percentile PUT {:.2} {:.2}", v, p);
                 }
             }
+            throughputs
         })
     });
 
@@ -235,10 +243,11 @@ fn main() {
         .map(|(i, g)| {
             println!("Starting getter #{}", i);
             let distribution = distribution.to_owned();
-            thread::spawn(move || {
+            thread::spawn(move || -> Vec<f64> {
                 let mut count = 0 as u64;
                 let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
                 let mut last_reported = start;
+                let mut throughputs = Vec::new();
 
                 let mut v_rng = Rng::from_seed(42);
 
@@ -274,6 +283,7 @@ fn main() {
                                      dur_to_ns!(start.elapsed()),
                                      i,
                                      throughput);
+                            throughputs.push(throughput);
 
                             last_reported = time::Instant::now();
                             count = 0;
@@ -286,6 +296,7 @@ fn main() {
                         println!("percentile GET{} {:.2} {:.2}", i, v, p);
                     }
                 }
+                throughputs
             })
         })
         .collect::<Vec<_>>();
@@ -294,9 +305,30 @@ fn main() {
     // clean
     if let Some(putter) = putter {
         // is putter also running?
-        putter.join().unwrap();
+        match putter.join() {
+            Err(e) => panic!(e),
+            Ok(th) => {
+                let sum: f64 = th.iter().sum();
+                println!("avg PUT: {:.2}", sum / th.len() as f64);
+            }
+        }
     }
+    let mut get_throughputs = Vec::new();
     for g in getters {
-        g.join().unwrap();
+        match g.join() {
+            Err(e) => panic!(e),
+            Ok(th) => get_throughputs.push(th),
+        }
+    }
+    if avg {
+        let mut thread_avgs = Vec::new();
+        for (i, v) in get_throughputs.iter().enumerate() {
+            let sum: f64 = v.iter().sum();
+            let avg: f64 = sum / v.len() as f64;
+            println!("avg GET{}: {:.2}", i, avg);
+            thread_avgs.push(avg);
+        }
+        let sum: f64 = thread_avgs.iter().sum();
+        println!("avg GET: {:.2}", sum / thread_avgs.len() as f64);
     }
 }
