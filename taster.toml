@@ -1,9 +1,9 @@
 [vote-uniform]
 command = "run"
-args = ["--release", "--bin", "vote", "--", "--distribution=uniform", "--articles=100000", "--runtime=70", "soup://"]
+args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=uniform", "--articles=100000", "--runtime=70", "soup://"]
 regexs = ["avg (GET: [0-9.]+)", "avg (PUT: [0-9.]+)"]
 
 [vote-zipf]
 command = "run"
-args = ["--release", "--bin", "vote", "--", "--distribution=zipf", "--articles=100000", "--runtime=70", "soup://"]
+args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=zipf", "--articles=100000", "--runtime=70", "soup://"]
 regexs = ["avg (GET: [0-9.]+)", "avg (PUT: [0-9.]+)"]
