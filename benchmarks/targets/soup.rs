@@ -91,7 +91,7 @@ impl Getter for sync::Arc<Option<Get>> {
                                    vec![shortcut::Condition {
                              column: 0,
                              cmp:
-                                 shortcut::Comparison::Equal(shortcut::Value::Const(id.into())),
+                                 shortcut::Comparison::Equal(shortcut::Value::new(DataType::from(id))),
                          }]);
                 for row in g(Some(&q)) {
                     match row[1] {
