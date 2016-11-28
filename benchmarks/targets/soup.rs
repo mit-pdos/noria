@@ -46,6 +46,11 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
             .join(vc, vec![1, 0]);
         end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
+        // let d = mig.add_domain();
+        // mig.assign_domain(article, d);
+        // mig.assign_domain(end, d);
+        // mig.assign_domain(vc, d);
+
         // start processing
         mig.commit()
     };
