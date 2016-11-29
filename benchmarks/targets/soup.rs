@@ -46,12 +46,16 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
             .join(vc, vec![1, 0]);
         end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
-        // let d = mig.add_domain();
-        // mig.assign_domain(article, d);
-        // mig.assign_domain(end, d);
-        // mig.assign_domain(vc, d);
-
-        let endq = mig.maintain(end);
+        let endq = if cfg!(feature = "rtm") {
+            let d = mig.add_domain();
+            mig.assign_domain(article, d);
+            mig.assign_domain(vote, d);
+            mig.assign_domain(end, d);
+            mig.assign_domain(vc, d);
+            None
+        } else {
+            Some(mig.maintain(end))
+        };
 
         // start processing
         (mig.commit(), endq)
@@ -60,7 +64,7 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     Box::new(SoupTarget {
         vote: put.remove(&vote),
         article: put.remove(&article),
-        end: sync::Arc::new(Some(endq)),
+        end: sync::Arc::new(endq),
         _g: g, // so it's not dropped and waits for threads
     })
 }
