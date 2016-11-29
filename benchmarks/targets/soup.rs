@@ -99,16 +99,14 @@ impl Getter for sync::Arc<Option<Get>> {
                              cmp:
                                  shortcut::Comparison::Equal(shortcut::Value::new(DataType::from(id))),
                          }]);
-                for row in g(Some(&q)) {
-                    match row[1] {
-                        DataType::Text(ref s) => {
-                            return Some((row[0].clone().into(),
-                                         (**s).clone(),
-                                         row[2].clone().into()));
-                        }
-                        _ => unreachable!(),
-                    }
-                }
+
+                let mut rows = g(Some(&q)).into_iter();
+                // we only care about the first result
+                let mut row = rows.next().unwrap().into_iter();
+                let id: i64 = row.next().unwrap().into();
+                let title: String = row.next().unwrap().into();
+                let count: i64 = row.next().unwrap().into();
+                return Some((id, title, count));
             }
             None
         })
