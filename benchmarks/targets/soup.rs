@@ -25,7 +25,7 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     let vote;
     let vc;
     let end;
-    let (mut put, mut get) = {
+    let (mut put, endq) = {
         // migrate
         let mut mig = g.start_migration();
 
@@ -51,14 +51,16 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
         // mig.assign_domain(end, d);
         // mig.assign_domain(vc, d);
 
+        let endq = mig.maintain(end);
+
         // start processing
-        mig.commit()
+        (mig.commit(), endq)
     };
 
     Box::new(SoupTarget {
         vote: put.remove(&vote),
         article: put.remove(&article),
-        end: sync::Arc::new(get.remove(&end)),
+        end: sync::Arc::new(Some(endq)),
         _g: g, // so it's not dropped and waits for threads
     })
 }
