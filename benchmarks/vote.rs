@@ -192,7 +192,10 @@ fn main() {
                     if cdf {
                         let t = time::Instant::now();
                         vote(vote_user, vote_rnd_id);
-                        samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                        let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                        if samples.record(t).is_err() {
+                            println!("failed to record slow put ({}ns)", t);
+                        }
                     } else {
                         vote(vote_user, vote_rnd_id);
                     }
