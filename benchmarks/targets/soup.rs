@@ -100,15 +100,17 @@ impl Getter for sync::Arc<Option<Get>> {
                                  shortcut::Comparison::Equal(shortcut::Value::new(DataType::from(id))),
                          }]);
 
-                let mut rows = g(Some(&q)).into_iter();
-                // we only care about the first result
-                let mut row = rows.next().unwrap().into_iter();
-                let id: i64 = row.next().unwrap().into();
-                let title: String = row.next().unwrap().into();
-                let count: i64 = row.next().unwrap().into();
-                return Some((id, title, count));
+                g(Some(&q)).into_iter().next().map(|row| {
+                    // we only care about the first result
+                    let mut row = row.into_iter();
+                    let id: i64 = row.next().unwrap().into();
+                    let title: String = row.next().unwrap().into();
+                    let count: i64 = row.next().unwrap().into();
+                    (id, title, count)
+                })
+            } else {
+                None
             }
-            None
         })
     }
 }
