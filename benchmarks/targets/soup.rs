@@ -109,6 +109,10 @@ impl Getter for sync::Arc<Option<Get>> {
                     (id, title, count)
                 })
             } else {
+                use std::time::Duration;
+                use std::thread;
+                // avoid spinning
+                thread::sleep(Duration::from_secs(1));
                 None
             }
         })
