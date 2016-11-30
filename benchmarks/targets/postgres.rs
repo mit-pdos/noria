@@ -66,9 +66,7 @@ impl Backend for r2d2::Pool<PCM> {
 impl Putter for PC {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         let prep = self.prepare("INSERT INTO art (id, title, votes) VALUES ($1, $2, 0)").unwrap();
-        Box::new(move |id, title| {
-            prep.execute(&[&id, &title]).unwrap();
-        })
+        Box::new(move |id, title| { prep.execute(&[&id, &title]).unwrap(); })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
