@@ -228,9 +228,19 @@ fn main() {
         })
     });
 
+    let avg_put_throughput = |th: Vec<f64>| {
+        if avg {
+            let sum: f64 = th.iter().sum();
+            println!("avg PUT: {:.2}", sum / th.len() as f64);
+        }
+    };
+
     if stage {
         println!("Waiting for putter before starting getters");
-        putter.take().unwrap().join().unwrap();
+        match putter.take().unwrap().join() {
+            Err(e) => panic!(e),
+            Ok(th) => avg_put_throughput(th),
+        }
         // avoid getters stopping immediately
         runtime *= 2;
     }
@@ -307,10 +317,7 @@ fn main() {
         // is putter also running?
         match putter.join() {
             Err(e) => panic!(e),
-            Ok(th) => {
-                let sum: f64 = th.iter().sum();
-                println!("avg PUT: {:.2}", sum / th.len() as f64);
-            }
+            Ok(th) => avg_put_throughput(th),
         }
     }
     let mut get_throughputs = Vec::new();
