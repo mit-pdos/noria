@@ -1,14 +1,13 @@
 use std::sync;
 
-use distributary::{Blender, Query, Base, Aggregation, JoinBuilder, DataType};
-use shortcut;
+use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
 
 use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
-type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
+type Get = Box<Fn(&DataType) -> Vec<Vec<DataType>> + Send + Sync>;
 
 pub struct SoupTarget {
     vote: Option<Put>,
@@ -57,7 +56,7 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
         let endq = if cfg!(feature = "rtm") {
             None
         } else {
-            Some(mig.maintain(end))
+            Some(mig.maintain(end, 0))
         };
 
         // start processing
@@ -96,14 +95,8 @@ impl Getter for sync::Arc<Option<Get>> {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
-                let q = Query::new(&[true, true, true],
-                                   vec![shortcut::Condition {
-                             column: 0,
-                             cmp:
-                                 shortcut::Comparison::Equal(shortcut::Value::new(DataType::from(id))),
-                         }]);
-
-                g(Some(&q)).into_iter().next().map(|row| {
+                let id = id.into();
+                g(&id).into_iter().next().map(|row| {
                     // we only care about the first result
                     let mut row = row.into_iter();
                     let id: i64 = row.next().unwrap().into();

@@ -13,7 +13,6 @@ extern crate r2d2_postgres;
 
 extern crate clocked_dispatch;
 extern crate distributary;
-extern crate shortcut;
 
 #[cfg(feature="b_netsoup")]
 extern crate tarpc;
@@ -231,11 +230,9 @@ fn main() {
         })
     });
 
-    let avg_put_throughput = |th: Vec<f64>| {
-        if avg {
-            let sum: f64 = th.iter().sum();
-            println!("avg PUT: {:.2}", sum / th.len() as f64);
-        }
+    let avg_put_throughput = |th: Vec<f64>| if avg {
+        let sum: f64 = th.iter().sum();
+        println!("avg PUT: {:.2}", sum / th.len() as f64);
     };
 
     if stage {
