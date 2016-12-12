@@ -294,7 +294,9 @@ fn main() {
                                         committed += 1
                                     }
                                     TransactionResult::Aborted => {
-                                        println!("abort");
+                                        if verbose {
+                                            println!("abort");
+                                        }
                                         aborted += 1
                                     }
                                 }
