@@ -272,13 +272,15 @@ fn main() {
                     let (balance1, token1) = get(first_pair.0).unwrap();
                     let (balance2, token2) = get(second_pair.0).unwrap();
                     if verbose {
-                        println!("read1 {}: {} (for {})",
+                        println!("read1 {}: {} @ {:#?} (for {})",
                                  first_pair.0,
                                  balance1,
+                                 token1,
                                  first_pair.1);
-                        println!("read2 {}: {} (for {})",
+                        println!("read2 {}: {} @ {:#?} (for {})",
                                  second_pair.0,
                                  balance2,
+                                 token2,
                                  second_pair.1);
                     }
 
@@ -287,9 +289,9 @@ fn main() {
                         let mut do_tx = |src, dst, amt, tkn| {
                             let mut count_result = |res| {
                                 match res {
-                                    TransactionResult::Committed(_) => {
+                                    TransactionResult::Committed(ts) => {
                                         if verbose {
-                                            println!("commit");
+                                            println!("commit @ {}", ts);
                                         }
                                         committed += 1
                                     }
