@@ -64,8 +64,8 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
     };
 
     Box::new(SoupTarget {
-        vote: put.remove(&vote),
-        article: put.remove(&article),
+        vote: put.remove(&vote).map(|x| x.0),
+        article: put.remove(&article).map(|x| x.0),
         end: sync::Arc::new(endq),
         _g: g, // so it's not dropped and waits for threads
     })
