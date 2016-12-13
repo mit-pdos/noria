@@ -6,7 +6,6 @@ extern crate randomkit;
 
 extern crate clocked_dispatch;
 extern crate distributary;
-extern crate shortcut;
 
 use randomkit::{Rng, Sample};
 use randomkit::dist::{Uniform, Zipf};
@@ -14,7 +13,7 @@ use std::sync;
 use std::thread;
 use std::time;
 
-use distributary::{Blender, Query, Base, Aggregation, JoinBuilder, DataType, Token,
+use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token,
                    TransactionResult};
 
 extern crate hdrsample;
@@ -22,8 +21,8 @@ use hdrsample::Histogram;
 
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type TxPut = Box<Fn(Vec<DataType>, Token) -> TransactionResult + Send + 'static>;
-type Get = Box<Fn(Option<&Query>) -> Vec<Vec<DataType>> + Send + Sync>;
-type TxGet = Box<Fn(Option<&Query>) -> (Vec<Vec<DataType>>, Token) + Send + Sync>;
+type Get = Box<Fn(&DataType) -> Datas + Send + Sync>;
+type TxGet = Box<Fn(&DataType) -> (Datas, Token) + Send + Sync>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -64,13 +63,13 @@ pub fn setup() -> Box<Bank> {
         debits = mig.add_ingredient("debits",
                                     &["acct_id", "total"],
                                     Aggregation::SUM.over(transfers, 2, &[0]));
-        mig.maintain(debits);
+        mig.maintain(debits, 0);
 
         // add all credits
         credits = mig.add_ingredient("credits",
                                      &["acct_id", "total"],
                                      Aggregation::SUM.over(transfers, 2, &[1]));
-        mig.maintain(credits);
+        mig.maintain(credits, 0);
 
         // add join of credits and debits; this is a hack as we don't currently have multi-parent
         // aggregations or arithmetic on columns.
@@ -78,7 +77,7 @@ pub fn setup() -> Box<Bank> {
             .from(credits, vec![1, 0])
             .join(debits, vec![1, 0]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        let balancesq = Some(mig.transactional_maintain(balances));
+        let balancesq = Some(mig.transactional_maintain(balances, 0));
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
@@ -128,13 +127,7 @@ impl Getter for sync::Arc<Option<TxGet>> {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, Token)> + 'a> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
-                let q = Query::new(&[true, true, true],
-                                   vec![shortcut::Condition {
-                             column: 0,
-                             cmp:
-                                 shortcut::Comparison::Equal(shortcut::Value::new(DataType::from(id))),
-                         }]);
-                let (res, token) = g(Some(&q));
+                let (res, token) = g(&id.into());
                 res.into_iter().next().map(|row| {
                     // we only care about the first result
                     let mut row = row.into_iter();
