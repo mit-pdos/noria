@@ -128,6 +128,7 @@ impl Getter for sync::Arc<Option<TxGet>> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
                 let (res, token) = g(&id.into());
+                assert_eq!(res.len(), 1);
                 res.into_iter().next().map(|row| {
                     // we only care about the first result
                     let mut row = row.into_iter();
