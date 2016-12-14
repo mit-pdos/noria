@@ -63,13 +63,11 @@ pub fn setup() -> Box<Bank> {
         debits = mig.add_ingredient("debits",
                                     &["acct_id", "total"],
                                     Aggregation::SUM.over(transfers, 2, &[0]));
-        mig.maintain(debits, 0);
 
         // add all credits
         credits = mig.add_ingredient("credits",
                                      &["acct_id", "total"],
                                      Aggregation::SUM.over(transfers, 2, &[1]));
-        mig.maintain(credits, 0);
 
         // add join of credits and debits; this is a hack as we don't currently have multi-parent
         // aggregations or arithmetic on columns.
