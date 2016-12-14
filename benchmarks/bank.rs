@@ -248,9 +248,12 @@ fn main() {
 
                 let mut sample_pair = || -> (i64, i64) {
                     let dst_acct_rnd_id = sample(&*distribution);
-                    let dst_acct_rnd_id = std::cmp::min(dst_acct_rnd_id, naccounts - 1) as i64;
                     assert!(dst_acct_rnd_id > 0);
-                    let src_acct_rnd_id = sample(&*distribution);
+                    let mut src_acct_rnd_id = sample(&*distribution);
+                    while src_acct_rnd_id == dst_acct_rnd_id {
+                        src_acct_rnd_id = sample(&*distribution);
+                    }
+                    let dst_acct_rnd_id = std::cmp::min(dst_acct_rnd_id, naccounts - 1) as i64;
                     let src_acct_rnd_id = std::cmp::min(src_acct_rnd_id, naccounts - 1) as i64;
                     assert!(src_acct_rnd_id > 0);
                     (src_acct_rnd_id, dst_acct_rnd_id)
