@@ -12,3 +12,8 @@ regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 command = "run"
 args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=zipf", "--articles=100000", "--stage", "--runtime=30", "soup://"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
+
+[tx-bank]
+command = "run"
+args = ["--release", "--bin", "bank", "--", "--avg", "--distribution=uniform", "--accounts=5", "--runtime=30"]
+regexs = ["(avg PUT): ([0-9.]+)"]
