@@ -280,20 +280,18 @@ fn main() {
                     // try to make both transfers
                     {
                         let mut do_tx = |src, dst, amt, tkn| {
-                            let mut count_result = |res| {
-                                match res {
-                                    TransactionResult::Committed(ts) => {
-                                        if verbose {
-                                            println!("commit @ {}", ts);
-                                        }
-                                        committed += 1
+                            let mut count_result = |res| match res {
+                                TransactionResult::Committed(ts) => {
+                                    if verbose {
+                                        println!("commit @ {}", ts);
                                     }
-                                    TransactionResult::Aborted => {
-                                        if verbose {
-                                            println!("abort");
-                                        }
-                                        aborted += 1
+                                    committed += 1
+                                }
+                                TransactionResult::Aborted => {
+                                    if verbose {
+                                        println!("abort");
                                     }
+                                    aborted += 1
                                 }
                             };
 
@@ -363,11 +361,9 @@ fn main() {
         })
     });
 
-    let avg_put_throughput = |th: Vec<f64>| {
-        if avg {
-            let sum: f64 = th.iter().sum();
-            println!("avg PUT: {:.2}", sum / th.len() as f64);
-        }
+    let avg_put_throughput = |th: Vec<f64>| if avg {
+        let sum: f64 = th.iter().sum();
+        println!("avg PUT: {:.2}", sum / th.len() as f64);
     };
 
     // clean
