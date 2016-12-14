@@ -39,7 +39,6 @@ EXAMPLES:
 
 pub struct Bank {
     transfers: Option<TxPut>,
-    transfers_notx: Option<Put>,
     balances: sync::Arc<Option<TxGet>>,
     _g: Blender,
 }
@@ -90,7 +89,6 @@ pub fn setup() -> Box<Bank> {
     let putters = put.remove(&transfers).unwrap();
     Box::new(Bank {
         transfers: Some(putters.1),
-        transfers_notx: Some(putters.0),
         balances: sync::Arc::new(balancesq),
         _g: g, // so it's not dropped and waits for threads
     })
@@ -203,13 +201,11 @@ fn main() {
     println!("Connected. Setting up {} accounts.", naccounts);
     {
         // let accounts_put = bank.accounts.as_ref().unwrap();
-        let money_put = bank.transfers_notx.as_ref().unwrap();
+        let mut money_put = transfers_put.transfer();
         for i in 0..naccounts {
             // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
-            money_put(vec![DataType::Number(0),
-                           DataType::Number(i as i64),
-                           DataType::Number(1000)]);
-            money_put(vec![DataType::Number(i as i64), DataType::Number(0), DataType::Number(1)]);
+            money_put(0, i as i64, 1000, Token::empty());
+            money_put(i as i64, 0, 1, Token::empty());
         }
     }
     println!("Done with account creation");
