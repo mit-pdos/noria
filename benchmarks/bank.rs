@@ -13,6 +13,8 @@ use std::sync;
 use std::thread;
 use std::time;
 
+use std::collections::HashMap;
+
 use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token,
                    TransactionResult};
 
@@ -181,6 +183,11 @@ fn main() {
             .long("verbose")
             .takes_value(false)
             .help("Verbose (debugging) output"))
+        .arg(Arg::with_name("audit")
+            .short("A")
+            .long("audit")
+            .takes_value(false)
+            .help("Audit results after benchmark completes"))
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -190,6 +197,7 @@ fn main() {
     let naccounts = value_t_or_exit!(args, "naccounts", isize);
     let distribution = args.value_of("distribution").unwrap();
     let verbose = args.is_present("verbose");
+    let audit = args.is_present("audit");
 
     // setup db
     println!("Attempting to set up bank");
@@ -211,8 +219,10 @@ fn main() {
     println!("Done with account creation");
 
     // let system settle
-    thread::sleep(time::Duration::new(1, 0));
+    // thread::sleep(time::Duration::new(1, 0));
     let start = time::Instant::now();
+
+    let mut transactions = vec![];
 
     // benchmark
     let client = Some({
@@ -283,6 +293,9 @@ fn main() {
                                     if verbose {
                                         println!("commit @ {}", ts);
                                     }
+                                    if audit {
+                                        transactions.push((src, dst, amt));
+                                    }
                                     committed += 1
                                 }
                                 TransactionResult::Aborted => {
@@ -347,6 +360,27 @@ fn main() {
                         committed = 0;
                         aborted = 0;
                     }
+                }
+
+                if audit {
+                    let mut target_balances = HashMap::new();
+                    for i in 0..naccounts {
+                        target_balances.insert(i as i64, 0);
+                    }
+                    for i in 0i64..(naccounts as i64) {
+                        *target_balances.get_mut(&0).unwrap() -= 999;
+                        *target_balances.get_mut(&i).unwrap() += 999;
+                    }
+
+                    for (src, dst, amt) in transactions {
+                        *target_balances.get_mut(&src).unwrap() -= amt;
+                        *target_balances.get_mut(&dst).unwrap() += amt;
+                    }
+
+                    for (account, balance) in target_balances {
+                        assert_eq!(get(account).unwrap().0, balance);
+                    }
+                    println!("Audit found no irregularities");
                 }
             }
 
