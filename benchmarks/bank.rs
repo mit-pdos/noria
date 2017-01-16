@@ -4,7 +4,6 @@ extern crate clap;
 extern crate rand;
 extern crate randomkit;
 
-extern crate clocked_dispatch;
 extern crate distributary;
 
 use randomkit::{Rng, Sample};
