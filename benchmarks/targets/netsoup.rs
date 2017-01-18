@@ -1,5 +1,5 @@
 use distributary::srv;
-use distributary::{FlowGraph, new, Base, Aggregation, JoinBuilder, DataType};
+use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
 use tarpc;
 
 use targets::Backend;
@@ -16,31 +16,39 @@ pub struct SoupTarget<D: tarpc::transport::Dialer> {
 
 pub fn make(addr: &str, _: usize) -> Box<Backend> {
     // set up graph
-    let mut g = FlowGraph::new();
+    let mut g = Blender::new();
 
-    // add article base node
-    let article = g.incorporate(new("article", &["id", "title"], true, Base {}));
+    let (article, vote, end) = {
+        let mut mig = g.start_migration();
 
-    // add vote base table
-    let vote = g.incorporate(new("vote", &["user", "id"], true, Base {}));
+        // add article base node
+        let article = mig.add_ingredient("article", &["id", "title"], Base {});
 
-    // add vote count
-    let vc = g.incorporate(new("vc",
-                               &["id", "votes"],
-                               true,
-                               Aggregation::COUNT.over(vote, 0, &[1])));
+        // add vote base table
+        let vote = mig.add_ingredient("vote", &["user", "id"], Base {});
 
-    // add final join -- joins on first field of each input
-    let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
-        .from(article, vec![1, 0])
-        .join(vc, vec![1, 0]);
-    let end = g.incorporate(new("awvc", &["id", "title", "votes"], true, j));
+        // add vote count
+        let vc = mig.add_ingredient("vc",
+                                    &["id", "votes"],
+                                    Aggregation::COUNT.over(vote, 0, &[1]));
+
+        // add final join -- joins on first field of each input
+        let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
+            .from(article, vec![1, 0])
+            .join(vc, vec![1, 0]);
+        let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
+
+        mig.maintain(end, 0);
+        mig.commit();
+
+        (article, vote, end)
+    };
 
     // start processing
     Box::new(SoupTarget {
-        vote: vote.index(),
-        article: article.index(),
-        end: end.index(),
+        vote: vote.into(),
+        article: article.into(),
+        end: end.into(),
         addr: addr.to_owned(),
         _srv: srv::run(g, addr),
     })
@@ -64,16 +72,14 @@ impl Putter for (srv::ext::Client, usize, usize) {
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| {
-            self.0.insert(self.1, vec![user.into(), id.into()]).unwrap();
-        })
+        Box::new(move |user, id| { self.0.insert(self.1, vec![user.into(), id.into()]).unwrap(); })
     }
 }
 
 impl Getter for (srv::ext::Client, usize) {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
         Box::new(move |id| {
-            for row in self.0.query(self.1, Some(vec![Some(id.into())])).unwrap().into_iter() {
+            for row in self.0.query(self.1, id.into()).unwrap().into_iter() {
                 match row[1] {
                     DataType::Text(ref s) => {
                         return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));
