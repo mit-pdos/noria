@@ -20,8 +20,10 @@ use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Tok
 extern crate hdrsample;
 use hdrsample::Histogram;
 
+#[allow(dead_code)]
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type TxPut = Box<Fn(Vec<DataType>, Token) -> TransactionResult + Send + 'static>;
+#[allow(dead_code)]
 type Get = Box<Fn(&DataType) -> Datas + Send + Sync>;
 type TxGet = Box<Fn(&DataType) -> (Datas, Token) + Send + Sync>;
 
