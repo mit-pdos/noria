@@ -11,7 +11,6 @@ extern crate r2d2;
 #[cfg(feature="b_postgresql")]
 extern crate r2d2_postgres;
 
-extern crate clocked_dispatch;
 extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
