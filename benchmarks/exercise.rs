@@ -90,9 +90,13 @@ fn driver<I, F>(start: time::Instant, config: RuntimeConfig, init: I, desc: Stri
             let uid = t_rng.gen::<i64>();
 
             // what article to vote for/retrieve?
+            // note that we always *compute* both so that zipf and uniform performance numbers are
+            // more directly comparable (zipf takes longer to generate).
+            let u = uniform_dist.sample(&mut v_rng) as isize;
+            let z = zipf_dist.sample(&mut v_rng) as isize;
             let aid = match config.distribution {
-                Distribution::Uniform => uniform_dist.sample(&mut v_rng) as isize,
-                Distribution::Zipf => zipf_dist.sample(&mut v_rng) as isize,
+                Distribution::Uniform => u,
+                Distribution::Zipf => z,
             };
             let aid = std::cmp::min(aid, config.narticles - 1) as i64;
             assert!(aid > 0);
