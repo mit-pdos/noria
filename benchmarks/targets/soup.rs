@@ -16,7 +16,7 @@ pub struct SoupTarget {
     _g: Blender,
 }
 
-pub fn make(_: &str, _: usize) -> Box<Backend> {
+pub fn make(_: &str, _: usize) -> SoupTarget {
     // set up graph
     let mut g = Blender::new();
 
@@ -63,21 +63,28 @@ pub fn make(_: &str, _: usize) -> Box<Backend> {
         (mig.commit(), endq)
     };
 
-    Box::new(SoupTarget {
+    SoupTarget {
         vote: put.remove(&vote).map(|x| x.0),
         article: put.remove(&article).map(|x| x.0),
         end: sync::Arc::new(endq),
         _g: g, // so it's not dropped and waits for threads
-    })
+    }
 }
 
 impl Backend for SoupTarget {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.end.clone())
+    type P = (Put, Put);
+    type G = sync::Arc<Option<Get>>;
+
+    fn getter(&mut self) -> Self::G {
+        self.end.clone()
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new((self.vote.take().unwrap(), self.article.take().unwrap()))
+    fn putter(&mut self) -> Self::P {
+        (self.vote.take().unwrap(), self.article.take().unwrap())
+    }
+
+    fn migrate(&mut self) -> (Self::P, Self::G) {
+        unimplemented!()
     }
 }
 

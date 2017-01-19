@@ -9,7 +9,7 @@ use targets::Getter;
 type PCM = PostgresConnectionManager;
 type PC = r2d2::PooledConnection<PCM>;
 
-pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
+pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<PCM> {
     use std::time;
     use postgres::IntoConnectParams;
 
@@ -50,16 +50,23 @@ pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
     conn.execute("CREATE INDEX ON art (id)", &[]).unwrap();
     conn.execute("CREATE INDEX ON vt (id)", &[]).unwrap();
 
-    Box::new(pool)
+    pool
 }
 
 impl Backend for r2d2::Pool<PCM> {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.clone().get().unwrap())
+    type P = PC;
+    type G = PC;
+
+    fn getter(&mut self) -> Self::G {
+        self.clone().get().unwrap()
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.clone().get().unwrap())
+    fn putter(&mut self) -> Self::P {
+        self.clone().get().unwrap()
+    }
+
+    fn migrate(&mut self) -> (Self::P, Self::G) {
+        unimplemented!()
     }
 }
 

@@ -19,24 +19,12 @@ extern crate tarpc;
 #[cfg(feature="b_memcached")]
 extern crate memcache;
 
-mod targets;
-
-use rand::Rng as StdRng;
-use randomkit::{Rng, Sample};
-use randomkit::dist::{Uniform, Zipf};
-use std::thread;
-use std::time;
-
 extern crate hdrsample;
-use hdrsample::Histogram;
 
-const NANOS_PER_SEC: u64 = 1_000_000_000;
-macro_rules! dur_to_ns {
-    ($d:expr) => {{
-        let d = $d;
-        d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
-    }}
-}
+mod targets;
+mod exercise;
+
+use std::time;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const BENCH_USAGE: &'static str = "\
@@ -115,28 +103,44 @@ fn main() {
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
     let dbn = args.value_of("BACKEND").unwrap();
-    let mut runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let distribution = args.value_of("distribution").unwrap();
     assert!(ngetters > 0);
     assert!(!dbn.is_empty());
 
+    let mut config = exercise::RuntimeConfig::new(ngetters, narticles, runtime);
+    config.produce_cdf(cdf);
+    config.set_distribution(distribution.into());
+    if stage {
+        config.put_then_get();
+    }
+
     // setup db
     println!("Attempting to connect to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
-    let mut target: Box<targets::Backend> = match dbn.next().unwrap() {
+    let (put_throughput, get_throughputs) = match dbn.next().unwrap() {
         // soup://
-        "soup" => targets::soup::make(dbn.next().unwrap(), ngetters),
+        "soup" => exercise::launch(targets::soup::make(dbn.next().unwrap(), ngetters), config),
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_postgresql")]
-        "postgresql" => targets::postgres::make(dbn.next().unwrap(), ngetters),
+        "postgresql" => {
+            exercise::launch(targets::postgres::make(dbn.next().unwrap(), ngetters),
+                             config)
+        }
         // memcached://127.0.0.1:11211
         #[cfg(feature="b_memcached")]
-        "memcached" => targets::memcached::make(dbn.next().unwrap(), ngetters),
+        "memcached" => {
+            exercise::launch(targets::memcached::make(dbn.next().unwrap(), ngetters),
+                             config)
+        }
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
-        "netsoup" => targets::netsoup::make(dbn.next().unwrap(), ngetters),
+        "netsoup" => {
+            exercise::launch(targets::netsoup::make(dbn.next().unwrap(), ngetters),
+                             config)
+        }
         // garbage
         t => {
             panic!("backend not supported -- make sure you compiled with --features b_{}",
@@ -144,187 +148,9 @@ fn main() {
         }
     };
 
-    // prepopulate
-    println!("Connected. Now retrieving putter for prepopulation.");
-    let mut putter = target.putter();
-    {
-        let mut article = putter.article();
+    let sum: f64 = put_throughput.iter().sum();
+    println!("avg PUT: {:.2}", sum / put_throughput.len() as f64);
 
-        // prepopulate
-        println!("Prepopulating with {} articles", narticles);
-        {
-            // let t = putter.transaction().unwrap();
-            for i in 0..narticles {
-                article(i as i64, format!("Article #{}", i));
-            }
-            // t.commit().unwrap();
-        }
-        println!("Done with prepopulation");
-    }
-
-    // let system settle
-    thread::sleep(time::Duration::new(1, 0));
-    let start = time::Instant::now();
-
-    // benchmark
-    // start putting
-    let mut putter = Some({
-        let distribution = distribution.to_owned();
-        thread::spawn(move || -> Vec<f64> {
-            let mut count = 0;
-            let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
-            let mut last_reported = start;
-            let mut throughputs = Vec::new();
-
-            let mut t_rng = rand::thread_rng();
-            let mut v_rng = Rng::from_seed(42);
-            let zipf_dist = Zipf::new(1.07).unwrap();
-
-            {
-                let mut vote = putter.vote();
-                while start.elapsed() < runtime {
-                    let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
-                    let vote_user = t_rng.gen::<i64>();
-                    let vote_rnd_id = match &*distribution {
-                        "uniform" => uniform_dist.sample(&mut v_rng) as isize,
-                        "zipf" => zipf_dist.sample(&mut v_rng) as isize,
-                        _ => panic!("unknown vote distribution {}!", distribution),
-                    };
-                    let vote_rnd_id = std::cmp::min(vote_rnd_id, narticles - 1) as i64;
-                    assert!(vote_rnd_id > 0);
-
-                    if cdf {
-                        let t = time::Instant::now();
-                        vote(vote_user, vote_rnd_id);
-                        let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                        if samples.record(t).is_err() {
-                            println!("failed to record slow put ({}ns)", t);
-                        }
-                    } else {
-                        vote(vote_user, vote_rnd_id);
-                    }
-                    count += 1;
-
-                    // check if we should report
-                    if last_reported.elapsed() > time::Duration::from_secs(1) {
-                        let ts = last_reported.elapsed();
-                        let throughput = count as f64 /
-                                         (ts.as_secs() as f64 +
-                                          ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                        println!("{:?} PUT: {:.2}", dur_to_ns!(start.elapsed()), throughput);
-                        throughputs.push(throughput);
-
-                        last_reported = time::Instant::now();
-                        count = 0;
-                    }
-                }
-            }
-
-            if cdf {
-                for (v, p, _, _) in samples.iter_percentiles(1) {
-                    println!("percentile PUT {:.2} {:.2}", v, p);
-                }
-            }
-            throughputs
-        })
-    });
-
-    let avg_put_throughput = |th: Vec<f64>| if avg {
-        let sum: f64 = th.iter().sum();
-        println!("avg PUT: {:.2}", sum / th.len() as f64);
-    };
-
-    if stage {
-        println!("Waiting for putter before starting getters");
-        match putter.take().unwrap().join() {
-            Err(e) => panic!(e),
-            Ok(th) => avg_put_throughput(th),
-        }
-        // avoid getters stopping immediately
-        runtime *= 2;
-    }
-
-    // start getters
-    println!("Starting {} getters", ngetters);
-    let getters = (0..ngetters)
-        .into_iter()
-        .map(|i| (i, target.getter()))
-        .map(|(i, g)| {
-            println!("Starting getter #{}", i);
-            let distribution = distribution.to_owned();
-            thread::spawn(move || -> Vec<f64> {
-                let mut count = 0 as u64;
-                let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
-                let mut last_reported = start;
-                let mut throughputs = Vec::new();
-
-                let mut v_rng = Rng::from_seed(42);
-
-                let zipf_dist = Zipf::new(1.07).unwrap();
-                let uniform_dist = Uniform::new(1.0, narticles as f64).unwrap();
-
-                {
-                    let mut get = g.get();
-                    while start.elapsed() < runtime {
-                        // what article to vote for?
-                        let id = match &*distribution {
-                            "uniform" => uniform_dist.sample(&mut v_rng) as isize,
-                            "zipf" => zipf_dist.sample(&mut v_rng) as isize,
-                            _ => panic!("unknown vote distribution {}!", distribution),
-                        };
-                        let id = std::cmp::min(id, narticles - 1) as i64;
-
-                        let t = time::Instant::now();
-                        if let Some(..) = get(id) {
-                            if cdf {
-                                samples += (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                            }
-                            count += 1;
-                        }
-
-                        if last_reported.elapsed() > time::Duration::from_secs(1) {
-                            let ts = last_reported.elapsed();
-                            let throughput = count as f64 /
-                                             (ts.as_secs() as f64 +
-                                              ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                            println!("{:?} GET{}: {:.2}",
-                                     dur_to_ns!(start.elapsed()),
-                                     i,
-                                     throughput);
-                            throughputs.push(throughput);
-
-                            last_reported = time::Instant::now();
-                            count = 0;
-                        }
-                    }
-                }
-
-                if cdf {
-                    for (v, p, _, _) in samples.iter_percentiles(1) {
-                        println!("percentile GET{} {:.2} {:.2}", i, v, p);
-                    }
-                }
-                throughputs
-            })
-        })
-        .collect::<Vec<_>>();
-    println!("Started {} getters", getters.len());
-
-    // clean
-    if let Some(putter) = putter {
-        // is putter also running?
-        match putter.join() {
-            Err(e) => panic!(e),
-            Ok(th) => avg_put_throughput(th),
-        }
-    }
-    let mut get_throughputs = Vec::new();
-    for g in getters {
-        match g.join() {
-            Err(e) => panic!(e),
-            Ok(th) => get_throughputs.push(th),
-        }
-    }
     if avg {
         let mut thread_avgs = Vec::new();
         for (i, v) in get_throughputs.iter().enumerate() {

@@ -1,6 +1,10 @@
 pub trait Backend {
-    fn putter(&mut self) -> Box<Putter>;
-    fn getter(&mut self) -> Box<Getter>;
+    type P: Putter;
+    type G: Getter;
+
+    fn putter(&mut self) -> Self::P;
+    fn getter(&mut self) -> Self::G;
+    fn migrate(&mut self) -> (Self::P, Self::G);
 }
 
 pub trait Putter: Send {
