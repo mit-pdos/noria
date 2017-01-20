@@ -121,6 +121,10 @@ fn main() {
     assert!(ngetters > 0);
     assert!(!dbn.is_empty());
 
+    if let Some(ref migrate_after) = migrate_after {
+        assert!(migrate_after < &runtime);
+    }
+
     let mut config = exercise::RuntimeConfig::new(ngetters, narticles, runtime);
     config.produce_cdf(cdf);
     config.set_distribution(distribution.into());
