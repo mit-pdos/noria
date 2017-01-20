@@ -1,11 +1,13 @@
 use targets;
 use targets::{Putter, Getter};
 
+use std::sync::mpsc;
 use std::thread;
 use std::time;
 use std;
 
 use rand;
+use spmc;
 use rand::Rng as StdRng;
 use randomkit::{Rng, Sample};
 use randomkit::dist::{Uniform, Zipf};
@@ -43,6 +45,7 @@ pub struct RuntimeConfig {
     runtime: time::Duration,
     cdf: bool,
     stage: bool,
+    migrate_after: Option<time::Duration>,
 }
 
 impl RuntimeConfig {
@@ -54,10 +57,13 @@ impl RuntimeConfig {
             runtime: runtime,
             cdf: true,
             stage: false,
+            migrate_after: None,
         }
     }
 
     pub fn put_then_get(&mut self) {
+        assert!(self.migrate_after.is_none(),
+                "staged migration is unsupported");
         self.stage = true;
     }
 
@@ -67,6 +73,11 @@ impl RuntimeConfig {
 
     pub fn set_distribution(&mut self, d: Distribution) {
         self.distribution = d;
+    }
+
+    pub fn perform_migration_at(&mut self, t: time::Duration) {
+        assert!(!self.stage, "staged migration is unsupported");
+        self.migrate_after = Some(t);
     }
 }
 
@@ -148,7 +159,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
 
     // prepopulate
     println!("Connected. Now retrieving putter for prepopulation.");
-    let mut putter = Box::new(target.putter());
+    let mut putter = target.putter();
     {
         let mut article = putter.article();
 
@@ -170,12 +181,45 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
 
     // benchmark
     // start putting
+    let (np_tx, np_rx): (mpsc::Sender<B::P>, _) = mpsc::channel();
     let mut putter = Some({
         thread::spawn(move || -> Vec<f64> {
             let mut vote = putter.vote();
+            let mut new_putter = None;
+            let mut new_vote = None;
             let init = move || {
+                let mut i = 0;
                 Box::new(move |uid, aid| -> bool {
-                    vote(uid, aid);
+                    if let Some(migrate_after) = config.migrate_after {
+                        if i % 16384 == 0 {
+                            if start.elapsed() > migrate_after {
+                                // we may have been given a new putter
+                                if let Ok(np) = np_rx.try_recv() {
+                                    // we have a new putter!
+                                    //
+                                    // it's unfortunate that we have to use unsafe here...
+                                    // hopefully it can go if
+                                    // https://github.com/Kimundi/owning-ref-rs/issues/22
+                                    // gets resolved. fundamentally, the problem is that the
+                                    // compiler doesn't know that we won't overwrite new_putter in
+                                    // some subsequent iteration of the loop, which would leave
+                                    // new_vote with a dangling pointer to new_putter!
+                                    // *we* know that won't happen though, so this is ok
+                                    new_putter = Some(np);
+                                    let np = new_putter.as_mut().unwrap() as *mut _;
+                                    let np: &mut B::P = unsafe { &mut *np };
+                                    new_vote = Some(np.vote());
+                                }
+                            }
+                        }
+                        i += 1;
+                    }
+
+                    if let Some(vote) = new_vote.as_mut() {
+                        vote(uid, aid);
+                    } else {
+                        vote(uid, aid);
+                    }
                     true
                 })
             };
@@ -198,16 +242,42 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
 
     // start getters
     println!("Starting {} getters", config.ngetters);
+    let (ng_tx, ng_rx): (spmc::Sender<B::G>, _) = spmc::channel();
     let getters = (0..config.ngetters)
         .into_iter()
-        .map(|i| (i, Box::new(target.getter())))
-        .map(|(i, g)| {
+        .map(|i| (i, target.getter()))
+        .map(|(i, getter)| {
             println!("Starting getter #{}", i);
+            let ng_rx = ng_rx.clone();
             thread::spawn(move || -> Vec<f64> {
-                let mut get = g.get();
+                let mut get = getter.get();
+                let mut new_getter = None;
+                let mut new_get = None;
                 let init = move || {
+                    let mut i = 0;
                     Box::new(move |_, aid| -> bool {
-                        get(aid).is_some()
+                        if let Some(migrate_after) = config.migrate_after {
+                            if i % 16384 == 0 {
+                                if start.elapsed() > migrate_after {
+                                    // we may have been given a new getter
+                                    if let Ok(ng) = ng_rx.try_recv() {
+                                        // we have a new getter!
+                                        // we have to do the same unsafe trick here as for putters
+                                        new_getter = Some(ng);
+                                        let ng = new_getter.as_mut().unwrap() as *mut _;
+                                        let ng: &mut B::G = unsafe { &mut *ng };
+                                        new_get = Some(ng.get());
+                                    }
+                                }
+                            }
+                            i += 1;
+                        }
+
+                        if let Some(get) = new_get.as_mut() {
+                            get(aid).is_some()
+                        } else {
+                            get(aid).is_some()
+                        }
                     })
                 };
                 driver(start, config, init, format!("GET{}", i))
@@ -215,6 +285,18 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
         })
         .collect::<Vec<_>>();
     println!("Started {} getters", getters.len());
+
+    // get ready to perform a migration
+    if let Some(migrate_after) = config.migrate_after {
+        thread::sleep(migrate_after);
+        println!("Starting migration");
+        let (new_put, new_gets) = target.migrate(config.ngetters);
+        assert_eq!(new_gets.len(), config.ngetters);
+        np_tx.send(new_put).unwrap();
+        for ng in new_gets {
+            ng_tx.send(ng).unwrap();
+        }
+    }
 
     // clean
     if let Some(putter) = putter {

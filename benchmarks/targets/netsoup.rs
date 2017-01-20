@@ -66,7 +66,7 @@ impl<D: tarpc::transport::Dialer> Backend for SoupTarget<D> {
         (srv::ext::Client::new(&self.addr).unwrap(), self.vote, self.article)
     }
 
-    fn migrate(&mut self) -> (Self::P, Self::G) {
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
         unimplemented!()
     }
 }

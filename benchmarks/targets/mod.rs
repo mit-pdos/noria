@@ -4,7 +4,7 @@ pub trait Backend {
 
     fn putter(&mut self) -> Self::P;
     fn getter(&mut self) -> Self::G;
-    fn migrate(&mut self) -> (Self::P, Self::G);
+    fn migrate(&mut self, usize) -> (Self::P, Vec<Self::G>);
 }
 
 pub trait Putter: Send {

@@ -21,6 +21,8 @@ extern crate memcache;
 
 extern crate hdrsample;
 
+extern crate spmc;
+
 mod targets;
 mod exercise;
 
@@ -85,6 +87,13 @@ fn main() {
             .value_name("N")
             .default_value("60")
             .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("migrate")
+            .short("m")
+            .long("migrate")
+            .value_name("N")
+            .default_value("30")
+            .help("Perform a migration after this many seconds")
+            .conflicts_with("stage"))
         .arg(Arg::with_name("distribution")
             .short("d")
             .long("distribution")
@@ -104,6 +113,9 @@ fn main() {
     let stage = args.is_present("stage");
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let migrate_after = args.value_of("migrate")
+        .map(|_| value_t_or_exit!(args, "migrate", u64))
+        .map(|s| time::Duration::from_secs(s));
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let distribution = args.value_of("distribution").unwrap();
@@ -115,6 +127,9 @@ fn main() {
     config.set_distribution(distribution.into());
     if stage {
         config.put_then_get();
+    }
+    if let Some(migrate_after) = migrate_after {
+        config.perform_migration_at(migrate_after);
     }
 
     // setup db

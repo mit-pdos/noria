@@ -37,7 +37,7 @@ impl Backend for Vec<Memcache> {
         self.pop().unwrap()
     }
 
-    fn migrate(&mut self) -> (Self::P, Self::G) {
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
         unimplemented!()
     }
 }

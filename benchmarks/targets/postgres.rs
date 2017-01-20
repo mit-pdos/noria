@@ -65,7 +65,7 @@ impl Backend for r2d2::Pool<PCM> {
         self.clone().get().unwrap()
     }
 
-    fn migrate(&mut self) -> (Self::P, Self::G) {
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
         unimplemented!()
     }
 }

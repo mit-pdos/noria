@@ -1,6 +1,6 @@
 use std::sync;
 
-use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
+use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType, NodeAddress};
 
 use targets::Backend;
 use targets::Putter;
@@ -10,6 +10,9 @@ type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type Get = Box<Fn(&DataType) -> Vec<Vec<DataType>> + Send + Sync>;
 
 pub struct SoupTarget {
+    vci: NodeAddress,
+    articlei: NodeAddress,
+
     vote: Option<Put>,
     article: Option<Put>,
     end: sync::Arc<Option<Get>>,
@@ -24,7 +27,7 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
     let vote;
     let vc;
     let end;
-    let (mut put, endq) = {
+    let (mut put, articlei, vci, endq) = {
         // migrate
         let mut mig = g.start_migration();
 
@@ -60,10 +63,12 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
         };
 
         // start processing
-        (mig.commit(), endq)
+        (mig.commit(), article, vc, endq)
     };
 
     SoupTarget {
+        articlei: articlei,
+        vci: vci,
         vote: put.remove(&vote).map(|x| x.0),
         article: put.remove(&article).map(|x| x.0),
         end: sync::Arc::new(endq),
@@ -72,7 +77,7 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
 }
 
 impl Backend for SoupTarget {
-    type P = (Put, Put);
+    type P = (Put, Option<Put>);
     type G = sync::Arc<Option<Get>>;
 
     fn getter(&mut self) -> Self::G {
@@ -80,17 +85,57 @@ impl Backend for SoupTarget {
     }
 
     fn putter(&mut self) -> Self::P {
-        (self.vote.take().unwrap(), self.article.take().unwrap())
+        (self.vote.take().unwrap(), Some(self.article.take().unwrap()))
     }
 
-    fn migrate(&mut self) -> (Self::P, Self::G) {
-        unimplemented!()
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+        let (put, newendq) = {
+            // migrate
+            let mut mig = self._g.start_migration();
+
+            let domain = mig.add_domain();
+
+            // add new "ratings" base table
+            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base {});
+
+            // add sum of ratings
+            let rs = mig.add_ingredient("rsum",
+                                        &["id", "total"],
+                                        Aggregation::SUM.over(rating, 2, &[1]));
+
+            // join vote count and rsum (and in theory, sum them)
+            let j = JoinBuilder::new(vec![(rs, 0), (rs, 1), (self.vci, 1)])
+                .from(rs, vec![1, 0])
+                .join(self.vci, vec![1, 0]);
+            let total = mig.add_ingredient("total", &["id", "ratings", "votes"], j);
+
+            mig.assign_domain(rating, domain);
+            mig.assign_domain(rs, domain);
+            mig.assign_domain(total, domain);
+
+            // finally, produce end result
+            let j = JoinBuilder::new(vec![(self.articlei, 0),
+                                          (self.articlei, 1),
+                                          (total, 1),
+                                          (total, 2)])
+                .from(self.articlei, vec![1, 0])
+                .join(total, vec![1, 0, 0]);
+            let newend = mig.add_ingredient("awr", &["id", "title", "ratings", "votes"], j);
+            let newendq = mig.maintain(newend, 0);
+
+            // start processing
+            (mig.commit().remove(&rating).unwrap().0, newendq)
+        };
+
+        let newendq = sync::Arc::new(Some(newendq));
+        ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
     }
 }
 
-impl Putter for (Put, Put) {
+impl Putter for (Put, Option<Put>) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
-        Box::new(move |id, title| { self.1(vec![id.into(), title.into()]); })
+        let articles = self.1.as_mut().expect("article putter is only available before migrations");
+        Box::new(move |id, title| { articles(vec![id.into(), title.into()]); })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
