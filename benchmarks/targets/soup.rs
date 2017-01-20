@@ -139,7 +139,13 @@ impl Putter for (Put, Option<Put>) {
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| { self.0(vec![user.into(), id.into()]); })
+        if self.1.is_some() {
+            // pre-migration
+            Box::new(move |user, id| { self.0(vec![user.into(), id.into()]); })
+        } else {
+            // post-migration
+            Box::new(move |user, id| { self.0(vec![user.into(), id.into(), 5.into()]); })
+        }
     }
 }
 
