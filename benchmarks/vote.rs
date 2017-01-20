@@ -91,7 +91,6 @@ fn main() {
             .short("m")
             .long("migrate")
             .value_name("N")
-            .default_value("30")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
         .arg(Arg::with_name("distribution")
