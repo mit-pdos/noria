@@ -377,11 +377,13 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
         thread::sleep(migrate_after);
         println!("Starting migration");
         let (new_put, new_gets) = target.migrate(config.ngetters);
+        println!("Migration completed");
         assert_eq!(new_gets.len(), config.ngetters);
         np_tx.send(new_put).unwrap();
         for ng in new_gets {
             ng_tx.send(ng).unwrap();
         }
+        println!("All threads notified of migration completion");
     }
 
     // clean
