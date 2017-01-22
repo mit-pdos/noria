@@ -12,6 +12,7 @@ use rand::Rng as StdRng;
 use randomkit::{Rng, Sample};
 use randomkit::dist::{Uniform, Zipf};
 use hdrsample::Histogram;
+use hdrsample;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -81,14 +82,92 @@ impl RuntimeConfig {
     }
 }
 
-fn driver<I, F>(start: time::Instant, config: RuntimeConfig, init: I, desc: String) -> Vec<f64>
+#[derive(Clone, Copy)]
+enum Period {
+    PreMigration,
+    PostMigration,
+}
+
+pub struct BenchmarkResult {
+    throughputs: Vec<f64>,
+    samples: Option<Histogram<u64>>,
+}
+
+impl Default for BenchmarkResult {
+    fn default() -> Self {
+        BenchmarkResult {
+            throughputs: Vec::new(),
+            samples: None,
+        }
+    }
+}
+
+impl BenchmarkResult {
+    fn keep_cdf(&mut self) {
+        self.samples = Some(Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap());
+    }
+
+    pub fn avg_throughput(&self) -> f64 {
+        let s: f64 = self.throughputs.iter().sum();
+        s / self.throughputs.len() as f64
+    }
+
+    pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::percentile::Iter<u64>>> {
+        self.samples.as_ref().map(|s| s.iter_percentiles(1))
+    }
+
+    pub fn sum_len(&self) -> (f64, usize) {
+        (self.throughputs.iter().sum(), self.throughputs.len())
+    }
+}
+
+#[derive(Default)]
+pub struct BenchmarkResults {
+    pub pre: BenchmarkResult,
+    pub post: BenchmarkResult,
+}
+
+impl BenchmarkResults {
+    fn keep_cdf(&mut self) {
+        self.pre.keep_cdf();
+        self.post.keep_cdf();
+    }
+
+    fn pick(&mut self, p: Period) -> &mut BenchmarkResult {
+        match p {
+            Period::PreMigration => &mut self.pre,
+            Period::PostMigration => &mut self.post,
+        }
+    }
+
+    fn record_latency(&mut self, p: Period, value: i64) -> Result<(), ()> {
+        if let Some(ref mut samples) = self.pick(p).samples {
+            samples.record(value)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn record_throughput(&mut self, p: Period, value: f64) {
+        self.pick(p).throughputs.push(value)
+    }
+}
+
+fn driver<I, F>(start: time::Instant,
+                config: RuntimeConfig,
+                init: I,
+                desc: String)
+                -> BenchmarkResults
     where I: FnOnce() -> Box<F>,
-          F: ?Sized + FnMut(i64, i64) -> bool
+          F: ?Sized + FnMut(i64, i64) -> (bool, Period)
 {
     let mut count = 0usize;
-    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
     let mut last_reported = start;
-    let mut throughputs = Vec::new();
+
+    let mut stats = BenchmarkResults::default();
+    if config.cdf {
+        stats.keep_cdf();
+    }
 
     let mut t_rng = rand::thread_rng();
     let mut v_rng = Rng::from_seed(42);
@@ -112,14 +191,14 @@ fn driver<I, F>(start: time::Instant, config: RuntimeConfig, init: I, desc: Stri
             let aid = std::cmp::min(aid, config.narticles - 1) as i64;
             assert!(aid > 0);
 
-            let register = if config.cdf {
+            let (register, period) = if config.cdf {
                 let t = time::Instant::now();
-                let reg = f(uid, aid);
+                let (reg, period) = f(uid, aid);
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                if samples.record(t).is_err() {
+                if stats.record_latency(period, t).is_err() {
                     println!("failed to record slow {} ({}ns)", desc, t);
                 }
-                reg
+                (reg, period)
             } else {
                 f(uid, aid)
             };
@@ -133,11 +212,22 @@ fn driver<I, F>(start: time::Instant, config: RuntimeConfig, init: I, desc: Stri
                 let throughput = count as f64 /
                                  (ts.as_secs() as f64 +
                                   ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                println!("{:?} {}: {:.2}",
-                         dur_to_ns!(start.elapsed()),
-                         desc,
-                         throughput);
-                throughputs.push(throughput);
+
+                match period {
+                    Period::PreMigration => {
+                        println!("{:?} {}: {:.2}",
+                                 dur_to_ns!(start.elapsed()),
+                                 desc,
+                                 throughput);
+                    }
+                    Period::PostMigration => {
+                        println!("{:?} {}+: {:.2}",
+                                 dur_to_ns!(start.elapsed()),
+                                 desc,
+                                 throughput);
+                    }
+                }
+                stats.record_throughput(period, throughput);
 
                 last_reported = time::Instant::now();
                 count = 0;
@@ -145,17 +235,12 @@ fn driver<I, F>(start: time::Instant, config: RuntimeConfig, init: I, desc: Stri
         }
     }
 
-    if config.cdf {
-        for (v, p, _, _) in samples.iter_percentiles(1) {
-            println!("percentile {} {:.2} {:.2}", desc, v, p);
-        }
-    }
-    throughputs
+    stats
 }
 
 pub fn launch<B: targets::Backend + 'static>(mut target: B,
                                              mut config: RuntimeConfig)
-                                             -> (Vec<f64>, Vec<Vec<f64>>) {
+                                             -> (BenchmarkResults, Vec<BenchmarkResults>) {
 
     // prepopulate
     println!("Connected. Now retrieving putter for prepopulation.");
@@ -183,13 +268,13 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
     // start putting
     let (np_tx, np_rx): (mpsc::Sender<B::P>, _) = mpsc::channel();
     let mut putter = Some({
-        thread::spawn(move || -> Vec<f64> {
+        thread::spawn(move || -> BenchmarkResults {
             let mut vote = putter.vote();
             let mut new_putter = None;
             let mut new_vote = None;
             let init = move || {
                 let mut i = 0;
-                Box::new(move |uid, aid| -> bool {
+                Box::new(move |uid, aid| -> (bool, Period) {
                     if let Some(migrate_after) = config.migrate_after {
                         if i % 16384 == 0 {
                             if start.elapsed() > migrate_after {
@@ -217,23 +302,24 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
 
                     if let Some(vote) = new_vote.as_mut() {
                         vote(uid, aid);
+                        (true, Period::PostMigration)
                     } else {
                         vote(uid, aid);
+                        (true, Period::PreMigration)
                     }
-                    true
                 })
             };
             driver(start, config, init, "PUT".to_string())
         })
     });
 
-    let mut put_throughput = Vec::new();
+    let mut put_stats = None;
     if config.stage {
         println!("Waiting for putter before starting getters");
         match putter.take().unwrap().join() {
             Err(e) => panic!(e),
             Ok(th) => {
-                put_throughput.extend(th);
+                put_stats = Some(th);
             }
         }
         // avoid getters stopping immediately
@@ -249,13 +335,13 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
         .map(|(i, getter)| {
             println!("Starting getter #{}", i);
             let ng_rx = ng_rx.clone();
-            thread::spawn(move || -> Vec<f64> {
+            thread::spawn(move || -> BenchmarkResults {
                 let mut get = getter.get();
                 let mut new_getter = None;
                 let mut new_get = None;
                 let init = move || {
                     let mut i = 0;
-                    Box::new(move |_, aid| -> bool {
+                    Box::new(move |_, aid| -> (bool, Period) {
                         if let Some(migrate_after) = config.migrate_after {
                             if i % 16384 == 0 {
                                 if start.elapsed() > migrate_after {
@@ -274,9 +360,9 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                         }
 
                         if let Some(get) = new_get.as_mut() {
-                            get(aid).is_some()
+                            (get(aid).is_some(), Period::PostMigration)
                         } else {
-                            get(aid).is_some()
+                            (get(aid).is_some(), Period::PreMigration)
                         }
                     })
                 };
@@ -304,16 +390,17 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
         match putter.join() {
             Err(e) => panic!(e),
             Ok(th) => {
-                put_throughput.extend(th);
+                assert!(put_stats.is_none());
+                put_stats = Some(th);
             }
         }
     }
-    let mut get_throughputs = Vec::new();
+    let mut get_stats = Vec::with_capacity(getters.len());
     for g in getters {
         match g.join() {
             Err(e) => panic!(e),
-            Ok(th) => get_throughputs.push(th),
+            Ok(th) => get_stats.push(th),
         }
     }
-    (put_throughput, get_throughputs)
+    (put_stats.unwrap(), get_stats)
 }

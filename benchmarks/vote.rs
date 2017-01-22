@@ -138,7 +138,7 @@ fn main() {
     // setup db
     println!("Attempting to connect to database using {}", dbn);
     let mut dbn = dbn.splitn(2, "://");
-    let (put_throughput, get_throughputs) = match dbn.next().unwrap() {
+    let (put_stats, get_stats) = match dbn.next().unwrap() {
         // soup://
         "soup" => exercise::launch(targets::soup::make(dbn.next().unwrap(), ngetters), config),
         // postgresql://soup@127.0.0.1/bench_psql
@@ -166,18 +166,40 @@ fn main() {
         }
     };
 
-    let sum: f64 = put_throughput.iter().sum();
-    println!("avg PUT: {:.2}", sum / put_throughput.len() as f64);
-
+    print_stats("PUT", &put_stats.pre);
     if avg {
-        let mut thread_avgs = Vec::new();
-        for (i, v) in get_throughputs.iter().enumerate() {
-            let sum: f64 = v.iter().sum();
-            let avg: f64 = sum / v.len() as f64;
-            println!("avg GET{}: {:.2}", i, avg);
-            thread_avgs.push(avg);
+        for (i, s) in get_stats.iter().enumerate() {
+            print_stats(format!("GET{}", i), &s.pre);
         }
-        let sum: f64 = thread_avgs.iter().sum();
-        println!("avg GET: {:.2}", sum / thread_avgs.len() as f64);
+        let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
+            // TODO: do we *really* want an average of averages?
+            let (sum, num) = stats.pre.sum_len();
+            (tot + sum, count + num)
+        });
+        println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
+
+    if migrate_after.is_some() {
+        print_stats("PUT+", &put_stats.post);
+        if avg {
+            for (i, s) in get_stats.iter().enumerate() {
+                print_stats(format!("GET{}+", i), &s.post);
+            }
+            let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
+                // TODO: do we *really* want an average of averages?
+                let (sum, num) = stats.pre.sum_len();
+                (tot + sum, count + num)
+            });
+            println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
+        }
+    }
+}
+
+fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult) {
+    if let Some(perc) = stats.cdf_percentiles() {
+        for (v, p, _, _) in perc {
+            println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
+        }
+    }
+    println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
 }
