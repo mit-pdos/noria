@@ -1,10 +1,12 @@
 use std::sync;
 
-use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType, NodeAddress};
+use distributary::{Blender, Base, Aggregation, JoinBuilder, Union, DataType, NodeAddress};
 
 use targets::Backend;
 use targets::Putter;
 use targets::Getter;
+
+use std::collections::HashMap;
 
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type Get = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync>;
@@ -111,8 +113,6 @@ impl Backend for SoupTarget {
             // migrate
             let mut mig = self._g.start_migration();
 
-            let domain = mig.add_domain();
-
             // add new "ratings" base table
             let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base {});
 
@@ -121,25 +121,37 @@ impl Backend for SoupTarget {
                                         &["id", "total"],
                                         Aggregation::SUM.over(rating, 2, &[1]));
 
-            // join vote count and rsum (and in theory, sum them)
-            let j = JoinBuilder::new(vec![(rs, 0), (rs, 1), (self.vci, 1)])
-                .from(rs, vec![1, 0])
-                .join(self.vci, vec![1, 0]);
-            let total = mig.add_ingredient("total", &["id", "ratings", "votes"], j);
+            // take a union of vote count and rsum
+            let mut emits = HashMap::new();
+            emits.insert(rs, vec![0, 1]);
+            emits.insert(self.vci, vec![0, 1]);
+            let u = Union::new(emits);
+            let both = mig.add_ingredient("both", &["id", "value"], u);
 
-            mig.assign_domain(rating, domain);
-            mig.assign_domain(rs, domain);
-            mig.assign_domain(total, domain);
+            // sum them by article id
+            let total = mig.add_ingredient("total",
+                                           &["id", "total"],
+                                           Aggregation::SUM.over(both, 1, &[0]));
 
             // finally, produce end result
-            let j = JoinBuilder::new(vec![(self.articlei, 0),
-                                          (self.articlei, 1),
-                                          (total, 1),
-                                          (total, 2)])
+            let j = JoinBuilder::new(vec![(self.articlei, 0), (self.articlei, 1), (total, 1)])
                 .from(self.articlei, vec![1, 0])
-                .join(total, vec![1, 0, 0]);
-            let newend = mig.add_ingredient("awr", &["id", "title", "ratings", "votes"], j);
+                .join(total, vec![1, 0]);
+            let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
             let newendq = mig.maintain(newend, 0);
+
+            // we want ratings, rsum, and the union to be in the same domain,
+            // because only rsum is really costly
+            let domain = mig.add_domain();
+            mig.assign_domain(rating, domain);
+            mig.assign_domain(rs, domain);
+            mig.assign_domain(both, domain);
+
+            // and then we want the total sum and the join in the same domain,
+            // to avoid duplicating the total state
+            let domain = mig.add_domain();
+            mig.assign_domain(total, domain);
+            mig.assign_domain(newend, domain);
 
             // start processing
             (mig.commit().remove(&rating).unwrap().0, newendq)
