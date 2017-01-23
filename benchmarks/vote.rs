@@ -166,11 +166,11 @@ fn main() {
         }
     };
 
-    print_stats("PUT", &put_stats.pre);
+    print_stats("PUT", &put_stats.pre, avg);
+    for (i, s) in get_stats.iter().enumerate() {
+        print_stats(format!("GET{}", i), &s.pre, avg);
+    }
     if avg {
-        for (i, s) in get_stats.iter().enumerate() {
-            print_stats(format!("GET{}", i), &s.pre);
-        }
         let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
             // TODO: do we *really* want an average of averages?
             let (sum, num) = stats.pre.sum_len();
@@ -180,11 +180,11 @@ fn main() {
     }
 
     if migrate_after.is_some() {
-        print_stats("PUT+", &put_stats.post);
+        print_stats("PUT+", &put_stats.post, avg);
+        for (i, s) in get_stats.iter().enumerate() {
+            print_stats(format!("GET{}+", i), &s.post, avg);
+        }
         if avg {
-            for (i, s) in get_stats.iter().enumerate() {
-                print_stats(format!("GET{}+", i), &s.post);
-            }
             let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
@@ -195,11 +195,13 @@ fn main() {
     }
 }
 
-fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult) {
+fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: bool) {
     if let Some(perc) = stats.cdf_percentiles() {
         for (v, p, _, _) in perc {
             println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
         }
     }
-    println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
+    if avg {
+        println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
+    }
 }
