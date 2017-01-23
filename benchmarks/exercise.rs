@@ -359,9 +359,15 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                         }
 
                         if let Some(get) = new_get.as_mut() {
-                            (get(aid).is_some(), Period::PostMigration)
+                            get(aid);
+                            // TODO: this should probably return false if the migration has not yet
+                            // completed? the issue is that we can't tell the difference
+                            // (currently) between an article that has no votes, and an article
+                            // whose vote count has not yet been computed after a migration…
+                            (true, Period::PostMigration)
                         } else {
-                            (get(aid).is_some(), Period::PreMigration)
+                            get(aid);
+                            (true, Period::PreMigration)
                         }
                     })
                 };
