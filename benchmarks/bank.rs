@@ -24,8 +24,8 @@ use hdrsample::Histogram;
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type TxPut = Box<Fn(Vec<DataType>, Token) -> TransactionResult + Send + 'static>;
 #[allow(dead_code)]
-type Get = Box<Fn(&DataType) -> Datas + Send + Sync>;
-type TxGet = Box<Fn(&DataType) -> (Datas, Token) + Send + Sync>;
+type Get = Box<Fn(&DataType) -> Result<Datas, ()> + Send + Sync>;
+type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send + Sync>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -119,29 +119,30 @@ impl Putter for TxPut {
 }
 
 pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, Token)> + 'a>;
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a>;
 }
 
 impl Getter for sync::Arc<Option<TxGet>> {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, Token)> + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
-                let (res, token) = g(&id.into());
-                assert_eq!(res.len(), 1);
-                res.into_iter().next().map(|row| {
-                    // we only care about the first result
-                    let mut row = row.into_iter();
-                    let _: i64 = row.next().unwrap().into();
-                    let credit: i64 = row.next().unwrap().into();
-                    let debit: i64 = row.next().unwrap().into();
-                    (credit - debit, token)
+                g(&id.into()).map(|(res, token)| {
+                    assert_eq!(res.len(), 1);
+                    res.into_iter().next().map(|row| {
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let _: i64 = row.next().unwrap().into();
+                        let credit: i64 = row.next().unwrap().into();
+                        let debit: i64 = row.next().unwrap().into();
+                        (credit - debit, token)
+                    })
                 })
             } else {
                 use std::time::Duration;
                 use std::thread;
                 // avoid spinning
                 thread::sleep(Duration::from_secs(1));
-                None
+                Err(())
             }
         })
     }
@@ -271,8 +272,8 @@ fn main() {
                     let second_pair = sample_pair();
 
                     // read two balances, the latter of which may end up being a stale read
-                    let (balance1, token1) = get(first_pair.0).unwrap();
-                    let (balance2, token2) = get(second_pair.0).unwrap();
+                    let (balance1, token1) = get(first_pair.0).unwrap().unwrap();
+                    let (balance2, token2) = get(second_pair.0).unwrap().unwrap();
                     if verbose {
                         println!("read1 {}: {} @ {:#?} (for {})",
                                  first_pair.0,
@@ -379,7 +380,7 @@ fn main() {
                     }
 
                     for (account, balance) in target_balances {
-                        assert_eq!(get(account).unwrap().0, balance);
+                        assert_eq!(get(account).unwrap().unwrap().0, balance);
                     }
                     println!("Audit found no irregularities");
                 }

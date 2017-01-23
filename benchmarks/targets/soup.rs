@@ -7,7 +7,7 @@ use targets::Putter;
 use targets::Getter;
 
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
-type Get = Box<Fn(&DataType) -> Vec<Vec<DataType>> + Send + Sync>;
+type Get = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync>;
 
 pub struct SoupTarget {
     vci: NodeAddress,
@@ -168,24 +168,26 @@ impl Putter for (Put, Option<Put>) {
 }
 
 impl Getter for sync::Arc<Option<Get>> {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
                 let id = id.into();
-                g(&id).into_iter().next().map(|row| {
-                    // we only care about the first result
-                    let mut row = row.into_iter();
-                    let id: i64 = row.next().unwrap().into();
-                    let title: String = row.next().unwrap().into();
-                    let count: i64 = row.next().unwrap().into();
-                    (id, title, count)
+                g(&id).map(|g| {
+                    g.into_iter().next().map(|row| {
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let id: i64 = row.next().unwrap().into();
+                        let title: String = row.next().unwrap().into();
+                        let count: i64 = row.next().unwrap().into();
+                        (id, title, count)
+                    })
                 })
             } else {
                 use std::time::Duration;
                 use std::thread;
                 // avoid spinning
                 thread::sleep(Duration::from_secs(1));
-                None
+                Err(())
             }
         })
     }
