@@ -54,6 +54,24 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
             mig.assign_domain(vote, d);
             mig.assign_domain(end, d);
             mig.assign_domain(vc, d);
+        } else {
+            // let's try to be clever about this.
+            //
+            // article and the join should certainly be together, since article is dormant after
+            // setup, this is purely a win. plus it avoids duplicating the article state
+            //
+            // NOTE: this domain will become dormant once migration has finished, which is good!
+            let ad = mig.add_domain();
+            mig.assign_domain(article, ad);
+            mig.assign_domain(end, ad);
+            // vote and votecount may as well be together since that's where the most number of
+            // puts will flow.
+            let vd = mig.add_domain();
+            mig.assign_domain(vote, vd);
+            mig.assign_domain(vc, vd);
+            // the real question is whether these *two* domains should be joined.
+            // it's not entirely clear. for now, let's keep them separate to allow the aggregation
+            // and the join to occur in parallel.
         }
 
         let endq = if cfg!(feature = "rtm") {
