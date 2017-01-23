@@ -104,7 +104,7 @@ impl Default for BenchmarkResult {
 
 impl BenchmarkResult {
     fn keep_cdf(&mut self) {
-        self.samples = Some(Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap());
+        self.samples = Some(Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap());
     }
 
     pub fn avg_throughput(&self) -> f64 {
