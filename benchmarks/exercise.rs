@@ -163,6 +163,7 @@ fn driver<I, F>(start: time::Instant,
 {
     let mut count = 0usize;
     let mut last_reported = start;
+    let report_every = time::Duration::from_millis(200);
 
     let mut stats = BenchmarkResults::default();
     if config.cdf {
@@ -207,27 +208,25 @@ fn driver<I, F>(start: time::Instant,
             }
 
             // check if we should report
-            if last_reported.elapsed() > time::Duration::from_secs(1) {
-                let ts = last_reported.elapsed();
-                let throughput = count as f64 /
-                                 (ts.as_secs() as f64 +
-                                  ts.subsec_nanos() as f64 / 1_000_000_000f64);
+            if last_reported.elapsed() > report_every {
+                let count_per_ns = count as f64 / dur_to_ns!(last_reported.elapsed()) as f64;
+                let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
 
                 match period {
                     Period::PreMigration => {
                         println!("{:?} {}: {:.2}",
                                  dur_to_ns!(start.elapsed()),
                                  desc,
-                                 throughput);
+                                 count_per_s);
                     }
                     Period::PostMigration => {
                         println!("{:?} {}+: {:.2}",
                                  dur_to_ns!(start.elapsed()),
                                  desc,
-                                 throughput);
+                                 count_per_s);
                     }
                 }
-                stats.record_throughput(period, throughput);
+                stats.record_throughput(period, count_per_s);
 
                 last_reported = time::Instant::now();
                 count = 0;
