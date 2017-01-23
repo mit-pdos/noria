@@ -196,7 +196,7 @@ fn driver<I, F>(start: time::Instant,
                 let (reg, period) = f(uid, aid);
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
                 if stats.record_latency(period, t).is_err() {
-                    println!("failed to record slow {} ({}ns)", desc, t);
+                    println!("failed to record slow {} ({}μs)", desc, t);
                 }
                 (reg, period)
             } else {
