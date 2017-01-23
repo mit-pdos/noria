@@ -112,8 +112,8 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
-    pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::percentile::Iter<u64>>> {
-        self.samples.as_ref().map(|s| s.iter_percentiles(1))
+    pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::recorded::Iter<u64>>> {
+        self.samples.as_ref().map(|s| s.iter_recorded())
     }
 
     pub fn sum_len(&self) -> (f64, usize) {
