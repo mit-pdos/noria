@@ -1,6 +1,6 @@
 use memcache;
 
-struct Memcache(memcache::Memcache);
+pub struct Memcache(memcache::Memcache);
 unsafe impl Send for Memcache {}
 
 use std::ops::Deref;
@@ -15,23 +15,30 @@ use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
-pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
+pub fn make(dbn: &str, getters: usize) -> Vec<Memcache> {
     let mut dbn = dbn.splitn(2, ':');
     let host = dbn.next().unwrap();
     let port: u64 = dbn.next().unwrap().parse().unwrap();
-    Box::new((0..(getters + 1))
+    (0..(getters + 1))
         .into_iter()
         .map(|_| Memcache(memcache::connect(&(host, port)).unwrap()))
-        .collect::<Vec<_>>())
+        .collect::<Vec<_>>()
 }
 
 impl Backend for Vec<Memcache> {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.pop().unwrap())
+    type P = Memcache;
+    type G = Memcache;
+
+    fn getter(&mut self) -> Self::G {
+        self.pop().unwrap()
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.pop().unwrap())
+    fn putter(&mut self) -> Self::P {
+        self.pop().unwrap()
+    }
+
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+        unimplemented!()
     }
 }
 

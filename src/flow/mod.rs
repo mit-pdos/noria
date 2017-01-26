@@ -46,6 +46,8 @@ enum NodeAddress_ {
     Local(LocalNodeIndex), // XXX: maybe include domain here?
 }
 
+/// `NodeAddress` is a unique identifier that can be used to refer to nodes in the graph across
+/// migrations.
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy, Debug)]
 pub struct NodeAddress {
     addr: NodeAddress_, // wrap the enum so people can't create these accidentally
@@ -96,14 +98,14 @@ impl fmt::Display for NodeAddress {
 }
 
 impl NodeAddress {
-    pub fn as_global(&self) -> &NodeIndex {
+    pub(crate) fn as_global(&self) -> &NodeIndex {
         match self.addr {
             NodeAddress_::Global(ref ni) => ni,
             NodeAddress_::Local(_) => unreachable!("tried to use local address as global"),
         }
     }
 
-    pub fn as_local(&self) -> &LocalNodeIndex {
+    pub(crate) fn as_local(&self) -> &LocalNodeIndex {
         match self.addr {
             NodeAddress_::Local(ref i) => i,
             NodeAddress_::Global(_) => unreachable!("tried to use global address as local"),
@@ -322,6 +324,25 @@ impl Blender {
                 }
             })
             .collect()
+    }
+
+    /// Obtain a new function for querying a given (already maintained) reader node.
+    pub fn get_getter
+        (&self,
+         node: NodeAddress)
+         -> Option<Box<Fn(&query::DataType) -> Result<ops::Datas, ()> + Send + Sync>> {
+
+        // reader should be a child of the given node
+        let reader = self.ingredients
+            .neighbors_directed(*node.as_global(), petgraph::EdgeDirection::Outgoing)
+            .filter_map(|ni| if let node::Type::Reader(_, ref inner) = *self.ingredients[ni] {
+                Some(inner)
+            } else {
+                None
+            })
+            .next(); // there should be at most one
+
+        reader.and_then(|r| r.get_reader())
     }
 
     /// Obtain a new function for inserting writes into the soup at the given base node.
@@ -544,7 +565,7 @@ impl<'a> Migration<'a> {
     pub fn maintain(&mut self,
                     n: NodeAddress,
                     key: usize)
-                    -> Box<Fn(&query::DataType) -> ops::Datas + Send + Sync> {
+                    -> Box<Fn(&query::DataType) -> Result<ops::Datas, ()> + Send + Sync> {
         self.ensure_reader_for(n);
 
         let ri = self.readers[n.as_global()];
@@ -576,7 +597,7 @@ impl<'a> Migration<'a> {
         (&mut self,
          n: NodeAddress,
          key: usize)
-         -> Box<Fn(&query::DataType) -> (ops::Datas, checktable::Token) + Send + Sync> {
+         -> Box<Fn(&query::DataType) -> Result<(ops::Datas, checktable::Token), ()> + Send + Sync> {
         self.ensure_reader_for(n);
         let ri = self.readers[n.as_global()];
 
@@ -594,12 +615,13 @@ impl<'a> Migration<'a> {
             // cook up a function to query this materialized state
             let arc = inner.state.as_ref().unwrap().clone();
             let generator = inner.token_generator.clone();
-            Box::new(move |q: &query::DataType| -> (ops::Datas, checktable::Token) {
-                let (res, ts) = arc.find_and(q, |rs| {
-                    rs.into_iter().map(|v| (&**v).clone()).collect::<Vec<_>>()
-                });
-                let token = generator.generate(ts, q.clone());
-                (res, token)
+            Box::new(move |q: &query::DataType| -> Result<(ops::Datas, checktable::Token), ()> {
+                arc.find_and(q,
+                              |rs| rs.into_iter().map(|v| (&**v).clone()).collect::<Vec<_>>())
+                    .map(|(res, ts)| {
+                        let token = generator.generate(ts, q.clone());
+                        (res, token)
+                    })
             })
         } else {
             unreachable!("tried to use non-reader node as a reader")
@@ -660,13 +682,9 @@ impl<'a> Migration<'a> {
         let mut domain_nodes = mainline.ingredients
             .node_indices()
             .filter(|&ni| ni != mainline.source)
-            .filter_map(|ni| {
+            .map(|ni| {
                 let domain = mainline.ingredients[ni].domain();
-                if changed_domains.contains(&domain) {
-                    Some((domain, ni, new.contains(&ni)))
-                } else {
-                    None
-                }
+                (domain, ni, new.contains(&ni))
             })
             .fold(HashMap::new(), |mut dns, (d, ni, new)| {
                 dns.entry(d).or_insert_with(Vec::new).push((ni, new));
@@ -700,6 +718,11 @@ impl<'a> Migration<'a> {
         for (domain, nodes) in &mut domain_nodes {
             // Number of pre-existing nodes
             let mut nnodes = nodes.iter().filter(|&&(_, new)| !new).count();
+
+            if nnodes == nodes.len() {
+                // Nothing to do here
+                continue;
+            }
 
             // Give local addresses to every (new) node
             for &(ni, new) in nodes.iter() {
@@ -752,6 +775,7 @@ impl<'a> Migration<'a> {
         // println!("{}", mainline);
 
         // Determine what nodes to materialize
+        // NOTE: index will also contain the materialization information for *existing* domains
         let index = domain_nodes.iter()
             .map(|(domain, ref nodes)| {
                 let mat = migrate::materialization::pick(&mainline.ingredients, &nodes[..]);

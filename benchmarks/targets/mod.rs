@@ -1,6 +1,10 @@
 pub trait Backend {
-    fn putter(&mut self) -> Box<Putter>;
-    fn getter(&mut self) -> Box<Getter>;
+    type P: Putter;
+    type G: Getter;
+
+    fn putter(&mut self) -> Self::P;
+    fn getter(&mut self) -> Self::G;
+    fn migrate(&mut self, usize) -> (Self::P, Vec<Self::G>);
 }
 
 pub trait Putter: Send {
@@ -9,7 +13,7 @@ pub trait Putter: Send {
 }
 
 pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a>;
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a>;
 }
 
 pub mod soup;

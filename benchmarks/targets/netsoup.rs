@@ -14,7 +14,7 @@ pub struct SoupTarget<D: tarpc::transport::Dialer> {
     _srv: tarpc::ServeHandle<D>, // so the server won't quit
 }
 
-pub fn make(addr: &str, _: usize) -> Box<Backend> {
+pub fn make(addr: &str, _: usize) -> SoupTarget<tarpc::transport::tcp::TcpDialer> {
     // set up graph
     let mut g = Blender::new();
 
@@ -45,22 +45,29 @@ pub fn make(addr: &str, _: usize) -> Box<Backend> {
     };
 
     // start processing
-    Box::new(SoupTarget {
+    SoupTarget {
         vote: vote.into(),
         article: article.into(),
         end: end.into(),
         addr: addr.to_owned(),
         _srv: srv::run(g, addr),
-    })
+    }
 }
 
 impl<D: tarpc::transport::Dialer> Backend for SoupTarget<D> {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new((srv::ext::Client::new(&self.addr).unwrap(), self.end))
+    type P = (srv::ext::Client, usize, usize);
+    type G = (srv::ext::Client, usize);
+
+    fn getter(&mut self) -> Self::G {
+        (srv::ext::Client::new(&self.addr).unwrap(), self.end)
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new((srv::ext::Client::new(&self.addr).unwrap(), self.vote, self.article))
+    fn putter(&mut self) -> Self::P {
+        (srv::ext::Client::new(&self.addr).unwrap(), self.vote, self.article)
+    }
+
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+        unimplemented!()
     }
 }
 

@@ -31,7 +31,7 @@ fn it_works() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // send a query to c
-    assert_eq!(cq(&id), vec![vec![1.into(), 2.into()]]);
+    assert_eq!(cq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // update value again
     put[&b].0(vec![id.clone(), 4.into()]);
@@ -40,7 +40,7 @@ fn it_works() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that value was updated again
-    let res = cq(&id);
+    let res = cq(&id).unwrap();
     assert!(res.iter().any(|r| r == &vec![id.clone(), 2.into()]));
     assert!(res.iter().any(|r| r == &vec![id.clone(), 4.into()]));
 }
@@ -110,7 +110,7 @@ fn it_works_w_mat() {
 
     // send a query to c
     // we should see all the a values
-    let res = cq(&id);
+    let res = cq(&id).unwrap();
     assert_eq!(res.len(), 3);
     assert!(res.iter().any(|r| r == &vec![id.clone(), 1.into()]));
     assert!(res.iter().any(|r| r == &vec![id.clone(), 2.into()]));
@@ -125,7 +125,7 @@ fn it_works_w_mat() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that value was updated again
-    let res = cq(&id);
+    let res = cq(&id).unwrap();
     assert_eq!(res.len(), 6);
     assert!(res.iter().any(|r| r == &vec![id.clone(), 1.into()]));
     assert!(res.iter().any(|r| r == &vec![id.clone(), 2.into()]));
@@ -184,7 +184,7 @@ fn votes() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // query articles to see that it was updated
-    assert_eq!(articleq(&a1), vec![vec![a1.clone(), 2.into()]]);
+    assert_eq!(articleq(&a1), Ok(vec![vec![a1.clone(), 2.into()]]));
 
     // make another article
     put[&article2].0(vec![a2.clone(), 4.into()]);
@@ -194,8 +194,8 @@ fn votes() {
 
     // query articles again to see that the new article was absorbed
     // and that the old one is still present
-    assert_eq!(articleq(&a1), vec![vec![a1.clone(), 2.into()]]);
-    assert_eq!(articleq(&a2), vec![vec![a2.clone(), 4.into()]]);
+    assert_eq!(articleq(&a1), Ok(vec![vec![a1.clone(), 2.into()]]));
+    assert_eq!(articleq(&a2), Ok(vec![vec![a2.clone(), 4.into()]]));
 
     // create a vote (user 1 votes for article 1)
     put[&vote].0(vec![1.into(), a1.clone()]);
@@ -204,19 +204,19 @@ fn votes() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // query vote count to see that the count was updated
-    let res = vcq(&a1);
+    let res = vcq(&a1).unwrap();
     assert!(res.iter().all(|r| r[0] == a1.clone() && r[1] == 1.into()));
     assert_eq!(res.len(), 1);
 
     // check that article 1 appears in the join view with a vote count of one
-    let res = endq(&a1);
+    let res = endq(&a1).unwrap();
     assert!(res.iter().any(|r| r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()),
             "no entry for [1,2,1|2] in {:?}",
             res);
     assert_eq!(res.len(), 1);
 
     // check that article 2 doesn't have any votes
-    let res = endq(&a2);
+    let res = endq(&a2).unwrap();
     assert!(res.len() <= 1) // could be 1 if we had zero-rows
 }
 
@@ -263,7 +263,7 @@ fn transactional_vote() {
     // start processing
     let put = mig.commit();
 
-    let token = articleq(&a1).1;
+    let token = articleq(&a1).unwrap().1;
 
     // make one article
     assert!(put[&article1].1(vec![a1.clone(), 2.into()], token).ok());
@@ -272,7 +272,7 @@ fn transactional_vote() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // query articles to see that it was absorbed
-    let (res, token) = articleq(&a1);
+    let (res, token) = articleq(&a1).unwrap();
     assert_eq!(res, vec![vec![a1.clone(), 2.into()]]);
 
     // make another article
@@ -283,9 +283,9 @@ fn transactional_vote() {
 
     // query articles again to see that the new article was absorbed
     // and that the old one is still present
-    let (res, mut token) = articleq(&a1);
+    let (res, mut token) = articleq(&a1).unwrap();
     assert_eq!(res, vec![vec![a1.clone(), 2.into()]]);
-    let (res, token2) = articleq(&a2);
+    let (res, token2) = articleq(&a2).unwrap();
     assert_eq!(res, vec![vec![a2.clone(), 4.into()]]);
 
     // Check that the two reads happened transactionally.
@@ -299,19 +299,19 @@ fn transactional_vote() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // query vote count to see that the count was updated
-    let res = vcq(&a1);
+    let res = vcq(&a1).unwrap();
     assert!(res.iter().all(|r| r[0] == a1.clone() && r[1] == 1.into()));
     assert_eq!(res.len(), 1);
 
     // check that article 1 appears in the join view with a vote count of one
-    let res = endq(&a1);
+    let res = endq(&a1).unwrap();
     assert!(res.iter().any(|r| r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()),
             "no entry for [1,2,1|2] in {:?}",
             res);
     assert_eq!(res.len(), 1);
 
     // check that article 2 doesn't have any votes
-    let res = endq(&a2);
+    let res = endq(&a2).unwrap();
     assert!(res.len() <= 1) // could be 1 if we had zero-rows
 }
 
@@ -344,7 +344,7 @@ fn empty_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // send a query to c
-    assert_eq!(cq(&id), vec![vec![1.into(), 2.into()]]);
+    assert_eq!(cq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // update value again
     put[&b].0(vec![id.clone(), 4.into()]);
@@ -353,7 +353,7 @@ fn empty_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that value was updated again
-    let res = cq(&id);
+    let res = cq(&id).unwrap();
     assert!(res.iter().any(|r| r == &vec![id.clone(), 2.into()]));
     assert!(res.iter().any(|r| r == &vec![id.clone(), 4.into()]));
 }
@@ -379,7 +379,7 @@ fn simple_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that a got it
-    assert_eq!(aq(&id), vec![vec![1.into(), 2.into()]]);
+    assert_eq!(aq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // add unrelated node b in a migration
     let (putb, b, bq) = {
@@ -397,7 +397,7 @@ fn simple_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that a got it
-    assert_eq!(bq(&id), vec![vec![1.into(), 4.into()]]);
+    assert_eq!(bq(&id), Ok(vec![vec![1.into(), 4.into()]]));
 }
 
 #[test]
@@ -465,7 +465,7 @@ fn independent_domain_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that a got it
-    assert_eq!(aq(&id), vec![vec![1.into(), 2.into()]]);
+    assert_eq!(aq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // add unrelated node b in a migration
     let (putb, b, bq) = {
@@ -486,7 +486,7 @@ fn independent_domain_migration() {
     thread::sleep(time::Duration::new(0, 10_000_000));
 
     // check that a got it
-    assert_eq!(bq(&id), vec![vec![1.into(), 4.into()]]);
+    assert_eq!(bq(&id), Ok(vec![vec![1.into(), 4.into()]]));
 }
 
 #[test]
@@ -602,6 +602,157 @@ fn state_replay_migration_stream() {
 }
 
 #[test]
+fn migration_depends_on_unchanged_domain() {
+    // here's the case we want to test: before the migration, we have some domain that contains
+    // some materialized node n, as well as an egress node. after the migration, we add a domain
+    // that depends on n being materialized. the tricky part here is that n's domain hasn't changed
+    // as far as the system is aware (in particular, because it didn't need to add an egress node).
+    // this is tricky, because the system must realize that n is materialized, even though it
+    // normally wouldn't even look at that part of the data flow graph!
+
+    let mut g = distributary::Blender::new();
+    let foo = {
+        let mut mig = g.start_migration();
+
+        // base node, so will be materialized
+        let foo = mig.add_ingredient("foo", &["a", "b"], distributary::Base {});
+
+        // node in different domain that depends on foo causes egress to be added
+        mig.add_ingredient("bar", &["a", "b"], distributary::Identity::new(foo));
+
+        // start processing
+        mig.commit();
+        foo
+    };
+
+    let mut mig = g.start_migration();
+
+    // joins require their inputs to be materialized
+    // we need a new base as well so we can actually make a join
+    let tmp = mig.add_ingredient("tmp", &["a", "b"], distributary::Base {});
+    let j = distributary::JoinBuilder::new(vec![(foo, 0), (tmp, 1)])
+        .from(foo, vec![1, 0])
+        .join(tmp, vec![1, 0]);
+    let j = mig.add_ingredient("join", &["a", "b"], j);
+
+    // we assign tmp and j to the same domain just to make the graph less complex
+    let d = mig.add_domain();
+    mig.assign_domain(tmp, d);
+    mig.assign_domain(j, d);
+
+    // start processing
+    mig.commit();
+    assert!(true);
+}
+
+#[test]
+fn full_vote_migration() {
+    // we're trying to force a very particular race, namely that a put arrives for a new join
+    // *before* its state has been fully initialized. it may take a couple of iterations to hit
+    // that, so we run the test a couple of times.
+    for _ in 0..5 {
+        use distributary::{Blender, Base, JoinBuilder, Aggregation, DataType};
+        let mut g = Blender::new();
+        let article;
+        let vote;
+        let vc;
+        let end;
+        let put1 = {
+            // migrate
+            let mut mig = g.start_migration();
+
+            // add article base node
+            article = mig.add_ingredient("article", &["id", "title"], Base {});
+
+            // add vote base table
+            vote = mig.add_ingredient("vote", &["user", "id"], Base {});
+
+            // add vote count
+            vc = mig.add_ingredient("votecount",
+                                    &["id", "votes"],
+                                    Aggregation::COUNT.over(vote, 0, &[1]));
+
+            // add final join using first field from article and first from vc
+            let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
+                .from(article, vec![1, 0])
+                .join(vc, vec![1, 0]);
+            end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
+
+            mig.maintain(end, 0);
+
+            // start processing
+            mig.commit()
+        };
+
+        let n = 1000i64;
+        let title: DataType = "foo".into();
+        let voten: DataType = 1.into();
+        let raten: DataType = 5.into();
+
+        for i in 0..n {
+            put1[&article].0(vec![i.into(), title.clone()]);
+        }
+        for i in 0..n {
+            put1[&vote].0(vec![1.into(), i.into()]);
+        }
+
+        // migrate
+        let mut mig = g.start_migration();
+
+        let domain = mig.add_domain();
+
+        // add new "ratings" base table
+        let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base {});
+
+        // add sum of ratings
+        let rs = mig.add_ingredient("rsum",
+                                    &["id", "total"],
+                                    Aggregation::SUM.over(rating, 2, &[1]));
+
+        // join vote count and rsum (and in theory, sum them)
+        let j = JoinBuilder::new(vec![(rs, 0), (rs, 1), (vc, 1)])
+            .from(rs, vec![1, 0])
+            .join(vc, vec![1, 0]);
+        let total = mig.add_ingredient("total", &["id", "ratings", "votes"], j);
+
+        mig.assign_domain(rating, domain);
+        mig.assign_domain(rs, domain);
+        mig.assign_domain(total, domain);
+
+        // finally, produce end result
+        let j = JoinBuilder::new(vec![(article, 0), (article, 1), (total, 1), (total, 2)])
+            .from(article, vec![1, 0])
+            .join(total, vec![1, 0, 0]);
+        let newend = mig.add_ingredient("awr", &["id", "title", "ratings", "votes"], j);
+        let last = mig.maintain(newend, 0);
+
+        // start processing
+        let put2 = mig.commit();
+        for i in 0..n {
+            put2[&rating].0(vec![1.into(), i.into(), raten.clone()]);
+        }
+
+        // system does about 10k/s = 10/ms
+        // wait for twice that before expecting to see results
+        thread::sleep(::std::time::Duration::from_millis(2 * n as u64 / 10));
+        for i in 0..n {
+            let foo = last(&i.into()).unwrap();
+            assert!(!foo.is_empty(), "every article should be voted for");
+            assert_eq!(foo.len(), 1, "every article should have only one entry");
+            let foo = foo.into_iter().next().unwrap();
+            assert_eq!(foo[0],
+                       i.into(),
+                       "each article result should have the right id");
+            assert_eq!(foo[1], title, "all articles should have title 'foo'");
+            assert_eq!(foo[2], raten, "all articles should have one 5-star rating");
+            assert_eq!(foo[3], voten, "all articles should have one vote");
+        }
+    }
+
+    assert!(true);
+}
+
+#[test]
 fn state_replay_migration_query() {
     // similar to test above, except we will have a materialized Reader node that we're going to
     // read from rather than relying on forwarding. to further stress the graph, *both* base nodes
@@ -644,16 +795,18 @@ fn state_replay_migration_query() {
     };
 
     // if all went according to plan, the join should now be fully populated!
+    assert!(!out(&1.into()).is_err());
 
     // there are (/should be) two records in a with x == 1
     // they may appear in any order
-    let res = out(&1.into());
+    let res = out(&1.into()).unwrap();
     assert!(res.iter().any(|r| r == &vec![1.into(), "a".into(), "n".into()]));
     assert!(res.iter().any(|r| r == &vec![1.into(), "b".into(), "n".into()]));
 
     // there are (/should be) one record in a with x == 2
-    assert_eq!(out(&2.into()), vec![vec![2.into(), "c".into(), "o".into()]]);
+    assert_eq!(out(&2.into()),
+               Ok(vec![vec![2.into(), "c".into(), "o".into()]]));
 
     // there are (/should be) no records with x == 3
-    assert!(out(&3.into()).is_empty());
+    assert!(out(&3.into()).unwrap().is_empty());
 }
