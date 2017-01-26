@@ -41,12 +41,12 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
-    transfers: Option<TxPut>,
+    transfers: Vec<TxPut>,
     balances: sync::Arc<Option<TxGet>>,
     _g: Blender,
 }
 
-pub fn setup() -> Box<Bank> {
+pub fn setup(num_putters: usize) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -54,7 +54,7 @@ pub fn setup() -> Box<Bank> {
     let credits;
     let debits;
     let balances;
-    let (mut put, balancesq) = {
+    let (_, balancesq) = {
         // migrate
         let mut mig = g.start_migration();
 
@@ -89,9 +89,11 @@ pub fn setup() -> Box<Bank> {
         (mig.commit(), balancesq)
     };
 
-    let putters = put.remove(&transfers).unwrap();
     Box::new(Bank {
-        transfers: Some(putters.1),
+        transfers: (0..num_putters)
+            .into_iter()
+            .map(|_| g.get_putter(transfers.clone()).1)
+            .collect::<Vec<_>>(),
         balances: sync::Arc::new(balancesq),
         _g: g, // so it's not dropped and waits for threads
     })
@@ -102,7 +104,7 @@ impl Bank {
         Box::new(self.balances.clone())
     }
     fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.transfers.take().unwrap())
+        Box::new(self.transfers.pop().unwrap())
     }
 }
 
@@ -147,6 +149,182 @@ impl Getter for sync::Arc<Option<TxGet>> {
     }
 }
 
+fn populate(naccounts: isize, transfers_put: &mut Box<Putter>) {
+    // prepopulate non-transactionally (this is okay because we add no accounts while running the
+    // benchmark)
+    println!("Connected. Setting up {} accounts.", naccounts);
+    {
+        // let accounts_put = bank.accounts.as_ref().unwrap();
+        let mut money_put = transfers_put.transfer();
+        for i in 0..naccounts {
+            // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
+            money_put(0, i as i64, 1000, Token::empty());
+            money_put(i as i64, 0, 1, Token::empty());
+        }
+    }
+    println!("Done with account creation");
+}
+
+fn client(i: usize,
+          mut transfers_put: Box<Putter>,
+          balances_get: Box<Getter>,
+          distribution: &str,
+          naccounts: isize,
+          start: time::Instant,
+          runtime: time::Duration,
+          verbose: bool,
+          cdf: bool,
+          audit: bool,
+          transactions: &mut Vec<(i64, i64, i64)>)
+          -> Vec<f64> {
+    let mut count = 0;
+    let mut committed = 0;
+    let mut aborted = 0;
+    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
+    let mut last_reported = start;
+    let mut throughputs = Vec::new();
+
+    let mut a_rng = Rng::from_seed(42);
+    let zipf_dist = Zipf::new(1.07).unwrap();
+    let uniform_dist = Uniform::new(1.0, naccounts as f64).unwrap();
+
+    let mut sample = |distribution| -> isize {
+        match distribution {
+            "uniform" => uniform_dist.sample(&mut a_rng) as isize,
+            "zipf" => zipf_dist.sample(&mut a_rng) as isize,
+            _ => panic!("unknown account ID distribution {}!", distribution),
+        }
+    };
+
+    {
+        let mut get = balances_get.get();
+        let mut put = transfers_put.transfer();
+
+        let mut sample_pair = || -> (i64, i64) {
+            let dst_acct_rnd_id = sample(&*distribution);
+            assert!(dst_acct_rnd_id > 0);
+            let mut src_acct_rnd_id = sample(&*distribution);
+            while src_acct_rnd_id == dst_acct_rnd_id {
+                src_acct_rnd_id = sample(&*distribution);
+            }
+            let dst_acct_rnd_id = std::cmp::min(dst_acct_rnd_id, naccounts - 1) as i64;
+            let src_acct_rnd_id = std::cmp::min(src_acct_rnd_id, naccounts - 1) as i64;
+            assert!(src_acct_rnd_id > 0);
+            (src_acct_rnd_id, dst_acct_rnd_id)
+        };
+
+        while start.elapsed() < runtime {
+            let pair = sample_pair();
+
+            let (balance, token) = get(pair.0).unwrap();
+            if verbose {
+                println!("t{} read {}: {} @ {:#?} (for {})",
+                         i,
+                         pair.0,
+                         balance,
+                         token,
+                         pair.1);
+            }
+
+            // try to make both transfers
+            {
+                let mut do_tx = |src, dst, amt, tkn| {
+                    let mut count_result = |res| match res {
+                        TransactionResult::Committed(ts) => {
+                            if verbose {
+                                println!("commit @ {}", ts);
+                            }
+                            if audit {
+                                transactions.push((src, dst, amt));
+                            }
+                            committed += 1
+                        }
+                        TransactionResult::Aborted => {
+                            if verbose {
+                                println!("abort");
+                            }
+                            aborted += 1
+                        }
+                    };
+
+                    if verbose {
+                        println!("trying {} -> {} of {}", src, dst, amt);
+                    }
+
+                    if cdf {
+                        let t = time::Instant::now();
+                        count_result(put(src, dst, amt, tkn));
+                        let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                        if samples.record(t).is_err() {
+                            println!("failed to record slow put ({}ns)", t);
+                        }
+                    } else {
+                        count_result(put(src, dst, amt, tkn));
+                    }
+                    count += 1;
+                };
+
+                if pair.0 != 0 {
+                    assert!(balance >= 0, format!("{} balance is {}", pair.0, balance));
+                }
+
+                if balance >= 100 {
+                    do_tx(pair.0, pair.1, 100, token);
+                }
+            }
+
+            // check if we should report
+            if last_reported.elapsed() > time::Duration::from_secs(1) {
+                let ts = last_reported.elapsed();
+                let throughput = count as f64 /
+                                 (ts.as_secs() as f64 +
+                                  ts.subsec_nanos() as f64 / 1_000_000_000f64);
+                let commit_rate = committed as f64 / count as f64;
+                let abort_rate = aborted as f64 / count as f64;
+                println!("{:?} PUT: {:.2} {:.2} {:.2}",
+                         dur_to_ns!(start.elapsed()),
+                         throughput,
+                         commit_rate,
+                         abort_rate);
+                throughputs.push(throughput);
+
+                last_reported = time::Instant::now();
+                count = 0;
+                committed = 0;
+                aborted = 0;
+            }
+        }
+
+        if audit {
+            let mut target_balances = HashMap::new();
+            for i in 0..naccounts {
+                target_balances.insert(i as i64, 0);
+            }
+            for i in 0i64..(naccounts as i64) {
+                *target_balances.get_mut(&0).unwrap() -= 999;
+                *target_balances.get_mut(&i).unwrap() += 999;
+            }
+
+            for &mut (src, dst, amt) in transactions {
+                *target_balances.get_mut(&src).unwrap() -= amt;
+                *target_balances.get_mut(&dst).unwrap() += amt;
+            }
+
+            for (account, balance) in target_balances {
+                assert_eq!(get(account).unwrap().0, balance);
+            }
+            println!("Audit found no irregularities");
+        }
+    }
+
+    if cdf {
+        for (v, p, _, _) in samples.iter_percentiles(1) {
+            println!("percentile PUT {:.2} {:.2}", v, p);
+        }
+    }
+    throughputs
+}
+
 fn main() {
     use clap::{Arg, App};
     let args = App::new("bank")
@@ -179,6 +357,12 @@ fn main() {
             .possible_values(&["zipf", "uniform"])
             .default_value("uniform")
             .help("Transfer source/destination distribution"))
+        .arg(Arg::with_name("threads")
+            .short("t")
+            .long("threads")
+            .value_name("T")
+            .default_value("2")
+            .help("Number of client threads"))
         .arg(Arg::with_name("verbose")
             .short("v")
             .long("verbose")
@@ -196,203 +380,51 @@ fn main() {
     let cdf = args.is_present("cdf");
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let naccounts = value_t_or_exit!(args, "naccounts", isize);
+    let nthreads = value_t_or_exit!(args, "threads", usize);
     let distribution = args.value_of("distribution").unwrap();
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
 
     // setup db
     println!("Attempting to set up bank");
-    let mut bank = setup();
-    let mut transfers_put = bank.putter();
-
-    // prepopulate non-transactionally (this is okay because we add no accounts while running the
-    // benchmark)
-    println!("Connected. Setting up {} accounts.", naccounts);
-    {
-        // let accounts_put = bank.accounts.as_ref().unwrap();
-        let mut money_put = transfers_put.transfer();
-        for i in 0..naccounts {
-            // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
-            money_put(0, i as i64, 1000, Token::empty());
-            money_put(i as i64, 0, 1, Token::empty());
-        }
-    }
-    println!("Done with account creation");
+    let mut bank = setup(nthreads);
 
     // let system settle
     // thread::sleep(time::Duration::new(1, 0));
     let start = time::Instant::now();
 
-    let mut transactions = vec![];
-
     // benchmark
-    let client = Some({
-        let balances_get: Box<Getter> = bank.getter();
-        let distribution = distribution.to_owned();
-        thread::spawn(move || -> Vec<f64> {
-            let mut count = 0;
-            let mut committed = 0;
-            let mut aborted = 0;
-            let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
-            let mut last_reported = start;
-            let mut throughputs = Vec::new();
+    let clients = (0..nthreads)
+        .into_iter()
+        .map(|i| {
+            Some({
+                let mut transfers_put = bank.putter();
+                let balances_get: Box<Getter> = bank.getter();
+                let distribution = distribution.to_owned();
+                let naccounts = naccounts.clone();
 
-            let mut a_rng = Rng::from_seed(42);
-            let zipf_dist = Zipf::new(1.07).unwrap();
-            let uniform_dist = Uniform::new(1.0, naccounts as f64).unwrap();
+                let mut transactions = vec![];
 
-            let mut sample = |distribution| -> isize {
-                match distribution {
-                    "uniform" => uniform_dist.sample(&mut a_rng) as isize,
-                    "zipf" => zipf_dist.sample(&mut a_rng) as isize,
-                    _ => panic!("unknown account ID distribution {}!", distribution),
-                }
-            };
-
-            {
-                let mut get = balances_get.get();
-                let mut put = transfers_put.transfer();
-
-                let mut sample_pair = || -> (i64, i64) {
-                    let dst_acct_rnd_id = sample(&*distribution);
-                    assert!(dst_acct_rnd_id > 0);
-                    let mut src_acct_rnd_id = sample(&*distribution);
-                    while src_acct_rnd_id == dst_acct_rnd_id {
-                        src_acct_rnd_id = sample(&*distribution);
-                    }
-                    let dst_acct_rnd_id = std::cmp::min(dst_acct_rnd_id, naccounts - 1) as i64;
-                    let src_acct_rnd_id = std::cmp::min(src_acct_rnd_id, naccounts - 1) as i64;
-                    assert!(src_acct_rnd_id > 0);
-                    (src_acct_rnd_id, dst_acct_rnd_id)
-                };
-
-                while start.elapsed() < runtime {
-                    let first_pair = sample_pair();
-                    let second_pair = sample_pair();
-
-                    // read two balances, the latter of which may end up being a stale read
-                    let (balance1, token1) = get(first_pair.0).unwrap();
-                    let (balance2, token2) = get(second_pair.0).unwrap();
-                    if verbose {
-                        println!("read1 {}: {} @ {:#?} (for {})",
-                                 first_pair.0,
-                                 balance1,
-                                 token1,
-                                 first_pair.1);
-                        println!("read2 {}: {} @ {:#?} (for {})",
-                                 second_pair.0,
-                                 balance2,
-                                 token2,
-                                 second_pair.1);
-                    }
-
-                    // try to make both transfers
-                    {
-                        let mut do_tx = |src, dst, amt, tkn| {
-                            let mut count_result = |res| match res {
-                                TransactionResult::Committed(ts) => {
-                                    if verbose {
-                                        println!("commit @ {}", ts);
-                                    }
-                                    if audit {
-                                        transactions.push((src, dst, amt));
-                                    }
-                                    committed += 1
-                                }
-                                TransactionResult::Aborted => {
-                                    if verbose {
-                                        println!("abort");
-                                    }
-                                    aborted += 1
-                                }
-                            };
-
-                            if verbose {
-                                println!("trying {} -> {} of {}", src, dst, amt);
-                            }
-
-                            if cdf {
-                                let t = time::Instant::now();
-                                count_result(put(src, dst, amt, tkn));
-                                let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                                if samples.record(t).is_err() {
-                                    println!("failed to record slow put ({}ns)", t);
-                                }
-                            } else {
-                                count_result(put(src, dst, amt, tkn));
-                            }
-                            count += 1;
-                        };
-
-                        if first_pair.0 != 0 {
-                            assert!(balance1 >= 0,
-                                    format!("{} balance is {}", first_pair.0, balance1));
-                        }
-                        if second_pair.0 != 0 {
-                            assert!(balance2 >= 0,
-                                    format!("{} balance is {}", second_pair.0, balance2));
-                        }
-
-                        if balance1 >= 100 {
-                            do_tx(first_pair.0, first_pair.1, 100, token1);
-                        }
-                        if balance2 >= 100 {
-                            do_tx(second_pair.0, second_pair.1, 100, token2);
-                        }
-                    }
-
-                    // check if we should report
-                    if last_reported.elapsed() > time::Duration::from_secs(1) {
-                        let ts = last_reported.elapsed();
-                        let throughput = count as f64 /
-                                         (ts.as_secs() as f64 +
-                                          ts.subsec_nanos() as f64 / 1_000_000_000f64);
-                        let commit_rate = committed as f64 / count as f64;
-                        let abort_rate = aborted as f64 / count as f64;
-                        println!("{:?} PUT: {:.2} {:.2} {:.2}",
-                                 dur_to_ns!(start.elapsed()),
-                                 throughput,
-                                 commit_rate,
-                                 abort_rate);
-                        throughputs.push(throughput);
-
-                        last_reported = time::Instant::now();
-                        count = 0;
-                        committed = 0;
-                        aborted = 0;
-                    }
+                if i == 0 {
+                    populate(naccounts, &mut transfers_put);
                 }
 
-                if audit {
-                    let mut target_balances = HashMap::new();
-                    for i in 0..naccounts {
-                        target_balances.insert(i as i64, 0);
-                    }
-                    for i in 0i64..(naccounts as i64) {
-                        *target_balances.get_mut(&0).unwrap() -= 999;
-                        *target_balances.get_mut(&i).unwrap() += 999;
-                    }
-
-                    for (src, dst, amt) in transactions {
-                        *target_balances.get_mut(&src).unwrap() -= amt;
-                        *target_balances.get_mut(&dst).unwrap() += amt;
-                    }
-
-                    for (account, balance) in target_balances {
-                        assert_eq!(get(account).unwrap().0, balance);
-                    }
-                    println!("Audit found no irregularities");
-                }
-            }
-
-            if cdf {
-                for (v, p, _, _) in samples.iter_percentiles(1) {
-                    println!("percentile PUT {:.2} {:.2}", v, p);
-                }
-            }
-            throughputs
+                thread::spawn(move || -> Vec<f64> {
+                    client(i,
+                           transfers_put,
+                           balances_get,
+                           &distribution,
+                           naccounts,
+                           start,
+                           runtime,
+                           verbose,
+                           cdf,
+                           audit,
+                           &mut transactions)
+                })
+            })
         })
-    });
+        .collect::<Vec<_>>();
 
     let avg_put_throughput = |th: Vec<f64>| if avg {
         let sum: f64 = th.iter().sum();
@@ -400,10 +432,12 @@ fn main() {
     };
 
     // clean
-    if let Some(client) = client {
-        match client.join() {
-            Err(e) => panic!(e),
-            Ok(th) => avg_put_throughput(th),
+    for c in clients {
+        if let Some(client) = c {
+            match client.join() {
+                Err(e) => panic!(e),
+                Ok(th) => avg_put_throughput(th),
+            }
         }
     }
 }
