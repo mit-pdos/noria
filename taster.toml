@@ -17,3 +17,8 @@ regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 command = "run"
 args = ["--release", "--bin", "bank", "--", "--avg", "--distribution=uniform", "--accounts=5", "--runtime=30"]
 regexs = ["(avg PUT): ([0-9.]+)"]
+
+[vote-migration]
+command = "run"
+args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=uniform", "--articles=100000", "--runtime=60", "--migrate=30", "soup://"]
+regexs = ["(Migration) completed in ([0-9.]+)s"]

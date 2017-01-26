@@ -375,8 +375,10 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
     if let Some(migrate_after) = config.migrate_after {
         thread::sleep(migrate_after);
         println!("Starting migration");
+        let mig_start = time::Instant::now();
         let (new_put, new_gets) = target.migrate(config.ngetters);
-        println!("Migration completed");
+        let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
+        println!("Migration completed in {:.4}s", mig_duration);
         assert_eq!(new_gets.len(), config.ngetters);
         np_tx.send(new_put).unwrap();
         for ng in new_gets {
