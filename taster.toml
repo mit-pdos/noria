@@ -22,3 +22,4 @@ regexs = ["(avg PUT): ([0-9.]+)"]
 command = "run"
 args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=uniform", "--articles=100000", "--runtime=60", "--migrate=30", "soup://"]
 regexs = ["(Migration) completed in ([0-9.]+)s"]
+lower_better = true
