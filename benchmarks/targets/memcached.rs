@@ -59,12 +59,12 @@ impl Putter for Memcache {
 }
 
 impl Getter for Memcache {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             let title = self.get_raw(&format!("article_{}", id)).unwrap();
             let vc = self.get_raw(&format!("article_{}_vc", id)).unwrap();
             let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
-            Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc))
+            Ok(Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc)))
         })
     }
 }
