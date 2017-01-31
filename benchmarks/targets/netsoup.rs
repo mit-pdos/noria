@@ -1,20 +1,22 @@
 use distributary::srv;
 use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
 use tarpc;
+use tarpc::util::FirstSocketAddr;
+use tarpc::client::sync::Connect;
 
 use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
-pub struct SoupTarget<D: tarpc::transport::Dialer> {
+pub struct SoupTarget {
     vote: usize,
     article: usize,
     end: usize,
     addr: String,
-    _srv: tarpc::ServeHandle<D>, // so the server won't quit
+    _srv: srv::ServerHandle,
 }
 
-pub fn make(addr: &str, _: usize) -> SoupTarget<tarpc::transport::tcp::TcpDialer> {
+pub fn make(addr: &str, _: usize) -> SoupTarget {
     // set up graph
     let mut g = Blender::new();
 
@@ -45,25 +47,34 @@ pub fn make(addr: &str, _: usize) -> SoupTarget<tarpc::transport::tcp::TcpDialer
     };
 
     // start processing
+    let srv = srv::run(g, addr.first_socket_addr(), 4);
+
     SoupTarget {
         vote: vote.into(),
         article: article.into(),
         end: end.into(),
         addr: addr.to_owned(),
-        _srv: srv::run(g, addr),
+        _srv: srv,
     }
 }
 
-impl<D: tarpc::transport::Dialer> Backend for SoupTarget<D> {
-    type P = (srv::ext::Client, usize, usize);
-    type G = (srv::ext::Client, usize);
+impl SoupTarget {
+    fn mkc(&self) -> srv::ext::SyncClient {
+        let options = tarpc::client::Options::default();
+        srv::ext::SyncClient::connect(self.addr.first_socket_addr(), options).unwrap()
+    }
+}
+
+impl Backend for SoupTarget {
+    type P = (srv::ext::SyncClient, usize, usize);
+    type G = (srv::ext::SyncClient, usize);
 
     fn getter(&mut self) -> Self::G {
-        (srv::ext::Client::new(&self.addr).unwrap(), self.end)
+        (self.mkc(), self.end)
     }
 
     fn putter(&mut self) -> Self::P {
-        (srv::ext::Client::new(&self.addr).unwrap(), self.vote, self.article)
+        (self.mkc(), self.vote, self.article)
     }
 
     fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
@@ -71,7 +82,7 @@ impl<D: tarpc::transport::Dialer> Backend for SoupTarget<D> {
     }
 }
 
-impl Putter for (srv::ext::Client, usize, usize) {
+impl Putter for (srv::ext::SyncClient, usize, usize) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
             self.0.insert(self.2, vec![id.into(), title.into()]).unwrap();
@@ -83,18 +94,25 @@ impl Putter for (srv::ext::Client, usize, usize) {
     }
 }
 
-impl Getter for (srv::ext::Client, usize) {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+impl Getter for (srv::ext::SyncClient, usize) {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
-            for row in self.0.query(self.1, id.into()).unwrap().into_iter() {
-                match row[1] {
-                    DataType::Text(ref s) => {
-                        return Some((row[0].clone().into(), (**s).clone(), row[2].clone().into()));
+            self.0
+                .query(self.1, id.into())
+                .unwrap()
+                .map(|rows| {
+                    for row in rows.into_iter() {
+                        match row[1] {
+                            DataType::Text(ref s) => {
+                                return Some((row[0].clone().into(),
+                                             (**s).clone(),
+                                             row[2].clone().into()));
+                            }
+                            _ => unreachable!(),
+                        }
                     }
-                    _ => unreachable!(),
-                }
-            }
-            None
+                    None
+                })
         })
     }
 }

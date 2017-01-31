@@ -1,3 +1,6 @@
+#![cfg_attr(feature="b_netsoup", feature(conservative_impl_trait, plugin))]
+#![cfg_attr(feature="b_netsoup", plugin(tarpc_plugins))]
+
 #[macro_use]
 extern crate clap;
 
@@ -15,6 +18,10 @@ extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
 extern crate tarpc;
+#[cfg(feature="b_netsoup")]
+extern crate futures;
+#[cfg(feature="b_netsoup")]
+extern crate tokio_core;
 
 #[cfg(feature="b_memcached")]
 extern crate memcache;
