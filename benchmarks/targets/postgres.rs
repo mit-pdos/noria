@@ -87,13 +87,13 @@ impl Putter for PC {
 }
 
 impl Getter for PC {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         let prep = self.prepare("SELECT id, title, votes FROM art WHERE id = $1").unwrap();
         Box::new(move |id| {
             for row in prep.query(&[&id]).unwrap().iter() {
-                return Some((row.get(0), row.get(1), row.get(2)));
+                return Ok(Some((row.get(0), row.get(1), row.get(2))));
             }
-            None
+            Ok(None)
         })
     }
 }
