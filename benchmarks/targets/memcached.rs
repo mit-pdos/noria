@@ -53,7 +53,7 @@ impl Putter for Memcache {
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
         Box::new(move |user, id| {
             self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
-            self.increment(&format!("article_{}_vc", id), 1).unwrap();
+            drop(self.increment(&format!("article_{}_vc", id), 1));
         })
     }
 }
@@ -68,7 +68,7 @@ impl Getter for Memcache {
                     let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
                     Ok(Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc)))
                 }
-                _ => Err(()),
+                _ => Ok(None),
             }
         })
     }
