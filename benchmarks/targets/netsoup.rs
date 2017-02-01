@@ -99,7 +99,7 @@ impl Getter for (srv::ext::SyncClient, usize) {
         Box::new(move |id| {
             self.0
                 .query(self.1, id.into())
-                .unwrap()
+                .map_err(|_| ())
                 .map(|rows| {
                     for row in rows.into_iter() {
                         match row[1] {
