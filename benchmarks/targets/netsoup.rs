@@ -2,7 +2,8 @@ use distributary::srv;
 use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
 use tarpc;
 use tarpc::util::FirstSocketAddr;
-use tarpc::client::sync::Connect;
+use tarpc::client::future::Connect;
+use tokio_core::reactor;
 
 use targets::Backend;
 use targets::Putter;
@@ -12,7 +13,7 @@ pub struct SoupTarget {
     vote: usize,
     article: usize,
     end: usize,
-    addr: String,
+    addr: ::std::net::SocketAddr,
     _srv: srv::ServerHandle,
 }
 
@@ -53,21 +54,35 @@ pub fn make(addr: &str, _: usize) -> SoupTarget {
         vote: vote.into(),
         article: article.into(),
         end: end.into(),
-        addr: addr.to_owned(),
+        addr: addr.first_socket_addr(),
         _srv: srv,
     }
 }
 
+pub struct Client {
+    rpc: srv::ext::FutureClient,
+    core: reactor::Core,
+}
+
+// safe because the core will remain on the same core as the client
+unsafe impl Send for Client {}
+
 impl SoupTarget {
-    fn mkc(&self) -> srv::ext::SyncClient {
-        let options = tarpc::client::Options::default();
-        srv::ext::SyncClient::connect(self.addr.first_socket_addr(), options).unwrap()
+    fn mkc(&self) -> Client {
+        use self::srv::ext::FutureClient;
+        let mut core = reactor::Core::new().unwrap();
+        let options = tarpc::client::Options::default().handle(core.handle());
+        let client = core.run(FutureClient::connect(self.addr, options)).unwrap();
+        Client {
+            rpc: client,
+            core: core,
+        }
     }
 }
 
 impl Backend for SoupTarget {
-    type P = (srv::ext::SyncClient, usize, usize);
-    type G = (srv::ext::SyncClient, usize);
+    type P = (Client, usize, usize);
+    type G = (Client, usize);
 
     fn getter(&mut self) -> Self::G {
         (self.mkc(), self.end)
@@ -82,23 +97,28 @@ impl Backend for SoupTarget {
     }
 }
 
-impl Putter for (srv::ext::SyncClient, usize, usize) {
+impl Putter for (Client, usize, usize) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
-            self.0.insert(self.2, vec![id.into(), title.into()]).unwrap();
+            self.0.core.run(self.0.rpc.insert(self.2, vec![id.into(), title.into()])).unwrap();
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| { self.0.insert(self.1, vec![user.into(), id.into()]).unwrap(); })
+        Box::new(move |user, id| {
+            self.0.core.run(self.0.rpc.insert(self.1, vec![user.into(), id.into()])).unwrap();
+        })
     }
 }
 
-impl Getter for (srv::ext::SyncClient, usize) {
+impl Getter for (Client, usize) {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             self.0
-                .query(self.1, id.into())
+                .core
+                .run(self.0
+                    .rpc
+                    .query(self.1, id.into()))
                 .map_err(|_| ())
                 .map(|rows| {
                     for row in rows.into_iter() {
