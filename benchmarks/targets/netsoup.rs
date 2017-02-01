@@ -71,12 +71,23 @@ impl SoupTarget {
     fn mkc(&self) -> Client {
         use self::srv::ext::FutureClient;
         let mut core = reactor::Core::new().unwrap();
-        let options = tarpc::client::Options::default().handle(core.handle());
-        let client = core.run(FutureClient::connect(self.addr, options)).unwrap();
-        Client {
-            rpc: client,
-            core: core,
+        for _ in 0..3 {
+            let options = tarpc::client::Options::default().handle(core.handle());
+            match core.run(FutureClient::connect(self.addr, options)) {
+                Ok(client) => {
+                    return Client {
+                        rpc: client,
+                        core: core,
+                    }
+                }
+                Err(_) => {
+                    use std::thread;
+                    use std::time::Duration;
+                    thread::sleep(Duration::from_millis(100));
+                }
+            }
         }
+        panic!("Failed to connect to netsoup server");
     }
 }
 
