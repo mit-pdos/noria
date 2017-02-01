@@ -191,7 +191,7 @@ fn client(i: usize,
     let mut last_reported = start;
     let mut throughputs = Vec::new();
 
-    let mut a_rng = Rng::from_seed(42);
+    let mut a_rng = Rng::from_seed(i as u32);
     let zipf_dist = Zipf::new(1.07).unwrap();
     let uniform_dist = Uniform::new(1.0, naccounts as f64).unwrap();
 
