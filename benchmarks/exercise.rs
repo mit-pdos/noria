@@ -267,7 +267,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
     // start putting
     let (np_tx, np_rx): (mpsc::Sender<B::P>, _) = mpsc::channel();
     let mut putter = Some({
-        thread::spawn(move || -> BenchmarkResults {
+        thread::Builder::new().name("put0".to_string()).spawn(move || -> BenchmarkResults {
             let mut vote = putter.vote();
             let mut new_putter = None;
             let mut new_vote = None;
@@ -309,7 +309,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                 })
             };
             driver(start, config, init, "PUT".to_string())
-        })
+        }).unwrap()
     });
 
     let mut put_stats = None;
@@ -334,7 +334,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
         .map(|(i, getter)| {
             println!("Starting getter #{}", i);
             let ng_rx = ng_rx.clone();
-            thread::spawn(move || -> BenchmarkResults {
+            thread::Builder::new().name(format!("get{}", i)).spawn(move || -> BenchmarkResults {
                 let mut get = getter.get();
                 let mut new_getter = None;
                 let mut new_get = None;
@@ -366,7 +366,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                     })
                 };
                 driver(start, config, init, format!("GET{}", i))
-            })
+            }).unwrap()
         })
         .collect::<Vec<_>>();
     println!("Started {} getters", getters.len());

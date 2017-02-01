@@ -410,19 +410,22 @@ fn main() {
                     populate(naccounts, &mut transfers_put);
                 }
 
-                thread::spawn(move || -> Vec<f64> {
-                    client(i,
-                           transfers_put,
-                           balances_get,
-                           &distribution,
-                           naccounts,
-                           start,
-                           runtime,
-                           verbose,
-                           cdf,
-                           audit,
-                           &mut transactions)
-                })
+                thread::Builder::new()
+                    .name(format!("bank{}", i))
+                    .spawn(move || -> Vec<f64> {
+                        client(i,
+                               transfers_put,
+                               balances_get,
+                               &distribution,
+                               naccounts,
+                               start,
+                               runtime,
+                               verbose,
+                               cdf,
+                               audit,
+                               &mut transactions)
+                    })
+                    .unwrap()
             })
         })
         .collect::<Vec<_>>();
