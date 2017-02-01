@@ -43,7 +43,7 @@ EXAMPLES:
 pub struct Bank {
     transfers: Vec<TxPut>,
     balances: sync::Arc<Option<TxGet>>,
-    _g: Blender,
+    migrate: Box<FnMut()>,
 }
 
 pub fn setup(num_putters: usize) -> Box<Bank> {
@@ -95,7 +95,13 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
             .map(|_| g.get_putter(transfers.clone()).1)
             .collect::<Vec<_>>(),
         balances: sync::Arc::new(balancesq),
-        _g: g, // so it's not dropped and waits for threads
+        migrate: Box::new(move ||{
+            let mut mig = g.start_migration();
+            let identity = mig.add_ingredient("identity", &["acct_id", "credit", "debit"],
+                                              distributary::Identity::new(balances));
+            let _ = mig.transactional_maintain(identity, 0);
+            let _ = mig.commit();
+        })
     })
 }
 
@@ -351,6 +357,12 @@ fn main() {
             .value_name("N")
             .default_value("60")
             .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("migrate")
+            .short("m")
+            .long("migrate")
+            .value_name("M")
+            .help("Perform a migration after this many seconds")
+            .conflicts_with("stage"))
         .arg(Arg::with_name("distribution")
             .short("d")
             .long("distribution")
@@ -380,11 +392,18 @@ fn main() {
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let migrate_after = args.value_of("migrate")
+        .map(|_| value_t_or_exit!(args, "migrate", u64))
+        .map(|s| time::Duration::from_secs(s));
     let naccounts = value_t_or_exit!(args, "naccounts", isize);
     let nthreads = value_t_or_exit!(args, "threads", usize);
     let distribution = args.value_of("distribution").unwrap();
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
+
+    if let Some(ref migrate_after) = migrate_after {
+        assert!(migrate_after < &runtime);
+    }
 
     // setup db
     println!("Attempting to set up bank");
@@ -434,6 +453,16 @@ fn main() {
         let sum: f64 = th.iter().sum();
         println!("avg PUT: {:.2}", sum / th.len() as f64);
     };
+
+    if let Some(duration) = migrate_after {
+        thread::sleep(duration);
+        println!("----- starting migration -----");
+        let start = time::Instant::now();
+        (bank.migrate)();
+        let duration = start.elapsed();
+        let length = 1000000000u64 * duration.as_secs() + duration.subsec_nanos() as u64;
+        println!("----- completed migration -----\nElapsed time = {} ms", 1e-6 * (length as f64));
+    }
 
     // clean
     for c in clients {
