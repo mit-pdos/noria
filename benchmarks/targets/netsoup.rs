@@ -95,7 +95,7 @@ impl Putter for (srv::ext::SyncClient, usize, usize) {
 }
 
 impl Getter for (srv::ext::SyncClient, usize) {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             self.0
                 .query(self.1, id.into())

@@ -59,7 +59,7 @@ impl Putter for Memcache {
 }
 
 impl Getter for Memcache {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             let title = self.get_raw(&format!("article_{}", id));
             let vc = self.get_raw(&format!("article_{}_vc", id));

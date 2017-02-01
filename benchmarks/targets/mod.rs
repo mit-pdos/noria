@@ -13,7 +13,7 @@ pub trait Putter: Send {
 }
 
 pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a>;
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a>;
 }
 
 pub mod soup;

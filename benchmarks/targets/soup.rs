@@ -180,7 +180,7 @@ impl Putter for (Put, Option<Put>) {
 }
 
 impl Getter for sync::Arc<Option<Get>> {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             if let Some(ref g) = *self.as_ref() {
                 let id = id.into();

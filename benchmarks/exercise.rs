@@ -331,7 +331,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
     let getters = (0..config.ngetters)
         .into_iter()
         .map(|i| (i, target.getter()))
-        .map(|(i, getter)| {
+        .map(|(i, mut getter)| {
             println!("Starting getter #{}", i);
             let ng_rx = ng_rx.clone();
             thread::Builder::new().name(format!("get{}", i)).spawn(move || -> BenchmarkResults {
