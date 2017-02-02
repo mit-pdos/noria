@@ -4,7 +4,6 @@ use targets::{Putter, Getter};
 use std::sync::mpsc;
 use std::thread;
 use std::time;
-use std;
 
 use rand;
 use spmc;
