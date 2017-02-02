@@ -51,8 +51,8 @@ impl Putter for Memcache {
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| {
-            self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
+        Box::new(move |_user, id| {
+            //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
             drop(self.increment(&format!("article_{}_vc", id), 1));
         })
     }
@@ -61,7 +61,9 @@ impl Putter for Memcache {
 impl Getter for Memcache {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
-            let title = self.get_raw(&format!("article_{}", id));
+            // TODO: use mget
+            //let title = self.get_raw(&format!("article_{}", id));
+            let title: Result<_, ()> = Ok((Vec::from(format!("article_{}", id).as_bytes()),));
             let vc = self.get_raw(&format!("article_{}_vc", id));
             match (title, vc) {
                 (Ok(title), Ok(vc)) => {
