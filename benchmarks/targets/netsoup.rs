@@ -48,7 +48,7 @@ pub fn make(addr: &str, _: usize) -> SoupTarget {
     };
 
     // start processing
-    let srv = srv::run(g, addr.first_socket_addr(), 4);
+    let srv = srv::run(g, addr.first_socket_addr(), 8);
 
     SoupTarget {
         vote: vote.into(),
