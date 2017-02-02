@@ -9,8 +9,6 @@ use std;
 use rand;
 use spmc;
 use rand::Rng as StdRng;
-use randomkit::{Rng, Sample};
-use randomkit::dist::{Uniform, Zipf};
 use hdrsample::Histogram;
 use hdrsample;
 
@@ -23,26 +21,9 @@ macro_rules! dur_to_ns {
 }
 
 #[derive(Clone, Copy)]
-pub enum Distribution {
-    Uniform,
-    Zipf,
-}
-
-impl<'a> From<&'a str> for Distribution {
-    fn from(s: &'a str) -> Self {
-        match s {
-            "uniform" => Distribution::Uniform,
-            "zipf" => Distribution::Zipf,
-            _ => panic!("unknown distribution '{}'", s),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
 pub struct RuntimeConfig {
     ngetters: usize,
     narticles: isize,
-    distribution: Distribution,
     runtime: time::Duration,
     cdf: bool,
     stage: bool,
@@ -54,7 +35,6 @@ impl RuntimeConfig {
         RuntimeConfig {
             ngetters: ngetters,
             narticles: narticles,
-            distribution: Distribution::Uniform,
             runtime: runtime,
             cdf: true,
             stage: false,
@@ -70,10 +50,6 @@ impl RuntimeConfig {
 
     pub fn produce_cdf(&mut self, yes: bool) {
         self.cdf = yes;
-    }
-
-    pub fn set_distribution(&mut self, d: Distribution) {
-        self.distribution = d;
     }
 
     pub fn perform_migration_at(&mut self, t: time::Duration) {
@@ -112,7 +88,7 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
-    pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::recorded::Iter<u64>>> {
+pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::recorded::Iter<u64>>>{
         self.samples.as_ref().map(|s| s.iter_recorded())
     }
 
@@ -171,26 +147,14 @@ fn driver<I, F>(start: time::Instant,
     }
 
     let mut t_rng = rand::thread_rng();
-    let mut v_rng = Rng::from_seed(42);
-    let zipf_dist = Zipf::new(1.07).unwrap();
-    let uniform_dist = Uniform::new(1.0, config.narticles as f64).unwrap();
 
     {
         let mut f = init();
         while start.elapsed() < config.runtime {
-            let uid = t_rng.gen::<i64>();
+            let uid: i64 = t_rng.gen();
 
             // what article to vote for/retrieve?
-            // note that we always *compute* both so that zipf and uniform performance numbers are
-            // more directly comparable (zipf takes longer to generate).
-            let u = uniform_dist.sample(&mut v_rng) as isize;
-            let z = zipf_dist.sample(&mut v_rng) as isize;
-            let aid = match config.distribution {
-                Distribution::Uniform => u,
-                Distribution::Zipf => z,
-            };
-            let aid = std::cmp::min(aid, config.narticles - 1) as i64;
-            assert!(aid > 0);
+            let aid = t_rng.gen_range(0, config.narticles) as i64;
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();

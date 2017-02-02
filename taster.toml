@@ -1,25 +1,20 @@
 [uniform]
 command = "run"
-args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=uniform", "--articles=100000", "--runtime=30", "soup://"]
-regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
-
-[zipf]
-command = "run"
-args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=zipf", "--articles=100000", "--runtime=30", "soup://"]
+args = ["--release", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "soup://"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [staged]
 command = "run"
-args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=zipf", "--articles=100000", "--stage", "--runtime=30", "soup://"]
+args = ["--release", "--bin", "vote", "--", "--avg", "--articles=100000", "--stage", "--runtime=30", "soup://"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [tx-bank]
 command = "run"
-args = ["--release", "--bin", "bank", "--", "--avg", "--distribution=uniform", "--accounts=5", "--runtime=30"]
+args = ["--release", "--bin", "bank", "--", "--avg", "--accounts=5", "--runtime=30"]
 regexs = ["(avg PUT): ([0-9.]+)"]
 
 [vote-migration]
 command = "run"
-args = ["--release", "--bin", "vote", "--", "--avg", "--distribution=uniform", "--articles=100000", "--runtime=60", "--migrate=30", "soup://"]
+args = ["--release", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30", "soup://"]
 regexs = ["(Migration) completed in ([0-9.]+)s"]
 lower_better = true

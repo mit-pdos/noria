@@ -5,7 +5,6 @@
 extern crate clap;
 
 extern crate rand;
-extern crate randomkit;
 
 #[cfg(feature="b_postgresql")]
 extern crate postgres;
@@ -100,13 +99,6 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
-        .arg(Arg::with_name("distribution")
-            .short("d")
-            .long("distribution")
-            .value_name("D")
-            .possible_values(&["zipf", "uniform"])
-            .default_value("zipf")
-            .help("Vote to article distribution for reads and writes"))
         .arg(Arg::with_name("BACKEND")
             .index(1)
             .help(&backends)
@@ -124,7 +116,6 @@ fn main() {
         .map(|s| time::Duration::from_secs(s));
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
-    let distribution = args.value_of("distribution").unwrap();
     assert!(ngetters > 0);
     assert!(!dbn.is_empty());
 
@@ -134,7 +125,6 @@ fn main() {
 
     let mut config = exercise::RuntimeConfig::new(ngetters, narticles, runtime);
     config.produce_cdf(cdf);
-    config.set_distribution(distribution.into());
     if stage {
         config.put_then_get();
     }

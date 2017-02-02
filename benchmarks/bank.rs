@@ -2,12 +2,9 @@
 extern crate clap;
 
 extern crate rand;
-extern crate randomkit;
 
 extern crate distributary;
 
-use randomkit::{Rng, Sample};
-use randomkit::dist::{Uniform, Zipf};
 use std::sync;
 use std::thread;
 use std::time;
@@ -16,6 +13,8 @@ use std::collections::HashMap;
 
 use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token,
                    TransactionResult};
+
+use rand::Rng;
 
 extern crate hdrsample;
 use hdrsample::Histogram;
@@ -95,13 +94,14 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
             .map(|_| g.get_putter(transfers.clone()).1)
             .collect::<Vec<_>>(),
         balances: sync::Arc::new(balancesq),
-        migrate: Box::new(move ||{
+        migrate: Box::new(move || {
             let mut mig = g.start_migration();
-            let identity = mig.add_ingredient("identity", &["acct_id", "credit", "debit"],
+            let identity = mig.add_ingredient("identity",
+                                              &["acct_id", "credit", "debit"],
                                               distributary::Identity::new(balances));
             let _ = mig.transactional_maintain(identity, 0);
             let _ = mig.commit();
-        })
+        }),
     })
 }
 
@@ -156,7 +156,7 @@ impl Getter for sync::Arc<Option<TxGet>> {
     }
 }
 
-fn populate(naccounts: isize, transfers_put: &mut Box<Putter>) {
+fn populate(naccounts: i64, transfers_put: &mut Box<Putter>) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
     println!("Connected. Setting up {} accounts.", naccounts);
@@ -165,8 +165,8 @@ fn populate(naccounts: isize, transfers_put: &mut Box<Putter>) {
         let mut money_put = transfers_put.transfer();
         for i in 0..naccounts {
             // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
-            money_put(0, i as i64, 1000, Token::empty());
-            money_put(i as i64, 0, 1, Token::empty());
+            money_put(0, i, 1000, Token::empty());
+            money_put(i, 0, 1, Token::empty());
         }
     }
     println!("Done with account creation");
@@ -175,8 +175,7 @@ fn populate(naccounts: isize, transfers_put: &mut Box<Putter>) {
 fn client(i: usize,
           mut transfers_put: Box<Putter>,
           balances_get: Box<Getter>,
-          distribution: &str,
-          naccounts: isize,
+          naccounts: i64,
           start: time::Instant,
           runtime: time::Duration,
           verbose: bool,
@@ -191,34 +190,23 @@ fn client(i: usize,
     let mut last_reported = start;
     let mut throughputs = Vec::new();
 
-    let mut a_rng = Rng::from_seed(i as u32);
-    let zipf_dist = Zipf::new(1.07).unwrap();
-    let uniform_dist = Uniform::new(1.0, naccounts as f64).unwrap();
+    let mut t_rng = rand::thread_rng();
 
-    let mut sample = |distribution| -> isize {
-        match distribution {
-            "uniform" => uniform_dist.sample(&mut a_rng) as isize,
-            "zipf" => zipf_dist.sample(&mut a_rng) as isize,
-            _ => panic!("unknown account ID distribution {}!", distribution),
+    let mut sample = || t_rng.gen_range(1, naccounts);
+    let mut sample_pair = || -> (_, _) {
+        let dst_acct_rnd_id = sample();
+        assert!(dst_acct_rnd_id > 0);
+        let mut src_acct_rnd_id = sample();
+        while src_acct_rnd_id == dst_acct_rnd_id {
+            src_acct_rnd_id = sample();
         }
+        assert!(src_acct_rnd_id > 0);
+        (src_acct_rnd_id, dst_acct_rnd_id)
     };
 
     {
         let mut get = balances_get.get();
         let mut put = transfers_put.transfer();
-
-        let mut sample_pair = || -> (i64, i64) {
-            let dst_acct_rnd_id = sample(&*distribution);
-            assert!(dst_acct_rnd_id > 0);
-            let mut src_acct_rnd_id = sample(&*distribution);
-            while src_acct_rnd_id == dst_acct_rnd_id {
-                src_acct_rnd_id = sample(&*distribution);
-            }
-            let dst_acct_rnd_id = std::cmp::min(dst_acct_rnd_id, naccounts - 1) as i64;
-            let src_acct_rnd_id = std::cmp::min(src_acct_rnd_id, naccounts - 1) as i64;
-            assert!(src_acct_rnd_id > 0);
-            (src_acct_rnd_id, dst_acct_rnd_id)
-        };
 
         while start.elapsed() < runtime {
             let pair = sample_pair();
@@ -363,13 +351,6 @@ fn main() {
             .value_name("M")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
-        .arg(Arg::with_name("distribution")
-            .short("d")
-            .long("distribution")
-            .value_name("D")
-            .possible_values(&["zipf", "uniform"])
-            .default_value("uniform")
-            .help("Transfer source/destination distribution"))
         .arg(Arg::with_name("threads")
             .short("t")
             .long("threads")
@@ -395,9 +376,8 @@ fn main() {
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
         .map(|s| time::Duration::from_secs(s));
-    let naccounts = value_t_or_exit!(args, "naccounts", isize);
+    let naccounts = value_t_or_exit!(args, "naccounts", i64);
     let nthreads = value_t_or_exit!(args, "threads", usize);
-    let distribution = args.value_of("distribution").unwrap();
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
 
@@ -420,7 +400,6 @@ fn main() {
             Some({
                 let mut transfers_put = bank.putter();
                 let balances_get: Box<Getter> = bank.getter();
-                let distribution = distribution.to_owned();
                 let naccounts = naccounts.clone();
 
                 let mut transactions = vec![];
@@ -435,7 +414,6 @@ fn main() {
                         client(i,
                                transfers_put,
                                balances_get,
-                               &distribution,
                                naccounts,
                                start,
                                runtime,
@@ -461,7 +439,8 @@ fn main() {
         (bank.migrate)();
         let duration = start.elapsed();
         let length = 1000000000u64 * duration.as_secs() + duration.subsec_nanos() as u64;
-        println!("----- completed migration -----\nElapsed time = {} ms", 1e-6 * (length as f64));
+        println!("----- completed migration -----\nElapsed time = {} ms",
+                 1e-6 * (length as f64));
     }
 
     // clean
