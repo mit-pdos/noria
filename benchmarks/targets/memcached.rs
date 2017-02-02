@@ -1,6 +1,6 @@
 use memcache;
 
-struct Memcache(memcache::Memcache);
+pub struct Memcache(memcache::Memcache);
 unsafe impl Send for Memcache {}
 
 use std::ops::Deref;
@@ -15,23 +15,30 @@ use targets::Backend;
 use targets::Putter;
 use targets::Getter;
 
-pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
+pub fn make(dbn: &str, getters: usize) -> Vec<Memcache> {
     let mut dbn = dbn.splitn(2, ':');
     let host = dbn.next().unwrap();
     let port: u64 = dbn.next().unwrap().parse().unwrap();
-    Box::new((0..(getters + 1))
+    (0..(getters + 1))
         .into_iter()
         .map(|_| Memcache(memcache::connect(&(host, port)).unwrap()))
-        .collect::<Vec<_>>())
+        .collect::<Vec<_>>()
 }
 
 impl Backend for Vec<Memcache> {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.pop().unwrap())
+    type P = Memcache;
+    type G = Memcache;
+
+    fn getter(&mut self) -> Self::G {
+        self.pop().unwrap()
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.pop().unwrap())
+    fn putter(&mut self) -> Self::P {
+        self.pop().unwrap()
+    }
+
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+        unimplemented!()
     }
 }
 
@@ -44,20 +51,27 @@ impl Putter for Memcache {
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| {
-            self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
-            self.increment(&format!("article_{}_vc", id), 1).unwrap();
+        Box::new(move |_user, id| {
+            //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
+            drop(self.increment(&format!("article_{}_vc", id), 1));
         })
     }
 }
 
 impl Getter for Memcache {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
-            let title = self.get_raw(&format!("article_{}", id)).unwrap();
-            let vc = self.get_raw(&format!("article_{}_vc", id)).unwrap();
-            let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
-            Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc))
+            // TODO: use mget
+            //let title = self.get_raw(&format!("article_{}", id));
+            let title: Result<_, ()> = Ok((Vec::from(format!("article_{}", id).as_bytes()),));
+            let vc = self.get_raw(&format!("article_{}_vc", id));
+            match (title, vc) {
+                (Ok(title), Ok(vc)) => {
+                    let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
+                    Ok(Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc)))
+                }
+                _ => Ok(None),
+            }
         })
     }
 }

@@ -1,0 +1,2 @@
+#!/bin/sh
+cargo run --bin vote --release --features "b_memcached b_netsoup b_postgresql" -- "$@" memcached://localhost:2222

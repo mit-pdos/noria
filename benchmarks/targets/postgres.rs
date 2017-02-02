@@ -9,7 +9,7 @@ use targets::Getter;
 type PCM = PostgresConnectionManager;
 type PC = r2d2::PooledConnection<PCM>;
 
-pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
+pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<PCM> {
     use std::time;
     use postgres::IntoConnectParams;
 
@@ -50,25 +50,30 @@ pub fn make(dbn: &str, getters: usize) -> Box<Backend> {
     conn.execute("CREATE INDEX ON art (id)", &[]).unwrap();
     conn.execute("CREATE INDEX ON vt (id)", &[]).unwrap();
 
-    Box::new(pool)
+    pool
 }
 
 impl Backend for r2d2::Pool<PCM> {
-    fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.clone().get().unwrap())
+    type P = PC;
+    type G = PC;
+
+    fn getter(&mut self) -> Self::G {
+        self.clone().get().unwrap()
     }
 
-    fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.clone().get().unwrap())
+    fn putter(&mut self) -> Self::P {
+        self.clone().get().unwrap()
+    }
+
+    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+        unimplemented!()
     }
 }
 
 impl Putter for PC {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         let prep = self.prepare("INSERT INTO art (id, title, votes) VALUES ($1, $2, 0)").unwrap();
-        Box::new(move |id, title| {
-            prep.execute(&[&id, &title]).unwrap();
-        })
+        Box::new(move |id, title| { prep.execute(&[&id, &title]).unwrap(); })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
@@ -82,13 +87,13 @@ impl Putter for PC {
 }
 
 impl Getter for PC {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Option<(i64, String, i64)> + 'a> {
+    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         let prep = self.prepare("SELECT id, title, votes FROM art WHERE id = $1").unwrap();
         Box::new(move |id| {
             for row in prep.query(&[&id]).unwrap().iter() {
-                return Some((row.get(0), row.get(1), row.get(2)));
+                return Ok(Some((row.get(0), row.get(1), row.get(2))));
             }
-            None
+            Ok(None)
         })
     }
 }
