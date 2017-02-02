@@ -77,6 +77,7 @@ impl Default for BenchmarkResult {
     }
 }
 
+use hdrsample::iterators::{HistogramIterator, recorded};
 impl BenchmarkResult {
     fn keep_cdf(&mut self) {
         self.samples = Some(Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap());
@@ -87,7 +88,7 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
-pub fn cdf_percentiles(&self) -> Option<hdrsample::iterators::HistogramIterator<u64, hdrsample::iterators::recorded::Iter<u64>>>{
+    pub fn cdf_percentiles(&self) -> Option<HistogramIterator<u64, recorded::Iter<u64>>> {
         self.samples.as_ref().map(|s| s.iter_recorded())
     }
 
