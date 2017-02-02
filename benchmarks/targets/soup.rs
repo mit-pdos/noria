@@ -17,7 +17,7 @@ pub struct SoupTarget {
 
     vote: Option<Put>,
     article: Option<Put>,
-    end: sync::Arc<Option<Get>>,
+    end: sync::Arc<Get>,
     _g: Blender,
 }
 
@@ -50,37 +50,25 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
             .join(vc, vec![1, 0]);
         end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
-        if cfg!(feature = "no_domains") {
-            let d = mig.add_domain();
-            mig.assign_domain(article, d);
-            mig.assign_domain(vote, d);
-            mig.assign_domain(end, d);
-            mig.assign_domain(vc, d);
-        } else {
-            // let's try to be clever about this.
-            //
-            // article and the join should certainly be together, since article is dormant after
-            // setup, this is purely a win. plus it avoids duplicating the article state
-            //
-            // NOTE: this domain will become dormant once migration has finished, which is good!
-            let ad = mig.add_domain();
-            mig.assign_domain(article, ad);
-            mig.assign_domain(end, ad);
-            // vote and votecount may as well be together since that's where the most number of
-            // puts will flow.
-            let vd = mig.add_domain();
-            mig.assign_domain(vote, vd);
-            mig.assign_domain(vc, vd);
-            // the real question is whether these *two* domains should be joined.
-            // it's not entirely clear. for now, let's keep them separate to allow the aggregation
-            // and the join to occur in parallel.
-        }
+        // let's try to be clever about this.
+        //
+        // article and the join should certainly be together, since article is dormant after
+        // setup, this is purely a win. plus it avoids duplicating the article state
+        //
+        // NOTE: this domain will become dormant once migration has finished, which is good!
+        let ad = mig.add_domain();
+        mig.assign_domain(article, ad);
+        mig.assign_domain(end, ad);
+        // vote and votecount may as well be together since that's where the most number of
+        // puts will flow.
+        let vd = mig.add_domain();
+        mig.assign_domain(vote, vd);
+        mig.assign_domain(vc, vd);
+        // the real question is whether these *two* domains should be joined.
+        // it's not entirely clear. for now, let's keep them separate to allow the aggregation
+        // and the join to occur in parallel.
 
-        let endq = if cfg!(feature = "rtm") {
-            None
-        } else {
-            Some(mig.maintain(end, 0))
-        };
+        let endq = mig.maintain(end, 0);
 
         // start processing
         (mig.commit(), article, vc, endq)
@@ -98,7 +86,7 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
 
 impl Backend for SoupTarget {
     type P = (Put, Option<Put>);
-    type G = sync::Arc<Option<Get>>;
+    type G = sync::Arc<Get>;
 
     fn getter(&mut self) -> Self::G {
         self.end.clone()
@@ -157,7 +145,7 @@ impl Backend for SoupTarget {
             (mig.commit().remove(&rating).unwrap().0, newendq)
         };
 
-        let newendq = sync::Arc::new(Some(newendq));
+        let newendq = sync::Arc::new(newendq);
         ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
     }
 }
@@ -179,28 +167,20 @@ impl Putter for (Put, Option<Put>) {
     }
 }
 
-impl Getter for sync::Arc<Option<Get>> {
+impl Getter for sync::Arc<Get> {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
-            if let Some(ref g) = *self.as_ref() {
-                let id = id.into();
-                g(&id).map(|g| {
-                    g.into_iter().next().map(|row| {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let id: i64 = row.next().unwrap().into();
-                        let title: String = row.next().unwrap().into();
-                        let count: i64 = row.next().unwrap().into();
-                        (id, title, count)
-                    })
+            let id = id.into();
+            self(&id).map(|g| {
+                g.into_iter().next().map(|row| {
+                    // we only care about the first result
+                    let mut row = row.into_iter();
+                    let id: i64 = row.next().unwrap().into();
+                    let title: String = row.next().unwrap().into();
+                    let count: i64 = row.next().unwrap().into();
+                    (id, title, count)
                 })
-            } else {
-                use std::time::Duration;
-                use std::thread;
-                // avoid spinning
-                thread::sleep(Duration::from_secs(1));
-                Err(())
-            }
+            })
         })
     }
 }
