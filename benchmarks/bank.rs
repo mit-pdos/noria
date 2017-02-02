@@ -91,7 +91,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     Box::new(Bank {
         transfers: (0..num_putters)
             .into_iter()
-            .map(|_| g.get_putter(transfers.clone()).1)
+            .map(|_| g.get_putter(transfers).1)
             .collect::<Vec<_>>(),
         balances: sync::Arc::new(balancesq),
         migrate: Box::new(move || {
@@ -375,7 +375,7 @@ fn main() {
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
-        .map(|s| time::Duration::from_secs(s));
+        .map(time::Duration::from_secs);
     let naccounts = value_t_or_exit!(args, "naccounts", i64);
     let nthreads = value_t_or_exit!(args, "threads", usize);
     let verbose = args.is_present("verbose");
@@ -400,7 +400,6 @@ fn main() {
             Some({
                 let mut transfers_put = bank.putter();
                 let balances_get: Box<Getter> = bank.getter();
-                let naccounts = naccounts.clone();
 
                 let mut transactions = vec![];
 

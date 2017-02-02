@@ -132,7 +132,7 @@ impl Getter for (Client, usize) {
                     .query(self.1, id.into()))
                 .map_err(|_| ())
                 .map(|rows| {
-                    for row in rows.into_iter() {
+                    for row in rows {
                         match row[1] {
                             DataType::Text(ref s) => {
                                 return Some((row[0].clone().into(),

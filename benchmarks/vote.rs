@@ -113,7 +113,7 @@ fn main() {
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
-        .map(|s| time::Duration::from_secs(s));
+        .map(time::Duration::from_secs);
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     assert!(ngetters > 0);

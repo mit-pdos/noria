@@ -9,7 +9,7 @@ use rand;
 use spmc;
 use rand::Rng as StdRng;
 use hdrsample::Histogram;
-use hdrsample;
+use hdrsample::iterators::{HistogramIterator, recorded};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -77,7 +77,6 @@ impl Default for BenchmarkResult {
     }
 }
 
-use hdrsample::iterators::{HistogramIterator, recorded};
 impl BenchmarkResult {
     fn keep_cdf(&mut self) {
         self.samples = Some(Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap());
@@ -239,25 +238,23 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                 let mut i = 0;
                 Box::new(move |uid, aid| -> (bool, Period) {
                     if let Some(migrate_after) = config.migrate_after {
-                        if i % 16384 == 0 {
-                            if start.elapsed() > migrate_after {
-                                // we may have been given a new putter
-                                if let Ok(np) = np_rx.try_recv() {
-                                    // we have a new putter!
-                                    //
-                                    // it's unfortunate that we have to use unsafe here...
-                                    // hopefully it can go if
-                                    // https://github.com/Kimundi/owning-ref-rs/issues/22
-                                    // gets resolved. fundamentally, the problem is that the
-                                    // compiler doesn't know that we won't overwrite new_putter in
-                                    // some subsequent iteration of the loop, which would leave
-                                    // new_vote with a dangling pointer to new_putter!
-                                    // *we* know that won't happen though, so this is ok
-                                    new_putter = Some(np);
-                                    let np = new_putter.as_mut().unwrap() as *mut _;
-                                    let np: &mut B::P = unsafe { &mut *np };
-                                    new_vote = Some(np.vote());
-                                }
+                        if i % 16384 == 0 && start.elapsed() > migrate_after {
+                            // we may have been given a new putter
+                            if let Ok(np) = np_rx.try_recv() {
+                                // we have a new putter!
+                                //
+                                // it's unfortunate that we have to use unsafe here...
+                                // hopefully it can go if
+                                // https://github.com/Kimundi/owning-ref-rs/issues/22
+                                // gets resolved. fundamentally, the problem is that the compiler
+                                // doesn't know that we won't overwrite new_putter in some
+                                // subsequent iteration of the loop, which would leave new_vote
+                                // with a dangling pointer to new_putter! *we* know that won't
+                                // happen though, so this is ok
+                                new_putter = Some(np);
+                                let np = new_putter.as_mut().unwrap() as *mut _;
+                                let np: &mut B::P = unsafe { &mut *np };
+                                new_vote = Some(np.vote());
                             }
                         }
                         i += 1;
@@ -292,13 +289,14 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
     // start getters
     println!("Starting {} getters", config.ngetters);
     let (ng_tx, ng_rx): (spmc::Sender<B::G>, _) = spmc::channel();
-    let getters = (0..config.ngetters)
-        .into_iter()
-        .map(|i| (i, target.getter()))
-        .map(|(i, mut getter)| {
-            println!("Starting getter #{}", i);
-            let ng_rx = ng_rx.clone();
-            thread::Builder::new().name(format!("get{}", i)).spawn(move || -> BenchmarkResults {
+    let getters =
+        (0..config.ngetters)
+            .into_iter()
+            .map(|i| (i, target.getter()))
+            .map(|(i, mut getter)| {
+                println!("Starting getter #{}", i);
+                let ng_rx = ng_rx.clone();
+                thread::Builder::new().name(format!("get{}", i)).spawn(move || -> BenchmarkResults {
                 let mut get = getter.get();
                 let mut new_getter = None;
                 let mut new_get = None;
@@ -306,8 +304,7 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                     let mut i = 0;
                     Box::new(move |_, aid| -> (bool, Period) {
                         if let Some(migrate_after) = config.migrate_after {
-                            if i % 16384 == 0 {
-                                if start.elapsed() > migrate_after {
+                            if i % 16384 == 0 && start.elapsed() > migrate_after {
                                     // we may have been given a new getter
                                     if let Ok(ng) = ng_rx.try_recv() {
                                         // we have a new getter!
@@ -317,7 +314,6 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                                         let ng: &mut B::G = unsafe { &mut *ng };
                                         new_get = Some(ng.get());
                                     }
-                                }
                             }
                             i += 1;
                         }
@@ -331,8 +327,8 @@ pub fn launch<B: targets::Backend + 'static>(mut target: B,
                 };
                 driver(start, config, init, format!("GET{}", i))
             }).unwrap()
-        })
-        .collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
     println!("Started {} getters", getters.len());
 
     // get ready to perform a migration
