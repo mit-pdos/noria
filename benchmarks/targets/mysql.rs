@@ -31,7 +31,7 @@ pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<MCM> {
     // Construct a DB pool connected to the soup database
     let config = r2d2::Config::builder()
         .error_handler(Box::new(r2d2::LoggingErrorHandler))
-        .pool_size((getters + 1) as u32 /* putter */)
+        .pool_size((getters + 2) as u32 /* putter */)
         .connection_timeout(time::Duration::new(1000, 0))
         .build();
 
@@ -55,7 +55,9 @@ pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<MCM> {
 }
 
 impl Backend for r2d2::Pool<MCM> {
-    type P = PC;
+    // need two connections here because the "mysql" crate only allows one outstanding prepared
+    // statement per connection.
+    type P = (PC, PC);
     type G = PC;
 
     fn getter(&mut self) -> Self::G {
@@ -63,7 +65,7 @@ impl Backend for r2d2::Pool<MCM> {
     }
 
     fn putter(&mut self) -> Self::P {
-        self.clone().get().unwrap()
+        (self.clone().get().unwrap(), self.clone().get().unwrap())
     }
 
     fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
@@ -71,9 +73,10 @@ impl Backend for r2d2::Pool<MCM> {
     }
 }
 
-impl Putter for PC {
+impl Putter for (PC, PC) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
-        let mut prep = self.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
+        let mut prep = self.0
+            .prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
             .unwrap();
         Box::new(move |id, title| {
             prep.execute(params!{"id" => id, "title" => &title}).unwrap();
@@ -81,10 +84,10 @@ impl Putter for PC {
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        //let mut pv = self.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)").unwrap();
-        let mut pa = self.prepare("UPDATE art SET votes = votes + 1 WHERE id = :id").unwrap();
+        let mut pv = self.0.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)").unwrap();
+        let mut pa = self.1.prepare("UPDATE art SET votes = votes + 1 WHERE id = :id").unwrap();
         Box::new(move |user, id| {
-            //pv.execute(params!{"user" => &user, "id" => &id}).unwrap();
+            pv.execute(params!{"user" => &user, "id" => &id}).unwrap();
             pa.execute(params!{"id" => &id}).unwrap();
         })
     }
