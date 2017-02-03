@@ -15,16 +15,17 @@ pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<MCM> {
     use r2d2_mysql::CreateManager;
 
     let dbn = format!("mysql://{}", dbn);
-    let opts = Opts::from_url(&dbn).unwrap();
-    let db = opts.get_db_name().as_ref().unwrap().clone();
-    println!("DB: {}", db);
+    // we need to do this dance to avoid using the DB early (which will crash us if it doesn't
+    // exist)
+    let db = &dbn[dbn.rfind("/").unwrap() + 1..];
+    let opts = Opts::from_url(&dbn[0..dbn.rfind("/").unwrap()]).unwrap();
 
     // Check whether database already exists, or whether we need to create it
-    let x = mysql::Pool::new(opts).unwrap();
-    if x.prep_exec(format!("USE {}", db), ()).is_ok() {
-        x.prep_exec(format!("DROP DATABASE \"{}\"", &db).as_str(), ()).unwrap();
+    let mut x = mysql::Pool::new(opts).unwrap().get_conn().unwrap();
+    if x.query(format!("USE {}", db)).is_ok() {
+        x.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
     }
-    x.prep_exec(format!("CREATE DATABASE \"{}\"", &db).as_str(), ()).unwrap();
+    x.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
     drop(x);
 
     // Construct a DB pool connected to the soup database
