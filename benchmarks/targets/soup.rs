@@ -1,6 +1,6 @@
 use std::sync;
 
-use distributary::{Blender, Base, Aggregation, JoinBuilder, Union, DataType, NodeAddress};
+use distributary::{Blender, Base, Aggregation, JoinBuilder, Union, DataType, NodeAddress, Mutator};
 
 use targets::Backend;
 use targets::Putter;
@@ -15,8 +15,8 @@ pub struct SoupTarget {
     vci: NodeAddress,
     articlei: NodeAddress,
 
-    vote: Option<Put>,
-    article: Option<Put>,
+    vote: Mutator,
+    article: Mutator,
     end: sync::Arc<Get>,
     _g: Blender,
 }
@@ -29,7 +29,7 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
     let vote;
     let vc;
     let end;
-    let (mut put, articlei, vci, endq) = {
+    let (articlei, vci, endq) = {
         // migrate
         let mut mig = g.start_migration();
 
@@ -71,14 +71,15 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
         let endq = mig.maintain(end, 0);
 
         // start processing
-        (mig.commit(), article, vc, endq)
+        mig.commit();
+        (article, vc, endq)
     };
 
     SoupTarget {
         articlei: articlei,
         vci: vci,
-        vote: put.remove(&vote).map(|x| x.0),
-        article: put.remove(&article).map(|x| x.0),
+        vote: g.get_mutator(vote),
+        article: g.get_mutator(article),
         end: sync::Arc::new(endq),
         _g: g, // so it's not dropped and waits for threads
     }
@@ -93,11 +94,21 @@ impl Backend for SoupTarget {
     }
 
     fn putter(&mut self) -> Self::P {
-        (self.vote.take().unwrap(), Some(self.article.take().unwrap()))
+        let v = self.vote.clone();
+        let vote = Box::new(move |u: Vec<DataType>|{
+            v.put(u)
+        });
+
+        let a = self.article.clone();
+        let article = Box::new(move |u: Vec<DataType>|{
+            a.put(u)
+        });
+
+        (vote, Some(article))
     }
 
     fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
-        let (put, newendq) = {
+        let (rating, newendq) = {
             // migrate
             let mut mig = self._g.start_migration();
 
@@ -142,8 +153,15 @@ impl Backend for SoupTarget {
             mig.assign_domain(newend, domain);
 
             // start processing
-            (mig.commit().remove(&rating).unwrap().0, newendq)
+            mig.commit();
+            (rating, newendq)
         };
+
+        let mutator = self._g.get_mutator(rating);
+        let put = Box::new(move |u: Vec<DataType>| {
+            mutator.put(u);
+        });
+
 
         let newendq = sync::Arc::new(newendq);
         ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
