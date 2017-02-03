@@ -39,15 +39,17 @@ pub fn make(dbn: &str, getters: usize) -> r2d2::Pool<MCM> {
 
     let mut conn = pool.get().unwrap();
 
-    // create tables
-    conn.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint)",
+    // allow larger in-memory tables (4 GB)
+    conn.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
+
+    // create tables with indices
+    conn.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, INDEX USING \
+                    HASH(id)) ENGINE = MEMORY",
                    ())
         .unwrap();
-    conn.prep_exec("CREATE TABLE vt (u bigint, id bigint)", ()).unwrap();
-
-    // create indices
-    conn.prep_exec("CREATE INDEX artid_idx ON art (id)", ()).unwrap();
-    conn.prep_exec("CREATE INDEX vtid_idx ON vt (id)", ()).unwrap();
+    conn.prep_exec("CREATE TABLE vt (u bigint, id bigint, INDEX USING HASH(id)) ENGINE = MEMORY",
+                   ())
+        .unwrap();
 
     pool
 }
