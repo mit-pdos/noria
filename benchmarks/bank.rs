@@ -12,7 +12,7 @@ use std::time;
 use std::collections::HashMap;
 
 use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token,
-                   TransactionResult};
+                   TransactionResult, Mutator};
 
 use rand::Rng;
 
@@ -40,7 +40,7 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
-    transfers: Vec<TxPut>,
+    transfers: Vec<Mutator>,
     balances: sync::Arc<Option<TxGet>>,
     migrate: Box<FnMut()>,
 }
@@ -91,7 +91,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     Box::new(Bank {
         transfers: (0..num_putters)
             .into_iter()
-            .map(|_| g.get_putter(transfers).1)
+            .map(|_| g.get_mutator(transfers))
             .collect::<Vec<_>>(),
         balances: sync::Arc::new(balancesq),
         migrate: Box::new(move || {
@@ -110,7 +110,12 @@ impl Bank {
         Box::new(self.balances.clone())
     }
     fn putter(&mut self) -> Box<Putter> {
-        Box::new(self.transfers.pop().unwrap())
+        let m = self.transfers.pop().unwrap();
+        let p: TxPut = Box::new(move|u: Vec<DataType>, t: Token|{
+            m.transactional_put(u, t)
+        });
+
+        Box::new(p)
     }
 }
 
