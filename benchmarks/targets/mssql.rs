@@ -9,44 +9,45 @@ use targets::Getter;
 
 pub struct MssqlTarget {
     dbn: String,
+    db: String,
 }
 
 pub fn make(dbn: &str, _: usize) -> MssqlTarget {
     let mut core = reactor::Core::new().unwrap();
 
     let cfg_string = &dbn[0..dbn.rfind("/").unwrap()];
-    println!("{}", cfg_string);
     let db = &dbn[dbn.rfind("/").unwrap() + 1..];
 
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
         .and_then(|conn| {
-            conn.simple_exec(format!("DROP DATABASE {}", db))
+            conn.simple_exec(format!("DROP DATABASE {};", db))
                 .and_then(|r| r)
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec(format!("CREATE DATABASE {}", db))
+            conn.simple_exec(format!("CREATE DATABASE {};", db))
                 .and_then(|r| r)
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec(format!("USE {}", db))
+            conn.simple_exec(format!("USE {};", db))
                 .and_then(|r| r)
                 .collect()
         })
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE TABLE art (
-                             id bigint NOT NULL,
-                             title varchar(255) NOT NULL
+                             id bigint PRIMARY KEY NONCLUSTERED,
+                             title varchar(255),
+                             votes bigint
                              );")
                 .and_then(|r| r)
                 .collect()
         })
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE TABLE vt (
-                             [u] [bigint] NOT NULL,
-                             [id] [bigint]
+                             u bigint,
+                             id bigint
                              );")
                 .and_then(|r| r)
                 .collect()
@@ -55,7 +56,10 @@ pub fn make(dbn: &str, _: usize) -> MssqlTarget {
     core.run(fut).unwrap();
     drop(core);
 
-    MssqlTarget { dbn: String::from(dbn) }
+    MssqlTarget {
+        dbn: String::from(cfg_string),
+        db: String::from(db),
+    }
 }
 
 pub struct Client {
@@ -70,15 +74,20 @@ impl MssqlTarget {
     fn mkc(&self) -> Client {
         let mut core = reactor::Core::new().unwrap();
 
-        let fc = tiberius::SqlConnection::connect(core.handle(), self.dbn.as_str());
+        let fc = tiberius::SqlConnection::connect(core.handle(), self.dbn.as_str())
+            .and_then(|conn| {
+                conn.simple_exec(format!("USE {}", self.db.as_str()))
+                    .and_then(|r| r)
+                    .collect()
+            });
         match core.run(fc) {
-            Ok(conn) => {
+            Ok((_, conn)) => {
                 return Client {
                     conn: Some(conn),
                     core: core,
                 }
             }
-            Err(_) => panic!("Failed to connect to netsoup server"),
+            Err(_) => panic!("Failed to connect to SQL server"),
         }
     }
 }
@@ -105,7 +114,7 @@ impl Putter for Client {
         let prep = self.conn
             .as_ref()
             .unwrap()
-            .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2)");
+            .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
         Box::new(move |id, title| {
             let fut = self.conn
                 .take()
@@ -122,11 +131,11 @@ impl Putter for Client {
         let pv = self.conn
             .as_ref()
             .unwrap()
-            .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2)");
+            .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
         let pa = self.conn
             .as_ref()
             .unwrap()
-            .prepare("UPDATE art SET votes = votes + 1 WHERE id = @P1");
+            .prepare("UPDATE art SET votes = votes + 1 WHERE id = @P1;");
         Box::new(move |user, id| {
             let fut = self.conn
                 .take()
@@ -148,19 +157,27 @@ impl Getter for Client {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         use tiberius::stmt::ResultStreamExt;
 
-        let prep =
-            self.conn.as_ref().unwrap().prepare("SELECT id, title, votes FROM art WHERE id = @P1");
+        let prep = self.conn
+            .as_ref()
+            .unwrap()
+            .prepare("SELECT id, title, votes FROM art WHERE id = @P1;");
         Box::new(move |id| {
             let mut res = None;
-            self.conn
-                .take()
-                .unwrap()
-                .query(&prep, &[&id])
-                .for_each_row(|row| {
-                    let title: &str = row.get(1);
-                    res = Some((row.get(0), String::from(title), row.get(2)));
-                    Ok(())
-                });
+            {
+                let fut = self.conn
+                    .take()
+                    .unwrap()
+                    .query(&prep, &[&id])
+                    .for_each_row(|ref row| {
+                        let aid: i64 = row.get(0);
+                        let title: &str = row.get(1);
+                        let votes: i64 = row.get(2);
+                        res = Some((aid, String::from(title), votes));
+                        Ok(())
+                    });
+                let conn = self.core.run(fut).unwrap();
+                self.conn = Some(conn);
+            }
             Ok(res)
         })
     }
