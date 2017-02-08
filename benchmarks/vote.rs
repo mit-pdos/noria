@@ -6,18 +6,28 @@ extern crate clap;
 
 extern crate rand;
 
+#[cfg(feature="b_mssql")]
+extern crate futures;
+#[cfg(feature="b_mssql")]
+extern crate futures_state_stream;
+#[cfg(feature="b_mssql")]
+extern crate tiberius;
+#[cfg(feature="b_mssql")]
+extern crate tokio_core;
+
+// Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
+// specify it twice.
+#[cfg(any(feature="b_mysql", feature="b_postgresql"))]
+extern crate r2d2;
+
 #[cfg(feature="b_mysql")]
 #[macro_use]
 extern crate mysql;
-#[cfg(feature="b_mysql")]
-extern crate r2d2;
 #[cfg(feature="b_mysql")]
 extern crate r2d2_mysql;
 
 #[cfg(feature="b_postgresql")]
 extern crate postgres;
-#[cfg(feature="b_postgresql")]
-extern crate r2d2;
 #[cfg(feature="b_postgresql")]
 extern crate r2d2_postgres;
 
@@ -48,12 +58,16 @@ EXAMPLES:
   vote soup://
   vote netsoup://127.0.0.1:7777
   vote memcached://127.0.0.1:11211
+  vote mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
   vote mysql://user@127.0.0.1/database
   vote postgresql://user@127.0.0.1/database";
 
 fn main() {
     use clap::{Arg, App};
     let mut backends = vec!["soup"];
+    if cfg!(feature = "b_mssql") {
+        backends.push("mssql");
+    }
     if cfg!(feature = "b_mysql") {
         backends.push("mysql");
     }
@@ -150,6 +164,9 @@ fn main() {
     let (put_stats, get_stats) = match dbn.next().unwrap() {
         // soup://
         "soup" => exercise::launch(targets::soup::make(dbn.next().unwrap(), ngetters), config),
+        // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
+        #[cfg(feature="b_mssql")]
+        "mssql" => exercise::launch(targets::mssql::make(dbn.next().unwrap(), ngetters), config),
         // mysql://soup@127.0.0.1/bench_mysql
         #[cfg(feature="b_mysql")]
         "mysql" => exercise::launch(targets::mysql::make(dbn.next().unwrap(), ngetters), config),
