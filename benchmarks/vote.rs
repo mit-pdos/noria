@@ -15,18 +15,19 @@ extern crate tiberius;
 #[cfg(feature="b_mssql")]
 extern crate tokio_core;
 
+// Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
+// specify it twice.
+#[cfg(any(feature="b_mysql", feature="b_postgresql"))]
+extern crate r2d2;
+
 #[cfg(feature="b_mysql")]
 #[macro_use]
 extern crate mysql;
-#[cfg(feature="b_mysql")]
-extern crate r2d2;
 #[cfg(feature="b_mysql")]
 extern crate r2d2_mysql;
 
 #[cfg(feature="b_postgresql")]
 extern crate postgres;
-#[cfg(feature="b_postgresql")]
-extern crate r2d2;
 #[cfg(feature="b_postgresql")]
 extern crate r2d2_postgres;
 
