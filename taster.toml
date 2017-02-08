@@ -18,3 +18,9 @@ command = "run"
 args = ["--release", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30", "soup://"]
 regexs = ["(Migration) completed in ([0-9.]+)s"]
 lower_better = true
+
+[slack-aliases]
+ms705 = "malte"
+fintelia = "jonathan"
+omegablitz = "aashish"
+rtmrtmrtmrtm = "rtm"
