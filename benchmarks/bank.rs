@@ -58,7 +58,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = mig.add_ingredient("transfers", &["src_acct", "dst_acct", "amount"], Base {});
+        transfers = mig.add_ingredient("transfers", &["src_acct", "dst_acct", "amount"], Base::default());
 
         // add all debits
         debits = mig.add_ingredient("debits",
