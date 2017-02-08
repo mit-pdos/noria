@@ -47,8 +47,23 @@ pub fn make(dbn: &str, _: usize) -> MssqlTarget {
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE TABLE vt (
                              u bigint,
-                             id bigint
+                             id bigint,
+                             PRIMARY KEY NONCLUSTERED (u, id)
                              );")
+                .and_then(|r| r)
+                .collect()
+        })
+        .and_then(|(_, conn)| {
+            conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
+                                SELECT art.id, art.title, COUNT_BIG(*) AS votes
+                                FROM dbo.art AS art, dbo.vt AS vt
+                                WHERE art.id = vt.id
+                                GROUP BY art.id, art.title;")
+                .and_then(|r| r)
+                .collect()
+        })
+        .and_then(|(_, conn)| {
+            conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
                 .and_then(|r| r)
                 .collect()
         });
@@ -132,19 +147,11 @@ impl Putter for Client {
             .as_ref()
             .unwrap()
             .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
-        let pa = self.conn
-            .as_ref()
-            .unwrap()
-            .prepare("UPDATE art SET votes = votes + 1 WHERE id = @P1;");
         Box::new(move |user, id| {
             let fut = self.conn
                 .take()
                 .unwrap()
                 .exec(&pv, &[&user, &id])
-                .and_then(|r| r)
-                .collect();
-            let (_, conn) = self.core.run(fut).unwrap();
-            let fut = conn.exec(&pa, &[&id])
                 .and_then(|r| r)
                 .collect();
             let (_, conn) = self.core.run(fut).unwrap();
@@ -160,7 +167,7 @@ impl Getter for Client {
         let prep = self.conn
             .as_ref()
             .unwrap()
-            .prepare("SELECT id, title, votes FROM art WHERE id = @P1;");
+            .prepare("SELECT id, title, votes FROM awvc WHERE id = @P1;");
         Box::new(move |id| {
             let mut res = None;
             {
