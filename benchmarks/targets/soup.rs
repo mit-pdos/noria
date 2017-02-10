@@ -39,10 +39,10 @@ pub fn make(_: &str, _: usize) -> SoupTarget {
         let mut mig = g.start_migration();
 
         // add article base node
-        article = mig.add_ingredient("article", &["id", "title"], Base {});
+        article = mig.add_ingredient("article", &["id", "title"], Base::default());
 
         // add vote base table
-        vote = mig.add_ingredient("vote", &["user", "id"], Base {});
+        vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
 
         // add vote count
         vc = mig.add_ingredient("votecount",
@@ -114,7 +114,7 @@ impl Backend for SoupTarget {
             let mut mig = self._g.start_migration();
 
             // add new "ratings" base table
-            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base {});
+            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
 
             // add sum of ratings
             let rs = mig.add_ingredient("rsum",
