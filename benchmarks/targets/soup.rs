@@ -95,14 +95,10 @@ impl Backend for SoupTarget {
 
     fn putter(&mut self) -> Self::P {
         let v = self.vote.clone();
-        let vote = Box::new(move |u: Vec<DataType>|{
-            v.put(u)
-        });
+        let vote = Box::new(move |u: Vec<DataType>| v.put(u));
 
         let a = self.article.clone();
-        let article = Box::new(move |u: Vec<DataType>|{
-            a.put(u)
-        });
+        let article = Box::new(move |u: Vec<DataType>| a.put(u));
 
         (vote, Some(article))
     }
@@ -158,9 +154,7 @@ impl Backend for SoupTarget {
         };
 
         let mutator = self._g.get_mutator(rating);
-        let put = Box::new(move |u: Vec<DataType>| {
-            mutator.put(u);
-        });
+        let put = Box::new(move |u: Vec<DataType>| { mutator.put(u); });
 
 
         let newendq = sync::Arc::new(newendq);
