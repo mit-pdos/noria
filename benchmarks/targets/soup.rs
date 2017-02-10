@@ -8,6 +8,10 @@ use targets::Getter;
 
 use std::collections::HashMap;
 
+use slog;
+use slog_term;
+use slog::DrainExt;
+
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type Get = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync>;
 
@@ -24,6 +28,7 @@ pub struct SoupTarget {
 pub fn make(_: &str, _: usize) -> SoupTarget {
     // set up graph
     let mut g = Blender::new();
+    g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
 
     let article;
     let vote;
