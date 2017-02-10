@@ -4,6 +4,9 @@
 #[macro_use]
 extern crate clap;
 
+extern crate slog;
+extern crate slog_term;
+
 extern crate rand;
 
 #[cfg(feature="b_mssql")]
