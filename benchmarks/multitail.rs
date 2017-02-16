@@ -1,6 +1,9 @@
 extern crate distributary;
 
-use std::{thread, time, env};
+#[macro_use]
+extern crate clap;
+
+use std::{thread, time};
 
 use distributary::{Blender, Base, Aggregation, Mutator, Token, JoinBuilder, NodeAddress};
 
@@ -10,8 +13,15 @@ struct Backend {
     _g: Blender,
 }
 
+enum DomainConfiguration {
+    SingleDomain,
+    DomainPerNode,
+    HorizSlice,
+    VerticalSlice,
+}
 
-fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
+
+fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
     // set up graph
     let mut g = Blender::new();
 
@@ -31,7 +41,7 @@ fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
         mig.assign_domain(number, domain);
         let mut base;
         match domains {
-            1 => {
+            DomainConfiguration::VerticalSlice => {
                 println!("Creating domain for each tail!");
                 for col in 0..width {
                     domain = mig.add_domain();
@@ -44,11 +54,11 @@ fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
                     }
                 }
             },
-            2 => {
+            DomainConfiguration::HorizSlice => {
                 println!("Creating domain for each row!");
                 let mut rows: Vec<NodeAddress> = Vec::new();
+                domain = mig.add_domain();
                 for col in 0..width {
-                    domain = mig.add_domain();
                     let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
                     rows.push(mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j));
                     mig.assign_domain(rows[col as usize], domain);
@@ -61,7 +71,7 @@ fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
                     }
                 }
             },
-            _ => {
+            DomainConfiguration::DomainPerNode => {
                 println!("Creating domain for each node!");
                 for col in 0..width {
                     let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
@@ -74,6 +84,19 @@ fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
                         mig.assign_domain(base, domain);
                     }
                 }
+            },
+            DomainConfiguration::SingleDomain => {
+                println!("Using one domain for all nodes!");
+                for col in 0..width {
+                    let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
+                    base = mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j);
+                    mig.assign_domain(base, domain);
+                    for row in 1..height {
+                        base = mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], Aggregation::SUM.over(base, 0, &[1]));
+                        mig.assign_domain(base, domain);
+                    }
+                }
+            
             }
         }
         mig.commit();
@@ -89,61 +112,46 @@ fn make(domains: u16, width: u16, height: u16) -> Box<Backend> {
 }
 
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    if args.len() <= 1 || args[1] != "domains" && args[1] != "no_domains" && args[1] != "horiz" {
-        println!("Usage:\n./multitail domains\n./multitail no_domains\n./multitail horiz\nOptionally put batch size after test type\nOptionally put '<width> <height>' after batch size");
-        return
-    }
-    let batch_size;
-    let width: u16;
-    let height: u16;
-    if args.len() > 2 {
-        let input_batch = args[2].parse();
-        match input_batch {
-            Ok(i) => {
-                batch_size = i;
-            },
-            Err(_) => {
-                println!("Invalid batch size!");
-                return
-            }
-        }
-    } else {
-        batch_size = 1;
-    }
-    if args.len() > 4 {
-        let w = args[3].parse();
-        let h = args[4].parse();
-        match w {
-            Ok(i) => {
-                width = i;
-            },
-            Err(_) => {
-                println!("Invalid width!");
-                return
-            }
-        }
-        match h {
-            Ok(i) => {
-                height = i;
-            },
-            Err(_) => {
-                println!("Invalid height!");
-                return
-            }
-        }
-    } else {
-        width = 3;
-        height = 3;
-    }
+    use clap::{Arg, App};
+    let matches = App::new("multitail")
+        .version("0.1")
+        .about("Benchmarks different thread domain splits for a multi-tailed graphi.")
+        .arg(Arg::with_name("cfg")
+             .short("c")
+             .possible_values(&["one_domain", "domain_per_node", "vert_slice", "horiz_slice"])
+             .takes_value(true)
+             .required(true)
+             .help("Domain split type"))
+        .arg(Arg::with_name("batch")
+             .short("b")
+             .takes_value(true)
+             .required(true)
+             .help("Batch size"))
+        .arg(Arg::with_name("width")
+             .short("w")
+             .takes_value(true)
+             .required(true)
+             .help("Number of tails"))
+        .arg(Arg::with_name("height")
+             .short("h")
+             .takes_value(true)
+             .required(true)
+             .help("Depth of each tail"))
+        .get_matches();
+
+    let cfg = matches.value_of("cfg").unwrap();
+    let batch_size = value_t_or_exit!(matches, "batch", i64);
+    let width = value_t_or_exit!(matches, "width", u16);
+    let height = value_t_or_exit!(matches, "height", u16);
 
     println!("Using batch size of {}", batch_size);
 
     let mut backend;
-    match args[1].as_ref() {
-        "domains" => backend = make(1, width, height),
-        "horiz" => backend = make(2, width, height),
-        _ => backend = make(0, width, height),
+    match cfg.as_ref() {
+        "vert_slice" => backend = make(DomainConfiguration::VerticalSlice, width, height),
+        "horiz_slice" => backend = make(DomainConfiguration::HorizSlice, width, height),
+        "domain_per_node" => backend = make(DomainConfiguration::DomainPerNode, width, height),
+        _ => backend = make(DomainConfiguration::SingleDomain, width, height),
     }
     let data_putter = backend.data.take().unwrap();
     let number_putter = backend.number.take().unwrap();
