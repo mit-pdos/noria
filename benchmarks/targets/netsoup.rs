@@ -1,9 +1,7 @@
 use distributary::srv;
 use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
-use tarpc;
 use tarpc::util::FirstSocketAddr;
-use tarpc::client::future::Connect;
-use tokio_core::reactor;
+use tarpc::client::sync::ClientExt;
 
 use targets::Backend;
 use targets::Putter;
@@ -25,10 +23,10 @@ pub fn make(addr: &str, _: usize) -> SoupTarget {
         let mut mig = g.start_migration();
 
         // add article base node
-        let article = mig.add_ingredient("article", &["id", "title"], Base {});
+        let article = mig.add_ingredient("article", &["id", "title"], Base::default());
 
         // add vote base table
-        let vote = mig.add_ingredient("vote", &["user", "id"], Base {});
+        let vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
 
         // add vote count
         let vc = mig.add_ingredient("vc",
@@ -59,26 +57,29 @@ pub fn make(addr: &str, _: usize) -> SoupTarget {
     }
 }
 
-pub struct Client {
-    rpc: srv::ext::FutureClient,
-    core: reactor::Core,
+pub struct C(srv::ext::SyncClient);
+use std::ops::{Deref, DerefMut};
+impl Deref for C {
+    type Target = srv::ext::SyncClient;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
-
-// safe because the core will remain on the same core as the client
-unsafe impl Send for Client {}
+impl DerefMut for C {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+unsafe impl Send for C {}
 
 impl SoupTarget {
-    fn mkc(&self) -> Client {
-        use self::srv::ext::FutureClient;
-        let mut core = reactor::Core::new().unwrap();
+    fn mkc(&self) -> C {
+        use self::srv::ext::SyncClient;
         for _ in 0..3 {
-            let options = tarpc::client::Options::default().handle(core.handle());
-            match core.run(FutureClient::connect(self.addr, options)) {
+            use tarpc::client::Options;
+            match SyncClient::connect(self.addr, Options::default()) {
                 Ok(client) => {
-                    return Client {
-                        rpc: client,
-                        core: core,
-                    }
+                    return C(client);
                 }
                 Err(_) => {
                     use std::thread;
@@ -92,8 +93,8 @@ impl SoupTarget {
 }
 
 impl Backend for SoupTarget {
-    type P = (Client, usize, usize);
-    type G = (Client, usize);
+    type P = (C, usize, usize);
+    type G = (C, usize);
 
     fn getter(&mut self) -> Self::G {
         (self.mkc(), self.end)
@@ -108,28 +109,23 @@ impl Backend for SoupTarget {
     }
 }
 
-impl Putter for (Client, usize, usize) {
+impl Putter for (C, usize, usize) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         Box::new(move |id, title| {
-            self.0.core.run(self.0.rpc.insert(self.2, vec![id.into(), title.into()])).unwrap();
+            self.0.insert(self.2, vec![id.into(), title.into()]).unwrap();
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        Box::new(move |user, id| {
-            self.0.core.run(self.0.rpc.insert(self.1, vec![user.into(), id.into()])).unwrap();
-        })
+        Box::new(move |user, id| { self.0.insert(self.1, vec![user.into(), id.into()]).unwrap(); })
     }
 }
 
-impl Getter for (Client, usize) {
+impl Getter for (C, usize) {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
         Box::new(move |id| {
             self.0
-                .core
-                .run(self.0
-                    .rpc
-                    .query(self.1, id.into()))
+                .query(self.1, id.into())
                 .map_err(|_| ())
                 .map(|rows| {
                     for row in rows {
