@@ -5,7 +5,7 @@ extern crate clap;
 
 use std::{thread, time};
 
-use distributary::{Blender, Base, Aggregation, Mutator, Token, JoinBuilder, NodeAddress};
+use distributary::{Blender, Base, Aggregation, Mutator, Token, JoinBuilder};
 
 struct Backend {
     data: Option<Mutator>,
@@ -36,67 +36,61 @@ fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
         // add number base node
         number = mig.add_ingredient("number", &["number"], Base::default());
 
-        let mut domain = mig.add_domain();
-        mig.assign_domain(data, domain);
-        mig.assign_domain(number, domain);
-        let mut base;
+        // create a setup for `width` chains of `height` aggregations using `width` joins
+        let mut all = Vec::with_capacity(width as usize);
+
+        // first, create the base of each chain
+        for col in 0..width {
+            let j = JoinBuilder::new(vec![(data, 0), (data, 1)])
+                .from(data, vec![1, 0])
+                .join(number, vec![1]);
+            all.push(vec![mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j)]);
+        }
+
+        // next, create the aggregations for each chain
+        for (col, els) in all.iter_mut().enumerate() {
+            for row in 1..height {
+                let agg = Aggregation::SUM.over(*els.last().unwrap(), 0, &[1]);
+                els.push(mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], agg));
+            }
+        }
+
+        // finally, assign nodes to domains
+        // base nodes are in one domain
+        let base_domain = mig.add_domain();
+        mig.assign_domain(data, base_domain);
+        mig.assign_domain(number, base_domain);
+
         match domains {
             DomainConfiguration::VerticalSlice => {
-                println!("Creating domain for each tail!");
-                for col in 0..width {
-                    domain = mig.add_domain();
-                    let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
-                    base = mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j);
-                    mig.assign_domain(base, domain);
-                    for row in 1..height {
-                        base = mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], Aggregation::SUM.over(base, 0, &[1]));
-                        mig.assign_domain(base, domain);
+                println!("Creating domain for each column!");
+                for col in &all {
+                    let domain = mig.add_domain();
+                    for node in col {
+                        mig.assign_domain(*node, domain);
                     }
                 }
-            },
+            }
             DomainConfiguration::HorizSlice => {
                 println!("Creating domain for each row!");
-                let mut rows: Vec<NodeAddress> = Vec::new();
-                domain = mig.add_domain();
-                for col in 0..width {
-                    let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
-                    rows.push(mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j));
-                    mig.assign_domain(rows[col as usize], domain);
-                }
-                for row in 1..height {
-                    domain = mig.add_domain();
-                    for col in 0..width {
-                        rows[col as usize] = mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], Aggregation::SUM.over(rows[col as usize], 0, &[1]));
-                        mig.assign_domain(rows[col as usize], domain);
+                let row2domain: Vec<_> = (0..height).map(|_| mig.add_domain()).collect();
+                for col in &all {
+                    for (row, node) in col.iter().enumerate() {
+                        mig.assign_domain(*node, row2domain[row]);
                     }
                 }
-            },
+            }
             DomainConfiguration::DomainPerNode => {
                 println!("Creating domain for each node!");
-                for col in 0..width {
-                    let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
-                    base = mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j);
-                    domain = mig.add_domain();
-                    mig.assign_domain(base, domain);
-                    for row in 1..height {
-                        base = mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], Aggregation::SUM.over(base, 0, &[1]));
-                        domain = mig.add_domain();
-                        mig.assign_domain(base, domain);
-                    }
-                }
-            },
+                // this is the default, so we don't need to do any assignments
+            }
             DomainConfiguration::SingleDomain => {
                 println!("Using one domain for all nodes!");
-                for col in 0..width {
-                    let j = JoinBuilder::new(vec![(data, 0), (data, 1)]).from(data, vec![1, 0]).join(number, vec![1]);
-                    base = mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j);
-                    mig.assign_domain(base, domain);
-                    for row in 1..height {
-                        base = mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], Aggregation::SUM.over(base, 0, &[1]));
-                        mig.assign_domain(base, domain);
+                for col in &all {
+                    for node in col {
+                        mig.assign_domain(*node, base_domain);
                     }
                 }
-            
             }
         }
         mig.commit();
