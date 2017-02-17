@@ -16,7 +16,7 @@ struct Backend {
 enum DomainConfiguration {
     SingleDomain,
     DomainPerNode,
-    HorizSlice,
+    HorizontalSlice,
     VerticalSlice,
 }
 
@@ -71,7 +71,7 @@ fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
                     }
                 }
             }
-            DomainConfiguration::HorizSlice => {
+            DomainConfiguration::HorizontalSlice => {
                 println!("Creating domain for each row!");
                 let row2domain: Vec<_> = (0..height).map(|_| mig.add_domain()).collect();
                 for col in &all {
@@ -143,7 +143,7 @@ fn main() {
     let mut backend;
     match cfg.as_ref() {
         "vert_slice" => backend = make(DomainConfiguration::VerticalSlice, width, height),
-        "horiz_slice" => backend = make(DomainConfiguration::HorizSlice, width, height),
+        "horiz_slice" => backend = make(DomainConfiguration::HorizontalSlice, width, height),
         "domain_per_node" => backend = make(DomainConfiguration::DomainPerNode, width, height),
         _ => backend = make(DomainConfiguration::SingleDomain, width, height),
     }
