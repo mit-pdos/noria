@@ -141,13 +141,12 @@ fn main() {
 
     println!("Using batch size of {}", batch_size);
 
-    let mut backend;
-    match cfg.as_ref() {
-        "vert_slice" => backend = make(DomainConfiguration::VerticalSlice, width, height),
-        "horiz_slice" => backend = make(DomainConfiguration::HorizontalSlice, width, height),
-        "domain_per_node" => backend = make(DomainConfiguration::DomainPerNode, width, height),
-        _ => backend = make(DomainConfiguration::SingleDomain, width, height),
-    }
+    let mut backend = match cfg.as_ref() {
+        "vert_slice" => make(DomainConfiguration::VerticalSlice, width, height),
+        "horiz_slice" => make(DomainConfiguration::HorizontalSlice, width, height),
+        "domain_per_node" => make(DomainConfiguration::DomainPerNode, width, height),
+        _ => make(DomainConfiguration::SingleDomain, width, height),
+    };
     let data_putter = backend.data.take().unwrap();
     let number_putter = backend.number.take().unwrap();
     println!("Seeding...");
