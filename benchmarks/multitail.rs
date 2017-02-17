@@ -20,7 +20,6 @@ enum DomainConfiguration {
     VerticalSlice,
 }
 
-
 fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
     // set up graph
     let mut g = Blender::new();
@@ -51,7 +50,9 @@ fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
         for (col, els) in all.iter_mut().enumerate() {
             for row in 1..height {
                 let agg = Aggregation::SUM.over(*els.last().unwrap(), 0, &[1]);
-                els.push(mig.add_ingredient(format!("node{}{}", row, col), &["number", "val"], agg));
+                let name = format!("node{}{}", row, col);
+                let n = mig.add_ingredient(name, &["number", "val"], agg);
+                els.push(n);
             }
         }
 
@@ -111,26 +112,26 @@ fn main() {
         .version("0.1")
         .about("Benchmarks different thread domain splits for a multi-tailed graphi.")
         .arg(Arg::with_name("cfg")
-             .short("c")
-             .possible_values(&["one_domain", "domain_per_node", "vert_slice", "horiz_slice"])
-             .takes_value(true)
-             .required(true)
-             .help("Domain split type"))
+            .short("c")
+            .possible_values(&["one_domain", "domain_per_node", "vert_slice", "horiz_slice"])
+            .takes_value(true)
+            .required(true)
+            .help("Domain split type"))
         .arg(Arg::with_name("batch")
-             .short("b")
-             .takes_value(true)
-             .required(true)
-             .help("Batch size"))
+            .short("b")
+            .takes_value(true)
+            .required(true)
+            .help("Batch size"))
         .arg(Arg::with_name("width")
-             .short("w")
-             .takes_value(true)
-             .required(true)
-             .help("Number of tails"))
+            .short("w")
+            .takes_value(true)
+            .required(true)
+            .help("Number of tails"))
         .arg(Arg::with_name("height")
-             .short("h")
-             .takes_value(true)
-             .required(true)
-             .help("Depth of each tail"))
+            .short("h")
+            .takes_value(true)
+            .required(true)
+            .help("Depth of each tail"))
         .get_matches();
 
     let cfg = matches.value_of("cfg").unwrap();
@@ -150,8 +151,7 @@ fn main() {
     let data_putter = backend.data.take().unwrap();
     let number_putter = backend.number.take().unwrap();
     println!("Seeding...");
-    for y in 1..batch_size+1 {
-        // 3 because 3 tails
+    for y in 1..batch_size + 1 {
         data_putter.transactional_put(vec![batch_size.into(), y.into()], Token::empty());
     }
     println!("Finished seeding! Sleeping for 1 second...");
