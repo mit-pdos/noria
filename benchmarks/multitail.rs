@@ -132,12 +132,16 @@ fn main() {
             .takes_value(true)
             .required(true)
             .help("Depth of each tail"))
+        .arg(Arg::with_name("csv")
+            .required(false)
+            .help("Print output in CSV format."))
         .get_matches();
 
     let cfg = matches.value_of("cfg").unwrap();
     let batch_size = value_t_or_exit!(matches, "batch", i64);
     let width = value_t_or_exit!(matches, "width", u16);
     let height = value_t_or_exit!(matches, "height", u16);
+    let csv = matches.is_present("csv");
 
     println!("Using batch size of {}", batch_size);
 
@@ -158,18 +162,29 @@ fn main() {
 
     println!("Starting benchmark!");
     let start = time::Instant::now();
-    let mut elapsed_millis: i64;
+    let mut elapsed_secs: f64;
+    let mut num_puts: i64 = 0;
     let mut num_updates: i64 = 0;
     loop {
-        num_updates += 3 * batch_size;
-        number_putter.transactional_put(vec![batch_size.into()], Token::empty());
+        num_puts += 1;
+        num_updates += batch_size * width as i64;
+        number_putter.put(vec![batch_size.into()]);
         let elapsed = time::Instant::now().duration_since(start);
-        elapsed_millis = (elapsed.as_secs() as i64 * 1_000) + (elapsed.subsec_nanos() as i64 / 1_000_000);
-        if elapsed_millis > 30_000 {
+        elapsed_secs = (elapsed.as_secs() as f64) +
+                       (elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
+        if elapsed_secs > 30.0 {
             break;
         }
     }
 
-    println!("{}", num_updates / elapsed_millis);
+    if csv {
+        println!("{:.2},{:.2}",
+                 num_puts as f64 / elapsed_secs,
+                 num_updates as f64 / elapsed_secs);
+    } else {
+        println!("{:.2} PUTs/sec, {:.2} updates/sec",
+                 num_puts as f64 / elapsed_secs,
+                 num_updates as f64 / elapsed_secs);
+    }
 
 }
