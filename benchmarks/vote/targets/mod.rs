@@ -27,3 +27,5 @@ pub mod postgres;
 pub mod netsoup;
 #[cfg(feature="b_memcached")]
 pub mod memcached;
+#[cfg(feature="b_hybrid")]
+pub mod hybrid;
