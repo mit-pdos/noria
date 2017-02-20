@@ -68,11 +68,12 @@ pub fn make(memcached_dbn: &str,
     conn.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
 
     // create tables with indices
-    conn.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, INDEX USING \
-                    HASH(id)) ENGINE = MEMORY",
+    conn.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, PRIMARY \
+                    KEY(id)) ENGINE = MEMORY",
                    ())
         .unwrap();
-    conn.prep_exec("CREATE TABLE vt (u bigint, id bigint, INDEX USING HASH(id)) ENGINE = MEMORY",
+    conn.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY(u, id), KEY id (id)) \
+                    ENGINE = MEMORY",
                    ())
         .unwrap();
 
