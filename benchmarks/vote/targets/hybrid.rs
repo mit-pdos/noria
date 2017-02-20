@@ -100,10 +100,12 @@ impl Backend for (Vec<Memcache>, r2d2::Pool<MCM>) {
 impl Putter for (Memcache, PC) {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
         let mut prep = self.1
-            .prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
+            .prepare("INSERT INTO art (id, title) VALUES (:id, :title)")
             .unwrap();
+        let ref mut memd = self.0;
         Box::new(move |id, title| {
             prep.execute(params!{"id" => id, "title" => &title}).unwrap();
+            drop(memd.set_raw(&format!("article_{}_vc", id), b"0", 0, 0));
         })
     }
 
@@ -112,7 +114,7 @@ impl Putter for (Memcache, PC) {
         let ref mut memd = self.0;
         Box::new(move |user, id| {
             // DB insert
-            pv.execute(params!{"user" => &user, "id" => &id}).unwrap();
+            pv.execute(params!{"user" => user, "id" => id}).unwrap();
             // memcached invalidate
             drop(memd.set_raw(&format!("article_{}_vc", id), b"0", 1, 0));
         })
@@ -121,17 +123,37 @@ impl Putter for (Memcache, PC) {
 
 impl Getter for (Memcache, PC) {
     fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
+        let mut prep = self.1
+            .prepare("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
+                      WHERE art.id = vt.id AND art.id = :id
+                      GROUP BY vt.id, title")
+            .unwrap();
+        let ref mut memd = self.0;
         Box::new(move |id| {
             // TODO: use mget
             //let title = self.get_raw(&format!("article_{}", id));
             let title: Result<_, ()> = Ok((Vec::from(format!("article_{}", id).as_bytes()),));
-            let vc = self.0.get_raw(&format!("article_{}_vc", id));
+            let vc = memd.get_raw(&format!("article_{}_vc", id));
             match (title, vc) {
                 (Ok(title), Ok(vc)) => {
                     let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
                     Ok(Some((id, String::from_utf8_lossy(&title.0[..]).into_owned(), vc)))
                 }
-                _ => Ok(None),
+                (Ok(title), Err(_)) => {
+                    for row in prep.execute(params!{"id" => &id}).unwrap() {
+                        let mut rr = row.unwrap();
+                        let id = rr.get(0).unwrap();
+                        let title = rr.get(1).unwrap();
+                        let vc = rr.get(2).unwrap();
+                        drop(memd.set_raw(&format!("article_{}_vc", id),
+                                          format!("{}", vc).as_bytes(),
+                                          0,
+                                          0));
+                        return Ok(Some((id, title, vc)));
+                    }
+                    Ok(None)
+                }
+                _ => panic!(),
             }
         })
     }
