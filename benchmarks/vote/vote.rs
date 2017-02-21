@@ -44,7 +44,7 @@ extern crate futures;
 extern crate tokio_core;
 
 #[cfg(any(feature="b_memcached", feature="b_hybrid"))]
-extern crate memcache;
+extern crate memcached;
 
 extern crate hdrsample;
 

@@ -1,16 +1,23 @@
-use memcache;
+use memcached;
+use memcached::proto::{Operation, ProtoType};
 use mysql;
 use r2d2;
 use r2d2_mysql::MysqlConnectionManager;
 
-pub struct Memcache(memcache::Memcache);
+pub struct Memcache(memcached::Client);
 unsafe impl Send for Memcache {}
 
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 impl Deref for Memcache {
-    type Target = memcache::Memcache;
+    type Target = memcached::Client;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Memcache {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -29,12 +36,13 @@ pub fn make(memcached_dbn: &str,
     use mysql::Opts;
     use r2d2_mysql::CreateManager;
 
-    let mut memcached_dbn = memcached_dbn.splitn(2, ':');
-    let host = memcached_dbn.next().unwrap();
-    let port: u64 = memcached_dbn.next().unwrap().parse().unwrap();
     let memcached_handles = (0..(getters + 1))
         .into_iter()
-        .map(|_| Memcache(memcache::connect(&(host, port)).unwrap()))
+        .map(|_| {
+            Memcache(memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
+                                                ProtoType::Binary)
+                .unwrap())
+        })
         .collect::<Vec<_>>();
 
     let mysql_dbn = format!("mysql://{}", mysql_dbn);
@@ -106,10 +114,10 @@ impl Putter for (Memcache, PC) {
         let ref mut memd = self.0;
         Box::new(move |id, title| {
             prep.execute(params!{"id" => id, "title" => &title}).unwrap();
-            drop(memd.set_raw(&format!("article_{}_vc", id),
-                              format!("{};{};0", id, title).as_bytes(),
-                              0,
-                              0));
+            drop(memd.set(format!("article_{}_vc", id).as_bytes(),
+                          format!("{};{};0", id, title).as_bytes(),
+                          0,
+                          0));
         })
     }
 
@@ -121,7 +129,7 @@ impl Putter for (Memcache, PC) {
             pv.execute(params!{"user" => user, "id" => id}).unwrap();
             // memcached invalidate: we use a hack with a short (1s) lifetime here because the
             // `memcached` crate does not expose `delete()`.
-            drop(memd.set_raw(&format!("article_{}_vc", id), b"0", 1, 0));
+            drop(memd.set(format!("article_{}_vc", id).as_bytes(), b"0", 1, 0));
         })
     }
 }
@@ -135,7 +143,7 @@ impl Getter for (Memcache, PC) {
             .unwrap();
         let ref mut memd = self.0;
         Box::new(move |id| {
-            let cached = memd.get_raw(&format!("article_{}_vc", id));
+            let cached = memd.get(format!("article_{}_vc", id).as_bytes());
 
             let mut handle_miss = |id: i64| -> Result<Option<(i64, String, i64)>, ()> {
                 for row in prep.execute(params!{"id" => &id}).unwrap() {
@@ -143,10 +151,10 @@ impl Getter for (Memcache, PC) {
                     let id = rr.get(0).unwrap();
                     let title = rr.get(1).unwrap();
                     let vc = rr.get(2).unwrap();
-                    drop(memd.set_raw(&format!("article_{}_vc", id),
-                                      format!("{};{};{}", id, title, vc).as_bytes(),
-                                      0,
-                                      0));
+                    drop(memd.set(format!("article_{}_vc", id).as_bytes(),
+                                  format!("{};{};{}", id, title, vc).as_bytes(),
+                                  0,
+                                  0));
                     return Ok(Some((id, title, vc)));
                 }
                 Ok(None)
