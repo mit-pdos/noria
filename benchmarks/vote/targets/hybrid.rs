@@ -129,7 +129,7 @@ impl Putter for (Memcache, PC) {
             pv.execute(params!{"user" => user, "id" => id}).unwrap();
             // memcached invalidate: we use a hack with a short (1s) lifetime here because the
             // `memcached` crate does not expose `delete()`.
-            drop(memd.set(format!("article_{}_vc", id).as_bytes(), b"0", 1, 0));
+            drop(memd.delete(format!("article_{}_vc", id).as_bytes()));
         })
     }
 }
@@ -163,16 +163,10 @@ impl Getter for (Memcache, PC) {
             match cached {
                 Ok(data) => {
                     let s = String::from_utf8_lossy(&data.0[..]);
-                    // we may see the temporary "invalidation" write here, so if we do, handle it
-                    // as a miss
-                    if s == "0" {
-                        handle_miss(id)
-                    } else {
-                        let mut parts = s.split(";");
-                        Ok(Some((parts.next().unwrap().parse().unwrap(),
-                                 String::from(parts.next().unwrap()),
-                                 parts.next().unwrap().parse().unwrap())))
-                    }
+                    let mut parts = s.split(";");
+                    Ok(Some((parts.next().unwrap().parse().unwrap(),
+                             String::from(parts.next().unwrap()),
+                             parts.next().unwrap().parse().unwrap())))
                 }
                 Err(_) => handle_miss(id),
             }
