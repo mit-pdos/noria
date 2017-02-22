@@ -31,7 +31,12 @@ pub fn make(dbn: &str, _: usize) -> MssqlTarget {
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec(format!("USE {};", db))
+            conn.simple_exec(format!("USE {}; \
+                                      SET NUMERIC_ROUNDABORT OFF; \
+                                      SET ANSI_PADDING, ANSI_WARNINGS, \
+                                      CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; ",
+                                     db))
                 .and_then(|r| r)
                 .collect()
         })
@@ -91,7 +96,12 @@ impl MssqlTarget {
 
         let fc = tiberius::SqlConnection::connect(core.handle(), self.dbn.as_str())
             .and_then(|conn| {
-                conn.simple_exec(format!("USE {}", self.db.as_str()))
+                conn.simple_exec(format!("USE {}; \
+                                          SET NUMERIC_ROUNDABORT OFF; \
+                                          SET ANSI_PADDING, ANSI_WARNINGS, \
+                                          CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
+                                          QUOTED_IDENTIFIER, ANSI_NULLS ON;",
+                                         self.db.as_str()))
                     .and_then(|r| r)
                     .collect()
             });
@@ -167,7 +177,7 @@ impl Getter for Client {
         let prep = self.conn
             .as_ref()
             .unwrap()
-            .prepare("SELECT id, title, votes FROM awvc WHERE id = @P1;");
+            .prepare("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P1;");
         Box::new(move |id| {
             let mut res = None;
             {
