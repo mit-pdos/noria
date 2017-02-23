@@ -1,11 +1,12 @@
-use memcache;
+use memcached;
+use memcached::proto::{Operation, ProtoType};
 
-pub struct Memcache(memcache::Memcache);
+pub struct Memcache(memcached::Client);
 unsafe impl Send for Memcache {}
 
 use std::ops::Deref;
 impl Deref for Memcache {
-    type Target = memcache::Memcache;
+    type Target = memcached::Client;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -16,12 +17,13 @@ use targets::Putter;
 use targets::Getter;
 
 pub fn make(dbn: &str, getters: usize) -> Vec<Memcache> {
-    let mut dbn = dbn.splitn(2, ':');
-    let host = dbn.next().unwrap();
-    let port: u64 = dbn.next().unwrap().parse().unwrap();
     (0..(getters + 1))
         .into_iter()
-        .map(|_| Memcache(memcache::connect(&(host, port)).unwrap()))
+        .map(|_| {
+            Memcache(memcached::Client::connect(&[(&format!("tcp://{}", dbn), 1)],
+                                                ProtoType::Binary)
+                .unwrap())
+        })
         .collect::<Vec<_>>()
 }
 
@@ -44,16 +46,19 @@ impl Backend for Vec<Memcache> {
 
 impl Putter for Memcache {
     fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
+        let ref mut memd = self.0;
         Box::new(move |id, title| {
-            self.set_raw(&format!("article_{}", id), title.as_bytes(), 0, 0).unwrap();
-            self.set_raw(&format!("article_{}_vc", id), b"0", 0, 0).unwrap();
+            memd.set(format!("article_{}", id).as_bytes(), title.as_bytes(), 0, 0)
+                .unwrap();
+            memd.set(format!("article_{}_vc", id).as_bytes(), b"0", 0, 0).unwrap();
         })
     }
 
     fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
+        let ref mut memd = self.0;
         Box::new(move |_user, id| {
             //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
-            drop(self.increment(&format!("article_{}_vc", id), 1));
+            drop(memd.increment(format!("article_{}_vc", id).as_bytes(), 1, 0, 0));
         })
     }
 }
@@ -64,7 +69,7 @@ impl Getter for Memcache {
             // TODO: use mget
             //let title = self.get_raw(&format!("article_{}", id));
             let title: Result<_, ()> = Ok((Vec::from(format!("article_{}", id).as_bytes()),));
-            let vc = self.get_raw(&format!("article_{}_vc", id));
+            let vc = self.0.get(format!("article_{}_vc", id).as_bytes());
             match (title, vc) {
                 (Ok(title), Ok(vc)) => {
                     let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();

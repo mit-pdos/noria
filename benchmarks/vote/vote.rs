@@ -20,13 +20,13 @@ extern crate tokio_core;
 
 // Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
 // specify it twice.
-#[cfg(any(feature="b_mysql", feature="b_postgresql"))]
+#[cfg(any(feature="b_mysql", feature="b_postgresql", feature="b_hybrid"))]
 extern crate r2d2;
 
-#[cfg(feature="b_mysql")]
+#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
 #[macro_use]
 extern crate mysql;
-#[cfg(feature="b_mysql")]
+#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
 extern crate r2d2_mysql;
 
 #[cfg(feature="b_postgresql")]
@@ -43,8 +43,8 @@ extern crate futures;
 #[cfg(feature="b_netsoup")]
 extern crate tokio_core;
 
-#[cfg(feature="b_memcached")]
-extern crate memcache;
+#[cfg(any(feature="b_memcached", feature="b_hybrid"))]
+extern crate memcached;
 
 extern crate hdrsample;
 
@@ -63,7 +63,8 @@ EXAMPLES:
   vote memcached://127.0.0.1:11211
   vote mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
   vote mysql://user@127.0.0.1/database
-  vote postgresql://user@127.0.0.1/database";
+  vote postgresql://user@127.0.0.1/database
+  vote hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
     use clap::{Arg, App};
@@ -82,6 +83,9 @@ fn main() {
     }
     if cfg!(feature = "b_netsoup") {
         backends.push("netsoup");
+    }
+    if cfg!(feature = "b_hybrid") {
+        backends.push("hybrid");
     }
     let backends = format!("Which database backend to use [{}]://<params>",
                            backends.join(", "));
@@ -173,6 +177,15 @@ fn main() {
         // mysql://soup@127.0.0.1/bench_mysql
         #[cfg(feature="b_mysql")]
         "mysql" => exercise::launch(targets::mysql::make(dbn.next().unwrap(), ngetters), config),
+        // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
+        #[cfg(feature="b_hybrid")]
+        "hybrid" => {
+            let mut split_dbn = dbn.next().unwrap().splitn(2, ",");
+            let mysql_dbn = &split_dbn.next().unwrap()[6..];
+            let memcached_dbn = &split_dbn.next().unwrap()[10..];
+            exercise::launch(targets::hybrid::make(memcached_dbn, mysql_dbn, ngetters),
+                             config)
+        }
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_postgresql")]
         "postgresql" => {
