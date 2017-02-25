@@ -9,14 +9,15 @@ extern crate slog_term;
 
 extern crate rand;
 
-#[cfg(feature="b_mssql")]
+#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
 extern crate futures;
+#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
+extern crate tokio_core;
+
 #[cfg(feature="b_mssql")]
 extern crate futures_state_stream;
 #[cfg(feature="b_mssql")]
 extern crate tiberius;
-#[cfg(feature="b_mssql")]
-extern crate tokio_core;
 
 // Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
 // specify it twice.
@@ -38,10 +39,6 @@ extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
 extern crate tarpc;
-#[cfg(feature="b_netsoup")]
-extern crate futures;
-#[cfg(feature="b_netsoup")]
-extern crate tokio_core;
 
 #[cfg(any(feature="b_memcached", feature="b_hybrid"))]
 extern crate memcached;
