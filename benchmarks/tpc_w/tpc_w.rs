@@ -1,6 +1,7 @@
 extern crate distributary;
 
-#[macro_use]
+mod populate;
+
 extern crate clap;
 extern crate slog;
 extern crate slog_term;
@@ -8,9 +9,9 @@ extern crate slog_term;
 use std::{thread, time};
 use slog::DrainExt;
 
-use distributary::{Blender, Base, Aggregation, Mutator, Recipe, Token, JoinBuilder};
+use distributary::{Blender, Recipe};
 
-struct Backend {
+pub struct Backend {
     r: Recipe,
     g: Blender,
 }
@@ -23,7 +24,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
     let mut g = Blender::new();
     g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
 
-    let mut recipe;
+    let recipe;
     {
         // migrate
         let mut mig = g.start_migration();
@@ -35,7 +36,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
         f.read_to_string(&mut s).unwrap();
         recipe = match Recipe::from_str(&s) {
             Ok(mut recipe) => {
-                recipe.activate(&mut mig);
+                recipe.activate(&mut mig).unwrap();
                 recipe
             }
             Err(e) => panic!(e),
@@ -44,7 +45,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
         mig.commit();
     }
 
-    println!("{}", g);
+    //println!("{}", g);
     Box::new(Backend {
         //data: Some(g.get_mutator(data)),
         r: recipe,
@@ -55,6 +56,8 @@ fn make(recipe_location: &str) -> Box<Backend> {
 
 fn main() {
     use clap::{Arg, App};
+    use populate::*;
+
     let matches = App::new("tpc_w")
         .version("0.1")
         .about("Soup TPC-W driver.")
@@ -63,18 +66,22 @@ fn main() {
             .required(true)
             .default_value("tests/tpc-w-queries.txt")
             .help("Location of the TPC-W recipe file."))
+        .arg(Arg::with_name("populate_from")
+            .short("p")
+            .required(true)
+            .default_value("benchmarks/tpc_w/data")
+            .help("Location of the data files for TPC-W prepopulation."))
         .get_matches();
 
-    let rloc = value_t_or_exit!(matches, "recipe", String);
+    let rloc = matches.value_of("recipe").unwrap();
+    let ploc = matches.value_of("populate_from").unwrap();
 
     println!("Loading TPC-W recipe from {}", rloc);
+    let backend = make(&rloc);
 
-    let mut backend = make(&rloc);
-
-    //let data_putter = backend.data.take().unwrap();
-
-    println!("Writing...");
-    //data_putter.transactional_put(vec![batch_size.into(), y.into()], Token::empty());
+    println!("Prepopulating from data files in {}", ploc);
+    populate_countries(&backend, &ploc);
+    populate_orders(&backend, &ploc);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
