@@ -6,6 +6,72 @@ use std::time;
 use distributary::Token;
 use super::Backend;
 
+pub fn populate_addresses(backend: &Backend, data_location: &str) {
+    let addresses_putter = backend.g.get_mutator(backend.r.node_addr_for("address").unwrap());
+
+    let f = File::open(format!("{}/address.tsv", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").collect();
+            let addr_id = i64::from_str(fields[0]).unwrap();
+            let addr_street1 = fields[1];
+            let addr_street2 = fields[2];
+            let addr_city = fields[3];
+            let addr_state = fields[4];
+            let addr_zip = fields[5];
+            let addr_co_id = fields[6];
+            addresses_putter.put(vec![addr_id.into(),
+                                      addr_street1.into(),
+                                      addr_street2.into(),
+                                      addr_city.into(),
+                                      addr_state.into(),
+                                      addr_zip.into(),
+                                      addr_co_id.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    println!("Wrote {} addresses in {:.2}s!",
+             i,
+             start.elapsed().as_secs());
+}
+
+pub fn populate_authors(backend: &Backend, data_location: &str) {
+    let author_putter = backend.g.get_mutator(backend.r.node_addr_for("author").unwrap());
+
+    let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").collect();
+            let a_id = i64::from_str(fields[0]).unwrap();
+            let a_fname = fields[1];
+            let a_lname = fields[2];
+            let a_mname = fields[3];
+            let a_dob = fields[4];
+            let a_bio = fields[5];
+            author_putter.put(vec![a_id.into(),
+                                   a_fname.into(),
+                                   a_lname.into(),
+                                   a_mname.into(),
+                                   a_dob.into(),
+                                   a_bio.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    println!("Wrote {} authors in {:.2}s!", i, start.elapsed().as_secs());
+}
+
 pub fn populate_countries(backend: &Backend, data_location: &str) {
     let country_putter = backend.g.get_mutator(backend.r.node_addr_for("country").unwrap());
 
