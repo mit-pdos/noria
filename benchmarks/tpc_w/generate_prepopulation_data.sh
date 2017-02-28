@@ -11,15 +11,16 @@ if [[ $# > 1 ]]; then
   SF_BROWSERS=$2
 fi
 
-mkdir -p generate
-mkdir -p data
+mkdir -p ${DIR}/generate
+mkdir -p ${DIR}/data
 
 # download
-wget ${URL} -O generate/generate.tar.gz
-tar -xzf generate/generate.tar.gz
+wget ${URL} -O ${DIR}/generate.tar.gz
+cd ${DIR}
+tar -xzf generate.tar.gz
+cd ${DIR}/generate
 
 # patch & build generator
-cd generate
 echo "char *getRandString(char *str, int l, int h);" >> tpcw-spec.h
 make clean && make all
 
@@ -37,3 +38,6 @@ echo "Generating addresses..."
 ./tpcw -t address -c ${CUST} > ../data/addresses.tsv
 echo "Generating orders..."
 ./tpcw -t orders -c ${CUST} -p ../data > ../data/orders.tsv
+
+# back to old workdir
+cd -
