@@ -9,7 +9,7 @@ use super::Backend;
 pub fn populate_addresses(backend: &Backend, data_location: &str) {
     let addresses_putter = backend.g.get_mutator(backend.r.node_addr_for("address").unwrap());
 
-    let f = File::open(format!("{}/address.tsv", data_location)).unwrap();
+    let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     let mut s = String::new();
