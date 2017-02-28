@@ -83,7 +83,7 @@ fn main() {
     populate_addresses(&backend, &ploc);
     populate_authors(&backend, &ploc);
     populate_countries(&backend, &ploc);
-    //populate_customers(&backend, &ploc);
+    populate_customers(&backend, &ploc);
     //populate_items(&backend, &ploc);
     populate_orders(&backend, &ploc);
 

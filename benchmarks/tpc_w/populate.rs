@@ -101,6 +101,62 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
              start.elapsed().as_secs());
 }
 
+pub fn populate_customers(backend: &Backend, data_location: &str) {
+    let customers_putter = backend.g.get_mutator(backend.r.node_addr_for("customer").unwrap());
+
+    let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").collect();
+            let c_id = i64::from_str(fields[0]).unwrap();
+            let c_uname = fields[1];
+            let c_passwd = fields[2]; // XXX(malte): DataType doesn't support floats
+            let c_fname = fields[3];
+            let c_lname = fields[4];
+            let c_addr_id = fields[5];
+            let c_phone = fields[6];
+            let c_email = fields[7];
+            let c_since = fields[8];
+            let c_last_login = fields[9];
+            let c_login = fields[10];
+            let c_expiration = fields[11];
+            let c_discount = fields[12];
+            let c_balance = fields[13];
+            let c_ytd_pmt = fields[14];
+            let c_birthdate = fields[15];
+            let c_data = fields[16];
+            customers_putter.put(vec![c_id.into(),
+                                      c_uname.into(),
+                                      c_passwd.into(),
+                                      c_fname.into(),
+                                      c_lname.into(),
+                                      c_addr_id.into(),
+                                      c_phone.into(),
+                                      c_email.into(),
+                                      c_since.into(),
+                                      c_last_login.into(),
+                                      c_login.into(),
+                                      c_expiration.into(),
+                                      c_discount.into(),
+                                      c_balance.into(),
+                                      c_ytd_pmt.into(),
+                                      c_birthdate.into(),
+                                      c_data.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    println!("Wrote {} customers in {:.2}s!",
+             i,
+             start.elapsed().as_secs());
+}
+
+
 pub fn populate_orders(backend: &Backend, data_location: &str) {
     let order_putter = backend.g.get_mutator(backend.r.node_addr_for("orders").unwrap());
 
