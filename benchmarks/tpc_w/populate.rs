@@ -6,6 +6,14 @@ use std::time;
 use distributary::Token;
 use super::Backend;
 
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+macro_rules! dur_to_fsec {
+    ($d:expr) => {{
+        let d = $d;
+        (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
+    }}
+}
+
 pub fn populate_addresses(backend: &Backend, data_location: &str) {
     let addresses_putter = backend.g.get_mutator(backend.r.node_addr_for("address").unwrap());
 
@@ -13,6 +21,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) {
     let mut reader = BufReader::new(f);
 
     let mut s = String::new();
+    println!("Prepopulating addresses...");
     let start = time::Instant::now();
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
@@ -36,9 +45,11 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} addresses in {:.2}s!",
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} addresses in {:.2}s ({:.2} PUTs/sec)!",
              i,
-             start.elapsed().as_secs());
+             dur,
+             f64::from(i) / dur);
 }
 
 pub fn populate_authors(backend: &Backend, data_location: &str) {
@@ -49,6 +60,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str) {
 
     let mut s = String::new();
     let start = time::Instant::now();
+    println!("Prepopulating authors...");
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
@@ -69,7 +81,11 @@ pub fn populate_authors(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} authors in {:.2}s!", i, start.elapsed().as_secs());
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} authors in {:.2}s ({:.2} PUTs/sec)!",
+             i,
+             dur,
+             f64::from(i) / dur);
 }
 
 pub fn populate_countries(backend: &Backend, data_location: &str) {
@@ -80,6 +96,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
 
     let mut s = String::new();
     let start = time::Instant::now();
+    println!("Prepopulating countries...");
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
@@ -96,9 +113,11 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} countries in {:.2}s!",
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} countries in {:.2}s ({:.2} PUTs/sec)!",
              i,
-             start.elapsed().as_secs());
+             dur,
+             f64::from(i) / dur);
 }
 
 pub fn populate_customers(backend: &Backend, data_location: &str) {
@@ -109,6 +128,7 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
 
     let mut s = String::new();
     let start = time::Instant::now();
+    println!("Prepopulating customers...");
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
@@ -151,9 +171,11 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} customers in {:.2}s!",
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} customers in {:.2}s ({:.2} PUTs/sec)!",
              i,
-             start.elapsed().as_secs());
+             dur,
+             f64::from(i) / dur);
 }
 
 pub fn populate_items(backend: &Backend, data_location: &str) {
@@ -164,6 +186,7 @@ pub fn populate_items(backend: &Backend, data_location: &str) {
 
     let mut s = String::new();
     let start = time::Instant::now();
+    println!("Prepopulating items...");
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
@@ -216,7 +239,11 @@ pub fn populate_items(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} items in {:.2}s!", i, start.elapsed().as_secs());
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} items in {:.2}s ({:.2} PUTs/sec)!",
+             i,
+             dur,
+             f64::from(i) / dur);
 }
 
 pub fn populate_orders(backend: &Backend, data_location: &str) {
@@ -227,6 +254,7 @@ pub fn populate_orders(backend: &Backend, data_location: &str) {
 
     let mut s = String::new();
     let start = time::Instant::now();
+    println!("Prepopulating orders...");
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
@@ -258,5 +286,9 @@ pub fn populate_orders(backend: &Backend, data_location: &str) {
         i += 1;
         s.clear();
     }
-    println!("Wrote {} orders in {:.2}s!", i, start.elapsed().as_secs());
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} orders in {:.2}s ({:.2} PUTs/sec)!",
+             i,
+             dur,
+             f64::from(i) / dur);
 }
