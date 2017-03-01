@@ -33,7 +33,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool)
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let addr_id = i32::from_str(fields[0]).unwrap();
             let addr_street1 = fields[1];
             let addr_street2 = fields[2];
@@ -71,7 +71,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let a_id = i32::from_str(fields[0]).unwrap();
             let a_fname = fields[1];
             let a_lname = fields[2];
@@ -107,7 +107,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool)
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let co_id = i32::from_str(fields[0]).unwrap();
             let co_name = fields[1];
             let co_exchange = fields[2]; // XXX(malte): DataType doesn't support floats
@@ -139,7 +139,7 @@ pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool)
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let c_id = i32::from_str(fields[0]).unwrap();
             let c_uname = fields[1];
             let c_passwd = fields[2];
@@ -197,7 +197,7 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let i_id = i32::from_str(fields[0]).unwrap();
             let i_title = fields[1];
             let i_a_id = i32::from_str(fields[2]).unwrap();
@@ -265,7 +265,7 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
         {
-            let fields: Vec<&str> = s.split("\t").collect();
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let o_id = i32::from_str(fields[0]).unwrap();
             let o_c_id = i32::from_str(fields[1]).unwrap();
             let o_date = fields[2];
