@@ -90,6 +90,8 @@ fn main() {
     populate_customers(&backend, &ploc, transactional);
     populate_items(&backend, &ploc, transactional);
     populate_orders(&backend, &ploc, transactional);
+    populate_cc_xacts(&backend, &ploc, transactional);
+    populate_order_line(&backend, &ploc, transactional);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));

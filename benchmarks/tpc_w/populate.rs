@@ -95,6 +95,48 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
              f64::from(i) / dur);
 }
 
+pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) {
+    let author_putter = backend.g.get_mutator(backend.r.node_addr_for("cc_xacts").unwrap());
+
+    let f = File::open(format!("{}/cc_xacts.data", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    println!("Prepopulating cc_xacts...");
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
+            let cx_o_id = i32::from_str(fields[0]).unwrap();
+            let cx_type = fields[1];
+            let cx_num = fields[2];
+            let cx_name = fields[3];
+            let cx_expire = fields[4];
+            let cx_auth_id = fields[5];
+            let cx_amt = fields[6]; // XXX(malte): DataType doesn't support double
+            let cx_xact_data = fields[7];
+            let cx_co_id = i32::from_str(fields[8]).unwrap();
+            do_put(&author_putter, use_txn)(vec![cx_o_id.into(),
+                                                 cx_type.into(),
+                                                 cx_num.into(),
+                                                 cx_name.into(),
+                                                 cx_expire.into(),
+                                                 cx_auth_id.into(),
+                                                 cx_amt.into(),
+                                                 cx_xact_data.into(),
+                                                 cx_co_id.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} cx_xacts in {:.2}s ({:.2} PUTs/sec)!",
+             i,
+             dur,
+             f64::from(i) / dur);
+}
+
 pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool) {
     let country_putter = backend.g.get_mutator(backend.r.node_addr_for("country").unwrap());
 
@@ -295,6 +337,43 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
     }
     let dur = dur_to_fsec!(start.elapsed());
     println!("Inserted {} orders in {:.2}s ({:.2} PUTs/sec)!",
+             i,
+             dur,
+             f64::from(i) / dur);
+}
+
+pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool) {
+    let order_putter = backend.g.get_mutator(backend.r.node_addr_for("order_line").unwrap());
+
+    let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    println!("Prepopulating order_line...");
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
+            let ol_id = i32::from_str(fields[0]).unwrap();
+            let ol_o_id = i32::from_str(fields[1]).unwrap();
+            let ol_i_id = i32::from_str(fields[2]).unwrap();
+            let ol_qty = i32::from_str(fields[3]).unwrap();
+            let ol_discount = fields[4]; // XXX(malte): DataType doesn't support floats
+            let ol_comments = fields[5];
+
+            do_put(&order_putter, use_txn)(vec![ol_id.into(),
+                                                ol_o_id.into(),
+                                                ol_i_id.into(),
+                                                ol_qty.into(),
+                                                ol_discount.into(),
+                                                ol_comments.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    let dur = dur_to_fsec!(start.elapsed());
+    println!("Inserted {} order_line records in {:.2}s ({:.2} PUTs/sec)!",
              i,
              dur,
              f64::from(i) / dur);
