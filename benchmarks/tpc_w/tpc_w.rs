@@ -84,7 +84,7 @@ fn main() {
     populate_authors(&backend, &ploc);
     populate_countries(&backend, &ploc);
     populate_customers(&backend, &ploc);
-    //populate_items(&backend, &ploc);
+    populate_items(&backend, &ploc);
     populate_orders(&backend, &ploc);
 
     println!("Finished writing! Sleeping for 1 second...");

@@ -156,6 +156,68 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
              start.elapsed().as_secs());
 }
 
+pub fn populate_items(backend: &Backend, data_location: &str) {
+    let items_putter = backend.g.get_mutator(backend.r.node_addr_for("item").unwrap());
+
+    let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let start = time::Instant::now();
+    let mut i = 0;
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").collect();
+            let i_id = i32::from_str(fields[0]).unwrap();
+            let i_title = fields[1];
+            let i_a_id = i32::from_str(fields[2]).unwrap();
+            let i_pub_date = fields[3];
+            let i_publisher = fields[4];
+            let i_subject = fields[5];
+            let i_desc = fields[6];
+            let i_related1 = i32::from_str(fields[7]).unwrap();
+            let i_related2 = i32::from_str(fields[8]).unwrap();
+            let i_related3 = i32::from_str(fields[9]).unwrap();
+            let i_related4 = i32::from_str(fields[10]).unwrap();
+            let i_related5 = i32::from_str(fields[11]).unwrap();
+            let i_thumbnail = fields[12];
+            let i_image = fields[13];
+            let i_srp = fields[14]; // XXX(malte): DataType doesn't support floats
+            let i_cost = fields[15];
+            let i_avail = fields[16];
+            let i_stock = i32::from_str(fields[17]).unwrap();
+            let i_isbn = fields[18];
+            let i_page = i32::from_str(fields[19]).unwrap();
+            let i_backing = fields[20];
+            let i_dimensions = fields[21];
+            items_putter.put(vec![i_id.into(),
+                                  i_title.into(),
+                                  i_a_id.into(),
+                                  i_pub_date.into(),
+                                  i_publisher.into(),
+                                  i_subject.into(),
+                                  i_desc.into(),
+                                  i_related1.into(),
+                                  i_related2.into(),
+                                  i_related3.into(),
+                                  i_related4.into(),
+                                  i_related5.into(),
+                                  i_thumbnail.into(),
+                                  i_image.into(),
+                                  i_srp.into(),
+                                  i_cost.into(),
+                                  i_avail.into(),
+                                  i_stock.into(),
+                                  i_isbn.into(),
+                                  i_page.into(),
+                                  i_backing.into(),
+                                  i_dimensions.into()]);
+        }
+        i += 1;
+        s.clear();
+    }
+    println!("Wrote {} items in {:.2}s!", i, start.elapsed().as_secs());
+}
 
 pub fn populate_orders(backend: &Backend, data_location: &str) {
     let order_putter = backend.g.get_mutator(backend.r.node_addr_for("orders").unwrap());
