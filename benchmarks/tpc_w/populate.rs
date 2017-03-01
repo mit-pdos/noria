@@ -18,7 +18,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").collect();
-            let addr_id = i64::from_str(fields[0]).unwrap();
+            let addr_id = i32::from_str(fields[0]).unwrap();
             let addr_street1 = fields[1];
             let addr_street2 = fields[2];
             let addr_city = fields[3];
@@ -53,7 +53,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str) {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").collect();
-            let a_id = i64::from_str(fields[0]).unwrap();
+            let a_id = i32::from_str(fields[0]).unwrap();
             let a_fname = fields[1];
             let a_lname = fields[2];
             let a_mname = fields[3];
@@ -84,7 +84,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").collect();
-            let co_id = i64::from_str(fields[0]).unwrap();
+            let co_id = i32::from_str(fields[0]).unwrap();
             let co_name = fields[1];
             let co_exchange = fields[2]; // XXX(malte): DataType doesn't support floats
             let co_currency = fields[3];
@@ -113,21 +113,21 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").collect();
-            let c_id = i64::from_str(fields[0]).unwrap();
+            let c_id = i32::from_str(fields[0]).unwrap();
             let c_uname = fields[1];
-            let c_passwd = fields[2]; // XXX(malte): DataType doesn't support floats
+            let c_passwd = fields[2];
             let c_fname = fields[3];
             let c_lname = fields[4];
-            let c_addr_id = fields[5];
+            let c_addr_id = i32::from_str(fields[5]).unwrap();
             let c_phone = fields[6];
             let c_email = fields[7];
             let c_since = fields[8];
             let c_last_login = fields[9];
             let c_login = fields[10];
             let c_expiration = fields[11];
-            let c_discount = fields[12];
-            let c_balance = fields[13];
-            let c_ytd_pmt = fields[14];
+            let c_discount = fields[12]; // XXX(malte): DataType doesn't support floats
+            let c_balance = fields[13]; // XXX(malte): DataType doesn't support floats
+            let c_ytd_pmt = fields[14]; // XXX(malte): DataType doesn't support floats
             let c_birthdate = fields[15];
             let c_data = fields[16];
             customers_putter.put(vec![c_id.into(),
@@ -169,16 +169,16 @@ pub fn populate_orders(backend: &Backend, data_location: &str) {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").collect();
-            let o_id = i64::from_str(fields[0]).unwrap();
-            let o_c_id = i64::from_str(fields[1]).unwrap();
+            let o_id = i32::from_str(fields[0]).unwrap();
+            let o_c_id = i32::from_str(fields[1]).unwrap();
             let o_date = fields[2];
             let o_sub_total = fields[3]; // XXX(malte): DataType doesn't support floats
             let o_tax = fields[4]; // XXX(malte): DataType doesn't support floats
             let o_total = fields[5]; // XXX(malte): DataType doesn't support floats
             let o_ship_type = fields[6];
             let o_ship_date = fields[7];
-            let o_bill_addr_id = i64::from_str(fields[8]).unwrap();
-            let o_ship_addr_id = i64::from_str(fields[9]).unwrap();
+            let o_bill_addr_id = i32::from_str(fields[8]).unwrap();
+            let o_ship_addr_id = i32::from_str(fields[9]).unwrap();
             let o_status = fields[10];
 
             order_putter.put(vec![o_id.into(),
