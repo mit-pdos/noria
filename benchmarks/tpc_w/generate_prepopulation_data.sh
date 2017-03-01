@@ -38,6 +38,8 @@ echo "Generating addresses..."
 ./tpcw -t address -c ${CUST} > ../data/addresses.tsv
 echo "Generating orders..."
 ./tpcw -t orders -c ${CUST} -p ../data > ../data/orders.tsv
+echo "Generating items..."
+./tpcw -t item -i ${SF_ITEMS} > ../data/items.tsv
 
 # back to old workdir
 cd -
