@@ -3,7 +3,7 @@ use std::fs::File;
 use std::str::FromStr;
 use std::time;
 
-use distributary::Token;
+use distributary::{DataType, Mutator, Token};
 use super::Backend;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -14,7 +14,14 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-pub fn populate_addresses(backend: &Backend, data_location: &str) {
+fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
+    match tx {
+        true => Box::new(move |v| assert!(mutator.transactional_put(v, Token::empty()).ok())),
+        false => Box::new(move |v| mutator.put(v)),
+    }
+}
+
+pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool) {
     let addresses_putter = backend.g.get_mutator(backend.r.node_addr_for("address").unwrap());
 
     let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
@@ -34,13 +41,13 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) {
             let addr_state = fields[4];
             let addr_zip = fields[5];
             let addr_co_id = fields[6];
-            addresses_putter.put(vec![addr_id.into(),
-                                      addr_street1.into(),
-                                      addr_street2.into(),
-                                      addr_city.into(),
-                                      addr_state.into(),
-                                      addr_zip.into(),
-                                      addr_co_id.into()]);
+            do_put(&addresses_putter, use_txn)(vec![addr_id.into(),
+                                                    addr_street1.into(),
+                                                    addr_street2.into(),
+                                                    addr_city.into(),
+                                                    addr_state.into(),
+                                                    addr_zip.into(),
+                                                    addr_co_id.into()]);
         }
         i += 1;
         s.clear();
@@ -52,7 +59,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) {
              f64::from(i) / dur);
 }
 
-pub fn populate_authors(backend: &Backend, data_location: &str) {
+pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
     let author_putter = backend.g.get_mutator(backend.r.node_addr_for("author").unwrap());
 
     let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
@@ -71,12 +78,12 @@ pub fn populate_authors(backend: &Backend, data_location: &str) {
             let a_mname = fields[3];
             let a_dob = fields[4];
             let a_bio = fields[5];
-            author_putter.put(vec![a_id.into(),
-                                   a_fname.into(),
-                                   a_lname.into(),
-                                   a_mname.into(),
-                                   a_dob.into(),
-                                   a_bio.into()]);
+            do_put(&author_putter, use_txn)(vec![a_id.into(),
+                                                 a_fname.into(),
+                                                 a_lname.into(),
+                                                 a_mname.into(),
+                                                 a_dob.into(),
+                                                 a_bio.into()]);
         }
         i += 1;
         s.clear();
@@ -88,7 +95,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str) {
              f64::from(i) / dur);
 }
 
-pub fn populate_countries(backend: &Backend, data_location: &str) {
+pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool) {
     let country_putter = backend.g.get_mutator(backend.r.node_addr_for("country").unwrap());
 
     let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
@@ -105,10 +112,10 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
             let co_name = fields[1];
             let co_exchange = fields[2]; // XXX(malte): DataType doesn't support floats
             let co_currency = fields[3];
-            country_putter.put(vec![co_id.into(),
-                                    co_name.into(),
-                                    co_exchange.into(),
-                                    co_currency.into()]);
+            do_put(&country_putter, use_txn)(vec![co_id.into(),
+                                                  co_name.into(),
+                                                  co_exchange.into(),
+                                                  co_currency.into()]);
         }
         i += 1;
         s.clear();
@@ -120,7 +127,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str) {
              f64::from(i) / dur);
 }
 
-pub fn populate_customers(backend: &Backend, data_location: &str) {
+pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool) {
     let customers_putter = backend.g.get_mutator(backend.r.node_addr_for("customer").unwrap());
 
     let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
@@ -150,23 +157,23 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
             let c_ytd_pmt = fields[14]; // XXX(malte): DataType doesn't support floats
             let c_birthdate = fields[15];
             let c_data = fields[16];
-            customers_putter.put(vec![c_id.into(),
-                                      c_uname.into(),
-                                      c_passwd.into(),
-                                      c_fname.into(),
-                                      c_lname.into(),
-                                      c_addr_id.into(),
-                                      c_phone.into(),
-                                      c_email.into(),
-                                      c_since.into(),
-                                      c_last_login.into(),
-                                      c_login.into(),
-                                      c_expiration.into(),
-                                      c_discount.into(),
-                                      c_balance.into(),
-                                      c_ytd_pmt.into(),
-                                      c_birthdate.into(),
-                                      c_data.into()]);
+            do_put(&customers_putter, use_txn)(vec![c_id.into(),
+                                                    c_uname.into(),
+                                                    c_passwd.into(),
+                                                    c_fname.into(),
+                                                    c_lname.into(),
+                                                    c_addr_id.into(),
+                                                    c_phone.into(),
+                                                    c_email.into(),
+                                                    c_since.into(),
+                                                    c_last_login.into(),
+                                                    c_login.into(),
+                                                    c_expiration.into(),
+                                                    c_discount.into(),
+                                                    c_balance.into(),
+                                                    c_ytd_pmt.into(),
+                                                    c_birthdate.into(),
+                                                    c_data.into()]);
         }
         i += 1;
         s.clear();
@@ -178,7 +185,7 @@ pub fn populate_customers(backend: &Backend, data_location: &str) {
              f64::from(i) / dur);
 }
 
-pub fn populate_items(backend: &Backend, data_location: &str) {
+pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
     let items_putter = backend.g.get_mutator(backend.r.node_addr_for("item").unwrap());
 
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
@@ -213,28 +220,28 @@ pub fn populate_items(backend: &Backend, data_location: &str) {
             let i_page = i32::from_str(fields[19]).unwrap();
             let i_backing = fields[20];
             let i_dimensions = fields[21];
-            items_putter.put(vec![i_id.into(),
-                                  i_title.into(),
-                                  i_a_id.into(),
-                                  i_pub_date.into(),
-                                  i_publisher.into(),
-                                  i_subject.into(),
-                                  i_desc.into(),
-                                  i_related1.into(),
-                                  i_related2.into(),
-                                  i_related3.into(),
-                                  i_related4.into(),
-                                  i_related5.into(),
-                                  i_thumbnail.into(),
-                                  i_image.into(),
-                                  i_srp.into(),
-                                  i_cost.into(),
-                                  i_avail.into(),
-                                  i_stock.into(),
-                                  i_isbn.into(),
-                                  i_page.into(),
-                                  i_backing.into(),
-                                  i_dimensions.into()]);
+            do_put(&items_putter, use_txn)(vec![i_id.into(),
+                                                i_title.into(),
+                                                i_a_id.into(),
+                                                i_pub_date.into(),
+                                                i_publisher.into(),
+                                                i_subject.into(),
+                                                i_desc.into(),
+                                                i_related1.into(),
+                                                i_related2.into(),
+                                                i_related3.into(),
+                                                i_related4.into(),
+                                                i_related5.into(),
+                                                i_thumbnail.into(),
+                                                i_image.into(),
+                                                i_srp.into(),
+                                                i_cost.into(),
+                                                i_avail.into(),
+                                                i_stock.into(),
+                                                i_isbn.into(),
+                                                i_page.into(),
+                                                i_backing.into(),
+                                                i_dimensions.into()]);
         }
         i += 1;
         s.clear();
@@ -246,7 +253,7 @@ pub fn populate_items(backend: &Backend, data_location: &str) {
              f64::from(i) / dur);
 }
 
-pub fn populate_orders(backend: &Backend, data_location: &str) {
+pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
     let order_putter = backend.g.get_mutator(backend.r.node_addr_for("orders").unwrap());
 
     let f = File::open(format!("{}/orders.tsv", data_location)).unwrap();
@@ -271,17 +278,17 @@ pub fn populate_orders(backend: &Backend, data_location: &str) {
             let o_ship_addr_id = i32::from_str(fields[9]).unwrap();
             let o_status = fields[10];
 
-            order_putter.put(vec![o_id.into(),
-                                  o_c_id.into(),
-                                  o_date.into(),
-                                  o_sub_total.into(),
-                                  o_tax.into(),
-                                  o_total.into(),
-                                  o_ship_type.into(),
-                                  o_ship_date.into(),
-                                  o_bill_addr_id.into(),
-                                  o_ship_addr_id.into(),
-                                  o_status.into()]);
+            do_put(&order_putter, use_txn)(vec![o_id.into(),
+                                                o_c_id.into(),
+                                                o_date.into(),
+                                                o_sub_total.into(),
+                                                o_tax.into(),
+                                                o_total.into(),
+                                                o_ship_type.into(),
+                                                o_ship_date.into(),
+                                                o_bill_addr_id.into(),
+                                                o_ship_addr_id.into(),
+                                                o_status.into()]);
         }
         i += 1;
         s.clear();

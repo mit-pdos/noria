@@ -71,21 +71,25 @@ fn main() {
             .required(true)
             .default_value("benchmarks/tpc_w/data")
             .help("Location of the data files for TPC-W prepopulation."))
+        .arg(Arg::with_name("transactional")
+            .short("t")
+            .help("Use transactional writes."))
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
+    let transactional = matches.is_present("transactional");
 
     println!("Loading TPC-W recipe from {}", rloc);
     let backend = make(&rloc);
 
     println!("Prepopulating from data files in {}", ploc);
-    populate_addresses(&backend, &ploc);
-    populate_authors(&backend, &ploc);
-    populate_countries(&backend, &ploc);
-    populate_customers(&backend, &ploc);
-    populate_items(&backend, &ploc);
-    populate_orders(&backend, &ploc);
+    populate_addresses(&backend, &ploc, transactional);
+    populate_authors(&backend, &ploc, transactional);
+    populate_countries(&backend, &ploc, transactional);
+    populate_customers(&backend, &ploc, transactional);
+    populate_items(&backend, &ploc, transactional);
+    populate_orders(&backend, &ploc, transactional);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
