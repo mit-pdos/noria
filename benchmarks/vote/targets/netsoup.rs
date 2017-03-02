@@ -91,7 +91,8 @@ impl SoupTarget {
         let mut core = reactor::Core::new().unwrap();
         for _ in 0..3 {
             use tarpc::client::Options;
-            match core.run(FutureClient::connect(self.addr, Options::default())) {
+            let c = FutureClient::connect(self.addr, Options::default().handle(core.handle()));
+            match core.run(c) {
                 Ok(client) => {
                     return C(client, core);
                 }
