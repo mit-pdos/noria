@@ -134,7 +134,11 @@ fn main() {
             .help("Depth of each tail"))
         .arg(Arg::with_name("csv")
             .required(false)
-            .help("Print output in CSV format."))
+             .help("Print output in CSV format."))
+        .arg(Arg::with_name("stats")
+             .short("s")
+             .required(false)
+             .help("Print statistics about time usage"))
         .get_matches();
 
     let cfg = matches.value_of("cfg").unwrap();
@@ -142,6 +146,7 @@ fn main() {
     let width = value_t_or_exit!(matches, "width", u16);
     let height = value_t_or_exit!(matches, "height", u16);
     let csv = matches.is_present("csv");
+    let stats = matches.is_present("stats");
 
     println!("Using batch size of {}", batch_size);
 
@@ -187,4 +192,28 @@ fn main() {
                  num_updates as f64 / elapsed_secs);
     }
 
+    if stats {
+        let s = backend._g.get_statistics();
+        for (domain_index, (domain_stats, node_map)) in s.domains {
+            let total_time = domain_stats.total_time as f64;
+            let wait_time = domain_stats.wait_time as f64;
+
+            let mut node_map:Vec<_> = node_map.iter().collect();
+            node_map.sort_by_key(|&(_,ns)| ns.process_time);
+            node_map.reverse();
+
+            let total_process_time: u64 = node_map.iter().map(|&(_,ns)| ns.process_time).sum();
+            println!("Domain {:?}: wait fraction = {:.3}, unaccounted = {:.3}",
+                     domain_index, wait_time / total_time,
+                     1.0 - (total_process_time as f64 + wait_time) / total_time);
+
+            for (node_address, node_stats) in node_map {
+                let process_time = node_stats.process_time as f64;
+                let process_ptime = node_stats.process_ptime as f64;
+                println!("  {:?}: {:.3} @ {:.0}%", node_address, process_time / total_time,
+                         100.0 * process_ptime / process_time);
+            }
+            println!("");
+        }
+    }
 }
