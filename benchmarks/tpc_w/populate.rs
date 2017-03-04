@@ -76,7 +76,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
             let a_fname = fields[1];
             let a_lname = fields[2];
             let a_mname = fields[3];
-            let a_dob = fields[4];
+            let a_dob = fields[4]; // XXX(malte): date
             let a_bio = fields[5];
             do_put(&author_putter, use_txn)(vec![a_id.into(),
                                                  a_fname.into(),
@@ -112,10 +112,10 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) 
             let cx_type = fields[1];
             let cx_num = fields[2];
             let cx_name = fields[3];
-            let cx_expire = fields[4];
+            let cx_expire = fields[4]; // XXX(malte): date
             let cx_auth_id = fields[5];
-            let cx_amt = fields[6]; // XXX(malte): DataType doesn't support double
-            let cx_xact_data = fields[7];
+            let cx_amt = f64::from_str(fields[6]).unwrap();
+            let cx_xact_date = fields[7]; // XXX(malte): date
             let cx_co_id = i32::from_str(fields[8]).unwrap();
             do_put(&author_putter, use_txn)(vec![cx_o_id.into(),
                                                  cx_type.into(),
@@ -124,7 +124,7 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) 
                                                  cx_expire.into(),
                                                  cx_auth_id.into(),
                                                  cx_amt.into(),
-                                                 cx_xact_data.into(),
+                                                 cx_xact_date.into(),
                                                  cx_co_id.into()]);
         }
         i += 1;
@@ -152,7 +152,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool)
             let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let co_id = i32::from_str(fields[0]).unwrap();
             let co_name = fields[1];
-            let co_exchange = fields[2]; // XXX(malte): DataType doesn't support floats
+            let co_exchange = f64::from_str(fields[2]).unwrap();
             let co_currency = fields[3];
             do_put(&country_putter, use_txn)(vec![co_id.into(),
                                                   co_name.into(),
@@ -194,9 +194,9 @@ pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool)
             let c_last_login = fields[9];
             let c_login = fields[10];
             let c_expiration = fields[11];
-            let c_discount = fields[12]; // XXX(malte): DataType doesn't support floats
-            let c_balance = fields[13]; // XXX(malte): DataType doesn't support floats
-            let c_ytd_pmt = fields[14]; // XXX(malte): DataType doesn't support floats
+            let c_discount = f64::from_str(fields[12]).unwrap();
+            let c_balance = f64::from_str(fields[13]).unwrap();
+            let c_ytd_pmt = f64::from_str(fields[14]).unwrap();
             let c_birthdate = fields[15];
             let c_data = fields[16];
             do_put(&customers_putter, use_txn)(vec![c_id.into(),
@@ -254,7 +254,7 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
             let i_related5 = i32::from_str(fields[11]).unwrap();
             let i_thumbnail = fields[12];
             let i_image = fields[13];
-            let i_srp = fields[14]; // XXX(malte): DataType doesn't support floats
+            let i_srp = f64::from_str(fields[14]).unwrap();
             let i_cost = fields[15];
             let i_avail = fields[16];
             let i_stock = i32::from_str(fields[17]).unwrap();
@@ -311,9 +311,9 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
             let o_id = i32::from_str(fields[0]).unwrap();
             let o_c_id = i32::from_str(fields[1]).unwrap();
             let o_date = fields[2];
-            let o_sub_total = fields[3]; // XXX(malte): DataType doesn't support floats
-            let o_tax = fields[4]; // XXX(malte): DataType doesn't support floats
-            let o_total = fields[5]; // XXX(malte): DataType doesn't support floats
+            let o_sub_total = f64::from_str(fields[3]).unwrap();
+            let o_tax = f64::from_str(fields[4]).unwrap();
+            let o_total = f64::from_str(fields[5]).unwrap();
             let o_ship_type = fields[6];
             let o_ship_date = fields[7];
             let o_bill_addr_id = i32::from_str(fields[8]).unwrap();
@@ -359,7 +359,7 @@ pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool
             let ol_o_id = i32::from_str(fields[1]).unwrap();
             let ol_i_id = i32::from_str(fields[2]).unwrap();
             let ol_qty = i32::from_str(fields[3]).unwrap();
-            let ol_discount = fields[4]; // XXX(malte): DataType doesn't support floats
+            let ol_discount = f64::from_str(fields[4]).unwrap();
             let ol_comments = fields[5];
 
             do_put(&order_putter, use_txn)(vec![ol_id.into(),
