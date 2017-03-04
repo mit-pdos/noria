@@ -143,9 +143,12 @@ impl Getter for (C, usize) {
                 .map(|rows| {
                     for row in rows {
                         match row[1] {
-                            DataType::Text(ref s) => {
+                            DataType::TinyText(..) |
+                            DataType::Text(..) => {
+                                use std::borrow::Cow;
+                                let t: Cow<_> = (&row[1]).into();
                                 return Some((row[0].clone().into(),
-                                             (**s).clone(),
+                                             t.to_string(),
                                              row[2].clone().into()));
                             }
                             _ => unreachable!(),
