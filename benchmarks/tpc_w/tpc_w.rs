@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate distributary;
 
 mod populate;

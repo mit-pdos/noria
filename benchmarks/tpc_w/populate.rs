@@ -1,3 +1,6 @@
+use chrono::naive::date::NaiveDate;
+use chrono::naive::time::NaiveTime;
+use chrono::naive::datetime::NaiveDateTime;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::str::FromStr;
@@ -19,6 +22,12 @@ fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
         true => Box::new(move |v| assert!(mutator.transactional_put(v, Token::empty()).ok())),
         false => Box::new(move |v| mutator.put(v)),
     }
+}
+
+fn parse_ymd_to_timestamp(s: &str) -> i64 {
+    let d = NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap();
+    let ts = d.and_time(NaiveTime::from_hms(0, 0, 0)).timestamp();
+    ts as i64
 }
 
 pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool) {
@@ -76,7 +85,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
             let a_fname = fields[1];
             let a_lname = fields[2];
             let a_mname = fields[3];
-            let a_dob = fields[4]; // XXX(malte): date
+            let a_dob = parse_ymd_to_timestamp(fields[4]);
             let a_bio = fields[5];
             do_put(&author_putter, use_txn)(vec![a_id.into(),
                                                  a_fname.into(),
@@ -112,10 +121,11 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) 
             let cx_type = fields[1];
             let cx_num = fields[2];
             let cx_name = fields[3];
-            let cx_expire = fields[4]; // XXX(malte): date
+            let cx_expire = parse_ymd_to_timestamp(fields[4]);
             let cx_auth_id = fields[5];
             let cx_amt = f64::from_str(fields[6]).unwrap();
-            let cx_xact_date = fields[7]; // XXX(malte): date
+            let xact_date = NaiveDateTime::parse_from_str(fields[7], "%Y-%m-%d %H:%M:%S");
+            let cx_xact_date = xact_date.unwrap().timestamp();
             let cx_co_id = i32::from_str(fields[8]).unwrap();
             do_put(&author_putter, use_txn)(vec![cx_o_id.into(),
                                                  cx_type.into(),
@@ -190,14 +200,14 @@ pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool)
             let c_addr_id = i32::from_str(fields[5]).unwrap();
             let c_phone = fields[6];
             let c_email = fields[7];
-            let c_since = fields[8];
-            let c_last_login = fields[9];
+            let c_since = parse_ymd_to_timestamp(fields[8]);
+            let c_last_login = parse_ymd_to_timestamp(fields[9]);
             let c_login = fields[10];
             let c_expiration = fields[11];
             let c_discount = f64::from_str(fields[12]).unwrap();
             let c_balance = f64::from_str(fields[13]).unwrap();
             let c_ytd_pmt = f64::from_str(fields[14]).unwrap();
-            let c_birthdate = fields[15];
+            let c_birthdate = parse_ymd_to_timestamp(fields[15]);
             let c_data = fields[16];
             do_put(&customers_putter, use_txn)(vec![c_id.into(),
                                                     c_uname.into(),
@@ -243,7 +253,7 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
             let i_id = i32::from_str(fields[0]).unwrap();
             let i_title = fields[1];
             let i_a_id = i32::from_str(fields[2]).unwrap();
-            let i_pub_date = fields[3];
+            let i_pub_date = parse_ymd_to_timestamp(fields[3]);
             let i_publisher = fields[4];
             let i_subject = fields[5];
             let i_desc = fields[6];
@@ -256,7 +266,7 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
             let i_image = fields[13];
             let i_srp = f64::from_str(fields[14]).unwrap();
             let i_cost = fields[15];
-            let i_avail = fields[16];
+            let i_avail = parse_ymd_to_timestamp(fields[16]);
             let i_stock = i32::from_str(fields[17]).unwrap();
             let i_isbn = fields[18];
             let i_page = i32::from_str(fields[19]).unwrap();
@@ -310,12 +320,16 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
             let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let o_id = i32::from_str(fields[0]).unwrap();
             let o_c_id = i32::from_str(fields[1]).unwrap();
-            let o_date = fields[2];
+            let o_date = NaiveDateTime::parse_from_str(fields[2], "'%Y-%m-%d %H:%M:%S'")
+                .unwrap()
+                .timestamp();
             let o_sub_total = f64::from_str(fields[3]).unwrap();
             let o_tax = f64::from_str(fields[4]).unwrap();
             let o_total = f64::from_str(fields[5]).unwrap();
             let o_ship_type = fields[6];
-            let o_ship_date = fields[7];
+            let o_ship_date = NaiveDateTime::parse_from_str(fields[7], "'%Y-%m-%d %H:%M:%S'")
+                .unwrap()
+                .timestamp();
             let o_bill_addr_id = i32::from_str(fields[8]).unwrap();
             let o_ship_addr_id = i32::from_str(fields[9]).unwrap();
             let o_status = fields[10];
