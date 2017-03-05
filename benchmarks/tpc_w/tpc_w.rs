@@ -17,6 +17,14 @@ pub struct Backend {
     g: Blender,
 }
 
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+macro_rules! dur_to_fsec {
+    ($d:expr) => {{
+        let d = $d;
+        (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
+    }}
+}
+
 fn make(recipe_location: &str) -> Box<Backend> {
     use std::io::Read;
     use std::fs::File;
@@ -98,4 +106,21 @@ fn main() {
     thread::sleep(time::Duration::from_millis(1000));
 
     println!("Reading...");
+    for nq in backend.r.aliases().iter() {
+        println!("{}", nq);
+        match backend.r.node_addr_for(nq) {
+            Err(_) => println!("no node!"),
+            Ok(nd) => {
+                let g = backend.g.get_getter(nd).unwrap();
+                let start = time::Instant::now();
+                for _ in 0..1_000_000 {
+                    g(&0.into());
+                }
+                let dur = dur_to_fsec!(start.elapsed());
+                println!("Took {:.2}s ({:.2} GETs/sec)!",
+                         dur,
+                         f64::from(1_000_000) / dur);
+            }
+        }
+    }
 }
