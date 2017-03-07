@@ -114,7 +114,7 @@ fn main() {
                 let g = backend.g.get_getter(nd).unwrap();
                 let start = time::Instant::now();
                 for _ in 0..1_000_000 {
-                    g(&0.into());
+                    drop(g(&0.into()));
                 }
                 let dur = dur_to_fsec!(start.elapsed());
                 println!("Took {:.2}s ({:.2} GETs/sec)!",

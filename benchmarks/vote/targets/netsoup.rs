@@ -119,7 +119,7 @@ impl Backend for SoupTarget {
         (self.mkc(), self.vote, self.article)
     }
 
-    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+    fn migrate(&mut self, _ngetters: usize) -> (Self::P, Vec<Self::G>) {
         unimplemented!()
     }
 }
