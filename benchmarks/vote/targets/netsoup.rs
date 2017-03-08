@@ -2,7 +2,7 @@ use distributary::srv;
 use distributary::{Blender, Base, Aggregation, JoinBuilder, DataType};
 use tarpc;
 use tarpc::util::FirstSocketAddr;
-use tarpc::client::future::ClientExt;
+use tarpc::future::client::{ClientExt, Options};
 use tokio_core::reactor;
 
 use targets::Backend;
@@ -90,8 +90,8 @@ impl SoupTarget {
         use self::srv::ext::FutureClient;
         let mut core = reactor::Core::new().unwrap();
         for _ in 0..3 {
-            use tarpc::client::Options;
-            match core.run(FutureClient::connect(self.addr, Options::default())) {
+            let c = FutureClient::connect(self.addr, Options::default().handle(core.handle()));
+            match core.run(c) {
                 Ok(client) => {
                     return C(client, core);
                 }
