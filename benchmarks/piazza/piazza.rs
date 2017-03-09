@@ -4,6 +4,8 @@ extern crate distributary;
 extern crate clap;
 
 use std::{thread, time};
+use std::fs::{OpenOptions, File};
+use std::io::Write;
 
 use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator};
 
@@ -98,24 +100,11 @@ fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator) {
     }
 }
 
-// writes a post for each class
-fn write_posts(nclasses: i64, uid: i64, post_putter: &Mutator) {
-    for cid in 0..nclasses {
-        post_putter.put(vec![0.into(), cid.into(), uid.into(), "post".into()]);
-    }
-}
-
 fn main() {
     use clap::{Arg, App};
     let args = App::new("piazza")
         .version("0.1")
         .about("Benchmarks Piazza-like application with some security policies.")
-        .arg(Arg::with_name("runtime")
-            .short("r")
-            .long("runtime")
-            .value_name("N")
-            .default_value("60")
-            .help("Benchmark runtime in seconds"))
         .arg(Arg::with_name("nclasses")
             .short("c")
             .long("classes")
@@ -129,8 +118,14 @@ fn main() {
             .default_value("100")
             .help("Number of users to prepopulate the database with"))
         .arg(Arg::with_name("csv")
+            .long("csv")
             .required(false)
             .help("Print output in CSV format."))
+        .arg(Arg::with_name("cfg")
+            .possible_values(&["write", "migration"])
+            .takes_value(true)
+            .required(true)
+            .help("Benchmark configuration"))
         .get_matches();
 
 
@@ -140,37 +135,124 @@ fn main() {
 
     let nusers = value_t_or_exit!(args, "nusers", i64);
     let nclasses = value_t_or_exit!(args, "nclasses", i64);
+    let cfg = args.value_of("cfg").unwrap();
+    let csv = args.is_present("csv");
 
     let class_putter = app.soup.get_mutator(app.class);
     let user_putter = app.soup.get_mutator(app.user);
     let taking_putter = app.soup.get_mutator(app.taking);
     let post_putter = app.soup.get_mutator(app.post);
 
-    println!("Populating db...", );
+    println!("Seeding...", );
     populate_users(nusers, user_putter);
     populate_classes(nclasses, class_putter);
     populate_taking(nclasses, nusers, taking_putter);
+
+    match cfg.as_ref() {
+        "migration" => {
+            // each user writes a post to each class
+            for uid in 0..nusers {
+                for cid in 0..nclasses {
+                    post_putter.put(vec![0.into(), cid.into(), uid.into(), "post".into()]);
+                }
+            }
+        },
+        "write" => {
+            // login nusers
+            for i in 0..nusers {
+                app.log_user(i.into());
+            }
+        }
+        _ => {
+            println!("wrong benchmark!");
+            return
+        }
+    }
+
     println!("Finished seeding! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
 
-    println!("Starting benchmark!");
-    println!("Logging in users...");
-    let start = time::Instant::now();
-    let mut elapsed_secs: f64;
-    for i in 0..nusers {
-        app.log_user(i.into());
-        write_posts(nclasses, i, &post_putter);
-        let elapsed = time::Instant::now().duration_since(start);
-        elapsed_secs = (elapsed.as_secs() as f64) +
-                       (elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
-        if elapsed_secs > 30.0 {
-            break;
-        }
 
-        let avg : f64 = ((nusers as f64)*(nclasses as f64)*(i as f64) as f64) / elapsed_secs;
-        // println!("PUTS {:?} posts in elapsed_secs {:?}", nusers*nclasses, elapsed_secs);
-        println!("avg {:?}",  avg);
+    let mut times = Vec::new();
+    if csv {
+       File::create("out.csv").unwrap();
     }
 
+    println!("Starting benchmark...");
+    for uid in 0..(nusers/10) {
+        let start;
+        let end;
+
+        match cfg.as_ref() {
+            "migration" => {
+                start = time::Instant::now();
+                for i in 0..10 {
+                    app.log_user((uid+i).into());
+                }
+                end = time::Instant::now().duration_since(start);
+            },
+            "write" => {
+                start = time::Instant::now();
+                for cid in 0..nclasses {
+                    post_putter.put(vec![0.into(), cid.into(), uid.into(), "post".into()]);
+                }
+                end = time::Instant::now().duration_since(start);
+
+                thread::sleep(time::Duration::from_millis(1000));
+            },
+            _ => {
+                println!("wrong benchmark!");
+                return
+            }
+        };
+
+        let time = (end.as_secs() as f64) +
+                       (end.subsec_nanos() as f64 / 1_000_000_000.0);
+
+        times.push(time);
+
+        if csv {
+            let mut f = OpenOptions::new().write(true).append(true).open("out.csv").unwrap();
+            writeln!(f, "{:?},{:?}", uid, time).unwrap();
+        } else {
+            println!("{:?}: {:?}", uid, time);
+        }
+    }
+
+    println!("{:?} results ", cfg);
+    println!("avg: {:?}", avg(&times) );
+    println!("max: {:?}", max_duration(&times) );
+    println!("min: {:?}", min_duration(&times) );
+
+
+
     println!("Done with benchmark.");
+
+}
+
+fn max_duration(stats: &Vec<f64>) -> f64 {
+    let max = stats.iter().fold(0f64, |acc, el| {
+        f64::max(acc, *el)
+    });
+
+    max
+}
+
+fn min_duration(stats: &Vec<f64>) -> f64 {
+    let min_start = stats[0];
+    let min = stats.iter().fold(min_start, |acc, el| {
+        f64::min(acc, *el)
+    });
+
+    min
+}
+
+
+fn avg(stats: &Vec<f64>) -> f64 {
+    let sum = stats.iter().fold(0f64, |acc, el| {
+        acc + (el / stats.len() as f64)
+
+    });
+
+    sum
 }
