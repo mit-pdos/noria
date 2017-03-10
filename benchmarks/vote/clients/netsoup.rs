@@ -70,8 +70,9 @@ impl Writer for C {
     fn make_article(&mut self, article_id: i64, title: String) {
         self.insert(ARTICLE_NODE, vec![article_id.into(), title.into()]);
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) {
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
         self.insert(VOTE_NODE, vec![user_id.into(), article_id.into()]);
+        Period::PreMigration
     }
 }
 

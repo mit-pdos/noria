@@ -8,7 +8,7 @@ pub struct Graph {
     pub vote: NodeAddress,
     pub article: NodeAddress,
     pub vc: NodeAddress,
-    pub end: Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync + 'static>,
+    pub end: Option<Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync + 'static>>,
     pub graph: Blender,
 }
 
@@ -67,7 +67,7 @@ pub fn make() -> Graph {
         vote: vote.into(),
         article: article.into(),
         vc: vc.into(),
-        end: end.into(),
+        end: Some(end.into()),
         graph: g,
     }
 }

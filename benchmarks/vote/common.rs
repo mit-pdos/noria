@@ -23,7 +23,7 @@ pub trait Writer: Send {
     type Migrator: MigrationHandle + 'static;
 
     fn make_article(&mut self, article_id: i64, title: String);
-    fn vote(&mut self, user_id: i64, article_id: i64);
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period;
 
     fn prepare_migration(&mut self) -> Self::Migrator {
         unimplemented!()

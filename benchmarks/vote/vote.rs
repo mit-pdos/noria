@@ -16,7 +16,7 @@ mod exercise;
 mod common;
 mod graph;
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, ArticleResult, Period, MigrationHandle};
 use distributary::{Mutator, DataType};
 
 use std::sync::mpsc;
@@ -92,9 +92,20 @@ fn main() {
     }
 
     // setup db
-    let g = graph::make();
-    let putter = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
-    let getter = sync::Arc::new(Getter(g.end));
+    let mut g = graph::make();
+    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
+    let getter = sync::Arc::new(Getter(g.end.take().unwrap()));
+
+    let g = sync::Arc::new(sync::Mutex::new(g));
+    let putter = Spoon {
+        graph: g.clone(),
+        article: putters.0,
+        vote: putters.1,
+        new_vote: None,
+        i: 0,
+    };
+
+    // preapre getters
     let getters = (0..ngetters).into_iter().map(move |_| getter.clone());
 
     let put_stats;
@@ -179,39 +190,121 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
 struct Getter(Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync>);
 
 //      if i % 16384 == 0 && start.elapsed() > migrate_after {
-//         // we may have been given a new putter
-//         if let Ok(np) = np_rx.try_recv() {
-//             // we have a new putter!
-//             //
-//             // it's unfortunate that we have to use unsafe here...
-//             // hopefully it can go if
-//             // https://github.com/Kimundi/owning-ref-rs/issues/22
-//             // gets resolved. fundamentally, the problem is that the compiler
-//             // doesn't know that we won't overwrite new_putter in some
-//             // subsequent iteration of the loop, which would leave new_vote
-//             // with a dangling pointer to new_putter! *we* know that won't
-//             // happen though, so this is ok
-//             new_putter = Some(np);
-//             let np = new_putter.as_mut().unwrap() as *mut _;
-//             let np: &mut B::P = unsafe { &mut *np };
-//             new_vote = Some(np.vote());
-//         }
 //     }
 //     i += 1;
 
-impl Writer for (Mutator, Mutator) {
-    type Migrator = ();
+struct Spoon {
+    graph: sync::Arc<sync::Mutex<graph::Graph>>,
+    article: Mutator,
+    vote: Mutator,
+    i: usize,
+    new_vote: Option<mpsc::Receiver<Mutator>>,
+}
+
+impl Writer for Spoon {
+    type Migrator = (sync::Arc<sync::Mutex<graph::Graph>>, mpsc::SyncSender<Mutator>);
+
     fn make_article(&mut self, article_id: i64, title: String) {
-        self.0.put(vec![article_id.into(), title.into()]);
+        self.article.put(vec![article_id.into(), title.into()]);
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) {
-        self.1.put(vec![user_id.into(), article_id.into()]);
-        // post-migration
-        // Box::new(move |user, id| { self.0(vec![user.into(), id.into(), 5.into()]); })
+
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
+        if self.new_vote.is_some() {
+            self.i += 1;
+            // don't try too eagerly
+            if self.i & 16384 == 0 {
+                // we may have been given a new putter
+                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
+                    // yay!
+                    self.new_vote = None;
+                    self.vote = nv;
+                    self.i = usize::max_value();
+                }
+            }
+        }
+
+        if self.i == usize::max_value() {
+            self.vote.put(vec![user_id.into(), article_id.into(), 5.into()]);
+            Period::PostMigration
+        } else {
+            self.vote.put(vec![user_id.into(), article_id.into()]);
+            Period::PreMigration
+        }
     }
+
     fn prepare_migration(&mut self) -> Self::Migrator {
-        // TODO
-        unimplemented!()
+        let (tx, rx) = mpsc::sync_channel(0);
+        self.new_vote = Some(rx);
+        self.i = 1;
+        (self.graph.clone(), tx)
+    }
+}
+
+impl MigrationHandle for (sync::Arc<sync::Mutex<graph::Graph>>, mpsc::SyncSender<Mutator>) {
+    fn execute(&mut self) {
+        use std::collections::HashMap;
+        use distributary::{Base, Aggregation, JoinBuilder, Union};
+
+        let mut g = self.0.lock().unwrap();
+        let (rating, newendq) = {
+            // get all the ids since migration will borrow g
+            let vc = g.vc;
+            let article = g.article;
+
+            // migrate
+            let mut mig = g.graph.start_migration();
+
+            // add new "ratings" base table
+            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
+
+            // add sum of ratings
+            let rs = mig.add_ingredient("rsum",
+                                        &["id", "total"],
+                                        Aggregation::SUM.over(rating, 2, &[1]));
+
+            // take a union of vote count and rsum
+            let mut emits = HashMap::new();
+            emits.insert(rs, vec![0, 1]);
+            emits.insert(vc, vec![0, 1]);
+            let u = Union::new(emits);
+            let both = mig.add_ingredient("both", &["id", "value"], u);
+
+            // sum them by article id
+            let total = mig.add_ingredient("total",
+                                           &["id", "total"],
+                                           Aggregation::SUM.over(both, 1, &[0]));
+
+            // finally, produce end result
+            let j = JoinBuilder::new(vec![(article, 0), (article, 1), (total, 1)])
+                .from(article, vec![1, 0])
+                .join(total, vec![1, 0]);
+            let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
+            let newendq = mig.maintain(newend, 0);
+
+            // we want ratings, rsum, and the union to be in the same domain,
+            // because only rsum is really costly
+            let domain = mig.add_domain();
+            mig.assign_domain(rating, domain);
+            mig.assign_domain(rs, domain);
+            mig.assign_domain(both, domain);
+
+            // and then we want the total sum and the join in the same domain,
+            // to avoid duplicating the total state
+            let domain = mig.add_domain();
+            mig.assign_domain(total, domain);
+            mig.assign_domain(newend, domain);
+
+            // start processing
+            mig.commit();
+            (rating, newendq)
+        };
+
+        let mutator = g.graph.get_mutator(rating);
+        self.1.send(mutator).unwrap();
+
+        // TODO: also updates getters
+        // let newendq = sync::Arc::new(newendq);
+        // ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
     }
 }
 
@@ -241,63 +334,3 @@ impl Reader for sync::Arc<Getter> {
         (res, Period::PreMigration)
     }
 }
-
-/*
-fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
-    let (rating, newendq) = {
-        // migrate
-        let mut mig = self._g.start_migration();
-
-        // add new "ratings" base table
-        let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
-
-        // add sum of ratings
-        let rs = mig.add_ingredient("rsum",
-                                    &["id", "total"],
-                                    Aggregation::SUM.over(rating, 2, &[1]));
-
-        // take a union of vote count and rsum
-        let mut emits = HashMap::new();
-        emits.insert(rs, vec![0, 1]);
-        emits.insert(self.vci, vec![0, 1]);
-        let u = Union::new(emits);
-        let both = mig.add_ingredient("both", &["id", "value"], u);
-
-        // sum them by article id
-        let total = mig.add_ingredient("total",
-                                       &["id", "total"],
-                                       Aggregation::SUM.over(both, 1, &[0]));
-
-        // finally, produce end result
-        let j = JoinBuilder::new(vec![(self.articlei, 0), (self.articlei, 1), (total, 1)])
-            .from(self.articlei, vec![1, 0])
-            .join(total, vec![1, 0]);
-        let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
-        let newendq = mig.maintain(newend, 0);
-
-        // we want ratings, rsum, and the union to be in the same domain,
-        // because only rsum is really costly
-        let domain = mig.add_domain();
-        mig.assign_domain(rating, domain);
-        mig.assign_domain(rs, domain);
-        mig.assign_domain(both, domain);
-
-        // and then we want the total sum and the join in the same domain,
-        // to avoid duplicating the total state
-        let domain = mig.add_domain();
-        mig.assign_domain(total, domain);
-        mig.assign_domain(newend, domain);
-
-        // start processing
-        mig.commit();
-        (rating, newendq)
-    };
-
-    let mutator = self._g.get_mutator(rating);
-    let put = Box::new(move |u: Vec<DataType>| { mutator.put(u); });
-
-
-    let newendq = sync::Arc::new(newendq);
-    ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
-}
-*/
