@@ -4,17 +4,21 @@ extern crate distributary;
 mod populate;
 
 extern crate clap;
+extern crate rand;
 extern crate slog;
 extern crate slog_term;
 
+use rand::Rng;
 use std::{thread, time};
+use std::collections::HashMap;
 use slog::DrainExt;
 
-use distributary::{Blender, Recipe};
+use distributary::{Blender, DataType, Recipe};
 
 pub struct Backend {
     r: Recipe,
     g: Blender,
+    prepop_counts: HashMap<String, usize>,
 }
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -56,11 +60,74 @@ fn make(recipe_location: &str) -> Box<Backend> {
 
     //println!("{}", g);
     Box::new(Backend {
-        //data: Some(g.get_mutator(data)),
         r: recipe,
         g: g,
+        prepop_counts: HashMap::new(),
     })
+}
 
+
+impl Backend {
+    fn generate_parameter(&self, query_name: &str, rng: &mut rand::ThreadRng) -> DataType {
+        match query_name {
+            "getName" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "getCustomer" => "".into(), // XXX(malte): fix username string generation
+            "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
+            "getUserName" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "getPassword" => "".into(), // XXX(malte): fix username string generation
+            "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
+            "getMostRecentOrderLines" => {
+                rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
+            }
+            "createEmptyCart" => 0i32.into(),
+            "addItem" => 0.into(), // XXX(malte): dual parameter query, need SCL ID range
+            "addRandomItemToCartIfNecessary" => 0.into(), // XXX(malte): need SCL ID range
+            "getCart" => 0.into(), // XXX(malte): need SCL ID range
+            "createNewCustomerMaxId" => 0i32.into(),
+            "getCDiscount" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "getCAddrId" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "getCAddr" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "enterAddressId" => rng.gen_range(1, self.prepop_counts["countries"] as i32).into(),
+            "enterAddressMaxId" => 0i32.into(),
+            "enterOrderMaxId" => 0i32.into(),
+            "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "verifyDBConsistencyCustId" => 0i32.into(),
+            "verifyDBConsistencyItemId" => 0i32.into(),
+            "verifyDBConsistencyAddrId" => 0i32.into(),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn read(&self, query_name: &str, num: usize) {
+        match self.r.node_addr_for(query_name) {
+            Err(_) => panic!("no node for {}!", query_name),
+            Ok(nd) => {
+                println!("reading {}", query_name);
+                let g = self.g.get_getter(nd).unwrap();
+                let mut rng = rand::thread_rng();
+                let start = time::Instant::now();
+                let mut ok = 0;
+                for _ in 0..num {
+                    let param = self.generate_parameter(query_name, &mut rng);
+                    match g(&param) {
+                        Err(_) => panic!(),
+                        Ok(datas) => {
+                            if datas.len() > 0 {
+                                ok += 1;
+                            }
+                        }
+                    }
+                }
+                let dur = dur_to_fsec!(start.elapsed());
+                println!("{}: ({:.2} GETs/sec) (ok: {})!",
+                         query_name,
+                         f64::from(1_000_000) / dur,
+                         ok);
+            }
+        }
+    }
 }
 
 fn main() {
@@ -90,37 +157,31 @@ fn main() {
     let transactional = matches.is_present("transactional");
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let backend = make(&rloc);
+    let mut backend = make(&rloc);
 
     println!("Prepopulating from data files in {}", ploc);
-    populate_addresses(&backend, &ploc, transactional);
-    populate_authors(&backend, &ploc, transactional);
-    populate_countries(&backend, &ploc, transactional);
-    populate_customers(&backend, &ploc, transactional);
-    populate_items(&backend, &ploc, transactional);
-    populate_orders(&backend, &ploc, transactional);
-    populate_cc_xacts(&backend, &ploc, transactional);
-    populate_order_line(&backend, &ploc, transactional);
+    let num_addr = populate_addresses(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("addresses".into(), num_addr);
+    let num_authors = populate_authors(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("authors".into(), num_authors);
+    let num_countries = populate_countries(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("countries".into(), num_countries);
+    let num_customers = populate_customers(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("customers".into(), num_customers);
+    let num_items = populate_items(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("items".into(), num_items);
+    let num_orders = populate_orders(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("orders".into(), num_orders);
+    let num_cc_xacts = populate_cc_xacts(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("cc_xacts".into(), num_cc_xacts);
+    let num_order_line = populate_order_line(&backend, &ploc, transactional);
+    backend.prepop_counts.insert("order_line".into(), num_order_line);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
 
     println!("Reading...");
     for nq in backend.r.aliases().iter() {
-        println!("{}", nq);
-        match backend.r.node_addr_for(nq) {
-            Err(_) => println!("no node!"),
-            Ok(nd) => {
-                let g = backend.g.get_getter(nd).unwrap();
-                let start = time::Instant::now();
-                for _ in 0..1_000_000 {
-                    drop(g(&0.into()));
-                }
-                let dur = dur_to_fsec!(start.elapsed());
-                println!("Took {:.2}s ({:.2} GETs/sec)!",
-                         dur,
-                         f64::from(1_000_000) / dur);
-            }
-        }
+        backend.read(nq, 1_000_000);
     }
 }

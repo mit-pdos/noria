@@ -30,7 +30,7 @@ fn parse_ymd_to_timestamp(s: &str) -> i64 {
     ts as i64
 }
 
-pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let addresses_putter = backend.g.get_mutator(backend.r.node_addr_for("address").unwrap());
 
     let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
@@ -66,9 +66,10 @@ pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool)
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let author_putter = backend.g.get_mutator(backend.r.node_addr_for("author").unwrap());
 
     let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
@@ -102,9 +103,10 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) {
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let author_putter = backend.g.get_mutator(backend.r.node_addr_for("cc_xacts").unwrap());
 
     let f = File::open(format!("{}/cc_xacts.data", data_location)).unwrap();
@@ -145,9 +147,10 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) 
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let country_putter = backend.g.get_mutator(backend.r.node_addr_for("country").unwrap());
 
     let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
@@ -177,9 +180,10 @@ pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool)
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let customers_putter = backend.g.get_mutator(backend.r.node_addr_for("customer").unwrap());
 
     let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
@@ -235,9 +239,10 @@ pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool)
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let items_putter = backend.g.get_mutator(backend.r.node_addr_for("item").unwrap());
 
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
@@ -303,9 +308,10 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) {
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let order_putter = backend.g.get_mutator(backend.r.node_addr_for("orders").unwrap());
 
     let f = File::open(format!("{}/orders.tsv", data_location)).unwrap();
@@ -354,9 +360,10 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) {
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
 
-pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool) {
+pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
     let order_putter = backend.g.get_mutator(backend.r.node_addr_for("order_line").unwrap());
 
     let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
@@ -391,4 +398,5 @@ pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool
              i,
              dur,
              f64::from(i) / dur);
+    i as usize
 }
