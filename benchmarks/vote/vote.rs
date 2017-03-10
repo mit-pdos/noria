@@ -132,7 +132,7 @@ fn main() {
             .unwrap();
 
         // wait for prepopulation to finish
-        prepop.recv().unwrap();
+        prepop.recv().is_err();
 
         let getters: Vec<_> = getters.enumerate()
             .map(|(i, g)| {

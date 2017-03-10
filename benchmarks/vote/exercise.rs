@@ -196,10 +196,10 @@ pub fn launch_writer<W: Writer + 'static>(mut writer: W,
         // t.commit().unwrap();
     }
     println!("Done with prepopulation");
-    drop(ready);
 
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
+    drop(ready);
     let start = time::Instant::now();
 
     let mut post = false;
