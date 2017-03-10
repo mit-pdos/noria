@@ -7,7 +7,7 @@ use std::{thread, time};
 use std::fs::{OpenOptions, File};
 use std::io::Write;
 
-use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator};
+use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator, Index};
 
 pub struct Piazza {
     pub soup: Blender,
@@ -15,6 +15,7 @@ pub struct Piazza {
     post: NodeAddress,
     class: NodeAddress,
     taking: NodeAddress,
+    domain: Index,
 }
 
 impl Piazza {
@@ -24,21 +25,33 @@ impl Piazza {
 
         let (user, post, class, taking);
 
+        let base_domain;
 
         {
             let mut mig = g.start_migration();
+
+            base_domain = mig.add_domain();
 
             // add a user account base table
             user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
 
             // add a post base table
-            post = mig.add_ingredient("post", &["pid", "cid", "author", "content"], Base::default());
+            post = mig.add_ingredient("post", &["pid", "cid", "author", "content"], Base::new(vec![1]));
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
 
             // associations between users and classes
-            taking = mig.add_ingredient("taking", &["uid", "cid"], Base::default());
+            taking = mig.add_ingredient("taking", &["cid", "uid"], Base::default());
+
+            // assign everything to the same domain to save up memory
+            mig.assign_domain(user, base_domain);
+
+            mig.assign_domain(post, base_domain);
+
+            mig.assign_domain(class, base_domain);
+
+            mig.assign_domain(taking, base_domain);
 
             // commit migration
             mig.commit();
@@ -50,6 +63,7 @@ impl Piazza {
             post: post,
             class: class,
             taking: taking,
+            domain: base_domain,
         }
     }
 
@@ -60,16 +74,21 @@ impl Piazza {
         let mut mig = self.soup.start_migration();
 
         // classes user is taking
-        let class_filter = Filter::new(self.taking, &[Some(uid.into()), None]);
+        let class_filter = Filter::new(self.taking, &[None, Some(uid.into())]);
 
-        let user_classes = mig.add_ingredient("class_filter", &["uid", "cid"], class_filter);
+        let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
         // add visible posts to user
         // only posts from classes the user is taking should be visible
         let j = JoinBuilder::new(vec![(self.post, 0), (self.post, 1), (self.post, 2), (self.post, 3)])
                 .from(self.post, vec![0, 1, 0, 0])
-                .join(user_classes, vec![0, 1]);
+                .join(user_classes, vec![1, 0]);
 
         visible_posts = mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
+
+        // assign everything to the same domain to save up memory
+        mig.assign_domain(user_classes, self.domain);
+
+        mig.assign_domain(visible_posts, self.domain);
 
         // maintain visible_posts
         mig.maintain(visible_posts, 0);
@@ -95,7 +114,7 @@ fn populate_classes(nclasses: i64, class_putter: Mutator) {
 fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator) {
     for i in 0..nclasses {
         for j in 0..nusers {
-            taking_putter.put(vec![j.into(), i.into()]);
+            taking_putter.put(vec![i.into(), j.into()]);
         }
     }
 }
@@ -109,7 +128,7 @@ fn main() {
             .short("c")
             .long("classes")
             .value_name("N")
-            .default_value("1000")
+            .default_value("100")
             .help("Number of classes to prepopulate the database with"))
         .arg(Arg::with_name("nusers")
             .short("u")
@@ -117,6 +136,12 @@ fn main() {
             .value_name("N")
             .default_value("100")
             .help("Number of users to prepopulate the database with"))
+        .arg(Arg::with_name("nposts")
+            .short("p")
+            .long("posts")
+            .value_name("N")
+            .default_value("10000")
+            .help("Number of posts to prepopulate the database with"))
         .arg(Arg::with_name("csv")
             .long("csv")
             .required(false)
@@ -135,6 +160,7 @@ fn main() {
 
     let nusers = value_t_or_exit!(args, "nusers", i64);
     let nclasses = value_t_or_exit!(args, "nclasses", i64);
+    let nposts = value_t_or_exit!(args, "nposts", i64);
     let cfg = args.value_of("cfg").unwrap();
     let csv = args.is_present("csv");
 
@@ -150,11 +176,13 @@ fn main() {
 
     match cfg.as_ref() {
         "migration" => {
-            // each user writes a post to each class
-            for uid in 0..nusers {
-                for cid in 0..nclasses {
-                    post_putter.put(vec![0.into(), cid.into(), uid.into(), "post".into()]);
-                }
+            for pid in 0..nposts {
+                post_putter.put(vec![
+                    pid.into(),
+                    (pid / nclasses).into(),
+                    (pid / nusers).into(),
+                    "post".into()
+                    ]);
             }
         },
         "write" => {
@@ -179,16 +207,14 @@ fn main() {
     }
 
     println!("Starting benchmark...");
-    for uid in 0..(nusers/10) {
+    for uid in 0..(nusers) {
         let start;
         let end;
 
         match cfg.as_ref() {
             "migration" => {
                 start = time::Instant::now();
-                for i in 0..10 {
-                    app.log_user((uid+i).into());
-                }
+                app.log_user(uid.into());
                 end = time::Instant::now().duration_since(start);
             },
             "write" => {
@@ -223,8 +249,6 @@ fn main() {
     println!("avg: {:?}", avg(&times) );
     println!("max: {:?}", max_duration(&times) );
     println!("min: {:?}", min_duration(&times) );
-
-
 
     println!("Done with benchmark.");
 
