@@ -59,6 +59,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
     }
 
     //println!("{}", g);
+
     Box::new(Backend {
         r: recipe,
         g: g,
@@ -176,6 +177,8 @@ fn main() {
     backend.prepop_counts.insert("cc_xacts".into(), num_cc_xacts);
     let num_order_line = populate_order_line(&backend, &ploc, transactional);
     backend.prepop_counts.insert("order_line".into(), num_order_line);
+
+    //println!("{}", backend.g);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
