@@ -1,6 +1,3 @@
-#![cfg_attr(feature="b_netsoup", feature(conservative_impl_trait, plugin))]
-#![cfg_attr(feature="b_netsoup", plugin(tarpc_plugins))]
-
 #[macro_use]
 extern crate clap;
 
@@ -9,88 +6,30 @@ extern crate slog_term;
 
 extern crate rand;
 
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
-extern crate futures;
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
-extern crate tokio_core;
-
-#[cfg(feature="b_mssql")]
-extern crate futures_state_stream;
-#[cfg(feature="b_mssql")]
-extern crate tiberius;
-
-// Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
-// specify it twice.
-#[cfg(any(feature="b_mysql", feature="b_postgresql", feature="b_hybrid"))]
-extern crate r2d2;
-
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-#[macro_use]
-extern crate mysql;
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-extern crate r2d2_mysql;
-
-#[cfg(feature="b_postgresql")]
-extern crate postgres;
-#[cfg(feature="b_postgresql")]
-extern crate r2d2_postgres;
-
 extern crate distributary;
-
-#[cfg(feature="b_netsoup")]
-extern crate tarpc;
-
-#[cfg(any(feature="b_memcached", feature="b_hybrid"))]
-extern crate memcached;
 
 extern crate hdrsample;
 
 extern crate spmc;
 
-mod targets;
 mod exercise;
+mod common;
+mod graph;
 
+use common::{Writer, Reader, ArticleResult, Period};
+use distributary::{Mutator, DataType};
+
+use std::sync::mpsc;
+use std::thread;
+use std::sync;
 use std::time;
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-const BENCH_USAGE: &'static str = "\
-EXAMPLES:
-  vote soup://
-  vote netsoup://127.0.0.1:7777
-  vote memcached://127.0.0.1:11211
-  vote mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
-  vote mysql://user@127.0.0.1/database
-  vote postgresql://user@127.0.0.1/database
-  vote hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
     use clap::{Arg, App};
-    let mut backends = vec!["soup"];
-    if cfg!(feature = "b_mssql") {
-        backends.push("mssql");
-    }
-    if cfg!(feature = "b_mysql") {
-        backends.push("mysql");
-    }
-    if cfg!(feature = "b_postgresql") {
-        backends.push("postgresql");
-    }
-    if cfg!(feature = "b_memcached") {
-        backends.push("memcached");
-    }
-    if cfg!(feature = "b_netsoup") {
-        backends.push("netsoup");
-    }
-    if cfg!(feature = "b_hybrid") {
-        backends.push("hybrid");
-    }
-    let backends = format!("Which database backend to use [{}]://<params>",
-                           backends.join(", "));
 
     let args = App::new("vote")
         .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for different storage \
-                backends.")
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
         .arg(Arg::with_name("avg")
             .long("avg")
             .takes_value(false)
@@ -129,17 +68,11 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
-        .arg(Arg::with_name("BACKEND")
-            .index(1)
-            .help(&backends)
-            .required(true))
-        .after_help(BENCH_USAGE)
         .get_matches();
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
-    let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
@@ -147,66 +80,61 @@ fn main() {
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     assert!(ngetters > 0);
-    assert!(!dbn.is_empty());
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = exercise::RuntimeConfig::new(ngetters, narticles, runtime);
+    let mut config = exercise::RuntimeConfig::new(narticles, runtime);
     config.produce_cdf(cdf);
-    if stage {
-        config.put_then_get();
-    }
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
 
     // setup db
-    println!("Attempting to connect to database using {}", dbn);
-    let mut dbn = dbn.splitn(2, "://");
-    let (put_stats, get_stats) = match dbn.next().unwrap() {
-        // soup://
-        "soup" => exercise::launch(targets::soup::make(dbn.next().unwrap(), ngetters), config),
-        // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
-        #[cfg(feature="b_mssql")]
-        "mssql" => exercise::launch(targets::mssql::make(dbn.next().unwrap(), ngetters), config),
-        // mysql://soup@127.0.0.1/bench_mysql
-        #[cfg(feature="b_mysql")]
-        "mysql" => exercise::launch(targets::mysql::make(dbn.next().unwrap(), ngetters), config),
-        // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
-        #[cfg(feature="b_hybrid")]
-        "hybrid" => {
-            let mut split_dbn = dbn.next().unwrap().splitn(2, ",");
-            let mysql_dbn = &split_dbn.next().unwrap()[6..];
-            let memcached_dbn = &split_dbn.next().unwrap()[10..];
-            exercise::launch(targets::hybrid::make(memcached_dbn, mysql_dbn, ngetters),
-                             config)
-        }
-        // postgresql://soup@127.0.0.1/bench_psql
-        #[cfg(feature="b_postgresql")]
-        "postgresql" => {
-            exercise::launch(targets::postgres::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // memcached://127.0.0.1:11211
-        #[cfg(feature="b_memcached")]
-        "memcached" => {
-            exercise::launch(targets::memcached::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // netsoup://127.0.0.1:7777
-        #[cfg(feature="b_netsoup")]
-        "netsoup" => {
-            exercise::launch(targets::netsoup::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // garbage
-        t => {
-            panic!("backend not supported -- make sure you compiled with --features b_{}",
-                   t)
-        }
-    };
+    let g = graph::make();
+    let putter = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
+    let getter = sync::Arc::new(Getter(g.end));
+    let getters = (0..ngetters).into_iter().map(move |_| getter.clone());
+
+    let put_stats;
+    let get_stats: Vec<_>;
+    if stage {
+        // put then get
+        put_stats = exercise::launch_writer(putter, config, None);
+        let getters: Vec<_> = getters.enumerate()
+            .map(|(i, g)| {
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || exercise::launch_reader(g, config))
+                    .unwrap()
+            })
+            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+    } else {
+        // put & get
+        // TODO: how do we start getters after prepopulate?
+        let (tx, prepop) = mpsc::sync_channel(0);
+        let putter = thread::Builder::new()
+            .name("PUT0".to_string())
+            .spawn(move || exercise::launch_writer(putter, config, Some(tx)))
+            .unwrap();
+
+        // wait for prepopulation to finish
+        prepop.recv().unwrap();
+
+        let getters: Vec<_> = getters.enumerate()
+            .map(|(i, g)| {
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || exercise::launch_reader(g, config))
+                    .unwrap()
+            })
+            .collect();
+
+        put_stats = putter.join().unwrap();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+    }
 
     print_stats("PUT", &put_stats.pre, avg);
     for (i, s) in get_stats.iter().enumerate() {
@@ -247,3 +175,129 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
         println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
     }
 }
+
+struct Getter(Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync>);
+
+//      if i % 16384 == 0 && start.elapsed() > migrate_after {
+//         // we may have been given a new putter
+//         if let Ok(np) = np_rx.try_recv() {
+//             // we have a new putter!
+//             //
+//             // it's unfortunate that we have to use unsafe here...
+//             // hopefully it can go if
+//             // https://github.com/Kimundi/owning-ref-rs/issues/22
+//             // gets resolved. fundamentally, the problem is that the compiler
+//             // doesn't know that we won't overwrite new_putter in some
+//             // subsequent iteration of the loop, which would leave new_vote
+//             // with a dangling pointer to new_putter! *we* know that won't
+//             // happen though, so this is ok
+//             new_putter = Some(np);
+//             let np = new_putter.as_mut().unwrap() as *mut _;
+//             let np: &mut B::P = unsafe { &mut *np };
+//             new_vote = Some(np.vote());
+//         }
+//     }
+//     i += 1;
+
+impl Writer for (Mutator, Mutator) {
+    type Migrator = ();
+    fn make_article(&mut self, article_id: i64, title: String) {
+        self.0.put(vec![article_id.into(), title.into()]);
+    }
+    fn vote(&mut self, user_id: i64, article_id: i64) {
+        self.1.put(vec![user_id.into(), article_id.into()]);
+        // post-migration
+        // Box::new(move |user, id| { self.0(vec![user.into(), id.into(), 5.into()]); })
+    }
+    fn prepare_migration(&mut self) -> Self::Migrator {
+        // TODO
+        unimplemented!()
+    }
+}
+
+impl Reader for sync::Arc<Getter> {
+    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
+        let id = article_id.into();
+        let res = match self.0(&id) {
+            Ok(g) => {
+                match g.into_iter().next() {
+                    Some(row) => {
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let id: i64 = row.next().unwrap().into();
+                        let title: String = row.next().unwrap().into();
+                        let count: i64 = row.next().unwrap().into();
+                        ArticleResult::Article {
+                            id: id,
+                            title: title,
+                            votes: count,
+                        }
+                    }
+                    None => ArticleResult::NoSuchArticle,
+                }
+            }
+            Err(_) => ArticleResult::Error,
+        };
+        (res, Period::PreMigration)
+    }
+}
+
+/*
+fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
+    let (rating, newendq) = {
+        // migrate
+        let mut mig = self._g.start_migration();
+
+        // add new "ratings" base table
+        let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
+
+        // add sum of ratings
+        let rs = mig.add_ingredient("rsum",
+                                    &["id", "total"],
+                                    Aggregation::SUM.over(rating, 2, &[1]));
+
+        // take a union of vote count and rsum
+        let mut emits = HashMap::new();
+        emits.insert(rs, vec![0, 1]);
+        emits.insert(self.vci, vec![0, 1]);
+        let u = Union::new(emits);
+        let both = mig.add_ingredient("both", &["id", "value"], u);
+
+        // sum them by article id
+        let total = mig.add_ingredient("total",
+                                       &["id", "total"],
+                                       Aggregation::SUM.over(both, 1, &[0]));
+
+        // finally, produce end result
+        let j = JoinBuilder::new(vec![(self.articlei, 0), (self.articlei, 1), (total, 1)])
+            .from(self.articlei, vec![1, 0])
+            .join(total, vec![1, 0]);
+        let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
+        let newendq = mig.maintain(newend, 0);
+
+        // we want ratings, rsum, and the union to be in the same domain,
+        // because only rsum is really costly
+        let domain = mig.add_domain();
+        mig.assign_domain(rating, domain);
+        mig.assign_domain(rs, domain);
+        mig.assign_domain(both, domain);
+
+        // and then we want the total sum and the join in the same domain,
+        // to avoid duplicating the total state
+        let domain = mig.add_domain();
+        mig.assign_domain(total, domain);
+        mig.assign_domain(newend, domain);
+
+        // start processing
+        mig.commit();
+        (rating, newendq)
+    };
+
+    let mutator = self._g.get_mutator(rating);
+    let put = Box::new(move |u: Vec<DataType>| { mutator.put(u); });
+
+
+    let newendq = sync::Arc::new(newendq);
+    ((put, None), (0..ngetters).into_iter().map(|_| newendq.clone()).collect())
+}
+*/
