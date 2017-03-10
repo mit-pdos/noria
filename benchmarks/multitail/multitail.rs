@@ -147,6 +147,7 @@ fn main() {
     let height = value_t_or_exit!(matches, "height", u16);
     let csv = matches.is_present("csv");
     let stats = matches.is_present("stats");
+    assert!(!stats || cfg!(feature = "profiling"));
 
     println!("Using batch size of {}", batch_size);
 
