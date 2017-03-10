@@ -179,17 +179,14 @@ fn main() {
             for pid in 0..nposts {
                 post_putter.put(vec![
                     pid.into(),
-                    (pid / nclasses).into(),
-                    (pid / nusers).into(),
+                    (pid % nclasses).into(),
+                    (pid % nusers).into(),
                     "post".into()
                     ]);
             }
         },
         "write" => {
-            // login nusers
-            for i in 0..nusers {
-                app.log_user(i.into());
-            }
+
         }
         _ => {
             println!("wrong benchmark!");
@@ -219,12 +216,14 @@ fn main() {
             },
             "write" => {
                 start = time::Instant::now();
-                for cid in 0..nclasses {
-                    post_putter.put(vec![0.into(), cid.into(), uid.into(), "post".into()]);
+                for i in 0..1000 {
+                    post_putter.put(vec![i.into(), (i % nclasses).into(), (i % nusers).into(), "post".into()]);
                 }
                 end = time::Instant::now().duration_since(start);
 
                 thread::sleep(time::Duration::from_millis(1000));
+
+                app.log_user(uid.into());
             },
             _ => {
                 println!("wrong benchmark!");
