@@ -7,9 +7,9 @@ use tokio_core::reactor;
 
 use common::{Writer, Reader, ArticleResult, Period};
 
-const ARTICLE_NODE: usize = 0;
-const VOTE_NODE: usize = 0;
-const END_NODE: usize = 0;
+const ARTICLE_NODE: usize = 1;
+const VOTE_NODE: usize = 2;
+const END_NODE: usize = 4;
 
 pub struct C(srv::ext::FutureClient, reactor::Core);
 use std::ops::{Deref, DerefMut};
