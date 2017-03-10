@@ -11,8 +11,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token,
-                   TransactionResult, Mutator};
+use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -21,7 +20,7 @@ use hdrsample::Histogram;
 
 #[allow(dead_code)]
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
-type TxPut = Box<Fn(Vec<DataType>, Token) -> TransactionResult + Send + 'static>;
+type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
 #[allow(dead_code)]
 type Get = Box<Fn(&DataType) -> Result<Datas, ()> + Send + Sync>;
 type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send + Sync>;
@@ -58,7 +57,9 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = mig.add_ingredient("transfers", &["src_acct", "dst_acct", "amount"], Base::default());
+        transfers = mig.add_ingredient("transfers",
+                                       &["src_acct", "dst_acct", "amount"],
+                                       Base::default());
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -111,20 +112,18 @@ impl Bank {
     }
     fn putter(&mut self) -> Box<Putter> {
         let m = self.transfers.pop().unwrap();
-        let p: TxPut = Box::new(move|u: Vec<DataType>, t: Token|{
-            m.transactional_put(u, t)
-        });
+        let p: TxPut = Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t));
 
         Box::new(p)
     }
 }
 
 pub trait Putter: Send {
-    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> TransactionResult + 'a>;
+    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> Result<i64, ()> + 'a>;
 }
 
 impl Putter for TxPut {
-    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> TransactionResult + 'a> {
+    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> Result<i64, ()> + 'a> {
         Box::new(move |src, dst, amount, token| {
             self(vec![src.into(), dst.into(), amount.into()], token.into())
         })
@@ -170,8 +169,8 @@ fn populate(naccounts: i64, transfers_put: &mut Box<Putter>) {
         let mut money_put = transfers_put.transfer();
         for i in 0..naccounts {
             // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
-            money_put(0, i, 1000, Token::empty());
-            money_put(i, 0, 1, Token::empty());
+            money_put(0, i, 1000, Token::empty()).unwrap();
+            money_put(i, 0, 1, Token::empty()).unwrap();
         }
     }
     println!("Done with account creation");
@@ -230,7 +229,7 @@ fn client(i: usize,
             {
                 let mut do_tx = |src, dst, amt, tkn| {
                     let mut count_result = |res| match res {
-                        TransactionResult::Committed(ts) => {
+                        Ok(ts) => {
                             if verbose {
                                 println!("commit @ {}", ts);
                             }
@@ -239,7 +238,7 @@ fn client(i: usize,
                             }
                             committed += 1
                         }
-                        TransactionResult::Aborted => {
+                        Err(_) => {
                             if verbose {
                                 println!("abort");
                             }
