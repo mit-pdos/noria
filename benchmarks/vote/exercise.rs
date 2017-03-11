@@ -72,6 +72,7 @@ impl BenchmarkResult {
         self.samples.as_ref().map(|s| s.iter_recorded())
     }
 
+    #[allow(dead_code)]
     pub fn sum_len(&self) -> (f64, usize) {
         (self.throughputs.iter().sum(), self.throughputs.len())
     }
@@ -181,10 +182,10 @@ fn driver<I, F>(start: time::Instant,
     stats
 }
 
-pub fn launch_writer<W: Writer + 'static>(mut writer: W,
-                                          mut config: RuntimeConfig,
-                                          ready: Option<mpsc::SyncSender<()>>)
-                                          -> BenchmarkResults {
+pub fn launch_writer<W: Writer>(mut writer: W,
+                                mut config: RuntimeConfig,
+                                ready: Option<mpsc::SyncSender<()>>)
+                                -> BenchmarkResults {
 
     // prepopulate
     println!("Prepopulating with {} articles", config.narticles);
@@ -235,9 +236,7 @@ pub fn launch_writer<W: Writer + 'static>(mut writer: W,
     driver(start, config, init, "PUT")
 }
 
-pub fn launch_reader<R: Reader + 'static>(mut reader: R,
-                                          config: RuntimeConfig)
-                                          -> BenchmarkResults {
+pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> BenchmarkResults {
 
     println!("Starting reader");
     let init = move || {

@@ -19,7 +19,7 @@ impl MigrationHandle for () {
     }
 }
 
-pub trait Writer: Send {
+pub trait Writer {
     type Migrator: MigrationHandle + 'static;
 
     fn make_article(&mut self, article_id: i64, title: String);
@@ -60,6 +60,6 @@ pub enum Period {
     PostMigration,
 }
 
-pub trait Reader: Send {
+pub trait Reader {
     fn get(&mut self, article_id: i64) -> (ArticleResult, Period);
 }

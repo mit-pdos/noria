@@ -1,175 +1,138 @@
 use memcached;
 use memcached::proto::{Operation, ProtoType};
 use mysql;
-use r2d2;
-use r2d2_mysql::MysqlConnectionManager;
 
-pub struct Memcache(memcached::Client);
-unsafe impl Send for Memcache {}
+use common::{Writer, Reader, ArticleResult, Period};
 
-use std::ops::{Deref, DerefMut};
-impl Deref for Memcache {
-    type Target = memcached::Client;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct Pool {
+    sql: mysql::Pool,
+    mc: Option<memcached::Client>,
 }
 
-impl DerefMut for Memcache {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+pub struct W<'a> {
+    a_prep: mysql::conn::Stmt<'a>,
+    v_prep: mysql::conn::Stmt<'a>,
+    mc: memcached::Client,
 }
 
-use targets::Backend;
-use targets::Putter;
-use targets::Getter;
-
-type MCM = MysqlConnectionManager;
-type PC = r2d2::PooledConnection<MCM>;
-
-pub fn make(memcached_dbn: &str,
-            mysql_dbn: &str,
-            getters: usize)
-            -> (Vec<Memcache>, r2d2::Pool<MCM>) {
-    use std::time;
+pub fn setup(memcached_dbn: &str, mysql_dbn: &str) -> Pool {
     use mysql::Opts;
-    use r2d2_mysql::CreateManager;
 
-    let memcached_handles = (0..(getters + 1))
-        .into_iter()
-        .map(|_| {
-            Memcache(memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
-                                                ProtoType::Binary)
-                .unwrap())
-        })
-        .collect::<Vec<_>>();
-
-    let mysql_dbn = format!("mysql://{}", mysql_dbn);
-    // we need to do this dance to avoid using the DB early (which will crash us if it doesn't
-    // exist)
-    let db = &mysql_dbn[mysql_dbn.rfind("/").unwrap() + 1..];
-    let opts = Opts::from_url(&mysql_dbn[0..mysql_dbn.rfind("/").unwrap()]).unwrap();
-
-    // Check whether database already exists, or whether we need to create it
-    let mut x = mysql::Pool::new(opts).unwrap().get_conn().unwrap();
-    if x.query(format!("USE {}", db)).is_ok() {
-        x.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
-    }
-    x.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
-    drop(x);
-
-    // Construct a DB pool connected to the soup database
-    let config = r2d2::Config::builder()
-        .error_handler(Box::new(r2d2::LoggingErrorHandler))
-        .pool_size((getters + 2) as u32 /* putter */)
-        .connection_timeout(time::Duration::new(1000, 0))
-        .build();
-
-    let mysql_pool = r2d2::Pool::new(config,
-                                     MysqlConnectionManager::new(mysql_dbn.as_str()).unwrap())
+    let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
+                                        ProtoType::Binary)
         .unwrap();
 
-    let mut conn = mysql_pool.get().unwrap();
+    let addr = format!("mysql://{}", mysql_dbn);
+    // we need to do this dance to avoid using the DB early (which will crash us if it doesn't
+    // exist)
+    let db = &addr[addr.rfind("/").unwrap() + 1..];
+    let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+
+    // Check whether database already exists, or whether we need to create it
+    let pool = mysql::Pool::new(opts).unwrap();
+    let mut conn = pool.get_conn().unwrap();
+    if conn.query(format!("USE {}", db)).is_ok() {
+        conn.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
+    }
+    conn.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
 
     // allow larger in-memory tables (4 GB)
-    conn.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
+    pool.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
 
     // create tables with indices
-    conn.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
+    pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
                     PRIMARY KEY USING HASH (id)) ENGINE = MEMORY",
                    ())
         .unwrap();
-    conn.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
+    pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
                     KEY id (id)) ENGINE = MEMORY",
                    ())
         .unwrap();
 
-    (memcached_handles, mysql_pool)
-}
-
-impl Backend for (Vec<Memcache>, r2d2::Pool<MCM>) {
-    type P = (Memcache, PC);
-    type G = (Memcache, PC);
-
-    fn getter(&mut self) -> Self::G {
-        // return (memcached handle, MySQL connection)
-        (self.0.pop().unwrap(), self.1.clone().get().unwrap())
-    }
-
-    fn putter(&mut self) -> Self::P {
-        (self.0.pop().unwrap(), self.1.clone().get().unwrap())
-    }
-
-    fn migrate(&mut self, ngetters: usize) -> (Self::P, Vec<Self::G>) {
-        unimplemented!()
+    Pool {
+        sql: pool,
+        mc: Some(mc),
     }
 }
 
-impl Putter for (Memcache, PC) {
-    fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
-        let mut prep = self.1
-            .prepare("INSERT INTO art (id, title) VALUES (:id, :title)")
-            .unwrap();
-        let ref mut memd = self.0;
-        Box::new(move |id, title| {
-            prep.execute(params!{"id" => id, "title" => &title}).unwrap();
-            drop(memd.set(format!("article_{}_vc", id).as_bytes(),
-                          format!("{};{};0", id, title).as_bytes(),
-                          0,
-                          0));
-        })
-    }
-
-    fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        let mut pv = self.1.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)").unwrap();
-        let ref mut memd = self.0;
-        Box::new(move |user, id| {
-            // DB insert
-            pv.execute(params!{"user" => user, "id" => id}).unwrap();
-            // memcached invalidate: we use a hack with a short (1s) lifetime here because the
-            // `memcached` crate does not expose `delete()`.
-            drop(memd.delete(format!("article_{}_vc", id).as_bytes()));
-        })
+pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
+    let mc = pool.mc.take().unwrap();
+    let pool = &pool.sql;
+    W {
+        a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)").unwrap(),
+        v_prep: pool.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)").unwrap(),
+        mc: mc,
     }
 }
 
-impl Getter for (Memcache, PC) {
-    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
-        let mut prep = self.1
-            .prepare("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
+impl<'a> Writer for W<'a> {
+    type Migrator = ();
+    fn make_article(&mut self, article_id: i64, title: String) {
+        self.a_prep.execute(params!{"id" => article_id, "title" => &title}).unwrap();
+        drop(self.mc.set(format!("article_{}_vc", article_id).as_bytes(),
+                         format!("{};{};0", article_id, title).as_bytes(),
+                         0,
+                         0));
+    }
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
+        self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
+        // memcached invalidate: we use a hack with a short (1s) lifetime here because the
+        // `memcached` crate does not expose `delete()`.
+        drop(self.mc.delete(format!("article_{}_vc", article_id).as_bytes()));
+        Period::PreMigration
+    }
+}
+
+pub struct R<'a> {
+    prep: mysql::conn::Stmt<'a>,
+    mc: memcached::Client,
+}
+
+pub fn make_reader<'a>(pool: &'a mut Pool) -> R<'a> {
+    let mc = pool.mc.take().unwrap();
+    let pool = &pool.sql;
+    R {
+        prep: pool.prepare("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
                       WHERE art.id = vt.id AND art.id = :id
                       GROUP BY vt.id, title")
-            .unwrap();
-        let ref mut memd = self.0;
-        Box::new(move |id| {
-            let cached = memd.get(format!("article_{}_vc", id).as_bytes());
+            .unwrap(),
+        mc: mc,
+    }
+}
 
-            let mut handle_miss = |id: i64| -> Result<Option<(i64, String, i64)>, ()> {
-                for row in prep.execute(params!{"id" => &id}).unwrap() {
+impl<'a> Reader for R<'a> {
+    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
+        let res = match self.mc.get(format!("article_{}_vc", article_id).as_bytes()) {
+            Ok(data) => {
+                let s = String::from_utf8_lossy(&data.0[..]);
+                let mut parts = s.split(";");
+                ArticleResult::Article {
+                    id: parts.next().unwrap().parse().unwrap(),
+                    title: String::from(parts.next().unwrap()),
+                    votes: parts.next().unwrap().parse().unwrap(),
+                }
+            }
+            Err(_) => {
+                for row in self.prep.execute(params!{"id" => &article_id}).unwrap() {
                     let mut rr = row.unwrap();
                     let id = rr.get(0).unwrap();
                     let title = rr.get(1).unwrap();
                     let vc = rr.get(2).unwrap();
-                    drop(memd.set(format!("article_{}_vc", id).as_bytes(),
-                                  format!("{};{};{}", id, title, vc).as_bytes(),
-                                  0,
-                                  0));
-                    return Ok(Some((id, title, vc)));
+                    drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
+                                     format!("{};{};{}", id, title, vc).as_bytes(),
+                                     0,
+                                     0));
+                    return (ArticleResult::Article {
+                                id: id,
+                                title: title,
+                                votes: vc,
+                            },
+                            Period::PreMigration);
                 }
-                Ok(None)
-            };
-
-            match cached {
-                Ok(data) => {
-                    let s = String::from_utf8_lossy(&data.0[..]);
-                    let mut parts = s.split(";");
-                    Ok(Some((parts.next().unwrap().parse().unwrap(),
-                             String::from(parts.next().unwrap()),
-                             parts.next().unwrap().parse().unwrap())))
-                }
-                Err(_) => handle_miss(id),
+                ArticleResult::NoSuchArticle
             }
-        })
+        };
+
+        (res, Period::PreMigration)
     }
 }

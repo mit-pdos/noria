@@ -3,20 +3,47 @@ use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
 
-use targets::Backend;
-use targets::Putter;
-use targets::Getter;
+use common::{Writer, Reader, ArticleResult, Period};
 
-pub struct MssqlTarget {
-    dbn: String,
-    db: String,
+pub struct Client {
+    conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
+    core: reactor::Core,
 }
 
-pub fn make(dbn: &str, _: usize) -> MssqlTarget {
+// safe because the core will remain on the same core as the client
+unsafe impl Send for Client {}
+
+fn mkc(addr: &str) -> Client {
+    let db = &addr[addr.rfind("/").unwrap() + 1..];
+    let cfg_string = &addr[0..addr.rfind("/").unwrap()];
+
+    let mut core = reactor::Core::new().unwrap();
+    let fc = tiberius::SqlConnection::connect(core.handle(), cfg_string).and_then(|conn| {
+        conn.simple_exec(format!("USE {}; \
+                                      SET NUMERIC_ROUNDABORT OFF; \
+                                      SET ANSI_PADDING, ANSI_WARNINGS, \
+                                      CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON;",
+                                 db))
+            .and_then(|r| r)
+            .collect()
+    });
+    match core.run(fc) {
+        Ok((_, conn)) => {
+            return Client {
+                conn: Some(conn),
+                core: core,
+            }
+        }
+        Err(_) => panic!("Failed to connect to SQL server"),
+    }
+}
+
+pub fn make_writer(addr: &str) -> W {
     let mut core = reactor::Core::new().unwrap();
 
-    let cfg_string = &dbn[0..dbn.rfind("/").unwrap()];
-    let db = &dbn[dbn.rfind("/").unwrap() + 1..];
+    let cfg_string = &addr[0..addr.rfind("/").unwrap()];
+    let db = &addr[addr.rfind("/").unwrap() + 1..];
 
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
@@ -76,126 +103,106 @@ pub fn make(dbn: &str, _: usize) -> MssqlTarget {
     core.run(fut).unwrap();
     drop(core);
 
-    MssqlTarget {
-        dbn: String::from(cfg_string),
-        db: String::from(db),
+    let client = mkc(addr);
+    let a_prep = client.conn
+        .as_ref()
+        .unwrap()
+        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
+    let v_prep = client.conn
+        .as_ref()
+        .unwrap()
+        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
+    W {
+        client: client,
+        a_prep: a_prep,
+        v_prep: v_prep,
     }
 }
 
-pub struct Client {
-    conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
-    core: reactor::Core,
+pub struct W {
+    client: Client,
+    a_prep: tiberius::stmt::Statement,
+    v_prep: tiberius::stmt::Statement,
 }
 
-// safe because the core will remain on the same core as the client
-unsafe impl Send for Client {}
+// all our methods are &mut
+unsafe impl Sync for W {}
+unsafe impl Send for W {}
 
-impl MssqlTarget {
-    fn mkc(&self) -> Client {
-        let mut core = reactor::Core::new().unwrap();
-
-        let fc = tiberius::SqlConnection::connect(core.handle(), self.dbn.as_str())
-            .and_then(|conn| {
-                conn.simple_exec(format!("USE {}; \
-                                          SET NUMERIC_ROUNDABORT OFF; \
-                                          SET ANSI_PADDING, ANSI_WARNINGS, \
-                                          CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                          QUOTED_IDENTIFIER, ANSI_NULLS ON;",
-                                         self.db.as_str()))
-                    .and_then(|r| r)
-                    .collect()
-            });
-        match core.run(fc) {
-            Ok((_, conn)) => {
-                return Client {
-                    conn: Some(conn),
-                    core: core,
-                }
-            }
-            Err(_) => panic!("Failed to connect to SQL server"),
-        }
+pub fn make_reader(addr: &str) -> R {
+    let client = mkc(addr);
+    let prep = client.conn
+        .as_ref()
+        .unwrap()
+        .prepare("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P1;");
+    R {
+        client: client,
+        prep: prep,
     }
 }
 
-impl Backend for MssqlTarget {
-    type P = Client;
-    type G = Client;
-
-    fn getter(&mut self) -> Self::G {
-        self.mkc()
-    }
-
-    fn putter(&mut self) -> Self::P {
-        self.mkc()
-    }
-
-    fn migrate(&mut self, _: usize) -> (Self::P, Vec<Self::G>) {
-        unimplemented!()
-    }
+pub struct R {
+    client: Client,
+    prep: tiberius::stmt::Statement,
 }
 
-impl Putter for Client {
-    fn article<'a>(&'a mut self) -> Box<FnMut(i64, String) + 'a> {
-        let prep = self.conn
-            .as_ref()
+// all our methods are &mut
+unsafe impl Sync for R {}
+unsafe impl Send for R {}
+
+impl Writer for W {
+    type Migrator = ();
+    fn make_article(&mut self, article_id: i64, title: String) {
+        let fut = self.client
+            .conn
+            .take()
             .unwrap()
-            .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
-        Box::new(move |id, title| {
-            let fut = self.conn
-                .take()
-                .unwrap()
-                .exec(&prep, &[&id, &title.as_str()])
-                .and_then(|r| r)
-                .collect();
-            let (_, conn) = self.core.run(fut).unwrap();
-            self.conn = Some(conn);
-        })
+            .exec(&self.a_prep, &[&article_id, &title.as_str()])
+            .and_then(|r| r)
+            .collect();
+        let (_, conn) = self.client.core.run(fut).unwrap();
+        self.client.conn = Some(conn);
     }
 
-    fn vote<'a>(&'a mut self) -> Box<FnMut(i64, i64) + 'a> {
-        let pv = self.conn
-            .as_ref()
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
+        let fut = self.client
+            .conn
+            .take()
             .unwrap()
-            .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
-        Box::new(move |user, id| {
-            let fut = self.conn
-                .take()
-                .unwrap()
-                .exec(&pv, &[&user, &id])
-                .and_then(|r| r)
-                .collect();
-            let (_, conn) = self.core.run(fut).unwrap();
-            self.conn = Some(conn);
-        })
+            .exec(&self.v_prep, &[&user_id, &article_id])
+            .and_then(|r| r)
+            .collect();
+        let (_, conn) = self.client.core.run(fut).unwrap();
+        self.client.conn = Some(conn);
+        Period::PreMigration
     }
 }
 
-impl Getter for Client {
-    fn get<'a>(&'a mut self) -> Box<FnMut(i64) -> Result<Option<(i64, String, i64)>, ()> + 'a> {
+impl Reader for R {
+    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
         use tiberius::stmt::ResultStreamExt;
 
-        let prep = self.conn
-            .as_ref()
-            .unwrap()
-            .prepare("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P1;");
-        Box::new(move |id| {
-            let mut res = None;
-            {
-                let fut = self.conn
-                    .take()
-                    .unwrap()
-                    .query(&prep, &[&id])
-                    .for_each_row(|ref row| {
-                        let aid: i64 = row.get(0);
-                        let title: &str = row.get(1);
-                        let votes: i64 = row.get(2);
-                        res = Some((aid, String::from(title), votes));
-                        Ok(())
-                    });
-                let conn = self.core.run(fut).unwrap();
-                self.conn = Some(conn);
-            }
-            Ok(res)
-        })
+        let mut res = ArticleResult::NoSuchArticle;
+        {
+            let fut = self.client
+                .conn
+                .take()
+                .unwrap()
+                .query(&self.prep, &[&article_id])
+                .for_each_row(|ref row| {
+                    let aid: i64 = row.get(0);
+                    let title: &str = row.get(1);
+                    let votes: i64 = row.get(2);
+                    res = ArticleResult::Article {
+                        id: aid,
+                        title: String::from(title),
+                        votes: votes,
+                    };
+                    Ok(())
+                });
+            let conn = self.client.core.run(fut).unwrap();
+            self.client.conn = Some(conn);
+        }
+        (res, Period::PreMigration)
     }
 }

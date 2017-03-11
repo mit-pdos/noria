@@ -19,21 +19,12 @@ extern crate futures_state_stream;
 #[cfg(feature="b_mssql")]
 extern crate tiberius;
 
-// Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
-// specify it twice.
-#[cfg(any(feature="b_mysql", feature="b_postgresql", feature="b_hybrid"))]
-extern crate r2d2;
-
 #[cfg(any(feature="b_mysql", feature="b_hybrid"))]
 #[macro_use]
 extern crate mysql;
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-extern crate r2d2_mysql;
 
 #[cfg(feature="b_postgresql")]
 extern crate postgres;
-#[cfg(feature="b_postgresql")]
-extern crate r2d2_postgres;
 
 extern crate distributary;
 
@@ -164,20 +155,26 @@ fn main() {
                 "mssql" => exercise::launch_reader(clients::mssql::make_reader(addr), config),
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
-                "mysql" => exercise::launch_reader(clients::mysql::make_reader(addr), config),
+                "mysql" => {
+                    let c = clients::mysql::setup(addr);
+                    exercise::launch_reader(clients::mysql::make_reader(&c), config)
+                }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
                 #[cfg(feature="b_hybrid")]
                 "hybrid" => {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    exercise::launch_raeder(targets::hybrid::make_reader(memcached_dbn, mysql_dbn),
-                                            config)
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn);
+                    exercise::launch_reader(clients::hybrid::make_reader(&mut c), config)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
                 #[cfg(feature="b_postgresql")]
                 "postgresql" => {
-                    exercise::launch_reader(clients::postgres::make_reader(addr), config)
+                    let c = clients::postgres::setup(addr);
+                    let res = exercise::launch_reader(clients::postgres::make_reader(&c), config);
+                    drop(c);
+                    res
                 }
                 // memcached://127.0.0.1:11211
                 #[cfg(feature="b_memcached")]
@@ -200,28 +197,35 @@ fn main() {
             let stats = match client {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
-                "mssql" => exercise::launch_writer(clients::mssql::make_writer(addr), config),
+                "mssql" => exercise::launch_writer(clients::mssql::make_writer(addr), config, None),
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
-                "mysql" => exercise::launch_writer(clients::mysql::make_writer(addr), config),
+                "mysql" => {
+                    let c = clients::mysql::setup(addr);
+                    exercise::launch_writer(clients::mysql::make_writer(&c), config, None)
+                }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
                 #[cfg(feature="b_hybrid")]
                 "hybrid" => {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    exercise::launch_raeder(targets::hybrid::make_writer(memcached_dbn, mysql_dbn),
-                                            config)
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn);
+                    exercise::launch_writer(clients::hybrid::make_writer(&mut c), config, None)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
                 #[cfg(feature="b_postgresql")]
                 "postgresql" => {
-                    exercise::launch_writer(clients::postgres::make_writer(addr), config)
+                    let c = clients::postgres::setup(addr);
+                    let res =
+                        exercise::launch_writer(clients::postgres::make_writer(&c), config, None);
+                    drop(c);
+                    res
                 }
                 // memcached://127.0.0.1:11211
                 #[cfg(feature="b_memcached")]
                 "memcached" => {
-                    exercise::launch_writer(clients::memcached::make_writer(addr), config)
+                    exercise::launch_writer(clients::memcached::make_writer(addr), config, None)
                 }
                 // netsoup://127.0.0.1:7777
                 #[cfg(feature="b_netsoup")]
