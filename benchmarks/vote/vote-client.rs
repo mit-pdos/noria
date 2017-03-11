@@ -156,7 +156,7 @@ fn main() {
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
-                    let c = clients::mysql::setup(addr);
+                    let c = clients::mysql::setup(addr, false);
                     exercise::launch_reader(clients::mysql::make_reader(&c), config)
                 }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
@@ -165,13 +165,13 @@ fn main() {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn);
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, false);
                     exercise::launch_reader(clients::hybrid::make_reader(&mut c), config)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
                 #[cfg(feature="b_postgresql")]
                 "postgresql" => {
-                    let c = clients::postgres::setup(addr);
+                    let c = clients::postgres::setup(addr, false);
                     let res = exercise::launch_reader(clients::postgres::make_reader(&c), config);
                     drop(c);
                     res
@@ -201,7 +201,7 @@ fn main() {
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
-                    let c = clients::mysql::setup(addr);
+                    let c = clients::mysql::setup(addr, true);
                     exercise::launch_writer(clients::mysql::make_writer(&c), config, None)
                 }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
@@ -210,13 +210,13 @@ fn main() {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn);
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, true);
                     exercise::launch_writer(clients::hybrid::make_writer(&mut c), config, None)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
                 #[cfg(feature="b_postgresql")]
                 "postgresql" => {
-                    let c = clients::postgres::setup(addr);
+                    let c = clients::postgres::setup(addr, true);
                     let res =
                         exercise::launch_writer(clients::postgres::make_writer(&c), config, None);
                     drop(c);

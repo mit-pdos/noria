@@ -8,37 +8,37 @@ pub struct W<'a> {
     vc_prep: mysql::conn::Stmt<'a>,
 }
 
-pub fn setup(addr: &str) -> mysql::Pool {
+pub fn setup(addr: &str, write: bool) -> mysql::Pool {
     use mysql::Opts;
 
     let addr = format!("mysql://{}", addr);
-    // we need to do this dance to avoid using the DB early (which will crash us if it doesn't
-    // exist)
-    let db = &addr[addr.rfind("/").unwrap() + 1..];
-    let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+    if write {
+        // clear the db (note that we strip of /db so we get default)
+        let db = &addr[addr.rfind("/").unwrap() + 1..];
+        let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+        let pool = mysql::Pool::new(opts).unwrap();
+        let mut conn = pool.get_conn().unwrap();
+        if conn.query(format!("USE {}", db)).is_ok() {
+            conn.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
+        }
+        conn.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
 
-    // Check whether database already exists, or whether we need to create it
-    let pool = mysql::Pool::new(opts).unwrap();
-    let mut conn = pool.get_conn().unwrap();
-    if conn.query(format!("USE {}", db)).is_ok() {
-        conn.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
+        // allow larger in-memory tables (4 GB)
+        pool.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
+
+        // create tables with indices
+        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
+                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY",
+                       ())
+            .unwrap();
+        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
+                        KEY id (id)) ENGINE = MEMORY",
+                       ())
+            .unwrap();
     }
-    conn.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
 
-    // allow larger in-memory tables (4 GB)
-    pool.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
-
-    // create tables with indices
-    pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
-                    PRIMARY KEY USING HASH (id)) ENGINE = MEMORY",
-                   ())
-        .unwrap();
-    pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
-                    KEY id (id)) ENGINE = MEMORY",
-                   ())
-        .unwrap();
-
-    pool
+    // now we connect for real
+    mysql::Pool::new(Opts::from_url(&addr).unwrap()).unwrap()
 }
 
 pub fn make_writer<'a>(pool: &'a mysql::Pool) -> W<'a> {

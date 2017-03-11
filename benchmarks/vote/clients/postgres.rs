@@ -2,33 +2,36 @@ use postgres;
 
 use common::{Writer, Reader, ArticleResult, Period};
 
-pub fn setup(addr: &str) -> postgres::Connection {
+pub fn setup(addr: &str, write: bool) -> postgres::Connection {
     use postgres::IntoConnectParams;
 
     let dbn = format!("postgresql://{}", addr);
     let params = dbn.into_connect_params().unwrap();
 
     // Check whether database already exists, or whether we need to create it
-    let mut check_new_params = params.clone();
-    check_new_params.database = Some(String::from("postgres"));
-    let db = params.database.clone().unwrap_or_else(|| String::from("soup_bench"));
-    let x = postgres::Connection::connect(check_new_params, postgres::SslMode::None).unwrap();
-    if x.execute("SELECT datname FROM pg_database WHERE datname=$1", &[&db]).unwrap() != 0 {
-        x.execute(format!("DROP DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
+    if write {
+        let mut check_new_params = params.clone();
+        check_new_params.database = Some(String::from("postgres"));
+        let db = params.database.clone().unwrap_or_else(|| String::from("soup_bench"));
+        let x = postgres::Connection::connect(check_new_params, postgres::SslMode::None).unwrap();
+        if x.execute("SELECT datname FROM pg_database WHERE datname=$1", &[&db]).unwrap() != 0 {
+            x.execute(format!("DROP DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
+        }
+        x.execute(format!("CREATE DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
+
+        // create tables
+        let x = postgres::Connection::connect(params.clone(), postgres::SslMode::None).unwrap();
+        x.execute("CREATE TABLE art (id bigint, title varchar(255), votes bigint)",
+                     &[])
+            .unwrap();
+        x.execute("CREATE TABLE vt (u bigint, id bigint)", &[]).unwrap();
+
+        // create indices
+        x.execute("CREATE INDEX ON art (id)", &[]).unwrap();
+        x.execute("CREATE INDEX ON vt (id)", &[]).unwrap();
     }
-    x.execute(format!("CREATE DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
 
-    // create tables
-    x.execute("CREATE TABLE art (id bigint, title varchar(255), votes bigint)",
-                 &[])
-        .unwrap();
-    x.execute("CREATE TABLE vt (u bigint, id bigint)", &[]).unwrap();
-
-    // create indices
-    x.execute("CREATE INDEX ON art (id)", &[]).unwrap();
-    x.execute("CREATE INDEX ON vt (id)", &[]).unwrap();
-
-    x
+    postgres::Connection::connect(params, postgres::SslMode::None).unwrap()
 }
 
 pub struct W<'a> {
