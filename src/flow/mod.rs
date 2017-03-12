@@ -819,28 +819,20 @@ impl<'a> Migration<'a> {
     /// This will spin up an execution thread for each new thread domain, and hook those new
     /// domains into the larger Soup graph. The returned map contains entry points through which
     /// new updates should be sent to introduce them into the Soup.
-    pub fn commit(self) {
+    pub fn commit(mut self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
         let mut new = HashSet::new();
+
+        for (node, _) in self.added.iter() {
+            new.insert(*node);
+        }
+
+        // Make sure all new nodes are assigned to a domain
+        migrate::assignment::assign_domains(&mut self, &new);
 
         let log = self.log;
         let start = self.start;
         let mainline = self.mainline;
-
-        // Make sure all new nodes are assigned to a domain
-        for (node, domain) in self.added {
-            let domain = domain.unwrap_or_else(|| {
-                // new node that doesn't belong to a domain
-                // create a new domain just for that node
-                // NOTE: this is the same code as in add_domain(), but we can't use self here
-                trace!(log, "node automatically added to domain"; "node" => node.index(), "domain" => mainline.ndomains);
-                mainline.ndomains += 1;
-                (mainline.ndomains - 1).into()
-
-            });
-            mainline.ingredients[node].add_to(domain);
-            new.insert(node);
-        }
 
         // Readers are nodes too.
         // And they should be assigned the same domain as their parents

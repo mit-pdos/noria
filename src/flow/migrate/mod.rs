@@ -20,6 +20,7 @@
 //!
 //! Beware, Here be dragons™
 
+pub mod assignment;
 pub mod routing;
 pub mod transactions;
 pub mod materialization;
