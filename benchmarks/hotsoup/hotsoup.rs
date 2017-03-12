@@ -1,5 +1,6 @@
-extern crate chrono;
 extern crate distributary;
+
+mod populate;
 
 extern crate clap;
 extern crate slog;
@@ -72,8 +73,12 @@ fn main() {
         .about("Soupy conference management system for your HotCRP needs.")
         .arg(Arg::with_name("graphs")
             .short("g")
-            .default_value("/tmp/hotcrp_graphs")
             .help("Directory to dump graphs for each schema version into (if set)."))
+        .arg(Arg::with_name("populate_from")
+            .short("p")
+            .required(true)
+            .default_value("benchmarks/hotsoup/testdata")
+            .help("Location of the HotCRP test data for population."))
         .arg(Arg::with_name("recipes")
             .short("r")
             .required(true)
@@ -86,7 +91,8 @@ fn main() {
 
     let rloc = matches.value_of("recipes").unwrap();
     let gloc = matches.value_of("graphs");
-    let _transactional = matches.is_present("transactional");
+    let dataloc = matches.value_of("populate_from").unwrap();
+    let transactional = matches.is_present("transactional");
 
     let mut backend = make();
 
@@ -120,6 +126,9 @@ fn main() {
 
         i += 1;
     }
+
+    // Populate with test data at latest schema
+    populate::populate(&backend, dataloc, transactional).unwrap();
 
     println!("{}", backend.g);
 }
