@@ -2,8 +2,12 @@
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 repo="https://github.com/kohler/hotcrp.git"
 
-mkdir -p ${dir}/schemas
+cargo build --release --bin extract_hotcrp_queries
 
+mkdir -p ${dir}/schemas
+mkdir -p ${dir}/queries
+
+rm -rf /tmp/hotcrp
 git clone ${repo} /tmp/hotcrp
 cd /tmp/hotcrp
 
@@ -23,9 +27,11 @@ for l in $(git log --oneline --follow src/schema.sql | cut -d' ' -f1); do
   cur_schema_ver=$(echo ${res} | cut -d' ' -f 8 | sed -e "s/);//" | tr -d [:space:])
 
   if [[ ${cur_schema_ver} -lt ${prev_schema_ver} ]]; then
+    echo "schema ${prev_schema_ver} -> ${cur_schema_ver}"
     # we have advanced to a new schema
     cp ${schema_file} ${dir}/schemas/hotcrp_${cur_schema_ver}.sql
-    echo "schema ${prev_schema_ver} -> ${cur_schema_ver}"
+    # extract the queries
+    ${dir}/../../target/debug/extract_hotcrp_queries $(pwd) --output ${dir}/queries/hotcrp_${cur_schema_ver}.sql
     prev_schema_ver=${cur_schema_ver}
   elif [[ ${cur_schema_ver} -gt ${prev_schema_ver} ]]; then
     echo "SCHEMA WENT BACKWARDS: ${cur_schema_ver} > ${prev_schema_ver} @ ${l}"
