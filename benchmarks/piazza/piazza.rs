@@ -2,10 +2,13 @@ extern crate distributary;
 
 #[macro_use]
 extern crate clap;
+extern crate slog;
+extern crate slog_term;
 
 use std::{thread, time};
 use std::fs::{OpenOptions, File};
 use std::io::Write;
+use slog::DrainExt;
 
 use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator, Index};
 
@@ -22,6 +25,7 @@ impl Piazza {
     // Create the base nodes for our Piazza application
     pub fn new() -> Self {
         let mut g = Blender::new();
+        g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
 
         let (user, post, class, taking);
 
@@ -67,12 +71,13 @@ impl Piazza {
         }
     }
 
-    pub fn log_user(&mut self, uid: DataType) {
+    pub fn log_user(&mut self, uid: DataType, domain_config: &str) {
 
         let visible_posts;
 
         let mut mig = self.soup.start_migration();
 
+        let user_domain = mig.add_domain();
         // classes user is taking
         let class_filter = Filter::new(self.taking, &[None, Some(uid.into())]);
 
@@ -85,10 +90,24 @@ impl Piazza {
 
         visible_posts = mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
-        // assign everything to the same domain to save up memory
-        mig.assign_domain(user_classes, self.domain);
+        match domain_config.as_ref() {
+            // creates one domain peruser
+            "peruser" => {
+                mig.assign_domain(user_classes, user_domain);
 
-        mig.assign_domain(visible_posts, self.domain);
+                mig.assign_domain(visible_posts, user_domain);
+            },
+            // assign everything to a single domain
+            "single" => {
+                mig.assign_domain(user_classes, self.domain);
+
+                mig.assign_domain(visible_posts, self.domain);
+            },
+            _ => {
+                println!("invalid domain configuration");
+                return
+            }
+        }
 
         // maintain visible_posts
         mig.maintain(visible_posts, 0);
@@ -111,10 +130,26 @@ fn populate_classes(nclasses: i64, class_putter: Mutator) {
     }
 }
 
-fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator) {
-    for i in 0..nclasses {
-        for j in 0..nusers {
-            taking_putter.put(vec![i.into(), j.into()]);
+fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: &str) {
+    match fanout.as_ref() {
+        "few" =>  {
+            for j in 0..nusers {
+                for i in 0..10 {
+                    let cid = (j*10 + i) % nclasses;
+                    taking_putter.put(vec![cid.into(), j.into()]);
+                }
+            }
+        },
+        "all" => {
+            for j in 0..nusers {
+                for i in 0..nclasses {
+                    taking_putter.put(vec![i.into(), j.into()]);
+                }
+            }
+        },
+        _ => {
+            println!("invalid fanout configuration");
+            return
         }
     }
 }
@@ -146,7 +181,20 @@ fn main() {
             .long("csv")
             .required(false)
             .help("Print output in CSV format."))
-        .arg(Arg::with_name("cfg")
+        .arg(Arg::with_name("fanout")
+            .long("fanout")
+            .short("f")
+            .possible_values(&["all", "few"])
+            .takes_value(true)
+            .default_value("all")
+            .help("Size of the class fanout for each user"))
+        .arg(Arg::with_name("domain_config")
+            .long("dcfg")
+            .possible_values(&["single", "peruser"])
+            .takes_value(true)
+            .default_value("single")
+            .help("Domain assignment configuration"))
+        .arg(Arg::with_name("benchmark")
             .possible_values(&["write", "migration"])
             .takes_value(true)
             .required(true)
@@ -161,7 +209,9 @@ fn main() {
     let nusers = value_t_or_exit!(args, "nusers", i64);
     let nclasses = value_t_or_exit!(args, "nclasses", i64);
     let nposts = value_t_or_exit!(args, "nposts", i64);
-    let cfg = args.value_of("cfg").unwrap();
+    let benchmark = args.value_of("benchmark").unwrap();
+    let domain_config = args.value_of("domain_config").unwrap();
+    let fanout = args.value_of("fanout").unwrap();
     let csv = args.is_present("csv");
 
     let class_putter = app.soup.get_mutator(app.class);
@@ -172,9 +222,9 @@ fn main() {
     println!("Seeding...", );
     populate_users(nusers, user_putter);
     populate_classes(nclasses, class_putter);
-    populate_taking(nclasses, nusers, taking_putter);
+    populate_taking(nclasses, nusers, taking_putter, fanout);
 
-    match cfg.as_ref() {
+    match benchmark.as_ref() {
         "migration" => {
             for pid in 0..nposts {
                 post_putter.put(vec![
@@ -208,10 +258,11 @@ fn main() {
         let start;
         let end;
 
-        match cfg.as_ref() {
+        match benchmark.as_ref() {
             "migration" => {
                 start = time::Instant::now();
-                app.log_user(uid.into());
+                app.log_user(uid.into(), domain_config);
+
                 end = time::Instant::now().duration_since(start);
             },
             "write" => {
@@ -223,7 +274,7 @@ fn main() {
 
                 thread::sleep(time::Duration::from_millis(1000));
 
-                app.log_user(uid.into());
+                app.log_user(uid.into(), domain_config);
             },
             _ => {
                 println!("wrong benchmark!");
@@ -244,7 +295,7 @@ fn main() {
         }
     }
 
-    println!("{:?} results ", cfg);
+    println!("{:?} results ", benchmark);
     println!("avg: {:?}", avg(&times) );
     println!("max: {:?}", max_duration(&times) );
     println!("min: {:?}", min_duration(&times) );
