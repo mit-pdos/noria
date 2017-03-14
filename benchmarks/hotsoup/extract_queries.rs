@@ -95,6 +95,7 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     let incomplete = Regex::new("=$").unwrap();
 
     queries.into_iter()
+        .filter(|&(_, ref q)| !q.contains("Matches"))
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
         .collect()
