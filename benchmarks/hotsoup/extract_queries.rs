@@ -153,7 +153,7 @@ fn main() {
 
     info!(log, "Writing {} valid queries...", ok.len());
     for (ql, q) in ok {
-        assert!(write!(f, "{}: {}\n", ql, q).is_ok());
+        assert!(write!(f, "{}: {};\n", ql, q).is_ok());
     }
 
     info!(log, "Writing {} rejected queries...", rejected.len());
