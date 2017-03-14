@@ -1,5 +1,4 @@
-#![cfg_attr(feature="b_netsoup", feature(conservative_impl_trait, plugin))]
-#![cfg_attr(feature="b_netsoup", plugin(tarpc_plugins))]
+#![feature(ptr_eq)]
 
 #[macro_use]
 extern crate clap;
@@ -9,88 +8,30 @@ extern crate slog_term;
 
 extern crate rand;
 
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
-extern crate futures;
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
-extern crate tokio_core;
-
-#[cfg(feature="b_mssql")]
-extern crate futures_state_stream;
-#[cfg(feature="b_mssql")]
-extern crate tiberius;
-
-// Both MySQL *and* PostgreSQL use r2d2, but compilation fails with both feature flags active if we
-// specify it twice.
-#[cfg(any(feature="b_mysql", feature="b_postgresql", feature="b_hybrid"))]
-extern crate r2d2;
-
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-#[macro_use]
-extern crate mysql;
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-extern crate r2d2_mysql;
-
-#[cfg(feature="b_postgresql")]
-extern crate postgres;
-#[cfg(feature="b_postgresql")]
-extern crate r2d2_postgres;
-
 extern crate distributary;
-
-#[cfg(feature="b_netsoup")]
-extern crate tarpc;
-
-#[cfg(any(feature="b_memcached", feature="b_hybrid"))]
-extern crate memcached;
 
 extern crate hdrsample;
 
 extern crate spmc;
 
-mod targets;
 mod exercise;
+mod common;
+mod graph;
 
+use common::{Writer, Reader, ArticleResult, Period, MigrationHandle};
+use distributary::{Mutator, DataType};
+
+use std::sync::mpsc;
+use std::thread;
+use std::sync;
 use std::time;
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-const BENCH_USAGE: &'static str = "\
-EXAMPLES:
-  vote soup://
-  vote netsoup://127.0.0.1:7777
-  vote memcached://127.0.0.1:11211
-  vote mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
-  vote mysql://user@127.0.0.1/database
-  vote postgresql://user@127.0.0.1/database
-  vote hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
     use clap::{Arg, App};
-    let mut backends = vec!["soup"];
-    if cfg!(feature = "b_mssql") {
-        backends.push("mssql");
-    }
-    if cfg!(feature = "b_mysql") {
-        backends.push("mysql");
-    }
-    if cfg!(feature = "b_postgresql") {
-        backends.push("postgresql");
-    }
-    if cfg!(feature = "b_memcached") {
-        backends.push("memcached");
-    }
-    if cfg!(feature = "b_netsoup") {
-        backends.push("netsoup");
-    }
-    if cfg!(feature = "b_hybrid") {
-        backends.push("hybrid");
-    }
-    let backends = format!("Which database backend to use [{}]://<params>",
-                           backends.join(", "));
 
     let args = App::new("vote")
         .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for different storage \
-                backends.")
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
         .arg(Arg::with_name("avg")
             .long("avg")
             .takes_value(false)
@@ -129,17 +70,11 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
-        .arg(Arg::with_name("BACKEND")
-            .index(1)
-            .help(&backends)
-            .required(true))
-        .after_help(BENCH_USAGE)
         .get_matches();
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
-    let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
@@ -147,66 +82,90 @@ fn main() {
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     assert!(ngetters > 0);
-    assert!(!dbn.is_empty());
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = exercise::RuntimeConfig::new(ngetters, narticles, runtime);
+    let mut config = exercise::RuntimeConfig::new(narticles, runtime);
     config.produce_cdf(cdf);
-    if stage {
-        config.put_then_get();
-    }
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
 
     // setup db
-    println!("Attempting to connect to database using {}", dbn);
-    let mut dbn = dbn.splitn(2, "://");
-    let (put_stats, get_stats) = match dbn.next().unwrap() {
-        // soup://
-        "soup" => exercise::launch(targets::soup::make(dbn.next().unwrap(), ngetters), config),
-        // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
-        #[cfg(feature="b_mssql")]
-        "mssql" => exercise::launch(targets::mssql::make(dbn.next().unwrap(), ngetters), config),
-        // mysql://soup@127.0.0.1/bench_mysql
-        #[cfg(feature="b_mysql")]
-        "mysql" => exercise::launch(targets::mysql::make(dbn.next().unwrap(), ngetters), config),
-        // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
-        #[cfg(feature="b_hybrid")]
-        "hybrid" => {
-            let mut split_dbn = dbn.next().unwrap().splitn(2, ",");
-            let mysql_dbn = &split_dbn.next().unwrap()[6..];
-            let memcached_dbn = &split_dbn.next().unwrap()[10..];
-            exercise::launch(targets::hybrid::make(memcached_dbn, mysql_dbn, ngetters),
-                             config)
-        }
-        // postgresql://soup@127.0.0.1/bench_psql
-        #[cfg(feature="b_postgresql")]
-        "postgresql" => {
-            exercise::launch(targets::postgres::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // memcached://127.0.0.1:11211
-        #[cfg(feature="b_memcached")]
-        "memcached" => {
-            exercise::launch(targets::memcached::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // netsoup://127.0.0.1:7777
-        #[cfg(feature="b_netsoup")]
-        "netsoup" => {
-            exercise::launch(targets::netsoup::make(dbn.next().unwrap(), ngetters),
-                             config)
-        }
-        // garbage
-        t => {
-            panic!("backend not supported -- make sure you compiled with --features b_{}",
-                   t)
-        }
+    let mut g = graph::make();
+    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
+    let getter = Box::new(g.end.take().unwrap()); // Box<Box<>>
+    let mut getter = unsafe { Getter::new(Box::into_raw(getter)) }; // so F is still Sized
+    let getter_orig = unsafe { getter.get_ptr() };
+
+    let g = sync::Arc::new(sync::Mutex::new(g));
+    let putter = Spoon {
+        graph: g.clone(),
+        getter: getter.clone(),
+        article: putters.0,
+        vote: putters.1,
+        new_vote: None,
+        i: 0,
     };
+
+    // prepare getters
+    let getters: Vec<_> = (0..ngetters).into_iter().map(|_| getter.clone()).collect();
+
+    let put_stats;
+    let get_stats: Vec<_>;
+    if stage {
+        // put then get
+        put_stats = exercise::launch_writer(putter, config, None);
+        let getters: Vec<_> = getters.into_iter()
+            .enumerate()
+            .map(|(i, g)| {
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || exercise::launch_reader(g, config))
+                    .unwrap()
+            })
+            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+    } else {
+        // put & get
+        // TODO: how do we start getters after prepopulate?
+        let (tx, prepop) = mpsc::sync_channel(0);
+        let putter = thread::Builder::new()
+            .name("PUT0".to_string())
+            .spawn(move || exercise::launch_writer(putter, config, Some(tx)))
+            .unwrap();
+
+        // wait for prepopulation to finish
+        prepop.recv().is_err();
+
+        let getters: Vec<_> = getters.into_iter()
+            .enumerate()
+            .map(|(i, g)| {
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || exercise::launch_reader(g, config))
+                    .unwrap()
+            })
+            .collect();
+
+        put_stats = putter.join().unwrap();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+    }
+
+    // clean up getter functions
+    let getter_end = unsafe { getter.get_ptr() };
+    use std::ptr;
+    if ptr::eq(getter_orig, getter_end) {
+        // only free once
+        unsafe { Box::from_raw(getter_orig) };
+    } else {
+        // free both
+        unsafe { Box::from_raw(getter_orig) };
+        unsafe { Box::from_raw(getter_orig) };
+        unsafe { Box::from_raw(getter_end) };
+    }
 
     print_stats("PUT", &put_stats.pre, avg);
     for (i, s) in get_stats.iter().enumerate() {
@@ -245,5 +204,215 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
     }
     if avg {
         println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
+    }
+}
+
+type G = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Sync + Send + 'static>;
+
+// A more dangerous AtomicPtr that also clones and derefs into the inner type
+use std::sync::atomic::AtomicPtr;
+struct Getter {
+    inner: sync::Arc<AtomicPtr<G>>,
+    orig: *const G,
+}
+
+unsafe impl Send for Getter {}
+
+impl Getter {
+    // unsafe because Getter will *not* destroy inner when dropped.
+    // users need to explicitly call destroy() on the *last* Getter.
+    pub unsafe fn new(inner: *mut G) -> Getter {
+        Getter {
+            inner: sync::Arc::new(AtomicPtr::new(inner)),
+            orig: inner,
+        }
+    }
+
+    // unsafe because caller must guarantee that old value isn't dropped prematurely
+    pub unsafe fn replace(&mut self, new: *mut G) {
+        self.inner.swap(new, sync::atomic::Ordering::SeqCst);
+    }
+
+    pub unsafe fn get_ptr(&mut self) -> *mut G {
+        self.inner.load(sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn same(&self) -> bool {
+        use std::ptr;
+        ptr::eq(self.orig, self.inner.load(sync::atomic::Ordering::Relaxed))
+    }
+}
+
+impl Clone for Getter {
+    fn clone(&self) -> Self {
+        Getter {
+            inner: self.inner.clone(),
+            orig: self.orig,
+        }
+    }
+}
+
+use std::ops::Deref;
+impl Deref for Getter {
+    type Target = G;
+    fn deref(&self) -> &Self::Target {
+        use std::mem;
+        unsafe { mem::transmute(self.inner.load(sync::atomic::Ordering::Relaxed)) }
+    }
+}
+
+struct Spoon {
+    graph: sync::Arc<sync::Mutex<graph::Graph>>,
+    article: Mutator,
+    getter: Getter,
+    vote: Mutator,
+    i: usize,
+    new_vote: Option<mpsc::Receiver<Mutator>>,
+}
+
+impl Writer for Spoon {
+    type Migrator = Migrator;
+
+    fn make_article(&mut self, article_id: i64, title: String) {
+        self.article.put(vec![article_id.into(), title.into()]);
+    }
+
+    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
+        if self.new_vote.is_some() {
+            self.i += 1;
+            // don't try too eagerly
+            if self.i & 16384 == 0 {
+                // we may have been given a new putter
+                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
+                    // yay!
+                    self.new_vote = None;
+                    self.vote = nv;
+                    self.i = usize::max_value();
+                }
+            }
+        }
+
+        if self.i == usize::max_value() {
+            self.vote.put(vec![user_id.into(), article_id.into(), 5.into()]);
+            Period::PostMigration
+        } else {
+            self.vote.put(vec![user_id.into(), article_id.into()]);
+            Period::PreMigration
+        }
+    }
+
+    fn prepare_migration(&mut self) -> Self::Migrator {
+        let (tx, rx) = mpsc::sync_channel(0);
+        self.new_vote = Some(rx);
+        self.i = 1;
+        Migrator {
+            graph: self.graph.clone(),
+            mut_tx: tx,
+            getter: self.getter.clone(),
+        }
+    }
+}
+
+struct Migrator {
+    graph: sync::Arc<sync::Mutex<graph::Graph>>,
+    mut_tx: mpsc::SyncSender<Mutator>,
+    getter: Getter,
+}
+
+impl MigrationHandle for Migrator {
+    fn execute(&mut self) {
+        use std::collections::HashMap;
+        use distributary::{Base, Aggregation, JoinBuilder, Union};
+
+        let mut g = self.graph.lock().unwrap();
+        let (rating, newendq) = {
+            // get all the ids since migration will borrow g
+            let vc = g.vc;
+            let article = g.article;
+
+            // migrate
+            let mut mig = g.graph.start_migration();
+
+            // add new "ratings" base table
+            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
+
+            // add sum of ratings
+            let rs = mig.add_ingredient("rsum",
+                                        &["id", "total"],
+                                        Aggregation::SUM.over(rating, 2, &[1]));
+
+            // take a union of vote count and rsum
+            let mut emits = HashMap::new();
+            emits.insert(rs, vec![0, 1]);
+            emits.insert(vc, vec![0, 1]);
+            let u = Union::new(emits);
+            let both = mig.add_ingredient("both", &["id", "value"], u);
+
+            // sum them by article id
+            let total = mig.add_ingredient("total",
+                                           &["id", "total"],
+                                           Aggregation::SUM.over(both, 1, &[0]));
+
+            // finally, produce end result
+            let j = JoinBuilder::new(vec![(article, 0), (article, 1), (total, 1)])
+                .from(article, vec![1, 0])
+                .join(total, vec![1, 0]);
+            let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
+            let newendq = mig.maintain(newend, 0);
+
+            // we want ratings, rsum, and the union to be in the same domain,
+            // because only rsum is really costly
+            let domain = mig.add_domain();
+            mig.assign_domain(rating, domain);
+            mig.assign_domain(rs, domain);
+            mig.assign_domain(both, domain);
+
+            // and then we want the total sum and the join in the same domain,
+            // to avoid duplicating the total state
+            let domain = mig.add_domain();
+            mig.assign_domain(total, domain);
+            mig.assign_domain(newend, domain);
+
+            // start processing
+            mig.commit();
+            (rating, newendq)
+        };
+
+        let mutator = g.graph.get_mutator(rating);
+        self.mut_tx.send(mutator).unwrap();
+        let g = Box::into_raw(Box::new(newendq));
+        unsafe { self.getter.replace(g) };
+    }
+}
+
+impl Reader for Getter {
+    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
+        let id = article_id.into();
+        let res = match self(&id) {
+            Ok(g) => {
+                match g.into_iter().next() {
+                    Some(row) => {
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let id: i64 = row.next().unwrap().into();
+                        let title: String = row.next().unwrap().into();
+                        let count: i64 = row.next().unwrap().into();
+                        ArticleResult::Article {
+                            id: id,
+                            title: title,
+                            votes: count,
+                        }
+                    }
+                    None => ArticleResult::NoSuchArticle,
+                }
+            }
+            Err(_) => ArticleResult::Error,
+        };
+
+        if self.same() {
+            (res, Period::PreMigration)
+        } else {
+            (res, Period::PostMigration)
+        }
     }
 }
