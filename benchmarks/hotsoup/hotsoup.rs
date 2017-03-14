@@ -28,25 +28,34 @@ fn make() -> Box<Backend> {
 }
 
 impl Backend {
-    fn migrate(&mut self, recipe_file: &str) -> Result<(), String> {
+    fn migrate(&mut self, schema_file: &str, query_file: &str) -> Result<(), String> {
         use std::io::Read;
         use std::fs::File;
 
         // migrate
         let mut mig = self.g.start_migration();
 
-        let mut f = File::open(recipe_file).unwrap();
+        let mut sf = File::open(schema_file).unwrap();
+        let mut qf = File::open(query_file).unwrap();
         let mut s = String::new();
 
-        // load queries
-        f.read_to_string(&mut s).unwrap();
+        // load schema
+        sf.read_to_string(&mut s).unwrap();
         // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
-        let s = s.lines()
+        let mut rs = s.lines()
             .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
             .take_while(|l| !l.contains("insert"))
             .collect::<Vec<_>>()
             .join("\n");
-        let new_recipe = Recipe::from_str(&s)?;
+        // load queries and concatenate them onto the table definitions from the schema
+        s.clear();
+        qf.read_to_string(&mut s).unwrap();
+        rs.push_str("\n");
+        rs.push_str(&s);
+
+        println!("{}", rs);
+
+        let new_recipe = Recipe::from_str(&rs)?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
@@ -66,6 +75,7 @@ fn main() {
     use clap::{Arg, App};
     use std::fs::{self, File};
     use std::io::Write;
+    use std::path::PathBuf;
     use std::str::FromStr;
 
     let matches = App::new("hotsoup")
@@ -73,47 +83,72 @@ fn main() {
         .about("Soupy conference management system for your HotCRP needs.")
         .arg(Arg::with_name("graphs")
             .short("g")
+            .value_name("DIR")
             .help("Directory to dump graphs for each schema version into (if set)."))
         .arg(Arg::with_name("populate_from")
             .short("p")
             .required(true)
             .default_value("benchmarks/hotsoup/testdata")
             .help("Location of the HotCRP test data for population."))
-        .arg(Arg::with_name("recipes")
-            .short("r")
+        .arg(Arg::with_name("schemas")
+            .short("s")
             .required(true)
             .default_value("benchmarks/hotsoup/schemas")
+            .help("Location of the HotCRP query recipes to move through."))
+        .arg(Arg::with_name("queries")
+            .short("q")
+            .required(true)
+            .default_value("benchmarks/hotsoup/queries")
             .help("Location of the HotCRP schema recipes to move through."))
         .arg(Arg::with_name("transactional")
             .short("t")
             .help("Use transactional writes."))
         .get_matches();
 
-    let rloc = matches.value_of("recipes").unwrap();
     let gloc = matches.value_of("graphs");
+    let sloc = matches.value_of("schemas").unwrap();
+    let qloc = matches.value_of("queries").unwrap();
     let dataloc = matches.value_of("populate_from").unwrap();
     let transactional = matches.is_present("transactional");
 
     let mut backend = make();
 
-    let mut files = Vec::new();
-    for entry in fs::read_dir(rloc).unwrap() {
+    let mut query_files = Vec::new();
+    let mut schema_files = Vec::new();
+
+    for entry in fs::read_dir(qloc).unwrap() {
         let entry = entry.unwrap();
         if entry.path().is_file() {
-            files.push(entry.path());
+            query_files.push(entry.path());
         }
     }
+
+    for entry in fs::read_dir(sloc).unwrap() {
+        let entry = entry.unwrap();
+        if entry.path().is_file() {
+            schema_files.push(entry.path());
+        }
+    }
+
     // hotcrp_*.sql
-    files.sort_by_key(|k| {
+    query_files.sort_by_key(|k| {
+        let fname = k.file_name().unwrap().to_str().unwrap();
+        u64::from_str(&fname[7..fname.len() - 4]).unwrap()
+    });
+    schema_files.sort_by_key(|k| {
         let fname = k.file_name().unwrap().to_str().unwrap();
         u64::from_str(&fname[7..fname.len() - 4]).unwrap()
     });
 
-    let mut i = 0;
-    for fname in files {
-        println!("Loading HotCRP recipe from {:?}", fname);
+    let files: Vec<(PathBuf, PathBuf)> = schema_files.into_iter().zip(query_files).collect();
 
-        match backend.migrate(&fname.to_str().unwrap()) {
+    let mut i = 0;
+    for (sfname, qfname) in files {
+        println!("Loading HotCRP schema from {:?}, queries from {:?}",
+                 sfname,
+                 qfname);
+
+        match backend.migrate(&sfname.to_str().unwrap(), &qfname.to_str().unwrap()) {
             Err(e) => panic!(e),
             _ => (),
         }
