@@ -263,8 +263,8 @@ fn main() {
         }
     }
 
-    println!("Finished seeding! Sleeping for 1 second...");
-    thread::sleep(time::Duration::from_millis(1000));
+    println!("Finished seeding! Sleeping...");
+    thread::sleep(time::Duration::from_millis(100));
 
 
     let mut times = Vec::new();
@@ -291,7 +291,7 @@ fn main() {
                 }
                 end = time::Instant::now().duration_since(start);
 
-                thread::sleep(time::Duration::from_millis(1000));
+                thread::sleep(time::Duration::from_millis(100));
 
                 app.log_user(uid.into(), &domain_config);
             },
