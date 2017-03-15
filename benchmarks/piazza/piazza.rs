@@ -21,6 +21,16 @@ pub struct Piazza {
     domain: Index,
 }
 
+pub enum DomainConfig {
+    Single,
+    PerUser
+}
+
+enum Fanout {
+    All,
+    Few
+}
+
 impl Piazza {
     // Create the base nodes for our Piazza application
     pub fn new() -> Self {
@@ -71,7 +81,7 @@ impl Piazza {
         }
     }
 
-    pub fn log_user(&mut self, uid: DataType, domain_config: &str) {
+    pub fn log_user(&mut self, uid: DataType, domain_config: &DomainConfig) {
 
         let visible_posts;
 
@@ -90,22 +100,18 @@ impl Piazza {
 
         visible_posts = mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
-        match domain_config.as_ref() {
+        match *domain_config {
             // creates one domain peruser
-            "peruser" => {
+            DomainConfig::PerUser => {
                 mig.assign_domain(user_classes, user_domain);
 
                 mig.assign_domain(visible_posts, user_domain);
             },
             // assign everything to a single domain
-            "single" => {
+            DomainConfig::Single => {
                 mig.assign_domain(user_classes, self.domain);
 
                 mig.assign_domain(visible_posts, self.domain);
-            },
-            _ => {
-                println!("invalid domain configuration");
-                return
             }
         }
 
@@ -130,9 +136,9 @@ fn populate_classes(nclasses: i64, class_putter: Mutator) {
     }
 }
 
-fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: &str) {
-    match fanout.as_ref() {
-        "few" =>  {
+fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: Fanout) {
+    match fanout {
+        Fanout::Few =>  {
             for j in 0..nusers {
                 for i in 0..10 {
                     let cid = (j*10 + i) % nclasses;
@@ -140,16 +146,12 @@ fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: &
                 }
             }
         },
-        "all" => {
+        Fanout::All => {
             for j in 0..nusers {
                 for i in 0..nclasses {
                     taking_putter.put(vec![i.into(), j.into()]);
                 }
             }
-        },
-        _ => {
-            println!("invalid fanout configuration");
-            return
         }
     }
 }
@@ -210,7 +212,7 @@ fn main() {
     let nclasses = value_t_or_exit!(args, "nclasses", i64);
     let nposts = value_t_or_exit!(args, "nposts", i64);
     let benchmark = args.value_of("benchmark").unwrap();
-    let domain_config = args.value_of("domain_config").unwrap();
+    let domain_config_str = args.value_of("domain_config").unwrap();
     let fanout = args.value_of("fanout").unwrap();
     let csv = args.is_present("csv");
 
@@ -222,7 +224,24 @@ fn main() {
     println!("Seeding...", );
     populate_users(nusers, user_putter);
     populate_classes(nclasses, class_putter);
-    populate_taking(nclasses, nusers, taking_putter, fanout);
+    match fanout.as_ref() {
+        "all" => populate_taking(nclasses, nusers, taking_putter, Fanout::All),
+        "few" => populate_taking(nclasses, nusers, taking_putter, Fanout::Few),
+        _ => {
+            println!("Invalid fanout configuration");
+            return
+        }
+    }
+
+    let domain_config;
+    match domain_config_str.as_ref() {
+        "single"  => domain_config = DomainConfig::Single,
+        "peruser" => domain_config = DomainConfig::PerUser,
+        _ => {
+            println!("Invalid domain configuration");
+            return
+        }
+    }
 
     match benchmark.as_ref() {
         "migration" => {
@@ -261,7 +280,7 @@ fn main() {
         match benchmark.as_ref() {
             "migration" => {
                 start = time::Instant::now();
-                app.log_user(uid.into(), domain_config);
+                app.log_user(uid.into(), &domain_config);
 
                 end = time::Instant::now().duration_since(start);
             },
@@ -274,7 +293,7 @@ fn main() {
 
                 thread::sleep(time::Duration::from_millis(1000));
 
-                app.log_user(uid.into(), domain_config);
+                app.log_user(uid.into(), &domain_config);
             },
             _ => {
                 println!("wrong benchmark!");
