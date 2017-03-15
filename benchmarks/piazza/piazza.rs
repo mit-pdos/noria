@@ -313,28 +313,18 @@ fn main() {
 }
 
 fn max_duration(stats: &Vec<f64>) -> f64 {
-    let max = stats.iter().fold(0f64, |acc, el| {
+    stats.iter().fold(0f64, |acc, el| {
         f64::max(acc, *el)
-    });
-
-    max
+    })
 }
 
 fn min_duration(stats: &Vec<f64>) -> f64 {
-    let min_start = stats[0];
-    let min = stats.iter().fold(min_start, |acc, el| {
+    stats.iter().fold(stats[0], |acc, el| {
         f64::min(acc, *el)
-    });
-
-    min
+    })
 }
 
 
 fn avg(stats: &Vec<f64>) -> f64 {
-    let sum = stats.iter().fold(0f64, |acc, el| {
-        acc + (el / stats.len() as f64)
-
-    });
-
-    sum
+    stats.iter().sum::<f64>() / stats.len() as f64
 }
