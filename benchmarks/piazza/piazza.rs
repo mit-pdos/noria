@@ -10,7 +10,7 @@ use std::fs::{OpenOptions, File};
 use std::io::Write;
 use slog::DrainExt;
 
-use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator, Index};
+use distributary::{DataType, JoinBuilder, Blender, Base, BaseDurabilityLevel, NodeAddress, Filter, Mutator, Index};
 
 pub struct Piazza {
     pub soup: Blender,
@@ -51,7 +51,7 @@ impl Piazza {
             user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
 
             // add a post base table
-            post = mig.add_ingredient("post", &["pid", "cid", "author", "content"], Base::new(vec![1]));
+            post = mig.add_ingredient("post", &["pid", "cid", "author", "content"], Base::new(vec![1], BaseDurabilityLevel::None));
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
