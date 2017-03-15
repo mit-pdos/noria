@@ -243,23 +243,14 @@ fn main() {
         }
     }
 
-    match benchmark.as_ref() {
-        "migration" => {
-            for pid in 0..nposts {
-                post_putter.put(vec![
-                    pid.into(),
-                    (pid % nclasses).into(),
-                    (pid % nusers).into(),
-                    "post".into()
-                    ]);
-            }
-        },
-        "write" => {
-
-        }
-        _ => {
-            println!("wrong benchmark!");
-            return
+    if benchmark == "migration" {
+        for pid in 0..nposts {
+            post_putter.put(vec![
+                pid.into(),
+                (pid % nclasses).into(),
+                (pid % nusers).into(),
+                "post".into()
+                ]);
         }
     }
 
@@ -273,19 +264,17 @@ fn main() {
     }
 
     println!("Starting benchmark...");
-    for uid in 0..(nusers) {
+    for uid in 0..nusers {
         let start;
         let end;
-
+        start = time::Instant::now();
         match benchmark.as_ref() {
             "migration" => {
-                start = time::Instant::now();
                 app.log_user(uid.into(), &domain_config);
 
                 end = time::Instant::now().duration_since(start);
             },
             "write" => {
-                start = time::Instant::now();
                 for i in 0..1000 {
                     post_putter.put(vec![i.into(), (i % nclasses).into(), (i % nusers).into(), "post".into()]);
                 }
