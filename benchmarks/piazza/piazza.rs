@@ -21,6 +21,7 @@ pub struct Piazza {
     domain: Index,
 }
 
+#[derive(Clone, Copy)]
 pub enum DomainConfig {
     Single,
     PerUser
@@ -81,7 +82,7 @@ impl Piazza {
         }
     }
 
-    pub fn log_user(&mut self, uid: DataType, domain_config: &DomainConfig) {
+    pub fn log_user(&mut self, uid: DataType, domain_config: DomainConfig) {
 
         let visible_posts;
 
@@ -100,7 +101,7 @@ impl Piazza {
 
         visible_posts = mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
-        match *domain_config {
+        match domain_config {
             // creates one domain peruser
             DomainConfig::PerUser => {
                 mig.assign_domain(user_classes, user_domain);
@@ -232,14 +233,13 @@ fn main() {
         }
     }
 
-    let domain_config;
-    match domain_config_str.as_ref() {
-        "single"  => domain_config = DomainConfig::Single,
-        "peruser" => domain_config = DomainConfig::PerUser,
+    let domain_config = match domain_config_str.as_ref() {
+        "single"  => DomainConfig::Single,
+        "peruser" => DomainConfig::PerUser,
         _ => {
             unreachable!();
         }
-    }
+    };
 
     if benchmark == "migration" {
         for pid in 0..nposts {
@@ -268,7 +268,7 @@ fn main() {
         start = time::Instant::now();
         match benchmark.as_ref() {
             "migration" => {
-                app.log_user(uid.into(), &domain_config);
+                app.log_user(uid.into(), domain_config);
 
                 end = time::Instant::now().duration_since(start);
             },
@@ -280,7 +280,7 @@ fn main() {
 
                 thread::sleep(time::Duration::from_millis(100));
 
-                app.log_user(uid.into(), &domain_config);
+                app.log_user(uid.into(), domain_config);
             },
             _ => {
                 unreachable!();
