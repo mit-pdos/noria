@@ -340,6 +340,7 @@ extern crate petgraph;
 extern crate regex;
 extern crate nom_sql;
 extern crate timekeeper;
+extern crate num_cpus;
 
 #[cfg(feature="web")]
 extern crate rustc_serialize;

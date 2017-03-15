@@ -159,6 +159,7 @@ fn main() {
 
     println!("Loading TPC-W recipe from {}", rloc);
     let mut backend = make(&rloc);
+    println!("{}", backend.g);
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc, transactional);
@@ -178,7 +179,6 @@ fn main() {
     let num_order_line = populate_order_line(&backend, &ploc, transactional);
     backend.prepop_counts.insert("order_line".into(), num_order_line);
 
-    //println!("{}", backend.g);
 
     println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));

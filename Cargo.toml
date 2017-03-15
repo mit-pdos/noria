@@ -60,6 +60,8 @@ serde_derive = { version = "0.9", optional = true }
 # for web
 rustc-serialize = { version = "0.3", optional = true }
 
+# for domain assignment
+num_cpus = "1.0"
 [dependencies.rustful]
 version = "0.9"
 default-features = false

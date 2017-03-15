@@ -366,6 +366,7 @@ impl Mutator {
 /// `Migration`, which can be started using `Blender::start_migration`. Only one `Migration` can
 /// occur at any given point in time.
 pub struct Blender {
+    assignment: migrate::assignment::DomainAssignment,
     ingredients: petgraph::Graph<node::Node, Edge>,
     source: NodeIndex,
     ndomains: usize,
@@ -382,6 +383,7 @@ impl Default for Blender {
         let source =
             g.add_node(node::Node::new("source", &["because-type-inference"], node::Type::Source));
         Blender {
+            assignment: migrate::assignment::DomainAssignment::new(),
             ingredients: g,
             source: source,
             ndomains: 0,
