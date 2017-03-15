@@ -1,15 +1,4 @@
-use targets;
-use targets::{Putter, Getter};
-
-use std::sync::mpsc;
-use std::thread;
-use std::time;
-
-use rand;
-use spmc;
-use rand::Rng as StdRng;
-use hdrsample::Histogram;
-use hdrsample::iterators::{HistogramIterator, recorded};
+use common::{Writer, ArticleResult, Reader, Period};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -19,32 +8,31 @@ macro_rules! dur_to_ns {
     }}
 }
 
+use std::sync::mpsc;
+use std::thread;
+use std::time;
+
+use rand;
+use rand::Rng as StdRng;
+use hdrsample::Histogram;
+use hdrsample::iterators::{HistogramIterator, recorded};
+
 #[derive(Clone, Copy)]
 pub struct RuntimeConfig {
-    ngetters: usize,
     narticles: isize,
     runtime: time::Duration,
     cdf: bool,
-    stage: bool,
     migrate_after: Option<time::Duration>,
 }
 
 impl RuntimeConfig {
-    pub fn new(ngetters: usize, narticles: isize, runtime: time::Duration) -> Self {
+    pub fn new(narticles: isize, runtime: time::Duration) -> Self {
         RuntimeConfig {
-            ngetters: ngetters,
             narticles: narticles,
             runtime: runtime,
             cdf: true,
-            stage: false,
             migrate_after: None,
         }
-    }
-
-    pub fn put_then_get(&mut self) {
-        assert!(self.migrate_after.is_none(),
-                "staged migration is unsupported");
-        self.stage = true;
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -52,15 +40,8 @@ impl RuntimeConfig {
     }
 
     pub fn perform_migration_at(&mut self, t: time::Duration) {
-        assert!(!self.stage, "staged migration is unsupported");
         self.migrate_after = Some(t);
     }
-}
-
-#[derive(Clone, Copy)]
-enum Period {
-    PreMigration,
-    PostMigration,
 }
 
 pub struct BenchmarkResult {
@@ -91,6 +72,7 @@ impl BenchmarkResult {
         self.samples.as_ref().map(|s| s.iter_recorded())
     }
 
+    #[allow(dead_code)]
     pub fn sum_len(&self) -> (f64, usize) {
         (self.throughputs.iter().sum(), self.throughputs.len())
     }
@@ -131,7 +113,7 @@ impl BenchmarkResults {
 fn driver<I, F>(start: time::Instant,
                 config: RuntimeConfig,
                 init: I,
-                desc: String)
+                desc: &str)
                 -> BenchmarkResults
     where I: FnOnce() -> Box<F>,
           F: ?Sized + FnMut(i64, i64) -> (bool, Period)
@@ -200,170 +182,71 @@ fn driver<I, F>(start: time::Instant,
     stats
 }
 
-pub fn launch<B: targets::Backend + 'static>(mut target: B,
-                                             mut config: RuntimeConfig)
-                                             -> (BenchmarkResults, Vec<BenchmarkResults>) {
+pub fn launch_writer<W: Writer>(mut writer: W,
+                                mut config: RuntimeConfig,
+                                ready: Option<mpsc::SyncSender<()>>)
+                                -> BenchmarkResults {
 
     // prepopulate
-    println!("Connected. Now retrieving putter for prepopulation.");
-    let mut putter = target.putter();
+    println!("Prepopulating with {} articles", config.narticles);
     {
-        let mut article = putter.article();
-
-        // prepopulate
-        println!("Prepopulating with {} articles", config.narticles);
-        {
-            // let t = putter.transaction().unwrap();
-            for i in 0..config.narticles {
-                article(i as i64, format!("Article #{}", i));
-            }
-            // t.commit().unwrap();
+        // let t = putter.transaction().unwrap();
+        for i in 0..config.narticles {
+            writer.make_article(i as i64, format!("Article #{}", i));
         }
-        println!("Done with prepopulation");
+        // t.commit().unwrap();
     }
+    println!("Done with prepopulation");
 
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
+    drop(ready);
     let start = time::Instant::now();
 
-    // benchmark
-    // start putting
-    let (np_tx, np_rx): (mpsc::Sender<B::P>, _) = mpsc::channel();
-    let mut putter = Some({
-        thread::Builder::new().name("put0".to_string()).spawn(move || -> BenchmarkResults {
-            let mut vote = putter.vote();
-            let mut new_putter = None;
-            let mut new_vote = None;
-            let init = move || {
-                let mut i = 0;
-                Box::new(move |uid, aid| -> (bool, Period) {
-                    if let Some(migrate_after) = config.migrate_after {
-                        if i % 16384 == 0 && start.elapsed() > migrate_after {
-                            // we may have been given a new putter
-                            if let Ok(np) = np_rx.try_recv() {
-                                // we have a new putter!
-                                //
-                                // it's unfortunate that we have to use unsafe here...
-                                // hopefully it can go if
-                                // https://github.com/Kimundi/owning-ref-rs/issues/22
-                                // gets resolved. fundamentally, the problem is that the compiler
-                                // doesn't know that we won't overwrite new_putter in some
-                                // subsequent iteration of the loop, which would leave new_vote
-                                // with a dangling pointer to new_putter! *we* know that won't
-                                // happen though, so this is ok
-                                new_putter = Some(np);
-                                let np = new_putter.as_mut().unwrap() as *mut _;
-                                let np: &mut B::P = unsafe { &mut *np };
-                                new_vote = Some(np.vote());
-                            }
-                        }
-                        i += 1;
-                    }
-
-                    if let Some(vote) = new_vote.as_mut() {
-                        vote(uid, aid);
-                        (true, Period::PostMigration)
-                    } else {
-                        vote(uid, aid);
-                        (true, Period::PreMigration)
-                    }
-                })
-            };
-            driver(start, config, init, "PUT".to_string())
-        }).unwrap()
-    });
-
-    let mut put_stats = None;
-    if config.stage {
-        println!("Waiting for putter before starting getters");
-        match putter.take().unwrap().join() {
-            Err(e) => panic!(e),
-            Ok(th) => {
-                put_stats = Some(th);
+    let mut post = false;
+    let mut migrate_done = None;
+    let init = move || {
+        Box::new(move |uid, aid| -> (bool, Period) {
+            if let Some(migrate_after) = config.migrate_after {
+                if start.elapsed() > migrate_after {
+                    migrate_done = Some(writer.migrate());
+                    config.migrate_after.take(); // so we don't migrate again
+                }
             }
-        }
-        // avoid getters stopping immediately
-        config.runtime *= 2;
-    }
 
-    // start getters
-    println!("Starting {} getters", config.ngetters);
-    let (ng_tx, ng_rx): (spmc::Sender<B::G>, _) = spmc::channel();
-    let getters =
-        (0..config.ngetters)
-            .into_iter()
-            .map(|i| (i, target.getter()))
-            .map(|(i, mut getter)| {
-                println!("Starting getter #{}", i);
-                let ng_rx = ng_rx.clone();
-                thread::Builder::new().name(format!("get{}", i)).spawn(move || -> BenchmarkResults {
-                let mut get = getter.get();
-                let mut new_getter = None;
-                let mut new_get = None;
-                let init = move || {
-                    let mut i = 0;
-                    Box::new(move |_, aid| -> (bool, Period) {
-                        if let Some(migrate_after) = config.migrate_after {
-                            if i % 16384 == 0 && start.elapsed() > migrate_after {
-                                    // we may have been given a new getter
-                                    if let Ok(ng) = ng_rx.try_recv() {
-                                        // we have a new getter!
-                                        // we have to do the same unsafe trick here as for putters
-                                        new_getter = Some(ng);
-                                        let ng = new_getter.as_mut().unwrap() as *mut _;
-                                        let ng: &mut B::G = unsafe { &mut *ng };
-                                        new_get = Some(ng.get());
-                                    }
-                            }
-                            i += 1;
-                        }
-
-                        if let Some(get) = new_get.as_mut() {
-                            (get(aid).is_ok(), Period::PostMigration)
-                        } else {
-                            (get(aid).is_ok(), Period::PreMigration)
-                        }
-                    })
-                };
-                driver(start, config, init, format!("GET{}", i))
-            }).unwrap()
-            })
-            .collect::<Vec<_>>();
-    println!("Started {} getters", getters.len());
-
-    // get ready to perform a migration
-    if let Some(migrate_after) = config.migrate_after {
-        thread::sleep(migrate_after);
-        println!("Starting migration");
-        let mig_start = time::Instant::now();
-        let (new_put, new_gets) = target.migrate(config.ngetters);
-        let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
-        println!("Migration completed in {:.4}s", mig_duration);
-        assert_eq!(new_gets.len(), config.ngetters);
-        np_tx.send(new_put).unwrap();
-        for ng in new_gets {
-            ng_tx.send(ng).unwrap();
-        }
-        println!("All threads notified of migration completion");
-    }
-
-    // clean
-    if let Some(putter) = putter {
-        // is putter also running?
-        match putter.join() {
-            Err(e) => panic!(e),
-            Ok(th) => {
-                assert!(put_stats.is_none());
-                put_stats = Some(th);
+            if migrate_done.is_some() {
+                match migrate_done.as_mut().unwrap().try_recv() {
+                    Err(mpsc::TryRecvError::Empty) => {}
+                    _ => {
+                        migrate_done = None;
+                        post = true;
+                    }
+                }
             }
-        }
-    }
-    let mut get_stats = Vec::with_capacity(getters.len());
-    for g in getters {
-        match g.join() {
-            Err(e) => panic!(e),
-            Ok(th) => get_stats.push(th),
-        }
-    }
-    (put_stats.unwrap(), get_stats)
+
+            writer.vote(uid, aid);
+            if post {
+                (true, Period::PostMigration)
+            } else {
+                (true, Period::PreMigration)
+            }
+        })
+    };
+
+    driver(start, config, init, "PUT")
+}
+
+pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> BenchmarkResults {
+
+    println!("Starting reader");
+    let init = move || {
+        Box::new(move |_, aid| -> (bool, Period) {
+            match reader.get(aid) {
+                (ArticleResult::Error, period) => (false, period),
+                (_, period) => (true, period),
+            }
+        })
+    };
+
+    driver(time::Instant::now(), config, init, "GET")
 }
