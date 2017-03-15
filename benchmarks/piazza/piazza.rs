@@ -228,8 +228,7 @@ fn main() {
         "all" => populate_taking(nclasses, nusers, taking_putter, Fanout::All),
         "few" => populate_taking(nclasses, nusers, taking_putter, Fanout::Few),
         _ => {
-            println!("Invalid fanout configuration");
-            return
+            unreachable!();
         }
     }
 
@@ -238,8 +237,7 @@ fn main() {
         "single"  => domain_config = DomainConfig::Single,
         "peruser" => domain_config = DomainConfig::PerUser,
         _ => {
-            println!("Invalid domain configuration");
-            return
+            unreachable!();
         }
     }
 
@@ -285,8 +283,7 @@ fn main() {
                 app.log_user(uid.into(), &domain_config);
             },
             _ => {
-                println!("wrong benchmark!");
-                return
+                unreachable!();
             }
         };
 
