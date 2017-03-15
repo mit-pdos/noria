@@ -98,6 +98,11 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
         .filter(|&(_, ref q)| !q.contains("Matches"))
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
+        .map(|(qn, q)| if !q.ends_with(";") {
+            (qn, format!("{};", q))
+        } else {
+            (qn, q)
+        })
         .collect()
 }
 
@@ -153,7 +158,7 @@ fn main() {
 
     info!(log, "Writing {} valid queries...", ok.len());
     for (ql, q) in ok {
-        assert!(write!(f, "{}: {};\n", ql, q).is_ok());
+        assert!(write!(f, "{}: {}\n", ql, q).is_ok());
     }
 
     info!(log, "Writing {} rejected queries...", rejected.len());
