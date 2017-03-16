@@ -31,7 +31,8 @@ for l in $(git log --oneline --follow src/schema.sql | cut -d' ' -f1); do
     # we have advanced to a new schema
     cp ${schema_file} ${dir}/schemas/hotcrp_${cur_schema_ver}.sql
     # extract the queries
-    ${dir}/../../target/debug/extract_hotcrp_queries $(pwd) --output ${dir}/queries/hotcrp_${cur_schema_ver}.sql
+    ${dir}/../../target/debug/extract_hotcrp_queries $(pwd) --output \
+      ${dir}/queries/hotcrp_${cur_schema_ver}.sql --git_rev ${l}
     prev_schema_ver=${cur_schema_ver}
   elif [[ ${cur_schema_ver} -gt ${prev_schema_ver} ]]; then
     echo "SCHEMA WENT BACKWARDS: ${cur_schema_ver} > ${prev_schema_ver} @ ${l}"

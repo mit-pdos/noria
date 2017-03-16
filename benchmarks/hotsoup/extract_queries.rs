@@ -31,60 +31,27 @@ fn traverse(path: &Path) -> Vec<PathBuf> {
     files
 }
 
-fn process_file(fp: &Path) -> Vec<(String, String)> {
+fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
+    use regex::Regex;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
     use std::io::Read;
     use std::fs::File;
+
+    let query_regex = Regex::new("\"((?is)select [^\"]* from [^\"]*(?-is))\"").unwrap();
 
     let mut f = File::open(fp).unwrap();
     let mut s = String::new();
 
     f.read_to_string(&mut s).unwrap();
-    let lines = s.lines()
-        .enumerate()
-        .map(|(i, l)| {
-            let fname = fp.file_name().unwrap().to_str().unwrap();
-            (format!("{}_{}", fname, i + 1), String::from(l))
-        })
-        .collect::<Vec<_>>();
 
-    let mut buf = String::new();
-    let mut in_query = false;
-    let mut location = String::new();
     let mut queries = Vec::new();
-    for (fl, line) in lines {
-        if !in_query && line.contains("\"select ") {
-            // start query, look for end
-            location = fl;
-            // is the end on the same line?
-            let qstart = line.find("\"select ").unwrap() + 1;
-            match line[qstart..].find("\"") {
-                None => {
-                    in_query = true;
-                    buf.push_str(&line[qstart..]);
-                }
-                Some(pos) => {
-                    queries.push((location.clone(), String::from(&line[qstart..qstart + pos])));
-                }
-            }
-        } else if in_query {
-            // query continues, look for end
-            match line.rfind("\"") {
-                None => {
-                    buf.push_str(" "); // replace newline with space
-                    buf.push_str(&line);
-                }
-                Some(pos) => {
-                    let qstr = format!("{}{}", buf, &line[0..pos + 1]);
-                    queries.push((location.clone(), qstr));
-                    in_query = false;
-                    buf.clear();
-                }
-            }
-        }
-    }
-    if in_query {
-        let qstr = format!("{}", buf);
-        queries.push((location.clone(), qstr));
+    let mut h = DefaultHasher::new();
+    for cap in query_regex.captures_iter(&s) {
+        let qstr = cap.at(1).unwrap();
+        qstr.hash(&mut h);
+        let qid = h.finish();
+        queries.push((format!("{}_{:x}", git_rev, qid), String::from(qstr)));
     }
     queries
 }
@@ -92,11 +59,13 @@ fn process_file(fp: &Path) -> Vec<(String, String)> {
 fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     use regex::Regex;
     let php_vars = Regex::new("\\$[a-zA-Z0-9->_]+").unwrap();
+    let linebreaks_tabs = Regex::new("\t|\n").unwrap();
     let incomplete = Regex::new("=$").unwrap();
 
     queries.into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
+        .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
         .map(|(qn, q)| if !q.ends_with(";") {
             (qn, format!("{};", q))
@@ -128,10 +97,17 @@ fn main() {
             .value_name("FILE")
             .help("Location to write output recipe to.")
             .required(true))
+        .arg(Arg::with_name("git_rev")
+            .short("g")
+            .long("git_rev")
+            .value_name("REV")
+            .help("Git revision that we're extracting for.")
+            .required(true))
         .get_matches();
 
     let path = matches.value_of("source").unwrap();
     let output = matches.value_of("output").unwrap();
+    let git_rev = matches.value_of("git_rev").unwrap();
 
     let files = traverse(Path::new(path));
 
@@ -142,7 +118,7 @@ fn main() {
             continue;
         }
 
-        let queries = process_file(fname.as_path());
+        let queries = process_file(fname.as_path(), git_rev);
 
         let formatted_queries = reformat(queries);
 
