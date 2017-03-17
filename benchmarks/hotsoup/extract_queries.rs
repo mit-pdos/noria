@@ -38,7 +38,8 @@ fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
     use std::io::Read;
     use std::fs::File;
 
-    let query_regex = Regex::new("\"((?is)select [^\"]* from [^\"]*(?-is))\"").unwrap();
+    let query_regex = Regex::new("\"((?is)select [^;]* from [^;]*(?-is))\"(?:, \"| \\.|;|\\)|,)")
+        .unwrap();
 
     let mut f = File::open(fp).unwrap();
     let mut s = String::new();
@@ -58,12 +59,17 @@ fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
 
 fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     use regex::Regex;
-    let php_vars = Regex::new("\\$[a-zA-Z0-9->_]+").unwrap();
-    let linebreaks_tabs = Regex::new("\t|\n").unwrap();
+
     let incomplete = Regex::new("=$").unwrap();
+    let linebreaks_tabs = Regex::new("\t|\n").unwrap();
+    let php_str_concat = Regex::new("\"[:space:]*\\.[:space:]*\"").unwrap();
+    let php_str_concat_inset = Regex::new("\"[:space:]*\\.(?P<cc>.*)\\.[:space:]*\"").unwrap();
+    let php_vars = Regex::new("\\$[a-zA-Z0-9->_]+").unwrap();
 
     queries.into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
+        .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc")))
+        .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "")))
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
         .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
