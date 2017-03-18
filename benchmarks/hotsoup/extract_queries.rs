@@ -38,8 +38,8 @@ fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
     use std::io::Read;
     use std::fs::File;
 
-    let query_regex = Regex::new("\"((?is)select [^;]* from [^;]*(?-is))\"(?:, \"| \\.|;|\\)|,)")
-        .unwrap();
+    let re = "\"((?is)select [^;]* from [^;]*?(?-is))\"(?:, \".*\"\\)| \\.|;|\\)|,)";
+    let query_regex = Regex::new(re).unwrap();
 
     let mut f = File::open(fp).unwrap();
     let mut s = String::new();
