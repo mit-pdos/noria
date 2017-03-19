@@ -31,10 +31,5 @@ fn main() {
 
     // start processing
     // TODO: what about the node indices?
-    let _srv = srv::run(g.graph, addr.first_socket_addr(), 8);
-    // run forever
-    loop {
-        // but without wasting CPU
-        thread::sleep(Duration::from_secs(1));
-    }
+    srv::run(g.graph, addr.first_socket_addr());
 }
