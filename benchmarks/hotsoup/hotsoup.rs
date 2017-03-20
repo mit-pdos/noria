@@ -11,17 +11,31 @@ use slog::DrainExt;
 use distributary::{Blender, Recipe};
 
 pub struct Backend {
+    blacklist: Vec<String>,
     r: Option<Recipe>,
     g: Blender,
 }
 
-fn make() -> Box<Backend> {
+fn make(blacklist: &str) -> Box<Backend> {
+    use std::io::Read;
+    use std::fs::File;
+
+    // load query blacklist
+    let mut bf = File::open(blacklist).unwrap();
+    let mut s = String::new();
+    bf.read_to_string(&mut s).unwrap();
+    let blacklisted_queries = s.lines()
+        .filter(|l| !l.is_empty() && !l.starts_with("#"))
+        .map(|l| String::from(l.split(":").next().unwrap()))
+        .collect();
+
     // set up graph
     let mut g = Blender::new();
     g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
 
     let recipe = Recipe::blank();
     Box::new(Backend {
+        blacklist: blacklisted_queries,
         r: Some(recipe),
         g: g,
     })
@@ -32,6 +46,7 @@ impl Backend {
         use std::io::Read;
         use std::fs::File;
 
+        let ref blacklist = self.blacklist;
         // migrate
         let mut mig = self.g.start_migration();
 
@@ -51,7 +66,18 @@ impl Backend {
         s.clear();
         qf.read_to_string(&mut s).unwrap();
         rs.push_str("\n");
-        rs.push_str(&s);
+        rs.push_str(&s.lines()
+            .filter(|ref l| {
+                // make sure to skip blacklisted queries
+                for ref q in blacklist {
+                    if l.contains(*q) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect::<Vec<_>>()
+            .join("\n"));
 
         println!("{}", rs);
 
@@ -100,18 +126,23 @@ fn main() {
             .required(true)
             .default_value("benchmarks/hotsoup/queries")
             .help("Location of the HotCRP schema recipes to move through."))
+        .arg(Arg::with_name("blacklist")
+            .short("b")
+            .default_value("benchmarks/hotsoup/query_blacklist.txt")
+            .help("File with blacklisted queries to skip."))
         .arg(Arg::with_name("transactional")
             .short("t")
             .help("Use transactional writes."))
         .get_matches();
 
+    let blloc = matches.value_of("blacklist").unwrap();
     let gloc = matches.value_of("graphs");
     let sloc = matches.value_of("schemas").unwrap();
     let qloc = matches.value_of("queries").unwrap();
     let dataloc = matches.value_of("populate_from").unwrap();
     let transactional = matches.is_present("transactional");
 
-    let mut backend = make();
+    let mut backend = make(blloc);
 
     let mut query_files = Vec::new();
     let mut schema_files = Vec::new();
