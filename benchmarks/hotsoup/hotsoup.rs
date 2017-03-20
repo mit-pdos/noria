@@ -79,8 +79,6 @@ impl Backend {
             .collect::<Vec<_>>()
             .join("\n"));
 
-        println!("{}", rs);
-
         let new_recipe = Recipe::from_str(&rs)?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
