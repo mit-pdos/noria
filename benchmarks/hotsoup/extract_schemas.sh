@@ -13,8 +13,8 @@ cd /tmp/hotcrp
 
 prev_schema_ver=99999999
 
-for l in $(git log --oneline --follow src/schema.sql | cut -d' ' -f1); do
-  # HotCRP schema versioning started in 80eeb70
+for l in $(git log --abbrev=8 --oneline --follow src/schema.sql | cut -d' ' -f1); do
+  # HotCRP schema versioning started in 80eeb701
   if [[ $l == "80eeb701" ]]; then
     break
   fi
