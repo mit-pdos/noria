@@ -1,5 +1,3 @@
-#![feature(ptr_eq)]
-
 #[macro_use]
 extern crate clap;
 
@@ -121,11 +119,11 @@ fn main() {
         let getters: Vec<_> = getters.into_iter()
             .enumerate()
             .map(|(i, g)| {
-                thread::Builder::new()
-                    .name(format!("GET{}", i))
-                    .spawn(move || exercise::launch_reader(g, config))
-                    .unwrap()
-            })
+                     thread::Builder::new()
+                         .name(format!("GET{}", i))
+                         .spawn(move || exercise::launch_reader(g, config))
+                         .unwrap()
+                 })
             .collect();
         get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     } else {
@@ -143,11 +141,11 @@ fn main() {
         let getters: Vec<_> = getters.into_iter()
             .enumerate()
             .map(|(i, g)| {
-                thread::Builder::new()
-                    .name(format!("GET{}", i))
-                    .spawn(move || exercise::launch_reader(g, config))
-                    .unwrap()
-            })
+                     thread::Builder::new()
+                         .name(format!("GET{}", i))
+                         .spawn(move || exercise::launch_reader(g, config))
+                         .unwrap()
+                 })
             .collect();
 
         put_stats = putter.join().unwrap();

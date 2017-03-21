@@ -31,9 +31,9 @@ fn mkc(addr: &str) -> Client {
     match core.run(fc) {
         Ok((_, conn)) => {
             return Client {
-                conn: Some(conn),
-                core: core,
-            }
+                       conn: Some(conn),
+                       core: core,
+                   }
         }
         Err(_) => panic!("Failed to connect to SQL server"),
     }
@@ -48,15 +48,11 @@ pub fn make_writer(addr: &str) -> W {
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
         .and_then(|conn| {
-            conn.simple_exec(format!("DROP DATABASE {};", db))
-                .and_then(|r| r)
-                .collect()
-        })
+                      conn.simple_exec(format!("DROP DATABASE {};", db)).and_then(|r| r).collect()
+                  })
         .and_then(|(_, conn)| {
-            conn.simple_exec(format!("CREATE DATABASE {};", db))
-                .and_then(|r| r)
-                .collect()
-        })
+                      conn.simple_exec(format!("CREATE DATABASE {};", db)).and_then(|r| r).collect()
+                  })
         .and_then(|(_, conn)| {
             conn.simple_exec(format!("USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
@@ -95,10 +91,10 @@ pub fn make_writer(addr: &str) -> W {
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
-                .and_then(|r| r)
-                .collect()
-        });
+                      conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
+                          .and_then(|r| r)
+                          .collect()
+                  });
 
     core.run(fut).unwrap();
     drop(core);
@@ -108,10 +104,7 @@ pub fn make_writer(addr: &str) -> W {
         .as_ref()
         .unwrap()
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
-    let v_prep = client.conn
-        .as_ref()
-        .unwrap()
-        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
+    let v_prep = client.conn.as_ref().unwrap().prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
     W {
         client: client,
         a_prep: a_prep,

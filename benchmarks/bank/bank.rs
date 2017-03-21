@@ -90,20 +90,20 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     };
 
     Box::new(Bank {
-        transfers: (0..num_putters)
-            .into_iter()
-            .map(|_| g.get_mutator(transfers))
-            .collect::<Vec<_>>(),
-        balances: sync::Arc::new(balancesq),
-        migrate: Box::new(move || {
-            let mut mig = g.start_migration();
-            let identity = mig.add_ingredient("identity",
+                 transfers: (0..num_putters)
+                     .into_iter()
+                     .map(|_| g.get_mutator(transfers))
+                     .collect::<Vec<_>>(),
+                 balances: sync::Arc::new(balancesq),
+                 migrate: Box::new(move || {
+                                       let mut mig = g.start_migration();
+                                       let identity = mig.add_ingredient("identity",
                                               &["acct_id", "credit", "debit"],
                                               distributary::Identity::new(balances));
-            let _ = mig.transactional_maintain(identity, 0);
-            let _ = mig.commit();
-        }),
-    })
+                                       let _ = mig.transactional_maintain(identity, 0);
+                                       let _ = mig.commit();
+                                   }),
+             })
 }
 
 impl Bank {
@@ -125,8 +125,8 @@ pub trait Putter: Send {
 impl Putter for TxPut {
     fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> Result<i64, ()> + 'a> {
         Box::new(move |src, dst, amount, token| {
-            self(vec![src.into(), dst.into(), amount.into()], token.into())
-        })
+                     self(vec![src.into(), dst.into(), amount.into()], token.into())
+                 })
     }
 }
 
@@ -141,13 +141,13 @@ impl Getter for sync::Arc<Option<TxGet>> {
                 g(&id.into()).map(|(res, token)| {
                     assert_eq!(res.len(), 1);
                     res.into_iter().next().map(|row| {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let _: i64 = row.next().unwrap().into();
-                        let credit: i64 = row.next().unwrap().into();
-                        let debit: i64 = row.next().unwrap().into();
-                        (credit - debit, token)
-                    })
+                                                   // we only care about the first result
+                                                   let mut row = row.into_iter();
+                                                   let _: i64 = row.next().unwrap().into();
+                                                   let credit: i64 = row.next().unwrap().into();
+                                                   let debit: i64 = row.next().unwrap().into();
+                                                   (credit - debit, token)
+                                               })
                 })
             } else {
                 use std::time::Duration;
@@ -402,31 +402,31 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let mut transfers_put = bank.putter();
-                let balances_get: Box<Getter> = bank.getter();
+                     let mut transfers_put = bank.putter();
+                     let balances_get: Box<Getter> = bank.getter();
 
-                let mut transactions = vec![];
+                     let mut transactions = vec![];
 
-                if i == 0 {
-                    populate(naccounts, &mut transfers_put);
-                }
+                     if i == 0 {
+                         populate(naccounts, &mut transfers_put);
+                     }
 
-                thread::Builder::new()
-                    .name(format!("bank{}", i))
-                    .spawn(move || -> Vec<f64> {
-                        client(i,
-                               transfers_put,
-                               balances_get,
-                               naccounts,
-                               start,
-                               runtime,
-                               verbose,
-                               cdf,
-                               audit,
-                               &mut transactions)
-                    })
-                    .unwrap()
-            })
+                     thread::Builder::new()
+                         .name(format!("bank{}", i))
+                         .spawn(move || -> Vec<f64> {
+                    client(i,
+                           transfers_put,
+                           balances_get,
+                           naccounts,
+                           start,
+                           runtime,
+                           verbose,
+                           cdf,
+                           audit,
+                           &mut transactions)
+                })
+                         .unwrap()
+                 })
         })
         .collect::<Vec<_>>();
 
