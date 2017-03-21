@@ -2,20 +2,21 @@
 # SCHEMA v1
 
 # "Paper" does not have a "contactId" field
-68be356_dd4e396b6e183da7: SELECT Paper.paperId, Paper.title, Paper.abstract,  ContactInfo.firstName, ContactInfo.lastName,  ContactInfo.email, ContactInfo.affiliation, Paper.authorInformation  FROM Paper,ContactInfo  WHERE Paper.contactId=ContactInfo.contactId AND Paper.timeSubmitted>0  ORDER BY paperId ;
-68be356_3d894009ebe2e4b5: SELECT firstName, lastName, email,  paperId, outcome, title  FROM ContactInfo, Paper  WHERE Paper.outcome>0  AND Paper.contactId=ContactInfo.contactId  ORDER BY paperId ;
+68be356a_dd4e396b6e183da7: SELECT Paper.paperId, Paper.title, Paper.abstract,  ContactInfo.firstName, ContactInfo.lastName,  ContactInfo.email, ContactInfo.affiliation, Paper.authorInformation  FROM Paper,ContactInfo  WHERE Paper.contactId=ContactInfo.contactId AND Paper.timeSubmitted>0  ORDER BY paperId ;
+68be356a_3d894009ebe2e4b5: SELECT firstName, lastName, email,  paperId, outcome, title  FROM ContactInfo, Paper  WHERE Paper.outcome>0  AND Paper.contactId=ContactInfo.contactId  ORDER BY paperId ;
 
 # "ReviewRequest" table does not exist
-68be356_19912ac4c5713b3f: SELECT  ContactInfo.firstName, ContactInfo.lastName, ContactInfo.email,  ContactInfo.contactId,  Paper.paperId, Paper.title  from ReviewRequest  join ContactInfo using (contactId)  join Paper using (paperId)  where ContactInfo.contactId=?;
+68be356a_19912ac4c5713b3f: SELECT  ContactInfo.firstName, ContactInfo.lastName, ContactInfo.email,  ContactInfo.contactId,  Paper.paperId, Paper.title  from ReviewRequest  join ContactInfo using (contactId)  join Paper using (paperId)  where ContactInfo.contactId=?;
+68be356a_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
 
 # Invalid WHERE clause
-68be356_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
+68be356a_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
 
 ######################
 # SCHEMA v2
 
 # No "reviewRequestId" field in "ReviewRequest"
-c80751d_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
+c80751de_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
 
 # Invalid WHERE clause
-c80751d_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
+c80751de_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;

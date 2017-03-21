@@ -15,7 +15,7 @@ prev_schema_ver=99999999
 
 for l in $(git log --oneline --follow src/schema.sql | cut -d' ' -f1); do
   # HotCRP schema versioning started in 80eeb70
-  if [[ $l == "80eeb70" ]]; then
+  if [[ $l == "80eeb701" ]]; then
     break
   fi
 
@@ -31,7 +31,7 @@ for l in $(git log --oneline --follow src/schema.sql | cut -d' ' -f1); do
     # we have advanced to a new schema
     cp ${schema_file} ${dir}/schemas/hotcrp_${cur_schema_ver}.sql
     # extract the queries
-    ${dir}/../../target/debug/extract_hotcrp_queries $(pwd) --output \
+    ${dir}/../../target/release/extract_hotcrp_queries $(pwd) --output \
       ${dir}/queries/hotcrp_${cur_schema_ver}.sql --git_rev ${l}
     prev_schema_ver=${cur_schema_ver}
   elif [[ ${cur_schema_ver} -gt ${prev_schema_ver} ]]; then
