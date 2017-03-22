@@ -20,7 +20,7 @@ pub fn setup(memcached_dbn: &str, mysql_dbn: &str, write: bool) -> Pool {
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
                                         ProtoType::Binary)
-        .unwrap();
+            .unwrap();
 
     let addr = format!("mysql://{}", mysql_dbn);
     if write {
