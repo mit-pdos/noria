@@ -241,11 +241,11 @@ pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> Benchma
     println!("Starting reader");
     let init = move || {
         Box::new(move |_, aid| -> (bool, Period) {
-            match reader.get(aid) {
-                (ArticleResult::Error, period) => (false, period),
-                (_, period) => (true, period),
-            }
-        })
+                     match reader.get(aid) {
+                         (ArticleResult::Error, period) => (false, period),
+                         (_, period) => (true, period),
+                     }
+                 })
     };
 
     driver(time::Instant::now(), config, init, "GET")

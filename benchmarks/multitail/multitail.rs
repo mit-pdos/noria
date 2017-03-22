@@ -99,10 +99,10 @@ fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
 
     println!("{}", g);
     Box::new(Backend {
-        data: Some(g.get_mutator(data)),
-        number: Some(g.get_mutator(number)),
-        _g: g,
-    })
+                 data: Some(g.get_mutator(data)),
+                 number: Some(g.get_mutator(number)),
+                 _g: g,
+             })
 
 }
 

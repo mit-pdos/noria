@@ -159,7 +159,10 @@ pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool)
             let co_name = fields[1];
             let co_exchange = f64::from_str(fields[2]).unwrap();
             let co_currency = fields[3];
-            records.push(vec![co_id.into(), co_name.into(), co_exchange.into(), co_currency.into()]);
+            records.push(vec![co_id.into(),
+                              co_name.into(),
+                              co_exchange.into(),
+                              co_currency.into()]);
         }
         s.clear();
     }
