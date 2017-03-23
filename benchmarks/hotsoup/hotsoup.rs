@@ -27,6 +27,7 @@ fn make(blacklist: &str) -> Box<Backend> {
     let blacklisted_queries = s.lines()
         .filter(|l| !l.is_empty() && !l.starts_with("#"))
         .map(|l| String::from(l.split(":").next().unwrap()))
+        .map(|l| String::from(l.split("_").nth(1).unwrap()))
         .collect();
 
     // set up graph
