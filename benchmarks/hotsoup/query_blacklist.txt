@@ -12,6 +12,12 @@
 # Invalid WHERE clause
 68be356a_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
 
+# LEFT JOIN unsupported, parameter in join condition
+# We can fix both of these by (1) having a left join op, (2) pulling the parameter out of the condition
+68be356a_32e74662fcdec376: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
+68be356a_1ab06c9faa4ed0c4: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
+
+
 ######################
 # SCHEMA v2
 
@@ -20,3 +26,10 @@ c80751de_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WH
 
 # Invalid WHERE clause
 c80751de_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
+
+
+######################
+# SCHEMA v3
+
+# Invalid WHERE clause
+f5077848_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
