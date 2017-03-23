@@ -22,9 +22,15 @@ fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
 }
 
 fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
-    let table_name = data.file_stem().unwrap().to_str().unwrap();
-    let putter = backend.g
-        .get_mutator(backend.r.as_ref().unwrap().node_addr_for(table_name).unwrap());
+    let table_name = data.file_stem()
+        .unwrap()
+        .to_str()
+        .unwrap();
+    let putter = backend.g.get_mutator(backend.r
+                                           .as_ref()
+                                           .unwrap()
+                                           .node_addr_for(table_name)
+                                           .unwrap());
 
     let f = File::open(data).unwrap();
     let mut reader = BufReader::new(f);

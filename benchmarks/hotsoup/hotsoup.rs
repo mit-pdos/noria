@@ -35,10 +35,10 @@ fn make(blacklist: &str) -> Box<Backend> {
 
     let recipe = Recipe::blank();
     Box::new(Backend {
-        blacklist: blacklisted_queries,
-        r: Some(recipe),
-        g: g,
-    })
+                 blacklist: blacklisted_queries,
+                 r: Some(recipe),
+                 g: g,
+             })
 }
 
 impl Backend {
@@ -67,17 +67,17 @@ impl Backend {
         qf.read_to_string(&mut s).unwrap();
         rs.push_str("\n");
         rs.push_str(&s.lines()
-            .filter(|ref l| {
-                // make sure to skip blacklisted queries
-                for ref q in blacklist {
-                    if l.contains(*q) {
-                        return false;
-                    }
+                         .filter(|ref l| {
+            // make sure to skip blacklisted queries
+            for ref q in blacklist {
+                if l.contains(*q) {
+                    return false;
                 }
-                true
-            })
-            .collect::<Vec<_>>()
-            .join("\n"));
+            }
+            true
+        })
+                         .collect::<Vec<_>>()
+                         .join("\n"));
 
         let new_recipe = Recipe::from_str(&rs)?;
         let cur_recipe = self.r.take().unwrap();
@@ -161,11 +161,17 @@ fn main() {
 
     // hotcrp_*.sql
     query_files.sort_by_key(|k| {
-        let fname = k.file_name().unwrap().to_str().unwrap();
+        let fname = k.file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
         u64::from_str(&fname[7..fname.len() - 4]).unwrap()
     });
     schema_files.sort_by_key(|k| {
-        let fname = k.file_name().unwrap().to_str().unwrap();
+        let fname = k.file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
         u64::from_str(&fname[7..fname.len() - 4]).unwrap()
     });
 

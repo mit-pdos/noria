@@ -31,9 +31,9 @@ fn mkc(addr: &str) -> Client {
     match core.run(fc) {
         Ok((_, conn)) => {
             return Client {
-                conn: Some(conn),
-                core: core,
-            }
+                       conn: Some(conn),
+                       core: core,
+                   }
         }
         Err(_) => panic!("Failed to connect to SQL server"),
     }
@@ -48,15 +48,11 @@ pub fn make_writer(addr: &str) -> W {
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
         .and_then(|conn| {
-            conn.simple_exec(format!("DROP DATABASE {};", db))
-                .and_then(|r| r)
-                .collect()
-        })
+                      conn.simple_exec(format!("DROP DATABASE {};", db)).and_then(|r| r).collect()
+                  })
         .and_then(|(_, conn)| {
-            conn.simple_exec(format!("CREATE DATABASE {};", db))
-                .and_then(|r| r)
-                .collect()
-        })
+                      conn.simple_exec(format!("CREATE DATABASE {};", db)).and_then(|r| r).collect()
+                  })
         .and_then(|(_, conn)| {
             conn.simple_exec(format!("USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
@@ -95,10 +91,10 @@ pub fn make_writer(addr: &str) -> W {
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
-                .and_then(|r| r)
-                .collect()
-        });
+                      conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
+                          .and_then(|r| r)
+                          .collect()
+                  });
 
     core.run(fut).unwrap();
     drop(core);
@@ -160,7 +156,10 @@ impl Writer for W {
             .exec(&self.a_prep, &[&article_id, &title.as_str()])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client.core.run(fut).unwrap();
+        let (_, conn) = self.client
+            .core
+            .run(fut)
+            .unwrap();
         self.client.conn = Some(conn);
     }
 
@@ -172,7 +171,10 @@ impl Writer for W {
             .exec(&self.v_prep, &[&user_id, &article_id])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client.core.run(fut).unwrap();
+        let (_, conn) = self.client
+            .core
+            .run(fut)
+            .unwrap();
         self.client.conn = Some(conn);
         Period::PreMigration
     }
@@ -200,7 +202,10 @@ impl Reader for R {
                     };
                     Ok(())
                 });
-            let conn = self.client.core.run(fut).unwrap();
+            let conn = self.client
+                .core
+                .run(fut)
+                .unwrap();
             self.client.conn = Some(conn);
         }
         (res, Period::PreMigration)

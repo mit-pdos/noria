@@ -20,7 +20,7 @@ pub fn setup(memcached_dbn: &str, mysql_dbn: &str, write: bool) -> Pool {
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
                                         ProtoType::Binary)
-        .unwrap();
+            .unwrap();
 
     let addr = format!("mysql://{}", mysql_dbn);
     if write {
@@ -106,9 +106,15 @@ impl<'a> Reader for R<'a> {
                 let s = String::from_utf8_lossy(&data.0[..]);
                 let mut parts = s.split(";");
                 ArticleResult::Article {
-                    id: parts.next().unwrap().parse().unwrap(),
+                    id: parts.next()
+                        .unwrap()
+                        .parse()
+                        .unwrap(),
                     title: String::from(parts.next().unwrap()),
-                    votes: parts.next().unwrap().parse().unwrap(),
+                    votes: parts.next()
+                        .unwrap()
+                        .parse()
+                        .unwrap(),
                 }
             }
             Err(_) => {

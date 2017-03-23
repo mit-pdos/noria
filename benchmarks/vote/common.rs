@@ -38,11 +38,11 @@ pub trait Writer {
         thread::Builder::new()
             .name("migrator".to_string())
             .spawn(move || {
-                handle.execute();
-                let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
-                println!("Migration completed in {:.4}s", mig_duration);
-                drop(tx);
-            })
+                       handle.execute();
+                       let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
+                       println!("Migration completed in {:.4}s", mig_duration);
+                       drop(tx);
+                   })
             .unwrap();
         rx
     }

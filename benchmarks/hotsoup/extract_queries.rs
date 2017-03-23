@@ -74,10 +74,10 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
         .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
         .map(|(qn, q)| if !q.ends_with(";") {
-            (qn, format!("{};", q))
-        } else {
-            (qn, q)
-        })
+                 (qn, format!("{};", q))
+             } else {
+                 (qn, q)
+             })
         .collect()
 }
 
@@ -94,21 +94,21 @@ fn main() {
         .version("0.1")
         .about("Extracts queries from HotCRP code.")
         .arg(Arg::with_name("source")
-            .index(1)
-            .help("Location of the HotCRP code to work on.")
-            .required(true))
+                 .index(1)
+                 .help("Location of the HotCRP code to work on.")
+                 .required(true))
         .arg(Arg::with_name("output")
-            .short("o")
-            .long("output")
-            .value_name("FILE")
-            .help("Location to write output recipe to.")
-            .required(true))
+                 .short("o")
+                 .long("output")
+                 .value_name("FILE")
+                 .help("Location to write output recipe to.")
+                 .required(true))
         .arg(Arg::with_name("git_rev")
-            .short("g")
-            .long("git_rev")
-            .value_name("REV")
-            .help("Git revision that we're extracting for.")
-            .required(true))
+                 .short("g")
+                 .long("git_rev")
+                 .value_name("REV")
+                 .help("Git revision that we're extracting for.")
+                 .required(true))
         .get_matches();
 
     let path = matches.value_of("source").unwrap();
@@ -120,7 +120,10 @@ fn main() {
     let mut ok = Vec::new();
     let mut rejected = Vec::new();
     for fname in files {
-        if SKIP_FILES.contains(&fname.file_name().unwrap().to_str().unwrap()) {
+        if SKIP_FILES.contains(&fname.file_name()
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap()) {
             continue;
         }
 

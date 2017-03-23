@@ -61,10 +61,10 @@ fn make(recipe_location: &str) -> Box<Backend> {
     //println!("{}", g);
 
     Box::new(Backend {
-        r: recipe,
-        g: g,
-        prepop_counts: HashMap::new(),
-    })
+                 r: recipe,
+                 g: g,
+                 prepop_counts: HashMap::new(),
+             })
 }
 
 
@@ -139,18 +139,16 @@ fn main() {
         .version("0.1")
         .about("Soup TPC-W driver.")
         .arg(Arg::with_name("recipe")
-            .short("r")
-            .required(true)
-            .default_value("tests/tpc-w-queries.txt")
-            .help("Location of the TPC-W recipe file."))
+                 .short("r")
+                 .required(true)
+                 .default_value("tests/tpc-w-queries.txt")
+                 .help("Location of the TPC-W recipe file."))
         .arg(Arg::with_name("populate_from")
-            .short("p")
-            .required(true)
-            .default_value("benchmarks/tpc_w/data")
-            .help("Location of the data files for TPC-W prepopulation."))
-        .arg(Arg::with_name("transactional")
-            .short("t")
-            .help("Use transactional writes."))
+                 .short("p")
+                 .required(true)
+                 .default_value("benchmarks/tpc_w/data")
+                 .help("Location of the data files for TPC-W prepopulation."))
+        .arg(Arg::with_name("transactional").short("t").help("Use transactional writes."))
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();

@@ -121,11 +121,11 @@ fn main() {
         let getters: Vec<_> = getters.into_iter()
             .enumerate()
             .map(|(i, g)| {
-                thread::Builder::new()
-                    .name(format!("GET{}", i))
-                    .spawn(move || exercise::launch_reader(g, config))
-                    .unwrap()
-            })
+                     thread::Builder::new()
+                         .name(format!("GET{}", i))
+                         .spawn(move || exercise::launch_reader(g, config))
+                         .unwrap()
+                 })
             .collect();
         get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     } else {
@@ -143,11 +143,11 @@ fn main() {
         let getters: Vec<_> = getters.into_iter()
             .enumerate()
             .map(|(i, g)| {
-                thread::Builder::new()
-                    .name(format!("GET{}", i))
-                    .spawn(move || exercise::launch_reader(g, config))
-                    .unwrap()
-            })
+                     thread::Builder::new()
+                         .name(format!("GET{}", i))
+                         .spawn(move || exercise::launch_reader(g, config))
+                         .unwrap()
+                 })
             .collect();
 
         put_stats = putter.join().unwrap();
@@ -283,7 +283,10 @@ impl Writer for Spoon {
             // don't try too eagerly
             if self.i & 16384 == 0 {
                 // we may have been given a new putter
-                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
+                if let Ok(nv) = self.new_vote
+                       .as_mut()
+                       .unwrap()
+                       .try_recv() {
                     // yay!
                     self.new_vote = None;
                     self.vote = nv;

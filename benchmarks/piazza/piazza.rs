@@ -24,12 +24,12 @@ pub struct Piazza {
 #[derive(Clone, Copy)]
 pub enum DomainConfig {
     Single,
-    PerUser
+    PerUser,
 }
 
 enum Fanout {
     All,
-    Few
+    Few,
 }
 
 impl Piazza {
@@ -51,7 +51,9 @@ impl Piazza {
             user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
 
             // add a post base table
-            post = mig.add_ingredient("post", &["pid", "cid", "author", "content"], Base::new(vec![1]));
+            post = mig.add_ingredient("post",
+                                      &["pid", "cid", "author", "content"],
+                                      Base::new(vec![1]));
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
@@ -83,6 +85,7 @@ impl Piazza {
     }
 
     pub fn log_user(&mut self, uid: DataType, domain_config: DomainConfig) {
+        use distributary::Operator;
 
         let visible_posts;
 
@@ -90,16 +93,18 @@ impl Piazza {
 
         let user_domain = mig.add_domain();
         // classes user is taking
-        let class_filter = Filter::new(self.taking, &[None, Some(uid.into())]);
+        let class_filter = Filter::new(self.taking, &[None, Some((Operator::Equal, uid.into()))]);
 
         let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
         // add visible posts to user
         // only posts from classes the user is taking should be visible
-        let j = JoinBuilder::new(vec![(self.post, 0), (self.post, 1), (self.post, 2), (self.post, 3)])
+        let j =
+            JoinBuilder::new(vec![(self.post, 0), (self.post, 1), (self.post, 2), (self.post, 3)])
                 .from(self.post, vec![0, 1, 0, 0])
                 .join(user_classes, vec![1, 0]);
 
-        visible_posts = mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
+        visible_posts =
+            mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
         match domain_config {
             // creates one domain peruser
@@ -107,7 +112,7 @@ impl Piazza {
                 mig.assign_domain(user_classes, user_domain);
 
                 mig.assign_domain(visible_posts, user_domain);
-            },
+            }
             // assign everything to a single domain
             DomainConfig::Single => {
                 mig.assign_domain(user_classes, self.domain);
@@ -139,14 +144,14 @@ fn populate_classes(nclasses: i64, class_putter: Mutator) {
 
 fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: Fanout) {
     match fanout {
-        Fanout::Few =>  {
+        Fanout::Few => {
             for j in 0..nusers {
                 for i in 0..10 {
-                    let cid = (j*10 + i) % nclasses;
+                    let cid = (j * 10 + i) % nclasses;
                     taking_putter.put(vec![cid.into(), j.into()]);
                 }
             }
-        },
+        }
         Fanout::All => {
             for j in 0..nusers {
                 for i in 0..nclasses {
@@ -163,45 +168,42 @@ fn main() {
         .version("0.1")
         .about("Benchmarks Piazza-like application with some security policies.")
         .arg(Arg::with_name("nclasses")
-            .short("c")
-            .long("classes")
-            .value_name("N")
-            .default_value("100")
-            .help("Number of classes to prepopulate the database with"))
+                 .short("c")
+                 .long("classes")
+                 .value_name("N")
+                 .default_value("100")
+                 .help("Number of classes to prepopulate the database with"))
         .arg(Arg::with_name("nusers")
-            .short("u")
-            .long("users")
-            .value_name("N")
-            .default_value("100")
-            .help("Number of users to prepopulate the database with"))
+                 .short("u")
+                 .long("users")
+                 .value_name("N")
+                 .default_value("100")
+                 .help("Number of users to prepopulate the database with"))
         .arg(Arg::with_name("nposts")
-            .short("p")
-            .long("posts")
-            .value_name("N")
-            .default_value("10000")
-            .help("Number of posts to prepopulate the database with"))
-        .arg(Arg::with_name("csv")
-            .long("csv")
-            .required(false)
-            .help("Print output in CSV format."))
+                 .short("p")
+                 .long("posts")
+                 .value_name("N")
+                 .default_value("10000")
+                 .help("Number of posts to prepopulate the database with"))
+        .arg(Arg::with_name("csv").long("csv").required(false).help("Print output in CSV format."))
         .arg(Arg::with_name("fanout")
-            .long("fanout")
-            .short("f")
-            .possible_values(&["all", "few"])
-            .takes_value(true)
-            .default_value("all")
-            .help("Size of the class fanout for each user"))
+                 .long("fanout")
+                 .short("f")
+                 .possible_values(&["all", "few"])
+                 .takes_value(true)
+                 .default_value("all")
+                 .help("Size of the class fanout for each user"))
         .arg(Arg::with_name("domain_config")
-            .long("dcfg")
-            .possible_values(&["single", "peruser"])
-            .takes_value(true)
-            .default_value("single")
-            .help("Domain assignment configuration"))
+                 .long("dcfg")
+                 .possible_values(&["single", "peruser"])
+                 .takes_value(true)
+                 .default_value("single")
+                 .help("Domain assignment configuration"))
         .arg(Arg::with_name("benchmark")
-            .possible_values(&["write", "migration"])
-            .takes_value(true)
-            .required(true)
-            .help("Benchmark configuration"))
+                 .possible_values(&["write", "migration"])
+                 .takes_value(true)
+                 .required(true)
+                 .help("Benchmark configuration"))
         .get_matches();
 
 
@@ -234,7 +236,7 @@ fn main() {
     }
 
     let domain_config = match domain_config_str.as_ref() {
-        "single"  => DomainConfig::Single,
+        "single" => DomainConfig::Single,
         "peruser" => DomainConfig::PerUser,
         _ => {
             unreachable!();
@@ -243,12 +245,10 @@ fn main() {
 
     if benchmark == "migration" {
         for pid in 0..nposts {
-            post_putter.put(vec![
-                pid.into(),
-                (pid % nclasses).into(),
-                (pid % nusers).into(),
-                "post".into()
-                ]);
+            post_putter.put(vec![pid.into(),
+                                 (pid % nclasses).into(),
+                                 (pid % nusers).into(),
+                                 "post".into()]);
         }
     }
 
@@ -258,7 +258,7 @@ fn main() {
 
     let mut times = Vec::new();
     if csv {
-       File::create("out.csv").unwrap();
+        File::create("out.csv").unwrap();
     }
 
     println!("Starting benchmark...");
@@ -271,29 +271,35 @@ fn main() {
                 app.log_user(uid.into(), domain_config);
 
                 end = time::Instant::now().duration_since(start);
-            },
+            }
             "write" => {
                 for i in 0..1000 {
-                    post_putter.put(vec![i.into(), (i % nclasses).into(), (i % nusers).into(), "post".into()]);
+                    post_putter.put(vec![i.into(),
+                                         (i % nclasses).into(),
+                                         (i % nusers).into(),
+                                         "post".into()]);
                 }
                 end = time::Instant::now().duration_since(start);
 
                 thread::sleep(time::Duration::from_millis(100));
 
                 app.log_user(uid.into(), domain_config);
-            },
+            }
             _ => {
                 unreachable!();
             }
         };
 
-        let time = (end.as_secs() as f64) +
-                       (end.subsec_nanos() as f64 / 1_000_000_000.0);
+        let time = (end.as_secs() as f64) + (end.subsec_nanos() as f64 / 1_000_000_000.0);
 
         times.push(time);
 
         if csv {
-            let mut f = OpenOptions::new().write(true).append(true).open("out.csv").unwrap();
+            let mut f = OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open("out.csv")
+                .unwrap();
             writeln!(f, "{:?},{:?}", uid, time).unwrap();
         } else {
             println!("{:?}: {:?}", uid, time);
@@ -301,24 +307,20 @@ fn main() {
     }
 
     println!("{:?} results ", benchmark);
-    println!("avg: {:?}", avg(&times) );
-    println!("max: {:?}", max_duration(&times) );
-    println!("min: {:?}", min_duration(&times) );
+    println!("avg: {:?}", avg(&times));
+    println!("max: {:?}", max_duration(&times));
+    println!("min: {:?}", min_duration(&times));
 
     println!("Done with benchmark.");
 
 }
 
 fn max_duration(stats: &Vec<f64>) -> f64 {
-    stats.iter().fold(0f64, |acc, el| {
-        f64::max(acc, *el)
-    })
+    stats.iter().fold(0f64, |acc, el| f64::max(acc, *el))
 }
 
 fn min_duration(stats: &Vec<f64>) -> f64 {
-    stats.iter().fold(stats[0], |acc, el| {
-        f64::min(acc, *el)
-    })
+    stats.iter().fold(stats[0], |acc, el| f64::min(acc, *el))
 }
 
 
