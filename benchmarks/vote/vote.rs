@@ -1,5 +1,3 @@
-#![feature(ptr_eq)]
-
 #[macro_use]
 extern crate clap;
 
