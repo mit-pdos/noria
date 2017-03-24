@@ -1,0 +1,77 @@
+######################
+# SCHEMA v1
+
+# "Paper" does not have a "contactId" field
+68be356a_dd4e396b6e183da7: SELECT Paper.paperId, Paper.title, Paper.abstract,  ContactInfo.firstName, ContactInfo.lastName,  ContactInfo.email, ContactInfo.affiliation, Paper.authorInformation  FROM Paper,ContactInfo  WHERE Paper.contactId=ContactInfo.contactId AND Paper.timeSubmitted>0  ORDER BY paperId ;
+68be356a_3d894009ebe2e4b5: SELECT firstName, lastName, email,  paperId, outcome, title  FROM ContactInfo, Paper  WHERE Paper.outcome>0  AND Paper.contactId=ContactInfo.contactId  ORDER BY paperId ;
+
+# "ReviewRequest" table does not exist
+68be356a_19912ac4c5713b3f: SELECT  ContactInfo.firstName, ContactInfo.lastName, ContactInfo.email,  ContactInfo.contactId,  Paper.paperId, Paper.title  from ReviewRequest  join ContactInfo using (contactId)  join Paper using (paperId)  where ContactInfo.contactId=?;
+68be356a_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
+
+# Invalid WHERE clause
+68be356a_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
+
+# LEFT JOIN unsupported, parameter in join condition
+# We can fix both of these by (1) having a left join op, (2) pulling the parameter out of the condition
+68be356a_32e74662fcdec376: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
+68be356a_1ab06c9faa4ed0c4: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
+
+
+######################
+# SCHEMA v2
+
+# No "reviewRequestId" field in "ReviewRequest"
+c80751de_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
+
+
+######################
+# SCHEMA v3
+
+# 28-column compound key required by GROUP_CONCAT
+f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted), count(reviewNeedsSubmit), group_concat(overAllMerit), PCMember.contactId as pc from PaperReview join Paper using (paperId) left join PCMember on (PaperReview.contactId=PCMember.contactId) where Paper.timeSubmitted>0 group by PaperReview.contactId;
+
+
+######################
+# SCHEMA v6
+
+# LEFT JOIN unsupported, parameter in join condition
+6f0a41d1_38b76a6bfd9a9104: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
+
+# count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
+6f0a41d1_929abaedd32ee211: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
+
+
+######################
+# SCHEMA v15
+
+# count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
+# XXX: why is the hash different to the identical query above?!
+3491de61_af778910f8779b0d: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
+
+
+######################
+# SCHEMA v161
+
+# "Conferences" table does not exist in schema
+a1ac837b_861fc461f61a0335: select confid from Conferences where `dbname`=?;
+
+# Invalid WHERE clause
+a1ac837b_f6bc8469eb1026bd: select paperId from Paper where ? limit 1;
+a1ac837b_3b8c44a3b50fcc9: select contactId from ContactInfo where ?;
+
+# No column "contactDbId" on "ContactInfo"
+a1ac837b_8bc426139d40387d: select * from ContactInfo where contactDbId=?;
+
+# Complex "ON" predicate unsupported, "Conferences" table unknown
+a1ac837b_e617f8fab63f1a86: select ContactInfo.contactDbId, Conferences.confid, roles, password             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+# Unknown tables "ReviewFormField" and "ReviewFormOptions"
+a1ac837b_bdc9619ab3be253d: select * from ReviewFormField where fieldName!='outcome';
+a1ac837b_2c19c35e41b44e16: select * from ReviewFormOptions where fieldName!='outcome' order by level asc;
+a1ac837b_60427ac36f75cc9c: select * from OptionType;
+a1ac837b_48dc657a24ccccb2: select * from ContactAddress;
+a1ac837b_8d679fcc66af4f50: select * from ReviewFormOptions where fieldName='outcome';
+
+# XXX: can't have non-alphanum characters in string
+a1ac837b_ea55010857ef0656: select value from Settings where name='rev_tokens';

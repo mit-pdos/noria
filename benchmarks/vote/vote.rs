@@ -281,7 +281,10 @@ impl Writer for Spoon {
             // don't try too eagerly
             if self.i & 16384 == 0 {
                 // we may have been given a new putter
-                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
+                if let Ok(nv) = self.new_vote
+                       .as_mut()
+                       .unwrap()
+                       .try_recv() {
                     // yay!
                     self.new_vote = None;
                     self.vote = nv;
