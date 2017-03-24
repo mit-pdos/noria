@@ -43,7 +43,7 @@ fn make(blacklist: &str) -> Box<Backend> {
 }
 
 impl Backend {
-    fn migrate(&mut self, schema_file: &str, query_file: &str) -> Result<(), String> {
+    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
         use std::fs::File;
 
@@ -52,7 +52,6 @@ impl Backend {
         let mut mig = self.g.start_migration();
 
         let mut sf = File::open(schema_file).unwrap();
-        let mut qf = File::open(query_file).unwrap();
         let mut s = String::new();
 
         // load schema
@@ -65,20 +64,26 @@ impl Backend {
             .join("\n");
         // load queries and concatenate them onto the table definitions from the schema
         s.clear();
-        qf.read_to_string(&mut s).unwrap();
-        rs.push_str("\n");
-        rs.push_str(&s.lines()
-                         .filter(|ref l| {
-            // make sure to skip blacklisted queries
-            for ref q in blacklist {
-                if l.contains(*q) {
-                    return false;
-                }
+        match query_file {
+            None => (),
+            Some(qf) => {
+                let mut qf = File::open(qf).unwrap();
+                qf.read_to_string(&mut s).unwrap();
+                rs.push_str("\n");
+                rs.push_str(&s.lines()
+                                 .filter(|ref l| {
+                    // make sure to skip blacklisted queries
+                    for ref q in blacklist {
+                        if l.contains(*q) {
+                            return false;
+                        }
+                    }
+                    true
+                })
+                                 .collect::<Vec<_>>()
+                                 .join("\n"))
             }
-            true
-        })
-                         .collect::<Vec<_>>()
-                         .join("\n"));
+        }
 
         let new_recipe = Recipe::from_str(&rs)?;
         let cur_recipe = self.r.take().unwrap();
@@ -129,6 +134,9 @@ fn main() {
             .short("b")
             .default_value("benchmarks/hotsoup/query_blacklist.txt")
             .help("File with blacklisted queries to skip."))
+        .arg(Arg::with_name("base_only")
+            .long("base_only")
+            .help("Only add base tables, not queries."))
         .arg(Arg::with_name("transactional")
             .short("t")
             .help("Use transactional writes."))
@@ -140,6 +148,7 @@ fn main() {
     let qloc = matches.value_of("queries").unwrap();
     let dataloc = matches.value_of("populate_from").unwrap();
     let transactional = matches.is_present("transactional");
+    let base_only = matches.is_present("base_only");
 
     let mut backend = make(blloc);
 
@@ -184,7 +193,12 @@ fn main() {
                  sfname,
                  qfname);
 
-        match backend.migrate(&sfname.to_str().unwrap(), &qfname.to_str().unwrap()) {
+        let queries = if base_only {
+            None
+        } else {
+            Some(qfname.to_str().unwrap())
+        };
+        match backend.migrate(&sfname.to_str().unwrap(), queries) {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), i);
                 let mut gf = File::create(graph_fname).unwrap();
