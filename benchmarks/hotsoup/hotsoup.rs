@@ -185,7 +185,12 @@ fn main() {
                  qfname);
 
         match backend.migrate(&sfname.to_str().unwrap(), &qfname.to_str().unwrap()) {
-            Err(e) => panic!(e),
+            Err(e) => {
+                let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), i);
+                let mut gf = File::create(graph_fname).unwrap();
+                assert!(write!(gf, "{}", backend.g).is_ok());
+                panic!(e)
+            }
             _ => (),
         }
 
