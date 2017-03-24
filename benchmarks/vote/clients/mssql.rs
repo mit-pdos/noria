@@ -104,7 +104,10 @@ pub fn make_writer(addr: &str) -> W {
         .as_ref()
         .unwrap()
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
-    let v_prep = client.conn.as_ref().unwrap().prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
+    let v_prep = client.conn
+        .as_ref()
+        .unwrap()
+        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
     W {
         client: client,
         a_prep: a_prep,
@@ -153,7 +156,10 @@ impl Writer for W {
             .exec(&self.a_prep, &[&article_id, &title.as_str()])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client.core.run(fut).unwrap();
+        let (_, conn) = self.client
+            .core
+            .run(fut)
+            .unwrap();
         self.client.conn = Some(conn);
     }
 
@@ -165,7 +171,10 @@ impl Writer for W {
             .exec(&self.v_prep, &[&user_id, &article_id])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client.core.run(fut).unwrap();
+        let (_, conn) = self.client
+            .core
+            .run(fut)
+            .unwrap();
         self.client.conn = Some(conn);
         Period::PreMigration
     }
@@ -193,7 +202,10 @@ impl Reader for R {
                     };
                     Ok(())
                 });
-            let conn = self.client.core.run(fut).unwrap();
+            let conn = self.client
+                .core
+                .run(fut)
+                .unwrap();
             self.client.conn = Some(conn);
         }
         (res, Period::PreMigration)

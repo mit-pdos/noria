@@ -85,6 +85,7 @@ impl Piazza {
     }
 
     pub fn log_user(&mut self, uid: DataType, domain_config: DomainConfig) {
+        use distributary::Operator;
 
         let visible_posts;
 
@@ -92,7 +93,7 @@ impl Piazza {
 
         let user_domain = mig.add_domain();
         // classes user is taking
-        let class_filter = Filter::new(self.taking, &[None, Some(uid.into())]);
+        let class_filter = Filter::new(self.taking, &[None, Some((Operator::Equal, uid.into()))]);
 
         let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
         // add visible posts to user
@@ -294,7 +295,11 @@ fn main() {
         times.push(time);
 
         if csv {
-            let mut f = OpenOptions::new().write(true).append(true).open("out.csv").unwrap();
+            let mut f = OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open("out.csv")
+                .unwrap();
             writeln!(f, "{:?},{:?}", uid, time).unwrap();
         } else {
             println!("{:?}: {:?}", uid, time);

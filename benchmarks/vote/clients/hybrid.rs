@@ -106,9 +106,15 @@ impl<'a> Reader for R<'a> {
                 let s = String::from_utf8_lossy(&data.0[..]);
                 let mut parts = s.split(";");
                 ArticleResult::Article {
-                    id: parts.next().unwrap().parse().unwrap(),
+                    id: parts.next()
+                        .unwrap()
+                        .parse()
+                        .unwrap(),
                     title: String::from(parts.next().unwrap()),
-                    votes: parts.next().unwrap().parse().unwrap(),
+                    votes: parts.next()
+                        .unwrap()
+                        .parse()
+                        .unwrap(),
                 }
             }
             Err(_) => {

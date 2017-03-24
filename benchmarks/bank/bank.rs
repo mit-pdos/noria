@@ -96,13 +96,13 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
                      .collect::<Vec<_>>(),
                  balances: sync::Arc::new(balancesq),
                  migrate: Box::new(move || {
-                                       let mut mig = g.start_migration();
-                                       let identity = mig.add_ingredient("identity",
-                                              &["acct_id", "credit", "debit"],
-                                              distributary::Identity::new(balances));
-                                       let _ = mig.transactional_maintain(identity, 0);
-                                       let _ = mig.commit();
-                                   }),
+        let mut mig = g.start_migration();
+        let identity = mig.add_ingredient("identity",
+                                          &["acct_id", "credit", "debit"],
+                                          distributary::Identity::new(balances));
+        let _ = mig.transactional_maintain(identity, 0);
+        let _ = mig.commit();
+    }),
              })
 }
 
@@ -141,13 +141,13 @@ impl Getter for sync::Arc<Option<TxGet>> {
                 g(&id.into()).map(|(res, token)| {
                     assert_eq!(res.len(), 1);
                     res.into_iter().next().map(|row| {
-                                                   // we only care about the first result
-                                                   let mut row = row.into_iter();
-                                                   let _: i64 = row.next().unwrap().into();
-                                                   let credit: i64 = row.next().unwrap().into();
-                                                   let debit: i64 = row.next().unwrap().into();
-                                                   (credit - debit, token)
-                                               })
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let _: i64 = row.next().unwrap().into();
+                        let credit: i64 = row.next().unwrap().into();
+                        let debit: i64 = row.next().unwrap().into();
+                        (credit - debit, token)
+                    })
                 })
             } else {
                 use std::time::Duration;
