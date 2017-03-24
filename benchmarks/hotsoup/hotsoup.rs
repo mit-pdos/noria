@@ -87,7 +87,7 @@ impl Backend {
                 recipe.activate(&mut mig).unwrap();
                 recipe
             }
-            Err(e) => panic!(e),
+            Err(e) => return Err(format!("failed to activate recipe: {}", e)),
         };
 
         mig.commit();
