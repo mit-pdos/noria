@@ -135,6 +135,10 @@ fn main() {
             .short("b")
             .default_value("benchmarks/hotsoup/query_blacklist.txt")
             .help("File with blacklisted queries to skip."))
+        .arg(Arg::with_name("populate_at")
+            .default_value("11")
+            .long("populate_at")
+            .help("Schema version to populate database at; must be compatible with test data."))
         .arg(Arg::with_name("start_at")
             .default_value("1")
             .long("start_at")
@@ -155,6 +159,7 @@ fn main() {
     let transactional = matches.is_present("transactional");
     let base_only = matches.is_present("base_only");
     let start_at_schema = value_t_or_exit!(matches, "start_at", u64);
+    let populate_at_schema = value_t_or_exit!(matches, "populate_at", u64);
 
     let mut backend = make(blloc);
 
@@ -234,10 +239,12 @@ fn main() {
             assert!(write!(gf, "{}", backend.g).is_ok());
         }
 
+        // on the first auto-upgradeable schema, populate with test data
+        if schema_version == populate_at_schema {
+            println!("Populating database!");
+            populate::populate(&backend, dataloc, transactional).unwrap();
+        }
     }
 
-    // Populate with test data at latest schema
-    populate::populate(&backend, dataloc, transactional).unwrap();
-
-    println!("{}", backend.g);
+    println!("Done!");
 }
