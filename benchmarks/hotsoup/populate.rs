@@ -40,11 +40,6 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     let start = time::Instant::now();
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
-        if i == 0 {
-            // skip header line
-            i += 1;
-            continue;
-        }
         {
             let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
             let rec: Vec<DataType> = fields.into_iter().map(|s| s.into()).collect();
