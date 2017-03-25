@@ -22,6 +22,8 @@ fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
 }
 
 fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
+    use std::str::FromStr;
+
     let table_name = data.file_stem()
         .unwrap()
         .to_str()
@@ -42,7 +44,12 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
-            let rec: Vec<DataType> = fields.into_iter().map(|s| s.into()).collect();
+            let rec: Vec<DataType> = fields.into_iter()
+                .map(|s| match i64::from_str(s) {
+                         Ok(v) => v.into(),
+                         Err(_) => s.into(),
+                     })
+                .collect();
             do_put(&putter, use_txn)(rec);
         }
         i += 1;
