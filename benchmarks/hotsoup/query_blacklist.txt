@@ -48,3 +48,30 @@ f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted),
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
 # XXX: why is the hash different to the identical query above?!
 3491de61_af778910f8779b0d: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
+
+
+######################
+# SCHEMA v161
+
+# "Conferences" table does not exist in schema
+a1ac837b_861fc461f61a0335: select confid from Conferences where `dbname`=?;
+
+# Invalid WHERE clause
+a1ac837b_f6bc8469eb1026bd: select paperId from Paper where ? limit 1;
+a1ac837b_3b8c44a3b50fcc9: select contactId from ContactInfo where ?;
+
+# No column "contactDbId" on "ContactInfo"
+a1ac837b_8bc426139d40387d: select * from ContactInfo where contactDbId=?;
+
+# Complex "ON" predicate unsupported, "Conferences" table unknown
+a1ac837b_e617f8fab63f1a86: select ContactInfo.contactDbId, Conferences.confid, roles, password             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+# Unknown tables "ReviewFormField" and "ReviewFormOptions"
+a1ac837b_bdc9619ab3be253d: select * from ReviewFormField where fieldName!='outcome';
+a1ac837b_2c19c35e41b44e16: select * from ReviewFormOptions where fieldName!='outcome' order by level asc;
+a1ac837b_60427ac36f75cc9c: select * from OptionType;
+a1ac837b_48dc657a24ccccb2: select * from ContactAddress;
+a1ac837b_8d679fcc66af4f50: select * from ReviewFormOptions where fieldName='outcome';
+
+# XXX: can't have non-alphanum characters in string
+a1ac837b_ea55010857ef0656: select value from Settings where name='rev_tokens';
