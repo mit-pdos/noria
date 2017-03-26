@@ -35,7 +35,9 @@ fn make(recipe_location: &str) -> Box<Backend> {
 
     // set up graph
     let mut g = Blender::new();
-    g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+    let main_log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
+    let recipe_log = main_log.new(None);
+    g.log_with(main_log);
 
     let recipe;
     {
@@ -47,7 +49,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
 
         // load queries
         f.read_to_string(&mut s).unwrap();
-        recipe = match Recipe::from_str(&s) {
+        recipe = match Recipe::from_str(&s, Some(recipe_log)) {
             Ok(mut recipe) => {
                 recipe.activate(&mut mig).unwrap();
                 recipe
