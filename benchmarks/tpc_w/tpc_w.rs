@@ -75,6 +75,7 @@ impl Backend {
             "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getCustomer" => "".into(), // XXX(malte): fix username string generation
             "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
+            "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
             "getUserName" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
             "getPassword" => "".into(), // XXX(malte): fix username string generation
             "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
