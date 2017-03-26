@@ -33,9 +33,11 @@ fn make(blacklist: &str) -> Box<Backend> {
 
     // set up graph
     let mut g = Blender::new();
-    g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+    let main_log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
+    let recipe_log = main_log.new(None);
+    g.log_with(main_log);
 
-    let recipe = Recipe::blank();
+    let recipe = Recipe::blank(Some(recipe_log));
     Box::new(Backend {
                  blacklist: blacklisted_queries,
                  r: Some(recipe),
@@ -86,7 +88,7 @@ impl Backend {
             }
         }
 
-        let new_recipe = Recipe::from_str(&rs)?;
+        let new_recipe = Recipe::from_str(&rs, None)?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
