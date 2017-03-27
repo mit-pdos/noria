@@ -2,7 +2,7 @@
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 repo="https://github.com/kohler/hotcrp.git"
 
-cargo build --release --bin extract_hotcrp_queries
+cargo build --features="binaries" --release --bin extract_hotcrp_queries
 
 mkdir -p ${dir}/schemas
 mkdir -p ${dir}/queries
