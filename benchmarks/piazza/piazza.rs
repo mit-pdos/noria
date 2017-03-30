@@ -10,7 +10,7 @@ use std::fs::{OpenOptions, File};
 use std::io::Write;
 use slog::DrainExt;
 
-use distributary::{DataType, JoinBuilder, Blender, Base, NodeAddress, Filter, Mutator, Index};
+use distributary::{DataType, Join, JoinType, Blender, Base, NodeAddress, Filter, Mutator, Index};
 
 pub struct Piazza {
     pub soup: Blender,
@@ -98,11 +98,11 @@ impl Piazza {
         let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
         // add visible posts to user
         // only posts from classes the user is taking should be visible
-        let j =
-            JoinBuilder::new(vec![(self.post, 0), (self.post, 1), (self.post, 2), (self.post, 3)])
-                .from(self.post, vec![0, 1, 0, 0])
-                .join(user_classes, vec![1, 0]);
-
+        use distributary::JoinSource::*;
+        let j = Join::new(self.post,
+                          user_classes,
+                          JoinType::Inner,
+                          vec![L(0), B(1, 0), L(2), L(3)]);
         visible_posts =
             mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
