@@ -5,7 +5,7 @@ extern crate clap;
 
 use std::{thread, time};
 
-use distributary::{Blender, Base, Aggregation, Mutator, Token, JoinBuilder};
+use distributary::{Blender, Base, Aggregation, Mutator, Token, Join, JoinType};
 
 struct Backend {
     data: Option<Mutator>,
@@ -40,9 +40,8 @@ fn make(domains: DomainConfiguration, width: u16, height: u16) -> Box<Backend> {
 
         // first, create the base of each chain
         for col in 0..width {
-            let j = JoinBuilder::new(vec![(data, 0), (data, 1)])
-                .from(data, vec![1, 0])
-                .join(number, vec![1]);
+            use distributary::JoinSource::*;
+            let j = Join::new(data, number, JoinType::Inner, vec![B(0, 0), L(1)]);
             all.push(vec![mig.add_ingredient(format!("nodeJ{}", col), &["number", "val"], j)]);
         }
 

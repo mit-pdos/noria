@@ -1,4 +1,4 @@
-use distributary::{Blender, Base, Aggregation, JoinBuilder, NodeAddress, DataType};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress, DataType};
 
 use slog;
 use slog_term;
@@ -33,9 +33,8 @@ pub fn make() -> Graph {
                                     Aggregation::COUNT.over(vote, 0, &[1]));
 
         // add final join using first field from article and first from vc
-        let j = JoinBuilder::new(vec![(article, 0), (article, 1), (vc, 1)])
-            .from(article, vec![1, 0])
-            .join(vc, vec![1, 0]);
+        use distributary::JoinSource::*;
+        let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
         // let's try to be clever about this.
