@@ -326,7 +326,7 @@ impl MigrationHandle for Migrator {
         use distributary::{Base, Aggregation, Join, JoinType, Union};
 
         let mut g = self.graph.lock().unwrap();
-        let (rating, newendq) = {
+        let (rating, newend) = {
             // get all the ids since migration will borrow g
             let vc = g.vc;
             let article = g.article;
@@ -358,7 +358,7 @@ impl MigrationHandle for Migrator {
             use distributary::JoinSource::*;
             let j = Join::new(article, total, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
             let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
-            let newendq = mig.maintain(newend, 0);
+            mig.maintain(newend, 0);
 
             // we want ratings, rsum, and the union to be in the same domain,
             // because only rsum is really costly
@@ -375,9 +375,10 @@ impl MigrationHandle for Migrator {
 
             // start processing
             mig.commit();
-            (rating, newendq)
+            (rating, newend)
         };
 
+        let newendq = g.graph.get_getter(newend).unwrap();
         let mutator = g.graph.get_mutator(rating);
         self.mut_tx.send(mutator).unwrap();
         let g = Box::into_raw(Box::new(newendq));

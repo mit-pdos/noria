@@ -52,7 +52,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     let credits;
     let debits;
     let balances;
-    let (_, balancesq) = {
+    {
         // migrate
         let mut mig = g.start_migration();
 
@@ -76,17 +76,17 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        let balancesq = Some(mig.transactional_maintain(balances, 0));
+        mig.transactional_maintain(balances, 0);
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
         mig.assign_domain(credits, d);
         mig.assign_domain(debits, d);
         mig.assign_domain(balances, d);
-
-        // start processing
-        (mig.commit(), balancesq)
+        mig.commit();
     };
+
+    let balancesq = g.get_transactional_getter(balances);
 
     Box::new(Bank {
                  transfers: (0..num_putters)
@@ -95,13 +95,13 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
                      .collect::<Vec<_>>(),
                  balances: sync::Arc::new(balancesq),
                  migrate: Box::new(move || {
-        let mut mig = g.start_migration();
-        let identity = mig.add_ingredient("identity",
+                                       let mut mig = g.start_migration();
+                                       let identity = mig.add_ingredient("identity",
                                           &["acct_id", "credit", "debit"],
                                           distributary::Identity::new(balances));
-        let _ = mig.transactional_maintain(identity, 0);
-        let _ = mig.commit();
-    }),
+                                       mig.transactional_maintain(identity, 0);
+                                       mig.commit();
+                                   }),
              })
 }
 

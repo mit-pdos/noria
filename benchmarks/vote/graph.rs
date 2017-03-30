@@ -55,12 +55,14 @@ pub fn make() -> Graph {
         // it's not entirely clear. for now, let's keep them separate to allow the aggregation
         // and the join to occur in parallel.
 
-        let endq = mig.maintain(end, 0);
+        mig.maintain(end, 0);
 
         // start processing
         mig.commit();
-        (article, vote, vc, endq)
+        (article, vote, vc, end)
     };
+
+    let end = g.get_getter(end).unwrap();
 
     Graph {
         vote: vote.into(),
