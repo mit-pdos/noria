@@ -227,6 +227,44 @@ f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
 
 
 ######################
+# SCHEMA v94
+
+# Parameter in join predicate
+18ef8776_29bcc9d26797588a: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+
+######################
+# SCHEMA v95
+
+# Invalid WHERE clause
+ab4bdf1b_4ef5c1036344dbbe: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v97
+
+# Parameter in join predicate
+d14c4391_8d2513c85f47c7af: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+
+######################
+# SCHEMA v99
+
+# Parameter in join predicate
+d50d5846_4fe39a84147979ab: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+# Invalid WHERE clause
+d50d5846_b553d49dd13b9e2c: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v112
+
+# Invalid WHERE clause
+553f6523_440b0a98197783c4: select paperId from PaperComment where commentId;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
