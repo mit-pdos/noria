@@ -51,6 +51,59 @@ f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted),
 
 
 ######################
+# SCHEMA v21
+
+# parameter in join condition
+da577b40_b2c36acdac2c9363: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
+
+# inequality on parameter unsupported
+da577b40_99b7f6c7df7cf3d3: select count(paperId) from PaperConflict where paperId=? and conflictType>=?;
+
+
+######################
+# SCHEMA v22
+
+# parameter in join condition
+# XXX: why is the hash different to the identical query in v21?
+5063baac_b08881033ef665a3: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
+
+
+######################
+# SCHEMA v35
+
+# parameter in join condition
+# XXX: why is the hash different to the identical query in v21 and v27?
+ff0cae2d_476a3599e7eccc5c: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
+
+# cannot group by agg columns (star expansion bug)
+ff0cae2d_71e181bd9892d0e5: select topicId, interest, count(*) from TopicInterest group by topicId, interest;
+
+
+######################
+# SCHEMA v37
+
+# Invalid WHERE clause
+91b079ef_cb3631c07b57bf0d: select paperId, title, authorInformation from Paper where ?;
+
+
+######################
+# SCHEMA v53
+
+# Invalid WHERE clause
+aa64f270_f56723cd6095f784: select commentId from PaperComment where paperId=? and ?;
+
+
+######################
+# SCHEMA v55
+
+# Projecting a literal unsupported
+ddf3f9aa_4d0ebc809119b9c8: select paperId, 0 from PaperConflict where conflictType!=0 and contactId=?;
+
+# Invalid WHERE clause
+ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from Paper where ?;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
