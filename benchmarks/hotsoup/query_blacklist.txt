@@ -112,6 +112,121 @@ ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from P
 
 
 ######################
+# SCHEMA v67
+
+# Projecting a literal unsupported
+8579cf2a_3c16ee09fd8c3cd4: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
+
+
+######################
+# SCHEMA v68
+
+# Projecting a literal unsupported
+# XXX: why is the hash different to the identical query in v67?
+15fe1caa_8ebaa6807805d74f: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
+
+
+######################
+# SCHEMA v70
+
+# Invalid WHERE clause
+b6390b24_5c42e0b048d9ac40: select * from ContactInfo where ? and contactId;
+
+
+######################
+# SCHEMA v72
+
+# cannot group by agg columns (preference pushed through group by for filter)
+14d02c65_a922d98552894f64: select contactId, count(preference) from PaperReviewPreference where preference!=0 group by contactId;
+
+
+######################
+# SCHEMA v75
+
+# parameter in join condition
+b10814f6_266a1206304bf998: select PCMember.contactId, count(reviewId)                 from PCMember left join PaperReview on (PaperReview.contactId=PCMember.contactId and PaperReview.reviewType=?)                 group by PCMember.contactId;
+
+# Invalid WHERE clause
+b10814f6_bdd16abba5e39051: select Paper.paperId, title, authorInformation from Paper where ?;
+
+
+######################
+# SCHEMA v76
+
+# No column named "id" in "ContactInfo"
+6078b8ff_9b0d846534e977c8: select email from ContactInfo where id=?;
+
+
+######################
+# SCHEMA v77
+
+# No column named "id" in "ContactInfo"
+cb8ee5a2_905ff475a1c9cd4b: select email from ContactInfo where id=?;
+
+# Projecting a literal unsupported
+# XXX: why is the hash different to the identical query in v68?
+cb8ee5a2_bdbff331e9335091: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
+
+
+######################
+# SCHEMA v78
+
+# Invalid WHERE clause
+d12323a6_442445b50d22f669: select paperId, contactId from PaperConflict where paperId;
+d12323a6_568e5051af8da71d: select Paper.paperId, title, authorInformation from Paper where ?;
+
+# Projecting a literal unsupported
+# XXX: why is the hash different to the identical query in v77?
+d12323a6_b87ff94d03c4aa02: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
+
+
+######################
+# SCHEMA v80
+
+# No column named "id" in "ContactInfo"
+f6efba71_e54dc2994491482b: select email from ContactInfo where id=?;
+
+
+######################
+# SCHEMA v81
+
+# No column named "id" in "ContactInfo"
+f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
+
+
+######################
+# SCHEMA v82
+
+# No column named "contactDbId" in "ContactInfo"
+4c4b747b_802fc3c769413fef: select * from ContactInfo where contactDbId=?;
+
+# Invalid WHERE clause
+4c4b747b_12a38741990097bf: select paperId, title, mimetype from Paper where paperId;
+4c4b747b_4427c456d8d134bd: select Paper.paperId, title, authorInformation from Paper where ?;
+
+
+######################
+# SCHEMA v83
+
+# Invalid WHERE clause
+7024f487_e59ec780c2c0ecc0: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v86
+
+# No column named "contactDbId" in "ContactInfo"
+17cbae06_f68467e747692c24: select * from ContactInfo where contactDbId=?;
+
+
+######################
+# SCHEMA v89
+
+# Invalid WHERE clause
+40d35695_3371ab14a8a96a34: select paperId from PaperComment where commentId;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
