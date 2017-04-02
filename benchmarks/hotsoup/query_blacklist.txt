@@ -104,6 +104,14 @@ ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from P
 
 
 ######################
+# SCHEMA v62
+
+# Projecting a literal unsupported
+# XXX: why is the hash different to the identical query in v55?
+52ebdf90_8aae10f861bf3995: select paperId, 0 from PaperConflict where conflictType!=0 and contactId=?;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
