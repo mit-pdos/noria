@@ -186,7 +186,7 @@ fn main() {
         if avg {
             let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.pre.sum_len();
+                let (sum, num) = stats.post.sum_len();
                 (tot + sum, count + num)
             });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
