@@ -272,6 +272,100 @@ d50d5846_b553d49dd13b9e2c: select paperId from PaperComment where commentId;
 
 
 ######################
+# SCHEMA v120
+
+# Invalid WHERE clause
+026186b2_a62d8a6051c85574: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v123
+
+# Invalid WHERE clause
+d1c333d6_78e1738aa94cb88b: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v126
+
+# Invalid WHERE clause
+27ac4dbc_d652321c5c4e8c36: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v130
+
+# Invalid WHERE clause
+543e907b_42c0ffa175c06e42: select paperId from Paper where ? limit 1;
+
+# Parameter in join predicate
+543e907b_f874259ccb56273d: select ContactInfo.contactDbId, Conferences.confid, roles, password             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
+
+
+######################
+# SCHEMA v131
+
+# Invalid WHERE clause
+b54ccbf4_bca27f54e270ba35: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v132
+
+# Invalid WHERE clause
+6da41902_1d4466fcbf80d18c: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v136
+
+# Invalid WHERE clause
+31006bda_abb7711506239b3a: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v140
+
+# Invalid WHERE clause
+aad8bf44_fa80a57cb24e4c1b: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v141
+
+# Invalid WHERE clause
+a3a15ec8_3f5a537d8d675d6f: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v143
+
+# Invalid WHERE clause
+1a90cd38_75dfadbbcad89aec: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v145
+
+# Invalid WHERE clause
+b6fea998_20af468cc9113d48: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v146
+
+# Invalid WHERE clause
+f5a359c3_98f9df7fcd6598a: select paperId from PaperComment where commentId;
+
+
+######################
+# SCHEMA v147
+
+# Invalid WHERE clause
+eb0bc9ee_b533b92b74a40db0: select paperId from PaperComment where commentId;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
@@ -293,6 +387,3 @@ a1ac837b_2c19c35e41b44e16: select * from ReviewFormOptions where fieldName!='out
 a1ac837b_60427ac36f75cc9c: select * from OptionType;
 a1ac837b_48dc657a24ccccb2: select * from ContactAddress;
 a1ac837b_8d679fcc66af4f50: select * from ReviewFormOptions where fieldName='outcome';
-
-# XXX: can't have non-alphanum characters in string
-a1ac837b_ea55010857ef0656: select value from Settings where name='rev_tokens';
