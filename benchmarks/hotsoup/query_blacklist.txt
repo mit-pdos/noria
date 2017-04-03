@@ -265,6 +265,13 @@ d50d5846_b553d49dd13b9e2c: select paperId from PaperComment where commentId;
 
 
 ######################
+# SCHEMA v114
+
+# Invalid WHERE clause
+49149615_93851b502c67d6af: select paperId from PaperComment where commentId;
+
+
+######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
