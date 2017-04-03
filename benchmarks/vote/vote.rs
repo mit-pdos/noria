@@ -323,7 +323,7 @@ struct Migrator {
 impl MigrationHandle for Migrator {
     fn execute(&mut self) {
         use std::collections::HashMap;
-        use distributary::{Base, Aggregation, JoinBuilder, Union};
+        use distributary::{Base, Aggregation, Join, JoinType, Union};
 
         let mut g = self.graph.lock().unwrap();
         let (rating, newendq) = {
@@ -355,9 +355,8 @@ impl MigrationHandle for Migrator {
                                            Aggregation::SUM.over(both, 1, &[0]));
 
             // finally, produce end result
-            let j = JoinBuilder::new(vec![(article, 0), (article, 1), (total, 1)])
-                .from(article, vec![1, 0])
-                .join(total, vec![1, 0]);
+            use distributary::JoinSource::*;
+            let j = Join::new(article, total, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
             let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
             let newendq = mig.maintain(newend, 0);
 

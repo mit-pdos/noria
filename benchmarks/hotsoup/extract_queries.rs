@@ -38,7 +38,7 @@ fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
     use std::io::Read;
     use std::fs::File;
 
-    let re = "\"((?is)select [^;]* from [^;]*?(?-is))\"(?:, \".*\"\\)| \\.|;|\\)|,)";
+    let re = "\"((?is)select [^;]* from [^;]*?(?-is))\"(?:, \".*\"\\)| \\.|;|\\s*\\)|,)";
     let query_regex = Regex::new(re).unwrap();
 
     let mut f = File::open(fp).unwrap();
@@ -65,6 +65,9 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     let php_str_concat = Regex::new("\"[:space:]*\\.[:space:]*\"").unwrap();
     let php_str_concat_inset = Regex::new("\"[:space:]*\\.(?P<cc>.*)\\.[:space:]*\"").unwrap();
     let php_vars = Regex::new("\\$[a-zA-Z0-9->_]+").unwrap();
+    let braces_question_mark = Regex::new("(\\{\\?\\})|'\\?'").unwrap();
+    let question_mark_a = Regex::new("[:space:]*\\?[A|a]").unwrap();
+    let unclosed_quote = Regex::new("='\\z").unwrap();
 
     queries.into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
@@ -73,6 +76,9 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
         .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ")))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
+        .map(|(qn, q)| (qn, braces_question_mark.replace_all(&q, "?")))
+        .map(|(qn, q)| (qn, question_mark_a.replace_all(&q, "=?")))
+        .map(|(qn, q)| (qn, unclosed_quote.replace_all(&q, "=?")))
         .map(|(qn, q)| if !q.ends_with(";") {
                  (qn, format!("{};", q))
              } else {

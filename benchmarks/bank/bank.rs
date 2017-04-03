@@ -11,7 +11,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, JoinBuilder, Datas, DataType, Token, Mutator};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -73,9 +73,8 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
 
         // add join of credits and debits; this is a hack as we don't currently have multi-parent
         // aggregations or arithmetic on columns.
-        let j2 = JoinBuilder::new(vec![(credits, 0), (credits, 1), (debits, 1)])
-            .from(credits, vec![1, 0])
-            .join(debits, vec![1, 0]);
+        use distributary::JoinSource::*;
+        let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
         let balancesq = Some(mig.transactional_maintain(balances, 0));
 
