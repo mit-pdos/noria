@@ -5,6 +5,8 @@ extern crate rand;
 
 extern crate distributary;
 
+extern crate timekeeper;
+
 use std::sync;
 use std::thread;
 use std::time;
@@ -13,10 +15,9 @@ use std::collections::HashMap;
 
 use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
-use rand::Rng;
+use timekeeper::{Source, RealTime};
 
-extern crate hdrsample;
-use hdrsample::Histogram;
+use rand::Rng;
 
 #[allow(dead_code)]
 type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
@@ -182,97 +183,87 @@ fn client(i: usize,
           start: time::Instant,
           runtime: time::Duration,
           verbose: bool,
-          cdf: bool,
           audit: bool,
+          measure_latency: bool,
           transactions: &mut Vec<(i64, i64, i64)>)
           -> Vec<f64> {
+    let clock = RealTime::default();
+
     let mut count = 0;
     let mut committed = 0;
     let mut aborted = 0;
-    let mut samples = Histogram::<u64>::new_with_bounds(1, 100000, 3).unwrap();
     let mut last_reported = start;
     let mut throughputs = Vec::new();
+    let mut read_latencies: Vec<u64> = Vec::new();
+    let mut write_latencies = Vec::new();
+    let mut settle_latencies = Vec::new();
 
     let mut t_rng = rand::thread_rng();
-
-    let mut sample = || t_rng.gen_range(1, naccounts);
-    let mut sample_pair = || -> (_, _) {
-        let dst_acct_rnd_id = sample();
-        assert!(dst_acct_rnd_id > 0);
-        let mut src_acct_rnd_id = sample();
-        while src_acct_rnd_id == dst_acct_rnd_id {
-            src_acct_rnd_id = sample();
-        }
-        assert!(src_acct_rnd_id > 0);
-        (src_acct_rnd_id, dst_acct_rnd_id)
-    };
 
     {
         let mut get = balances_get.get();
         let mut put = transfers_put.transfer();
 
         while start.elapsed() < runtime {
-            let pair = sample_pair();
+            let dst = t_rng.gen_range(1, naccounts);
+            let src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
+            assert_ne!(dst, src);
 
-            let (balance, token) = get(pair.0).unwrap().unwrap();
+            let transaction_start = clock.get_time();
+            let (balance, token) = get(src).unwrap().unwrap();
             if verbose {
                 println!("t{} read {}: {} @ {:#?} (for {})",
                          i,
-                         pair.0,
+                         src,
                          balance,
                          token,
-                         pair.1);
+                         dst);
             }
 
-            // try to make both transfers
-            {
-                let mut do_tx = |src, dst, amt, tkn| {
-                    let mut count_result = |res| match res {
-                        Ok(ts) => {
-                            if verbose {
-                                println!("commit @ {}", ts);
-                            }
-                            if audit {
-                                transactions.push((src, dst, amt));
-                            }
-                            committed += 1
-                        }
-                        Err(_) => {
-                            if verbose {
-                                println!("abort");
-                            }
-                            aborted += 1
-                        }
-                    };
+            assert!(balance >= 0, format!("{} balance is {}", src, balance));
 
-                    if verbose {
-                        println!("trying {} -> {} of {}", src, dst, amt);
-                    }
-
-                    if cdf {
-                        let t = time::Instant::now();
-                        count_result(put(src, dst, amt, tkn));
-                        let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                        if samples.record(t).is_err() {
-                            println!("failed to record slow put ({}ns)", t);
-                        }
-                    } else {
-                        count_result(put(src, dst, amt, tkn));
-                    }
-                    count += 1;
-                };
-
-                if pair.0 != 0 {
-                    assert!(balance >= 0, format!("{} balance is {}", pair.0, balance));
+            if balance >= 100 {
+                if verbose {
+                    println!("trying {} -> {} of {}", src, dst, 100);
                 }
 
-                if balance >= 100 {
-                    do_tx(pair.0, pair.1, 100, token);
+                let write_start = clock.get_time();
+                let res = put(src, dst, 100, token);
+                let write_end = clock.get_time();
+
+                match res {
+                    Ok(ts) => {
+                        if verbose {
+                            println!("commit @ {}", ts);
+                        }
+                        if audit {
+                            transactions.push((src, dst, 100));
+                        }
+                        if measure_latency {
+                            let mut token = get(src).unwrap().unwrap().1;
+                            while token.get_timestamp() < ts {
+                                token = get(src).unwrap().unwrap().1;
+                            }
+                            let transaction_end = clock.get_time();
+                            read_latencies.push(write_start - transaction_start);
+                            write_latencies.push(write_end - write_start);
+                            settle_latencies.push(transaction_end - write_end);
+                        }
+                        committed += 1;
+                    }
+                    Err(_) => {
+                        if verbose {
+                            println!("abort");
+                        }
+                        aborted += 1
+                    }
                 }
+
+                count += 1;
             }
 
             // check if we should report
-            if last_reported.elapsed() > time::Duration::from_secs(1) {
+            if !measure_latency && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
                 let throughput = count as f64 /
                                  (ts.as_secs() as f64 +
@@ -315,10 +306,14 @@ fn client(i: usize,
         }
     }
 
-    if cdf {
-        for (v, p, _, _) in samples.iter_percentiles(1) {
-            println!("percentile PUT {:.2} {:.2}", v, p);
-        }
+    if measure_latency {
+        let rl: u64 = read_latencies.iter().sum();
+        let wl: u64 = write_latencies.iter().sum();
+        let sl: u64 = settle_latencies.iter().sum();
+        let n = write_latencies.len() as f64;
+        println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
+        println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
+        println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
     }
     throughputs
 }
@@ -329,52 +324,52 @@ fn main() {
         .version("0.1")
         .about("Benchmarks Soup transactions and reports abort rate.")
         .arg(Arg::with_name("avg")
-            .long("avg")
-            .takes_value(false)
-            .help("compute average throughput at the end of benchmark"))
-        .arg(Arg::with_name("cdf")
-            .long("cdf")
-            .takes_value(false)
-            .help("produce a CDF of recorded latencies for each client at the end"))
+                 .long("avg")
+                 .takes_value(false)
+                 .help("compute average throughput at the end of benchmark"))
         .arg(Arg::with_name("naccounts")
-            .short("a")
-            .long("accounts")
-            .value_name("N")
-            .default_value("5")
-            .help("Number of bank accounts to prepopulate the database with"))
+                 .short("a")
+                 .long("accounts")
+                 .value_name("N")
+                 .default_value("5")
+                 .help("Number of bank accounts to prepopulate the database with"))
         .arg(Arg::with_name("runtime")
-            .short("r")
-            .long("runtime")
-            .value_name("N")
-            .default_value("60")
-            .help("Benchmark runtime in seconds"))
+                 .short("r")
+                 .long("runtime")
+                 .value_name("N")
+                 .default_value("60")
+                 .help("Benchmark runtime in seconds"))
         .arg(Arg::with_name("migrate")
-            .short("m")
-            .long("migrate")
-            .value_name("M")
-            .help("Perform a migration after this many seconds")
-            .conflicts_with("stage"))
+                 .short("m")
+                 .long("migrate")
+                 .value_name("M")
+                 .help("Perform a migration after this many seconds")
+                 .conflicts_with("stage"))
         .arg(Arg::with_name("threads")
-            .short("t")
-            .long("threads")
-            .value_name("T")
-            .default_value("2")
-            .help("Number of client threads"))
+                 .short("t")
+                 .long("threads")
+                 .value_name("T")
+                 .default_value("2")
+                 .help("Number of client threads"))
+        .arg(Arg::with_name("latency")
+                 .short("l")
+                 .long("latency")
+                 .takes_value(false)
+                 .help("Measure latency of requests"))
         .arg(Arg::with_name("verbose")
-            .short("v")
-            .long("verbose")
-            .takes_value(false)
-            .help("Verbose (debugging) output"))
+                 .short("v")
+                 .long("verbose")
+                 .takes_value(false)
+                 .help("Verbose (debugging) output"))
         .arg(Arg::with_name("audit")
-            .short("A")
-            .long("audit")
-            .takes_value(false)
-            .help("Audit results after benchmark completes"))
+                 .short("A")
+                 .long("audit")
+                 .takes_value(false)
+                 .help("Audit results after benchmark completes"))
         .after_help(BENCH_USAGE)
         .get_matches();
 
     let avg = args.is_present("avg");
-    let cdf = args.is_present("cdf");
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
@@ -383,6 +378,7 @@ fn main() {
     let nthreads = value_t_or_exit!(args, "threads", usize);
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
+    let measure_latency = args.is_present("latency");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -390,7 +386,11 @@ fn main() {
 
     // setup db
     println!("Attempting to set up bank");
-    let mut bank = setup(nthreads);
+    let mut bank = if measure_latency {
+        setup(nthreads + 1)
+    } else {
+        setup(nthreads)
+    };
 
     // let system settle
     // thread::sleep(time::Duration::new(1, 0));
@@ -420,14 +420,44 @@ fn main() {
                            start,
                            runtime,
                            verbose,
-                           cdf,
                            audit,
+                           false,
                            &mut transactions)
                 })
                          .unwrap()
                  })
         })
         .collect::<Vec<_>>();
+
+    let latency_client = if measure_latency {
+        Some({
+                 let mut transfers_put = bank.putter();
+                 let balances_get: Box<Getter> = bank.getter();
+
+                 if nthreads == 0 {
+                     populate(naccounts, &mut transfers_put);
+                 }
+
+                 let mut transactions = vec![];
+                 thread::Builder::new()
+                     .name(format!("bank{}", nthreads))
+                     .spawn(move || -> Vec<f64> {
+                client(nthreads,
+                       transfers_put,
+                       balances_get,
+                       naccounts,
+                       start,
+                       runtime,
+                       verbose,
+                       audit,
+                       true,
+                       &mut transactions)
+            })
+                     .unwrap()
+             })
+    } else {
+        None
+    };
 
     let avg_put_throughput = |th: Vec<f64>| if avg {
         let sum: f64 = th.iter().sum();
@@ -453,5 +483,9 @@ fn main() {
                 Ok(th) => avg_put_throughput(th),
             }
         }
+    }
+
+    if let Some(c) = latency_client {
+        c.join().unwrap();
     }
 }
