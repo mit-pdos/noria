@@ -92,10 +92,16 @@ impl Backend {
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
-                recipe.activate(&mut mig).unwrap();
+                match recipe.activate(&mut mig) {
+                    Ok(ar) => {
+                        println!("{} expressions added", ar.expressions_added);
+                        println!("{} expressions removed", ar.expressions_removed);
+                    }
+                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                };
                 recipe
             }
-            Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
         };
 
         mig.commit();
