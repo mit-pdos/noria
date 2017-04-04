@@ -27,7 +27,7 @@ lower_better = true
 [post-migration]
 command = "run"
 args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--migrate=10"]
-regexs = ["avg (GET)\+: ([0-9.]+)", "avg (PUT)\+: ([0-9.]+)"]
+regexs = ["avg (GET)\\+: ([0-9.]+)", "avg (PUT)\\+: ([0-9.]+)"]
 
 [slack-aliases]
 ms705 = "malte"
