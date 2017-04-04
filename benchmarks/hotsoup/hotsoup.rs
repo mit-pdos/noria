@@ -14,6 +14,7 @@ use distributary::{Blender, Recipe};
 pub struct Backend {
     blacklist: Vec<String>,
     r: Option<Recipe>,
+    rlog: slog::Logger,
     g: Blender,
 }
 
@@ -37,10 +38,11 @@ fn make(blacklist: &str) -> Box<Backend> {
     let recipe_log = main_log.new(None);
     g.log_with(main_log);
 
-    let recipe = Recipe::blank(Some(recipe_log));
+    let recipe = Recipe::blank(Some(recipe_log.clone()));
     Box::new(Backend {
                  blacklist: blacklisted_queries,
                  r: Some(recipe),
+                 rlog: recipe_log,
                  g: g,
              })
 }
@@ -88,14 +90,20 @@ impl Backend {
             }
         }
 
-        let new_recipe = Recipe::from_str(&rs, None)?;
+        let new_recipe = Recipe::from_str(&rs, Some(self.rlog.clone()))?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
-                recipe.activate(&mut mig).unwrap();
+                match recipe.activate(&mut mig) {
+                    Ok(ar) => {
+                        println!("{} expressions added", ar.expressions_added);
+                        println!("{} expressions removed", ar.expressions_removed);
+                    }
+                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                };
                 recipe
             }
-            Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
         };
 
         mig.commit();
@@ -145,6 +153,10 @@ fn main() {
             .default_value("1")
             .long("start_at")
             .help("Schema version to start at; versions prior to this will be skipped."))
+        .arg(Arg::with_name("stop_at")
+            .default_value("161")
+            .long("stop_at")
+            .help("Schema version to stop at; versions after this will be skipped."))
         .arg(Arg::with_name("base_only")
             .long("base_only")
             .help("Only add base tables, not queries."))
@@ -161,6 +173,7 @@ fn main() {
     let transactional = matches.is_present("transactional");
     let base_only = matches.is_present("base_only");
     let start_at_schema = value_t_or_exit!(matches, "start_at", u64);
+    let stop_at_schema = value_t_or_exit!(matches, "stop_at", u64);
     let populate_at_schema = value_t_or_exit!(matches, "populate_at", u64);
 
     let mut backend = make(blloc);
@@ -211,7 +224,7 @@ fn main() {
     for (sf, qf) in files {
         assert_eq!(sf.0, qf.0);
         let schema_version = sf.0;
-        if schema_version < start_at_schema {
+        if schema_version < start_at_schema || schema_version > stop_at_schema {
             println!("Skipping schema {:?}", sf.1);
             continue;
         }
