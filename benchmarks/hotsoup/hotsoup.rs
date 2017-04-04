@@ -14,6 +14,7 @@ use distributary::{Blender, Recipe};
 pub struct Backend {
     blacklist: Vec<String>,
     r: Option<Recipe>,
+    rlog: slog::Logger,
     g: Blender,
 }
 
@@ -37,10 +38,11 @@ fn make(blacklist: &str) -> Box<Backend> {
     let recipe_log = main_log.new(None);
     g.log_with(main_log);
 
-    let recipe = Recipe::blank(Some(recipe_log));
+    let recipe = Recipe::blank(Some(recipe_log.clone()));
     Box::new(Backend {
                  blacklist: blacklisted_queries,
                  r: Some(recipe),
+                 rlog: recipe_log,
                  g: g,
              })
 }
@@ -88,14 +90,20 @@ impl Backend {
             }
         }
 
-        let new_recipe = Recipe::from_str(&rs, None)?;
+        let new_recipe = Recipe::from_str(&rs, Some(self.rlog.clone()))?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
-                recipe.activate(&mut mig).unwrap();
+                match recipe.activate(&mut mig) {
+                    Ok(ar) => {
+                        println!("{} expressions added", ar.expressions_added);
+                        println!("{} expressions removed", ar.expressions_removed);
+                    }
+                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                };
                 recipe
             }
-            Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
         };
 
         mig.commit();
