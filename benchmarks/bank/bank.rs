@@ -7,7 +7,6 @@ extern crate distributary;
 
 extern crate timekeeper;
 
-use std::sync;
 use std::thread;
 use std::time;
 
@@ -19,12 +18,8 @@ use timekeeper::{Source, RealTime};
 
 use rand::Rng;
 
-#[allow(dead_code)]
-type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
-#[allow(dead_code)]
-type Get = Box<Fn(&DataType) -> Result<Datas, ()> + Send + Sync>;
-type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send + Sync>;
+type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -40,9 +35,9 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
+    blender: Blender,
     transfers: Vec<Mutator>,
-    balances: sync::Arc<Option<TxGet>>,
-    migrate: Box<FnMut()>,
+    balances: distributary::NodeAddress,
 }
 
 pub fn setup(num_putters: usize) -> Box<Bank> {
@@ -53,7 +48,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     let credits;
     let debits;
     let balances;
-    let (_, balancesq) = {
+    {
         // migrate
         let mut mig = g.start_migration();
 
@@ -77,7 +72,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        let balancesq = Some(mig.transactional_maintain(balances, 0));
+        mig.transactional_maintain(balances, 0);
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
@@ -86,35 +81,35 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         mig.assign_domain(balances, d);
 
         // start processing
-        (mig.commit(), balancesq)
+        mig.commit();
     };
 
+    let transfers = (0..num_putters).into_iter().map(|_| g.get_mutator(transfers)).collect();
     Box::new(Bank {
-                 transfers: (0..num_putters)
-                     .into_iter()
-                     .map(|_| g.get_mutator(transfers))
-                     .collect::<Vec<_>>(),
-                 balances: sync::Arc::new(balancesq),
-                 migrate: Box::new(move || {
-        let mut mig = g.start_migration();
-        let identity = mig.add_ingredient("identity",
-                                          &["acct_id", "credit", "debit"],
-                                          distributary::Identity::new(balances));
-        let _ = mig.transactional_maintain(identity, 0);
-        let _ = mig.commit();
-    }),
+                 blender: g,
+                 transfers: transfers,
+                 balances: balances,
              })
 }
 
 impl Bank {
     fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.balances.clone())
+        Box::new(self.blender.get_transactional_getter(self.balances).unwrap())
     }
     fn putter(&mut self) -> Box<Putter> {
         let m = self.transfers.pop().unwrap();
         let p: TxPut = Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t));
 
         Box::new(p)
+    }
+    pub fn migrate(&mut self) {
+        let mut mig = self.blender.start_migration();
+        let identity =
+            mig.add_ingredient("identity",
+                               &["acct_id", "credit", "debit"],
+                               distributary::Identity::new(self.balances));
+        let _ = mig.transactional_maintain(identity, 0);
+        let _ = mig.commit();
     }
 }
 
@@ -134,28 +129,20 @@ pub trait Getter: Send {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a>;
 }
 
-impl Getter for sync::Arc<Option<TxGet>> {
+impl Getter for TxGet {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a> {
         Box::new(move |id| {
-            if let Some(ref g) = *self.as_ref() {
-                g(&id.into()).map(|(res, token)| {
-                    assert_eq!(res.len(), 1);
-                    res.into_iter().next().map(|row| {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let _: i64 = row.next().unwrap().into();
-                        let credit: i64 = row.next().unwrap().into();
-                        let debit: i64 = row.next().unwrap().into();
-                        (credit - debit, token)
-                    })
-                })
-            } else {
-                use std::time::Duration;
-                use std::thread;
-                // avoid spinning
-                thread::sleep(Duration::from_secs(1));
-                Err(())
-            }
+            self(&id.into()).map(|(res, token)| {
+                assert_eq!(res.len(), 1);
+                res.into_iter().next().map(|row| {
+                                               // we only care about the first result
+                                               let mut row = row.into_iter();
+                                               let _: i64 = row.next().unwrap().into();
+                                               let credit: i64 = row.next().unwrap().into();
+                                               let debit: i64 = row.next().unwrap().into();
+                                               (credit - debit, token)
+                                           })
+            })
         })
     }
 }
@@ -468,7 +455,7 @@ fn main() {
         thread::sleep(duration);
         println!("----- starting migration -----");
         let start = time::Instant::now();
-        (bank.migrate)();
+        bank.migrate();
         let duration = start.elapsed();
         let length = 1000000000u64 * duration.as_secs() + duration.subsec_nanos() as u64;
         println!("----- completed migration -----\nElapsed time = {} ms",
