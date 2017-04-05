@@ -2,21 +2,38 @@
 # SCHEMA v1
 
 # "Paper" does not have a "contactId" field
+68be356a_3b6f02bcac501f9e: SELECT paperId, title FROM Paper, ContactInfo  WHERE (Paper.contactId=ContactInfo.contactId AND  ContactInfo.email=?);
 68be356a_dd4e396b6e183da7: SELECT Paper.paperId, Paper.title, Paper.abstract,  ContactInfo.firstName, ContactInfo.lastName,  ContactInfo.email, ContactInfo.affiliation, Paper.authorInformation  FROM Paper,ContactInfo  WHERE Paper.contactId=ContactInfo.contactId AND Paper.timeSubmitted>0  ORDER BY paperId ;
 68be356a_3d894009ebe2e4b5: SELECT firstName, lastName, email,  paperId, outcome, title  FROM ContactInfo, Paper  WHERE Paper.outcome>0  AND Paper.contactId=ContactInfo.contactId  ORDER BY paperId ;
 
 # "ReviewRequest" table does not exist
 68be356a_19912ac4c5713b3f: SELECT  ContactInfo.firstName, ContactInfo.lastName, ContactInfo.email,  ContactInfo.contactId,  Paper.paperId, Paper.title  from ReviewRequest  join ContactInfo using (contactId)  join Paper using (paperId)  where ContactInfo.contactId=?;
 68be356a_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
+68be356a_fb002e97e8f23f5a: SELECT firstName, lastName, email  FROM ContactInfo join ReviewRequest using (contactId)  WHERE paperId=? and reviewType=?;
+68be356a_4fd1ee69b7c34964: SELECT firstName, lastName, email  FROM ContactInfo, ReviewRequest  WHERE ReviewRequest.asked=ContactInfo.contactId  AND ReviewRequest.paperId=?;
+68be356a_4dcd3dcda1f733ae: SELECT firstName, lastName, email  FROM ContactInfo join ReviewRequest using (contactId)  WHERE paperId=? and reviewType=?;
+68be356a_f5ec10186351c281: SELECT firstName, lastName, email  FROM ContactInfo, ReviewRequest  WHERE ReviewRequest.asked=ContactInfo.contactId  AND ReviewRequest.paperId=?;
 
-# Invalid WHERE clause
-68be356a_e13bbfc430de2ac7: select paperId, title, authorInformation from Paper where ?;
+# "SecondaryReviewer" table does not exist
+68be356a_b31086f24e23935f: SELECT firstName, lastName, email  FROM ContactInfo join SecondaryReviewer using (contactId)  WHERE SecondaryReviewer.paperId=?;
+68be356a_f9435e7ef81d74d5: SELECT firstName, lastName, email  FROM ContactInfo join SecondaryReviewer using (contactId)  WHERE SecondaryReviewer.paperId=?;
 
-# LEFT JOIN unsupported, parameter in join condition
-# We can fix both of these by (1) having a left join op, (2) pulling the parameter out of the condition
+# AVG() unsupported, alias used in ORDER BY and not correctly resolved
+# TODO: we can fix this by (i) having an AVG operator, (ii) removing aliases outside the FROM clause
+68be356a_c6b2cf3d8b88c900: SELECT Paper.paperId, Paper.title,  AVG(PaperReview.overAllMerit) as merit  FROM Paper  LEFT JOIN PaperReview  ON PaperReview.paperId=Paper.paperId  WHERE PaperReview.reviewSubmitted>0  GROUP BY PaperReview.paperId  ORDER BY merit DESC, Paper.paperId ;
+68be356a_d82aecebfed87c3a: SELECT Paper.paperId, Paper.title,  AVG(PaperGrade.grade) as merit  FROM Paper  LEFT JOIN PaperGrade  ON PaperGrade.paperId=Paper.paperId  GROUP BY PaperGrade.paperId  ORDER BY merit DESC, Paper.paperId ;
+
+# parameter in join condition
 68be356a_32e74662fcdec376: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
 68be356a_1ab06c9faa4ed0c4: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
+68be356a_fd708786fcc78b0d: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
+68be356a_2209301630b94c80: select TopicArea.topicId, PaperTopic.paperId from TopicArea left join PaperTopic on PaperTopic.paperId=? and PaperTopic.topicId=TopicArea.topicId;
 
+68be356a_9d93f2352449d3a9: select OptionType.optionId, PaperOption.paperId from OptionType left join PaperOption on PaperOption.paperId=? and PaperOption.optionId=OptionType.optionId;
+
+# XXX: don't try to pull reviewSubmitted through COUNT
+68be356a_8a61cc3b2a503f81: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
+68be356a_4cb03dd450bbd256: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
 
 ######################
 # SCHEMA v2

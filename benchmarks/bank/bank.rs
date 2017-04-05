@@ -172,6 +172,7 @@ fn client(i: usize,
           verbose: bool,
           audit: bool,
           measure_latency: bool,
+          coarse: bool,
           transactions: &mut Vec<(i64, i64, i64)>)
           -> Vec<f64> {
     let clock = RealTime::default();
@@ -197,7 +198,7 @@ fn client(i: usize,
             assert_ne!(dst, src);
 
             let transaction_start = clock.get_time();
-            let (balance, token) = get(src).unwrap().unwrap();
+            let (balance, mut token) = get(src).unwrap().unwrap();
             if verbose {
                 println!("t{} read {}: {} @ {:#?} (for {})",
                          i,
@@ -212,6 +213,10 @@ fn client(i: usize,
             if balance >= 100 {
                 if verbose {
                     println!("trying {} -> {} of {}", src, dst, 100);
+                }
+
+                if coarse {
+                    token.make_coarse();
                 }
 
                 let write_start = clock.get_time();
@@ -252,7 +257,7 @@ fn client(i: usize,
             // check if we should report
             if !measure_latency && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
-                let throughput = count as f64 /
+                let throughput = committed as f64 /
                                  (ts.as_secs() as f64 +
                                   ts.subsec_nanos() as f64 / 1_000_000_000f64);
                 let commit_rate = committed as f64 / count as f64;
@@ -343,6 +348,11 @@ fn main() {
                  .long("latency")
                  .takes_value(false)
                  .help("Measure latency of requests"))
+        .arg(Arg::with_name("coarse")
+                 .short("c")
+                 .long("coarse")
+                 .takes_value(false)
+                 .help("Use only coarse grained checktables"))
         .arg(Arg::with_name("verbose")
                  .short("v")
                  .long("verbose")
@@ -361,11 +371,12 @@ fn main() {
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
         .map(time::Duration::from_secs);
-    let naccounts = value_t_or_exit!(args, "naccounts", i64);
+    let naccounts = value_t_or_exit!(args, "naccounts", i64) + 1;
     let nthreads = value_t_or_exit!(args, "threads", usize);
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
     let measure_latency = args.is_present("latency");
+    let coarse_checktables = args.is_present("coarse");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -409,6 +420,7 @@ fn main() {
                            verbose,
                            audit,
                            false,
+                           coarse_checktables,
                            &mut transactions)
                 })
                          .unwrap()
@@ -437,6 +449,7 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
+                       coarse_checktables,
                        true,
                        &mut transactions)
             })
@@ -444,11 +457,6 @@ fn main() {
              })
     } else {
         None
-    };
-
-    let avg_put_throughput = |th: Vec<f64>| if avg {
-        let sum: f64 = th.iter().sum();
-        println!("avg PUT: {:.2}", sum / th.len() as f64);
     };
 
     if let Some(duration) = migrate_after {
@@ -463,13 +471,21 @@ fn main() {
     }
 
     // clean
+    let mut throughput = 0.0;
     for c in clients {
         if let Some(client) = c {
             match client.join() {
                 Err(e) => panic!(e),
-                Ok(th) => avg_put_throughput(th),
+                Ok(th) => {
+                    let sum: f64 = th.iter().sum();
+                    throughput += sum / (th.len() as f64);
+                }
             }
         }
+    }
+
+    if avg {
+        println!("avg PUT: {:.2}", throughput);
     }
 
     if let Some(c) = latency_client {
