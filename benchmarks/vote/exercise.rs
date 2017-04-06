@@ -165,28 +165,33 @@ fn driver<I, F>(start: time::Instant,
         // random uids
         let mut t_rng = rand::thread_rng();
 
-        // random aids with distribution
-        let exp = if let Distribution::Zipf(e) = config.distribution {
-            e
-        } else {
-            0.04
+        // random article ids with distribution. we pre-generate these to avoid overhead at
+        // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
+        // means it might also do vector resizing.
+        let mut i = 0;
+        let randomness: Vec<_> = {
+            let n = 1_000_000 * config.runtime.as_secs();
+            println!("Generating ~{}M random numbers; this'll take a few seconds...",
+                     n / 1_000_000);
+            match config.distribution {
+                Distribution::Uniform => {
+                    let mut u = rand::thread_rng();
+                    (0..n).map(|_| u.next_u64()).collect()
+                }
+                Distribution::Zipf(e) => {
+                    let mut z =
+                        ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
+                            .unwrap();
+                    (0..n).map(|_| z.next_u64()).collect()
+                }
+            }
         };
-        let mut u = rand::thread_rng();
-        let mut z = ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, exp)
-            .unwrap();
-        let randomness: Vec<_> = (0..(1_000_000 * config.runtime.as_secs()))
-            .map(move |_| match config.distribution {
-                     Distribution::Uniform => u.next_u64(),
-                     Distribution::Zipf(..) => z.next_u64(),
-                 })
-            .collect();
-        let mut randomness = randomness.into_iter().cycle();
 
         while start.elapsed() < config.runtime {
             let uid: i64 = t_rng.gen();
 
             // what article to vote for/retrieve?
-            let aid = randomness.next().unwrap() as i64;
+            let aid = randomness[i] as i64;
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
@@ -227,6 +232,8 @@ fn driver<I, F>(start: time::Instant,
                 last_reported = time::Instant::now();
                 count = 0;
             }
+
+            i = (i + 1) % randomness.len();
         }
     }
 
