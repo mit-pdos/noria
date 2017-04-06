@@ -31,8 +31,8 @@
 68be356a_9d93f2352449d3a9: select OptionType.optionId, PaperOption.paperId from OptionType left join PaperOption on PaperOption.paperId=? and PaperOption.optionId=OptionType.optionId;
 
 # XXX: don't try to pull reviewSubmitted through COUNT
-68be356a_8a61cc3b2a503f81: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
-68be356a_4cb03dd450bbd256: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
+# 68be356a_8a61cc3b2a503f81: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
+# 68be356a_4cb03dd450bbd256: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
 
 ######################
 # SCHEMA v2
