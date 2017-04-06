@@ -98,6 +98,11 @@ fn main() {
             .value_name("N")
             .default_value("100000")
             .help("Number of articles to prepopulate the database with"))
+        .arg(Arg::with_name("distribution")
+            .short("d")
+            .takes_value(true)
+            .default_value("uniform")
+            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
         .arg(Arg::with_name("runtime")
             .short("r")
             .long("runtime")
@@ -124,6 +129,7 @@ fn main() {
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
+    let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
@@ -142,6 +148,7 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.use_distribution(dist);
 
     // setup db
     println!("Attempting to connect to database using {}", dbn);

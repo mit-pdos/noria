@@ -45,6 +45,11 @@ fn main() {
             .long("stage")
             .takes_value(false)
             .help("stage execution such that all writes are performed before all reads"))
+        .arg(Arg::with_name("distribution")
+            .short("d")
+            .takes_value(true)
+            .default_value("uniform")
+            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
         .arg(Arg::with_name("ngetters")
             .short("g")
             .long("getters")
@@ -74,6 +79,7 @@ fn main() {
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
+    let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
@@ -91,6 +97,7 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.use_distribution(dist);
 
     // setup db
     let g = graph::make();
