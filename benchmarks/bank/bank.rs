@@ -19,6 +19,7 @@ use timekeeper::{Source, RealTime};
 use rand::Rng;
 
 type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
+#[allow(dead_code)]
 type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
