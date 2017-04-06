@@ -35,6 +35,7 @@ extern crate tarpc;
 extern crate memcached;
 
 extern crate hdrsample;
+extern crate zipf;
 
 extern crate spmc;
 

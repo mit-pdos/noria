@@ -9,6 +9,7 @@ extern crate rand;
 extern crate distributary;
 
 extern crate hdrsample;
+extern crate zipf;
 
 extern crate spmc;
 

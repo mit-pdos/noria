@@ -16,11 +16,37 @@ use rand;
 use rand::Rng as StdRng;
 use hdrsample::Histogram;
 use hdrsample::iterators::{HistogramIterator, recorded};
+use zipf::ZipfDistribution;
+
+#[derive(Clone, Copy)]
+pub enum Distribution {
+    Uniform,
+    Zipf(f64),
+}
+
+use std::str::FromStr;
+impl FromStr for Distribution {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "uniform" {
+            Ok(Distribution::Uniform)
+        } else if s.starts_with("zipf:") {
+            let s = s.trim_left_matches("zipf:");
+            str::parse::<f64>(s).map(|exp| Distribution::Zipf(exp)).map_err(|e| {
+                use std::error::Error;
+                e.description().to_string()
+            })
+        } else {
+            Err(format!("unknown distribution '{}'", s))
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct RuntimeConfig {
     narticles: isize,
     runtime: time::Duration,
+    distribution: Distribution,
     cdf: bool,
     migrate_after: Option<time::Duration>,
 }
@@ -30,9 +56,15 @@ impl RuntimeConfig {
         RuntimeConfig {
             narticles: narticles,
             runtime: runtime,
+            distribution: Distribution::Uniform,
             cdf: true,
             migrate_after: None,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn use_distribution(&mut self, d: Distribution) {
+        self.distribution = d;
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -127,15 +159,34 @@ fn driver<I, F>(start: time::Instant,
         stats.keep_cdf();
     }
 
-    let mut t_rng = rand::thread_rng();
-
     {
         let mut f = init();
+
+        // random uids
+        let mut t_rng = rand::thread_rng();
+
+        // random aids with distribution
+        let exp = if let Distribution::Zipf(e) = config.distribution {
+            e
+        } else {
+            0.04
+        };
+        let mut u = rand::thread_rng();
+        let mut z = ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, exp)
+            .unwrap();
+        let randomness: Vec<_> = (0..(1_000_000 * config.runtime.as_secs()))
+            .map(move |_| match config.distribution {
+                     Distribution::Uniform => u.next_u64(),
+                     Distribution::Zipf(..) => z.next_u64(),
+                 })
+            .collect();
+        let mut randomness = randomness.into_iter().cycle();
+
         while start.elapsed() < config.runtime {
             let uid: i64 = t_rng.gen();
 
             // what article to vote for/retrieve?
-            let aid = t_rng.gen_range(0, config.narticles) as i64;
+            let aid = randomness.next().unwrap() as i64;
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
