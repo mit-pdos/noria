@@ -1,4 +1,4 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress, DataType};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress};
 
 use slog;
 use slog_term;
@@ -8,7 +8,7 @@ pub struct Graph {
     pub vote: NodeAddress,
     pub article: NodeAddress,
     pub vc: NodeAddress,
-    pub end: Option<Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync + 'static>>,
+    pub end: NodeAddress,
     pub graph: Blender,
 }
 
@@ -62,13 +62,11 @@ pub fn make() -> Graph {
         (article, vote, vc, end)
     };
 
-    let end = g.get_getter(end).unwrap();
-
     Graph {
         vote: vote.into(),
         article: article.into(),
         vc: vc.into(),
-        end: Some(end.into()),
+        end: end.into(),
         graph: g,
     }
 }

@@ -92,24 +92,24 @@ fn main() {
     }
 
     // setup db
-    let mut g = graph::make();
+    let g = graph::make();
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
-    let getter = Box::new(g.end.take().unwrap()); // Box<Box<>>
-    let mut getter = unsafe { Getter::new(Box::into_raw(getter)) }; // so F is still Sized
-    let getter_orig = unsafe { getter.get_ptr() };
+
+    // prepare getters
+    let getters: Vec<_> = (0..ngetters)
+        .into_iter()
+        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap()))
+        .collect();
 
     let g = sync::Arc::new(sync::Mutex::new(g));
     let putter = Spoon {
         graph: g.clone(),
-        getter: getter.clone(),
+        getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
         article: putters.0,
         vote: putters.1,
         new_vote: None,
         i: 0,
     };
-
-    // prepare getters
-    let getters: Vec<_> = (0..ngetters).into_iter().map(|_| getter.clone()).collect();
 
     let put_stats;
     let get_stats: Vec<_>;
@@ -152,19 +152,6 @@ fn main() {
         get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     }
 
-    // clean up getter functions
-    let getter_end = unsafe { getter.get_ptr() };
-    use std::ptr;
-    if ptr::eq(getter_orig, getter_end) {
-        // only free once
-        unsafe { Box::from_raw(getter_orig) };
-    } else {
-        // free both
-        unsafe { Box::from_raw(getter_orig) };
-        unsafe { Box::from_raw(getter_orig) };
-        unsafe { Box::from_raw(getter_end) };
-    }
-
     print_stats("PUT", &put_stats.pre, avg);
     for (i, s) in get_stats.iter().enumerate() {
         print_stats(format!("GET{}", i), &s.pre, avg);
@@ -205,64 +192,85 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
     }
 }
 
-type G = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Sync + Send + 'static>;
+type G = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + 'static>;
 
-// A more dangerous AtomicPtr that also clones and derefs into the inner type
+// A more dangerous AtomicPtr that also derefs into the inner type
 use std::sync::atomic::AtomicPtr;
 struct Getter {
-    inner: sync::Arc<AtomicPtr<G>>,
-    orig: *const G,
+    real: sync::Arc<AtomicPtr<G>>,
+    used: sync::Arc<AtomicPtr<G>>,
+    swapped: bool,
+    callable: bool,
 }
 
-unsafe impl Send for Getter {}
-
 impl Getter {
-    // unsafe because Getter will *not* destroy inner when dropped.
-    // users need to explicitly call destroy() on the *last* Getter.
-    pub unsafe fn new(inner: *mut G) -> Getter {
+    pub fn new(inner: G) -> Getter {
+        let m = Box::into_raw(Box::new(inner));
         Getter {
-            inner: sync::Arc::new(AtomicPtr::new(inner)),
-            orig: inner,
+            real: sync::Arc::new(AtomicPtr::new(m)),
+            used: sync::Arc::new(AtomicPtr::new(m)),
+            swapped: false,
+            callable: true,
         }
     }
 
-    // unsafe because caller must guarantee that old value isn't dropped prematurely
-    pub unsafe fn replace(&mut self, new: *mut G) {
-        self.inner.swap(new, sync::atomic::Ordering::SeqCst);
+    // unsafe, because cannot use call() on clones
+    pub unsafe fn clone(&self) -> Self {
+        Getter {
+            real: self.real.clone(),
+            used: self.used.clone(),
+            swapped: false,
+            callable: false,
+        }
     }
 
-    pub unsafe fn get_ptr(&mut self) -> *mut G {
-        self.inner.load(sync::atomic::Ordering::SeqCst)
+    // unsafe, because may only be called once
+    pub unsafe fn replace(&mut self, new: G) {
+        let m = Box::into_raw(Box::new(new));
+        self.real.store(m, sync::atomic::Ordering::Release);
     }
 
     pub fn same(&self) -> bool {
-        use std::ptr;
-        ptr::eq(self.orig, self.inner.load(sync::atomic::Ordering::Relaxed))
+        !self.swapped
     }
-}
 
-impl Clone for Getter {
-    fn clone(&self) -> Self {
-        Getter {
-            inner: self.inner.clone(),
-            orig: self.orig,
-        }
-    }
-}
+    pub fn call(&mut self) -> &mut G {
+        assert!(self.callable);
 
-use std::ops::Deref;
-impl Deref for Getter {
-    type Target = G;
-    fn deref(&self) -> &Self::Target {
         use std::mem;
-        unsafe { mem::transmute(self.inner.load(sync::atomic::Ordering::Relaxed)) }
+        let mut used = self.used.load(sync::atomic::Ordering::Relaxed);
+        if !self.swapped {
+            let real = self.real.load(sync::atomic::Ordering::Acquire);
+            if used != real {
+                // replace() happened
+                self.used.store(real, sync::atomic::Ordering::Relaxed);
+                // need to free the old used
+                drop(unsafe { Box::from_raw(used) });
+                // no need to check again
+                self.swapped = true;
+                // use the new pointer
+                used = real;
+            }
+        }
+        unsafe { mem::transmute(used) }
+    }
+}
+
+impl Drop for Getter {
+    fn drop(&mut self) {
+        if self.callable {
+            let used = self.used.load(sync::atomic::Ordering::Acquire);
+            let real = self.real.load(sync::atomic::Ordering::Acquire);
+            assert_eq!(used, real);
+            drop(unsafe { Box::from_raw(used) });
+        }
     }
 }
 
 struct Spoon {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     article: Mutator,
-    getter: Getter,
+    getters: Vec<Getter>,
     vote: Mutator,
     i: usize,
     new_vote: Option<mpsc::Receiver<Mutator>>,
@@ -309,7 +317,10 @@ impl Writer for Spoon {
         Migrator {
             graph: self.graph.clone(),
             mut_tx: tx,
-            getter: self.getter.clone(),
+            getters: self.getters
+                .iter()
+                .map(|g| unsafe { g.clone() })
+                .collect(),
         }
     }
 }
@@ -317,7 +328,7 @@ impl Writer for Spoon {
 struct Migrator {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     mut_tx: mpsc::SyncSender<Mutator>,
-    getter: Getter,
+    getters: Vec<Getter>,
 }
 
 impl MigrationHandle for Migrator {
@@ -378,18 +389,18 @@ impl MigrationHandle for Migrator {
             (rating, newend)
         };
 
-        let newendq = g.graph.get_getter(newend).unwrap();
         let mutator = g.graph.get_mutator(rating);
         self.mut_tx.send(mutator).unwrap();
-        let g = Box::into_raw(Box::new(newendq));
-        unsafe { self.getter.replace(g) };
+        for getter in &mut self.getters {
+            unsafe { getter.replace(g.graph.get_getter(newend).unwrap()) };
+        }
     }
 }
 
 impl Reader for Getter {
     fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
         let id = article_id.into();
-        let res = match self(&id) {
+        let res = match (self.call())(&id) {
             Ok(g) => {
                 match g.into_iter().next() {
                     Some(row) => {
