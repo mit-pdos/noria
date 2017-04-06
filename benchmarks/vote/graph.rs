@@ -1,4 +1,4 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress, DataType};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress};
 
 use slog;
 use slog_term;
@@ -8,7 +8,7 @@ pub struct Graph {
     pub vote: NodeAddress,
     pub article: NodeAddress,
     pub vc: NodeAddress,
-    pub end: Option<Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + Sync + 'static>>,
+    pub end: NodeAddress,
     pub graph: Blender,
 }
 
@@ -55,18 +55,18 @@ pub fn make() -> Graph {
         // it's not entirely clear. for now, let's keep them separate to allow the aggregation
         // and the join to occur in parallel.
 
-        let endq = mig.maintain(end, 0);
+        mig.maintain(end, 0);
 
         // start processing
         mig.commit();
-        (article, vote, vc, endq)
+        (article, vote, vc, end)
     };
 
     Graph {
         vote: vote.into(),
         article: article.into(),
         vc: vc.into(),
-        end: Some(end.into()),
+        end: end.into(),
         graph: g,
     }
 }

@@ -7,7 +7,6 @@ extern crate distributary;
 
 extern crate timekeeper;
 
-use std::sync;
 use std::thread;
 use std::time;
 
@@ -19,12 +18,9 @@ use timekeeper::{Source, RealTime};
 
 use rand::Rng;
 
-#[allow(dead_code)]
-type Put = Box<Fn(Vec<DataType>) + Send + 'static>;
 type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
 #[allow(dead_code)]
-type Get = Box<Fn(&DataType) -> Result<Datas, ()> + Send + Sync>;
-type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send + Sync>;
+type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -40,9 +36,9 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
+    blender: Blender,
     transfers: Vec<Mutator>,
-    balances: sync::Arc<Option<TxGet>>,
-    migrate: Box<FnMut()>,
+    balances: distributary::NodeAddress,
 }
 
 pub fn setup(num_putters: usize) -> Box<Bank> {
@@ -53,7 +49,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
     let credits;
     let debits;
     let balances;
-    let (_, balancesq) = {
+    {
         // migrate
         let mut mig = g.start_migration();
 
@@ -77,7 +73,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        let balancesq = Some(mig.transactional_maintain(balances, 0));
+        mig.transactional_maintain(balances, 0);
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
@@ -86,35 +82,35 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         mig.assign_domain(balances, d);
 
         // start processing
-        (mig.commit(), balancesq)
+        mig.commit();
     };
 
+    let transfers = (0..num_putters).into_iter().map(|_| g.get_mutator(transfers)).collect();
     Box::new(Bank {
-                 transfers: (0..num_putters)
-                     .into_iter()
-                     .map(|_| g.get_mutator(transfers))
-                     .collect::<Vec<_>>(),
-                 balances: sync::Arc::new(balancesq),
-                 migrate: Box::new(move || {
-        let mut mig = g.start_migration();
-        let identity = mig.add_ingredient("identity",
-                                          &["acct_id", "credit", "debit"],
-                                          distributary::Identity::new(balances));
-        let _ = mig.transactional_maintain(identity, 0);
-        let _ = mig.commit();
-    }),
+                 blender: g,
+                 transfers: transfers,
+                 balances: balances,
              })
 }
 
 impl Bank {
     fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.balances.clone())
+        Box::new(self.blender.get_transactional_getter(self.balances).unwrap())
     }
     fn putter(&mut self) -> Box<Putter> {
         let m = self.transfers.pop().unwrap();
         let p: TxPut = Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t));
 
         Box::new(p)
+    }
+    pub fn migrate(&mut self) {
+        let mut mig = self.blender.start_migration();
+        let identity =
+            mig.add_ingredient("identity",
+                               &["acct_id", "credit", "debit"],
+                               distributary::Identity::new(self.balances));
+        let _ = mig.transactional_maintain(identity, 0);
+        let _ = mig.commit();
     }
 }
 
@@ -134,28 +130,20 @@ pub trait Getter: Send {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a>;
 }
 
-impl Getter for sync::Arc<Option<TxGet>> {
+impl Getter for TxGet {
     fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a> {
         Box::new(move |id| {
-            if let Some(ref g) = *self.as_ref() {
-                g(&id.into()).map(|(res, token)| {
-                    assert_eq!(res.len(), 1);
-                    res.into_iter().next().map(|row| {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let _: i64 = row.next().unwrap().into();
-                        let credit: i64 = row.next().unwrap().into();
-                        let debit: i64 = row.next().unwrap().into();
-                        (credit - debit, token)
-                    })
-                })
-            } else {
-                use std::time::Duration;
-                use std::thread;
-                // avoid spinning
-                thread::sleep(Duration::from_secs(1));
-                Err(())
-            }
+            self(&id.into()).map(|(res, token)| {
+                assert_eq!(res.len(), 1);
+                res.into_iter().next().map(|row| {
+                                               // we only care about the first result
+                                               let mut row = row.into_iter();
+                                               let _: i64 = row.next().unwrap().into();
+                                               let credit: i64 = row.next().unwrap().into();
+                                               let debit: i64 = row.next().unwrap().into();
+                                               (credit - debit, token)
+                                           })
+            })
         })
     }
 }
@@ -185,6 +173,7 @@ fn client(i: usize,
           verbose: bool,
           audit: bool,
           measure_latency: bool,
+          coarse: bool,
           transactions: &mut Vec<(i64, i64, i64)>)
           -> Vec<f64> {
     let clock = RealTime::default();
@@ -210,7 +199,7 @@ fn client(i: usize,
             assert_ne!(dst, src);
 
             let transaction_start = clock.get_time();
-            let (balance, token) = get(src).unwrap().unwrap();
+            let (balance, mut token) = get(src).unwrap().unwrap();
             if verbose {
                 println!("t{} read {}: {} @ {:#?} (for {})",
                          i,
@@ -225,6 +214,10 @@ fn client(i: usize,
             if balance >= 100 {
                 if verbose {
                     println!("trying {} -> {} of {}", src, dst, 100);
+                }
+
+                if coarse {
+                    token.make_coarse();
                 }
 
                 let write_start = clock.get_time();
@@ -265,7 +258,7 @@ fn client(i: usize,
             // check if we should report
             if !measure_latency && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
-                let throughput = count as f64 /
+                let throughput = committed as f64 /
                                  (ts.as_secs() as f64 +
                                   ts.subsec_nanos() as f64 / 1_000_000_000f64);
                 let commit_rate = committed as f64 / count as f64;
@@ -356,6 +349,11 @@ fn main() {
                  .long("latency")
                  .takes_value(false)
                  .help("Measure latency of requests"))
+        .arg(Arg::with_name("coarse")
+                 .short("c")
+                 .long("coarse")
+                 .takes_value(false)
+                 .help("Use only coarse grained checktables"))
         .arg(Arg::with_name("verbose")
                  .short("v")
                  .long("verbose")
@@ -374,11 +372,12 @@ fn main() {
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
         .map(time::Duration::from_secs);
-    let naccounts = value_t_or_exit!(args, "naccounts", i64);
+    let naccounts = value_t_or_exit!(args, "naccounts", i64) + 1;
     let nthreads = value_t_or_exit!(args, "threads", usize);
     let verbose = args.is_present("verbose");
     let audit = args.is_present("audit");
     let measure_latency = args.is_present("latency");
+    let coarse_checktables = args.is_present("coarse");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -422,6 +421,7 @@ fn main() {
                            verbose,
                            audit,
                            false,
+                           coarse_checktables,
                            &mut transactions)
                 })
                          .unwrap()
@@ -450,6 +450,7 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
+                       coarse_checktables,
                        true,
                        &mut transactions)
             })
@@ -459,16 +460,11 @@ fn main() {
         None
     };
 
-    let avg_put_throughput = |th: Vec<f64>| if avg {
-        let sum: f64 = th.iter().sum();
-        println!("avg PUT: {:.2}", sum / th.len() as f64);
-    };
-
     if let Some(duration) = migrate_after {
         thread::sleep(duration);
         println!("----- starting migration -----");
         let start = time::Instant::now();
-        (bank.migrate)();
+        bank.migrate();
         let duration = start.elapsed();
         let length = 1000000000u64 * duration.as_secs() + duration.subsec_nanos() as u64;
         println!("----- completed migration -----\nElapsed time = {} ms",
@@ -476,13 +472,21 @@ fn main() {
     }
 
     // clean
+    let mut throughput = 0.0;
     for c in clients {
         if let Some(client) = c {
             match client.join() {
                 Err(e) => panic!(e),
-                Ok(th) => avg_put_throughput(th),
+                Ok(th) => {
+                    let sum: f64 = th.iter().sum();
+                    throughput += sum / (th.len() as f64);
+                }
             }
         }
+    }
+
+    if avg {
+        println!("avg PUT: {:.2}", throughput);
     }
 
     if let Some(c) = latency_client {
