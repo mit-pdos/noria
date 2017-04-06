@@ -40,6 +40,11 @@
 # No "reviewRequestId" field in "ReviewRequest"
 c80751de_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
 
+# "SecondaryReviewer" table does not exist
+c80751de_ed3ede91c8770863: SELECT firstName, lastName, email  FROM ContactInfo join SecondaryReviewer using (contactId)  WHERE SecondaryReviewer.paperId=?;
+
+# parameters in join condition
+c80751de_4b49110aa7e70b39: select PC1.paperId, PC1.conflictType, PC2.conflictType from PaperConflict PC1 left join PaperConflict PC2 on (PC1.paperId=PC2.paperId and PC1.contactId=? and PC2.contactId=?) where PC1.contactId=?;
 
 ######################
 # SCHEMA v3
