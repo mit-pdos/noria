@@ -142,18 +142,10 @@ impl BenchmarkResults {
     }
 }
 
-fn driver<I, F>(start: time::Instant,
-                config: RuntimeConfig,
-                init: I,
-                desc: &str)
-                -> BenchmarkResults
+fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
     where I: FnOnce() -> F,
-          F: FnMut(i64, i64) -> (bool, Period)
+          F: FnMut(&time::Instant, i64, i64) -> (bool, Period)
 {
-    let mut count = 0usize;
-    let mut last_reported = start;
-    let report_every = time::Duration::from_millis(200);
-
     let mut stats = BenchmarkResults::default();
     if config.cdf {
         stats.keep_cdf();
@@ -187,6 +179,10 @@ fn driver<I, F>(start: time::Instant,
             }
         };
 
+        let mut count = 0usize;
+        let start = time::Instant::now();
+        let mut last_reported = start;
+        let report_every = time::Duration::from_millis(200);
         while start.elapsed() < config.runtime {
             let uid: i64 = t_rng.gen();
 
@@ -195,14 +191,14 @@ fn driver<I, F>(start: time::Instant,
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
-                let (reg, period) = f(uid, aid);
+                let (reg, period) = f(&start, uid, aid);
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
                 if stats.record_latency(period, t).is_err() {
                     println!("failed to record slow {} ({}μs)", desc, t);
                 }
                 (reg, period)
             } else {
-                f(uid, aid)
+                f(&start, uid, aid)
             };
             if register {
                 count += 1;
@@ -259,12 +255,11 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
     drop(ready);
-    let start = time::Instant::now();
 
     let mut post = false;
     let mut migrate_done = None;
     let init = move || {
-        move |uid, aid| -> (bool, Period) {
+        move |start: &time::Instant, uid, aid| -> (bool, Period) {
             if let Some(migrate_after) = config.migrate_after {
                 if start.elapsed() > migrate_after {
                     migrate_done = Some(writer.migrate());
@@ -291,14 +286,14 @@ pub fn launch_writer<W: Writer>(mut writer: W,
         }
     };
 
-    driver(start, config, init, "PUT")
+    driver(config, init, "PUT")
 }
 
 pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> BenchmarkResults {
 
     println!("Starting reader");
     let init = move || {
-        move |_, aid| -> (bool, Period) {
+        move |_: &time::Instant, _, aid| -> (bool, Period) {
             match reader.get(aid) {
                 (ArticleResult::Error, period) => (false, period),
                 (_, period) => (true, period),
@@ -306,5 +301,5 @@ pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> Benchma
         }
     };
 
-    driver(time::Instant::now(), config, init, "GET")
+    driver(config, init, "GET")
 }
