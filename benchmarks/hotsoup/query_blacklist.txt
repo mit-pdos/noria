@@ -49,9 +49,8 @@ c80751de_4b49110aa7e70b39: select PC1.paperId, PC1.conflictType, PC2.conflictTyp
 ######################
 # SCHEMA v3
 
-# 28-column compound key required by GROUP_CONCAT
+# 5-column compound key required on first aggregation: 3x computed column => carry 2x over columns; 2x projected column; 1x filter column timeSubmitted
 f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted), count(reviewNeedsSubmit), group_concat(overAllMerit), PCMember.contactId as pc from PaperReview join Paper using (paperId) left join PCMember on (PaperReview.contactId=PCMember.contactId) where Paper.timeSubmitted>0 group by PaperReview.contactId;
-
 
 ######################
 # SCHEMA v6
