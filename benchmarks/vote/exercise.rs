@@ -147,8 +147,8 @@ fn driver<I, F>(start: time::Instant,
                 init: I,
                 desc: &str)
                 -> BenchmarkResults
-    where I: FnOnce() -> Box<F>,
-          F: ?Sized + FnMut(i64, i64) -> (bool, Period)
+    where I: FnOnce() -> F,
+          F: FnMut(i64, i64) -> (bool, Period)
 {
     let mut count = 0usize;
     let mut last_reported = start;
@@ -264,7 +264,7 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     let mut post = false;
     let mut migrate_done = None;
     let init = move || {
-        Box::new(move |uid, aid| -> (bool, Period) {
+        move |uid, aid| -> (bool, Period) {
             if let Some(migrate_after) = config.migrate_after {
                 if start.elapsed() > migrate_after {
                     migrate_done = Some(writer.migrate());
@@ -288,7 +288,7 @@ pub fn launch_writer<W: Writer>(mut writer: W,
             } else {
                 (true, Period::PreMigration)
             }
-        })
+        }
     };
 
     driver(start, config, init, "PUT")
@@ -298,12 +298,12 @@ pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> Benchma
 
     println!("Starting reader");
     let init = move || {
-        Box::new(move |_, aid| -> (bool, Period) {
-                     match reader.get(aid) {
-                         (ArticleResult::Error, period) => (false, period),
-                         (_, period) => (true, period),
-                     }
-                 })
+        move |_, aid| -> (bool, Period) {
+            match reader.get(aid) {
+                (ArticleResult::Error, period) => (false, period),
+                (_, period) => (true, period),
+            }
+        }
     };
 
     driver(time::Instant::now(), config, init, "GET")
