@@ -28,7 +28,6 @@
 68be356a_1ab06c9faa4ed0c4: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
 68be356a_fd708786fcc78b0d: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 68be356a_2209301630b94c80: select TopicArea.topicId, PaperTopic.paperId from TopicArea left join PaperTopic on PaperTopic.paperId=? and PaperTopic.topicId=TopicArea.topicId;
-
 68be356a_9d93f2352449d3a9: select OptionType.optionId, PaperOption.paperId from OptionType left join PaperOption on PaperOption.paperId=? and PaperOption.optionId=OptionType.optionId;
 
 # XXX: don't try to pull reviewSubmitted through COUNT
@@ -52,7 +51,7 @@ f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted),
 ######################
 # SCHEMA v6
 
-# LEFT JOIN unsupported, parameter in join condition
+# parameter in join condition
 6f0a41d1_38b76a6bfd9a9104: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
 
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
