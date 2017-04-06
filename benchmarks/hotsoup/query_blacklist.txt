@@ -98,6 +98,7 @@ ea7df066_86becef9be87a6e3: select TopicArea.topicId, TopicArea.topicName, TopicI
 ######################
 # SCHEMA v24
 
+# parameter in join condition
 88eca8d4_2fed556b5887f07b: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
@@ -110,13 +111,13 @@ ff0cae2d_476a3599e7eccc5c: select ContactInfo.contactId, reviewType, commentId, 
 # cannot group by agg columns (star expansion bug)
 ff0cae2d_71e181bd9892d0e5: select topicId, interest, count(*) from TopicInterest group by topicId, interest;
 
-
 ######################
 # SCHEMA v37
 
-# Invalid WHERE clause
-91b079ef_cb3631c07b57bf0d: select paperId, title, authorInformation from Paper where ?;
-
+# parameter join clause
+8dbbc83c_1dfdc69db02acb92: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+8dbbc83c_9e0f1c5f2aca03e3: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+8dbbc83c_34426d08700b212: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
 # SCHEMA v53
