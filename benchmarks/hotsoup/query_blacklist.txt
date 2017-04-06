@@ -61,14 +61,17 @@ f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted),
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
 6f0a41d1_929abaedd32ee211: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
 
-
 ######################
 # SCHEMA v15
 
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
-# XXX: why is the hash different to the identical query above?!
 3491de61_af778910f8779b0d: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
 
+######################
+# SCHEMA v19
+
+# parameters in join condition
+ddd10cab_56c36eb0fdd1ba07: select PaperReview.reviewId from PaperReview join PaperReview B on (PaperReview.paperId=B.paperId and PaperReview.contactId=? and B.contactId=?);
 
 ######################
 # SCHEMA v21
@@ -79,7 +82,6 @@ da577b40_b2c36acdac2c9363: select ContactInfo.contactId, reviewType, commentId, 
 # inequality on parameter unsupported
 da577b40_99b7f6c7df7cf3d3: select count(paperId) from PaperConflict where paperId=? and conflictType>=?;
 
-
 ######################
 # SCHEMA v22
 
@@ -87,6 +89,16 @@ da577b40_99b7f6c7df7cf3d3: select count(paperId) from PaperConflict where paperI
 # XXX: why is the hash different to the identical query in v21?
 5063baac_b08881033ef665a3: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
 
+######################
+# SCHEMA v23
+
+# parameter in join condition
+ea7df066_86becef9be87a6e3: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
+
+######################
+# SCHEMA v24
+
+88eca8d4_2fed556b5887f07b: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
 # SCHEMA v35
