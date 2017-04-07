@@ -388,8 +388,6 @@ impl Writer for Spoon {
             self.rng = Some(rand::thread_rng());
         }
 
-        thread::sleep(time::Duration::from_millis(50));
-
         if let Some(ref mut vote_post) = self.vote_post {
             let e = self.swapped.as_ref().unwrap().elapsed();
             if self.crossover.is_none() {
