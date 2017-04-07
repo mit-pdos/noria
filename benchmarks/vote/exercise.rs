@@ -16,11 +16,37 @@ use rand;
 use rand::Rng as StdRng;
 use hdrsample::Histogram;
 use hdrsample::iterators::{HistogramIterator, recorded};
+use zipf::ZipfDistribution;
+
+#[derive(Clone, Copy)]
+pub enum Distribution {
+    Uniform,
+    Zipf(f64),
+}
+
+use std::str::FromStr;
+impl FromStr for Distribution {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "uniform" {
+            Ok(Distribution::Uniform)
+        } else if s.starts_with("zipf:") {
+            let s = s.trim_left_matches("zipf:");
+            str::parse::<f64>(s).map(|exp| Distribution::Zipf(exp)).map_err(|e| {
+                use std::error::Error;
+                e.description().to_string()
+            })
+        } else {
+            Err(format!("unknown distribution '{}'", s))
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct RuntimeConfig {
     narticles: isize,
     runtime: time::Duration,
+    distribution: Distribution,
     cdf: bool,
     migrate_after: Option<time::Duration>,
 }
@@ -30,9 +56,15 @@ impl RuntimeConfig {
         RuntimeConfig {
             narticles: narticles,
             runtime: runtime,
+            distribution: Distribution::Uniform,
             cdf: true,
             migrate_after: None,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn use_distribution(&mut self, d: Distribution) {
+        self.distribution = d;
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -110,43 +142,63 @@ impl BenchmarkResults {
     }
 }
 
-fn driver<I, F>(start: time::Instant,
-                config: RuntimeConfig,
-                init: I,
-                desc: &str)
-                -> BenchmarkResults
-    where I: FnOnce() -> Box<F>,
-          F: ?Sized + FnMut(i64, i64) -> (bool, Period)
+fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
+    where I: FnOnce() -> F,
+          F: FnMut(&time::Instant, i64, i64) -> (bool, Period)
 {
-    let mut count = 0usize;
-    let mut last_reported = start;
-    let report_every = time::Duration::from_millis(200);
-
     let mut stats = BenchmarkResults::default();
     if config.cdf {
         stats.keep_cdf();
     }
 
-    let mut t_rng = rand::thread_rng();
-
     {
         let mut f = init();
+
+        // random uids
+        let mut t_rng = rand::thread_rng();
+
+        // random article ids with distribution. we pre-generate these to avoid overhead at
+        // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
+        // means it might also do vector resizing.
+        let mut i = 0;
+        let randomness: Vec<_> = {
+            let n = 1_000_000 * config.runtime.as_secs();
+            println!("Generating ~{}M random numbers; this'll take a few seconds...",
+                     n / 1_000_000);
+            match config.distribution {
+                Distribution::Uniform => {
+                    let mut u = rand::thread_rng();
+                    (0..n).map(|_| u.gen_range(0, config.narticles)).collect()
+                }
+                Distribution::Zipf(e) => {
+                    let mut z =
+                        ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
+                            .unwrap();
+                    (0..n).map(|_| z.gen_range(0, config.narticles)).collect()
+                }
+            }
+        };
+
+        let mut count = 0usize;
+        let start = time::Instant::now();
+        let mut last_reported = start;
+        let report_every = time::Duration::from_millis(200);
         while start.elapsed() < config.runtime {
             let uid: i64 = t_rng.gen();
 
             // what article to vote for/retrieve?
-            let aid = t_rng.gen_range(0, config.narticles) as i64;
+            let aid = randomness[i] as i64;
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
-                let (reg, period) = f(uid, aid);
+                let (reg, period) = f(&start, uid, aid);
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
                 if stats.record_latency(period, t).is_err() {
                     println!("failed to record slow {} ({}μs)", desc, t);
                 }
                 (reg, period)
             } else {
-                f(uid, aid)
+                f(&start, uid, aid)
             };
             if register {
                 count += 1;
@@ -176,6 +228,8 @@ fn driver<I, F>(start: time::Instant,
                 last_reported = time::Instant::now();
                 count = 0;
             }
+
+            i = (i + 1) % randomness.len();
         }
     }
 
@@ -201,12 +255,11 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
     drop(ready);
-    let start = time::Instant::now();
 
     let mut post = false;
     let mut migrate_done = None;
     let init = move || {
-        Box::new(move |uid, aid| -> (bool, Period) {
+        move |start: &time::Instant, uid, aid| -> (bool, Period) {
             if let Some(migrate_after) = config.migrate_after {
                 if start.elapsed() > migrate_after {
                     migrate_done = Some(writer.migrate());
@@ -230,23 +283,23 @@ pub fn launch_writer<W: Writer>(mut writer: W,
             } else {
                 (true, Period::PreMigration)
             }
-        })
+        }
     };
 
-    driver(start, config, init, "PUT")
+    driver(config, init, "PUT")
 }
 
 pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> BenchmarkResults {
 
     println!("Starting reader");
     let init = move || {
-        Box::new(move |_, aid| -> (bool, Period) {
-                     match reader.get(aid) {
-                         (ArticleResult::Error, period) => (false, period),
-                         (_, period) => (true, period),
-                     }
-                 })
+        move |_: &time::Instant, _, aid| -> (bool, Period) {
+            match reader.get(aid) {
+                (ArticleResult::Error, period) => (false, period),
+                (_, period) => (true, period),
+            }
+        }
     };
 
-    driver(time::Instant::now(), config, init, "GET")
+    driver(config, init, "GET")
 }
