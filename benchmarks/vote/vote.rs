@@ -14,8 +14,10 @@ extern crate zipf;
 extern crate spmc;
 
 mod exercise;
-mod common;
 mod graph;
+
+#[macro_use]
+mod common;
 
 use common::{Writer, Reader, ArticleResult, Period, MigrationHandle};
 use distributary::{Mutator, DataType};
@@ -74,6 +76,11 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("crossover")
+            .short("x")
+            .takes_value(true)
+            .help("Period for transition to new views for readers")
+            .requires("migrate"))
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -83,6 +90,9 @@ fn main() {
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
+        .map(time::Duration::from_secs);
+    let crossover = args.value_of("crossover")
+        .map(|_| value_t_or_exit!(args, "crossover", u64))
         .map(time::Duration::from_secs);
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
@@ -106,7 +116,7 @@ fn main() {
     // prepare getters
     let getters: Vec<_> = (0..ngetters)
         .into_iter()
-        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap()))
+        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap(), crossover))
         .collect();
 
     let g = sync::Arc::new(sync::Mutex::new(g));
@@ -218,18 +228,27 @@ type G = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + 'static>;
 use std::sync::atomic::AtomicPtr;
 struct Getter {
     real: sync::Arc<AtomicPtr<G>>,
-    used: sync::Arc<AtomicPtr<G>>,
-    swapped: bool,
+    before: *mut G,
+    after: *mut G,
+    swapped: Option<time::Instant>,
+    crossover: Option<time::Duration>,
+    rng: Option<rand::ThreadRng>,
     callable: bool,
 }
 
+// unsafe because cannot be sent after first call to call
+unsafe impl Send for Getter {}
+
 impl Getter {
-    pub fn new(inner: G) -> Getter {
+    pub fn new(inner: G, crossover: Option<time::Duration>) -> Getter {
         let m = Box::into_raw(Box::new(inner));
         Getter {
             real: sync::Arc::new(AtomicPtr::new(m)),
-            used: sync::Arc::new(AtomicPtr::new(m)),
-            swapped: false,
+            before: m,
+            after: m,
+            swapped: None,
+            crossover: crossover,
+            rng: None,
             callable: true,
         }
     }
@@ -238,8 +257,11 @@ impl Getter {
     pub unsafe fn clone(&self) -> Self {
         Getter {
             real: self.real.clone(),
-            used: self.used.clone(),
-            swapped: false,
+            before: self.before.clone(),
+            after: self.after.clone(),
+            swapped: None,
+            crossover: self.crossover,
+            rng: None,
             callable: false,
         }
     }
@@ -251,38 +273,70 @@ impl Getter {
     }
 
     pub fn same(&self) -> bool {
-        !self.swapped
+        self.swapped.is_none()
     }
 
     pub fn call(&mut self) -> &mut G {
         assert!(self.callable);
 
+        if self.rng.is_none() {
+            self.rng = Some(rand::thread_rng());
+        }
+
         use std::mem;
-        let mut used = self.used.load(sync::atomic::Ordering::Relaxed);
-        if !self.swapped {
+        if self.swapped.is_none() {
             let real = self.real.load(sync::atomic::Ordering::Acquire);
-            if used != real {
+            if self.after != real {
                 // replace() happened
-                self.used.store(real, sync::atomic::Ordering::Relaxed);
-                // need to free the old used
-                drop(unsafe { Box::from_raw(used) });
+                self.after = real;
                 // no need to check again
-                self.swapped = true;
-                // use the new pointer
-                used = real;
+                self.swapped = Some(time::Instant::now());
             }
         }
-        unsafe { mem::transmute(used) }
+
+        if let Some(ref swapped) = self.swapped {
+            let e = swapped.elapsed();
+            if self.crossover.is_none() {
+                return unsafe { mem::transmute(self.after) };
+            }
+
+            let crossover = self.crossover.as_ref().unwrap();
+            if &e > crossover {
+                return unsafe { mem::transmute(self.after) };
+            }
+
+            // the farther we are, the more likely to use after. we do this by generating a random
+            // point in the span of the crossover and using `after` if that point is the elapsed
+            // span. as the elapsed span grows, so too does the chance of picking after.
+            use rand::Rng;
+            if self.rng
+                   .as_mut()
+                   .unwrap()
+                   .gen_range(0, dur_to_ns!(crossover)) < dur_to_ns!(e) {
+                unsafe { mem::transmute(self.after) }
+            } else {
+                unsafe { mem::transmute(self.before) }
+            }
+        } else {
+            unsafe { mem::transmute(self.before) }
+        }
     }
 }
 
 impl Drop for Getter {
     fn drop(&mut self) {
         if self.callable {
-            let used = self.used.load(sync::atomic::Ordering::Acquire);
+            // free original get function
+            drop(unsafe { Box::from_raw(self.before) });
+
             let real = self.real.load(sync::atomic::Ordering::Acquire);
-            assert_eq!(used, real);
-            drop(unsafe { Box::from_raw(used) });
+            if self.swapped.is_some() {
+                // we swapped, so also free after
+                assert_eq!(self.after, real);
+                drop(unsafe { Box::from_raw(self.after) });
+            } else {
+                assert_eq!(self.before, real);
+            }
         }
     }
 }
