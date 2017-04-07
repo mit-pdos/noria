@@ -79,7 +79,7 @@ fn main() {
         .arg(Arg::with_name("crossover")
             .short("x")
             .takes_value(true)
-            .help("Period for transition to new views for readers")
+            .help("Period for transition to new views for readers and writers")
             .requires("migrate"))
         .get_matches();
 
@@ -124,7 +124,11 @@ fn main() {
         graph: g.clone(),
         getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
         article: putters.0,
-        vote: putters.1,
+        swapped: None,
+        crossover: crossover,
+        vote_pre: putters.1,
+        vote_post: None,
+        rng: None,
         new_vote: None,
         i: 0,
     };
@@ -345,10 +349,17 @@ struct Spoon {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     article: Mutator,
     getters: Vec<Getter>,
-    vote: Mutator,
+    vote_pre: Mutator,
+    vote_post: Option<Mutator>,
     i: usize,
+    swapped: Option<time::Instant>,
+    crossover: Option<time::Duration>,
+    rng: Option<rand::ThreadRng>,
     new_vote: Option<mpsc::Receiver<Mutator>>,
 }
+
+// unsafe because cannot be sent after first call to votre
+unsafe impl Send for Spoon {}
 
 impl Writer for Spoon {
     type Migrator = Migrator;
@@ -366,18 +377,51 @@ impl Writer for Spoon {
                 if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
                     self.new_vote = None;
-                    self.vote = nv;
+                    self.swapped = Some(time::Instant::now());
+                    self.vote_post = Some(nv);
                     self.i = usize::max_value();
                 }
             }
         }
 
-        if self.i == usize::max_value() {
-            self.vote
-                .put(vec![user_id.into(), article_id.into(), 5.into()]);
-            Period::PostMigration
+        if self.rng.is_none() {
+            self.rng = Some(rand::thread_rng());
+        }
+
+        thread::sleep(time::Duration::from_millis(50));
+
+        if let Some(ref mut vote_post) = self.vote_post {
+            let e = self.swapped.as_ref().unwrap().elapsed();
+            if self.crossover.is_none() {
+                vote_post.put(vec![user_id.into(), article_id.into(), 5.into()]);
+                return Period::PostMigration;
+            }
+
+            let crossover = self.crossover.as_ref().unwrap();
+            if &e > crossover {
+                vote_post.put(vec![user_id.into(), article_id.into(), 5.into()]);
+                return Period::PostMigration;
+            }
+
+            // the farther we are, the more likely to use after. we do this by generating a random
+            // point in the span of the crossover and using `after` if that point is the elapsed
+            // span. as the elapsed span grows, so too does the chance of picking after.
+            use rand::Rng;
+            if self.rng
+                   .as_mut()
+                   .unwrap()
+                   .gen_range(0, dur_to_ns!(crossover)) < dur_to_ns!(e) {
+                vote_post.put(vec![user_id.into(), article_id.into(), 5.into()]);
+                Period::PostMigration
+            } else {
+                self.vote_pre
+                    .put(vec![user_id.into(), article_id.into()]);
+                // XXX: unclear if this should be Pre- or Post-
+                Period::PostMigration
+            }
         } else {
-            self.vote.put(vec![user_id.into(), article_id.into()]);
+            self.vote_pre
+                .put(vec![user_id.into(), article_id.into()]);
             Period::PreMigration
         }
     }
