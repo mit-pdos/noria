@@ -32,10 +32,12 @@ impl FromStr for Distribution {
             Ok(Distribution::Uniform)
         } else if s.starts_with("zipf:") {
             let s = s.trim_left_matches("zipf:");
-            str::parse::<f64>(s).map(|exp| Distribution::Zipf(exp)).map_err(|e| {
-                use std::error::Error;
-                e.description().to_string()
-            })
+            str::parse::<f64>(s)
+                .map(|exp| Distribution::Zipf(exp))
+                .map_err(|e| {
+                             use std::error::Error;
+                             e.description().to_string()
+                         })
         } else {
             Err(format!("unknown distribution '{}'", s))
         }
@@ -168,13 +170,17 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
-                    (0..n).map(|_| u.gen_range(0, config.narticles)).collect()
+                    (0..n)
+                        .map(|_| u.gen_range(0, config.narticles))
+                        .collect()
                 }
                 Distribution::Zipf(e) => {
                     let mut z =
                         ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
                             .unwrap();
-                    (0..n).map(|_| z.gen_range(0, config.narticles)).collect()
+                    (0..n)
+                        .map(|_| z.gen_range(0, config.narticles))
+                        .collect()
                 }
             }
         };

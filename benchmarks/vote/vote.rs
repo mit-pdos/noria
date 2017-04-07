@@ -124,7 +124,8 @@ fn main() {
     if stage {
         // put then get
         put_stats = exercise::launch_writer(putter, config, None);
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -133,7 +134,10 @@ fn main() {
                          .unwrap()
                  })
             .collect();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     } else {
         // put & get
         // TODO: how do we start getters after prepopulate?
@@ -146,7 +150,8 @@ fn main() {
         // wait for prepopulation to finish
         prepop.recv().is_err();
 
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -157,7 +162,10 @@ fn main() {
             .collect();
 
         put_stats = putter.join().unwrap();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     }
 
     print_stats("PUT", &put_stats.pre, avg);
@@ -165,11 +173,13 @@ fn main() {
         print_stats(format!("GET{}", i), &s.pre, avg);
     }
     if avg {
-        let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-            // TODO: do we *really* want an average of averages?
-            let (sum, num) = stats.pre.sum_len();
-            (tot + sum, count + num)
-        });
+        let sum = get_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
+                // TODO: do we *really* want an average of averages?
+                let (sum, num) = stats.pre.sum_len();
+                (tot + sum, count + num)
+            });
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -179,11 +189,13 @@ fn main() {
             print_stats(format!("GET{}+", i), &s.post, avg);
         }
         if avg {
-            let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-                // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.pre.sum_len();
-                (tot + sum, count + num)
-            });
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.pre.sum_len();
+                    (tot + sum, count + num)
+                });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -297,10 +309,7 @@ impl Writer for Spoon {
             // don't try too eagerly
             if self.i & 16384 == 0 {
                 // we may have been given a new putter
-                if let Ok(nv) = self.new_vote
-                       .as_mut()
-                       .unwrap()
-                       .try_recv() {
+                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
                     self.new_vote = None;
                     self.vote = nv;
@@ -310,7 +319,8 @@ impl Writer for Spoon {
         }
 
         if self.i == usize::max_value() {
-            self.vote.put(vec![user_id.into(), article_id.into(), 5.into()]);
+            self.vote
+                .put(vec![user_id.into(), article_id.into(), 5.into()]);
             Period::PostMigration
         } else {
             self.vote.put(vec![user_id.into(), article_id.into()]);
