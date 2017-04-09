@@ -32,10 +32,12 @@ impl FromStr for Distribution {
             Ok(Distribution::Uniform)
         } else if s.starts_with("zipf:") {
             let s = s.trim_left_matches("zipf:");
-            str::parse::<f64>(s).map(|exp| Distribution::Zipf(exp)).map_err(|e| {
-                use std::error::Error;
-                e.description().to_string()
-            })
+            str::parse::<f64>(s)
+                .map(|exp| Distribution::Zipf(exp))
+                .map_err(|e| {
+                             use std::error::Error;
+                             e.description().to_string()
+                         })
         } else {
             Err(format!("unknown distribution '{}'", s))
         }

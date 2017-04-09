@@ -14,8 +14,10 @@ extern crate zipf;
 extern crate spmc;
 
 mod exercise;
-mod common;
 mod graph;
+
+#[macro_use]
+mod common;
 
 use common::{Writer, Reader, ArticleResult, Period, MigrationHandle};
 use distributary::{Mutator, DataType};
@@ -74,6 +76,11 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("crossover")
+            .short("x")
+            .takes_value(true)
+            .help("Period for transition to new views for readers and writers")
+            .requires("migrate"))
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -83,6 +90,9 @@ fn main() {
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
+        .map(time::Duration::from_secs);
+    let crossover = args.value_of("crossover")
+        .map(|_| value_t_or_exit!(args, "crossover", u64))
         .map(time::Duration::from_secs);
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
@@ -106,7 +116,7 @@ fn main() {
     // prepare getters
     let getters: Vec<_> = (0..ngetters)
         .into_iter()
-        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap()))
+        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap(), crossover))
         .collect();
 
     let g = sync::Arc::new(sync::Mutex::new(g));
@@ -114,9 +124,11 @@ fn main() {
         graph: g.clone(),
         getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
         article: putters.0,
-        vote: putters.1,
+        vote_pre: putters.1,
+        vote_post: None,
         new_vote: None,
         i: 0,
+        x: Crossover::new(crossover),
     };
 
     let put_stats;
@@ -200,25 +212,95 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
     }
 }
 
+#[derive(Clone)]
+struct Crossover {
+    swapped: Option<time::Instant>,
+    crossover: Option<time::Duration>,
+    done: bool,
+    steps: Vec<bool>,
+    iteration: usize,
+}
+
+const CROSSOVER_QUANT: usize = 100; // steps of 1%
+impl Crossover {
+    pub fn new(crossover: Option<time::Duration>) -> Self {
+        Crossover {
+            swapped: None,
+            crossover: crossover,
+            steps: (0..CROSSOVER_QUANT).map(|_| false).collect(),
+            iteration: 0,
+            done: false,
+        }
+    }
+
+    pub fn swapped(&mut self) {
+        assert!(self.swapped.is_none());
+        self.swapped = Some(time::Instant::now());
+    }
+
+    pub fn has_swapped(&self) -> bool {
+        self.swapped.is_some()
+    }
+
+    pub fn use_post(&mut self) -> bool {
+        if self.done {
+            return true;
+        }
+        if self.crossover.is_none() || self.swapped.is_none() {
+            return false;
+        }
+
+        let elapsed = self.swapped
+            .as_ref()
+            .unwrap()
+            .elapsed();
+
+        if elapsed > *self.crossover.as_ref().unwrap() {
+            // we've fully crossed over
+            self.done = true;
+            return true;
+        }
+
+        self.iteration += 1;
+
+        if self.iteration % (1 << 17) == 0 {
+            let crossover = self.crossover.as_ref().unwrap();
+            let fraction = dur_to_ns!(elapsed) as f64 / dur_to_ns!(crossover) as f64;
+            let mut rng = rand::thread_rng();
+            for i in self.steps.iter_mut() {
+                use rand::Rng;
+                *i = rng.next_f64() < fraction;
+            }
+        }
+
+        self.steps[self.iteration % CROSSOVER_QUANT]
+    }
+}
+
 type G = Box<Fn(&DataType) -> Result<Vec<Vec<DataType>>, ()> + Send + 'static>;
 
 // A more dangerous AtomicPtr that also derefs into the inner type
 use std::sync::atomic::AtomicPtr;
 struct Getter {
     real: sync::Arc<AtomicPtr<G>>,
-    used: sync::Arc<AtomicPtr<G>>,
-    swapped: bool,
+    before: *mut G,
+    after: *mut G,
     callable: bool,
+    x: Crossover,
 }
 
+// *muts are Send
+unsafe impl Send for Getter {}
+
 impl Getter {
-    pub fn new(inner: G) -> Getter {
+    pub fn new(inner: G, crossover: Option<time::Duration>) -> Getter {
         let m = Box::into_raw(Box::new(inner));
         Getter {
             real: sync::Arc::new(AtomicPtr::new(m)),
-            used: sync::Arc::new(AtomicPtr::new(m)),
-            swapped: false,
+            before: m,
+            after: m,
             callable: true,
+            x: Crossover::new(crossover),
         }
     }
 
@@ -226,8 +308,9 @@ impl Getter {
     pub unsafe fn clone(&self) -> Self {
         Getter {
             real: self.real.clone(),
-            used: self.used.clone(),
-            swapped: false,
+            before: self.before.clone(),
+            after: self.after.clone(),
+            x: self.x.clone(),
             callable: false,
         }
     }
@@ -239,38 +322,44 @@ impl Getter {
     }
 
     pub fn same(&self) -> bool {
-        !self.swapped
+        !self.x.has_swapped()
     }
 
     pub fn call(&mut self) -> &mut G {
         assert!(self.callable);
 
         use std::mem;
-        let mut used = self.used.load(sync::atomic::Ordering::Relaxed);
-        if !self.swapped {
+        if !self.x.has_swapped() {
             let real = self.real.load(sync::atomic::Ordering::Acquire);
-            if used != real {
+            if self.after != real {
                 // replace() happened
-                self.used.store(real, sync::atomic::Ordering::Relaxed);
-                // need to free the old used
-                drop(unsafe { Box::from_raw(used) });
-                // no need to check again
-                self.swapped = true;
-                // use the new pointer
-                used = real;
+                self.after = real;
+                self.x.swapped();
             }
         }
-        unsafe { mem::transmute(used) }
+
+        if self.x.use_post() {
+            unsafe { mem::transmute(self.after) }
+        } else {
+            unsafe { mem::transmute(self.before) }
+        }
     }
 }
 
 impl Drop for Getter {
     fn drop(&mut self) {
         if self.callable {
-            let used = self.used.load(sync::atomic::Ordering::Acquire);
+            // free original get function
+            drop(unsafe { Box::from_raw(self.before) });
+
             let real = self.real.load(sync::atomic::Ordering::Acquire);
-            assert_eq!(used, real);
-            drop(unsafe { Box::from_raw(used) });
+            if self.x.has_swapped() {
+                // we swapped, so also free after
+                assert_eq!(self.after, real);
+                drop(unsafe { Box::from_raw(self.after) });
+            } else {
+                assert_eq!(self.before, real);
+            }
         }
     }
 }
@@ -279,8 +368,10 @@ struct Spoon {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     article: Mutator,
     getters: Vec<Getter>,
-    vote: Mutator,
+    vote_pre: Mutator,
+    vote_post: Option<Mutator>,
     i: usize,
+    x: Crossover,
     new_vote: Option<mpsc::Receiver<Mutator>>,
 }
 
@@ -303,18 +394,23 @@ impl Writer for Spoon {
                        .try_recv() {
                     // yay!
                     self.new_vote = None;
-                    self.vote = nv;
+                    self.x.swapped();
+                    self.vote_post = Some(nv);
                     self.i = usize::max_value();
                 }
             }
         }
 
-        if self.i == usize::max_value() {
-            self.vote.put(vec![user_id.into(), article_id.into(), 5.into()]);
+        if self.x.use_post() {
+            self.vote_post
+                .as_mut()
+                .unwrap()
+                .put(vec![user_id.into(), article_id.into(), 5.into()]);
             Period::PostMigration
         } else {
-            self.vote.put(vec![user_id.into(), article_id.into()]);
-            Period::PreMigration
+            self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+            // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
+            Period::PostMigration
         }
     }
 
