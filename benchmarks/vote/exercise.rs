@@ -170,17 +170,13 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
-                    (0..n)
-                        .map(|_| u.gen_range(0, config.narticles))
-                        .collect()
+                    (0..n).map(|_| u.gen_range(0, config.narticles)).collect()
                 }
                 Distribution::Zipf(e) => {
                     let mut z =
                         ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
                             .unwrap();
-                    (0..n)
-                        .map(|_| z.gen_range(0, config.narticles))
-                        .collect()
+                    (0..n).map(|_| z.gen_range(0, config.narticles)).collect()
                 }
             }
         };
