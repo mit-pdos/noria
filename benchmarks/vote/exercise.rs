@@ -1,4 +1,4 @@
-use common::{Writer, ArticleResult, Reader, Period};
+use common::{Writer, Reader, Period};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -50,6 +50,7 @@ pub struct RuntimeConfig {
     runtime: time::Duration,
     distribution: Distribution,
     cdf: bool,
+    batch_size: usize,
     migrate_after: Option<time::Duration>,
 }
 
@@ -59,6 +60,7 @@ impl RuntimeConfig {
             narticles: narticles,
             runtime: runtime,
             distribution: Distribution::Uniform,
+            batch_size: 1,
             cdf: true,
             migrate_after: None,
         }
@@ -67,6 +69,15 @@ impl RuntimeConfig {
     #[allow(dead_code)]
     pub fn use_distribution(&mut self, d: Distribution) {
         self.distribution = d;
+    }
+
+    #[allow(dead_code)]
+    pub fn use_batching(&mut self, batch_size: usize) {
+        if batch_size == 0 {
+            self.batch_size = 1;
+        } else {
+            self.batch_size = batch_size;
+        }
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -146,7 +157,7 @@ impl BenchmarkResults {
 
 fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
     where I: FnOnce() -> F,
-          F: FnMut(&time::Instant, i64, i64) -> (bool, Period)
+          F: FnMut(&time::Instant, &[(i64, i64)]) -> (bool, Period)
 {
     let mut stats = BenchmarkResults::default();
     if config.cdf {
@@ -156,27 +167,24 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
     {
         let mut f = init();
 
-        // random uids
-        let mut t_rng = rand::thread_rng();
-
         // random article ids with distribution. we pre-generate these to avoid overhead at
         // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
         // means it might also do vector resizing.
         let mut i = 0;
-        let randomness: Vec<_> = {
+        let randomness: Vec<i64> = {
             let n = 1_000_000 * config.runtime.as_secs();
             println!("Generating ~{}M random numbers; this'll take a few seconds...",
                      n / 1_000_000);
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
-                    (0..n).map(|_| u.gen_range(0, config.narticles)).collect()
+                    (0..n).map(|_| u.gen_range(0, config.narticles) as i64).collect()
                 }
                 Distribution::Zipf(e) => {
                     let mut z =
                         ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
                             .unwrap();
-                    (0..n).map(|_| z.gen_range(0, config.narticles)).collect()
+                    (0..n).map(|_| z.gen_range(0, config.narticles) as i64).collect()
                 }
             }
         };
@@ -185,25 +193,27 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
         let start = time::Instant::now();
         let mut last_reported = start;
         let report_every = time::Duration::from_millis(200);
+        let mut batch: Vec<_> =
+            (0..config.batch_size).into_iter().map(|i| (i as i64, i as i64)).collect();
         while start.elapsed() < config.runtime {
-            let uid: i64 = t_rng.gen();
-
-            // what article to vote for/retrieve?
-            let aid = randomness[i] as i64;
+            // construct ids for the next batch
+            for &mut (_, ref mut aid) in &mut batch {
+                *aid = randomness[i];
+            }
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
-                let (reg, period) = f(&start, uid, aid);
+                let (reg, period) = f(&start, &batch[..]);
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
                 if stats.record_latency(period, t).is_err() {
                     println!("failed to record slow {} ({}μs)", desc, t);
                 }
                 (reg, period)
             } else {
-                f(&start, uid, aid)
+                f(&start, &batch[..])
             };
             if register {
-                count += 1;
+                count += config.batch_size;
             }
 
             // check if we should report
@@ -261,7 +271,7 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     let mut post = false;
     let mut migrate_done = None;
     let init = move || {
-        move |start: &time::Instant, uid, aid| -> (bool, Period) {
+        move |start: &time::Instant, ids: &_| -> (bool, Period) {
             if let Some(migrate_after) = config.migrate_after {
                 if start.elapsed() > migrate_after {
                     migrate_done = Some(writer.migrate());
@@ -279,7 +289,7 @@ pub fn launch_writer<W: Writer>(mut writer: W,
                 }
             }
 
-            writer.vote(uid, aid);
+            writer.vote(ids);
             if post {
                 (true, Period::PostMigration)
             } else {
@@ -295,9 +305,9 @@ pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> Benchma
 
     println!("Starting reader");
     let init = move || {
-        move |_: &time::Instant, _, aid| -> (bool, Period) {
-            match reader.get(aid) {
-                (ArticleResult::Error, period) => (false, period),
+        move |_: &time::Instant, ids: &_| -> (bool, Period) {
+            match reader.get(ids) {
+                (Err(_), period) => (false, period),
                 (_, period) => (true, period),
             }
         }
