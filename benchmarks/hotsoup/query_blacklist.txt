@@ -30,10 +30,6 @@
 68be356a_2209301630b94c80: select TopicArea.topicId, PaperTopic.paperId from TopicArea left join PaperTopic on PaperTopic.paperId=? and PaperTopic.topicId=TopicArea.topicId;
 68be356a_9d93f2352449d3a9: select OptionType.optionId, PaperOption.paperId from OptionType left join PaperOption on PaperOption.paperId=? and PaperOption.optionId=OptionType.optionId;
 
-# XXX: don't try to pull reviewSubmitted through COUNT
-# 68be356a_8a61cc3b2a503f81: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
-# 68be356a_4cb03dd450bbd256: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
-
 ######################
 # SCHEMA v2
 
@@ -161,12 +157,6 @@ ddf3f9aa_4d0ebc809119b9c8: select paperId, 0 from PaperConflict where conflictTy
 # parameter in join predicate
 15fe1caa_bc4916bbed4f0031: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
 15fe1caa_11279a4c2e55c27e: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
-
-######################
-# SCHEMA v72
-
-# cannot group by agg columns (preference pushed through group by for filter)
-14d02c65_a922d98552894f64: select contactId, count(preference) from PaperReviewPreference where preference!=0 group by contactId;
 
 ######################
 # SCHEMA v75
