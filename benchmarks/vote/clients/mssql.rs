@@ -163,51 +163,58 @@ impl Writer for W {
         self.client.conn = Some(conn);
     }
 
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
-        let fut = self.client
-            .conn
-            .take()
-            .unwrap()
-            .exec(&self.v_prep, &[&user_id, &article_id])
-            .and_then(|r| r)
-            .collect();
-        let (_, conn) = self.client
-            .core
-            .run(fut)
-            .unwrap();
-        self.client.conn = Some(conn);
-        Period::PreMigration
-    }
-}
-
-impl Reader for R {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        use tiberius::stmt::ResultStreamExt;
-
-        let mut res = ArticleResult::NoSuchArticle;
-        {
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        for &(user_id, article_id) in ids {
             let fut = self.client
                 .conn
                 .take()
                 .unwrap()
-                .query(&self.prep, &[&article_id])
-                .for_each_row(|ref row| {
-                    let aid: i64 = row.get(0);
-                    let title: &str = row.get(1);
-                    let votes: i64 = row.get(2);
-                    res = ArticleResult::Article {
-                        id: aid,
-                        title: String::from(title),
-                        votes: votes,
-                    };
-                    Ok(())
-                });
-            let conn = self.client
+                .exec(&self.v_prep, &[&user_id, &article_id])
+                .and_then(|r| r)
+                .collect();
+            let (_, conn) = self.client
                 .core
                 .run(fut)
                 .unwrap();
             self.client.conn = Some(conn);
         }
-        (res, Period::PreMigration)
+        Period::PreMigration
+    }
+}
+
+impl Reader for R {
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        use tiberius::stmt::ResultStreamExt;
+
+        let res = ids.iter()
+            .map(|&(_, article_id)| {
+                let mut res = ArticleResult::NoSuchArticle;
+                {
+                    let fut = self.client
+                        .conn
+                        .take()
+                        .unwrap()
+                        .query(&self.prep, &[&article_id])
+                        .for_each_row(|ref row| {
+                            let aid: i64 = row.get(0);
+                            let title: &str = row.get(1);
+                            let votes: i64 = row.get(2);
+                            res = ArticleResult::Article {
+                                id: aid,
+                                title: String::from(title),
+                                votes: votes,
+                            };
+                            Ok(())
+                        });
+                    let conn = self.client
+                        .core
+                        .run(fut)
+                        .unwrap();
+                    self.client.conn = Some(conn);
+                }
+                res
+            })
+            .collect();
+        (Ok(res), Period::PreMigration)
     }
 }

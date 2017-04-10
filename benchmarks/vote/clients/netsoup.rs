@@ -70,37 +70,41 @@ impl Writer for C {
     fn make_article(&mut self, article_id: i64, title: String) {
         self.insert(ARTICLE_NODE, vec![article_id.into(), title.into()]);
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
-        self.insert(VOTE_NODE, vec![user_id.into(), article_id.into()]);
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        for &(user_id, article_id) in ids {
+            self.insert(VOTE_NODE, vec![user_id.into(), article_id.into()]);
+        }
         Period::PreMigration
     }
 }
 
 impl Reader for C {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        let article = match self.query(END_NODE, article_id.into()) {
-            Ok(rows) => {
-                match rows.into_iter().next() {
-                    Some(row) => {
-                        match row[1] {
-                            DataType::TinyText(..) |
-                            DataType::Text(..) => {
-                                use std::borrow::Cow;
-                                let t: Cow<_> = (&row[1]).into();
-                                ArticleResult::Article {
-                                    id: row[0].clone().into(),
-                                    title: t.to_string(),
-                                    votes: row[2].clone().into(),
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let res = ids.iter()
+            .map(|&(_, article_id)| {
+                // rustfmt
+                self.query(END_NODE, article_id.into()).map_err(|_| ()).map(|rows| {
+                    match rows.into_iter().next() {
+                        Some(row) => {
+                            match row[1] {
+                                DataType::TinyText(..) |
+                                DataType::Text(..) => {
+                                    use std::borrow::Cow;
+                                    let t: Cow<_> = (&row[1]).into();
+                                    ArticleResult::Article {
+                                        id: row[0].clone().into(),
+                                        title: t.to_string(),
+                                        votes: row[2].clone().into(),
+                                    }
                                 }
+                                _ => unreachable!(),
                             }
-                            _ => unreachable!(),
                         }
+                        None => ArticleResult::NoSuchArticle,
                     }
-                    None => ArticleResult::NoSuchArticle,
-                }
-            }
-            Err(_) => ArticleResult::Error,
-        };
-        (article, Period::PreMigration)
+                })
+            })
+            .collect();
+        (res, Period::PreMigration)
     }
 }

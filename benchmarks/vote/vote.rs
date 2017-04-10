@@ -385,7 +385,7 @@ impl Writer for Spoon {
         self.article.put(vec![article_id.into(), title.into()]);
     }
 
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         if self.new_vote.is_some() {
             self.i += 1;
             // don't try too eagerly
@@ -405,13 +405,17 @@ impl Writer for Spoon {
         }
 
         if self.x.use_post() {
-            self.vote_post
-                .as_mut()
-                .unwrap()
-                .put(vec![user_id.into(), article_id.into(), 5.into()]);
+            for &(user_id, article_id) in ids {
+                self.vote_post
+                    .as_mut()
+                    .unwrap()
+                    .put(vec![user_id.into(), article_id.into(), 5.into()]);
+            }
             Period::PostMigration
         } else {
-            self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+            for &(user_id, article_id) in ids {
+                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+            }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration
         }
@@ -505,28 +509,28 @@ impl MigrationHandle for Migrator {
 }
 
 impl Reader for Getter {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        let id = article_id.into();
-        let res = match (self.call())(&id) {
-            Ok(g) => {
-                match g.into_iter().next() {
-                    Some(row) => {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let id: i64 = row.next().unwrap().into();
-                        let title: String = row.next().unwrap().into();
-                        let count: i64 = row.next().unwrap().into();
-                        ArticleResult::Article {
-                            id: id,
-                            title: title,
-                            votes: count,
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let res = ids.iter()
+            .map(|&(_, article_id)| {
+                (self.call())(&article_id.into()).map_err(|_| ()).map(|g| {
+                    match g.into_iter().next() {
+                        Some(row) => {
+                            // we only care about the first result
+                            let mut row = row.into_iter();
+                            let id: i64 = row.next().unwrap().into();
+                            let title: String = row.next().unwrap().into();
+                            let count: i64 = row.next().unwrap().into();
+                            ArticleResult::Article {
+                                id: id,
+                                title: title,
+                                votes: count,
+                            }
                         }
+                        None => ArticleResult::NoSuchArticle,
                     }
-                    None => ArticleResult::NoSuchArticle,
-                }
-            }
-            Err(_) => ArticleResult::Error,
-        };
+                })
+            })
+            .collect();
 
         if self.same() {
             (res, Period::PreMigration)
