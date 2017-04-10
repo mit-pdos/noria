@@ -256,7 +256,7 @@ impl Crossover {
 
 
         self.iteration += 1;
-        if self.iteration % (1 << 8) == 0 {
+        if self.iteration == (1 << 8) {
             let elapsed = dur_to_ns!(self.swapped
                                          .as_ref()
                                          .unwrap()
@@ -273,6 +273,7 @@ impl Crossover {
                 .as_mut()
                 .unwrap()
                 .gen_range(0, self.crossover.unwrap()) < elapsed;
+            self.iteration = 0;
         }
 
         self.post
