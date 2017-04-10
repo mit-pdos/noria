@@ -215,27 +215,31 @@ fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: b
 #[derive(Clone)]
 struct Crossover {
     swapped: Option<time::Instant>,
-    crossover: Option<time::Duration>,
+    crossover: Option<u64>,
     done: bool,
-    steps: Vec<bool>,
+    rng: Option<rand::ThreadRng>,
     iteration: usize,
+    post: bool,
 }
 
-const CROSSOVER_QUANT: usize = 100; // steps of 1%
+unsafe impl Send for Crossover {}
+
 impl Crossover {
     pub fn new(crossover: Option<time::Duration>) -> Self {
         Crossover {
             swapped: None,
-            crossover: crossover,
-            steps: (0..CROSSOVER_QUANT).map(|_| false).collect(),
-            iteration: 0,
+            crossover: crossover.map(|d| dur_to_ns!(d)),
             done: false,
+            iteration: 0,
+            post: false,
+            rng: None,
         }
     }
 
     pub fn swapped(&mut self) {
         assert!(self.swapped.is_none());
         self.swapped = Some(time::Instant::now());
+        self.rng = Some(rand::thread_rng());
     }
 
     pub fn has_swapped(&self) -> bool {
@@ -250,30 +254,29 @@ impl Crossover {
             return false;
         }
 
-        let elapsed = self.swapped
-            .as_ref()
-            .unwrap()
-            .elapsed();
-
-        if elapsed > *self.crossover.as_ref().unwrap() {
-            // we've fully crossed over
-            self.done = true;
-            return true;
-        }
 
         self.iteration += 1;
+        if self.iteration == (1 << 8) {
+            let elapsed = dur_to_ns!(self.swapped
+                                         .as_ref()
+                                         .unwrap()
+                                         .elapsed());
 
-        if self.iteration % (1 << 17) == 0 {
-            let crossover = self.crossover.as_ref().unwrap();
-            let fraction = dur_to_ns!(elapsed) as f64 / dur_to_ns!(crossover) as f64;
-            let mut rng = rand::thread_rng();
-            for i in self.steps.iter_mut() {
-                use rand::Rng;
-                *i = rng.next_f64() < fraction;
+            if elapsed > self.crossover.unwrap() {
+                // we've fully crossed over
+                self.done = true;
+                return true;
             }
+
+            use rand::Rng;
+            self.post = self.rng
+                .as_mut()
+                .unwrap()
+                .gen_range(0, self.crossover.unwrap()) < elapsed;
+            self.iteration = 0;
         }
 
-        self.steps[self.iteration % CROSSOVER_QUANT]
+        self.post
     }
 }
 
