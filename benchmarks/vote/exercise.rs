@@ -167,9 +167,6 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
     {
         let mut f = init();
 
-        // random uids
-        let mut t_rng = rand::thread_rng();
-
         // random article ids with distribution. we pre-generate these to avoid overhead at
         // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
         // means it might also do vector resizing.
@@ -196,12 +193,12 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
         let start = time::Instant::now();
         let mut last_reported = start;
         let report_every = time::Duration::from_millis(200);
-        let mut batch = Vec::with_capacity(config.batch_size);
+        let mut batch: Vec<_> =
+            (0..config.batch_size).into_iter().map(|i| (i as i64, i as i64)).collect();
         while start.elapsed() < config.runtime {
             // construct ids for the next batch
-            batch.clear();
-            for i in 0..config.batch_size {
-                batch.push((t_rng.gen(), randomness[i]));
+            for &mut (_, ref mut aid) in &mut batch {
+                *aid = randomness[i];
             }
 
             let (register, period) = if config.cdf {
