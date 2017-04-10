@@ -205,7 +205,9 @@ fn main() {
                 }
             };
             print_stats("GET", &stats.pre, avg);
-            print_stats("GET+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("GET+", &stats.post, avg);
+            }
         }
         "write" => {
             let stats = match client {
@@ -253,7 +255,9 @@ fn main() {
                 }
             };
             print_stats("PUT", &stats.pre, avg);
-            print_stats("PUT+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("PUT+", &stats.post, avg);
+            }
         }
         _ => unreachable!(),
     }
