@@ -250,20 +250,20 @@ impl Crossover {
             return false;
         }
 
-        let elapsed = self.swapped
-            .as_ref()
-            .unwrap()
-            .elapsed();
-
-        if elapsed > *self.crossover.as_ref().unwrap() {
-            // we've fully crossed over
-            self.done = true;
-            return true;
-        }
-
         self.iteration += 1;
 
         if self.iteration % (1 << 17) == 0 {
+            let elapsed = self.swapped
+                .as_ref()
+                .unwrap()
+                .elapsed();
+
+            if elapsed > *self.crossover.as_ref().unwrap() {
+                // we've fully crossed over
+                self.done = true;
+                return true;
+            }
+
             let crossover = self.crossover.as_ref().unwrap();
             let fraction = dur_to_ns!(elapsed) as f64 / dur_to_ns!(crossover) as f64;
             let mut rng = rand::thread_rng();
