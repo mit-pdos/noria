@@ -54,9 +54,11 @@ impl<'a> Writer for W<'a> {
     fn make_article(&mut self, article_id: i64, title: String) {
         self.a_prep.execute(params!{"id" => article_id, "title" => &title}).unwrap();
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
-        self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
-        self.vc_prep.execute(params!{"id" => &article_id}).unwrap();
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        for &(user_id, article_id) in ids {
+            self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
+            self.vc_prep.execute(params!{"id" => &article_id}).unwrap();
+        }
         Period::PreMigration
     }
 }
@@ -66,17 +68,20 @@ pub fn make_reader<'a>(pool: &'a mysql::Pool) -> mysql::conn::Stmt<'a> {
 }
 
 impl<'a> Reader for mysql::conn::Stmt<'a> {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        let mut res = ArticleResult::NoSuchArticle;
-        for row in self.execute(params!{"id" => &article_id}).unwrap() {
-            let mut rr = row.unwrap();
-            res = ArticleResult::Article {
-                id: rr.get(0).unwrap(),
-                title: rr.get(1).unwrap(),
-                votes: rr.get(2).unwrap(),
-            };
-            break;
-        }
-        (res, Period::PreMigration)
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let res = ids.iter()
+            .map(|&(_, ref article_id)| {
+                for row in self.execute(params!{"id" => &article_id}).unwrap() {
+                    let mut rr = row.unwrap();
+                    return ArticleResult::Article {
+                               id: rr.get(0).unwrap(),
+                               title: rr.get(1).unwrap(),
+                               votes: rr.get(2).unwrap(),
+                           };
+                }
+                ArticleResult::NoSuchArticle
+            })
+            .collect();
+        (Ok(res), Period::PreMigration)
     }
 }

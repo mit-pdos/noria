@@ -4,6 +4,7 @@ use tarpc;
 use tarpc::util::FirstSocketAddr;
 use tarpc::future::client::{ClientExt, Options};
 use tokio_core::reactor;
+use futures;
 
 use common::{Writer, Reader, ArticleResult, Period};
 
@@ -25,14 +26,18 @@ impl DerefMut for C {
     }
 }
 impl C {
-    pub fn insert(&mut self, view: usize, data: Vec<DataType>) {
-        self.1.run(self.0.insert(view, data)).unwrap();
+    pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
+        let &mut C(ref client, ref mut core) = self;
+        let fut = futures::future::join_all(data.into_iter().map(|row| client.insert(view, row)));
+        core.run(fut).unwrap();
     }
     pub fn query(&mut self,
                  view: usize,
-                 key: DataType)
-                 -> Result<Vec<Vec<DataType>>, tarpc::Error<()>> {
-        self.1.run(self.0.query(view, key))
+                 keys: Vec<DataType>)
+                 -> Result<Vec<Vec<Vec<DataType>>>, tarpc::Error<()>> {
+        let &mut C(ref client, ref mut core) = self;
+        let fut = futures::future::join_all(keys.into_iter().map(|key| client.query(view, key)));
+        core.run(fut)
     }
 }
 unsafe impl Send for C {}
@@ -68,39 +73,46 @@ pub fn make_writer(addr: &str) -> C {
 impl Writer for C {
     type Migrator = ();
     fn make_article(&mut self, article_id: i64, title: String) {
-        self.insert(ARTICLE_NODE, vec![article_id.into(), title.into()]);
+        self.mput(ARTICLE_NODE, vec![vec![article_id.into(), title.into()]]);
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
-        self.insert(VOTE_NODE, vec![user_id.into(), article_id.into()]);
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        let votes = ids.iter()
+            .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into()])
+            .collect();
+        self.mput(VOTE_NODE, votes);
         Period::PreMigration
     }
 }
 
 impl Reader for C {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        let article = match self.query(END_NODE, article_id.into()) {
-            Ok(rows) => {
-                match rows.into_iter().next() {
-                    Some(row) => {
-                        match row[1] {
-                            DataType::TinyText(..) |
-                            DataType::Text(..) => {
-                                use std::borrow::Cow;
-                                let t: Cow<_> = (&row[1]).into();
-                                ArticleResult::Article {
-                                    id: row[0].clone().into(),
-                                    title: t.to_string(),
-                                    votes: row[2].clone().into(),
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let aids = ids.iter().map(|&(_, article_id)| article_id.into()).collect();
+        let res = self.query(END_NODE, aids).map_err(|_| ()).map(|rows| {
+            assert_eq!(ids.len(), rows.len());
+            rows.into_iter()
+                .map(|rows| {
+                    // rustfmt
+                    match rows.into_iter().next() {
+                        Some(row) => {
+                            match row[1] {
+                                DataType::TinyText(..) |
+                                DataType::Text(..) => {
+                                    use std::borrow::Cow;
+                                    let t: Cow<_> = (&row[1]).into();
+                                    ArticleResult::Article {
+                                        id: row[0].clone().into(),
+                                        title: t.to_string(),
+                                        votes: row[2].clone().into(),
+                                    }
                                 }
+                                _ => unreachable!(),
                             }
-                            _ => unreachable!(),
                         }
+                        None => ArticleResult::NoSuchArticle,
                     }
-                    None => ArticleResult::NoSuchArticle,
-                }
-            }
-            Err(_) => ArticleResult::Error,
-        };
-        (article, Period::PreMigration)
+                })
+                .collect()
+        });
+        (res, Period::PreMigration)
     }
 }

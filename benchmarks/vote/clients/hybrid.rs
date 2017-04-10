@@ -73,11 +73,13 @@ impl<'a> Writer for W<'a> {
                          0,
                          0));
     }
-    fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
-        self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
-        // memcached invalidate: we use a hack with a short (1s) lifetime here because the
-        // `memcached` crate does not expose `delete()`.
-        drop(self.mc.delete(format!("article_{}_vc", article_id).as_bytes()));
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        for &(user_id, article_id) in ids {
+            self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
+            // memcached invalidate: we use a hack with a short (1s) lifetime here because the
+            // `memcached` crate does not expose `delete()`.
+            drop(self.mc.delete(format!("article_{}_vc", article_id).as_bytes()));
+        }
         Period::PreMigration
     }
 }
@@ -100,44 +102,48 @@ pub fn make_reader<'a>(pool: &'a mut Pool) -> R<'a> {
 }
 
 impl<'a> Reader for R<'a> {
-    fn get(&mut self, article_id: i64) -> (ArticleResult, Period) {
-        let res = match self.mc.get(format!("article_{}_vc", article_id).as_bytes()) {
-            Ok(data) => {
-                let s = String::from_utf8_lossy(&data.0[..]);
-                let mut parts = s.split(";");
-                ArticleResult::Article {
-                    id: parts.next()
-                        .unwrap()
-                        .parse()
-                        .unwrap(),
-                    title: String::from(parts.next().unwrap()),
-                    votes: parts.next()
-                        .unwrap()
-                        .parse()
-                        .unwrap(),
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let res = ids.iter()
+            .map(|&(_, article_id)| {
+                // rustfmt
+                match self.mc.get(format!("article_{}_vc", article_id).as_bytes()) {
+                    Ok(data) => {
+                        let s = String::from_utf8_lossy(&data.0[..]);
+                        let mut parts = s.split(";");
+                        ArticleResult::Article {
+                            id: parts.next()
+                                .unwrap()
+                                .parse()
+                                .unwrap(),
+                            title: String::from(parts.next().unwrap()),
+                            votes: parts.next()
+                                .unwrap()
+                                .parse()
+                                .unwrap(),
+                        }
+                    }
+                    Err(_) => {
+                        for row in self.prep.execute(params!{"id" => &article_id}).unwrap() {
+                            let mut rr = row.unwrap();
+                            let id = rr.get(0).unwrap();
+                            let title = rr.get(1).unwrap();
+                            let vc = rr.get(2).unwrap();
+                            drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
+                                             format!("{};{};{}", id, title, vc).as_bytes(),
+                                             0,
+                                             0));
+                            return ArticleResult::Article {
+                                       id: id,
+                                       title: title,
+                                       votes: vc,
+                                   };
+                        }
+                        ArticleResult::NoSuchArticle
+                    }
                 }
-            }
-            Err(_) => {
-                for row in self.prep.execute(params!{"id" => &article_id}).unwrap() {
-                    let mut rr = row.unwrap();
-                    let id = rr.get(0).unwrap();
-                    let title = rr.get(1).unwrap();
-                    let vc = rr.get(2).unwrap();
-                    drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
-                                     format!("{};{};{}", id, title, vc).as_bytes(),
-                                     0,
-                                     0));
-                    return (ArticleResult::Article {
-                                id: id,
-                                title: title,
-                                votes: vc,
-                            },
-                            Period::PreMigration);
-                }
-                ArticleResult::NoSuchArticle
-            }
-        };
+            })
+            .collect();
 
-        (res, Period::PreMigration)
+        (Ok(res), Period::PreMigration)
     }
 }

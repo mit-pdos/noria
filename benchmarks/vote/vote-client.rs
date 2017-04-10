@@ -109,6 +109,11 @@ fn main() {
             .value_name("N")
             .default_value("60")
             .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("batch")
+            .short("b")
+            .takes_value(true)
+            .default_value("1")
+            .help("Number of operations per batch (if supported)"))
         .arg(Arg::with_name("migrate")
             .short("m")
             .long("migrate")
@@ -148,6 +153,7 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.use_batching(value_t_or_exit!(args, "batch", usize));
     config.use_distribution(dist);
 
     // setup db
@@ -199,7 +205,9 @@ fn main() {
                 }
             };
             print_stats("GET", &stats.pre, avg);
-            print_stats("GET+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("GET+", &stats.post, avg);
+            }
         }
         "write" => {
             let stats = match client {
@@ -247,7 +255,9 @@ fn main() {
                 }
             };
             print_stats("PUT", &stats.pre, avg);
-            print_stats("PUT+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("PUT+", &stats.post, avg);
+            }
         }
         _ => unreachable!(),
     }
