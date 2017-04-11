@@ -52,6 +52,7 @@ pub struct RuntimeConfig {
     cdf: bool,
     batch_size: usize,
     migrate_after: Option<time::Duration>,
+    verbose: bool,
 }
 
 impl RuntimeConfig {
@@ -63,6 +64,7 @@ impl RuntimeConfig {
             batch_size: 1,
             cdf: true,
             migrate_after: None,
+            verbose: false,
         }
     }
 
@@ -78,6 +80,11 @@ impl RuntimeConfig {
         } else {
             self.batch_size = batch_size;
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn set_verbose(&mut self, yes: bool) {
+        self.verbose = yes;
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -223,16 +230,20 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
 
                 match period {
                     Period::PreMigration => {
-                        println!("{:?} {}: {:.2}",
-                                 dur_to_ns!(start.elapsed()),
-                                 desc,
-                                 count_per_s);
+                        if config.verbose {
+                            println!("{:?} {}: {:.2}",
+                                     dur_to_ns!(start.elapsed()),
+                                     desc,
+                                     count_per_s);
+                        }
                     }
                     Period::PostMigration => {
-                        println!("{:?} {}+: {:.2}",
-                                 dur_to_ns!(start.elapsed()),
-                                 desc,
-                                 count_per_s);
+                        if config.verbose {
+                            println!("{:?} {}+: {:.2}",
+                                     dur_to_ns!(start.elapsed()),
+                                     desc,
+                                     count_per_s);
+                        }
                     }
                 }
                 stats.record_throughput(period, count_per_s);

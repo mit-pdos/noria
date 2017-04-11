@@ -120,6 +120,10 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("quiet")
+            .short("q")
+            .long("quiet")
+            .help("No noisy output while running"))
         .arg(Arg::with_name("MODE")
             .index(1)
             .possible_values(&["read", "write"])
@@ -153,6 +157,7 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.set_verbose(!args.is_present("quiet"));
     config.use_batching(value_t_or_exit!(args, "batch", usize));
     config.use_distribution(dist);
 
