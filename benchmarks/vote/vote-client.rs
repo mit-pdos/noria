@@ -35,6 +35,7 @@ extern crate tarpc;
 extern crate memcached;
 
 extern crate hdrsample;
+extern crate zipf;
 
 extern crate spmc;
 
@@ -97,12 +98,22 @@ fn main() {
             .value_name("N")
             .default_value("100000")
             .help("Number of articles to prepopulate the database with"))
+        .arg(Arg::with_name("distribution")
+            .short("d")
+            .takes_value(true)
+            .default_value("uniform")
+            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
         .arg(Arg::with_name("runtime")
             .short("r")
             .long("runtime")
             .value_name("N")
             .default_value("60")
             .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("batch")
+            .short("b")
+            .takes_value(true)
+            .default_value("1")
+            .help("Number of operations per batch (if supported)"))
         .arg(Arg::with_name("migrate")
             .short("m")
             .long("migrate")
@@ -123,6 +134,7 @@ fn main() {
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
+    let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
@@ -141,6 +153,8 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.use_batching(value_t_or_exit!(args, "batch", usize));
+    config.use_distribution(dist);
 
     // setup db
     println!("Attempting to connect to database using {}", dbn);
@@ -191,7 +205,9 @@ fn main() {
                 }
             };
             print_stats("GET", &stats.pre, avg);
-            print_stats("GET+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("GET+", &stats.post, avg);
+            }
         }
         "write" => {
             let stats = match client {
@@ -239,7 +255,9 @@ fn main() {
                 }
             };
             print_stats("PUT", &stats.pre, avg);
-            print_stats("PUT+", &stats.post, avg);
+            if migrate_after.is_some() {
+                print_stats("PUT+", &stats.post, avg);
+            }
         }
         _ => unreachable!(),
     }

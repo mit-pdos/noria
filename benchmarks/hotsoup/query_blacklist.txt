@@ -28,12 +28,7 @@
 68be356a_1ab06c9faa4ed0c4: SELECT TopicArea.topicId, TopicArea.topicName, TopicInterest.interest FROM TopicArea left join TopicInterest on (TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId);
 68be356a_fd708786fcc78b0d: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 68be356a_2209301630b94c80: select TopicArea.topicId, PaperTopic.paperId from TopicArea left join PaperTopic on PaperTopic.paperId=? and PaperTopic.topicId=TopicArea.topicId;
-
 68be356a_9d93f2352449d3a9: select OptionType.optionId, PaperOption.paperId from OptionType left join PaperOption on PaperOption.paperId=? and PaperOption.optionId=OptionType.optionId;
-
-# XXX: don't try to pull reviewSubmitted through COUNT
-68be356a_8a61cc3b2a503f81: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
-68be356a_4cb03dd450bbd256: SELECT count(reviewSubmitted)  FROM PaperReview  WHERE PaperReview.paperId=? AND PaperReview.reviewSubmitted>0 ;
 
 ######################
 # SCHEMA v2
@@ -41,31 +36,38 @@
 # No "reviewRequestId" field in "ReviewRequest"
 c80751de_8c2996977694d11f: SELECT reviewRequestId, paperId FROM ReviewRequest WHERE paperId=? AND asked=?;
 
+# "SecondaryReviewer" table does not exist
+c80751de_ed3ede91c8770863: SELECT firstName, lastName, email  FROM ContactInfo join SecondaryReviewer using (contactId)  WHERE SecondaryReviewer.paperId=?;
+
+# parameters in join condition
+c80751de_4b49110aa7e70b39: select PC1.paperId, PC1.conflictType, PC2.conflictType from PaperConflict PC1 left join PaperConflict PC2 on (PC1.paperId=PC2.paperId and PC1.contactId=? and PC2.contactId=?) where PC1.contactId=?;
 
 ######################
 # SCHEMA v3
 
-# 28-column compound key required by GROUP_CONCAT
+# 5-column compound key required on first aggregation: 3x computed column => carry 2x over columns; 2x projected column; 1x filter column timeSubmitted
 f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted), count(reviewNeedsSubmit), group_concat(overAllMerit), PCMember.contactId as pc from PaperReview join Paper using (paperId) left join PCMember on (PaperReview.contactId=PCMember.contactId) where Paper.timeSubmitted>0 group by PaperReview.contactId;
-
 
 ######################
 # SCHEMA v6
 
-# LEFT JOIN unsupported, parameter in join condition
+# parameter in join condition
 6f0a41d1_38b76a6bfd9a9104: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
 
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
 6f0a41d1_929abaedd32ee211: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
 
-
 ######################
 # SCHEMA v15
 
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
-# XXX: why is the hash different to the identical query above?!
 3491de61_af778910f8779b0d: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
 
+######################
+# SCHEMA v19
+
+# parameters in join condition
+ddd10cab_56c36eb0fdd1ba07: select PaperReview.reviewId from PaperReview join PaperReview B on (PaperReview.paperId=B.paperId and PaperReview.contactId=? and B.contactId=?);
 
 ######################
 # SCHEMA v21
@@ -76,7 +78,6 @@ da577b40_b2c36acdac2c9363: select ContactInfo.contactId, reviewType, commentId, 
 # inequality on parameter unsupported
 da577b40_99b7f6c7df7cf3d3: select count(paperId) from PaperConflict where paperId=? and conflictType>=?;
 
-
 ######################
 # SCHEMA v22
 
@@ -84,6 +85,17 @@ da577b40_99b7f6c7df7cf3d3: select count(paperId) from PaperConflict where paperI
 # XXX: why is the hash different to the identical query in v21?
 5063baac_b08881033ef665a3: select ContactInfo.contactId, reviewType, commentId, conflictType, watch from ContactInfo left join PaperReview on (PaperReview.paperId=? and PaperReview.contactId=ContactInfo.contactId) left join PaperComment on (PaperComment.paperId=? and PaperComment.contactId=ContactInfo.contactId) left join PaperConflict on (PaperConflict.paperId=? and PaperConflict.contactId=ContactInfo.contactId) left join PaperWatch on (PaperWatch.paperId=? and PaperWatch.contactId=ContactInfo.contactId) where ContactInfo.contactId=?;
 
+######################
+# SCHEMA v23
+
+# parameter in join condition
+ea7df066_86becef9be87a6e3: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
+
+######################
+# SCHEMA v24
+
+# parameter in join condition
+88eca8d4_2fed556b5887f07b: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
 # SCHEMA v35
@@ -95,30 +107,32 @@ ff0cae2d_476a3599e7eccc5c: select ContactInfo.contactId, reviewType, commentId, 
 # cannot group by agg columns (star expansion bug)
 ff0cae2d_71e181bd9892d0e5: select topicId, interest, count(*) from TopicInterest group by topicId, interest;
 
-
 ######################
 # SCHEMA v37
 
-# Invalid WHERE clause
-91b079ef_cb3631c07b57bf0d: select paperId, title, authorInformation from Paper where ?;
-
+# parameter in join clause
+8dbbc83c_1dfdc69db02acb92: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+8dbbc83c_9e0f1c5f2aca03e3: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+8dbbc83c_34426d08700b212: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
-# SCHEMA v53
+# SCHEMA v46
 
-# Invalid WHERE clause
-aa64f270_f56723cd6095f784: select commentId from PaperComment where paperId=? and ?;
+# parameter in join clause
+db62d1f2_3c64366889d7dda6: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
 
+######################
+# SCHEMA v49
+
+# parameter in join clause
+385c9b24_7020f9d88308433f: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+385c9b24_c45026bc22b0ed05: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
 # SCHEMA v55
 
 # Projecting a literal unsupported
 ddf3f9aa_4d0ebc809119b9c8: select paperId, 0 from PaperConflict where conflictType!=0 and contactId=?;
-
-# Invalid WHERE clause
-ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from Paper where ?;
-
 
 ######################
 # SCHEMA v62
@@ -127,13 +141,11 @@ ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from P
 # XXX: why is the hash different to the identical query in v55?
 52ebdf90_8aae10f861bf3995: select paperId, 0 from PaperConflict where conflictType!=0 and contactId=?;
 
-
 ######################
 # SCHEMA v67
 
 # Projecting a literal unsupported
 8579cf2a_3c16ee09fd8c3cd4: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
-
 
 ######################
 # SCHEMA v68
@@ -142,30 +154,19 @@ ddf3f9aa_e88d9d0bd9664523: select Paper.paperId, title, authorInformation from P
 # XXX: why is the hash different to the identical query in v67?
 15fe1caa_8ebaa6807805d74f: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
 
-
-######################
-# SCHEMA v70
-
-# Invalid WHERE clause
-b6390b24_5c42e0b048d9ac40: select * from ContactInfo where ? and contactId;
-
-
-######################
-# SCHEMA v72
-
-# cannot group by agg columns (preference pushed through group by for filter)
-14d02c65_a922d98552894f64: select contactId, count(preference) from PaperReviewPreference where preference!=0 group by contactId;
-
+# parameter in join predicate
+15fe1caa_bc4916bbed4f0031: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+15fe1caa_11279a4c2e55c27e: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
 # SCHEMA v75
 
-# parameter in join condition
+# parameter in join predicate
 b10814f6_266a1206304bf998: select PCMember.contactId, count(reviewId)                 from PCMember left join PaperReview on (PaperReview.contactId=PCMember.contactId and PaperReview.reviewType=?)                 group by PCMember.contactId;
-
-# Invalid WHERE clause
-b10814f6_bdd16abba5e39051: select Paper.paperId, title, authorInformation from Paper where ?;
-
+b10814f6_e43a269b582f3dd4: select Paper.paperId, PaperConflict.conflictType,         reviewId, reviewType, reviewModified         from Paper         left join PaperReview on (Paper.paperId=PaperReview.paperId and PaperReview.contactId=?)         left join PaperConflict on (Paper.paperId=PaperConflict.paperId and PaperConflict.contactId=?)         where timeSubmitted>0         order by paperId asc, reviewId asc;
+b10814f6_f5452732d051501d: select PaperReview.reviewId from PaperReview join PaperReview B on (PaperReview.paperId=B.paperId and PaperReview.contactId=? and B.contactId=?);
+b10814f6_e2b64a7de6631aea: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+b10814f6_e2b64a7de6631aea: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
 
 ######################
 # SCHEMA v76
@@ -173,6 +174,8 @@ b10814f6_bdd16abba5e39051: select Paper.paperId, title, authorInformation from P
 # No column named "id" in "ContactInfo"
 6078b8ff_9b0d846534e977c8: select email from ContactInfo where id=?;
 
+# parameter in join predicate
+6078b8ff_dbe9ac1619180725: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
 
 ######################
 # SCHEMA v77
@@ -184,18 +187,12 @@ cb8ee5a2_905ff475a1c9cd4b: select email from ContactInfo where id=?;
 # XXX: why is the hash different to the identical query in v68?
 cb8ee5a2_bdbff331e9335091: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
 
-
 ######################
 # SCHEMA v78
-
-# Invalid WHERE clause
-d12323a6_442445b50d22f669: select paperId, contactId from PaperConflict where paperId;
-d12323a6_568e5051af8da71d: select Paper.paperId, title, authorInformation from Paper where ?;
 
 # Projecting a literal unsupported
 # XXX: why is the hash different to the identical query in v77?
 d12323a6_b87ff94d03c4aa02: select paperId, 0 from PaperConflict where conflictType>0 and contactId=?;
-
 
 ######################
 # SCHEMA v80
@@ -203,13 +200,17 @@ d12323a6_b87ff94d03c4aa02: select paperId, 0 from PaperConflict where conflictTy
 # No column named "id" in "ContactInfo"
 f6efba71_e54dc2994491482b: select email from ContactInfo where id=?;
 
-
 ######################
 # SCHEMA v81
 
 # No column named "id" in "ContactInfo"
 f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
 
+# Literal projection
+f836fe9b_20640d21b2045049: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, roles, disabled,                 conflictType, 0 myReviewType                 from ContactInfo join PaperConflict using (contactId)                 where paperId=? and conflictType>=?;
+
+# parameter in join predicate
+f836fe9b_ecc066582241234e: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, roles, disabled,                 conflictType, reviewType myReviewType                 from ContactInfo                 join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=?)                 left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=?)                 group by ContactInfo.contactId;
 
 ######################
 # SCHEMA v82
@@ -217,17 +218,12 @@ f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
 # No column named "contactDbId" in "ContactInfo"
 4c4b747b_802fc3c769413fef: select * from ContactInfo where contactDbId=?;
 
-# Invalid WHERE clause
-4c4b747b_12a38741990097bf: select paperId, title, mimetype from Paper where paperId;
-4c4b747b_4427c456d8d134bd: select Paper.paperId, title, authorInformation from Paper where ?;
+# No columns "siteclass" anywhere in the schema
+4c4b747b_322eb2817248cdd8: select c.confid, siteclass, shortName, url         from Roles r join Conferences c on (c.confid=r.confid)         join ContactInfo u on (u.contactDbId=r.contactDbId)         where u.email=? order by r.updated_at desc;
 
-
-######################
-# SCHEMA v83
-
-# Invalid WHERE clause
-7024f487_e59ec780c2c0ecc0: select paperId from PaperComment where commentId;
-
+# parameter in join predicate
+4c4b747b_38579997490b5b06: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, roles, disabled,                 conflictType, 0 myReviewType                 from ContactInfo join PaperConflict using (contactId)                 where paperId=? and conflictType>=?;
+4c4b747b_3b82761a5e3de58a: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, roles, disabled,                 conflictType, reviewType myReviewType                 from ContactInfo                 join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=?)                 left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=?)                 group by ContactInfo.contactId;
 
 ######################
 # SCHEMA v86
@@ -235,13 +231,22 @@ f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
 # No column named "contactDbId" in "ContactInfo"
 17cbae06_f68467e747692c24: select * from ContactInfo where contactDbId=?;
 
+######################
+# SCHEMA v92
+
+# parameter in join predicate
+e18037cb_18443945a1e533b2: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password,                 roles, disabled, contactTags,                 conflictType, 0 myReviewType                 from ContactInfo join PaperConflict using (contactId)                 where paperId=? and conflictType>=?;
+e18037cb_68b28e16ed3edeba: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password,                 roles, disabled, contactTags,                 conflictType, reviewType myReviewType                 from ContactInfo                 join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=?)                 left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=?)                 group by ContactInfo.contactId;
+e18037cb_460817bdfc4ef541: select count(ta.topicId), count(ti.topicId) from TopicArea ta left join TopicInterest ti on (ti.contactId=? and ti.topicId=ta.topicId);
+
+# No column named "contactDbId" in "ContactInfo"
+e18037cb_8ccde90904f2976: select *, password contactdb_password from ContactInfo where contactDbId=?;
 
 ######################
-# SCHEMA v89
+# SCHEMA v93
 
-# Invalid WHERE clause
-40d35695_3371ab14a8a96a34: select paperId from PaperComment where commentId;
-
+# No column named "contactDbId" in "ContactInfo"
+e27af343_812afe9cd33eb6a2: select *, password contactdb_encoded_password from ContactInfo where contactDbId=?;
 
 ######################
 # SCHEMA v94
@@ -249,20 +254,17 @@ f836fe9b_2a2cf1d31f05c73a: select email from ContactInfo where id=?;
 # Parameter in join predicate
 18ef8776_29bcc9d26797588a: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
 
-
-######################
-# SCHEMA v95
-
-# Invalid WHERE clause
-ab4bdf1b_4ef5c1036344dbbe: select paperId from PaperComment where commentId;
-
-
 ######################
 # SCHEMA v97
 
 # Parameter in join predicate
 d14c4391_8d2513c85f47c7af: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
 
+# Literal projection
+d14c4391_481148ab7dae0ae6: select *, 1 is_contactdb from ContactInfo where email=?;
+
+# No column named "contactDbId" in "ContactInfo"
+d14c4391_f82a8302dcdf3141: select *, 1 is_contactdb from ContactInfo where contactDbId=?;
 
 ######################
 # SCHEMA v99
@@ -270,127 +272,81 @@ d14c4391_8d2513c85f47c7af: select ContactInfo.contactDbId, Conferences.confid, r
 # Parameter in join predicate
 d50d5846_4fe39a84147979ab: select ContactInfo.contactDbId, Conferences.confid, roles             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
 
-# Invalid WHERE clause
-d50d5846_b553d49dd13b9e2c: select paperId from PaperComment where commentId;
-
-
 ######################
-# SCHEMA v112
+# SCHEMA v103
 
-# Invalid WHERE clause
-553f6523_440b0a98197783c4: select paperId from PaperComment where commentId;
-
+# Parameter in join predicate
+aa2c2feb_caea94820c5adc33: select PaperReview.reviewId from PaperReview join PaperReview B on (PaperReview.paperId=B.paperId and PaperReview.contactId=? and B.contactId=?);
 
 ######################
 # SCHEMA v114
 
-# Invalid WHERE clause
-49149615_93851b502c67d6af: select paperId from PaperComment where commentId;
-
-
-######################
-# SCHEMA v120
-
-# Invalid WHERE clause
-026186b2_a62d8a6051c85574: select paperId from PaperComment where commentId;
-
+# Parameter in join predicate
+49149615_f84eca61f66cfbc9: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password,                 roles, disabled, contactTags,                 conflictType, 0 myReviewType                 from ContactInfo join PaperConflict using (contactId)                 where paperId=? and conflictType>=?;
+49149615_d3f3e3ea6bcf8b3f: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password,                 roles, disabled, contactTags,                 conflictType, reviewType myReviewType                 from ContactInfo                 join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=?)                 left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=?)                 group by ContactInfo.contactId;
 
 ######################
-# SCHEMA v123
+# SCHEMA v124
 
-# Invalid WHERE clause
-d1c333d6_78e1738aa94cb88b: select paperId from PaperComment where commentId;
+# Literal projection
+7055b205_9971ede8d89a37e9: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, passwordIsCdb,                 roles, disabled, contactTags,                 conflictType, 0 myReviewType                 from ContactInfo join PaperConflict using (contactId)                 where paperId=? and conflictType>=?;
 
-
-######################
-# SCHEMA v126
-
-# Invalid WHERE clause
-27ac4dbc_d652321c5c4e8c36: select paperId from PaperComment where commentId;
-
+# Parameter in join predicate
+7055b205_971d1130cb4099ca: select ContactInfo.contactId,                 firstName, lastName, email, preferredEmail, password, passwordIsCdb,                 roles, disabled, contactTags,                 conflictType, reviewType myReviewType                 from ContactInfo                 join PaperReview on (PaperReview.contactId=ContactInfo.contactId and PaperReview.paperId=?)                 left join PaperConflict on (PaperConflict.contactId=ContactInfo.contactId and PaperConflict.paperId=?)                 group by ContactInfo.contactId;
 
 ######################
 # SCHEMA v130
 
-# Invalid WHERE clause
-543e907b_42c0ffa175c06e42: select paperId from Paper where ? limit 1;
-
 # Parameter in join predicate
 543e907b_f874259ccb56273d: select ContactInfo.contactDbId, Conferences.confid, roles, password             from ContactInfo             left join Conferences on (Conferences.`dbname`=?)             left join Roles on (Roles.contactDbId=ContactInfo.contactDbId and Roles.confid=Conferences.confid)             where email=?;
-
-
-######################
-# SCHEMA v131
-
-# Invalid WHERE clause
-b54ccbf4_bca27f54e270ba35: select paperId from PaperComment where commentId;
-
-
-######################
-# SCHEMA v132
-
-# Invalid WHERE clause
-6da41902_1d4466fcbf80d18c: select paperId from PaperComment where commentId;
-
-
-######################
-# SCHEMA v136
-
-# Invalid WHERE clause
-31006bda_abb7711506239b3a: select paperId from PaperComment where commentId;
-
 
 ######################
 # SCHEMA v140
 
-# Invalid WHERE clause
-aad8bf44_fa80a57cb24e4c1b: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+aad8bf44_ebdc6720f8ac816: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+aad8bf44_e37cac29e1a688ba: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>0 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
 # SCHEMA v141
 
-# Invalid WHERE clause
-a3a15ec8_3f5a537d8d675d6f: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+a3a15ec8_3b37fd321e005027: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+a3a15ec8_2b01a4a21964f6ab: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
 # SCHEMA v143
 
-# Invalid WHERE clause
-1a90cd38_75dfadbbcad89aec: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+1a90cd38_2196350e4e4adb37: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+1a90cd38_a4edeaf4dd579d80: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
 # SCHEMA v145
 
-# Invalid WHERE clause
-b6fea998_20af468cc9113d48: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+b6fea998_3135e38d352ce574: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+b6fea998_6fd82a75e1f21c07: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
 # SCHEMA v146
 
-# Invalid WHERE clause
-f5a359c3_98f9df7fcd6598a: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+f5a359c3_1b814c10e954169a: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+f5a359c3_1e82ec7eb41ca3fc: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
-# SCHEMA v147
+# SCHEMA v152
 
-# Invalid WHERE clause
-eb0bc9ee_b533b92b74a40db0: select paperId from PaperComment where commentId;
-
+# inequality joins unsupported
+e87490ac_d125d15374c964f4: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+e87490ac_8a2d4ac6caa4a88e: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
 
 ######################
 # SCHEMA v161
 
 # "Conferences" table does not exist in schema
 a1ac837b_861fc461f61a0335: select confid from Conferences where `dbname`=?;
-
-# Invalid WHERE clause
-a1ac837b_f6bc8469eb1026bd: select paperId from Paper where ? limit 1;
-a1ac837b_3b8c44a3b50fcc9: select contactId from ContactInfo where ?;
 
 # No column "contactDbId" on "ContactInfo"
 a1ac837b_8bc426139d40387d: select * from ContactInfo where contactDbId=?;
@@ -404,3 +360,7 @@ a1ac837b_2c19c35e41b44e16: select * from ReviewFormOptions where fieldName!='out
 a1ac837b_60427ac36f75cc9c: select * from OptionType;
 a1ac837b_48dc657a24ccccb2: select * from ContactAddress;
 a1ac837b_8d679fcc66af4f50: select * from ReviewFormOptions where fieldName='outcome';
+
+# inequality joins unsupported
+a1ac837b_42bf1bb948ceda13: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.paperStorageId) where p.finalPaperStorageId<=0 and p.paperStorageId>1 and (p.sha1!=ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;
+a1ac837b_65a899b93c7de67c: select p.paperId from Paper p join PaperStorage ps on (ps.paperStorageId=p.finalPaperStorageId) where p.finalPaperStorageId>1 and (p.sha1 != ps.sha1 or p.size!=ps.size or p.mimetype!=ps.mimetype or p.timestamp!=ps.timestamp) limit 1;

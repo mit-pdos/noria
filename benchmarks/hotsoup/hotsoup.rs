@@ -4,6 +4,7 @@ mod populate;
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
 extern crate slog;
 extern crate slog_term;
 
@@ -14,7 +15,7 @@ use distributary::{Blender, Recipe};
 pub struct Backend {
     blacklist: Vec<String>,
     r: Option<Recipe>,
-    rlog: slog::Logger,
+    log: slog::Logger,
     g: Blender,
 }
 
@@ -34,15 +35,15 @@ fn make(blacklist: &str) -> Box<Backend> {
 
     // set up graph
     let mut g = Blender::new();
-    let main_log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
-    let recipe_log = main_log.new(None);
-    g.log_with(main_log);
+    let log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
+    let blender_log = log.clone();
+    g.log_with(blender_log);
 
-    let recipe = Recipe::blank(Some(recipe_log.clone()));
+    let recipe = Recipe::blank(Some(log.clone()));
     Box::new(Backend {
                  blacklist: blacklisted_queries,
                  r: Some(recipe),
-                 rlog: recipe_log,
+                 log: log,
                  g: g,
              })
 }
@@ -59,6 +60,8 @@ impl Backend {
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
 
+        let mut blacklisted = 0;
+
         // load schema
         sf.read_to_string(&mut s).unwrap();
         // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
@@ -69,6 +72,7 @@ impl Backend {
             .join("\n");
         // load queries and concatenate them onto the table definitions from the schema
         s.clear();
+
         match query_file {
             None => (),
             Some(qf) => {
@@ -80,6 +84,7 @@ impl Backend {
                     // make sure to skip blacklisted queries
                     for ref q in blacklist {
                         if l.contains(*q) {
+                            blacklisted += 1;
                             return false;
                         }
                     }
@@ -90,14 +95,16 @@ impl Backend {
             }
         }
 
-        let new_recipe = Recipe::from_str(&rs, Some(self.rlog.clone()))?;
+        info!(self.log, "Ignored {} blacklisted queries", blacklisted);
+
+        let new_recipe = Recipe::from_str(&rs, Some(self.log.clone()))?;
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
                 match recipe.activate(&mut mig) {
                     Ok(ar) => {
-                        println!("{} expressions added", ar.expressions_added);
-                        println!("{} expressions removed", ar.expressions_removed);
+                        info!(self.log, "{} expressions added", ar.expressions_added);
+                        info!(self.log, "{} expressions removed", ar.expressions_removed);
                     }
                     Err(e) => return Err(format!("failed to activate recipe: {}", e)),
                 };
@@ -225,13 +232,14 @@ fn main() {
         assert_eq!(sf.0, qf.0);
         let schema_version = sf.0;
         if schema_version < start_at_schema || schema_version > stop_at_schema {
-            println!("Skipping schema {:?}", sf.1);
+            info!(backend.log, "Skipping schema {:?}", sf.1);
             continue;
         }
 
-        println!("Loading HotCRP schema from {:?}, queries from {:?}",
-                 sf.1,
-                 qf.1);
+        info!(backend.log,
+              "Loading HotCRP schema from {:?}, queries from {:?}",
+              sf.1,
+              qf.1);
 
         let queries = if base_only {
             None
@@ -256,10 +264,8 @@ fn main() {
 
         // on the first auto-upgradeable schema, populate with test data
         if schema_version == populate_at_schema {
-            println!("Populating database!");
+            info!(backend.log, "Populating database!");
             populate::populate(&backend, dataloc, transactional).unwrap();
         }
     }
-
-    println!("Done!");
 }

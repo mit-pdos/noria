@@ -420,7 +420,7 @@ fn main() {
                            runtime,
                            verbose,
                            audit,
-                           false,
+                           false,  /* measure_latency */
                            coarse_checktables,
                            &mut transactions)
                 })
@@ -450,8 +450,8 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
+                       true,  /* measure_latency */
                        coarse_checktables,
-                       true,
                        &mut transactions)
             })
                      .unwrap()
