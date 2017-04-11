@@ -1,5 +1,5 @@
 use memcached;
-use memcached::proto::{Operation, ProtoType};
+use memcached::proto::{Operation, MultiOperation, ProtoType};
 
 pub struct Memcache(memcached::Client);
 unsafe impl Send for Memcache {}
@@ -40,26 +40,44 @@ impl Writer for Memcache {
 
 impl Reader for Memcache {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        // TODO: use mget
-        //let title = self.get_raw(&format!("article_{}", id));
-        let res = ids.iter()
-            .map(|&(_, article_id)| {
-                let title: Result<_, ()> = Ok((Vec::from(format!("article_{}", article_id)
-                                                             .as_bytes()),));
-                let vc = self.0.get(format!("article_{}_vc", article_id).as_bytes());
-                match (title, vc) {
-                    (Ok(title), Ok(vc)) => {
+        let keys: Vec<_> = ids.iter()
+            .flat_map(|&(_, ref article_id)| {
+                          vec![format!("article_{}", article_id),
+                               format!("article_{}_vc", article_id)]
+                      })
+            .collect();
+        let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
+
+        let vals = match self.0.get_multi(&keys[..]) {
+            Err(_) => return (Err(()), Period::PreMigration),
+            Ok(v) => v,
+        };
+
+        let res = keys.iter()
+            .enumerate()
+            .filter_map(|(i, &key)| {
+                if i % 2 == 1 {
+                    // already read
+                    return None;
+                }
+
+                // title (vc has key i+1)
+                let r = match (vals.get(key), vals.get(keys[i + 1])) {
+                    (Some(title), Some(vc)) => {
                         let vc: i64 = String::from_utf8_lossy(&vc.0[..]).parse().unwrap();
                         ArticleResult::Article {
-                            id: article_id,
+                            id: ids[i / 2].1,
                             title: String::from_utf8_lossy(&title.0[..]).into_owned(),
                             votes: vc,
                         }
                     }
                     _ => ArticleResult::NoSuchArticle,
-                }
+                };
+
+                Some(r)
             })
             .collect();
+
         (Ok(res), Period::PreMigration)
     }
 }
