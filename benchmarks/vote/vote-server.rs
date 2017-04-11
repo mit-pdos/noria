@@ -13,8 +13,6 @@ mod graph;
 
 use distributary::srv;
 use tarpc::util::FirstSocketAddr;
-use std::time::Duration;
-use std::thread;
 
 fn main() {
     use clap::{Arg, App};
