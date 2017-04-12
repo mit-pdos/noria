@@ -64,25 +64,34 @@ impl<'a> Writer for W<'a> {
     }
 }
 
-pub fn make_reader<'a>(pool: &'a mysql::Pool) -> mysql::conn::Stmt<'a> {
-    pool.prepare("SELECT id, title, votes FROM art WHERE id = :id").unwrap()
+pub fn make_reader(pool: &mysql::Pool) -> mysql::PooledConn {
+    pool.get_conn().unwrap()
 }
 
-impl<'a> Reader for mysql::conn::Stmt<'a> {
+impl Reader for mysql::PooledConn {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let res = ids.iter()
+        let query = ids.iter()
             .map(|&(_, ref article_id)| {
-                for row in self.execute(params!{"id" => &article_id}).unwrap() {
-                    let mut rr = row.unwrap();
-                    return ArticleResult::Article {
-                               id: rr.get(0).unwrap(),
-                               title: rr.get(1).unwrap(),
-                               votes: rr.get(2).unwrap(),
-                           };
-                }
-                ArticleResult::NoSuchArticle
-            })
-            .collect();
+                     format!("SELECT id, title, votes FROM art WHERE id = {}; ",
+                             article_id)
+                 })
+            .collect::<Vec<_>>()
+            .join("");
+
+        let mut res = Vec::new();
+        let mut qresult = self.query(query).unwrap();
+        while qresult.more_results_exists() {
+            for row in qresult.by_ref() {
+                let mut rr = row.unwrap();
+                res.push(ArticleResult::Article {
+                             id: rr.get(0).unwrap(),
+                             title: rr.get(1).unwrap(),
+                             votes: rr.get(2).unwrap(),
+                         });
+            }
+        }
+        assert_eq!(res.len(), ids.len());
+
         (Ok(res), Period::PreMigration)
     }
 }
