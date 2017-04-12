@@ -12,7 +12,6 @@ pub struct Pool {
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
     v_prep: mysql::conn::Stmt<'a>,
-    conn: mysql::PooledConn,
     mc: memcached::Client,
 }
 
