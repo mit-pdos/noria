@@ -106,10 +106,10 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
 
     let mut vote_qstring = String::new();
-    for i in 0..batch_size {
+    for i in 1..batch_size + 1 {
         vote_qstring.push_str(&format!("INSERT INTO vt (u, id) VALUES (@P{}, @P{}); ",
-                                       i * 2,
-                                       i * 2 + 1));
+                                       i * 2 - 1,
+                                       i * 2));
     }
 
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
