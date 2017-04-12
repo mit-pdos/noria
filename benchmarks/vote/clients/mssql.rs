@@ -23,7 +23,8 @@ fn mkc(addr: &str) -> Client {
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON;",
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                                  db))
             .and_then(|r| r)
             .collect()
@@ -62,7 +63,8 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; ",
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                                      db))
                 .and_then(|r| r)
                 .collect()
