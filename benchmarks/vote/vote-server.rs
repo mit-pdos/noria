@@ -13,8 +13,6 @@ mod graph;
 
 use distributary::srv;
 use tarpc::util::FirstSocketAddr;
-use std::time::Duration;
-use std::thread;
 
 fn main() {
     use clap::{Arg, App};
@@ -31,10 +29,5 @@ fn main() {
 
     // start processing
     // TODO: what about the node indices?
-    let _srv = srv::run(g.graph, addr.first_socket_addr(), 8);
-    // run forever
-    loop {
-        // but without wasting CPU
-        thread::sleep(Duration::from_secs(1));
-    }
+    srv::run(g.graph, addr.first_socket_addr());
 }

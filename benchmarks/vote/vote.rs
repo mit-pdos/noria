@@ -81,6 +81,10 @@ fn main() {
             .takes_value(true)
             .help("Period for transition to new views for readers and writers")
             .requires("migrate"))
+        .arg(Arg::with_name("quiet")
+            .short("q")
+            .long("quiet")
+            .help("No noisy output while running"))
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -103,6 +107,7 @@ fn main() {
     }
 
     let mut config = exercise::RuntimeConfig::new(narticles, runtime);
+    config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);

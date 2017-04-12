@@ -54,9 +54,9 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = mig.add_ingredient("transfers",
-                                       &["src_acct", "dst_acct", "amount"],
-                                       Base::default());
+        transfers = mig.add_transactional_base("transfers",
+                                               &["src_acct", "dst_acct", "amount"],
+                                               Base::default());
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -109,8 +109,8 @@ impl Bank {
             mig.add_ingredient("identity",
                                &["acct_id", "credit", "debit"],
                                distributary::Identity::new(self.balances));
-        let _ = mig.transactional_maintain(identity, 0);
-        let _ = mig.commit();
+        mig.transactional_maintain(identity, 0);
+        mig.commit();
     }
 }
 
@@ -136,13 +136,13 @@ impl Getter for TxGet {
             self(&id.into()).map(|(res, token)| {
                 assert_eq!(res.len(), 1);
                 res.into_iter().next().map(|row| {
-                                               // we only care about the first result
-                                               let mut row = row.into_iter();
-                                               let _: i64 = row.next().unwrap().into();
-                                               let credit: i64 = row.next().unwrap().into();
-                                               let debit: i64 = row.next().unwrap().into();
-                                               (credit - debit, token)
-                                           })
+                    // we only care about the first result
+                    let mut row = row.into_iter();
+                    let _: i64 = row.next().unwrap().into();
+                    let credit: i64 = row.next().unwrap().into();
+                    let debit: i64 = row.next().unwrap().into();
+                    (credit - debit, token)
+                })
             })
         })
     }
@@ -420,7 +420,7 @@ fn main() {
                            runtime,
                            verbose,
                            audit,
-                           false,  /* measure_latency */
+                           false, /* measure_latency */
                            coarse_checktables,
                            &mut transactions)
                 })
@@ -450,7 +450,7 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
-                       true,  /* measure_latency */
+                       true, /* measure_latency */
                        coarse_checktables,
                        &mut transactions)
             })
