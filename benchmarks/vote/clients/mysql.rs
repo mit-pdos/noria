@@ -4,8 +4,7 @@ use common::{Writer, Reader, ArticleResult, Period};
 
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
-    v_prep: mysql::conn::Stmt<'a>,
-    vc_prep: mysql::conn::Stmt<'a>,
+    conn: mysql::PooledConn,
 }
 
 pub fn setup(addr: &str, write: bool) -> mysql::Pool {
@@ -48,10 +47,7 @@ pub fn make_writer<'a>(pool: &'a mysql::Pool) -> W<'a> {
     W {
         a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
             .unwrap(),
-        v_prep: pool.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)")
-            .unwrap(),
-        vc_prep: pool.prepare("UPDATE art SET votes = votes + 1 WHERE id = :id")
-            .unwrap(),
+        conn: pool.get_conn().unwrap(),
     }
 }
 
@@ -63,14 +59,21 @@ impl<'a> Writer for W<'a> {
             .unwrap();
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        for &(user_id, article_id) in ids {
-            self.v_prep
-                .execute(params!{"user" => &user_id, "id" => &article_id})
-                .unwrap();
-            self.vc_prep
-                .execute(params!{"id" => &article_id})
-                .unwrap();
-        }
+        let values = ids.iter()
+            .map(|&(ref u, ref a)| format!("({}, {})", u, a))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!("INSERT INTO vt (u, id) VALUES {}; ", values);
+
+        self.conn.query(query).unwrap();
+
+        let query = ids.iter()
+            .map(|&(_, ref a)| format!("UPDATE art SET votes = votes + 1 WHERE id = {}; ", a))
+            .collect::<Vec<_>>()
+            .join("");
+
+        self.conn.query(query).unwrap();
+
         Period::PreMigration
     }
 }
