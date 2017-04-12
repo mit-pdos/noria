@@ -25,7 +25,7 @@ fn main() {
 
     let addr = args.value_of("ADDR").unwrap();
     println!("Attempting to start soup on {}", addr);
-    let g = graph::make();
+    let g = graph::make(false);
 
     // start processing
     // TODO: what about the node indices?
