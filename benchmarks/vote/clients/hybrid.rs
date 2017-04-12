@@ -43,11 +43,10 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
 
         // create tables with indices
         pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
-                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY",
+                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
-        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
-                        KEY id (id)) ENGINE = MEMORY",
+        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
     }
