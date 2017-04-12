@@ -75,8 +75,7 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE TABLE vt (
                              u bigint,
-                             id bigint,
-                             PRIMARY KEY NONCLUSTERED (u, id)
+                             id bigint
                              );")
                 .and_then(|r| r)
                 .collect()
