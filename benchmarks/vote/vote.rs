@@ -76,6 +76,11 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("transactions")
+            .short("t")
+            .long("transactions")
+            .takes_value(false)
+            .help("Use transactional reads and writes"))
         .arg(Arg::with_name("crossover")
             .short("x")
             .takes_value(true)
@@ -90,6 +95,7 @@ fn main() {
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
+    let transactions = args.is_present("transactions");
     let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
@@ -115,7 +121,7 @@ fn main() {
     config.use_distribution(dist);
 
     // setup db
-    let g = graph::make();
+    let g = graph::make(transactions);
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
@@ -134,6 +140,7 @@ fn main() {
         new_vote: None,
         i: 0,
         x: Crossover::new(crossover),
+        transactions: transactions,
     };
 
     let put_stats;
@@ -255,10 +262,12 @@ impl Crossover {
         if self.done {
             return true;
         }
-        if self.crossover.is_none() || self.swapped.is_none() {
+        if self.swapped.is_none() {
             return false;
         }
-
+        if self.crossover.is_none() {
+            return true;
+        }
 
         self.iteration += 1;
         if self.iteration == (1 << 8) {
@@ -381,6 +390,7 @@ struct Spoon {
     i: usize,
     x: Crossover,
     new_vote: Option<mpsc::Receiver<Mutator>>,
+    transactions: bool,
 }
 
 impl Writer for Spoon {
@@ -437,6 +447,7 @@ impl Writer for Spoon {
                 .iter()
                 .map(|g| unsafe { g.clone() })
                 .collect(),
+            transactions: self.transactions,
         }
     }
 }
@@ -445,6 +456,7 @@ struct Migrator {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     mut_tx: mpsc::SyncSender<Mutator>,
     getters: Vec<Getter>,
+    transactions: bool,
 }
 
 impl MigrationHandle for Migrator {
@@ -462,7 +474,11 @@ impl MigrationHandle for Migrator {
             let mut mig = g.graph.start_migration();
 
             // add new "ratings" base table
-            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
+            let rating = if self.transactions {
+                mig.add_transactional_base("rating", &["user", "id", "stars"], Base::default())
+            } else {
+                mig.add_ingredient("rating", &["user", "id", "stars"], Base::default())
+            };
 
             // add sum of ratings
             let rs = mig.add_ingredient("rsum",
