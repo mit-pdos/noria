@@ -190,13 +190,17 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
-                    (0..n).map(|_| u.gen_range(0, config.narticles) as i64).collect()
+                    (0..n)
+                        .map(|_| u.gen_range(0, config.narticles) as i64)
+                        .collect()
                 }
                 Distribution::Zipf(e) => {
                     let mut z =
                         ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
                             .unwrap();
-                    (0..n).map(|_| z.gen_range(0, config.narticles) as i64).collect()
+                    (0..n)
+                        .map(|_| z.gen_range(0, config.narticles) as i64)
+                        .collect()
                 }
             }
         };
@@ -205,8 +209,10 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
         let start = time::Instant::now();
         let mut last_reported = start;
         let report_every = time::Duration::from_millis(200);
-        let mut batch: Vec<_> =
-            (0..config.batch_size).into_iter().map(|i| (i as i64, i as i64)).collect();
+        let mut batch: Vec<_> = (0..config.batch_size)
+            .into_iter()
+            .map(|i| (i as i64, i as i64))
+            .collect();
         while start.elapsed() < config.runtime {
             // construct ids for the next batch
             for &mut (_, ref mut aid) in &mut batch {

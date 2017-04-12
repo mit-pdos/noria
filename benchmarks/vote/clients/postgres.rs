@@ -12,19 +12,26 @@ pub fn setup(addr: &str, write: bool) -> postgres::Connection {
     if write {
         let mut check_new_params = params.clone();
         check_new_params.database = Some(String::from("postgres"));
-        let db = params.database.clone().unwrap_or_else(|| String::from("soup_bench"));
+        let db = params
+            .database
+            .clone()
+            .unwrap_or_else(|| String::from("soup_bench"));
         let x = postgres::Connection::connect(check_new_params, postgres::SslMode::None).unwrap();
-        if x.execute("SELECT datname FROM pg_database WHERE datname=$1", &[&db]).unwrap() != 0 {
-            x.execute(format!("DROP DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
+        if x.execute("SELECT datname FROM pg_database WHERE datname=$1", &[&db])
+               .unwrap() != 0 {
+            x.execute(format!("DROP DATABASE \"{}\"", &db).as_str(), &[])
+                .unwrap();
         }
-        x.execute(format!("CREATE DATABASE \"{}\"", &db).as_str(), &[]).unwrap();
+        x.execute(format!("CREATE DATABASE \"{}\"", &db).as_str(), &[])
+            .unwrap();
 
         // create tables
         let x = postgres::Connection::connect(params.clone(), postgres::SslMode::None).unwrap();
         x.execute("CREATE TABLE art (id bigint, title varchar(255), votes bigint)",
                      &[])
             .unwrap();
-        x.execute("CREATE TABLE vt (u bigint, id bigint)", &[]).unwrap();
+        x.execute("CREATE TABLE vt (u bigint, id bigint)", &[])
+            .unwrap();
 
         // create indices
         x.execute("CREATE INDEX ON art (id)", &[]).unwrap();
@@ -42,9 +49,12 @@ pub struct W<'a> {
 
 pub fn make_writer<'a>(conn: &'a postgres::Connection) -> W<'a> {
     W {
-        a_prep: conn.prepare("INSERT INTO art (id, title, votes) VALUES ($1, $2, 0)").unwrap(),
-        v_prep: conn.prepare("INSERT INTO vt (u, id) VALUES ($1, $2)").unwrap(),
-        vc_prep: conn.prepare("UPDATE art SET votes = votes + 1 WHERE id = $1").unwrap(),
+        a_prep: conn.prepare("INSERT INTO art (id, title, votes) VALUES ($1, $2, 0)")
+            .unwrap(),
+        v_prep: conn.prepare("INSERT INTO vt (u, id) VALUES ($1, $2)")
+            .unwrap(),
+        vc_prep: conn.prepare("UPDATE art SET votes = votes + 1 WHERE id = $1")
+            .unwrap(),
     }
 }
 
@@ -61,7 +71,8 @@ impl<'a> Writer for W<'a> {
 }
 
 pub fn make_reader<'a>(conn: &'a postgres::Connection) -> postgres::stmt::Statement<'a> {
-    conn.prepare("SELECT id, title, votes FROM art WHERE id = $1").unwrap()
+    conn.prepare("SELECT id, title, votes FROM art WHERE id = $1")
+        .unwrap()
 }
 
 impl<'a> Reader for postgres::stmt::Statement<'a> {

@@ -69,7 +69,8 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     let question_mark_a = Regex::new("[:space:]*\\?[A|a]").unwrap();
     let unclosed_quote = Regex::new("='\\z").unwrap();
 
-    queries.into_iter()
+    queries
+        .into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
         .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc")))
         .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "")))
@@ -126,10 +127,7 @@ fn main() {
     let mut ok = Vec::new();
     let mut rejected = Vec::new();
     for fname in files {
-        if SKIP_FILES.contains(&fname.file_name()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap()) {
+        if SKIP_FILES.contains(&fname.file_name().unwrap().to_str().unwrap()) {
             continue;
         }
 

@@ -48,10 +48,14 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
         .and_then(|conn| {
-                      conn.simple_exec(format!("DROP DATABASE {};", db)).and_then(|r| r).collect()
+                      conn.simple_exec(format!("DROP DATABASE {};", db))
+                          .and_then(|r| r)
+                          .collect()
                   })
         .and_then(|(_, conn)| {
-                      conn.simple_exec(format!("CREATE DATABASE {};", db)).and_then(|r| r).collect()
+                      conn.simple_exec(format!("CREATE DATABASE {};", db))
+                          .and_then(|r| r)
+                          .collect()
                   })
         .and_then(|(_, conn)| {
             conn.simple_exec(format!("USE {}; \
@@ -73,13 +77,13 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE TABLE vt (
+                      conn.simple_exec("CREATE TABLE vt (
                              u bigint,
                              id bigint
                              );")
-                .and_then(|r| r)
-                .collect()
-        })
+                          .and_then(|r| r)
+                          .collect()
+                  })
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
@@ -99,7 +103,8 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
     drop(core);
 
     let client = mkc(addr);
-    let a_prep = client.conn
+    let a_prep = client
+        .conn
         .as_ref()
         .unwrap()
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
@@ -134,7 +139,9 @@ pub fn make_reader(addr: &str, batch_size: usize) -> R {
 
     let mut qstring = String::new();
     for i in 1..batch_size + 1 {
-        qstring.push_str(&format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{};", i));
+        let sql = format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{};",
+                          i);
+        qstring.push_str(&sql);
     }
 
     let prep = client.conn.as_ref().unwrap().prepare(qstring);
@@ -163,10 +170,7 @@ impl Writer for W {
             .exec(&self.a_prep, &[&article_id, &title.as_str()])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client
-            .core
-            .run(fut)
-            .unwrap();
+        let (_, conn) = self.client.core.run(fut).unwrap();
         self.client.conn = Some(conn);
     }
 
