@@ -197,11 +197,7 @@ impl Reader for R {
         // scope needed so that the compiler realizes that `fut` goes out of scope, thus returning
         // the borrow of `res`
         {
-            let data = ids.iter()
-                .fold(Vec::new(), |mut acc, &(_, ref a)| {
-                    acc.push(a as &_);
-                    acc
-                });
+            let data: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
             let fut = self.client
                 .conn
                 .take()
@@ -209,19 +205,18 @@ impl Reader for R {
                 .query(&self.prep, data.as_slice())
                 .for_each(|qs| {
                     let q_res: Vec<ArticleResult> = qs.wait()
-                        .fold(Vec::new(), |mut acc,
-                               row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
+                        .map(|row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
                             let row = row.unwrap();
                             let aid: i64 = row.get(0);
                             let title: &str = row.get(1);
                             let votes: i64 = row.get(2);
-                            acc.push(ArticleResult::Article {
-                                         id: aid,
-                                         title: String::from(title),
-                                         votes: votes,
-                                     });
-                            acc
-                        });
+                            ArticleResult::Article {
+                                id: aid,
+                                title: String::from(title),
+                                votes: votes,
+                            }
+                        })
+                        .collect();
                     res.extend(q_res);
                     Ok(())
                 });
