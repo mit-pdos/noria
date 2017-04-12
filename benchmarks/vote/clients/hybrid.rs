@@ -76,8 +76,6 @@ impl<'a> Writer for W<'a> {
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         for &(user_id, article_id) in ids {
             self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
-            // memcached invalidate: we use a hack with a short (1s) lifetime here because the
-            // `memcached` crate does not expose `delete()`.
             drop(self.mc.delete(format!("article_{}_vc", article_id).as_bytes()));
         }
         Period::PreMigration
