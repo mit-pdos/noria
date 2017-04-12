@@ -68,6 +68,10 @@ impl RuntimeConfig {
         }
     }
 
+    pub fn batch_size(&self) -> usize {
+        self.batch_size
+    }
+
     #[allow(dead_code)]
     pub fn use_distribution(&mut self, d: Distribution) {
         self.distribution = d;

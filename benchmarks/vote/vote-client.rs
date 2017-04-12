@@ -171,7 +171,10 @@ fn main() {
             let stats = match client {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
-                "mssql" => exercise::launch_reader(clients::mssql::make_reader(addr), config),
+                "mssql" => {
+                    exercise::launch_reader(clients::mssql::make_reader(addr, config.batch_size()),
+                                            config)
+                }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
@@ -218,7 +221,11 @@ fn main() {
             let stats = match client {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
-                "mssql" => exercise::launch_writer(clients::mssql::make_writer(addr), config, None),
+                "mssql" => {
+                    exercise::launch_writer(clients::mssql::make_writer(addr, config.batch_size()),
+                                            config,
+                                            None)
+                }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
