@@ -22,7 +22,7 @@ pub mod payload;
 pub mod statistics;
 pub mod keys;
 pub mod core;
-mod migrate;
+pub mod migrate;
 mod transactions;
 mod hook;
 
@@ -165,6 +165,7 @@ pub struct Blender {
     source: NodeIndex,
     ndomains: usize,
     checktable: Arc<Mutex<checktable::CheckTable>>,
+    partial: HashSet<NodeIndex>,
 
     txs: HashMap<domain::Index, mpsc::SyncSender<payload::Packet>>,
     domains: Vec<thread::JoinHandle<()>>,
@@ -184,6 +185,7 @@ impl Default for Blender {
             source: source,
             ndomains: 0,
             checktable: Arc::new(Mutex::new(checktable::CheckTable::new())),
+            partial: Default::default(),
 
             txs: HashMap::default(),
             domains: Vec::new(),
@@ -600,12 +602,8 @@ impl<'a> Migration<'a> {
 
     /// Set up the given node such that its output can be efficiently queried.
     ///
-    /// The returned function can be called with a `Query`, and any matching results will be
-    /// returned.
-    pub fn maintain(&mut self,
-                    n: core::NodeAddress,
-                    key: usize)
-                    -> Box<Fn(&prelude::DataType) -> Result<core::Datas, ()> + Send> {
+    /// To query into the maintained state, use `Blender::get_getter`.
+    pub fn maintain(&mut self, n: core::NodeAddress, key: usize) {
         self.ensure_reader_for(n);
         let ri = self.readers[n.as_global()];
 
@@ -621,9 +619,6 @@ impl<'a> Migration<'a> {
                 inner.state = Some(r);
                 *wh = Some(w);
             }
-
-            // cook up a function to query this materialized state
-            inner.get_reader().unwrap()
         } else {
             unreachable!("tried to use non-reader node as a reader")
         }
@@ -632,20 +627,14 @@ impl<'a> Migration<'a> {
     /// Set up the given node such that its output can be efficiently queried, and the results can
     /// be used in transactions.
     ///
-    /// The returned function can be called with a `Query`, and any matching results will be
-    /// returned, along with a token.
-    pub fn transactional_maintain
-        (&mut self,
-         n: core::NodeAddress,
-         key: usize)
-         -> Result<Box<Fn(&prelude::DataType) -> Result<(core::Datas, checktable::Token), ()> + Send>, ()> {
+    ///
+    /// To query into the maintained state, use `Blender::get_transactional_getter`.
+    pub fn transactional_maintain(&mut self, n: core::NodeAddress, key: usize) {
         self.ensure_reader_for(n);
         self.ensure_token_generator(n, key);
         let ri = self.readers[n.as_global()];
 
-        if !self.mainline.ingredients[ri].is_transactional() {
-            return Err(());
-        }
+        assert!(self.mainline.ingredients[ri].is_transactional());
 
         // we need to do these here because we'll mutably borrow self.mainline in the if let
         let cols = self.mainline.ingredients[ri].fields().len();
@@ -659,21 +648,6 @@ impl<'a> Migration<'a> {
                 inner.state = Some(r);
                 *wh = Some(w);
             }
-
-            // cook up a function to query this materialized state
-            let arc = inner.state
-                .as_ref()
-                .unwrap()
-                .clone();
-            let generator = inner.token_generator.clone().unwrap();
-            Ok(Box::new(move |q: &prelude::DataType| -> Result<(core::Datas, checktable::Token), ()> {
-                arc.find_and(q,
-                              |rs| rs.into_iter().map(|r|(&**r).clone()).collect())
-                    .map(|(res, ts)| {
-                        let token = generator.generate(ts, q.clone());
-                        (res.unwrap_or_else(Vec::new), token)
-                    })
-            }))
         } else {
             unreachable!("tried to use non-reader node as a reader")
         }
@@ -700,7 +674,8 @@ impl<'a> Migration<'a> {
                           n: core::NodeAddress,
                           name: String,
                           servers: &[(&str, usize)],
-                          key: usize) -> io::Result<core::NodeAddress> {
+                          key: usize)
+                          -> io::Result<core::NodeAddress> {
         let h = try!(hook::Hook::new(name, servers, vec![key]));
         let h = node::Type::Hook(Some(h));
         let h = self.mainline.ingredients[*n.as_global()].mirror(h);
@@ -846,13 +821,13 @@ impl<'a> Migration<'a> {
         debug!(log, "calculating materializations");
         let index = domain_nodes.iter()
             .map(|(domain, nodes)| {
-                use self::migrate::materialization::{pick, index};
-                debug!(log, "picking materializations"; "domain" => domain.index());
-                let mat = pick(&log, &mainline.ingredients, &nodes[..]);
-                debug!(log, "deriving indices"; "domain" => domain.index());
-                let idx = index(&log, &mainline.ingredients, &nodes[..], mat);
-                (*domain, idx)
-            })
+                     use self::migrate::materialization::{pick, index};
+                     debug!(log, "picking materializations"; "domain" => domain.index());
+                     let mat = pick(&log, &mainline.ingredients, &nodes[..]);
+                     debug!(log, "deriving indices"; "domain" => domain.index());
+                     let idx = index(&log, &mainline.ingredients, &nodes[..], mat);
+                     (*domain, idx)
+                 })
             .collect();
 
         let mut uninformed_domain_nodes = domain_nodes.clone();
@@ -903,14 +878,24 @@ impl<'a> Migration<'a> {
 
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
-        migrate::materialization::initialize(&log,
-                                             &mainline.ingredients,
-                                             mainline.source,
-                                             &new,
-                                             index,
-                                             &mut mainline.txs);
+        let domains_on_path = migrate::materialization::initialize(&log,
+                                                                   &mut mainline.ingredients,
+                                                                   mainline.source,
+                                                                   &new,
+                                                                   &mut mainline.partial,
+                                                                   index,
+                                                                   &mut mainline.txs);
 
         info!(log, "finalizing migration");
+
+        // Ideally this should happen as part of checktable::perform_migration(), but we don't know
+        // the replay paths then. It is harmless to do now since we know the new replay paths won't
+        // request timestamps until after the migration in finished.
+        mainline.checktable
+            .lock()
+            .unwrap()
+            .add_replay_paths(domains_on_path);
+
         migrate::transactions::finalize(ingresses_from_base, &log, &mut mainline.txs, end_ts);
 
         warn!(log, "migration completed"; "ms" => dur_to_ns!(start.elapsed()) / 1_000_000);

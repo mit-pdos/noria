@@ -73,7 +73,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        mig.transactional_maintain(balances, 0).unwrap();
+        mig.transactional_maintain(balances, 0);
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
@@ -109,8 +109,8 @@ impl Bank {
             mig.add_ingredient("identity",
                                &["acct_id", "credit", "debit"],
                                distributary::Identity::new(self.balances));
-        let _ = mig.transactional_maintain(identity, 0).unwrap();
-        let _ = mig.commit();
+        mig.transactional_maintain(identity, 0);
+        mig.commit();
     }
 }
 
@@ -136,13 +136,13 @@ impl Getter for TxGet {
             self(&id.into()).map(|(res, token)| {
                 assert_eq!(res.len(), 1);
                 res.into_iter().next().map(|row| {
-                                               // we only care about the first result
-                                               let mut row = row.into_iter();
-                                               let _: i64 = row.next().unwrap().into();
-                                               let credit: i64 = row.next().unwrap().into();
-                                               let debit: i64 = row.next().unwrap().into();
-                                               (credit - debit, token)
-                                           })
+                    // we only care about the first result
+                    let mut row = row.into_iter();
+                    let _: i64 = row.next().unwrap().into();
+                    let credit: i64 = row.next().unwrap().into();
+                    let debit: i64 = row.next().unwrap().into();
+                    (credit - debit, token)
+                })
             })
         })
     }
@@ -420,7 +420,7 @@ fn main() {
                            runtime,
                            verbose,
                            audit,
-                           false,  /* measure_latency */
+                           false, /* measure_latency */
                            coarse_checktables,
                            &mut transactions)
                 })
@@ -450,7 +450,7 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
-                       true,  /* measure_latency */
+                       true, /* measure_latency */
                        coarse_checktables,
                        &mut transactions)
             })

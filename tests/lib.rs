@@ -12,7 +12,7 @@ const SETTLE_TIME_MS: u64 = 100;
 fn it_works() {
     // set up graph
     let mut g = distributary::Blender::new();
-    let (a, b, cq) = {
+    let (a, b, c) = {
         let mut mig = g.start_migration();
         let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::new(vec![0]));
         let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::new(vec![0]));
@@ -22,11 +22,12 @@ fn it_works() {
         emits.insert(b, vec![0, 1]);
         let u = distributary::Union::new(emits);
         let c = mig.add_ingredient("c", &["a", "b"], u);
-        let cq = mig.maintain(c, 0);
+        mig.maintain(c, 0);
         mig.commit();
-        (a, b, cq)
+        (a, b, c)
     };
 
+    let cq = g.get_getter(c).unwrap();
     let muta = g.get_mutator(a);
     let mutb = g.get_mutator(b);
     let id: distributary::DataType = 1.into();
@@ -152,7 +153,7 @@ fn shared_interdomain_ancestor() {
 fn it_works_w_mat() {
     // set up graph
     let mut g = distributary::Blender::new();
-    let (a, b, cq) = {
+    let (a, b, c) = {
         let mut mig = g.start_migration();
         let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::default());
         let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::default());
@@ -162,11 +163,12 @@ fn it_works_w_mat() {
         emits.insert(b, vec![0, 1]);
         let u = distributary::Union::new(emits);
         let c = mig.add_ingredient("c", &["a", "b"], u);
-        let cq = mig.maintain(c, 0);
+        mig.maintain(c, 0);
         mig.commit();
-        (a, b, cq)
+        (a, b, c)
     };
 
+    let cq = g.get_getter(c).unwrap();
     let muta = g.get_mutator(a);
     let mutb = g.get_mutator(b);
     let id: distributary::DataType = 1.into();
@@ -250,7 +252,7 @@ fn votes() {
 
     // set up graph
     let mut g = distributary::Blender::new();
-    let (article1, article2, vote, articleq, vcq, endq) = {
+    let (article1, article2, vote, article, vc, end) = {
         let mut mig = g.start_migration();
 
         // add article base nodes (we use two so we can exercise unions too)
@@ -263,7 +265,7 @@ fn votes() {
         emits.insert(article2, vec![0, 1]);
         let u = Union::new(emits);
         let article = mig.add_ingredient("article", &["id", "title"], u);
-        let articleq = mig.maintain(article, 0);
+        mig.maintain(article, 0);
 
         // add vote base table
         let vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
@@ -272,18 +274,22 @@ fn votes() {
         let vc = mig.add_ingredient("vc",
                                     &["id", "votes"],
                                     Aggregation::COUNT.over(vote, 0, &[1]));
-        let vcq = mig.maintain(vc, 0);
+        mig.maintain(vc, 0);
 
         // add final join using first field from article and first from vc
         use distributary::JoinSource::*;
         let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("end", &["id", "title", "votes"], j);
-        let endq = mig.maintain(end, 0);
+        mig.maintain(end, 0);
 
         // start processing
         mig.commit();
-        (article1, article2, vote, articleq, vcq, endq)
+        (article1, article2, vote, article, vc, end)
     };
+
+    let articleq = g.get_getter(article).unwrap();
+    let vcq = g.get_getter(vc).unwrap();
+    let endq = g.get_getter(end).unwrap();
 
     let mut1 = g.get_mutator(article1);
     let mut2 = g.get_mutator(article2);
@@ -343,7 +349,7 @@ fn transactional_vote() {
     let mut g = distributary::Blender::new();
     let validate = g.get_validator();
 
-    let (article1, article2, vote, articleq, vcq, endq, endq_title, endq_votes) = {
+    let (article1, article2, vote, article, vc, end, end_title, end_votes) = {
         let mut mig = g.start_migration();
 
         // add article base nodes (we use two so we can exercise unions too)
@@ -356,7 +362,7 @@ fn transactional_vote() {
         emits.insert(article2, vec![0, 1]);
         let u = Union::new(emits);
         let article = mig.add_ingredient("article", &["id", "title"], u);
-        let articleq = mig.transactional_maintain(article, 0).unwrap();
+        mig.transactional_maintain(article, 0);
 
         // add vote base table
         let vote = mig.add_transactional_base("vote", &["user", "id"], Base::default());
@@ -365,23 +371,29 @@ fn transactional_vote() {
         let vc = mig.add_ingredient("vc",
                                     &["id", "votes"],
                                     Aggregation::COUNT.over(vote, 0, &[1]));
-        let vcq = mig.maintain(vc, 0);
+        mig.maintain(vc, 0);
 
         // add final join using first field from article and first from vc
         use distributary::JoinSource::*;
         let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("end", &["id", "title", "votes"], j);
-        let end2 = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
-        let end3 = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
+        let end_title = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
+        let end_votes = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
 
-        let endq = mig.transactional_maintain(end, 0).unwrap();
-        let endq_title = mig.transactional_maintain(end2, 1).unwrap();
-        let endq_votes = mig.transactional_maintain(end3, 2).unwrap();
+        mig.transactional_maintain(end, 0);
+        mig.transactional_maintain(end_title, 1);
+        mig.transactional_maintain(end_votes, 2);
 
         // start processing
         mig.commit();
-        (article1, article2, vote, articleq, vcq, endq, endq_title, endq_votes)
+        (article1, article2, vote, article, vc, end, end_title, end_votes)
     };
+
+    let articleq = g.get_transactional_getter(article).unwrap();
+    let vcq = g.get_getter(vc).unwrap();
+    let endq = g.get_transactional_getter(end).unwrap();
+    let endq_title = g.get_transactional_getter(end_title).unwrap();
+    let endq_votes = g.get_transactional_getter(end_votes).unwrap();
 
     let mut1 = g.get_mutator(article1);
     let mut2 = g.get_mutator(article2);
@@ -473,7 +485,7 @@ fn empty_migration() {
         mig.commit();
     }
 
-    let (a, b, cq) = {
+    let (a, b, c) = {
         let mut mig = g.start_migration();
         let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::default());
         let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::default());
@@ -483,11 +495,12 @@ fn empty_migration() {
         emits.insert(b, vec![0, 1]);
         let u = distributary::Union::new(emits);
         let c = mig.add_ingredient("c", &["a", "b"], u);
-        let cq = mig.maintain(c, 0);
+        mig.maintain(c, 0);
         mig.commit();
-        (a, b, cq)
+        (a, b, c)
     };
 
+    let cq = g.get_getter(c).unwrap();
     let muta = g.get_mutator(a);
     let mutb = g.get_mutator(b);
     let id: distributary::DataType = 1.into();
@@ -519,13 +532,15 @@ fn simple_migration() {
 
     // set up graph
     let mut g = distributary::Blender::new();
-    let (a, aq) = {
+    let a = {
         let mut mig = g.start_migration();
         let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::default());
-        let aq = mig.maintain(a, 0);
+        mig.maintain(a, 0);
         mig.commit();
-        (a, aq)
+        a
     };
+
+    let aq = g.get_getter(a).unwrap();
     let muta = g.get_mutator(a);
 
     // send a value on a
@@ -538,13 +553,15 @@ fn simple_migration() {
     assert_eq!(aq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // add unrelated node b in a migration
-    let (b, bq) = {
+    let b = {
         let mut mig = g.start_migration();
         let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::default());
-        let bq = mig.maintain(b, 0);
+        mig.maintain(b, 0);
         mig.commit();
-        (b, bq)
+        b
     };
+
+    let bq = g.get_getter(b).unwrap();
     let mutb = g.get_mutator(b);
 
     // send a value on b
@@ -561,13 +578,15 @@ fn simple_migration() {
 fn transactional_migration() {
     // set up graph
     let mut g = distributary::Blender::new();
-    let (a, aq) = {
+    let a = {
         let mut mig = g.start_migration();
         let a = mig.add_transactional_base("a", &["a", "b"], distributary::Base::default());
-        let aq = mig.transactional_maintain(a, 0).unwrap();
+        mig.transactional_maintain(a, 0);
         mig.commit();
-        (a, aq)
+        a
     };
+
+    let aq = g.get_transactional_getter(a).unwrap();
     let muta = g.get_mutator(a);
 
     // send a value on a
@@ -580,13 +599,15 @@ fn transactional_migration() {
     assert_eq!(aq(&1.into()).unwrap().0, vec![vec![1.into(), 2.into()]]);
 
     // add unrelated node b in a migration
-    let (b, bq) = {
+    let b = {
         let mut mig = g.start_migration();
         let b = mig.add_transactional_base("b", &["a", "b"], distributary::Base::default());
-        let bq = mig.transactional_maintain(b, 0).unwrap();
+        mig.transactional_maintain(b, 0);
         mig.commit();
-        (b, bq)
+        b
     };
+
+    let bq = g.get_transactional_getter(b).unwrap();
     let mutb = g.get_mutator(b);
 
     // send a value on b
@@ -598,17 +619,19 @@ fn transactional_migration() {
     // check that b got it
     assert_eq!(bq(&2.into()).unwrap().0, vec![vec![2.into(), 4.into()]]);
 
-    let cq = {
+    let c = {
         let mut mig = g.start_migration();
         let mut emits = HashMap::new();
         emits.insert(a, vec![0, 1]);
         emits.insert(b, vec![0, 1]);
         let u = distributary::Union::new(emits);
         let c = mig.add_ingredient("c", &["a", "b"], u);
-        let cq = mig.transactional_maintain(c, 0).unwrap();
-        let _ = mig.commit();
-        cq
+        mig.transactional_maintain(c, 0);
+        mig.commit();
+        c
     };
+
+    let cq = g.get_transactional_getter(c).unwrap();
 
     // check that c has both previous entries
     assert_eq!(aq(&1.into()).unwrap().0, vec![vec![1.into(), 2.into()]]);
@@ -667,15 +690,17 @@ fn independent_domain_migration() {
 
     // set up graph
     let mut g = distributary::Blender::new();
-    let (a, aq, domain) = {
+    let (a, domain) = {
         let mut mig = g.start_migration();
         let domain = mig.add_domain();
         let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::default());
         mig.assign_domain(a, domain);
-        let aq = mig.maintain(a, 0);
+        mig.maintain(a, 0);
         mig.commit();
-        (a, aq, domain)
+        (a, domain)
     };
+
+    let aq = g.get_getter(a).unwrap();
     let muta = g.get_mutator(a);
 
     // send a value on a
@@ -688,14 +713,16 @@ fn independent_domain_migration() {
     assert_eq!(aq(&id), Ok(vec![vec![1.into(), 2.into()]]));
 
     // add unrelated node b in a migration
-    let (b, bq) = {
+    let b = {
         let mut mig = g.start_migration();
         let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::default());
         mig.assign_domain(b, domain);
-        let bq = mig.maintain(b, 0);
+        mig.maintain(b, 0);
         mig.commit();
-        (b, bq)
+        b
     };
+
+    let bq = g.get_getter(b).unwrap();
     let mutb = g.get_mutator(b);
 
     // TODO: check that b is actually running in `domain`
@@ -752,6 +779,13 @@ fn domain_amend_migration() {
 }
 
 #[test]
+#[ignore]
+// this test is ignored because partial materialization does not forward for keys unless they are
+// explicitly queried for. to re-add support for streaming consumers of Readers, we would need to
+// add a mechanism for registering interesting a key (effectively triggering a replay of that key
+// when called). this should be fairly straightforward to add in the existing infrastructure (just
+// use the same trigger that's given to the `backlog::ReadHandle` when it is partial), but it's
+// work we're fine putting off for now.
 fn state_replay_migration_stream() {
     // we're going to set up a migration test that requires replaying existing state
     // to do that, we'll first create a schema with just a base table, and write some stuff to it.
@@ -866,12 +900,11 @@ fn migration_depends_on_unchanged_domain() {
     assert!(true);
 }
 
-#[test]
-fn full_vote_migration() {
+fn do_full_vote_migration(old_puts_after: bool) {
     // we're trying to force a very particular race, namely that a put arrives for a new join
     // *before* its state has been fully initialized. it may take a couple of iterations to hit
     // that, so we run the test a couple of times.
-    for _ in 0..5 {
+    for _ in 0..3 {
         use distributary::{Blender, Base, Join, JoinType, Aggregation, DataType};
         let mut g = Blender::new();
         let article;
@@ -910,7 +943,6 @@ fn full_vote_migration() {
 
         let n = 1000i64;
         let title: DataType = "foo".into();
-        let voten: DataType = 1.into();
         let raten: DataType = 5.into();
 
         for i in 0..n {
@@ -949,15 +981,20 @@ fn full_vote_migration() {
                               JoinType::Inner,
                               vec![B(0, 0), L(1), R(1), R(2)]);
             let newend = mig.add_ingredient("awr", &["id", "title", "ratings", "votes"], j);
-            let last = mig.maintain(newend, 0);
+            mig.maintain(newend, 0);
 
             // start processing
             mig.commit();
 
-            (rating, last)
+            (rating, newend)
         };
+
+        let last = g.get_getter(last).unwrap();
         let mutr = g.get_mutator(rating);
         for i in 0..n {
+            if old_puts_after {
+                mutv.put(vec![1.into(), i.into()]);
+            }
             mutr.put(vec![1.into(), i.into(), raten.clone()]);
         }
 
@@ -974,7 +1011,11 @@ fn full_vote_migration() {
                        "each article result should have the right id");
             assert_eq!(row[1], title, "all articles should have title 'foo'");
             assert_eq!(row[2], raten, "all articles should have one 5-star rating");
-            assert_eq!(row[3], voten, "all articles should have one vote");
+            if old_puts_after {
+                assert_eq!(row[3], 2.into(), "all articles should have two votes");
+            } else {
+                assert_eq!(row[3], 1.into(), "all articles should have one vote");
+            }
         }
     }
 
@@ -982,11 +1023,20 @@ fn full_vote_migration() {
 }
 
 #[test]
+fn full_vote_migration_only_new() {
+    do_full_vote_migration(false);
+}
+
+#[test]
+fn full_vote_migration_new_and_old() {
+    do_full_vote_migration(true);
+}
+
+#[test]
 fn live_writes() {
     use std::time::Duration;
     use distributary::{Blender, Aggregation, DataType};
     let mut g = Blender::new();
-    let vc_state;
     let vote;
     let vc;
     {
@@ -1001,14 +1051,16 @@ fn live_writes() {
                                 &["id", "votes"],
                                 Aggregation::COUNT.over(vote, 0, &[1]));
 
-        vc_state = mig.maintain(vc, 0);
+        mig.maintain(vc, 0);
 
         // start processing
         mig.commit();
     }
+
+    let vc_state = g.get_getter(vc).unwrap();
     let add = g.get_mutator(vote);
 
-    let ids = 10000;
+    let ids = 1000;
     let votes = 7;
 
     // continuously write to vote
@@ -1025,12 +1077,17 @@ fn live_writes() {
     thread::sleep(Duration::from_millis(SETTLE_TIME_MS));
 
     // now do a migration that's going to have to copy state
-    let mut mig = g.start_migration();
-    let vc2 = mig.add_ingredient("votecount2",
-                                 &["id", "votes"],
-                                 Aggregation::SUM.over(vc, 1, &[0]));
-    let vc2_state = mig.maintain(vc2, 0);
-    mig.commit();
+    let vc2 = {
+        let mut mig = g.start_migration();
+        let vc2 = mig.add_ingredient("votecount2",
+                                     &["id", "votes"],
+                                     Aggregation::SUM.over(vc, 1, &[0]));
+        mig.maintain(vc2, 0);
+        mig.commit();
+        vc2
+    };
+
+    let vc2_state = g.get_getter(vc2).unwrap();
 
     // TODO: check that the writer did indeed complete writes during the migration
 
@@ -1087,17 +1144,17 @@ fn state_replay_migration_query() {
         let j = mig.add_ingredient("j", &["x", "y", "z"], j);
 
         // we want to observe what comes out of the join
-        let out = mig.maintain(j, 0);
+        mig.maintain(j, 0);
 
         // do the migration
-        let _ = mig.commit();
+        mig.commit();
 
-        out
+        j
     };
 
-    // if all went according to plan, the join should now be fully populated!
-    assert!(!out(&1.into()).is_err());
+    let out = g.get_getter(out).unwrap();
 
+    // if all went according to plan, the join should now be fully populated!
     // there are (/should be) two records in a with x == 1
     // they may appear in any order
     let res = out(&1.into()).unwrap();

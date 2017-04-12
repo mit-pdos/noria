@@ -67,8 +67,8 @@ impl Ingredient for Base {
                 rs: Records,
                 _: &DomainNodes,
                 state: &StateMap)
-                -> Records {
-        rs.into_iter()
+                -> ProcessingResult {
+        let rs = rs.into_iter()
             .map(|r| match r {
                      Record::Positive(u) => Record::Positive(u),
                      Record::Negative(u) => Record::Negative(u),
@@ -82,13 +82,21 @@ impl Ingredient for Base {
                                   .unwrap()
                                   .as_local())
                         .expect("base must have its own state materialized to support deletions");
-                let rows = db.lookup(cols.as_slice(), &KeyType::from(&key[..]));
-                assert_eq!(rows.len(), 1);
 
-                Record::Negative(rows[0].clone())
+                match db.lookup(cols.as_slice(), &KeyType::from(&key[..])) {
+                    LookupResult::Some(rows) => {
+                        assert_eq!(rows.len(), 1);
+                        Record::Negative(rows[0].clone())
+                    }
+                    LookupResult::Missing => unreachable!(),
+                }
             }
                  })
-            .collect()
+            .collect();
+        ProcessingResult {
+            results: rs,
+            misses: Vec::new(),
+        }
     }
 
     fn suggest_indexes(&self, n: NodeAddress) -> HashMap<NodeAddress, Vec<usize>> {

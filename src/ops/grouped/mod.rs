@@ -156,18 +156,21 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
                 rs: Records,
                 _: &DomainNodes,
                 state: &StateMap)
-                -> Records {
+                -> ProcessingResult {
         debug_assert_eq!(from, self.src);
 
         if rs.is_empty() {
-            return rs;
+            return ProcessingResult {
+                       results: rs,
+                       misses: vec![],
+                   };
         }
 
         // First, we want to be smart about multiple added/removed rows with same group.
         // For example, if we get a -, then a +, for the same group, we don't want to
         // execute two queries.
         let mut consolidate = HashMap::new();
-        for rec in rs.iter() {
+        for rec in &rs {
             let val = self.inner.to_diff(&rec[..], rec.is_positive());
             let group = rec.iter()
                 .enumerate()
@@ -181,6 +184,7 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             consolidate.entry(group).or_insert_with(Vec::new).push(val);
         }
 
+        let mut misses = Vec::new();
         let mut out = Vec::with_capacity(2 * consolidate.len());
         for (group, diffs) in consolidate {
             // find the current value for this group
@@ -189,9 +193,20 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
                                    .unwrap()
                                    .as_local())
                 .expect("grouped operators must have their own state materialized");
-            let rs = db.lookup(&self.out_key[..], &KeyType::from(&group[..]));
-            debug_assert!(rs.len() <= 1, "a group had more than 1 result");
-            let old = rs.get(0);
+
+            let old = match db.lookup(&self.out_key[..], &KeyType::from(&group[..])) {
+                LookupResult::Some(rs) => {
+                    debug_assert!(rs.len() <= 1, "a group had more than 1 result");
+                    rs.get(0)
+                }
+                LookupResult::Missing => {
+                    misses.push(Miss {
+                                    node: *self.us.unwrap().as_local(),
+                                    key: group.iter().map(|&dt| dt.clone()).collect(),
+                                });
+                    continue;
+                }
+            };
 
             let (current, new) = {
                 use std::borrow::Cow;
@@ -243,7 +258,10 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             }
         }
 
-        out.into()
+        ProcessingResult {
+            results: out.into(),
+            misses: misses,
+        }
     }
 
     fn suggest_indexes(&self, this: NodeAddress) -> HashMap<NodeAddress, Vec<usize>> {

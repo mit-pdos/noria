@@ -36,7 +36,7 @@ impl Hook {
         let client = try!(memcached::Client::connect(&servers, ProtoType::Binary));
 
         let mut s = State::default();
-        s.add_key(&key_columns[..]);
+        s.add_key(&key_columns[..], false);
 
         Ok(Self {
                client: Memcache(client),
@@ -48,6 +48,8 @@ impl Hook {
 
     /// Push the relevant record updates to Memcached.
     pub fn on_input(&mut self, records: Records) {
+        // TODO: detect need for partial replay
+
         // Update materialized state
         for rec in records.iter() {
             match rec {
@@ -84,7 +86,12 @@ impl Hook {
 
         // Push to Memcached
         for key in modified_keys {
-            let rows = self.state.lookup(&self.key_columns[..], &KeyType::from(&key[..]));
+            let rows = match self.state.lookup(&self.key_columns[..], &KeyType::from(&key[..])) {
+                LookupResult::Some(rows) => rows,
+                LookupResult::Missing => {
+                    unreachable!();
+                }
+            };
             let k = Json::Array(vec![self.name.clone(), key.to_json()]).to_string();
             let v = Json::Array(rows.into_iter()
                                     .map(|row| {
