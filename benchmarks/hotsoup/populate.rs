@@ -24,15 +24,15 @@ fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
 fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     use std::str::FromStr;
 
-    let table_name = data.file_stem()
-        .unwrap()
-        .to_str()
-        .unwrap();
-    let putter = backend.g.get_mutator(backend.r
-                                           .as_ref()
-                                           .unwrap()
-                                           .node_addr_for(table_name)
-                                           .unwrap());
+    let table_name = data.file_stem().unwrap().to_str().unwrap();
+    let putter = backend
+        .g
+        .get_mutator(backend
+                         .r
+                         .as_ref()
+                         .unwrap()
+                         .node_addr_for(table_name)
+                         .unwrap());
 
     let f = File::open(data).unwrap();
     let mut reader = BufReader::new(f);
@@ -44,7 +44,8 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     while reader.read_line(&mut s).unwrap() > 0 {
         {
             let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
-            let rec: Vec<DataType> = fields.into_iter()
+            let rec: Vec<DataType> = fields
+                .into_iter()
                 .map(|s| match i64::from_str(s) {
                          Ok(v) => v.into(),
                          Err(_) => s.into(),

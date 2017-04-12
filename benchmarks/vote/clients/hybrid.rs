@@ -34,9 +34,11 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
         let pool = mysql::Pool::new(opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
-            conn.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
+            conn.query(format!("DROP DATABASE {}", &db).as_str())
+                .unwrap();
         }
-        conn.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
+        conn.query(format!("CREATE DATABASE {}", &db).as_str())
+            .unwrap();
 
         // allow larger in-memory tables (4 GB)
 
@@ -60,8 +62,10 @@ pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
     let mc = pool.mc.take().unwrap();
     let pool = &pool.sql;
     W {
-        a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)").unwrap(),
-        v_prep: pool.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)").unwrap(),
+        a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
+            .unwrap(),
+        v_prep: pool.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)")
+            .unwrap(),
         mc: mc,
     }
 }
@@ -69,16 +73,22 @@ pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
 impl<'a> Writer for W<'a> {
     type Migrator = ();
     fn make_article(&mut self, article_id: i64, title: String) {
-        self.a_prep.execute(params!{"id" => article_id, "title" => &title}).unwrap();
-        drop(self.mc.set(format!("article_{}_vc", article_id).as_bytes(),
-                         format!("{};{};0", article_id, title).as_bytes(),
-                         0,
-                         0));
+        self.a_prep
+            .execute(params!{"id" => article_id, "title" => &title})
+            .unwrap();
+        drop(self.mc
+                 .set(format!("article_{}_vc", article_id).as_bytes(),
+                      format!("{};{};0", article_id, title).as_bytes(),
+                      0,
+                      0));
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         for &(user_id, article_id) in ids {
-            self.v_prep.execute(params!{"user" => &user_id, "id" => &article_id}).unwrap();
-            drop(self.mc.delete(format!("article_{}_vc", article_id).as_bytes()));
+            self.v_prep
+                .execute(params!{"user" => &user_id, "id" => &article_id})
+                .unwrap();
+            drop(self.mc
+                     .delete(format!("article_{}_vc", article_id).as_bytes()));
         }
         Period::PreMigration
     }
@@ -106,20 +116,15 @@ impl<'a> Reader for R<'a> {
         let res = ids.iter()
             .map(|&(_, article_id)| {
                 // rustfmt
-                match self.mc.get(format!("article_{}_vc", article_id).as_bytes()) {
+                match self.mc
+                          .get(format!("article_{}_vc", article_id).as_bytes()) {
                     Ok(data) => {
                         let s = String::from_utf8_lossy(&data.0[..]);
                         let mut parts = s.split(";");
                         ArticleResult::Article {
-                            id: parts.next()
-                                .unwrap()
-                                .parse()
-                                .unwrap(),
+                            id: parts.next().unwrap().parse().unwrap(),
                             title: String::from(parts.next().unwrap()),
-                            votes: parts.next()
-                                .unwrap()
-                                .parse()
-                                .unwrap(),
+                            votes: parts.next().unwrap().parse().unwrap(),
                         }
                     }
                     Err(_) => {
@@ -128,10 +133,11 @@ impl<'a> Reader for R<'a> {
                             let id = rr.get(0).unwrap();
                             let title = rr.get(1).unwrap();
                             let vc = rr.get(2).unwrap();
-                            drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
-                                             format!("{};{};{}", id, title, vc).as_bytes(),
-                                             0,
-                                             0));
+                            drop(self.mc
+                                     .set(format!("article_{}_vc", id).as_bytes(),
+                                          format!("{};{};{}", id, title, vc).as_bytes(),
+                                          0,
+                                          0));
                             return ArticleResult::Article {
                                        id: id,
                                        title: title,

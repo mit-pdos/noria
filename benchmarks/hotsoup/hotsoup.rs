@@ -203,24 +203,20 @@ fn main() {
     }
 
     // hotcrp_*.sql
-    let mut query_files = query_files.into_iter()
+    let mut query_files = query_files
+        .into_iter()
         .map(|k| {
-            let fname = String::from(k.file_name()
-                                         .unwrap()
-                                         .to_str()
-                                         .unwrap());
-            let ver = u64::from_str(&fname[7..fname.len() - 4]).unwrap();
-            (ver, k)
-        })
+                 let fname = String::from(k.file_name().unwrap().to_str().unwrap());
+                 let ver = u64::from_str(&fname[7..fname.len() - 4]).unwrap();
+                 (ver, k)
+             })
         .collect::<Vec<(u64, PathBuf)>>();
-    let mut schema_files = schema_files.into_iter()
+    let mut schema_files = schema_files
+        .into_iter()
         .map(|k| {
-            let fname = String::from(k.file_name()
-                                         .unwrap()
-                                         .to_str()
-                                         .unwrap());
-            (u64::from_str(&fname[7..fname.len() - 4]).unwrap(), k)
-        })
+                 let fname = String::from(k.file_name().unwrap().to_str().unwrap());
+                 (u64::from_str(&fname[7..fname.len() - 4]).unwrap(), k)
+             })
         .collect::<Vec<(u64, PathBuf)>>();
     query_files.sort_by_key(|t| t.0);
     schema_files.sort_by_key(|t| t.0);

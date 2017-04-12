@@ -18,7 +18,9 @@ macro_rules! dur_to_fsec {
 }
 
 fn populate(backend: &Backend, name: &str, tx: bool, mut records: Vec<Vec<DataType>>) -> usize {
-    let mutator = backend.g.get_mutator(backend.r.node_addr_for(name).unwrap());
+    let mutator = backend
+        .g
+        .get_mutator(backend.r.node_addr_for(name).unwrap());
 
     let start = time::Instant::now();
     let mut i: i32 = 0;

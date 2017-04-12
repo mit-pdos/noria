@@ -148,7 +148,8 @@ fn main() {
     if stage {
         // put then get
         put_stats = exercise::launch_writer(putter, config, None);
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -157,7 +158,10 @@ fn main() {
                          .unwrap()
                  })
             .collect();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     } else {
         // put & get
         // TODO: how do we start getters after prepopulate?
@@ -170,7 +174,8 @@ fn main() {
         // wait for prepopulation to finish
         prepop.recv().is_err();
 
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -181,7 +186,10 @@ fn main() {
             .collect();
 
         put_stats = putter.join().unwrap();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     }
 
     print_stats("PUT", &put_stats.pre, avg);
@@ -189,11 +197,13 @@ fn main() {
         print_stats(format!("GET{}", i), &s.pre, avg);
     }
     if avg {
-        let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-            // TODO: do we *really* want an average of averages?
-            let (sum, num) = stats.pre.sum_len();
-            (tot + sum, count + num)
-        });
+        let sum = get_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
+                // TODO: do we *really* want an average of averages?
+                let (sum, num) = stats.pre.sum_len();
+                (tot + sum, count + num)
+            });
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -203,11 +213,13 @@ fn main() {
             print_stats(format!("GET{}+", i), &s.post, avg);
         }
         if avg {
-            let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-                // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.post.sum_len();
-                (tot + sum, count + num)
-            });
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.post.sum_len();
+                    (tot + sum, count + num)
+                });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -271,10 +283,7 @@ impl Crossover {
 
         self.iteration += 1;
         if self.iteration == (1 << 8) {
-            let elapsed = dur_to_ns!(self.swapped
-                                         .as_ref()
-                                         .unwrap()
-                                         .elapsed());
+            let elapsed = dur_to_ns!(self.swapped.as_ref().unwrap().elapsed());
 
             if elapsed > self.crossover.unwrap() {
                 // we've fully crossed over
@@ -406,10 +415,7 @@ impl Writer for Spoon {
             // don't try too eagerly
             if self.i & 16384 == 0 {
                 // we may have been given a new putter
-                if let Ok(nv) = self.new_vote
-                       .as_mut()
-                       .unwrap()
-                       .try_recv() {
+                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
                     self.new_vote = None;
                     self.x.swapped();
@@ -429,7 +435,8 @@ impl Writer for Spoon {
             Period::PostMigration
         } else {
             for &(user_id, article_id) in ids {
-                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+                self.vote_pre
+                    .put(vec![user_id.into(), article_id.into()]);
             }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration
@@ -533,23 +540,25 @@ impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let res = ids.iter()
             .map(|&(_, article_id)| {
-                (self.call())(&article_id.into()).map_err(|_| ()).map(|g| {
-                    match g.into_iter().next() {
-                        Some(row) => {
-                            // we only care about the first result
-                            let mut row = row.into_iter();
-                            let id: i64 = row.next().unwrap().into();
-                            let title: String = row.next().unwrap().into();
-                            let count: i64 = row.next().unwrap().into();
-                            ArticleResult::Article {
-                                id: id,
-                                title: title,
-                                votes: count,
+                (self.call())(&article_id.into())
+                    .map_err(|_| ())
+                    .map(|g| {
+                        match g.into_iter().next() {
+                            Some(row) => {
+                                // we only care about the first result
+                                let mut row = row.into_iter();
+                                let id: i64 = row.next().unwrap().into();
+                                let title: String = row.next().unwrap().into();
+                                let count: i64 = row.next().unwrap().into();
+                                ArticleResult::Article {
+                                    id: id,
+                                    title: title,
+                                    votes: count,
+                                }
                             }
+                            None => ArticleResult::NoSuchArticle,
                         }
-                        None => ArticleResult::NoSuchArticle,
-                    }
-                })
+                    })
             })
             .collect();
 

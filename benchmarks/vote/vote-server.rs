@@ -20,7 +20,10 @@ fn main() {
         .version("0.1")
         .about("Benchmarks user-curated news aggregator throughput for different storage \
                 backends.")
-        .arg(Arg::with_name("ADDR").index(1).help("Address and port to listen on").required(true))
+        .arg(Arg::with_name("ADDR")
+                 .index(1)
+                 .help("Address and port to listen on")
+                 .required(true))
         .get_matches();
 
     let addr = args.value_of("ADDR").unwrap();

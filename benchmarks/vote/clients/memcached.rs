@@ -26,13 +26,18 @@ impl Writer for Memcache {
                  0,
                  0)
             .unwrap();
-        self.0.set(format!("article_{}_vc", article_id).as_bytes(), b"0", 0, 0).unwrap();
+        self.0
+            .set(format!("article_{}_vc", article_id).as_bytes(), b"0", 0, 0)
+            .unwrap();
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         use std::collections::HashMap;
-        let keys: Vec<_> =
-            ids.iter().map(|&(_, article_id)| format!("article_{}_vc", article_id)).collect();
-        let ids: HashMap<_, _> = keys.iter().map(|key| (key.as_bytes(), (1, 0, 0))).collect();
+        let keys: Vec<_> = ids.iter()
+            .map(|&(_, article_id)| format!("article_{}_vc", article_id))
+            .collect();
+        let ids: HashMap<_, _> = keys.iter()
+            .map(|key| (key.as_bytes(), (1, 0, 0)))
+            .collect();
         //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
         drop(self.0.increment_multi(ids));
         Period::PreMigration
