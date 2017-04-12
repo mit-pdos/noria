@@ -1,4 +1,4 @@
-use mysql;
+use mysql::{self, OptsBuilder};
 
 use common::{Writer, Reader, ArticleResult, Period};
 
@@ -16,23 +16,24 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
         // clear the db (note that we strip of /db so we get default)
         let db = &addr[addr.rfind("/").unwrap() + 1..];
         let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+        let mut opts = OptsBuilder::from_opts(opts);
+        opts.db_name(Some(db));
+        opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
+
         let pool = mysql::Pool::new(opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
             conn.query(format!("DROP DATABASE {}", &db).as_str()).unwrap();
         }
         conn.query(format!("CREATE DATABASE {}", &db).as_str()).unwrap();
-
-        // allow larger in-memory tables (4 GB)
-        pool.prep_exec("SET max_heap_table_size = 4294967296", ()).unwrap();
+        conn.query(format!("USE {}", &db).as_str()).unwrap();
 
         // create tables with indices
         pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
-                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY",
+                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
-        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, PRIMARY KEY USING HASH (u, id), \
-                        KEY id (id)) ENGINE = MEMORY",
+        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
     }
