@@ -68,6 +68,7 @@ impl RuntimeConfig {
         }
     }
 
+    #[allow(dead_code)]
     pub fn batch_size(&self) -> usize {
         self.batch_size
     }
