@@ -192,8 +192,6 @@ impl Writer for W {
 
 impl Reader for R {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        use tiberius::stmt::ResultStreamExt;
-
         let mut res = Vec::new();
         let conn;
         // scope needed so that the compiler realizes that `fut` goes out of scope, thus returning
