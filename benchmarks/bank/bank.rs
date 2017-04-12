@@ -54,9 +54,9 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = mig.add_ingredient("transfers",
-                                       &["src_acct", "dst_acct", "amount"],
-                                       Base::default());
+        transfers = mig.add_transactional_base("transfers",
+                                               &["src_acct", "dst_acct", "amount"],
+                                               Base::default());
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -73,7 +73,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        mig.transactional_maintain(balances, 0);
+        mig.transactional_maintain(balances, 0).unwrap();
 
         let d = mig.add_domain();
         mig.assign_domain(transfers, d);
@@ -109,7 +109,7 @@ impl Bank {
             mig.add_ingredient("identity",
                                &["acct_id", "credit", "debit"],
                                distributary::Identity::new(self.balances));
-        let _ = mig.transactional_maintain(identity, 0);
+        let _ = mig.transactional_maintain(identity, 0).unwrap();
         let _ = mig.commit();
     }
 }
