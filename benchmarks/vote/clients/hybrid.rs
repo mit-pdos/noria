@@ -12,10 +12,11 @@ pub struct Pool {
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
     v_prep: mysql::conn::Stmt<'a>,
+    conn: mysql::PooledConn,
     mc: memcached::Client,
 }
 
-pub fn setup(memcached_dbn: &str, mysql_dbn: &str, write: bool) -> Pool {
+pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
     use mysql::Opts;
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
