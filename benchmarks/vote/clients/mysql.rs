@@ -11,15 +11,15 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
     use mysql::Opts;
 
     let addr = format!("mysql://{}", addr);
+    let db = &addr[addr.rfind("/").unwrap() + 1..];
+    let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+
     if write {
         // clear the db (note that we strip of /db so we get default)
-        let db = &addr[addr.rfind("/").unwrap() + 1..];
-        let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
-        let mut opts = OptsBuilder::from_opts(opts);
+        let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
         opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
-
-        let pool = mysql::Pool::new(opts).unwrap();
+        let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
             conn.query(format!("DROP DATABASE {}", &db).as_str())
@@ -27,7 +27,9 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
         }
         conn.query(format!("CREATE DATABASE {}", &db).as_str())
             .unwrap();
-        conn.query(format!("USE {}", &db).as_str()).unwrap();
+        conn.query(format!("USE {}", db)).unwrap();
+
+        drop(conn);
 
         // create tables with indices
         pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
@@ -40,7 +42,10 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
     }
 
     // now we connect for real
-    mysql::Pool::new(Opts::from_url(&addr).unwrap()).unwrap()
+    let mut opts = OptsBuilder::from_opts(opts);
+    opts.db_name(Some(db));
+    opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
+    mysql::Pool::new_manual(1, 4, opts).unwrap()
 }
 
 pub fn make_writer<'a>(pool: &'a mysql::Pool) -> W<'a> {

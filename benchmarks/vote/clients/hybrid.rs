@@ -23,15 +23,17 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
             .unwrap();
 
     let addr = format!("mysql://{}", mysql_dbn);
+    let db = &addr[addr.rfind("/").unwrap() + 1..];
+    let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+
     if write {
         // clear the db (note that we strip of /db so we get default)
-        let db = &addr[addr.rfind("/").unwrap() + 1..];
-        let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
-        let mut opts = OptsBuilder::from_opts(opts);
+        let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
+        // allow larger in-memory tables (4 GB)
         opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
 
-        let pool = mysql::Pool::new(opts).unwrap();
+        let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
             conn.query(format!("DROP DATABASE {}", &db).as_str())
@@ -39,8 +41,9 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
         }
         conn.query(format!("CREATE DATABASE {}", &db).as_str())
             .unwrap();
+        conn.query(format!("USE {}", db)).unwrap();
 
-        // allow larger in-memory tables (4 GB)
+        drop(conn);
 
         // create tables with indices
         pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
@@ -52,8 +55,13 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
             .unwrap();
     }
 
+    let mut opts = OptsBuilder::from_opts(opts.clone());
+    opts.db_name(Some(db));
+    // allow larger in-memory tables (4 GB)
+    opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
+
     Pool {
-        sql: mysql::Pool::new(Opts::from_url(&addr).unwrap()).unwrap(),
+        sql: mysql::Pool::new_manual(1, 4, opts).unwrap(),
         mc: Some(mc),
     }
 }
