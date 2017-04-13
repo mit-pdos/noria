@@ -72,12 +72,9 @@ impl<'a> Writer for W<'a> {
 
         self.conn.query(query).unwrap();
 
-        let query = ids.iter()
-            .map(|&(_, ref a)| format!("UPDATE art SET votes = votes + 1 WHERE id = {}; ", a))
-            .collect::<Vec<_>>()
-            .join("");
-
-        self.conn.query(query).unwrap();
+        for &(_, ref a) in ids {
+            self.conn.prep_exec("UPDATE art SET votes = votes + 1 WHERE id = ?;", vec![a]).unwrap();
+        }
 
         Period::PreMigration
     }
