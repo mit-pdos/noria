@@ -117,10 +117,17 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .join(", ");
     let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
+
+    let v1_prep = client
+        .conn
+        .as_ref()
+        .unwrap()
+        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2)");
     W {
         client: client,
         a_prep: a_prep,
         v_prep: v_prep,
+        v1_prep: v1_prep,
     }
 }
 
@@ -128,6 +135,7 @@ pub struct W {
     client: Client,
     a_prep: tiberius::stmt::Statement,
     v_prep: tiberius::stmt::Statement,
+    v1_prep: tiberius::stmt::Statement,
 }
 
 // all our methods are &mut
@@ -185,11 +193,17 @@ impl Writer for W {
                 acc.push(a as &_);
                 acc
             });
+
+        let prep = if ids.len() == 1 {
+            &self.v1_prep
+        } else {
+            &self.v_prep
+        };
         let fut = self.client
             .conn
             .take()
             .unwrap()
-            .exec(&self.v_prep, data.as_slice())
+            .exec(prep, data.as_slice())
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
