@@ -14,8 +14,12 @@ fn it_works() {
     let mut g = distributary::Blender::new();
     let (a, b, c) = {
         let mut mig = g.start_migration();
-        let a = mig.add_ingredient("a", &["a", "b"], distributary::Base::new(vec![0]));
-        let b = mig.add_ingredient("b", &["a", "b"], distributary::Base::new(vec![0]));
+        let a = mig.add_ingredient("a",
+                                   &["a", "b"],
+                                   distributary::Base::with_key(vec![0], vec![]));
+        let b = mig.add_ingredient("b",
+                                   &["a", "b"],
+                                   distributary::Base::with_key(vec![0], vec![]));
 
         let mut emits = HashMap::new();
         emits.insert(a, vec![0, 1]);
@@ -214,8 +218,12 @@ fn it_works_deletion() {
     let mut g = distributary::Blender::new();
     let (a, b, cq) = {
         let mut mig = g.start_migration();
-        let a = mig.add_ingredient("a", &["x", "y"], distributary::Base::new(vec![1]));
-        let b = mig.add_ingredient("b", &["_", "x", "y"], distributary::Base::new(vec![2]));
+        let a = mig.add_ingredient("a",
+                                   &["x", "y"],
+                                   distributary::Base::with_key(vec![1], vec![]));
+        let b = mig.add_ingredient("b",
+                                   &["_", "x", "y"],
+                                   distributary::Base::with_key(vec![2], vec![]));
 
         let mut emits = HashMap::new();
         emits.insert(a, vec![0, 1]);
@@ -579,6 +587,194 @@ fn simple_migration() {
 
     // check that b got it
     assert_eq!(bq(&id), Ok(vec![vec![1.into(), 4.into()]]));
+}
+
+#[test]
+fn add_columns() {
+    let id: distributary::DataType = "x".into();
+
+    // set up graph
+    let mut g = distributary::Blender::new();
+    let (a, aq) = {
+        let mut mig = g.start_migration();
+        let a = mig.add_ingredient("a",
+                                   &["a", "b"],
+                                   distributary::Base::new(vec![1.into(), 2.into()]));
+        let aq = mig.stream(a);
+        mig.commit();
+        (a, aq)
+    };
+    let muta = g.get_mutator(a);
+
+    // send a value on a
+    muta.put(vec![id.clone(), "y".into()]);
+
+    // check that a got it
+    assert_eq!(aq.recv(), Ok(vec![vec![id.clone(), "y".into()].into()]));
+
+    // add a third column to a
+    {
+        let mut mig = g.start_migration();
+        mig.add_column(a, "c", 3.into());
+        mig.commit();
+    }
+
+    // send another (old) value on a
+    muta.put(vec![id.clone(), "z".into()]);
+
+    // check that a got it, and added the new, third column's default
+    assert_eq!(aq.recv(),
+               Ok(vec![vec![id.clone(), "z".into(), 3.into()].into()]));
+
+    // send a new value on a
+    muta.put(vec![id.clone(), "a".into(), 10.into()]);
+
+    // check that a got it, and included the third column
+    assert_eq!(aq.recv(),
+               Ok(vec![vec![id.clone(), "a".into(), 10.into()].into()]));
+}
+
+#[test]
+fn migrate_added_columns() {
+    let id: distributary::DataType = "x".into();
+
+    // set up graph
+    let mut g = distributary::Blender::new();
+    let a = {
+        let mut mig = g.start_migration();
+        let a = mig.add_ingredient("a",
+                                   &["a", "b"],
+                                   distributary::Base::new(vec![1.into(), 2.into()]));
+        mig.commit();
+        a
+    };
+    let muta = g.get_mutator(a);
+
+    // send a value on a
+    muta.put(vec![id.clone(), "y".into()]);
+
+    // add a third column to a, and a view that uses it
+    let b = {
+        let mut mig = g.start_migration();
+        mig.add_column(a, "c", 3.into());
+        let b = mig.add_ingredient("x", &["c", "b"], distributary::Permute::new(a, &[2, 0]));
+        mig.maintain(b, 1);
+        mig.commit();
+        b
+    };
+
+    let bq = g.get_getter(b).unwrap();
+
+    // send another (old) value on a
+    muta.put(vec![id.clone(), "z".into()]);
+    // and an entirely new value
+    muta.put(vec![id.clone(), "a".into(), 10.into()]);
+
+    // give it some time to propagate
+    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
+
+    // we should now see the pre-migration write and the old post-migration write with the default
+    // value, and the new post-migration write with the value it contained.
+    let res = bq(&id).unwrap();
+    assert_eq!(res.len(), 3);
+    assert_eq!(res.iter()
+                   .filter(|&r| r == &vec![3.into(), id.clone()])
+                   .count(),
+               2);
+    assert!(res.iter().any(|r| r == &vec![10.into(), id.clone()]));
+}
+
+#[test]
+fn migrate_drop_columns() {
+    let id: distributary::DataType = "x".into();
+
+    // set up graph
+    let mut g = distributary::Blender::new();
+    let (a, stream) = {
+        let mut mig = g.start_migration();
+        let a = mig.add_ingredient("a",
+                                   &["a", "b"],
+                                   distributary::Base::new(vec!["a".into(), "b".into()]));
+        let stream = mig.stream(a);
+        mig.commit();
+        (a, stream)
+    };
+    let muta1 = g.get_mutator(a);
+
+    // send a value on a
+    muta1.put(vec![id.clone(), "bx".into()]);
+
+    // drop a column
+    {
+        let mut mig = g.start_migration();
+        mig.drop_column(a, 1);
+        mig.commit();
+    }
+
+    // new mutator should only require one column
+    // and should inject default for a.b
+    let muta2 = g.get_mutator(a);
+    muta2.put(vec![id.clone()]);
+
+    // add a new column
+    {
+        let mut mig = g.start_migration();
+        mig.add_column(a, "c", "c".into());
+        mig.commit();
+    }
+
+    // new mutator allows putting two values, and injects default for a.b
+    let muta3 = g.get_mutator(a);
+    muta3.put(vec![id.clone(), "cy".into()]);
+
+    // using an old putter now should add default for c
+    muta1.put(vec![id.clone(), "bz".into()]);
+
+    // using putter that knows of neither b nor c should result in defaults for both
+    muta2.put(vec![id.clone()]);
+
+    assert_eq!(stream.recv(),
+               Ok(vec![vec![id.clone(), "bx".into()].into()]));
+    assert_eq!(stream.recv(), Ok(vec![vec![id.clone(), "b".into()].into()]));
+    assert_eq!(stream.recv(),
+               Ok(vec![vec![id.clone(), "b".into(), "cy".into()].into()]));
+    assert_eq!(stream.recv(),
+               Ok(vec![vec![id.clone(), "bz".into(), "c".into()].into()]));
+    assert_eq!(stream.recv(),
+               Ok(vec![vec![id.clone(), "b".into(), "c".into()].into()]));
+    assert_eq!(stream.try_recv(), Err(mpsc::TryRecvError::Empty));
+}
+
+#[test]
+#[ignore]
+fn key_on_added() {
+    // set up graph
+    let mut g = distributary::Blender::new();
+    let a = {
+        let mut mig = g.start_migration();
+        let a = mig.add_ingredient("a",
+                                   &["a", "b"],
+                                   distributary::Base::new(vec![1.into(), 2.into()]));
+        mig.commit();
+        a
+    };
+
+    // add a maintained view keyed on newly added column
+    let b = {
+        let mut mig = g.start_migration();
+        mig.add_column(a, "c", 3.into());
+        let b = mig.add_ingredient("x", &["c", "b"], distributary::Permute::new(a, &[2, 1]));
+        // interestingly, this *also* currently fails if s/0/1/. I *believe* this is because the
+        // code decides to do partial materialization, even though the key provenence does *not* go
+        // all the way back to the Base for 2 *or* 1 (since it is keyed on a[0]).
+        mig.maintain(b, 0);
+        mig.commit();
+        b
+    };
+
+    // make sure we can read (may trigger a replay)
+    let bq = g.get_getter(b).unwrap();
+    assert!(bq(&3.into()).unwrap().is_empty());
 }
 
 #[test]
