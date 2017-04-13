@@ -109,7 +109,8 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .conn
         .as_ref()
         .unwrap()
-        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
+        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0); \
+                 INSERT INTO vt (u, id) VALUES (0, @P3);");
 
     let vals = (1..batch_size + 1)
         .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
@@ -117,17 +118,10 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .join(", ");
     let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
-
-    let v1_prep = client
-        .conn
-        .as_ref()
-        .unwrap()
-        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2)");
     W {
         client: client,
         a_prep: a_prep,
         v_prep: v_prep,
-        v1_prep: v1_prep,
     }
 }
 
@@ -135,7 +129,6 @@ pub struct W {
     client: Client,
     a_prep: tiberius::stmt::Statement,
     v_prep: tiberius::stmt::Statement,
-    v1_prep: tiberius::stmt::Statement,
 }
 
 // all our methods are &mut
@@ -175,15 +168,11 @@ impl Writer for W {
             .conn
             .take()
             .unwrap()
-            .exec(&self.a_prep, &[&article_id, &title.as_str()])
+            .exec(&self.a_prep, &[&article_id, &title.as_str(), &article_id])
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
         self.client.conn = Some(conn);
-
-        // we must also vote for the article, because mssql doesn't allow LEFT JOIN in indexed
-        // views: additional-requirements
-        self.vote(&[(0, article_id)]);
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
@@ -193,17 +182,11 @@ impl Writer for W {
                 acc.push(a as &_);
                 acc
             });
-
-        let prep = if ids.len() == 1 {
-            &self.v1_prep
-        } else {
-            &self.v_prep
-        };
         let fut = self.client
             .conn
             .take()
             .unwrap()
-            .exec(prep, data.as_slice())
+            .exec(&self.v_prep, data.as_slice())
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
