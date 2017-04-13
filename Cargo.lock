@@ -28,8 +28,8 @@ dependencies = [
  "slog-term 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "snowflake 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spmc 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc 0.7.1 (git+https://github.com/ms705/tarpc?branch=hack)",
- "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc?branch=hack)",
+ "tarpc 0.7.1 (git+https://github.com/ms705/tarpc.git?branch=hack)",
+ "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "tiberius 0.2.0 (git+https://github.com/ms705/tiberius/)",
  "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -419,7 +419,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "lazy_static"
-version = "0.2.8"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -543,7 +543,7 @@ dependencies = [
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "named_pipe 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1006,20 +1006,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "tarpc"
 version = "0.7.1"
-source = "git+https://github.com/ms705/tarpc?branch=hack#bdcde77c7cc97ae91d8a5aa54f61bc174fa200cb"
+source = "git+https://github.com/ms705/tarpc.git?branch=hack#bdcde77c7cc97ae91d8a5aa54f61bc174fa200cb"
 dependencies = [
  "bincode 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc?branch=hack)",
+ "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "thread-pool 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1030,7 +1030,7 @@ dependencies = [
 [[package]]
 name = "tarpc-plugins"
 version = "0.1.0"
-source = "git+https://github.com/ms705/tarpc?branch=hack#bdcde77c7cc97ae91d8a5aa54f61bc174fa200cb"
+source = "git+https://github.com/ms705/tarpc.git?branch=hack#bdcde77c7cc97ae91d8a5aa54f61bc174fa200cb"
 dependencies = [
  "itertools 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1108,7 +1108,7 @@ dependencies = [
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-state-stream 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "secur32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1375,7 +1375,7 @@ dependencies = [
 "checksum itoa 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "eb2f404fbc66fd9aac13e998248505e7ecb2ad8e44ab6388684c5fb11c6c251c"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
-"checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
+"checksum lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2f61b8421c7a4648c391611625d56fdd5c7567da05af1be655fd8cacc643abb3"
 "checksum lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce12306c4739d86ee97c23139f3a34ddf0387bbf181bc7929d287025a8c3ef6b"
 "checksum libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)" = "88ee81885f9f04bff991e306fea7c1c60a5f0f9e409e99f6b40e3311a3363135"
 "checksum log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "5141eca02775a762cc6cd564d8d2c50f67c0ea3a372cbf1c51592b3e029e10ad"
@@ -1444,8 +1444,8 @@ dependencies = [
 "checksum syn 0.11.10 (registry+https://github.com/rust-lang/crates.io-index)" = "171b739972d9a1bfb169e8077238b51f9ebeaae4ff6e08072f7ba386a8802da2"
 "checksum synom 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a393066ed9010ebaed60b9eafa373d4b1baac186dd7e008555b0f702b51945b6"
 "checksum take 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b157868d8ac1f56b64604539990685fa7611d8fa9e5476cf0c02cf34d32917c5"
-"checksum tarpc 0.7.1 (git+https://github.com/ms705/tarpc?branch=hack)" = "<none>"
-"checksum tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc?branch=hack)" = "<none>"
+"checksum tarpc 0.7.1 (git+https://github.com/ms705/tarpc.git?branch=hack)" = "<none>"
+"checksum tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc.git?branch=hack)" = "<none>"
 "checksum tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "87974a6f5c1dfb344d733055601650059a3363de2a6104819293baff662132d6"
 "checksum term_size 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2b6b55df3198cc93372e85dd2ed817f0e38ce8cc0f22eb32391bfad9c4bf209"
 "checksum thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a9539db560102d1cef46b8b78ce737ff0bb64e7e18d35b2a5688f7d097d0ff03"
