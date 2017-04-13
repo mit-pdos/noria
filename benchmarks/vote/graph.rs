@@ -38,7 +38,7 @@ pub fn make(transactions: bool) -> Graph {
 
         // add final join using first field from article and first from vc
         use distributary::JoinSource::*;
-        let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
+        let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
         // let's try to be clever about this.
