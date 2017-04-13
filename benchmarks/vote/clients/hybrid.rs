@@ -80,6 +80,7 @@ pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
 
 impl<'a> Writer for W<'a> {
     type Migrator = ();
+
     fn make_article(&mut self, article_id: i64, title: String) {
         self.a_prep
             .execute(params!{"id" => article_id, "title" => &title})
@@ -90,14 +91,25 @@ impl<'a> Writer for W<'a> {
                       0,
                       0));
     }
+
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        use memcached::proto::MultiOperation;
+
         for &(user_id, article_id) in ids {
             self.v_prep
                 .execute(params!{"user" => &user_id, "id" => &article_id})
                 .unwrap();
-            drop(self.mc
-                     .delete(format!("article_{}_vc", article_id).as_bytes()));
         }
+
+        let keys: Vec<_> = ids.iter()
+            .map(|&(_, a)| format!("article_{}_vc", a))
+            .collect();
+        drop(self.mc
+                 .delete_multi(keys.iter()
+                                   .map(String::as_bytes)
+                                   .collect::<Vec<_>>()
+                                   .as_slice()));
+
         Period::PreMigration
     }
 }
@@ -121,42 +133,48 @@ pub fn make_reader<'a>(pool: &'a mut Pool) -> R<'a> {
 
 impl<'a> Reader for R<'a> {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let res = ids.iter()
-            .map(|&(_, article_id)| {
-                // rustfmt
-                match self.mc
-                          .get(format!("article_{}_vc", article_id).as_bytes()) {
-                    Ok(data) => {
-                        let s = String::from_utf8_lossy(&data.0[..]);
-                        let mut parts = s.split(";");
-                        ArticleResult::Article {
-                            id: parts.next().unwrap().parse().unwrap(),
-                            title: String::from(parts.next().unwrap()),
-                            votes: parts.next().unwrap().parse().unwrap(),
-                        }
-                    }
-                    Err(_) => {
-                        for row in self.prep.execute(params!{"id" => &article_id}).unwrap() {
-                            let mut rr = row.unwrap();
-                            let id = rr.get(0).unwrap();
-                            let title = rr.get(1).unwrap();
-                            let vc = rr.get(2).unwrap();
-                            drop(self.mc
-                                     .set(format!("article_{}_vc", id).as_bytes(),
-                                          format!("{};{};{}", id, title, vc).as_bytes(),
-                                          0,
-                                          0));
-                            return ArticleResult::Article {
-                                       id: id,
-                                       title: title,
-                                       votes: vc,
-                                   };
-                        }
-                        ArticleResult::NoSuchArticle
-                    }
-                }
-            })
+        use memcached::proto::MultiOperation;
+
+        let keys: Vec<_> = ids.iter()
+            .map(|&(_, ref article_id)| format!("article_{}_vc", article_id))
             .collect();
+        let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
+
+        let vals = match self.mc.get_multi(&keys[..]) {
+            Err(_) => return (Err(()), Period::PreMigration),
+            Ok(v) => v,
+        };
+
+        let mut res = Vec::new();
+        for k in keys {
+            if !vals.contains_key(k) {
+                // missed, we must go to the database
+                for row in self.prep.execute(params!{"id" => k}).unwrap() {
+                    let mut rr = row.unwrap();
+                    let id = rr.get(0).unwrap();
+                    let title = rr.get(1).unwrap();
+                    let vc = rr.get(2).unwrap();
+                    drop(self.mc
+                             .set(format!("article_{}_vc", id).as_bytes(),
+                                  format!("{};{};{}", id, title, vc).as_bytes(),
+                                  0,
+                                  0));
+                    res.push(ArticleResult::Article {
+                                 id: id,
+                                 title: title,
+                                 votes: vc,
+                             });
+                }
+            } else {
+                let s = String::from_utf8_lossy(vals.get(k).unwrap().0.as_slice());
+                let mut parts = s.split(";");
+                res.push(ArticleResult::Article {
+                             id: parts.next().unwrap().parse().unwrap(),
+                             title: String::from(parts.next().unwrap()),
+                             votes: parts.next().unwrap().parse().unwrap(),
+                         });
+            }
+        }
 
         (Ok(res), Period::PreMigration)
     }
