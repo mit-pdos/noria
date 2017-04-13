@@ -28,7 +28,7 @@ dependencies = [
  "tarpc 0.7.1 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "tiberius 0.2.0 (git+https://github.com/ms705/tiberius/)",
- "timekeeper 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timekeeper 0.2.4 (git+https://github.com/ms705/timekeeper)",
  "tokio-core 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1084,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "timekeeper"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/ms705/timekeeper#0eae794a732522a6e9dcbbfb533d3ad7fdf0f198"
 
 [[package]]
 name = "tokio-core"
@@ -1405,7 +1405,7 @@ dependencies = [
 "checksum thread_local 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c85048c6260d17cf486ceae3282d9fb6b90be220bf5b28c400f5485ffc29f0c7"
 "checksum tiberius 0.2.0 (git+https://github.com/ms705/tiberius/)" = "<none>"
 "checksum time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)" = "211b63c112206356ef1ff9b19355f43740fc3f85960c598a93d3a3d3ba7beade"
-"checksum timekeeper 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "fe331f71ab799ac67d61d5b3a2d87e13579b66616e49c21f4d67696e0f326dd1"
+"checksum timekeeper 0.2.4 (git+https://github.com/ms705/timekeeper)" = "<none>"
 "checksum tokio-core 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "99e958104a67877907c1454386d5482fe8e965a55d60be834a15a44328e7dc76"
 "checksum tokio-io 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "48f55df1341bb92281f229a6030bc2abffde2c7a44c6d6b802b7687dd8be0775"
 "checksum tokio-proto 0.1.1 (git+https://github.com/jonhoo/tokio-proto?branch=bigger-max-in-flight)" = "<none>"

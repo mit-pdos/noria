@@ -5,7 +5,11 @@ extern crate rand;
 
 extern crate distributary;
 
+extern crate hdrsample;
+
 extern crate timekeeper;
+
+use hdrsample::Histogram;
 
 use std::thread;
 use std::time;
@@ -14,9 +18,9 @@ use std::collections::HashMap;
 
 use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
-use timekeeper::{Source, RealTime};
-
 use rand::Rng;
+
+use timekeeper::{Source, RealTime};
 
 type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
 #[allow(dead_code)]
@@ -307,6 +311,17 @@ fn client(i: usize,
     }
 
     if measure_latency {
+        let mut settle_latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
+        for sample in settle_latencies {
+            settle_latencies_hist.record(sample as i64);
+        }
+
+        for (v, p, _, _) in settle_latencies_hist.iter_recorded() {
+            // XXX: Print CDF in the format expected by the print_latency_cdf script.
+            println!("percentile PUT {:.2} {:.2}", v, p);
+        }
+
+        // Print average latencies.
         let rl: u64 = read_latencies.iter().sum();
         let wl: u64 = write_latencies.iter().sum();
         let sl: u64 = settle_latencies.iter().sum();
