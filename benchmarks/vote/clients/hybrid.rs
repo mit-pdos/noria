@@ -11,7 +11,7 @@ pub struct Pool {
 
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
-    v_prep: mysql::conn::Stmt<'a>,
+    conn: mysql::PooledConn,
     mc: memcached::Client,
 }
 
@@ -31,7 +31,8 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
         // allow larger in-memory tables (4 GB)
-        opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
+        opts.init(vec!["SET max_heap_table_size = 4294967296;",
+                       "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
 
         let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
@@ -58,7 +59,8 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
     let mut opts = OptsBuilder::from_opts(opts.clone());
     opts.db_name(Some(db));
     // allow larger in-memory tables (4 GB)
-    opts.init(vec!["SET max_heap_table_size = 4294967296;"]);
+    opts.init(vec!["SET max_heap_table_size = 4294967296;",
+                   "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
 
     Pool {
         sql: mysql::Pool::new_manual(1, 4, opts).unwrap(),
@@ -72,8 +74,7 @@ pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
     W {
         a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
             .unwrap(),
-        v_prep: pool.prepare("INSERT INTO vt (u, id) VALUES (:user, :id)")
-            .unwrap(),
+        conn: pool.get_conn().unwrap(),
         mc: mc,
     }
 }
@@ -95,11 +96,13 @@ impl<'a> Writer for W<'a> {
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         use memcached::proto::MultiOperation;
 
-        for &(user_id, article_id) in ids {
-            self.v_prep
-                .execute(params!{"user" => &user_id, "id" => &article_id})
-                .unwrap();
-        }
+        let values = ids.iter()
+            .map(|&(ref u, ref a)| format!("({}, {})", u, a))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!("INSERT INTO vt (u, id) VALUES {};", values);
+
+        self.conn.query(query).unwrap();
 
         let keys: Vec<_> = ids.iter()
             .map(|&(_, a)| format!("article_{}_vc", a))
