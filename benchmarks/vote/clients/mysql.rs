@@ -121,8 +121,6 @@ impl<'a> Reader for mysql::conn::Stmt<'a> {
                          });
             }
         }
-        assert_eq!(res.len(), ids.len());
-
         (Ok(res), Period::PreMigration)
     }
 }
