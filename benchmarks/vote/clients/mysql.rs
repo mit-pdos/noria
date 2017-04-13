@@ -97,11 +97,10 @@ impl<'a> Writer for W<'a> {
 }
 
 pub fn make_reader(pool: &mysql::Pool, batch_size: usize) -> mysql::conn::Stmt {
-    let vals = (1..batch_size + 1)
-        .map(|_| "?")
+    let qstring = (1..batch_size + 1)
+        .map(|_| "SELECT id, title, votes FROM art WHERE id = ?")
         .collect::<Vec<_>>()
-        .join(",");
-    let qstring = format!("SELECT id, title, votes FROM art WHERE id IN({})", vals);
+        .join(" UNION ");
     pool.prepare(qstring).unwrap()
 }
 
