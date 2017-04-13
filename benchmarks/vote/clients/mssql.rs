@@ -111,13 +111,11 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .unwrap()
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
 
-    let mut vote_qstring = String::new();
-    for i in 1..batch_size + 1 {
-        vote_qstring.push_str(&format!("INSERT INTO vt (u, id) VALUES (@P{}, @P{}); ",
-                                       i * 2 - 1,
-                                       i * 2));
-    }
-
+    let vals = (1..batch_size + 1)
+        .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
     W {
         client: client,
@@ -139,13 +137,12 @@ unsafe impl Send for W {}
 pub fn make_reader(addr: &str, batch_size: usize) -> R {
     let client = mkc(addr);
 
-    let mut qstring = String::new();
-    for i in 1..batch_size + 1 {
-        let sql = format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{};",
-                          i);
-        qstring.push_str(&sql);
-    }
-
+    let conds = (1..batch_size + 1)
+        .map(|i| format!("@P{}", i))
+        .collect::<Vec<_>>()
+        .join(",");
+    let qstring = format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id IN ({})",
+                          conds);
     let prep = client.conn.as_ref().unwrap().prepare(qstring);
     R {
         client: client,
