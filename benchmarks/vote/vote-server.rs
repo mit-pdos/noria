@@ -13,8 +13,6 @@ mod graph;
 
 use distributary::srv;
 use tarpc::util::FirstSocketAddr;
-use std::time::Duration;
-use std::thread;
 
 fn main() {
     use clap::{Arg, App};
@@ -22,19 +20,17 @@ fn main() {
         .version("0.1")
         .about("Benchmarks user-curated news aggregator throughput for different storage \
                 backends.")
-        .arg(Arg::with_name("ADDR").index(1).help("Address and port to listen on").required(true))
+        .arg(Arg::with_name("ADDR")
+                 .index(1)
+                 .help("Address and port to listen on")
+                 .required(true))
         .get_matches();
 
     let addr = args.value_of("ADDR").unwrap();
     println!("Attempting to start soup on {}", addr);
-    let g = graph::make();
+    let g = graph::make(false);
 
     // start processing
     // TODO: what about the node indices?
-    let _srv = srv::run(g.graph, addr.first_socket_addr(), 8);
-    // run forever
-    loop {
-        // but without wasting CPU
-        thread::sleep(Duration::from_secs(1));
-    }
+    srv::run(g.graph, addr.first_socket_addr());
 }

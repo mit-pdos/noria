@@ -54,9 +54,9 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = mig.add_ingredient("transfers",
-                                       &["src_acct", "dst_acct", "amount"],
-                                       Base::default());
+        transfers = mig.add_transactional_base("transfers",
+                                               &["src_acct", "dst_acct", "amount"],
+                                               Base::default());
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -85,7 +85,10 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         mig.commit();
     };
 
-    let transfers = (0..num_putters).into_iter().map(|_| g.get_mutator(transfers)).collect();
+    let transfers = (0..num_putters)
+        .into_iter()
+        .map(|_| g.get_mutator(transfers))
+        .collect();
     Box::new(Bank {
                  blender: g,
                  transfers: transfers,
@@ -95,7 +98,9 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
 
 impl Bank {
     fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.blender.get_transactional_getter(self.balances).unwrap())
+        Box::new(self.blender
+                     .get_transactional_getter(self.balances)
+                     .unwrap())
     }
     fn putter(&mut self) -> Box<Putter> {
         let m = self.transfers.pop().unwrap();
@@ -109,8 +114,8 @@ impl Bank {
             mig.add_ingredient("identity",
                                &["acct_id", "credit", "debit"],
                                distributary::Identity::new(self.balances));
-        let _ = mig.transactional_maintain(identity, 0);
-        let _ = mig.commit();
+        mig.transactional_maintain(identity, 0);
+        mig.commit();
     }
 }
 
@@ -135,14 +140,16 @@ impl Getter for TxGet {
         Box::new(move |id| {
             self(&id.into()).map(|(res, token)| {
                 assert_eq!(res.len(), 1);
-                res.into_iter().next().map(|row| {
-                                               // we only care about the first result
-                                               let mut row = row.into_iter();
-                                               let _: i64 = row.next().unwrap().into();
-                                               let credit: i64 = row.next().unwrap().into();
-                                               let debit: i64 = row.next().unwrap().into();
-                                               (credit - debit, token)
-                                           })
+                res.into_iter()
+                    .next()
+                    .map(|row| {
+                             // we only care about the first result
+                             let mut row = row.into_iter();
+                             let _: i64 = row.next().unwrap().into();
+                             let credit: i64 = row.next().unwrap().into();
+                             let debit: i64 = row.next().unwrap().into();
+                             (credit - debit, token)
+                         })
             })
         })
     }
@@ -420,7 +427,7 @@ fn main() {
                            runtime,
                            verbose,
                            audit,
-                           false,  /* measure_latency */
+                           false, /* measure_latency */
                            coarse_checktables,
                            &mut transactions)
                 })
@@ -450,7 +457,7 @@ fn main() {
                        runtime,
                        verbose,
                        audit,
-                       true,  /* measure_latency */
+                       true, /* measure_latency */
                        coarse_checktables,
                        &mut transactions)
             })

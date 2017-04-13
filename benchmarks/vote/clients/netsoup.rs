@@ -86,33 +86,37 @@ impl Writer for C {
 
 impl Reader for C {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let aids = ids.iter().map(|&(_, article_id)| article_id.into()).collect();
-        let res = self.query(END_NODE, aids).map_err(|_| ()).map(|rows| {
-            assert_eq!(ids.len(), rows.len());
-            rows.into_iter()
-                .map(|rows| {
-                    // rustfmt
-                    match rows.into_iter().next() {
-                        Some(row) => {
-                            match row[1] {
-                                DataType::TinyText(..) |
-                                DataType::Text(..) => {
-                                    use std::borrow::Cow;
-                                    let t: Cow<_> = (&row[1]).into();
-                                    ArticleResult::Article {
-                                        id: row[0].clone().into(),
-                                        title: t.to_string(),
-                                        votes: row[2].clone().into(),
+        let aids = ids.iter()
+            .map(|&(_, article_id)| article_id.into())
+            .collect();
+        let res = self.query(END_NODE, aids)
+            .map_err(|_| ())
+            .map(|rows| {
+                assert_eq!(ids.len(), rows.len());
+                rows.into_iter()
+                    .map(|rows| {
+                        // rustfmt
+                        match rows.into_iter().next() {
+                            Some(row) => {
+                                match row[1] {
+                                    DataType::TinyText(..) |
+                                    DataType::Text(..) => {
+                                        use std::borrow::Cow;
+                                        let t: Cow<_> = (&row[1]).into();
+                                        ArticleResult::Article {
+                                            id: row[0].clone().into(),
+                                            title: t.to_string(),
+                                            votes: row[2].clone().into(),
+                                        }
                                     }
+                                    _ => unreachable!(),
                                 }
-                                _ => unreachable!(),
                             }
+                            None => ArticleResult::NoSuchArticle,
                         }
-                        None => ArticleResult::NoSuchArticle,
-                    }
-                })
-                .collect()
-        });
+                    })
+                    .collect()
+            });
         (res, Period::PreMigration)
     }
 }

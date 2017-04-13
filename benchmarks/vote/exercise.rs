@@ -52,6 +52,7 @@ pub struct RuntimeConfig {
     cdf: bool,
     batch_size: usize,
     migrate_after: Option<time::Duration>,
+    verbose: bool,
 }
 
 impl RuntimeConfig {
@@ -63,7 +64,13 @@ impl RuntimeConfig {
             batch_size: 1,
             cdf: true,
             migrate_after: None,
+            verbose: false,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn batch_size(&self) -> usize {
+        self.batch_size
     }
 
     #[allow(dead_code)]
@@ -78,6 +85,11 @@ impl RuntimeConfig {
         } else {
             self.batch_size = batch_size;
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn set_verbose(&mut self, yes: bool) {
+        self.verbose = yes;
     }
 
     pub fn produce_cdf(&mut self, yes: bool) {
@@ -178,13 +190,17 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
-                    (0..n).map(|_| u.gen_range(0, config.narticles) as i64).collect()
+                    (0..n)
+                        .map(|_| u.gen_range(0, config.narticles) as i64)
+                        .collect()
                 }
                 Distribution::Zipf(e) => {
                     let mut z =
                         ZipfDistribution::new(rand::thread_rng(), config.narticles as usize, e)
                             .unwrap();
-                    (0..n).map(|_| z.gen_range(0, config.narticles) as i64).collect()
+                    (0..n)
+                        .map(|_| z.gen_range(0, config.narticles) as i64)
+                        .collect()
                 }
             }
         };
@@ -193,8 +209,10 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
         let start = time::Instant::now();
         let mut last_reported = start;
         let report_every = time::Duration::from_millis(200);
-        let mut batch: Vec<_> =
-            (0..config.batch_size).into_iter().map(|i| (i as i64, i as i64)).collect();
+        let mut batch: Vec<_> = (0..config.batch_size)
+            .into_iter()
+            .map(|i| (i as i64, i as i64))
+            .collect();
         while start.elapsed() < config.runtime {
             // construct ids for the next batch
             for &mut (_, ref mut aid) in &mut batch {
@@ -223,16 +241,20 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
 
                 match period {
                     Period::PreMigration => {
-                        println!("{:?} {}: {:.2}",
-                                 dur_to_ns!(start.elapsed()),
-                                 desc,
-                                 count_per_s);
+                        if config.verbose {
+                            println!("{:?} {}: {:.2}",
+                                     dur_to_ns!(start.elapsed()),
+                                     desc,
+                                     count_per_s);
+                        }
                     }
                     Period::PostMigration => {
-                        println!("{:?} {}+: {:.2}",
-                                 dur_to_ns!(start.elapsed()),
-                                 desc,
-                                 count_per_s);
+                        if config.verbose {
+                            println!("{:?} {}+: {:.2}",
+                                     dur_to_ns!(start.elapsed()),
+                                     desc,
+                                     count_per_s);
+                        }
                     }
                 }
                 stats.record_throughput(period, count_per_s);

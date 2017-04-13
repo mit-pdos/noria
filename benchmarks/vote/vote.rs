@@ -76,16 +76,26 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("transactions")
+            .short("t")
+            .long("transactions")
+            .takes_value(false)
+            .help("Use transactional reads and writes"))
         .arg(Arg::with_name("crossover")
             .short("x")
             .takes_value(true)
             .help("Period for transition to new views for readers and writers")
             .requires("migrate"))
+        .arg(Arg::with_name("quiet")
+            .short("q")
+            .long("quiet")
+            .help("No noisy output while running"))
         .get_matches();
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
+    let transactions = args.is_present("transactions");
     let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
@@ -103,6 +113,7 @@ fn main() {
     }
 
     let mut config = exercise::RuntimeConfig::new(narticles, runtime);
+    config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
@@ -110,7 +121,7 @@ fn main() {
     config.use_distribution(dist);
 
     // setup db
-    let g = graph::make();
+    let g = graph::make(transactions);
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
@@ -129,6 +140,7 @@ fn main() {
         new_vote: None,
         i: 0,
         x: Crossover::new(crossover),
+        transactions: transactions,
     };
 
     let put_stats;
@@ -136,7 +148,8 @@ fn main() {
     if stage {
         // put then get
         put_stats = exercise::launch_writer(putter, config, None);
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -145,7 +158,10 @@ fn main() {
                          .unwrap()
                  })
             .collect();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     } else {
         // put & get
         // TODO: how do we start getters after prepopulate?
@@ -158,7 +174,8 @@ fn main() {
         // wait for prepopulation to finish
         prepop.recv().is_err();
 
-        let getters: Vec<_> = getters.into_iter()
+        let getters: Vec<_> = getters
+            .into_iter()
             .enumerate()
             .map(|(i, g)| {
                      thread::Builder::new()
@@ -169,7 +186,10 @@ fn main() {
             .collect();
 
         put_stats = putter.join().unwrap();
-        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        get_stats = getters
+            .into_iter()
+            .map(|jh| jh.join().unwrap())
+            .collect();
     }
 
     print_stats("PUT", &put_stats.pre, avg);
@@ -177,11 +197,13 @@ fn main() {
         print_stats(format!("GET{}", i), &s.pre, avg);
     }
     if avg {
-        let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-            // TODO: do we *really* want an average of averages?
-            let (sum, num) = stats.pre.sum_len();
-            (tot + sum, count + num)
-        });
+        let sum = get_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
+                // TODO: do we *really* want an average of averages?
+                let (sum, num) = stats.pre.sum_len();
+                (tot + sum, count + num)
+            });
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -191,11 +213,13 @@ fn main() {
             print_stats(format!("GET{}+", i), &s.post, avg);
         }
         if avg {
-            let sum = get_stats.iter().fold((0f64, 0usize), |(tot, count), stats| {
-                // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.pre.sum_len();
-                (tot + sum, count + num)
-            });
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.post.sum_len();
+                    (tot + sum, count + num)
+                });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -250,17 +274,16 @@ impl Crossover {
         if self.done {
             return true;
         }
-        if self.crossover.is_none() || self.swapped.is_none() {
+        if self.swapped.is_none() {
             return false;
         }
-
+        if self.crossover.is_none() {
+            return true;
+        }
 
         self.iteration += 1;
         if self.iteration == (1 << 8) {
-            let elapsed = dur_to_ns!(self.swapped
-                                         .as_ref()
-                                         .unwrap()
-                                         .elapsed());
+            let elapsed = dur_to_ns!(self.swapped.as_ref().unwrap().elapsed());
 
             if elapsed > self.crossover.unwrap() {
                 // we've fully crossed over
@@ -376,6 +399,7 @@ struct Spoon {
     i: usize,
     x: Crossover,
     new_vote: Option<mpsc::Receiver<Mutator>>,
+    transactions: bool,
 }
 
 impl Writer for Spoon {
@@ -391,10 +415,7 @@ impl Writer for Spoon {
             // don't try too eagerly
             if self.i & 16384 == 0 {
                 // we may have been given a new putter
-                if let Ok(nv) = self.new_vote
-                       .as_mut()
-                       .unwrap()
-                       .try_recv() {
+                if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
                     self.new_vote = None;
                     self.x.swapped();
@@ -414,7 +435,8 @@ impl Writer for Spoon {
             Period::PostMigration
         } else {
             for &(user_id, article_id) in ids {
-                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+                self.vote_pre
+                    .put(vec![user_id.into(), article_id.into()]);
             }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration
@@ -432,6 +454,7 @@ impl Writer for Spoon {
                 .iter()
                 .map(|g| unsafe { g.clone() })
                 .collect(),
+            transactions: self.transactions,
         }
     }
 }
@@ -440,6 +463,7 @@ struct Migrator {
     graph: sync::Arc<sync::Mutex<graph::Graph>>,
     mut_tx: mpsc::SyncSender<Mutator>,
     getters: Vec<Getter>,
+    transactions: bool,
 }
 
 impl MigrationHandle for Migrator {
@@ -457,7 +481,11 @@ impl MigrationHandle for Migrator {
             let mut mig = g.graph.start_migration();
 
             // add new "ratings" base table
-            let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
+            let rating = if self.transactions {
+                mig.add_transactional_base("rating", &["user", "id", "stars"], Base::default())
+            } else {
+                mig.add_ingredient("rating", &["user", "id", "stars"], Base::default())
+            };
 
             // add sum of ratings
             let rs = mig.add_ingredient("rsum",
@@ -512,23 +540,25 @@ impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let res = ids.iter()
             .map(|&(_, article_id)| {
-                (self.call())(&article_id.into()).map_err(|_| ()).map(|g| {
-                    match g.into_iter().next() {
-                        Some(row) => {
-                            // we only care about the first result
-                            let mut row = row.into_iter();
-                            let id: i64 = row.next().unwrap().into();
-                            let title: String = row.next().unwrap().into();
-                            let count: i64 = row.next().unwrap().into();
-                            ArticleResult::Article {
-                                id: id,
-                                title: title,
-                                votes: count,
+                (self.call())(&article_id.into())
+                    .map_err(|_| ())
+                    .map(|g| {
+                        match g.into_iter().next() {
+                            Some(row) => {
+                                // we only care about the first result
+                                let mut row = row.into_iter();
+                                let id: i64 = row.next().unwrap().into();
+                                let title: String = row.next().unwrap().into();
+                                let count: i64 = row.next().unwrap().into();
+                                ArticleResult::Article {
+                                    id: id,
+                                    title: title,
+                                    votes: count,
+                                }
                             }
+                            None => ArticleResult::NoSuchArticle,
                         }
-                        None => ArticleResult::NoSuchArticle,
-                    }
-                })
+                    })
             })
             .collect();
 

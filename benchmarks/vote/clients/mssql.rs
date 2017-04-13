@@ -1,4 +1,4 @@
-use futures::Future;
+use futures::{Future, Stream};
 use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
@@ -23,7 +23,8 @@ fn mkc(addr: &str) -> Client {
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON;",
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                                  db))
             .and_then(|r| r)
             .collect()
@@ -39,7 +40,7 @@ fn mkc(addr: &str) -> Client {
     }
 }
 
-pub fn make_writer(addr: &str) -> W {
+pub fn make_writer(addr: &str, batch_size: usize) -> W {
     let mut core = reactor::Core::new().unwrap();
 
     let cfg_string = &addr[0..addr.rfind("/").unwrap()];
@@ -48,17 +49,22 @@ pub fn make_writer(addr: &str) -> W {
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
         .and_then(|conn| {
-                      conn.simple_exec(format!("DROP DATABASE {};", db)).and_then(|r| r).collect()
+                      conn.simple_exec(format!("DROP DATABASE {};", db))
+                          .and_then(|r| r)
+                          .collect()
                   })
         .and_then(|(_, conn)| {
-                      conn.simple_exec(format!("CREATE DATABASE {};", db)).and_then(|r| r).collect()
+                      conn.simple_exec(format!("CREATE DATABASE {};", db))
+                          .and_then(|r| r)
+                          .collect()
                   })
         .and_then(|(_, conn)| {
             conn.simple_exec(format!("USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; ",
+                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                                      db))
                 .and_then(|r| r)
                 .collect()
@@ -73,14 +79,13 @@ pub fn make_writer(addr: &str) -> W {
                 .collect()
         })
         .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE TABLE vt (
+                      conn.simple_exec("CREATE TABLE vt (
                              u bigint,
-                             id bigint,
-                             PRIMARY KEY NONCLUSTERED (u, id)
+                             id bigint
                              );")
-                .and_then(|r| r)
-                .collect()
-        })
+                          .and_then(|r| r)
+                          .collect()
+                  })
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
@@ -100,14 +105,20 @@ pub fn make_writer(addr: &str) -> W {
     drop(core);
 
     let client = mkc(addr);
-    let a_prep = client.conn
+    let a_prep = client
+        .conn
         .as_ref()
         .unwrap()
         .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
-    let v_prep = client.conn
-        .as_ref()
-        .unwrap()
-        .prepare("INSERT INTO vt (u, id) VALUES (@P1, @P2);");
+
+    let mut vote_qstring = String::new();
+    for i in 1..batch_size + 1 {
+        vote_qstring.push_str(&format!("INSERT INTO vt (u, id) VALUES (@P{}, @P{}); ",
+                                       i * 2 - 1,
+                                       i * 2));
+    }
+
+    let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
     W {
         client: client,
         a_prep: a_prep,
@@ -125,12 +136,17 @@ pub struct W {
 unsafe impl Sync for W {}
 unsafe impl Send for W {}
 
-pub fn make_reader(addr: &str) -> R {
+pub fn make_reader(addr: &str, batch_size: usize) -> R {
     let client = mkc(addr);
-    let prep = client.conn
-        .as_ref()
-        .unwrap()
-        .prepare("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P1;");
+
+    let mut qstring = String::new();
+    for i in 1..batch_size + 1 {
+        let sql = format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{};",
+                          i);
+        qstring.push_str(&sql);
+    }
+
+    let prep = client.conn.as_ref().unwrap().prepare(qstring);
     R {
         client: client,
         prep: prep,
@@ -156,65 +172,63 @@ impl Writer for W {
             .exec(&self.a_prep, &[&article_id, &title.as_str()])
             .and_then(|r| r)
             .collect();
-        let (_, conn) = self.client
-            .core
-            .run(fut)
-            .unwrap();
+        let (_, conn) = self.client.core.run(fut).unwrap();
         self.client.conn = Some(conn);
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        for &(user_id, article_id) in ids {
-            let fut = self.client
-                .conn
-                .take()
-                .unwrap()
-                .exec(&self.v_prep, &[&user_id, &article_id])
-                .and_then(|r| r)
-                .collect();
-            let (_, conn) = self.client
-                .core
-                .run(fut)
-                .unwrap();
-            self.client.conn = Some(conn);
-        }
+        let data = ids.iter()
+            .fold(Vec::new(), |mut acc, &(ref u, ref a)| {
+                acc.push(u as &_);
+                acc.push(a as &_);
+                acc
+            });
+        let fut = self.client
+            .conn
+            .take()
+            .unwrap()
+            .exec(&self.v_prep, data.as_slice())
+            .and_then(|r| r)
+            .collect();
+        let (_, conn) = self.client.core.run(fut).unwrap();
+        self.client.conn = Some(conn);
         Period::PreMigration
     }
 }
 
 impl Reader for R {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        use tiberius::stmt::ResultStreamExt;
-
-        let res = ids.iter()
-            .map(|&(_, article_id)| {
-                let mut res = ArticleResult::NoSuchArticle;
-                {
-                    let fut = self.client
-                        .conn
-                        .take()
-                        .unwrap()
-                        .query(&self.prep, &[&article_id])
-                        .for_each_row(|ref row| {
+        let mut res = Vec::new();
+        let conn;
+        // scope needed so that the compiler realizes that `fut` goes out of scope, thus returning
+        // the borrow of `res`
+        {
+            let data: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
+            let fut = self.client
+                .conn
+                .take()
+                .unwrap()
+                .query(&self.prep, data.as_slice())
+                .for_each(|qs| {
+                    let q_res: Vec<ArticleResult> = qs.wait()
+                        .map(|row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
+                            let row = row.unwrap();
                             let aid: i64 = row.get(0);
                             let title: &str = row.get(1);
                             let votes: i64 = row.get(2);
-                            res = ArticleResult::Article {
+                            ArticleResult::Article {
                                 id: aid,
                                 title: String::from(title),
                                 votes: votes,
-                            };
-                            Ok(())
-                        });
-                    let conn = self.client
-                        .core
-                        .run(fut)
-                        .unwrap();
-                    self.client.conn = Some(conn);
-                }
-                res
-            })
-            .collect();
+                            }
+                        })
+                        .collect();
+                    res.extend(q_res);
+                    Ok(())
+                });
+            conn = self.client.core.run(fut).unwrap();
+        }
+        self.client.conn = Some(conn);
         (Ok(res), Period::PreMigration)
     }
 }

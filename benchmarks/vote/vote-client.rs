@@ -120,6 +120,10 @@ fn main() {
             .value_name("N")
             .help("Perform a migration after this many seconds")
             .conflicts_with("stage"))
+        .arg(Arg::with_name("quiet")
+            .short("q")
+            .long("quiet")
+            .help("No noisy output while running"))
         .arg(Arg::with_name("MODE")
             .index(1)
             .possible_values(&["read", "write"])
@@ -153,6 +157,7 @@ fn main() {
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.set_verbose(!args.is_present("quiet"));
     config.use_batching(value_t_or_exit!(args, "batch", usize));
     config.use_distribution(dist);
 
@@ -166,7 +171,10 @@ fn main() {
             let stats = match client {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
-                "mssql" => exercise::launch_reader(clients::mssql::make_reader(addr), config),
+                "mssql" => {
+                    exercise::launch_reader(clients::mssql::make_reader(addr, config.batch_size()),
+                                            config)
+                }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
@@ -213,7 +221,11 @@ fn main() {
             let stats = match client {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
-                "mssql" => exercise::launch_writer(clients::mssql::make_writer(addr), config, None),
+                "mssql" => {
+                    exercise::launch_writer(clients::mssql::make_writer(addr, config.batch_size()),
+                                            config,
+                                            None)
+                }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {

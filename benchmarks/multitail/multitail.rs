@@ -111,33 +111,36 @@ fn main() {
         .version("0.1")
         .about("Benchmarks different thread domain splits for a multi-tailed graphi.")
         .arg(Arg::with_name("cfg")
-            .short("c")
-            .possible_values(&["one_domain", "domain_per_node", "vert_slice", "horiz_slice"])
-            .takes_value(true)
-            .required(true)
-            .help("Domain split type"))
+                 .short("c")
+                 .possible_values(&["one_domain",
+                                    "domain_per_node",
+                                    "vert_slice",
+                                    "horiz_slice"])
+                 .takes_value(true)
+                 .required(true)
+                 .help("Domain split type"))
         .arg(Arg::with_name("batch")
-            .short("b")
-            .takes_value(true)
-            .required(true)
-            .help("Batch size"))
+                 .short("b")
+                 .takes_value(true)
+                 .required(true)
+                 .help("Batch size"))
         .arg(Arg::with_name("width")
-            .short("w")
-            .takes_value(true)
-            .required(true)
-            .help("Number of tails"))
+                 .short("w")
+                 .takes_value(true)
+                 .required(true)
+                 .help("Number of tails"))
         .arg(Arg::with_name("height")
-            .short("h")
-            .takes_value(true)
-            .required(true)
-            .help("Depth of each tail"))
+                 .short("h")
+                 .takes_value(true)
+                 .required(true)
+                 .help("Depth of each tail"))
         .arg(Arg::with_name("csv")
-            .required(false)
-            .help("Print output in CSV format."))
+                 .required(false)
+                 .help("Print output in CSV format."))
         .arg(Arg::with_name("stats")
-            .short("s")
-            .required(false)
-            .help("Print statistics about time usage"))
+                 .short("s")
+                 .required(false)
+                 .help("Print statistics about time usage"))
         .get_matches();
 
     let cfg = matches.value_of("cfg").unwrap();
@@ -160,7 +163,9 @@ fn main() {
     let number_putter = backend.number.take().unwrap();
     println!("Seeding...");
     for y in 1..batch_size + 1 {
-        data_putter.transactional_put(vec![batch_size.into(), y.into()], Token::empty()).unwrap();
+        data_putter
+            .transactional_put(vec![batch_size.into(), y.into()], Token::empty())
+            .unwrap();
     }
     println!("Finished seeding! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));

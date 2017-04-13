@@ -10,7 +10,7 @@ use std::fs::{OpenOptions, File};
 use std::io::Write;
 use slog::DrainExt;
 
-use distributary::{DataType, Join, JoinType, Blender, Base, BaseDurabilityLevel, NodeAddress, Filter, Mutator, Index};
+use distributary::{DataType, Join, JoinType, Blender, Base, NodeAddress, Filter, Mutator, Index};
 
 pub struct Piazza {
     pub soup: Blender,
@@ -52,7 +52,8 @@ impl Piazza {
 
             // add a post base table
             post = mig.add_ingredient("post",
-                                      &["pid", "cid", "author", "content"], Base::new(vec![1]));
+                                      &["pid", "cid", "author", "content"],
+                                      Base::new(vec![1]));
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
@@ -184,7 +185,10 @@ fn main() {
                  .value_name("N")
                  .default_value("10000")
                  .help("Number of posts to prepopulate the database with"))
-        .arg(Arg::with_name("csv").long("csv").required(false).help("Print output in CSV format."))
+        .arg(Arg::with_name("csv")
+                 .long("csv")
+                 .required(false)
+                 .help("Print output in CSV format."))
         .arg(Arg::with_name("fanout")
                  .long("fanout")
                  .short("f")

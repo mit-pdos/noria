@@ -73,30 +73,58 @@ fn make(recipe_location: &str) -> Box<Backend> {
 impl Backend {
     fn generate_parameter(&self, query_name: &str, rng: &mut rand::ThreadRng) -> DataType {
         match query_name {
-            "getName" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
-            "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "getName" => {
+                rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                    .into()
+            }
+            "getBook" => {
+                rng.gen_range(1, self.prepop_counts["items"] as i32)
+                    .into()
+            }
             "getCustomer" => "".into(), // XXX(malte): fix username string generation
             "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
             "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
-            "getUserName" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
+            "getUserName" => {
+                rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                    .into()
+            }
             "getPassword" => "".into(), // XXX(malte): fix username string generation
-            "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "getRelated1" => {
+                rng.gen_range(1, self.prepop_counts["items"] as i32)
+                    .into()
+            }
             "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
             "getMostRecentOrderLines" => {
-                rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
+                rng.gen_range(1, self.prepop_counts["orders"] as i32)
+                    .into()
             }
             "createEmptyCart" => 0i32.into(),
             "addItem" => 0.into(), // XXX(malte): dual parameter query, need SCL ID range
             "addRandomItemToCartIfNecessary" => 0.into(), // XXX(malte): need SCL ID range
             "getCart" => 0.into(), // XXX(malte): need SCL ID range
             "createNewCustomerMaxId" => 0i32.into(),
-            "getCDiscount" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
-            "getCAddrId" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
-            "getCAddr" => rng.gen_range(1, self.prepop_counts["customers"] as i32).into(),
-            "enterAddressId" => rng.gen_range(1, self.prepop_counts["countries"] as i32).into(),
+            "getCDiscount" => {
+                rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                    .into()
+            }
+            "getCAddrId" => {
+                rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                    .into()
+            }
+            "getCAddr" => {
+                rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                    .into()
+            }
+            "enterAddressId" => {
+                rng.gen_range(1, self.prepop_counts["countries"] as i32)
+                    .into()
+            }
             "enterAddressMaxId" => 0i32.into(),
             "enterOrderMaxId" => 0i32.into(),
-            "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
+            "getStock" => {
+                rng.gen_range(1, self.prepop_counts["items"] as i32)
+                    .into()
+            }
             "verifyDBConsistencyCustId" => 0i32.into(),
             "verifyDBConsistencyItemId" => 0i32.into(),
             "verifyDBConsistencyAddrId" => 0i32.into(),
@@ -151,7 +179,9 @@ fn main() {
                  .required(true)
                  .default_value("benchmarks/tpc_w/data")
                  .help("Location of the data files for TPC-W prepopulation."))
-        .arg(Arg::with_name("transactional").short("t").help("Use transactional writes."))
+        .arg(Arg::with_name("transactional")
+                 .short("t")
+                 .help("Use transactional writes."))
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
@@ -163,21 +193,33 @@ fn main() {
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("addresses".into(), num_addr);
+    backend
+        .prepop_counts
+        .insert("addresses".into(), num_addr);
     let num_authors = populate_authors(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("authors".into(), num_authors);
+    backend
+        .prepop_counts
+        .insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("countries".into(), num_countries);
+    backend
+        .prepop_counts
+        .insert("countries".into(), num_countries);
     let num_customers = populate_customers(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("customers".into(), num_customers);
+    backend
+        .prepop_counts
+        .insert("customers".into(), num_customers);
     let num_items = populate_items(&backend, &ploc, transactional);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc, transactional);
     backend.prepop_counts.insert("orders".into(), num_orders);
     let num_cc_xacts = populate_cc_xacts(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("cc_xacts".into(), num_cc_xacts);
+    backend
+        .prepop_counts
+        .insert("cc_xacts".into(), num_cc_xacts);
     let num_order_line = populate_order_line(&backend, &ploc, transactional);
-    backend.prepop_counts.insert("order_line".into(), num_order_line);
+    backend
+        .prepop_counts
+        .insert("order_line".into(), num_order_line);
 
     //println!("{}", backend.g);
 

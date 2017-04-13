@@ -12,7 +12,7 @@ pub struct Graph {
     pub graph: Blender,
 }
 
-pub fn make() -> Graph {
+pub fn make(transactions: bool) -> Graph {
     // set up graph
     let mut g = Blender::new();
     g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
@@ -22,7 +22,11 @@ pub fn make() -> Graph {
         let mut mig = g.start_migration();
 
         // add article base node
-        let article = mig.add_ingredient("article", &["id", "title"], Base::default());
+        let article = if transactions {
+            mig.add_transactional_base("article", &["id", "title"], Base::default())
+        } else {
+            mig.add_ingredient("article", &["id", "title"], Base::default())
+        };
 
         // add vote base table
         let vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
