@@ -19,7 +19,7 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
         opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                       "SET SESSION ISOLATION_LEVEL READ UNCOMMITTED;"]);
+                       "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
         let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
@@ -46,7 +46,7 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
     let mut opts = OptsBuilder::from_opts(opts);
     opts.db_name(Some(db));
     opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                   "SET SESSION ISOLATION_LEVEL READ UNCOMMITTED;"]);
+                   "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
     mysql::Pool::new_manual(1, 4, opts).unwrap()
 }
 
