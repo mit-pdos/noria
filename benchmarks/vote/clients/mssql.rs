@@ -89,8 +89,8 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .and_then(|(_, conn)| {
             conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
-                                FROM dbo.art AS art
-                                LEFT JOIN dbo.vt AS vt ON (art.id = vt.id)
+                                FROM dbo.art AS art, dbo.vt AS vt
+                                WHERE art.id = vt.id
                                 GROUP BY art.id, art.title;")
                 .and_then(|r| r)
                 .collect()
@@ -172,6 +172,10 @@ impl Writer for W {
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
         self.client.conn = Some(conn);
+
+        // we must also vote for the article, because mssql doesn't allow LEFT JOIN in indexed
+        // views: additional-requirements
+        self.vote(&[(0, article_id)]);
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
