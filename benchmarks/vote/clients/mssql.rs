@@ -109,15 +109,14 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
         .conn
         .as_ref()
         .unwrap()
-        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0);");
+        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0); \
+                 INSERT INTO vt (u, id) VALUES (0, @P3);");
 
-    let mut vote_qstring = String::new();
-    for i in 1..batch_size + 1 {
-        vote_qstring.push_str(&format!("INSERT INTO vt (u, id) VALUES (@P{}, @P{}); ",
-                                       i * 2 - 1,
-                                       i * 2));
-    }
-
+    let vals = (1..batch_size + 1)
+        .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
     W {
         client: client,
@@ -139,13 +138,13 @@ unsafe impl Send for W {}
 pub fn make_reader(addr: &str, batch_size: usize) -> R {
     let client = mkc(addr);
 
-    let mut qstring = String::new();
-    for i in 1..batch_size + 1 {
-        let sql = format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{};",
-                          i);
-        qstring.push_str(&sql);
-    }
-
+    let qstring = (1..batch_size + 1)
+        .map(|i| {
+                 format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{}",
+                         i)
+             })
+        .collect::<Vec<_>>()
+        .join(" UNION ");
     let prep = client.conn.as_ref().unwrap().prepare(qstring);
     R {
         client: client,
@@ -169,7 +168,7 @@ impl Writer for W {
             .conn
             .take()
             .unwrap()
-            .exec(&self.a_prep, &[&article_id, &title.as_str()])
+            .exec(&self.a_prep, &[&article_id, &title.as_str(), &article_id])
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();

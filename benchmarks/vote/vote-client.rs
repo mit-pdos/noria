@@ -179,7 +179,8 @@ fn main() {
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
                     let c = clients::mysql::setup(addr, false);
-                    exercise::launch_reader(clients::mysql::make_reader(&c), config)
+                    exercise::launch_reader(clients::mysql::make_reader(&c, config.batch_size()),
+                                            config)
                 }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
                 #[cfg(feature="b_hybrid")]
@@ -230,7 +231,9 @@ fn main() {
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
                     let c = clients::mysql::setup(addr, true);
-                    exercise::launch_writer(clients::mysql::make_writer(&c), config, None)
+                    exercise::launch_writer(clients::mysql::make_writer(&c, config.batch_size()),
+                                            config,
+                                            None)
                 }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
                 #[cfg(feature="b_hybrid")]

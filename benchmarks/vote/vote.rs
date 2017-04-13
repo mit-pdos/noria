@@ -549,11 +549,14 @@ impl Reader for Getter {
                                 let mut row = row.into_iter();
                                 let id: i64 = row.next().unwrap().into();
                                 let title: String = row.next().unwrap().into();
-                                let count: i64 = row.next().unwrap().into();
+                                let votes: i64 = match row.next().unwrap() {
+                                    DataType::None => 0,
+                                    d => d.into(),
+                                };
                                 ArticleResult::Article {
                                     id: id,
                                     title: title,
-                                    votes: count,
+                                    votes: votes,
                                 }
                             }
                             None => ArticleResult::NoSuchArticle,

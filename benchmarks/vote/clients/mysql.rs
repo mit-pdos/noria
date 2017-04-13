@@ -4,7 +4,8 @@ use common::{Writer, Reader, ArticleResult, Period};
 
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
-    conn: mysql::PooledConn,
+    v_prep_1: mysql::conn::Stmt<'a>,
+    v_prep_2: mysql::conn::Stmt<'a>,
 }
 
 pub fn setup(addr: &str, write: bool) -> mysql::Pool {
@@ -50,11 +51,26 @@ pub fn setup(addr: &str, write: bool) -> mysql::Pool {
     mysql::Pool::new_manual(1, 4, opts).unwrap()
 }
 
-pub fn make_writer<'a>(pool: &'a mysql::Pool) -> W<'a> {
+pub fn make_writer<'a>(pool: &'a mysql::Pool, batch_size: usize) -> W<'a> {
+    let vals = (1..batch_size + 1)
+        .map(|_| "(?, ?)")
+        .collect::<Vec<_>>()
+        .join(", ");
+    let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
+    let v_prep_1 = pool.prepare(vote_qstring).unwrap();
+
+    let vals = (1..batch_size + 1)
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN({})", vals);
+    let v_prep_2 = pool.prepare(vote_qstring).unwrap();
+
     W {
         a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
             .unwrap(),
-        conn: pool.get_conn().unwrap(),
+        v_prep_1: v_prep_1,
+        v_prep_2: v_prep_2,
     }
 }
 
@@ -66,40 +82,36 @@ impl<'a> Writer for W<'a> {
             .unwrap();
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        let values = ids.iter()
-            .map(|&(ref u, ref a)| format!("({}, {})", u, a))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let query = format!("INSERT INTO vt (u, id) VALUES {}; ", values);
+        // register votes
+        let values_1 = ids.iter()
+            .flat_map(|&(ref u, ref a)| vec![u as &_, a as &_])
+            .collect::<Vec<_>>();
+        self.v_prep_1.execute(&values_1[..]).unwrap();
 
-        self.conn.query(query).unwrap();
-
-        for &(_, ref a) in ids {
-            self.conn
-                .prep_exec("UPDATE art SET votes = votes + 1 WHERE id = ?;", vec![a])
-                .unwrap();
-        }
+        // update vote counts
+        let values_2 = ids.iter()
+            .map(|&(_, ref a)| a as &_)
+            .collect::<Vec<_>>();
+        self.v_prep_2.execute(&values_2[..]).unwrap();
 
         Period::PreMigration
     }
 }
 
-pub fn make_reader(pool: &mysql::Pool) -> mysql::PooledConn {
-    pool.get_conn().unwrap()
+pub fn make_reader(pool: &mysql::Pool, batch_size: usize) -> mysql::conn::Stmt {
+    let qstring = (1..batch_size + 1)
+        .map(|_| "SELECT id, title, votes FROM art WHERE id = ?")
+        .collect::<Vec<_>>()
+        .join(" UNION ");
+    pool.prepare(qstring).unwrap()
 }
 
-impl Reader for mysql::PooledConn {
+impl<'a> Reader for mysql::conn::Stmt<'a> {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let query = ids.iter()
-            .map(|&(_, ref article_id)| {
-                     format!("SELECT id, title, votes FROM art WHERE id = {}; ",
-                             article_id)
-                 })
-            .collect::<Vec<_>>()
-            .join("");
+        let ids: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
 
         let mut res = Vec::new();
-        let mut qresult = self.query(query).unwrap();
+        let mut qresult = self.execute(&ids[..]).unwrap();
         while qresult.more_results_exists() {
             for row in qresult.by_ref() {
                 let mut rr = row.unwrap();
@@ -110,8 +122,6 @@ impl Reader for mysql::PooledConn {
                          });
             }
         }
-        assert_eq!(res.len(), ids.len());
-
         (Ok(res), Period::PreMigration)
     }
 }

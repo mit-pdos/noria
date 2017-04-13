@@ -217,6 +217,7 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             // construct ids for the next batch
             for &mut (_, ref mut aid) in &mut batch {
                 *aid = randomness[i];
+                i = (i + 1) % randomness.len();
             }
 
             let (register, period) = if config.cdf {
@@ -262,8 +263,6 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
                 last_reported = time::Instant::now();
                 count = 0;
             }
-
-            i = (i + 1) % randomness.len();
         }
     }
 
