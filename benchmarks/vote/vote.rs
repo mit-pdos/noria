@@ -405,8 +405,13 @@ struct Spoon {
 impl Writer for Spoon {
     type Migrator = Migrator;
 
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.article.put(vec![article_id.into(), title.into()]);
+    fn make_articles<I>(&mut self, articles: I)
+        where I: ExactSizeIterator,
+              I: Iterator<Item = (i64, String)>
+    {
+        for (article_id, title) in articles {
+            self.article.put(vec![article_id.into(), title.into()]);
+        }
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {

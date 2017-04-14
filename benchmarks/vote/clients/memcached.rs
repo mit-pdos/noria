@@ -19,17 +19,23 @@ pub fn make_reader(addr: &str) -> Memcache {
 impl Writer for Memcache {
     type Migrator = ();
 
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.0
-            .set(format!("article_{}", article_id).as_bytes(),
-                 title.as_bytes(),
-                 0,
-                 0)
-            .unwrap();
-        self.0
-            .set(format!("article_{}_vc", article_id).as_bytes(), b"0", 0, 0)
-            .unwrap();
+    fn make_articles<I>(&mut self, articles: I)
+        where I: ExactSizeIterator,
+              I: Iterator<Item = (i64, String)>
+    {
+        for (article_id, title) in articles {
+            self.0
+                .set(format!("article_{}", article_id).as_bytes(),
+                     title.as_bytes(),
+                     0,
+                     0)
+                .unwrap();
+            self.0
+                .set(format!("article_{}_vc", article_id).as_bytes(), b"0", 0, 0)
+                .unwrap();
+        }
     }
+
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         use std::collections::HashMap;
         let keys: Vec<_> = ids.iter()

@@ -194,12 +194,14 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     // prepopulate
     if !config.should_reuse() {
         println!("Prepopulating with {} articles", config.narticles);
-        {
-            // let t = putter.transaction().unwrap();
-            for i in 0..config.narticles {
-                writer.make_article(i as i64, format!("Article #{}", i));
-            }
-            // t.commit().unwrap();
+        let pop_batch_size = 100;
+        assert_eq!(config.narticles % pop_batch_size, 0);
+        for i in 0..config.narticles / pop_batch_size {
+            let reali = pop_batch_size * i;
+            writer.make_articles((reali..reali + pop_batch_size).map(|i| {
+                                                                         (i as i64,
+                                                                          format!("Article #{}", i))
+                                                                     }));
         }
         println!("Done with prepopulation");
     }

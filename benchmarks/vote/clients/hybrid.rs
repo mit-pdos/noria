@@ -9,8 +9,7 @@ pub struct Pool {
     mc: Option<memcached::Client>,
 }
 
-pub struct W<'a> {
-    a_prep: mysql::conn::Stmt<'a>,
+pub struct W {
     conn: mysql::PooledConn,
     mc: memcached::Client,
 }
@@ -68,29 +67,47 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool, config: &Runtime
     }
 }
 
-pub fn make_writer<'a>(pool: &'a mut Pool) -> W<'a> {
+pub fn make_writer(pool: &mut Pool) -> W {
     let mc = pool.mc.take().unwrap();
     let pool = &pool.sql;
     W {
-        a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
-            .unwrap(),
         conn: pool.get_conn().unwrap(),
         mc: mc,
     }
 }
 
-impl<'a> Writer for W<'a> {
+impl Writer for W {
     type Migrator = ();
 
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.a_prep
-            .execute(params!{"id" => article_id, "title" => &title})
-            .unwrap();
-        drop(self.mc
-                 .set(format!("article_{}_vc", article_id).as_bytes(),
-                      format!("{};{};0", article_id, title).as_bytes(),
-                      0,
-                      0));
+    fn make_articles<I>(&mut self, articles: I)
+        where I: ExactSizeIterator,
+              I: Iterator<Item = (i64, String)>
+    {
+        let mut vals = Vec::with_capacity(articles.len());
+        let args: Vec<_> = articles
+            .map(|(aid, title)| {
+                     vals.push("(?, ?, 0)");
+                     (aid, title)
+                 })
+            .collect();
+        {
+            let args: Vec<_> = args.iter()
+                .flat_map(|&(ref aid, ref title)| vec![aid as &_, title as &_])
+                .collect();
+            let vals = vals.join(", ");
+            self.conn
+                .prep_exec(format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
+                           &args[..])
+                .unwrap();
+        }
+
+        for (article_id, title) in args {
+            drop(self.mc
+                     .set(format!("article_{}_vc", article_id).as_bytes(),
+                          format!("{};{};0", article_id, title).as_bytes(),
+                          0,
+                          0));
+        }
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
