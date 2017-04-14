@@ -58,7 +58,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        let d = BaseDurabilityLevel::Buffered;
+        let d = BaseDurabilityLevel::SyncImmediately;  // Buffered makes assert on getter fail.
         transfers = mig.add_transactional_base("transfers",
                                                &["src_acct", "dst_acct", "amount"],
                                                Base::default().with_durability(d));
