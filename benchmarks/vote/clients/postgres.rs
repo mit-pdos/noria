@@ -60,8 +60,13 @@ pub fn make_writer<'a>(conn: &'a postgres::Connection) -> W<'a> {
 
 impl<'a> Writer for W<'a> {
     type Migrator = ();
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.a_prep.execute(&[&article_id, &title]).unwrap();
+    fn make_articles<I>(&mut self, articles: I)
+        where I: ExactSizeIterator,
+              I: Iterator<Item = (i64, String)>
+    {
+        for (article_id, title) in articles {
+            self.a_prep.execute(&[&article_id, &title]).unwrap();
+        }
     }
     fn vote(&mut self, user_id: i64, article_id: i64) -> Period {
         self.v_prep.execute(&[&user_id, &article_id]).unwrap();

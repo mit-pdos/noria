@@ -87,6 +87,10 @@ fn main() {
             .long("avg")
             .takes_value(false)
             .help("compute average throughput at the end of benchmark"))
+        .arg(Arg::with_name("reuse")
+            .long("reuse")
+            .takes_value(false)
+            .help("do not prepopulate"))
         .arg(Arg::with_name("cdf")
             .short("c")
             .long("cdf")
@@ -138,7 +142,7 @@ fn main() {
 
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
-    let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
+    let dist = value_t_or_exit!(args, "distribution", common::Distribution);
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
@@ -152,11 +156,12 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = exercise::RuntimeConfig::new(narticles, runtime);
+    let mut config = common::RuntimeConfig::new(narticles, runtime);
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {
         config.perform_migration_at(migrate_after);
     }
+    config.set_reuse(args.is_present("reuse"));
     config.set_verbose(!args.is_present("quiet"));
     config.use_batching(value_t_or_exit!(args, "batch", usize));
     config.use_distribution(dist);
@@ -172,14 +177,14 @@ fn main() {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
                 "mssql" => {
-                    exercise::launch_reader(clients::mssql::make_reader(addr, config.batch_size()),
+                    exercise::launch_reader(clients::mssql::make_reader(addr, config.batch_size),
                                             config)
                 }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
-                    let c = clients::mysql::setup(addr, false);
-                    exercise::launch_reader(clients::mysql::make_reader(&c, config.batch_size()),
+                    let c = clients::mysql::setup(addr, false, &config);
+                    exercise::launch_reader(clients::mysql::make_reader(&c, config.batch_size),
                                             config)
                 }
                 // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
@@ -188,7 +193,7 @@ fn main() {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, false);
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, false, &config);
                     exercise::launch_reader(clients::hybrid::make_reader(&mut c), config)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
@@ -223,15 +228,15 @@ fn main() {
                 // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
                 #[cfg(feature="b_mssql")]
                 "mssql" => {
-                    exercise::launch_writer(clients::mssql::make_writer(addr, config.batch_size()),
+                    exercise::launch_writer(clients::mssql::make_writer(addr, &config),
                                             config,
                                             None)
                 }
                 // mysql://soup@127.0.0.1/bench_mysql
                 #[cfg(feature="b_mysql")]
                 "mysql" => {
-                    let c = clients::mysql::setup(addr, true);
-                    exercise::launch_writer(clients::mysql::make_writer(&c, config.batch_size()),
+                    let c = clients::mysql::setup(addr, true, &config);
+                    exercise::launch_writer(clients::mysql::make_writer(&c, config.batch_size),
                                             config,
                                             None)
                 }
@@ -241,15 +246,16 @@ fn main() {
                     let mut split_dbn = addr.splitn(2, ",");
                     let mysql_dbn = &split_dbn.next().unwrap()[6..];
                     let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, true);
+                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, true, &config);
                     exercise::launch_writer(clients::hybrid::make_writer(&mut c), config, None)
                 }
                 // postgresql://soup@127.0.0.1/bench_psql
                 #[cfg(feature="b_postgresql")]
                 "postgresql" => {
                     let c = clients::postgres::setup(addr, true);
-                    let res =
-                        exercise::launch_writer(clients::postgres::make_writer(&c), config, None);
+                    let res = exercise::launch_writer(clients::postgres::make_writer(&c, &config),
+                                                      config,
+                                                      None);
                     drop(c);
                     res
                 }

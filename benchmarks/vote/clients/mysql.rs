@@ -1,21 +1,21 @@
 use mysql::{self, OptsBuilder};
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 
 pub struct W<'a> {
-    a_prep: mysql::conn::Stmt<'a>,
     v_prep_1: mysql::conn::Stmt<'a>,
     v_prep_2: mysql::conn::Stmt<'a>,
+    pool: &'a mysql::Pool,
 }
 
-pub fn setup(addr: &str, write: bool) -> mysql::Pool {
+pub fn setup(addr: &str, write: bool, config: &RuntimeConfig) -> mysql::Pool {
     use mysql::Opts;
 
     let addr = format!("mysql://{}", addr);
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
 
-    if write {
+    if write && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
@@ -67,20 +67,35 @@ pub fn make_writer<'a>(pool: &'a mysql::Pool, batch_size: usize) -> W<'a> {
     let v_prep_2 = pool.prepare(vote_qstring).unwrap();
 
     W {
-        a_prep: pool.prepare("INSERT INTO art (id, title, votes) VALUES (:id, :title, 0)")
-            .unwrap(),
         v_prep_1: v_prep_1,
         v_prep_2: v_prep_2,
+        pool: pool,
     }
 }
 
 impl<'a> Writer for W<'a> {
     type Migrator = ();
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.a_prep
-            .execute(params!{"id" => article_id, "title" => &title})
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        let mut vals = Vec::with_capacity(articles.len());
+        let args: Vec<_> = articles
+            .map(|(aid, title)| {
+                     vals.push("(?, ?, 0)");
+                     (aid, title)
+                 })
+            .collect();
+        let args: Vec<_> = args.iter()
+            .flat_map(|&(ref aid, ref title)| vec![aid as &_, title as &_])
+            .collect();
+        let vals = vals.join(", ");
+        self.pool
+            .prep_exec(format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
+                       &args[..])
             .unwrap();
     }
+
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         // register votes
         let values_1 = ids.iter()

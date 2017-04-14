@@ -19,7 +19,7 @@ mod graph;
 #[macro_use]
 mod common;
 
-use common::{Writer, Reader, ArticleResult, Period, MigrationHandle};
+use common::{Writer, Reader, ArticleResult, Period, MigrationHandle, RuntimeConfig, Distribution};
 use distributary::{Mutator, DataType};
 
 use std::sync::mpsc;
@@ -96,7 +96,7 @@ fn main() {
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
     let transactions = args.is_present("transactions");
-    let dist = value_t_or_exit!(args, "distribution", exercise::Distribution);
+    let dist = value_t_or_exit!(args, "distribution", Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
@@ -112,7 +112,7 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = exercise::RuntimeConfig::new(narticles, runtime);
+    let mut config = RuntimeConfig::new(narticles, runtime);
     config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {
@@ -405,8 +405,13 @@ struct Spoon {
 impl Writer for Spoon {
     type Migrator = Migrator;
 
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.article.put(vec![article_id.into(), title.into()]);
+    fn make_articles<I>(&mut self, articles: I)
+        where I: ExactSizeIterator,
+              I: Iterator<Item = (i64, String)>
+    {
+        for (article_id, title) in articles {
+            self.article.put(vec![article_id.into(), title.into()]);
+        }
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {

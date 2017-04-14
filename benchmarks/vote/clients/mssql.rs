@@ -3,7 +3,7 @@ use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 
 pub struct Client {
     conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
@@ -40,79 +40,77 @@ fn mkc(addr: &str) -> Client {
     }
 }
 
-pub fn make_writer(addr: &str, batch_size: usize) -> W {
+pub fn make_writer(addr: &str, config: &RuntimeConfig) -> W {
     let mut core = reactor::Core::new().unwrap();
 
     let cfg_string = &addr[0..addr.rfind("/").unwrap()];
     let db = &addr[addr.rfind("/").unwrap() + 1..];
 
-    // Check whether database already exists, or whether we need to create it
-    let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string)
-        .and_then(|conn| {
-                      conn.simple_exec(format!("DROP DATABASE {};", db))
-                          .and_then(|r| r)
-                          .collect()
-                  })
-        .and_then(|(_, conn)| {
-                      conn.simple_exec(format!("CREATE DATABASE {};", db))
-                          .and_then(|r| r)
-                          .collect()
-                  })
-        .and_then(|(_, conn)| {
-            conn.simple_exec(format!("USE {}; \
+    let fixconn = |conn: tiberius::SqlConnection<Box<tiberius::BoxableIo>>| {
+        conn.simple_exec(format!("USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
                                       QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                                       SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                                     db))
-                .and_then(|r| r)
-                .collect()
-        })
-        .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE TABLE art (
+                                 db))
+            .and_then(|r| r)
+            .collect()
+    };
+
+    // Check whether database already exists, or whether we need to create it
+    let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string);
+    if config.should_reuse() {
+        core.run(fut.and_then(fixconn)).unwrap();
+    } else {
+        let fut = fut.and_then(|conn| {
+                                   conn.simple_exec(format!("DROP DATABASE {};", db))
+                                       .and_then(|r| r)
+                                       .collect()
+                               })
+            .and_then(|(_, conn)| {
+                          conn.simple_exec(format!("CREATE DATABASE {};", db))
+                              .and_then(|r| r)
+                              .collect()
+                      })
+            .and_then(|(_, conn)| fixconn(conn))
+            .and_then(|(_, conn)| {
+                          conn.simple_exec("CREATE TABLE art (
                              id bigint PRIMARY KEY NONCLUSTERED,
-                             title varchar(255),
-                             votes bigint
+                             title varchar(255)
                              );")
-                .and_then(|r| r)
-                .collect()
-        })
-        .and_then(|(_, conn)| {
-                      conn.simple_exec("CREATE TABLE vt (
+                              .and_then(|r| r)
+                              .collect()
+                      })
+            .and_then(|(_, conn)| {
+                          conn.simple_exec("CREATE TABLE vt (
                              u bigint,
                              id bigint
                              );")
-                          .and_then(|r| r)
-                          .collect()
-                  })
-        .and_then(|(_, conn)| {
-            conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
+                              .and_then(|r| r)
+                              .collect()
+                      })
+            .and_then(|(_, conn)| {
+                conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
                                 FROM dbo.art AS art, dbo.vt AS vt
                                 WHERE art.id = vt.id
                                 GROUP BY art.id, art.title;")
-                .and_then(|r| r)
-                .collect()
-        })
-        .and_then(|(_, conn)| {
-                      conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
-                          .and_then(|r| r)
-                          .collect()
-                  });
+                    .and_then(|r| r)
+                    .collect()
+            })
+            .and_then(|(_, conn)| {
+                          conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
+                              .and_then(|r| r)
+                              .collect()
+                      });
+        core.run(fut).unwrap();
+    };
 
-    core.run(fut).unwrap();
     drop(core);
 
     let client = mkc(addr);
-    let a_prep = client
-        .conn
-        .as_ref()
-        .unwrap()
-        .prepare("INSERT INTO art (id, title, votes) VALUES (@P1, @P2, 0); \
-                 INSERT INTO vt (u, id) VALUES (0, @P3);");
-
-    let vals = (1..batch_size + 1)
+    let vals = (1..config.batch_size + 1)
         .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
         .collect::<Vec<_>>()
         .join(", ");
@@ -120,14 +118,12 @@ pub fn make_writer(addr: &str, batch_size: usize) -> W {
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
     W {
         client: client,
-        a_prep: a_prep,
         v_prep: v_prep,
     }
 }
 
 pub struct W {
     client: Client,
-    a_prep: tiberius::stmt::Statement,
     v_prep: tiberius::stmt::Statement,
 }
 
@@ -163,12 +159,44 @@ unsafe impl Send for R {}
 
 impl Writer for W {
     type Migrator = ();
-    fn make_article(&mut self, article_id: i64, title: String) {
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        let articles: Vec<_> = articles.collect();
+        let narticles = articles.len();
+        let vals = (1..narticles + 1)
+            .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let qstring = format!("INSERT INTO art (id, title) VALUES {}", vals);
+        let a1_prep = self.client.conn.as_ref().unwrap().prepare(qstring);
+        let qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
+        let a2_prep = self.client.conn.as_ref().unwrap().prepare(qstring);
+
+        let articles: Vec<_> = articles
+            .iter()
+            .map(|&(article_id, ref title)| (0, article_id, title.as_str()))
+            .collect();
+        let mut a1_vals = Vec::with_capacity(narticles * 2);
+        let mut a2_vals = Vec::with_capacity(narticles * 2);
+        for &(ref zero, ref article_id, ref title) in &articles {
+            a1_vals.push(article_id as &_);
+            a1_vals.push(title as &_);
+            a2_vals.push(zero as &_);
+            a2_vals.push(article_id as &_);
+        }
+
         let fut = self.client
             .conn
             .take()
             .unwrap()
-            .exec(&self.a_prep, &[&article_id, &title.as_str(), &article_id])
+            .exec(&a1_prep, &a1_vals[..])
+            .and_then(|r| r)
+            .collect();
+        let (_, conn) = self.client.core.run(fut).unwrap();
+        let fut = conn.exec(&a2_prep, &a2_vals[..])
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
