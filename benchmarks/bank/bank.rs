@@ -197,6 +197,7 @@ fn client(i: usize,
     let mut read_latencies: Vec<u64> = Vec::new();
     let mut write_latencies = Vec::new();
     let mut settle_latencies = Vec::new();
+    let mut write_start_to_txn_end_latencies = Vec::new();
 
     let mut t_rng = rand::thread_rng();
 
@@ -252,6 +253,7 @@ fn client(i: usize,
                             read_latencies.push(write_start - transaction_start);
                             write_latencies.push(write_end - write_start);
                             settle_latencies.push(transaction_end - write_end);
+                            write_start_to_txn_end_latencies.push(transaction_end - write_start);
                         }
                         committed += 1;
                     }
@@ -320,13 +322,13 @@ fn client(i: usize,
         println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
         println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
 
-        let mut settle_latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
-        for sample_nanos in settle_latencies {
+        let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
+        for sample_nanos in write_start_to_txn_end_latencies {
             let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
-            settle_latencies_hist.record(sample_micros);
+            latencies_hist.record(sample_micros);
         }
 
-        for (v, p, _, _) in settle_latencies_hist.iter_recorded() {
+        for (v, p, _, _) in latencies_hist.iter_recorded() {
             // XXX: Print CDF in the format expected by the print_latency_cdf script.
             println!("percentile PUT {:.2} {:.2}", v, p);
         }
