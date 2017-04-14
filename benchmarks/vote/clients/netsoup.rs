@@ -72,8 +72,14 @@ pub fn make_writer(addr: &str) -> C {
 
 impl Writer for C {
     type Migrator = ();
-    fn make_article(&mut self, article_id: i64, title: String) {
-        self.mput(ARTICLE_NODE, vec![vec![article_id.into(), title.into()]]);
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        let articles = articles
+            .map(|(aid, title)| vec![aid.into(), title.into()])
+            .collect();
+        self.mput(ARTICLE_NODE, articles);
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         let votes = ids.iter()

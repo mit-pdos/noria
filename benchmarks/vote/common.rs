@@ -23,7 +23,10 @@ impl MigrationHandle for () {
 pub trait Writer {
     type Migrator: MigrationHandle + 'static;
 
-    fn make_article(&mut self, article_id: i64, title: String);
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator;
+
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period;
 
     fn prepare_migration(&mut self) -> Self::Migrator {
