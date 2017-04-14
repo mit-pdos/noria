@@ -103,10 +103,14 @@ impl Reader for C {
                                     DataType::Text(..) => {
                                         use std::borrow::Cow;
                                         let t: Cow<_> = (&row[1]).into();
+                                        let count: i64 = match row[2].clone() {
+                                            DataType::None => 0,
+                                            d => d.into(),
+                                        };
                                         ArticleResult::Article {
                                             id: row[0].clone().into(),
                                             title: t.to_string(),
-                                            votes: row[2].clone().into(),
+                                            votes: count,
                                         }
                                     }
                                     _ => unreachable!(),
