@@ -164,7 +164,6 @@ impl Writer for W {
               I: ExactSizeIterator
     {
         let articles: Vec<_> = articles.collect();
-        assert!(articles.len() < 50);
         let narticles = articles.len();
         let vals = (1..narticles + 1)
             .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
