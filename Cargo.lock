@@ -31,6 +31,7 @@ dependencies = [
  "tarpc 0.7.1 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "tarpc-plugins 0.1.0 (git+https://github.com/ms705/tarpc.git?branch=hack)",
  "tiberius 0.2.0 (git+https://github.com/ms705/tiberius/)",
+ "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
