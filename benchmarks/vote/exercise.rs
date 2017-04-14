@@ -1,4 +1,4 @@
-use common::{Writer, Reader, Period};
+use common::{Writer, Reader, Period, RuntimeConfig, Distribution};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -17,89 +17,6 @@ use rand::Rng as StdRng;
 use hdrsample::Histogram;
 use hdrsample::iterators::{HistogramIterator, recorded};
 use zipf::ZipfDistribution;
-
-#[derive(Clone, Copy)]
-pub enum Distribution {
-    Uniform,
-    Zipf(f64),
-}
-
-use std::str::FromStr;
-impl FromStr for Distribution {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "uniform" {
-            Ok(Distribution::Uniform)
-        } else if s.starts_with("zipf:") {
-            let s = s.trim_left_matches("zipf:");
-            str::parse::<f64>(s)
-                .map(|exp| Distribution::Zipf(exp))
-                .map_err(|e| {
-                             use std::error::Error;
-                             e.description().to_string()
-                         })
-        } else {
-            Err(format!("unknown distribution '{}'", s))
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RuntimeConfig {
-    narticles: isize,
-    runtime: time::Duration,
-    distribution: Distribution,
-    cdf: bool,
-    batch_size: usize,
-    migrate_after: Option<time::Duration>,
-    verbose: bool,
-}
-
-impl RuntimeConfig {
-    pub fn new(narticles: isize, runtime: time::Duration) -> Self {
-        RuntimeConfig {
-            narticles: narticles,
-            runtime: runtime,
-            distribution: Distribution::Uniform,
-            batch_size: 1,
-            cdf: true,
-            migrate_after: None,
-            verbose: false,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn batch_size(&self) -> usize {
-        self.batch_size
-    }
-
-    #[allow(dead_code)]
-    pub fn use_distribution(&mut self, d: Distribution) {
-        self.distribution = d;
-    }
-
-    #[allow(dead_code)]
-    pub fn use_batching(&mut self, batch_size: usize) {
-        if batch_size == 0 {
-            self.batch_size = 1;
-        } else {
-            self.batch_size = batch_size;
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn set_verbose(&mut self, yes: bool) {
-        self.verbose = yes;
-    }
-
-    pub fn produce_cdf(&mut self, yes: bool) {
-        self.cdf = yes;
-    }
-
-    pub fn perform_migration_at(&mut self, t: time::Duration) {
-        self.migrate_after = Some(t);
-    }
-}
 
 pub struct BenchmarkResult {
     throughputs: Vec<f64>,
@@ -275,15 +192,17 @@ pub fn launch_writer<W: Writer>(mut writer: W,
                                 -> BenchmarkResults {
 
     // prepopulate
-    println!("Prepopulating with {} articles", config.narticles);
-    {
-        // let t = putter.transaction().unwrap();
-        for i in 0..config.narticles {
-            writer.make_article(i as i64, format!("Article #{}", i));
+    if !config.should_reuse() {
+        println!("Prepopulating with {} articles", config.narticles);
+        {
+            // let t = putter.transaction().unwrap();
+            for i in 0..config.narticles {
+                writer.make_article(i as i64, format!("Article #{}", i));
+            }
+            // t.commit().unwrap();
         }
-        // t.commit().unwrap();
+        println!("Done with prepopulation");
     }
-    println!("Done with prepopulation");
 
     // let system settle
     thread::sleep(time::Duration::new(1, 0));

@@ -1,6 +1,6 @@
 use mysql::{self, OptsBuilder};
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 
 pub struct W<'a> {
     a_prep: mysql::conn::Stmt<'a>,
@@ -8,14 +8,14 @@ pub struct W<'a> {
     v_prep_2: mysql::conn::Stmt<'a>,
 }
 
-pub fn setup(addr: &str, write: bool) -> mysql::Pool {
+pub fn setup(addr: &str, write: bool, config: &RuntimeConfig) -> mysql::Pool {
     use mysql::Opts;
 
     let addr = format!("mysql://{}", addr);
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
 
-    if write {
+    if write && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));

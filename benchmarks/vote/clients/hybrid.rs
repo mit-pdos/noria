@@ -2,7 +2,7 @@ use memcached;
 use memcached::proto::{Operation, ProtoType};
 use mysql::{self, OptsBuilder};
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 
 pub struct Pool {
     sql: mysql::Pool,
@@ -15,7 +15,7 @@ pub struct W<'a> {
     mc: memcached::Client,
 }
 
-pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
+pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool, config: &RuntimeConfig) -> Pool {
     use mysql::Opts;
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
@@ -26,7 +26,7 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool) -> Pool {
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
 
-    if write {
+    if write && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
