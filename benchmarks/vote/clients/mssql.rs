@@ -110,7 +110,7 @@ pub fn make_writer(addr: &str, config: &RuntimeConfig) -> W {
     drop(core);
 
     let client = mkc(addr);
-    let vals = (1..config.batch_size + 1)
+    let vals = (1..config.mix.write_size().unwrap() + 1)
         .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
         .collect::<Vec<_>>()
         .join(", ");

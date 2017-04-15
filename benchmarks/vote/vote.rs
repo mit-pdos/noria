@@ -112,7 +112,7 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = RuntimeConfig::new(narticles, Some(runtime));
+    let mut config = RuntimeConfig::new(narticles, common::Mix::Read(1), Some(runtime));
     config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {
@@ -147,16 +147,20 @@ fn main() {
     let get_stats: Vec<_>;
     if stage {
         // put then get
-        put_stats = exercise::launch_writer(putter, config, None);
+        let mut pconfig = config;
+        pconfig.mix = common::Mix::Write(1);
+        put_stats = exercise::launch(None::<exercise::NullClient>, Some(putter), pconfig, None);
         let getters: Vec<_> = getters
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
-                     thread::Builder::new()
-                         .name(format!("GET{}", i))
-                         .spawn(move || exercise::launch_reader(g, config))
-                         .unwrap()
-                 })
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || {
+                               exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                           })
+                    .unwrap()
+            })
             .collect();
         get_stats = getters
             .into_iter()
@@ -166,9 +170,16 @@ fn main() {
         // put & get
         // TODO: how do we start getters after prepopulate?
         let (tx, prepop) = mpsc::sync_channel(0);
+        let mut pconfig = config;
+        pconfig.mix = common::Mix::Write(1);
         let putter = thread::Builder::new()
             .name("PUT0".to_string())
-            .spawn(move || exercise::launch_writer(putter, config, Some(tx)))
+            .spawn(move || {
+                       exercise::launch(None::<exercise::NullClient>,
+                                        Some(putter),
+                                        pconfig,
+                                        Some(tx))
+                   })
             .unwrap();
 
         // wait for prepopulation to finish
@@ -178,11 +189,13 @@ fn main() {
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
-                     thread::Builder::new()
-                         .name(format!("GET{}", i))
-                         .spawn(move || exercise::launch_reader(g, config))
-                         .unwrap()
-                 })
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || {
+                               exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                           })
+                    .unwrap()
+            })
             .collect();
 
         put_stats = putter.join().unwrap();
@@ -192,9 +205,9 @@ fn main() {
             .collect();
     }
 
-    print_stats("PUT", &put_stats.pre, avg);
+    print_stats("PUT", false, &put_stats.pre, avg);
     for (i, s) in get_stats.iter().enumerate() {
-        print_stats(format!("GET{}", i), &s.pre, avg);
+        print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
         let sum = get_stats
@@ -208,9 +221,9 @@ fn main() {
     }
 
     if migrate_after.is_some() {
-        print_stats("PUT+", &put_stats.post, avg);
+        print_stats("PUT+", false, &put_stats.post, avg);
         for (i, s) in get_stats.iter().enumerate() {
-            print_stats(format!("GET{}+", i), &s.post, avg);
+            print_stats(format!("GET{}+", i), true, &s.post, avg);
         }
         if avg {
             let sum = get_stats
@@ -225,8 +238,9 @@ fn main() {
     }
 }
 
-fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: bool) {
-    if let Some(perc) = stats.cdf_percentiles() {
+fn print_stats<S: AsRef<str>>(desc: S, read: bool, stats: &exercise::BenchmarkResult, avg: bool) {
+    if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
+        let perc = if read { r_perc } else { w_perc };
         for (v, p, _, _) in perc {
             println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
         }
