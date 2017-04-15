@@ -213,25 +213,33 @@ fn main() {
                    t)
         }
     };
-    if config.mix.does_read() {
-        print_stats(true, &stats, avg);
-    }
-    if config.mix.does_write() {
-        print_stats(false, &stats, avg);
-    }
+    print_stats(&config.mix, &stats, avg);
 }
 
-fn print_stats(read: bool, stats: &exercise::BenchmarkResults, avg: bool) {
-    let desc = if read { "GET" } else { "PUT" };
-
+fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool) {
     let stats = &stats.pre;
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
-        let perc = if read { r_perc } else { w_perc };
-        for (v, p, _, _) in perc {
-            println!("percentile {} {:.2} {:.2}", desc, v, p);
+        if mix.does_read() {
+            for (v, p, _, _) in r_perc {
+                println!("percentile GET {:.2} {:.2}", v, p);
+            }
+        }
+        if mix.does_write() {
+            for (v, p, _, _) in w_perc {
+                println!("percentile PUT {:.2} {:.2}", v, p);
+            }
         }
     }
+
     if avg {
+        let desc = if mix.is_mixed() {
+            "MIX"
+        } else if mix.does_read() {
+            "GET"
+        } else {
+            "PUT"
+        };
+
         println!("avg {}: {:.2}", desc, stats.avg_throughput());
     }
 }

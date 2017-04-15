@@ -178,7 +178,11 @@ fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> Be
                 let count_per_ns = count as f64 / dur_to_ns!(last_reported.elapsed()) as f64;
                 let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
 
-                let desc = if read { "GET" } else { "PUT" };
+                let desc = if config.mix.is_mixed() {
+                    "MIX"
+                } else {
+                    if read { "GET" } else { "PUT" }
+                };
                 match period {
                     Period::PreMigration => {
                         if config.verbose {
