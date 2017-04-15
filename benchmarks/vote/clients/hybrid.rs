@@ -138,26 +138,24 @@ impl Writer for W {
     }
 }
 
-pub struct R<'a> {
-    prep: mysql::conn::Stmt<'a>,
+pub struct R {
+    conn: mysql::PooledConn,
     mc: memcached::Client,
 }
 
-pub fn make_reader<'a>(pool: &'a mut Pool) -> R<'a> {
+pub fn make_reader(pool: &mut Pool) -> R {
     let mc = pool.mc.take().unwrap();
     let pool = &pool.sql;
     R {
-        prep: pool.prepare("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
-                      WHERE art.id = vt.id AND art.id = :id
-                      GROUP BY vt.id, title")
-            .unwrap(),
+        conn: pool.get_conn().unwrap(),
         mc: mc,
     }
 }
 
-impl<'a> Reader for R<'a> {
+impl Reader for R {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         use memcached::proto::MultiOperation;
+        use std::str;
 
         let keys: Vec<_> = ids.iter()
             .map(|&(_, ref article_id)| format!("article_{}_vc", article_id))
@@ -170,32 +168,46 @@ impl<'a> Reader for R<'a> {
         };
 
         let mut res = Vec::new();
-        for k in keys {
-            if !vals.contains_key(k) {
-                // missed, we must go to the database
-                for row in self.prep.execute(params!{"id" => k}).unwrap() {
-                    let mut rr = row.unwrap();
-                    let id = rr.get(0).unwrap();
-                    let title = rr.get(1).unwrap();
-                    let vc = rr.get(2).unwrap();
-                    drop(self.mc
-                             .set(format!("article_{}_vc", id).as_bytes(),
-                                  format!("{};{};{}", id, title, vc).as_bytes(),
-                                  0,
-                                  0));
-                    res.push(ArticleResult::Article {
-                                 id: id,
-                                 title: title,
-                                 votes: vc,
-                             });
-                }
-            } else {
-                let s = String::from_utf8_lossy(vals.get(k).unwrap().0.as_slice());
-                let mut parts = s.split(";");
+        let hits: Vec<_> = keys.iter().filter(|k| vals.contains_key(**k)).collect();
+        for k in hits {
+            let s = String::from_utf8_lossy(vals.get(*k).unwrap().0.as_slice());
+            let mut parts = s.split(";");
+            res.push(ArticleResult::Article {
+                         id: parts.next().unwrap().parse().unwrap(),
+                         title: String::from(parts.next().unwrap()),
+                         votes: parts.next().unwrap().parse().unwrap(),
+                     });
+        }
+
+        let missed: Vec<_> = keys.iter()
+            .filter(|k| !vals.contains_key(**k))
+            .collect();
+        if !missed.is_empty() {
+            // missed, we must go to the database
+            let qstring = missed
+                .into_iter()
+                .map(|k| {
+                         format!("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
+                      WHERE art.id = vt.id AND art.id = {}
+                      GROUP BY vt.id, title",
+                                 str::from_utf8(&k[8..k.len() - 3]).unwrap())
+                     })
+                .collect::<Vec<_>>()
+                .join(" UNION ");
+            for row in self.conn.query(qstring).unwrap() {
+                let mut rr = row.unwrap();
+                let id = rr.get(0).unwrap();
+                let title = rr.get(1).unwrap();
+                let vc = rr.get(2).unwrap();
+                drop(self.mc
+                         .set(format!("article_{}_vc", id).as_bytes(),
+                              format!("{};{};{}", id, title, vc).as_bytes(),
+                              0,
+                              0));
                 res.push(ArticleResult::Article {
-                             id: parts.next().unwrap().parse().unwrap(),
-                             title: String::from(parts.next().unwrap()),
-                             votes: parts.next().unwrap().parse().unwrap(),
+                             id: id,
+                             title: title,
+                             votes: vc,
                          });
             }
         }
