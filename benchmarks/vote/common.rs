@@ -67,6 +67,39 @@ pub trait Reader {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period);
 }
 
+use std::rc::Rc;
+use std::cell::RefCell;
+impl<T> Writer for Rc<RefCell<T>>
+    where T: Writer
+{
+    type Migrator = T::Migrator;
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        self.borrow_mut().make_articles(articles)
+    }
+
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        self.borrow_mut().vote(ids)
+    }
+
+    fn prepare_migration(&mut self) -> Self::Migrator {
+        self.borrow_mut().prepare_migration()
+    }
+
+    fn migrate(&mut self) -> mpsc::Receiver<()> {
+        self.borrow_mut().migrate()
+    }
+}
+impl<T> Reader for Rc<RefCell<T>>
+    where T: Reader
+{
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        self.borrow_mut().get(ids)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Distribution {
     Uniform,
@@ -140,6 +173,15 @@ impl Mix {
 
     pub fn does_read(&self) -> bool {
         if let Mix::Write(..) = *self {
+            false
+        } else {
+            true
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn does_write(&self) -> bool {
+        if let Mix::Read(..) = *self {
             false
         } else {
             true

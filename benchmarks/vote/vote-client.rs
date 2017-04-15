@@ -182,29 +182,15 @@ fn main() {
         // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
         #[cfg(feature="b_mssql")]
         "mssql" => {
-            let w = config
-                .mix
-                .write_size()
-                .map(|_| clients::mssql::make_writer(addr, &config));
-            let r = config
-                .mix
-                .read_size()
-                .map(|bs| clients::mssql::make_reader(addr, bs));
-            exercise::launch(r, w, config, None)
+            let c = clients::mssql::make(addr, &config);
+            exercise::launch_mix(c, config)
         }
         // mysql://soup@127.0.0.1/bench_mysql
         #[cfg(feature="b_mysql")]
         "mysql" => {
-            let c = clients::mysql::setup(addr, false, &config);
-            let w = config
-                .mix
-                .write_size()
-                .map(|bs| clients::mysql::make_writer(&c, bs));
-            let r = config
-                .mix
-                .read_size()
-                .map(|bs| clients::mysql::make_reader(&c, bs));
-            exercise::launch(r, w, config, None)
+            let c = clients::mysql::setup(addr, &config);
+            let c = clients::mysql::make(&c, &config);
+            exercise::launch_mix(c, config)
         }
         // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
         #[cfg(feature="b_hybrid")]
@@ -212,16 +198,9 @@ fn main() {
             let mut split_dbn = addr.splitn(2, ",");
             let mysql_dbn = &split_dbn.next().unwrap()[6..];
             let memcached_dbn = &split_dbn.next().unwrap()[10..];
-            let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, false, &config);
-            let w = config
-                .mix
-                .write_size()
-                .map(|_| clients::hybrid::make_writer(&mut c));
-            let r = config
-                .mix
-                .read_size()
-                .map(|_| clients::hybrid::make_reader(&mut c));
-            exercise::launch(r, w, config, None)
+            let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, &config);
+            let c = clients::hybrid::make(&mut c);
+            exercise::launch_mix(c, config)
         }
         // postgresql://soup@127.0.0.1/bench_psql
         #[cfg(feature="b_postgresql")]
@@ -240,28 +219,14 @@ fn main() {
         // memcached://127.0.0.1:11211
         #[cfg(feature="b_memcached")]
         "memcached" => {
-            let w = config
-                .mix
-                .write_size()
-                .map(|_| clients::memcached::make_writer(addr));
-            let r = config
-                .mix
-                .read_size()
-                .map(|_| clients::memcached::make_reader(addr));
-            exercise::launch(r, w, config, None)
+            let c = clients::memcached::make(addr);
+            exercise::launch_mix(c, config)
         }
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
         "netsoup" => {
-            let w = config
-                .mix
-                .write_size()
-                .map(|_| clients::netsoup::make_writer(addr));
-            let r = config
-                .mix
-                .read_size()
-                .map(|_| clients::netsoup::make_reader(addr));
-            exercise::launch(r, w, config, None)
+            let c = clients::netsoup::make(addr);
+            exercise::launch_mix(c, config)
         }
         // garbage
         t => {
@@ -272,7 +237,7 @@ fn main() {
     if config.mix.does_read() {
         print_stats(true, &stats, avg);
     }
-    if config.mix.is_mixed() || !config.mix.does_read() {
+    if config.mix.does_write() {
         print_stats(false, &stats, avg);
     }
 }

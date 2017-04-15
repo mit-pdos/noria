@@ -10,9 +10,6 @@ pub struct Client {
     core: reactor::Core,
 }
 
-// safe because the core will remain on the same core as the client
-unsafe impl Send for Client {}
-
 fn mkc(addr: &str) -> Client {
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let cfg_string = &addr[0..addr.rfind("/").unwrap()];
@@ -40,7 +37,7 @@ fn mkc(addr: &str) -> Client {
     }
 }
 
-pub fn make_writer(addr: &str, config: &RuntimeConfig) -> W {
+pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
     let mut core = reactor::Core::new().unwrap();
 
     let cfg_string = &addr[0..addr.rfind("/").unwrap()];
@@ -60,9 +57,7 @@ pub fn make_writer(addr: &str, config: &RuntimeConfig) -> W {
 
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string);
-    if config.should_reuse() {
-        core.run(fut.and_then(fixconn)).unwrap();
-    } else {
+    if config.mix.does_write() && !config.should_reuse() {
         let fut = fut.and_then(|conn| {
                                    conn.simple_exec(format!("DROP DATABASE {};", db))
                                        .and_then(|r| r)
@@ -105,36 +100,21 @@ pub fn make_writer(addr: &str, config: &RuntimeConfig) -> W {
                               .collect()
                       });
         core.run(fut).unwrap();
-    };
+    } else {
+        core.run(fut.and_then(fixconn)).unwrap();
+    }
 
     drop(core);
 
     let client = mkc(addr);
-    let vals = (1..config.mix.write_size().unwrap() + 1)
+    let vals = (1..config.mix.write_size().unwrap_or(1) + 1)
         .map(|i| format!("(@P{}, @P{})", i * 2 - 1, i * 2))
         .collect::<Vec<_>>()
         .join(", ");
     let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep = client.conn.as_ref().unwrap().prepare(vote_qstring);
-    W {
-        client: client,
-        v_prep: v_prep,
-    }
-}
 
-pub struct W {
-    client: Client,
-    v_prep: tiberius::stmt::Statement,
-}
-
-// all our methods are &mut
-unsafe impl Sync for W {}
-unsafe impl Send for W {}
-
-pub fn make_reader(addr: &str, batch_size: usize) -> R {
-    let client = mkc(addr);
-
-    let qstring = (1..batch_size + 1)
+    let qstring = (1..config.mix.read_size().unwrap_or(1) + 1)
         .map(|i| {
                  format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{}",
                          i)
@@ -142,22 +122,21 @@ pub fn make_reader(addr: &str, batch_size: usize) -> R {
         .collect::<Vec<_>>()
         .join(" UNION ");
     let prep = client.conn.as_ref().unwrap().prepare(qstring);
-    R {
+
+    RW {
         client: client,
+        v_prep: v_prep,
         prep: prep,
     }
 }
 
-pub struct R {
+pub struct RW {
     client: Client,
+    v_prep: tiberius::stmt::Statement,
     prep: tiberius::stmt::Statement,
 }
 
-// all our methods are &mut
-unsafe impl Sync for R {}
-unsafe impl Send for R {}
-
-impl Writer for W {
+impl Writer for RW {
     type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
         where I: Iterator<Item = (i64, String)>,
@@ -223,7 +202,7 @@ impl Writer for W {
     }
 }
 
-impl Reader for R {
+impl Reader for RW {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let mut res = Vec::new();
         let conn;

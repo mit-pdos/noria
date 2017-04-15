@@ -308,6 +308,16 @@ pub fn launch<R: Reader, W: Writer>(reader: Option<R>,
 }
 
 #[allow(dead_code)]
+pub fn launch_mix<T>(inner: T, config: RuntimeConfig) -> BenchmarkResults
+    where T: Reader + Writer
+{
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    let inner = Rc::new(RefCell::new(inner));
+    launch(Some(inner.clone()), Some(inner), config, None)
+}
+
+#[allow(dead_code)]
 pub struct NullClient;
 impl Reader for NullClient {
     fn get(&mut self, _: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
