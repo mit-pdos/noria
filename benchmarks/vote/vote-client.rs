@@ -20,7 +20,6 @@ extern crate futures_state_stream;
 extern crate tiberius;
 
 #[cfg(any(feature="b_mysql", feature="b_hybrid"))]
-#[macro_use]
 extern crate mysql;
 
 #[cfg(feature="b_postgresql")]
@@ -145,10 +144,9 @@ fn main() {
     let dist = value_t_or_exit!(args, "distribution", common::Distribution);
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
-    let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+    let runtime = value_t_or_exit!(args, "runtime", u64);
     let migrate_after = args.value_of("migrate")
-        .map(|_| value_t_or_exit!(args, "migrate", u64))
-        .map(time::Duration::from_secs);
+        .map(|_| value_t_or_exit!(args, "migrate", u64));
     let narticles = value_t_or_exit!(args, "narticles", isize);
     assert!(!dbn.is_empty());
 
@@ -156,6 +154,9 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
+    let runtime = if runtime == 0 { None } else { Some(runtime) };
+    let migrate_after = migrate_after.map(time::Duration::from_secs);
+    let runtime = runtime.map(time::Duration::from_secs);
     let mut config = common::RuntimeConfig::new(narticles, runtime);
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {

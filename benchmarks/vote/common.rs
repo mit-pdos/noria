@@ -96,7 +96,7 @@ impl FromStr for Distribution {
 #[derive(Clone, Copy)]
 pub struct RuntimeConfig {
     pub narticles: isize,
-    pub runtime: time::Duration,
+    pub runtime: Option<time::Duration>,
     pub distribution: Distribution,
     pub cdf: bool,
     pub batch_size: usize,
@@ -106,7 +106,7 @@ pub struct RuntimeConfig {
 }
 
 impl RuntimeConfig {
-    pub fn new(narticles: isize, runtime: time::Duration) -> Self {
+    pub fn new(narticles: isize, runtime: Option<time::Duration>) -> Self {
         RuntimeConfig {
             narticles: narticles,
             runtime: runtime,

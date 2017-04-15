@@ -112,7 +112,7 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = RuntimeConfig::new(narticles, runtime);
+    let mut config = RuntimeConfig::new(narticles, Some(runtime));
     config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     if let Some(migrate_after) = migrate_after {

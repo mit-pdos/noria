@@ -101,7 +101,7 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
         // means it might also do vector resizing.
         let mut i = 0;
         let randomness: Vec<i64> = {
-            let n = 1_000_000 * config.runtime.as_secs();
+            let n = 1_000_000 * config.runtime.as_ref().unwrap().as_secs();
             println!("Generating ~{}M random numbers; this'll take a few seconds...",
                      n / 1_000_000);
             match config.distribution {
@@ -130,7 +130,8 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             .into_iter()
             .map(|i| (i as i64, i as i64))
             .collect();
-        while start.elapsed() < config.runtime {
+        let runtime = config.runtime.unwrap();
+        while start.elapsed() < runtime {
             // construct ids for the next batch
             for &mut (_, ref mut aid) in &mut batch {
                 *aid = randomness[i];
@@ -209,6 +210,11 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
     drop(ready);
+
+    if config.runtime.is_none() {
+        println!("Doing no writes for prepopulating writer");
+        return BenchmarkResults::default();
+    }
 
     let mut post = false;
     let mut migrate_done = None;
