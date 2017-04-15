@@ -1,5 +1,5 @@
 use memcached;
-use memcached::proto::{Operation, MultiOperation, ProtoType};
+use memcached::proto::{MultiOperation, ProtoType};
 
 pub struct Memcache(memcached::Client);
 unsafe impl Send for Memcache {}
@@ -23,17 +23,21 @@ impl Writer for Memcache {
         where I: ExactSizeIterator,
               I: Iterator<Item = (i64, String)>
     {
-        for (article_id, title) in articles {
-            self.0
-                .set(format!("article_{}", article_id).as_bytes(),
-                     title.as_bytes(),
-                     0,
-                     0)
-                .unwrap();
-            self.0
-                .set(format!("article_{}_vc", article_id).as_bytes(), b"0", 0, 0)
-                .unwrap();
+        use std::collections::BTreeMap;
+        let articles: Vec<_> = articles
+            .map(|(article_id, title)| {
+                     (format!("article_{}", article_id),
+                      title,
+                      format!("article_{}_vc", article_id),
+                      b"0")
+                 })
+            .collect();
+        let mut m = BTreeMap::new();
+        for &(ref tkey, ref title, ref vck, ref vc) in &articles {
+            m.insert(tkey.as_bytes(), (title.as_bytes(), 0, 0));
+            m.insert(vck.as_bytes(), (&vc[..], 0, 0));
         }
+        self.0.set_multi(m).unwrap();
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {

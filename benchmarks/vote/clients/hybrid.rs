@@ -1,5 +1,5 @@
 use memcached;
-use memcached::proto::{Operation, ProtoType};
+use memcached::proto::{Operation, MultiOperation, ProtoType};
 use mysql::{self, OptsBuilder};
 
 use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
@@ -83,16 +83,21 @@ impl Writer for W {
         where I: ExactSizeIterator,
               I: Iterator<Item = (i64, String)>
     {
-        let mut vals = Vec::with_capacity(articles.len());
-        let args: Vec<_> = articles
-            .map(|(aid, title)| {
-                     vals.push("(?, ?, 0)");
-                     (aid, title)
+        let articles: Vec<_> = articles
+            .map(|(article_id, title)| {
+                     let init = format!("{};{};0", article_id, title);
+                     (article_id, title, format!("article_{}_vc", article_id), init)
                  })
             .collect();
+
         {
-            let args: Vec<_> = args.iter()
-                .flat_map(|&(ref aid, ref title)| vec![aid as &_, title as &_])
+            let mut vals = Vec::with_capacity(articles.len());
+            let args: Vec<_> = articles
+                .iter()
+                .flat_map(|&(ref aid, ref title, _, _)| {
+                              vals.push("(?, ?, 0)");
+                              vec![aid as &_, title as &_]
+                          })
                 .collect();
             let vals = vals.join(", ");
             self.conn
@@ -101,13 +106,12 @@ impl Writer for W {
                 .unwrap();
         }
 
-        for (article_id, title) in args {
-            drop(self.mc
-                     .set(format!("article_{}_vc", article_id).as_bytes(),
-                          format!("{};{};0", article_id, title).as_bytes(),
-                          0,
-                          0));
+        use std::collections::BTreeMap;
+        let mut m = BTreeMap::new();
+        for &(_, _, ref key, ref init) in &articles {
+            m.insert(key.as_bytes(), (init.as_bytes(), 0, 0));
         }
+        self.mc.set_multi(m).unwrap();
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
