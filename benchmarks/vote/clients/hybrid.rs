@@ -168,7 +168,8 @@ impl Reader for R {
         };
 
         let mut res = Vec::new();
-        let hits: Vec<_> = keys.iter().filter(|k| vals.contains_key(**k)).collect();
+        let (hits, misses): (Vec<&&[u8]>, Vec<_>) =
+            keys.iter().partition(|k| vals.contains_key(**k));
         for k in hits {
             let s = String::from_utf8_lossy(vals.get(*k).unwrap().0.as_slice());
             let mut parts = s.split(";");
@@ -179,18 +180,16 @@ impl Reader for R {
                      });
         }
 
-        let missed: Vec<_> = keys.iter()
-            .filter(|k| !vals.contains_key(**k))
-            .collect();
-        if !missed.is_empty() {
+        if !misses.is_empty() {
             // missed, we must go to the database
-            let qstring = missed
+            let qstring = misses
                 .into_iter()
                 .map(|k| {
-                         format!("SELECT art.id, title, COUNT(vt.u) as votes FROM art, vt
-                      WHERE art.id = vt.id AND art.id = {}
-                      GROUP BY vt.id, title",
-                                 str::from_utf8(&k[8..k.len() - 3]).unwrap())
+                         format!("SELECT art.id, title, COUNT(vt.u) as votes \
+                                  FROM art, vt \
+                                  WHERE art.id = vt.id AND art.id = {} \
+                                  GROUP BY vt.id, title",
+                                 ids[keys.iter().position(|kk| kk == k).unwrap()].1)
                      })
                 .collect::<Vec<_>>()
                 .join(" UNION ");
