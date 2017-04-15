@@ -192,31 +192,31 @@ fn main() {
     let mut backend = make(&rloc);
 
     println!("Prepopulating from data files in {}", ploc);
-    let num_addr = populate_addresses(&backend, &ploc, transactional);
+    let num_addr = populate_addresses(&backend, &ploc);
     backend
         .prepop_counts
         .insert("addresses".into(), num_addr);
-    let num_authors = populate_authors(&backend, &ploc, transactional);
+    let num_authors = populate_authors(&backend, &ploc);
     backend
         .prepop_counts
         .insert("authors".into(), num_authors);
-    let num_countries = populate_countries(&backend, &ploc, transactional);
+    let num_countries = populate_countries(&backend, &ploc);
     backend
         .prepop_counts
         .insert("countries".into(), num_countries);
-    let num_customers = populate_customers(&backend, &ploc, transactional);
+    let num_customers = populate_customers(&backend, &ploc);
     backend
         .prepop_counts
         .insert("customers".into(), num_customers);
-    let num_items = populate_items(&backend, &ploc, transactional);
+    let num_items = populate_items(&backend, &ploc);
     backend.prepop_counts.insert("items".into(), num_items);
-    let num_orders = populate_orders(&backend, &ploc, transactional);
+    let num_orders = populate_orders(&backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
-    let num_cc_xacts = populate_cc_xacts(&backend, &ploc, transactional);
+    let num_cc_xacts = populate_cc_xacts(&backend, &ploc);
     backend
         .prepop_counts
         .insert("cc_xacts".into(), num_cc_xacts);
-    let num_order_line = populate_order_line(&backend, &ploc, transactional);
+    let num_order_line = populate_order_line(&backend, &ploc);
     backend
         .prepop_counts
         .insert("order_line".into(), num_order_line);

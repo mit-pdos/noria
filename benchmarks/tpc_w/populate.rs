@@ -17,7 +17,7 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn populate(backend: &Backend, name: &str, tx: bool, mut records: Vec<Vec<DataType>>) -> usize {
+fn populate(backend: &Backend, name: &str, mut records: Vec<Vec<DataType>>) -> usize {
     let mutator = backend
         .g
         .get_mutator(backend.r.node_addr_for(name).unwrap());
@@ -25,10 +25,7 @@ fn populate(backend: &Backend, name: &str, tx: bool, mut records: Vec<Vec<DataTy
     let start = time::Instant::now();
     let mut i: i32 = 0;
     for r in records.drain(..) {
-        match tx {
-            true => assert!(mutator.transactional_put(r, Token::empty()).is_ok()),
-            false => mutator.put(r),
-        }
+        mutator.put(r);
         i += 1;
     }
 
@@ -47,7 +44,7 @@ fn parse_ymd_to_timestamp(s: &str) -> i64 {
     ts as i64
 }
 
-pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -76,10 +73,10 @@ pub fn populate_addresses(backend: &Backend, data_location: &str, use_txn: bool)
         s.clear();
     }
 
-    populate(backend, "address", use_txn, records)
+    populate(backend, "address", records)
 }
 
-pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_authors(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -106,10 +103,10 @@ pub fn populate_authors(backend: &Backend, data_location: &str, use_txn: bool) -
         s.clear();
     }
 
-    populate(backend, "author", use_txn, records)
+    populate(backend, "author", records)
 }
 
-pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_cc_xacts(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/cc_xacts.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -143,10 +140,10 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str, use_txn: bool) 
         s.clear();
     }
 
-    populate(backend, "cc_xacts", use_txn, records)
+    populate(backend, "cc_xacts", records)
 }
 
-pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -169,10 +166,10 @@ pub fn populate_countries(backend: &Backend, data_location: &str, use_txn: bool)
         s.clear();
     }
 
-    populate(backend, "country", use_txn, records)
+    populate(backend, "country", records)
 }
 
-pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_customers(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -221,10 +218,10 @@ pub fn populate_customers(backend: &Backend, data_location: &str, use_txn: bool)
         s.clear();
     }
 
-    populate(backend, "customer", use_txn, records)
+    populate(backend, "customer", records)
 }
 
-pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -283,10 +280,10 @@ pub fn populate_items(backend: &Backend, data_location: &str, use_txn: bool) -> 
         s.clear();
     }
 
-    populate(backend, "item", use_txn, records)
+    populate(backend, "item", records)
 }
 
-pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_orders(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/orders.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -328,10 +325,10 @@ pub fn populate_orders(backend: &Backend, data_location: &str, use_txn: bool) ->
         s.clear();
     }
 
-    populate(backend, "orders", use_txn, records)
+    populate(backend, "orders", records)
 }
 
-pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool) -> usize {
+pub fn populate_order_line(backend: &Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -359,5 +356,5 @@ pub fn populate_order_line(backend: &Backend, data_location: &str, use_txn: bool
         s.clear();
     }
 
-    populate(backend, "order_line", use_txn, records)
+    populate(backend, "order_line", records)
 }
