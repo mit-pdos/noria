@@ -6,7 +6,7 @@ use std::fs::File;
 use std::str::FromStr;
 use std::time;
 
-use distributary::{DataType, Token};
+use distributary::DataType;
 use super::Backend;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
