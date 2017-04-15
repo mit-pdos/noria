@@ -22,9 +22,6 @@ extern crate tiberius;
 #[cfg(any(feature="b_mysql", feature="b_hybrid"))]
 extern crate mysql;
 
-#[cfg(feature="b_postgresql")]
-extern crate postgres;
-
 extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
@@ -51,7 +48,6 @@ EXAMPLES:
   vote-client [read|write] memcached://127.0.0.1:11211
   vote-client [read|write] mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
   vote-client [read|write] mysql://user@127.0.0.1/database
-  vote-client [read|write] postgresql://user@127.0.0.1/database
   vote-client [read|write] hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
@@ -62,9 +58,6 @@ fn main() {
     }
     if cfg!(feature = "b_mysql") {
         backends.push("mysql");
-    }
-    if cfg!(feature = "b_postgresql") {
-        backends.push("postgresql");
     }
     if cfg!(feature = "b_memcached") {
         backends.push("memcached");
@@ -201,20 +194,6 @@ fn main() {
             let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, &config);
             let c = clients::hybrid::make(&mut c);
             exercise::launch_mix(c, config)
-        }
-        // postgresql://soup@127.0.0.1/bench_psql
-        #[cfg(feature="b_postgresql")]
-        "postgresql" => {
-            let c = clients::postgres::setup(addr, false);
-            let w = config
-                .mix
-                .write_size()
-                .map(|_| clients::postgres::make_writer(&c));
-            let r = config
-                .mix
-                .read_size()
-                .map(|_| clients::postgres::make_reader(&c));
-            exercise::launch(r, w, config, None)
         }
         // memcached://127.0.0.1:11211
         #[cfg(feature="b_memcached")]
