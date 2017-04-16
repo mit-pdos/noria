@@ -16,7 +16,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
+use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -58,9 +58,10 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
+        let d = BaseDurabilityLevel::SyncImmediately;  // Buffered makes assert on getter fail.
         transfers = mig.add_transactional_base("transfers",
                                                &["src_acct", "dst_acct", "amount"],
-                                               Base::default());
+                                               Base::default().with_durability(d));
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -317,10 +318,13 @@ fn client(i: usize,
         let rl: u64 = read_latencies.iter().sum();
         let wl: u64 = write_latencies.iter().sum();
         let sl: u64 = settle_latencies.iter().sum();
+        let wsl: u64 = write_start_to_txn_end_latencies.iter().sum();
+
         let n = write_latencies.len() as f64;
         println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
         println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
         println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
+        println!("write + settle latency: {:.3} μs", wsl as f64 / n * 0.001);
 
         let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
         for sample_nanos in write_start_to_txn_end_latencies {
@@ -417,7 +421,7 @@ fn main() {
     };
 
     // let system settle
-    // thread::sleep(time::Duration::new(1, 0));
+    // thread::sleep(time::Duration::new(2, 0));
     let start = time::Instant::now();
 
     // benchmark
@@ -432,6 +436,10 @@ fn main() {
 
                      if i == 0 {
                          populate(naccounts, &mut transfers_put);
+
+                         //println!("Let those accounts settle...");
+                         //thread::sleep(time::Duration::new(2, 0));
+                         //println!("Done!");
                      }
 
                      thread::Builder::new()

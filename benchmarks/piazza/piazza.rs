@@ -53,7 +53,7 @@ impl Piazza {
             // add a post base table
             post = mig.add_ingredient("post",
                                       &["pid", "cid", "author", "content"],
-                                      Base::with_key(vec![1], vec![]));
+                                      Base::default().with_key(vec![1]));
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
