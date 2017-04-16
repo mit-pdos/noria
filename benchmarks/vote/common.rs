@@ -67,6 +67,39 @@ pub trait Reader {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period);
 }
 
+use std::rc::Rc;
+use std::cell::RefCell;
+impl<T> Writer for Rc<RefCell<T>>
+    where T: Writer
+{
+    type Migrator = T::Migrator;
+    fn make_articles<I>(&mut self, articles: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        self.borrow_mut().make_articles(articles)
+    }
+
+    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
+        self.borrow_mut().vote(ids)
+    }
+
+    fn prepare_migration(&mut self) -> Self::Migrator {
+        self.borrow_mut().prepare_migration()
+    }
+
+    fn migrate(&mut self) -> mpsc::Receiver<()> {
+        self.borrow_mut().migrate()
+    }
+}
+impl<T> Reader for Rc<RefCell<T>>
+    where T: Reader
+{
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        self.borrow_mut().get(ids)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Distribution {
     Uniform,
@@ -94,24 +127,87 @@ impl FromStr for Distribution {
 }
 
 #[derive(Clone, Copy)]
+pub enum Mix {
+    Write(usize),
+    Read(usize),
+    #[allow(dead_code)]
+    RW(usize, usize),
+}
+
+impl Mix {
+    pub fn batch_size_for(&self, read: bool) -> usize {
+        if read {
+            self.read_size().unwrap()
+        } else {
+            self.write_size().unwrap()
+        }
+    }
+
+    pub fn read_size(&self) -> Option<usize> {
+        match *self {
+            Mix::Read(bs) => Some(bs),
+            Mix::RW(bs, _) => Some(bs),
+            _ => None,
+        }
+    }
+
+    pub fn write_size(&self) -> Option<usize> {
+        match *self {
+            Mix::Write(bs) => Some(bs),
+            Mix::RW(_, bs) => Some(bs),
+            _ => None,
+        }
+    }
+
+    pub fn max_batch_size(&self) -> usize {
+        match *self {
+            Mix::Write(bs) => bs,
+            Mix::Read(bs) => bs,
+            Mix::RW(bs, _) => bs,
+        }
+    }
+
+    pub fn is_mixed(&self) -> bool {
+        if let Mix::RW(..) = *self { true } else { false }
+    }
+
+    pub fn does_read(&self) -> bool {
+        if let Mix::Write(..) = *self {
+            false
+        } else {
+            true
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn does_write(&self) -> bool {
+        if let Mix::Read(..) = *self {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct RuntimeConfig {
     pub narticles: isize,
-    pub runtime: time::Duration,
+    pub runtime: Option<time::Duration>,
     pub distribution: Distribution,
     pub cdf: bool,
-    pub batch_size: usize,
+    pub mix: Mix,
     pub migrate_after: Option<time::Duration>,
     pub reuse: bool,
     pub verbose: bool,
 }
 
 impl RuntimeConfig {
-    pub fn new(narticles: isize, runtime: time::Duration) -> Self {
+    pub fn new(narticles: isize, mix: Mix, runtime: Option<time::Duration>) -> Self {
         RuntimeConfig {
             narticles: narticles,
             runtime: runtime,
             distribution: Distribution::Uniform,
-            batch_size: 1,
+            mix: mix,
             cdf: true,
             migrate_after: None,
             reuse: false,
@@ -134,15 +230,6 @@ impl RuntimeConfig {
     }
 
     #[allow(dead_code)]
-    pub fn use_batching(&mut self, batch_size: usize) {
-        if batch_size == 0 {
-            self.batch_size = 1;
-        } else {
-            self.batch_size = batch_size;
-        }
-    }
-
-    #[allow(dead_code)]
     pub fn set_verbose(&mut self, yes: bool) {
         self.verbose = yes;
     }
@@ -151,6 +238,7 @@ impl RuntimeConfig {
         self.cdf = yes;
     }
 
+    #[allow(dead_code)]
     pub fn perform_migration_at(&mut self, t: time::Duration) {
         self.migrate_after = Some(t);
     }

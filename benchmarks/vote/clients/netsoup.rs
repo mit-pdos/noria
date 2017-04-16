@@ -62,11 +62,7 @@ fn mkc(addr: &str) -> C {
     panic!("Failed to connect to netsoup server");
 }
 
-pub fn make_reader(addr: &str) -> C {
-    mkc(addr)
-}
-
-pub fn make_writer(addr: &str) -> C {
+pub fn make(addr: &str) -> C {
     mkc(addr)
 }
 

@@ -2,20 +2,21 @@ use mysql::{self, OptsBuilder};
 
 use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 
-pub struct W<'a> {
+pub struct RW<'a> {
     v_prep_1: mysql::conn::Stmt<'a>,
     v_prep_2: mysql::conn::Stmt<'a>,
+    r_prep: mysql::conn::Stmt<'a>,
     pool: &'a mysql::Pool,
 }
 
-pub fn setup(addr: &str, write: bool, config: &RuntimeConfig) -> mysql::Pool {
+pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
     use mysql::Opts;
 
     let addr = format!("mysql://{}", addr);
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
 
-    if write && !config.should_reuse() {
+    if config.mix.does_write() && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
@@ -51,29 +52,36 @@ pub fn setup(addr: &str, write: bool, config: &RuntimeConfig) -> mysql::Pool {
     mysql::Pool::new_manual(1, 4, opts).unwrap()
 }
 
-pub fn make_writer<'a>(pool: &'a mysql::Pool, batch_size: usize) -> W<'a> {
-    let vals = (1..batch_size + 1)
+pub fn make<'a>(pool: &'a mysql::Pool, config: &RuntimeConfig) -> RW<'a> {
+    let vals = (1..config.mix.write_size().unwrap_or(1) + 1)
         .map(|_| "(?, ?)")
         .collect::<Vec<_>>()
         .join(", ");
     let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
     let v_prep_1 = pool.prepare(vote_qstring).unwrap();
 
-    let vals = (1..batch_size + 1)
+    let vals = (1..config.mix.write_size().unwrap_or(1) + 1)
         .map(|_| "?")
         .collect::<Vec<_>>()
         .join(",");
     let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN({})", vals);
     let v_prep_2 = pool.prepare(vote_qstring).unwrap();
 
-    W {
-        v_prep_1: v_prep_1,
-        v_prep_2: v_prep_2,
-        pool: pool,
+    let qstring = (1..config.mix.read_size().unwrap_or(1) + 1)
+        .map(|_| "SELECT id, title, votes FROM art WHERE id = ?")
+        .collect::<Vec<_>>()
+        .join(" UNION ");
+    let r_prep = pool.prepare(qstring).unwrap();
+
+    RW {
+        v_prep_1,
+        v_prep_2,
+        r_prep,
+        pool,
     }
 }
 
-impl<'a> Writer for W<'a> {
+impl<'a> Writer for RW<'a> {
     type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
         where I: Iterator<Item = (i64, String)>,
@@ -113,20 +121,12 @@ impl<'a> Writer for W<'a> {
     }
 }
 
-pub fn make_reader(pool: &mysql::Pool, batch_size: usize) -> mysql::conn::Stmt {
-    let qstring = (1..batch_size + 1)
-        .map(|_| "SELECT id, title, votes FROM art WHERE id = ?")
-        .collect::<Vec<_>>()
-        .join(" UNION ");
-    pool.prepare(qstring).unwrap()
-}
-
-impl<'a> Reader for mysql::conn::Stmt<'a> {
+impl<'a> Reader for RW<'a> {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let ids: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
 
         let mut res = Vec::new();
-        let mut qresult = self.execute(&ids[..]).unwrap();
+        let mut qresult = self.r_prep.execute(&ids[..]).unwrap();
         while qresult.more_results_exists() {
             for row in qresult.by_ref() {
                 let mut rr = row.unwrap();
