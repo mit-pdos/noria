@@ -15,7 +15,7 @@ regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [tx-bank]
 command = "run"
-args = ["--release", "--features", "binaries", "--bin", "bank", "--", "--avg", "--accounts=5", "--runtime=30"]
+args = ["--release", "--features", "binaries", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
 regexs = ["(avg PUT): ([0-9.]+)"]
 
 [vote-migration]
