@@ -22,9 +22,6 @@ extern crate tiberius;
 #[cfg(any(feature="b_mysql", feature="b_hybrid"))]
 extern crate mysql;
 
-#[cfg(feature="b_postgresql")]
-extern crate postgres;
-
 extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
@@ -51,7 +48,6 @@ EXAMPLES:
   vote-client [read|write] memcached://127.0.0.1:11211
   vote-client [read|write] mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
   vote-client [read|write] mysql://user@127.0.0.1/database
-  vote-client [read|write] postgresql://user@127.0.0.1/database
   vote-client [read|write] hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
@@ -62,9 +58,6 @@ fn main() {
     }
     if cfg!(feature = "b_mysql") {
         backends.push("mysql");
-    }
-    if cfg!(feature = "b_postgresql") {
-        backends.push("postgresql");
     }
     if cfg!(feature = "b_memcached") {
         backends.push("memcached");
@@ -117,20 +110,13 @@ fn main() {
             .takes_value(true)
             .default_value("1")
             .help("Number of operations per batch (if supported)"))
-        .arg(Arg::with_name("migrate")
-            .short("m")
-            .long("migrate")
-            .value_name("N")
-            .help("Perform a migration after this many seconds")
-            .conflicts_with("stage"))
         .arg(Arg::with_name("quiet")
             .short("q")
             .long("quiet")
             .help("No noisy output while running"))
         .arg(Arg::with_name("MODE")
             .index(1)
-            .possible_values(&["read", "write"])
-            .help("Mode to run this client in")
+            .help("Mode to run this client in [read|write|mix:rw_ratio]")
             .required(true))
         .arg(Arg::with_name("BACKEND")
             .index(2)
@@ -145,26 +131,38 @@ fn main() {
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
     let runtime = value_t_or_exit!(args, "runtime", u64);
-    let migrate_after = args.value_of("migrate")
-        .map(|_| value_t_or_exit!(args, "migrate", u64));
     let narticles = value_t_or_exit!(args, "narticles", isize);
     assert!(!dbn.is_empty());
 
-    if let Some(ref migrate_after) = migrate_after {
-        assert!(migrate_after < &runtime);
-    }
+    let batch_size = value_t_or_exit!(args, "batch", usize);
+    let mix = match mode {
+        "read" => common::Mix::Read(batch_size),
+        "write" => common::Mix::Write(batch_size),
+        mode if mode.starts_with("mix:") => {
+            // ratio is number of reads per write
+            let ratio = mode.split(':')
+                .skip(1)
+                .next()
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+            // we want batch size of reads to be batch_size
+            // what should batch size for writes be to get this ratio?
+            if batch_size % ratio != 0 {
+                println!("mix ratio does not evenly divide batch size");
+                return;
+            }
+            common::Mix::RW(batch_size, batch_size / ratio)
+        }
+        _ => unreachable!(),
+    };
 
     let runtime = if runtime == 0 { None } else { Some(runtime) };
-    let migrate_after = migrate_after.map(time::Duration::from_secs);
     let runtime = runtime.map(time::Duration::from_secs);
-    let mut config = common::RuntimeConfig::new(narticles, runtime);
+    let mut config = common::RuntimeConfig::new(narticles, mix, runtime);
     config.produce_cdf(cdf);
-    if let Some(migrate_after) = migrate_after {
-        config.perform_migration_at(migrate_after);
-    }
     config.set_reuse(args.is_present("reuse"));
     config.set_verbose(!args.is_present("quiet"));
-    config.use_batching(value_t_or_exit!(args, "batch", usize));
     config.use_distribution(dist);
 
     // setup db
@@ -172,126 +170,76 @@ fn main() {
     let mut dbn = dbn.splitn(2, "://");
     let client = dbn.next().unwrap();
     let addr = dbn.next().unwrap();
-    match mode {
-        "read" => {
-            let stats = match client {
-                // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
-                #[cfg(feature="b_mssql")]
-                "mssql" => {
-                    exercise::launch_reader(clients::mssql::make_reader(addr, config.batch_size),
-                                            config)
-                }
-                // mysql://soup@127.0.0.1/bench_mysql
-                #[cfg(feature="b_mysql")]
-                "mysql" => {
-                    let c = clients::mysql::setup(addr, false, &config);
-                    exercise::launch_reader(clients::mysql::make_reader(&c, config.batch_size),
-                                            config)
-                }
-                // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
-                #[cfg(feature="b_hybrid")]
-                "hybrid" => {
-                    let mut split_dbn = addr.splitn(2, ",");
-                    let mysql_dbn = &split_dbn.next().unwrap()[6..];
-                    let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, false, &config);
-                    exercise::launch_reader(clients::hybrid::make_reader(&mut c), config)
-                }
-                // postgresql://soup@127.0.0.1/bench_psql
-                #[cfg(feature="b_postgresql")]
-                "postgresql" => {
-                    let c = clients::postgres::setup(addr, false);
-                    let res = exercise::launch_reader(clients::postgres::make_reader(&c), config);
-                    drop(c);
-                    res
-                }
-                // memcached://127.0.0.1:11211
-                #[cfg(feature="b_memcached")]
-                "memcached" => {
-                    exercise::launch_reader(clients::memcached::make_reader(addr), config)
-                }
-                // netsoup://127.0.0.1:7777
-                #[cfg(feature="b_netsoup")]
-                "netsoup" => exercise::launch_reader(clients::netsoup::make_reader(addr), config),
-                // garbage
-                t => {
-                    panic!("backend not supported -- make sure you compiled with --features b_{}",
-                           t)
-                }
-            };
-            print_stats("GET", &stats.pre, avg);
-            if migrate_after.is_some() {
-                print_stats("GET+", &stats.post, avg);
-            }
+
+    let stats = match client {
+        // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
+        #[cfg(feature="b_mssql")]
+        "mssql" => {
+            let c = clients::mssql::make(addr, &config);
+            exercise::launch_mix(c, config)
         }
-        "write" => {
-            let stats = match client {
-                // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
-                #[cfg(feature="b_mssql")]
-                "mssql" => {
-                    exercise::launch_writer(clients::mssql::make_writer(addr, &config),
-                                            config,
-                                            None)
-                }
-                // mysql://soup@127.0.0.1/bench_mysql
-                #[cfg(feature="b_mysql")]
-                "mysql" => {
-                    let c = clients::mysql::setup(addr, true, &config);
-                    exercise::launch_writer(clients::mysql::make_writer(&c, config.batch_size),
-                                            config,
-                                            None)
-                }
-                // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
-                #[cfg(feature="b_hybrid")]
-                "hybrid" => {
-                    let mut split_dbn = addr.splitn(2, ",");
-                    let mysql_dbn = &split_dbn.next().unwrap()[6..];
-                    let memcached_dbn = &split_dbn.next().unwrap()[10..];
-                    let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, true, &config);
-                    exercise::launch_writer(clients::hybrid::make_writer(&mut c), config, None)
-                }
-                // postgresql://soup@127.0.0.1/bench_psql
-                #[cfg(feature="b_postgresql")]
-                "postgresql" => {
-                    let c = clients::postgres::setup(addr, true);
-                    let res = exercise::launch_writer(clients::postgres::make_writer(&c, &config),
-                                                      config,
-                                                      None);
-                    drop(c);
-                    res
-                }
-                // memcached://127.0.0.1:11211
-                #[cfg(feature="b_memcached")]
-                "memcached" => {
-                    exercise::launch_writer(clients::memcached::make_writer(addr), config, None)
-                }
-                // netsoup://127.0.0.1:7777
-                #[cfg(feature="b_netsoup")]
-                "netsoup" => {
-                    exercise::launch_writer(clients::netsoup::make_writer(addr), config, None)
-                }
-                // garbage
-                t => {
-                    panic!("backend not supported -- make sure you compiled with --features b_{}",
-                           t)
-                }
-            };
-            print_stats("PUT", &stats.pre, avg);
-            if migrate_after.is_some() {
-                print_stats("PUT+", &stats.post, avg);
-            }
+        // mysql://soup@127.0.0.1/bench_mysql
+        #[cfg(feature="b_mysql")]
+        "mysql" => {
+            let c = clients::mysql::setup(addr, &config);
+            let c = clients::mysql::make(&c, &config);
+            exercise::launch_mix(c, config)
         }
-        _ => unreachable!(),
-    }
+        // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
+        #[cfg(feature="b_hybrid")]
+        "hybrid" => {
+            let mut split_dbn = addr.splitn(2, ",");
+            let mysql_dbn = &split_dbn.next().unwrap()[6..];
+            let memcached_dbn = &split_dbn.next().unwrap()[10..];
+            let mut c = clients::hybrid::setup(mysql_dbn, memcached_dbn, &config);
+            let c = clients::hybrid::make(&mut c);
+            exercise::launch_mix(c, config)
+        }
+        // memcached://127.0.0.1:11211
+        #[cfg(feature="b_memcached")]
+        "memcached" => {
+            let c = clients::memcached::make(addr);
+            exercise::launch_mix(c, config)
+        }
+        // netsoup://127.0.0.1:7777
+        #[cfg(feature="b_netsoup")]
+        "netsoup" => {
+            let c = clients::netsoup::make(addr);
+            exercise::launch_mix(c, config)
+        }
+        // garbage
+        t => {
+            panic!("backend not supported -- make sure you compiled with --features b_{}",
+                   t)
+        }
+    };
+    print_stats(&config.mix, &stats, avg);
 }
 
-fn print_stats<S: AsRef<str>>(desc: S, stats: &exercise::BenchmarkResult, avg: bool) {
-    if let Some(perc) = stats.cdf_percentiles() {
-        for (v, p, _, _) in perc {
-            println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
+fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool) {
+    let stats = &stats.pre;
+    if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
+        if mix.does_read() {
+            for (v, p, _, _) in r_perc {
+                println!("percentile GET {:.2} {:.2}", v, p);
+            }
+        }
+        if mix.does_write() {
+            for (v, p, _, _) in w_perc {
+                println!("percentile PUT {:.2} {:.2}", v, p);
+            }
         }
     }
+
     if avg {
-        println!("avg {}: {:.2}", desc.as_ref(), stats.avg_throughput());
+        let desc = if mix.is_mixed() {
+            "MIX"
+        } else if mix.does_read() {
+            "GET"
+        } else {
+            "PUT"
+        };
+
+        println!("avg {}: {:.2}", desc, stats.avg_throughput());
     }
 }

@@ -6,12 +6,7 @@ unsafe impl Send for Memcache {}
 
 use common::{Writer, Reader, ArticleResult, Period};
 
-pub fn make_writer(addr: &str) -> Memcache {
-    Memcache(memcached::Client::connect(&[(&format!("tcp://{}", addr), 1)], ProtoType::Binary)
-                 .unwrap())
-}
-
-pub fn make_reader(addr: &str) -> Memcache {
+pub fn make(addr: &str) -> Memcache {
     Memcache(memcached::Client::connect(&[(&format!("tcp://{}", addr), 1)], ProtoType::Binary)
                  .unwrap())
 }

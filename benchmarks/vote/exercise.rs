@@ -1,4 +1,4 @@
-use common::{Writer, Reader, Period, RuntimeConfig, Distribution};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -20,7 +20,7 @@ use zipf::ZipfDistribution;
 
 pub struct BenchmarkResult {
     throughputs: Vec<f64>,
-    samples: Option<Histogram<u64>>,
+    samples: Option<(Histogram<u64>, Histogram<u64>)>,
 }
 
 impl Default for BenchmarkResult {
@@ -34,7 +34,8 @@ impl Default for BenchmarkResult {
 
 impl BenchmarkResult {
     fn keep_cdf(&mut self) {
-        self.samples = Some(Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap());
+        self.samples = Some((Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap(),
+                             Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap()));
     }
 
     pub fn avg_throughput(&self) -> f64 {
@@ -42,8 +43,12 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
-    pub fn cdf_percentiles(&self) -> Option<HistogramIterator<u64, recorded::Iter<u64>>> {
-        self.samples.as_ref().map(|s| s.iter_recorded())
+    pub fn cdf_percentiles(&self)
+                           -> Option<(HistogramIterator<u64, recorded::Iter<u64>>,
+                                      HistogramIterator<u64, recorded::Iter<u64>>)> {
+        self.samples
+            .as_ref()
+            .map(|&(ref r, ref w)| (r.iter_recorded(), w.iter_recorded()))
     }
 
     #[allow(dead_code)]
@@ -71,9 +76,13 @@ impl BenchmarkResults {
         }
     }
 
-    fn record_latency(&mut self, p: Period, value: i64) -> Result<(), ()> {
-        if let Some(ref mut samples) = self.pick(p).samples {
-            samples.record(value)
+    fn record_latency(&mut self, read: bool, p: Period, value: i64) -> Result<(), ()> {
+        if let Some((ref mut r_samples, ref mut w_samples)) = self.pick(p).samples {
+            if read {
+                r_samples.record(value)
+            } else {
+                w_samples.record(value)
+            }
         } else {
             Ok(())
         }
@@ -84,9 +93,9 @@ impl BenchmarkResults {
     }
 }
 
-fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
-    where I: FnOnce() -> F,
-          F: FnMut(&time::Instant, &[(i64, i64)]) -> (bool, Period)
+fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> BenchmarkResults
+    where R: Reader,
+          W: Writer
 {
     let mut stats = BenchmarkResults::default();
     if config.cdf {
@@ -94,7 +103,7 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
     }
 
     {
-        let mut f = init();
+        let mut w = w.map(|w| WState::new(w));
 
         // random article ids with distribution. we pre-generate these to avoid overhead at
         // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
@@ -122,35 +131,46 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
             }
         };
 
+        let mut read = config.mix.does_read();
         let mut count = 0usize;
         let start = time::Instant::now();
         let mut last_reported = start;
         let report_every = time::Duration::from_millis(200);
-        let mut batch: Vec<_> = (0..config.batch_size)
+        let mut batch: Vec<_> = (0..config.mix.max_batch_size())
             .into_iter()
             .map(|i| (i as i64, i as i64))
             .collect();
         let runtime = config.runtime.unwrap();
         while start.elapsed() < runtime {
+            let bs = config.mix.batch_size_for(read);
+
             // construct ids for the next batch
-            for &mut (_, ref mut aid) in &mut batch {
+            // TODO: eliminate uid from read now that they're separate?
+            for &mut (_, ref mut aid) in batch.iter_mut().take(bs) {
                 *aid = randomness[i];
                 i = (i + 1) % randomness.len();
             }
 
             let (register, period) = if config.cdf {
                 let t = time::Instant::now();
-                let (reg, period) = f(&start, &batch[..]);
+                let (reg, period) = if read {
+                    do_read(r.as_mut().unwrap(), &mut config, &start, &batch[..bs])
+                } else {
+                    do_write(w.as_mut().unwrap(), &mut config, &start, &batch[..bs])
+                };
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
-                if stats.record_latency(period, t).is_err() {
+                if stats.record_latency(read, period, t).is_err() {
+                    let desc = if read { "GET" } else { "PUT" };
                     println!("failed to record slow {} ({}μs)", desc, t);
                 }
                 (reg, period)
+            } else if read {
+                do_read(r.as_mut().unwrap(), &mut config, &start, &batch[..bs])
             } else {
-                f(&start, &batch[..])
+                do_write(w.as_mut().unwrap(), &mut config, &start, &batch[..bs])
             };
             if register {
-                count += config.batch_size;
+                count += bs;
             }
 
             // check if we should report
@@ -158,6 +178,11 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
                 let count_per_ns = count as f64 / dur_to_ns!(last_reported.elapsed()) as f64;
                 let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
 
+                let desc = if config.mix.is_mixed() {
+                    "MIX"
+                } else {
+                    if read { "GET" } else { "PUT" }
+                };
                 match period {
                     Period::PreMigration => {
                         if config.verbose {
@@ -181,16 +206,65 @@ fn driver<I, F>(config: RuntimeConfig, init: I, desc: &str) -> BenchmarkResults
                 last_reported = time::Instant::now();
                 count = 0;
             }
+
+            if config.mix.is_mixed() {
+                read = !read;
+            }
         }
     }
 
     stats
 }
 
-pub fn launch_writer<W: Writer>(mut writer: W,
-                                mut config: RuntimeConfig,
-                                ready: Option<mpsc::SyncSender<()>>)
-                                -> BenchmarkResults {
+struct WState<W: Writer> {
+    inner: W,
+    post: bool,
+    migrate_done: Option<mpsc::Receiver<()>>,
+}
+
+impl<W: Writer> WState<W> {
+    pub fn new(writer: W) -> Self {
+        WState {
+            inner: writer,
+            post: false,
+            migrate_done: None,
+        }
+    }
+}
+
+fn do_write<W: Writer>(writer: &mut WState<W>,
+                       config: &mut RuntimeConfig,
+                       start: &time::Instant,
+                       ids: &[(i64, i64)])
+                       -> (bool, Period) {
+    if let Some(migrate_after) = config.migrate_after {
+        if start.elapsed() > migrate_after {
+            writer.migrate_done = Some(writer.inner.migrate());
+            config.migrate_after.take(); // so we don't migrate again
+        }
+    }
+
+    if writer.migrate_done.is_some() {
+        match writer.migrate_done.as_mut().unwrap().try_recv() {
+            Err(mpsc::TryRecvError::Empty) => {}
+            _ => {
+                writer.migrate_done = None;
+                writer.post = true;
+            }
+        }
+    }
+
+    writer.inner.vote(ids);
+    if writer.post {
+        (true, Period::PostMigration)
+    } else {
+        (true, Period::PreMigration)
+    }
+}
+
+pub fn prep_writer<W: Writer>(writer: &mut W,
+                              config: &RuntimeConfig,
+                              ready: Option<mpsc::SyncSender<()>>) {
 
     // prepopulate
     if !config.should_reuse() {
@@ -210,56 +284,61 @@ pub fn launch_writer<W: Writer>(mut writer: W,
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
     drop(ready);
-
-    if config.runtime.is_none() {
-        println!("Doing no writes for prepopulating writer");
-        return BenchmarkResults::default();
-    }
-
-    let mut post = false;
-    let mut migrate_done = None;
-    let init = move || {
-        move |start: &time::Instant, ids: &_| -> (bool, Period) {
-            if let Some(migrate_after) = config.migrate_after {
-                if start.elapsed() > migrate_after {
-                    migrate_done = Some(writer.migrate());
-                    config.migrate_after.take(); // so we don't migrate again
-                }
-            }
-
-            if migrate_done.is_some() {
-                match migrate_done.as_mut().unwrap().try_recv() {
-                    Err(mpsc::TryRecvError::Empty) => {}
-                    _ => {
-                        migrate_done = None;
-                        post = true;
-                    }
-                }
-            }
-
-            writer.vote(ids);
-            if post {
-                (true, Period::PostMigration)
-            } else {
-                (true, Period::PreMigration)
-            }
-        }
-    };
-
-    driver(config, init, "PUT")
 }
 
-pub fn launch_reader<R: Reader>(mut reader: R, config: RuntimeConfig) -> BenchmarkResults {
+fn do_read<R: Reader>(reader: &mut R,
+                      _: &RuntimeConfig,
+                      _: &time::Instant,
+                      ids: &[(i64, i64)])
+                      -> (bool, Period) {
+    match reader.get(ids) {
+        (Err(_), period) => (false, period),
+        (_, period) => (true, period),
+    }
+}
 
-    println!("Starting reader");
-    let init = move || {
-        move |_: &time::Instant, ids: &_| -> (bool, Period) {
-            match reader.get(ids) {
-                (Err(_), period) => (false, period),
-                (_, period) => (true, period),
-            }
-        }
-    };
+pub fn launch<R: Reader, W: Writer>(reader: Option<R>,
+                                    mut writer: Option<W>,
+                                    config: RuntimeConfig,
+                                    ready: Option<mpsc::SyncSender<()>>)
+                                    -> BenchmarkResults {
+    if let Some(ref mut writer) = writer {
+        prep_writer(writer, &config, ready);
+    }
+    if config.runtime.is_none() {
+        return BenchmarkResults::default();
+    }
+    driver(config, reader, writer)
+}
 
-    driver(config, init, "GET")
+#[allow(dead_code)]
+pub fn launch_mix<T>(inner: T, config: RuntimeConfig) -> BenchmarkResults
+    where T: Reader + Writer
+{
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    let inner = Rc::new(RefCell::new(inner));
+    launch(Some(inner.clone()), Some(inner), config, None)
+}
+
+#[allow(dead_code)]
+pub struct NullClient;
+impl Reader for NullClient {
+    fn get(&mut self, _: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        unreachable!()
+    }
+}
+impl Writer for NullClient {
+    type Migrator = ();
+
+    fn make_articles<I>(&mut self, _: I)
+        where I: Iterator<Item = (i64, String)>,
+              I: ExactSizeIterator
+    {
+        unreachable!()
+    }
+
+    fn vote(&mut self, _: &[(i64, i64)]) -> Period {
+        unreachable!()
+    }
 }

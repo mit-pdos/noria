@@ -9,12 +9,12 @@ pub struct Pool {
     mc: Option<memcached::Client>,
 }
 
-pub struct W {
+pub struct RW {
     conn: mysql::PooledConn,
     mc: memcached::Client,
 }
 
-pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool, config: &RuntimeConfig) -> Pool {
+pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Pool {
     use mysql::Opts;
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
@@ -25,7 +25,7 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool, config: &Runtime
     let db = &addr[addr.rfind("/").unwrap() + 1..];
     let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
 
-    if write && !config.should_reuse() {
+    if config.mix.does_write() && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
         opts.db_name(Some(db));
@@ -67,16 +67,16 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, write: bool, config: &Runtime
     }
 }
 
-pub fn make_writer(pool: &mut Pool) -> W {
+pub fn make(pool: &mut Pool) -> RW {
     let mc = pool.mc.take().unwrap();
     let pool = &pool.sql;
-    W {
+    RW {
         conn: pool.get_conn().unwrap(),
         mc: mc,
     }
 }
 
-impl Writer for W {
+impl Writer for RW {
     type Migrator = ();
 
     fn make_articles<I>(&mut self, articles: I)
@@ -138,21 +138,7 @@ impl Writer for W {
     }
 }
 
-pub struct R {
-    conn: mysql::PooledConn,
-    mc: memcached::Client,
-}
-
-pub fn make_reader(pool: &mut Pool) -> R {
-    let mc = pool.mc.take().unwrap();
-    let pool = &pool.sql;
-    R {
-        conn: pool.get_conn().unwrap(),
-        mc: mc,
-    }
-}
-
-impl Reader for R {
+impl Reader for RW {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         use memcached::proto::MultiOperation;
         use std::str;
