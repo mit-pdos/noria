@@ -255,12 +255,9 @@ struct Crossover {
     swapped: Option<time::Instant>,
     crossover: Option<u64>,
     done: bool,
-    rng: Option<rand::ThreadRng>,
     iteration: usize,
     post: usize,
 }
-
-unsafe impl Send for Crossover {}
 
 impl Crossover {
     pub fn new(crossover: Option<time::Duration>) -> Self {
@@ -270,14 +267,12 @@ impl Crossover {
             done: false,
             iteration: 0,
             post: 0,
-            rng: None,
         }
     }
 
     pub fn swapped(&mut self) {
         assert!(self.swapped.is_none());
         self.swapped = Some(time::Instant::now());
-        self.rng = Some(rand::thread_rng());
     }
 
     pub fn has_swapped(&self) -> bool {
@@ -305,7 +300,6 @@ impl Crossover {
                 return true;
             }
 
-            use rand::Rng;
             self.post = ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as
                         usize;
             self.iteration = 0;
