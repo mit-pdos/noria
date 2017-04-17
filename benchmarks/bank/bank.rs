@@ -16,8 +16,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas,
-                   DataType, Token, Mutator};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -44,9 +43,10 @@ pub struct Bank {
     blender: Blender,
     transfers: Vec<Mutator>,
     balances: distributary::NodeAddress,
+    transactions: bool,
 }
 
-pub fn setup(num_putters: usize) -> Box<Bank> {
+pub fn setup(num_putters: usize, transactions: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -59,10 +59,15 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        let d = BaseDurabilityLevel::SyncImmediately; // Buffered makes assert on getter fail.
-        transfers = mig.add_transactional_base("transfers",
-                                               &["src_acct", "dst_acct", "amount"],
-                                               Base::default().with_durability(d));
+        transfers = if transactions {
+            mig.add_transactional_base("transfers",
+                                       &["src_acct", "dst_acct", "amount"],
+                                       Base::default())
+        } else {
+            mig.add_ingredient("transfers",
+                               &["src_acct", "dst_acct", "amount"],
+                               Base::default())
+        };
 
         // add all debits
         debits = mig.add_ingredient("debits",
@@ -99,18 +104,32 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
                  blender: g,
                  transfers: transfers,
                  balances: balances,
+                 transactions: transactions,
              })
 }
 
 impl Bank {
     fn getter(&mut self) -> Box<Getter> {
-        Box::new(self.blender
-                     .get_transactional_getter(self.balances)
-                     .unwrap())
+        if self.transactions {
+            Box::new(self.blender
+                         .get_transactional_getter(self.balances)
+                         .unwrap())
+        } else {
+            let g = self.blender.get_getter(self.balances).unwrap();
+            let b = Box::new(move |d: &DataType| g(d).map(|r| (r, Token::empty()))) as Box<_>;
+            Box::new(b)
+        }
     }
     fn putter(&mut self) -> Box<Putter> {
         let m = self.transfers.pop().unwrap();
-        let p: TxPut = Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t));
+        let p: TxPut = if self.transactions {
+            Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t))
+        } else {
+            Box::new(move |u: Vec<DataType>, _: Token| {
+                         m.put(u);
+                         Ok(0)
+                     })
+        };
 
         Box::new(p)
     }
@@ -173,6 +192,7 @@ fn populate(naccounts: i64, transfers_put: &mut Box<Putter>) {
             money_put(0, i, 1000, Token::empty()).unwrap();
             money_put(i, 0, 1, Token::empty()).unwrap();
         }
+        thread::sleep(time::Duration::new(0, 50000000));
     }
     println!("Done with account creation");
 }
@@ -187,7 +207,7 @@ fn client(i: usize,
           audit: bool,
           measure_latency: bool,
           coarse: bool,
-          transactions: &mut Vec<(i64, i64, i64)>)
+          transactions: bool)
           -> Vec<f64> {
     let clock = RealTime::default();
 
@@ -202,6 +222,8 @@ fn client(i: usize,
     let mut write_start_to_txn_end_latencies = Vec::new();
 
     let mut t_rng = rand::thread_rng();
+
+    let mut successful_transfers = Vec::new();
 
     {
         let mut get = balances_get.get();
@@ -223,7 +245,8 @@ fn client(i: usize,
                          dst);
             }
 
-            assert!(balance >= 0, format!("{} balance is {}", src, balance));
+            assert!(balance >= 0 || !transactions,
+                    format!("{} balance is {}", src, balance));
 
             if balance >= 100 {
                 if verbose {
@@ -244,7 +267,7 @@ fn client(i: usize,
                             println!("commit @ {}", ts);
                         }
                         if audit {
-                            transactions.push((src, dst, 100));
+                            successful_transfers.push((src, dst, 100));
                         }
                         if measure_latency {
                             let mut token = get(src).unwrap().unwrap().1;
@@ -302,9 +325,10 @@ fn client(i: usize,
                 *target_balances.get_mut(&i).unwrap() += 999;
             }
 
-            for &mut (src, dst, amt) in transactions {
+            for (src, dst, amt) in successful_transfers {
                 *target_balances.get_mut(&src).unwrap() -= amt;
                 *target_balances.get_mut(&dst).unwrap() += amt;
+                assert!(*target_balances.get(&src).unwrap() >= 0);
             }
 
             for (account, balance) in target_balances {
@@ -394,6 +418,10 @@ fn main() {
                  .long("audit")
                  .takes_value(false)
                  .help("Audit results after benchmark completes"))
+        .arg(Arg::with_name("nontransactional")
+                 .long("nontransactional")
+                 .takes_value(false)
+                 .help("Audit results after benchmark completes"))
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -408,6 +436,7 @@ fn main() {
     let audit = args.is_present("audit");
     let measure_latency = args.is_present("latency");
     let coarse_checktables = args.is_present("coarse");
+    let transactions = !args.is_present("nontransactional");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -416,9 +445,9 @@ fn main() {
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
-        setup(nthreads + 1)
+        setup(nthreads + 1, transactions)
     } else {
-        setup(nthreads)
+        setup(nthreads, transactions)
     };
 
     // let system settle
@@ -432,8 +461,6 @@ fn main() {
             Some({
                      let mut transfers_put = bank.putter();
                      let balances_get: Box<Getter> = bank.getter();
-
-                     let mut transactions = vec![];
 
                      if i == 0 {
                          populate(naccounts, &mut transfers_put);
@@ -456,7 +483,7 @@ fn main() {
                            audit,
                            false, /* measure_latency */
                            coarse_checktables,
-                           &mut transactions)
+                           transactions)
                 })
                          .unwrap()
                  })
@@ -472,7 +499,6 @@ fn main() {
                      populate(naccounts, &mut transfers_put);
                  }
 
-                 let mut transactions = vec![];
                  thread::Builder::new()
                      .name(format!("bank{}", nthreads))
                      .spawn(move || -> Vec<f64> {
@@ -486,7 +512,7 @@ fn main() {
                        audit,
                        true, /* measure_latency */
                        coarse_checktables,
-                       &mut transactions)
+                       transactions)
             })
                      .unwrap()
              })
