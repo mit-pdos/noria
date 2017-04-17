@@ -16,7 +16,8 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
+use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas,
+                   DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -58,7 +59,7 @@ pub fn setup(num_putters: usize) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        let d = BaseDurabilityLevel::SyncImmediately;  // Buffered makes assert on getter fail.
+        let d = BaseDurabilityLevel::SyncImmediately; // Buffered makes assert on getter fail.
         transfers = mig.add_transactional_base("transfers",
                                                &["src_acct", "dst_acct", "amount"],
                                                Base::default().with_durability(d));
@@ -329,7 +330,7 @@ fn client(i: usize,
         let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
         for sample_nanos in write_start_to_txn_end_latencies {
             let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
-            latencies_hist.record(sample_micros);
+            latencies_hist.record(sample_micros).unwrap();
         }
 
         for (v, p, _, _) in latencies_hist.iter_recorded() {

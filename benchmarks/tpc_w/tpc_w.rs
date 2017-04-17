@@ -29,7 +29,7 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn make(recipe_location: &str) -> Box<Backend> {
+fn make(recipe_location: &str, transactions: bool) -> Box<Backend> {
     use std::io::Read;
     use std::fs::File;
 
@@ -51,7 +51,7 @@ fn make(recipe_location: &str) -> Box<Backend> {
         f.read_to_string(&mut s).unwrap();
         recipe = match Recipe::from_str(&s, Some(recipe_log)) {
             Ok(mut recipe) => {
-                recipe.activate(&mut mig).unwrap();
+                recipe.activate(&mut mig, transactions).unwrap();
                 recipe
             }
             Err(e) => panic!(e),
@@ -186,10 +186,10 @@ fn main() {
 
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
-    let transactional = matches.is_present("transactional");
+    let transactions = matches.is_present("transactional");
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(&rloc);
+    let mut backend = make(&rloc, transactions);
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc);
