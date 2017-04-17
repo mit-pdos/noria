@@ -70,6 +70,10 @@ fn main() {
             .value_name("N")
             .default_value("60")
             .help("Benchmark runtime in seconds"))
+        .arg(Arg::with_name("stupid")
+             .long("stupid")
+            .help("Make the migration stupid")
+            .requires("migrate"))
         .arg(Arg::with_name("migrate")
             .short("m")
             .long("migrate")
@@ -138,6 +142,7 @@ fn main() {
         vote_pre: putters.1,
         vote_post: None,
         new_vote: None,
+        stupid: args.is_present("stupid"),
         i: 0,
         x: Crossover::new(crossover),
         transactions: transactions,
@@ -402,6 +407,7 @@ struct Spoon {
     getters: Vec<Getter>,
     vote_pre: Mutator,
     vote_post: Option<Mutator>,
+    stupid: bool,
     i: usize,
     x: Crossover,
     new_vote: Option<mpsc::Receiver<Mutator>>,
@@ -461,6 +467,7 @@ impl Writer for Spoon {
         Migrator {
             graph: self.graph.clone(),
             mut_tx: tx,
+            stupid: self.stupid,
             getters: self.getters
                 .iter()
                 .map(|g| unsafe { g.clone() })
@@ -475,17 +482,19 @@ struct Migrator {
     mut_tx: mpsc::SyncSender<Mutator>,
     getters: Vec<Getter>,
     transactions: bool,
+    stupid: bool,
 }
 
 impl MigrationHandle for Migrator {
     fn execute(&mut self) {
         use std::collections::HashMap;
-        use distributary::{Base, Aggregation, Join, JoinType, Union};
+        use distributary::{Base, Aggregation, Join, JoinType, Union, Project};
 
         let mut g = self.graph.lock().unwrap();
         let (rating, newend) = {
             // get all the ids since migration will borrow g
             let vc = g.vc;
+            let vote = g.vote;
             let article = g.article;
 
             // migrate
@@ -498,35 +507,61 @@ impl MigrationHandle for Migrator {
                 mig.add_ingredient("rating", &["user", "id", "stars"], Base::default())
             };
 
-            // add sum of ratings
-            let rs = mig.add_ingredient("rsum",
-                                        &["id", "total"],
-                                        Aggregation::SUM.over(rating, 2, &[1]));
+            let total = if self.stupid {
+                // project on 1 to votes
+                let upgrade =
+                    mig.add_ingredient("upvote",
+                                       &["id", "one"],
+                                       Project::new(vote, &[0], Some(vec![1.into()])));
 
-            // take a union of vote count and rsum
-            let mut emits = HashMap::new();
-            emits.insert(rs, vec![0, 1]);
-            emits.insert(vc, vec![0, 1]);
-            let u = Union::new(emits);
-            let both = mig.add_ingredient("both", &["id", "value"], u);
+                // take a union of votes and ratings
+                let mut emits = HashMap::new();
+                emits.insert(rating, vec![0, 2]);
+                emits.insert(upgrade, vec![0, 1]);
+                let u = Union::new(emits);
+                let both = mig.add_ingredient("both", &["id", "value"], u);
 
-            // sum them by article id
-            let total = mig.add_ingredient("total",
-                                           &["id", "total"],
-                                           Aggregation::SUM.over(both, 1, &[0]));
+                // we want all these to be in the same domain
+                let domain = mig.add_domain();
+                mig.assign_domain(rating, domain);
+                mig.assign_domain(upgrade, domain);
+                mig.assign_domain(both, domain);
+
+                // add sum of combined ratings
+                mig.add_ingredient("total",
+                                   &["id", "total"],
+                                   Aggregation::SUM.over(both, 1, &[0]))
+            } else {
+                // add sum of ratings
+                let rs = mig.add_ingredient("rsum",
+                                            &["id", "total"],
+                                            Aggregation::SUM.over(rating, 2, &[1]));
+
+                // take a union of vote count and rsum
+                let mut emits = HashMap::new();
+                emits.insert(rs, vec![0, 1]);
+                emits.insert(vc, vec![0, 1]);
+                let u = Union::new(emits);
+                let both = mig.add_ingredient("both", &["id", "value"], u);
+
+                // we want ratings, rsum, and the union to be in the same domain,
+                // because only rsum is really costly
+                let domain = mig.add_domain();
+                mig.assign_domain(rating, domain);
+                mig.assign_domain(rs, domain);
+                mig.assign_domain(both, domain);
+
+                // sum them by article id
+                mig.add_ingredient("total",
+                                   &["id", "total"],
+                                   Aggregation::SUM.over(both, 1, &[0]))
+            };
 
             // finally, produce end result
             use distributary::JoinSource::*;
             let j = Join::new(article, total, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
             let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
             mig.maintain(newend, 0);
-
-            // we want ratings, rsum, and the union to be in the same domain,
-            // because only rsum is really costly
-            let domain = mig.add_domain();
-            mig.assign_domain(rating, domain);
-            mig.assign_domain(rs, domain);
-            mig.assign_domain(both, domain);
 
             // and then we want the total sum and the join in the same domain,
             // to avoid duplicating the total state
