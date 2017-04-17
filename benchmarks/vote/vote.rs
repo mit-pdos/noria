@@ -296,7 +296,7 @@ impl Crossover {
         }
 
         self.iteration += 1;
-        if self.iteration == (1 << 8) {
+        if self.iteration == (1 << 12) {
             let elapsed = dur_to_ns!(self.swapped.as_ref().unwrap().elapsed());
 
             if elapsed > self.crossover.unwrap() {
