@@ -49,7 +49,11 @@ fn make(blacklist: &str) -> Box<Backend> {
 }
 
 impl Backend {
-    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
+    fn migrate(&mut self,
+               schema_file: &str,
+               query_file: Option<&str>,
+               transactions: bool)
+               -> Result<(), String> {
         use std::io::Read;
         use std::fs::File;
 
@@ -101,7 +105,7 @@ impl Backend {
         let cur_recipe = self.r.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
-                match recipe.activate(&mut mig) {
+                match recipe.activate(&mut mig, transactions) {
                     Ok(ar) => {
                         info!(self.log, "{} expressions added", ar.expressions_added);
                         info!(self.log, "{} expressions removed", ar.expressions_removed);
@@ -242,7 +246,7 @@ fn main() {
         } else {
             Some(qf.1.to_str().unwrap())
         };
-        match backend.migrate(&sf.1.to_str().unwrap(), queries) {
+        match backend.migrate(&sf.1.to_str().unwrap(), queries, transactional) {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
                 let mut gf = File::create(graph_fname).unwrap();
