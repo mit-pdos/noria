@@ -185,7 +185,7 @@ impl Getter for TxGet {
     }
 }
 
-fn populate(naccounts: i64, transfers_put: &mut Box<Putter>) {
+fn populate(naccounts: i64, transfers_put: &mut Box<Putter>, transactions: bool) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
     println!("Connected. Setting up {} accounts.", naccounts);
@@ -197,8 +197,16 @@ fn populate(naccounts: i64, transfers_put: &mut Box<Putter>) {
             money_put(0, i, 1000, Token::empty()).unwrap();
             money_put(i, 0, 1, Token::empty()).unwrap();
         }
-        thread::sleep(time::Duration::new(0, 50000000));
+
+        if !transactions {
+            // Insert a bunch of empty transfers to make sure any buffers are flushed
+            for _ in 0..1024 {
+                money_put(0, 0, 0, Token::empty()).unwrap();
+            }
+            thread::sleep(time::Duration::new(0, 50000000));
+        }
     }
+
     println!("Done with account creation");
 }
 
@@ -455,10 +463,16 @@ fn main() {
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
-        setup(nthreads + 1, transactions, durable)
+        setup(nthreads + 2, transactions, durable)
     } else {
-        setup(nthreads, transactions, durable)
+        setup(nthreads + 1, transactions, durable)
     };
+
+
+    {
+        let mut transfers_put = bank.putter();
+        populate(naccounts, &mut transfers_put, transactions);
+    }
 
     // let system settle
     // thread::sleep(time::Duration::new(2, 0));
@@ -469,16 +483,8 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                     let mut transfers_put = bank.putter();
+                     let transfers_put = bank.putter();
                      let balances_get: Box<Getter> = bank.getter();
-
-                     if i == 0 {
-                         populate(naccounts, &mut transfers_put);
-
-                         //println!("Let those accounts settle...");
-                         //thread::sleep(time::Duration::new(2, 0));
-                         //println!("Done!");
-                     }
 
                      thread::Builder::new()
                          .name(format!("bank{}", i))
@@ -502,12 +508,8 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-                 let mut transfers_put = bank.putter();
+                 let transfers_put = bank.putter();
                  let balances_get: Box<Getter> = bank.getter();
-
-                 if nthreads == 0 {
-                     populate(naccounts, &mut transfers_put);
-                 }
 
                  thread::Builder::new()
                      .name(format!("bank{}", nthreads))
