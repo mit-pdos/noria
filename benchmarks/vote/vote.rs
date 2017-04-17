@@ -273,6 +273,9 @@ impl Crossover {
     pub fn swapped(&mut self) {
         assert!(self.swapped.is_none());
         self.swapped = Some(time::Instant::now());
+        if self.crossover.is_none() {
+            self.done = true;
+        }
     }
 
     pub fn has_swapped(&self) -> bool {
@@ -285,9 +288,6 @@ impl Crossover {
         }
         if self.swapped.is_none() {
             return false;
-        }
-        if self.crossover.is_none() {
-            return true;
         }
 
         self.iteration += 1;
