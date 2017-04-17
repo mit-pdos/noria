@@ -257,7 +257,7 @@ struct Crossover {
     done: bool,
     rng: Option<rand::ThreadRng>,
     iteration: usize,
-    post: bool,
+    post: usize,
 }
 
 unsafe impl Send for Crossover {}
@@ -269,7 +269,7 @@ impl Crossover {
             crossover: crossover.map(|d| dur_to_ns!(d)),
             done: false,
             iteration: 0,
-            post: false,
+            post: 0,
             rng: None,
         }
     }
@@ -306,14 +306,12 @@ impl Crossover {
             }
 
             use rand::Rng;
-            self.post = self.rng
-                .as_mut()
-                .unwrap()
-                .gen_range(0, self.crossover.unwrap()) < elapsed;
+            self.post = ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as
+                        usize;
             self.iteration = 0;
         }
 
-        self.post
+        self.iteration < self.post
     }
 }
 
