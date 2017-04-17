@@ -559,28 +559,26 @@ impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let res = ids.iter()
             .map(|&(_, article_id)| {
-                (self.call())(&article_id.into())
-                    .map_err(|_| ())
-                    .map(|g| {
-                        match g.into_iter().next() {
-                            Some(row) => {
-                                // we only care about the first result
-                                let mut row = row.into_iter();
-                                let id: i64 = row.next().unwrap().into();
-                                let title: String = row.next().unwrap().into();
-                                let votes: i64 = match row.next().unwrap() {
-                                    DataType::None => 0,
-                                    d => d.into(),
-                                };
-                                ArticleResult::Article {
-                                    id: id,
-                                    title: title,
-                                    votes: votes,
-                                }
-                            }
-                            None => ArticleResult::NoSuchArticle,
-                        }
-                    })
+                let rows = try!((self.call())(&article_id.into()).map_err(|_| ()));
+                debug_assert_eq!(rows.len(), 1);
+                match rows.into_iter().last() {
+                    Some(row) => {
+                        // we only care about the first result
+                        let mut row = row.into_iter();
+                        let id: i64 = row.next().unwrap().into();
+                        let title: String = row.next().unwrap().into();
+                        let votes: i64 = match row.next().unwrap() {
+                            DataType::None => 42,
+                            d => d.into(),
+                        };
+                        Ok(ArticleResult::Article {
+                               id: id,
+                               title: title,
+                               votes: votes,
+                           })
+                    }
+                    None => Ok(ArticleResult::NoSuchArticle),
+                }
             })
             .collect();
 
