@@ -525,7 +525,7 @@ impl MigrationHandle for Migrator {
 
             // finally, produce end result
             use distributary::JoinSource::*;
-            let j = Join::new(article, total, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
+            let j = Join::new(article, total, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
             let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
             mig.maintain(newend, 0);
 
