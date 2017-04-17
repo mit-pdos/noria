@@ -1,4 +1,4 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress};
+use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, NodeAddress};
 
 use slog;
 use slog_term;
@@ -12,7 +12,7 @@ pub struct Graph {
     pub graph: Blender,
 }
 
-pub fn make(transactions: bool) -> Graph {
+pub fn make(transactions: bool, durability: Option<BaseDurabilityLevel>) -> Graph {
     // set up graph
     let mut g = Blender::new();
     g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
@@ -22,14 +22,22 @@ pub fn make(transactions: bool) -> Graph {
         let mut mig = g.start_migration();
 
         // add article base node
+        let mut b = Base::default();
+        if let Some(d) = durability {
+            b = b.with_durability(d).delete_log_on_drop();
+        }
         let article = if transactions {
-            mig.add_transactional_base("article", &["id", "title"], Base::default())
+            mig.add_transactional_base("article", &["id", "title"], b)
         } else {
-            mig.add_ingredient("article", &["id", "title"], Base::default())
+            mig.add_ingredient("article", &["id", "title"], b)
         };
 
         // add vote base table
-        let vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
+        let mut b = Base::default();
+        if let Some(d) = durability {
+            b = b.with_durability(d).delete_log_on_drop();
+        }
+        let vote = mig.add_ingredient("vote", &["user", "id"], b);
 
         // add vote count
         let vc = mig.add_ingredient("votecount",

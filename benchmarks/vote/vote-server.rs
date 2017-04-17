@@ -28,7 +28,7 @@ fn main() {
 
     let addr = args.value_of("ADDR").unwrap();
     println!("Attempting to start soup on {}", addr);
-    let g = graph::make(false);
+    let g = graph::make(false, Some(distributary::BaseDurabilityLevel::Buffered));
 
     // start processing
     // TODO: what about the node indices?

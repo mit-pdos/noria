@@ -121,7 +121,7 @@ fn main() {
     config.use_distribution(dist);
 
     // setup db
-    let g = graph::make(transactions);
+    let g = graph::make(transactions, None);
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
