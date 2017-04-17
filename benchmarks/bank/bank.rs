@@ -16,7 +16,8 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
+use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas,
+                   DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -46,7 +47,7 @@ pub struct Bank {
     transactions: bool,
 }
 
-pub fn setup(num_putters: usize, transactions: bool) -> Box<Bank> {
+pub fn setup(num_putters: usize, transactions: bool, durable: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -59,14 +60,18 @@ pub fn setup(num_putters: usize, transactions: bool) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        transfers = if transactions {
-            mig.add_transactional_base("transfers",
-                                       &["src_acct", "dst_acct", "amount"],
-                                       Base::default())
+        let base = if !durable {
+            Base::default()
+        } else if transactions {
+            Base::default().with_durability(BaseDurabilityLevel::SyncImmediately)
         } else {
-            mig.add_ingredient("transfers",
-                               &["src_acct", "dst_acct", "amount"],
-                               Base::default())
+            Base::default().with_durability(BaseDurabilityLevel::Buffered)
+        };
+
+        transfers = if transactions {
+            mig.add_transactional_base("transfers", &["src_acct", "dst_acct", "amount"], base)
+        } else {
+            mig.add_ingredient("transfers", &["src_acct", "dst_acct", "amount"], base)
         };
 
         // add all debits
@@ -421,7 +426,11 @@ fn main() {
         .arg(Arg::with_name("nontransactional")
                  .long("nontransactional")
                  .takes_value(false)
-                 .help("Audit results after benchmark completes"))
+                 .help("Use non-transactional writes"))
+        .arg(Arg::with_name("durable")
+                 .long("durable")
+                 .takes_value(false)
+                 .help("Use durable writes"))
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -437,6 +446,7 @@ fn main() {
     let measure_latency = args.is_present("latency");
     let coarse_checktables = args.is_present("coarse");
     let transactions = !args.is_present("nontransactional");
+    let durable = args.is_present("durable");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -445,9 +455,9 @@ fn main() {
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
-        setup(nthreads + 1, transactions)
+        setup(nthreads + 1, transactions, durable)
     } else {
-        setup(nthreads, transactions)
+        setup(nthreads, transactions, durable)
     };
 
     // let system settle
