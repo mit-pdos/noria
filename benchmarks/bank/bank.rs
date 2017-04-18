@@ -224,8 +224,6 @@ fn client(i: usize,
           -> Vec<f64> {
     let clock = RealTime::default();
 
-    println!("at client creation, measure_latency={}", measure_latency);
-
     let mut count = 0;
     let mut committed = 0;
     let mut aborted = 0;
