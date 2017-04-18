@@ -244,7 +244,7 @@ fn client(i: usize,
 
         while start.elapsed() < runtime {
             let dst = t_rng.gen_range(1, naccounts);
-            let src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
+            let src = dst - 1;  // (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
             assert_ne!(dst, src);
 
             let transaction_start = clock.get_time();
