@@ -38,9 +38,9 @@ pub fn make(transactions: bool, durability: Option<BaseDurabilityLevel>) -> Grap
             b = b.with_durability(d).delete_log_on_drop();
         }
         let vote = if transactions {
-            mig.add_transactional_base("vote", &["user", "id"], Base::default());
+            mig.add_transactional_base("vote", &["user", "id"], Base::default())
         } else {
-            mig.add_ingredient("vote", &["user", "id"], Base::default());
+            mig.add_ingredient("vote", &["user", "id"], Base::default())
         };
 
         // add vote count
