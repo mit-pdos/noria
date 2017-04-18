@@ -33,11 +33,9 @@ pub fn make(transactions: bool, durability: Option<BaseDurabilityLevel>) -> Grap
         };
 
         // add vote base table
-        let mut b = Base::default();
+        let mut b = Base::default().with_key(vec![1]);
         if let Some(d) = durability {
-            b = b.with_key(vec![1])
-                .with_durability(d)
-                .delete_log_on_drop();
+            b = b.with_durability(d).delete_log_on_drop();
         }
         let vote = if transactions {
             mig.add_transactional_base("vote", &["user", "id"], b)
