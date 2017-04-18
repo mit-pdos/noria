@@ -37,7 +37,11 @@ pub fn make(transactions: bool, durability: Option<BaseDurabilityLevel>) -> Grap
         if let Some(d) = durability {
             b = b.with_durability(d).delete_log_on_drop();
         }
-        let vote = mig.add_ingredient("vote", &["user", "id"], b);
+        let vote = if transactions {
+            mig.add_transactional_base("vote", &["user", "id"], Base::default());
+        } else {
+            mig.add_ingredient("vote", &["user", "id"], Base::default());
+        };
 
         // add vote count
         let vc = mig.add_ingredient("votecount",
