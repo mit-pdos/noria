@@ -220,7 +220,8 @@ fn client(i: usize,
           audit: bool,
           measure_latency: bool,
           coarse: bool,
-          transactions: bool)
+          transactions: bool,
+          is_transfer_deterministic: bool)
           -> Vec<f64> {
     let clock = RealTime::default();
 
@@ -242,9 +243,18 @@ fn client(i: usize,
         let mut get = balances_get.get();
         let mut put = transfers_put.transfer();
 
+        let mut num_requests = 1;
         while start.elapsed() < runtime {
-            let dst = t_rng.gen_range(1, naccounts);
-            let src = dst - 1;  // (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
+            let dst;
+            let src;
+            if is_transfer_deterministic {
+                dst = num_requests % (naccounts - 1) + 1;
+                src = dst - 1;
+                num_requests += 1;
+            } else {
+                dst = t_rng.gen_range(1, naccounts);
+                src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
+            }
             assert_ne!(dst, src);
 
             let transaction_start = clock.get_time();
@@ -448,6 +458,10 @@ fn main() {
                  .long("durable")
                  .takes_value(false)
                  .help("Use durable writes"))
+        .arg(Arg::with_name("deterministic")
+                 .long("deterministic")
+                 .takes_value(false)
+                 .help("Use deterministic money transfers"))
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -464,6 +478,7 @@ fn main() {
     let coarse_checktables = args.is_present("coarse");
     let transactions = !args.is_present("nontransactional");
     let durable = args.is_present("durable");
+    let is_transfer_deterministic = args.is_present("deterministic");
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -508,7 +523,8 @@ fn main() {
                            audit,
                            false, /* measure_latency */
                            coarse_checktables,
-                           transactions)
+                           transactions,
+                           is_transfer_deterministic)
                 })
                          .unwrap()
                  })
@@ -533,7 +549,8 @@ fn main() {
                        audit,
                        true, /* measure_latency */
                        coarse_checktables,
-                       transactions)
+                       transactions,
+                       is_transfer_deterministic)
             })
                      .unwrap()
              })
