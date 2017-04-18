@@ -24,10 +24,8 @@ fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType
         .get_mutator(backend.r.node_addr_for(name).unwrap());
 
     let i = records.len();
-    let barrier = backend.barrier.clone();
 
-    thread::spawn(move || {
-        barrier.wait();
+    let mut do_prepop = move || {
         let start = time::Instant::now();
 
         let i = records.len();
@@ -41,8 +39,19 @@ fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType
                  name,
                  dur,
                  i as f64 / dur);
-        barrier.wait();
-    });
+    };
+
+    if backend.parallel_prepop {
+        let barrier = backend.barrier.clone();
+
+        thread::spawn(move || {
+                          barrier.wait();
+                          do_prepop();
+                          barrier.wait();
+                      });
+    } else {
+        do_prepop();
+    }
 
     i
 }

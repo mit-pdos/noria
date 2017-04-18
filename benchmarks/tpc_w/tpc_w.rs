@@ -20,6 +20,7 @@ use distributary::{Blender, DataType, Recipe};
 pub struct Backend {
     r: Recipe,
     g: Blender,
+    parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
 }
@@ -32,7 +33,7 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn make(recipe_location: &str, transactions: bool) -> Box<Backend> {
+fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backend> {
     use std::io::Read;
     use std::fs::File;
 
@@ -68,8 +69,9 @@ fn make(recipe_location: &str, transactions: bool) -> Box<Backend> {
     Box::new(Backend {
                  r: recipe,
                  g: g,
+                 parallel_prepop: parallel,
                  prepop_counts: HashMap::new(),
-                 barrier: Arc::new(Barrier::new(9)),
+                 barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
              })
 }
 
@@ -183,6 +185,9 @@ fn main() {
                  .required(true)
                  .default_value("benchmarks/tpc_w/data")
                  .help("Location of the data files for TPC-W prepopulation."))
+        .arg(Arg::with_name("parallel_prepopulation")
+                 .long("parallel-prepopulation")
+                 .help("Prepopulate using parallel threads."))
         .arg(Arg::with_name("transactional")
                  .short("t")
                  .help("Use transactional writes."))
@@ -191,9 +196,10 @@ fn main() {
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
     let transactions = matches.is_present("transactional");
+    let parallel_prepop = matches.is_present("parallel_prepopulation");
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(&rloc, transactions);
+    let mut backend = make(&rloc, transactions, parallel_prepop);
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc);
@@ -225,8 +231,10 @@ fn main() {
         .prepop_counts
         .insert("order_line".into(), num_order_line);
 
-    backend.barrier.wait();
-    backend.barrier.wait();
+    if parallel_prepop {
+        backend.barrier.wait();
+        backend.barrier.wait();
+    }
 
     //println!("{}", backend.g);
 
