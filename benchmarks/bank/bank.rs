@@ -224,6 +224,8 @@ fn client(i: usize,
           -> Vec<f64> {
     let clock = RealTime::default();
 
+    println!("at client creation, measure_latency={}", measure_latency);
+
     let mut count = 0;
     let mut committed = 0;
     let mut aborted = 0;
@@ -283,9 +285,18 @@ fn client(i: usize,
                             successful_transfers.push((src, dst, 100));
                         }
                         if measure_latency {
-                            let mut token = get(src).unwrap().unwrap().1;
-                            while token.get_timestamp() < ts {
-                                token = get(src).unwrap().unwrap().1;
+                            if transactions {
+                                let mut token = get(src).unwrap().unwrap().1;
+                                while token.get_timestamp() < ts {
+                                    token = get(src).unwrap().unwrap().1;
+                                }
+                            } else {
+                                // spin until balance is different from the
+                                // start of the transaction
+                                let mut new_balance = get(src).unwrap().unwrap().0;
+                                while new_balance == balance {
+                                    new_balance = get(src).unwrap().unwrap().0;
+                                }
                             }
                             let transaction_end = clock.get_time();
                             read_latencies.push(write_start - transaction_start);
