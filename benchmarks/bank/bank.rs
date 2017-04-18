@@ -121,7 +121,7 @@ impl Bank {
                          .unwrap())
         } else {
             let g = self.blender.get_getter(self.balances).unwrap();
-            let b = Box::new(move |d: &DataType| g(d).map(|r| (r, Token::empty()))) as Box<_>;
+            let b = Box::new(move |d: &DataType| g(d, true).map(|r| (r, Token::empty()))) as Box<_>;
             Box::new(b)
         }
     }
