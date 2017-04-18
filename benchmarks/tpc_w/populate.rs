@@ -5,6 +5,7 @@ use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::str::FromStr;
 use std::time;
+use std::thread;
 
 use distributary::DataType;
 use super::Backend;
@@ -17,25 +18,33 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn populate(backend: &Backend, name: &str, mut records: Vec<Vec<DataType>>) -> usize {
+fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
     let mutator = backend
         .g
         .get_mutator(backend.r.node_addr_for(name).unwrap());
 
-    let start = time::Instant::now();
-    let mut i: i32 = 0;
-    for r in records.drain(..) {
-        mutator.put(r);
-        i += 1;
-    }
+    let i = records.len();
+    let barrier = backend.barrier.clone();
 
-    let dur = dur_to_fsec!(start.elapsed());
-    println!("Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-             i,
-             name,
-             dur,
-             f64::from(i) / dur);
-    i as usize
+    thread::spawn(move || {
+        barrier.wait();
+        let start = time::Instant::now();
+
+        let i = records.len();
+        for r in records.drain(..) {
+            mutator.put(r);
+        }
+
+        let dur = dur_to_fsec!(start.elapsed());
+        println!("Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+                 i,
+                 name,
+                 dur,
+                 i as f64 / dur);
+        barrier.wait();
+    });
+
+    i
 }
 
 fn parse_ymd_to_timestamp(s: &str) -> i64 {

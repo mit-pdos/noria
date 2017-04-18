@@ -13,12 +13,15 @@ use std::{thread, time};
 use std::collections::HashMap;
 use slog::DrainExt;
 
+use std::sync::{Arc, Barrier};
+
 use distributary::{Blender, DataType, Recipe};
 
 pub struct Backend {
     r: Recipe,
     g: Blender,
     prepop_counts: HashMap<String, usize>,
+    barrier: Arc<Barrier>,
 }
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -66,6 +69,7 @@ fn make(recipe_location: &str, transactions: bool) -> Box<Backend> {
                  r: recipe,
                  g: g,
                  prepop_counts: HashMap::new(),
+                 barrier: Arc::new(Barrier::new(9)),
              })
 }
 
@@ -220,6 +224,9 @@ fn main() {
     backend
         .prepop_counts
         .insert("order_line".into(), num_order_line);
+
+    backend.barrier.wait();
+    backend.barrier.wait();
 
     //println!("{}", backend.g);
 
