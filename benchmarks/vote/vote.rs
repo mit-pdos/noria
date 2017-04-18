@@ -501,10 +501,11 @@ impl MigrationHandle for Migrator {
             let mut mig = g.graph.start_migration();
 
             // add new "ratings" base table
+            let b = Base::default().with_key(vec![1]);
             let rating = if self.transactions {
-                mig.add_transactional_base("rating", &["user", "id", "stars"], Base::default())
+                mig.add_transactional_base("rating", &["user", "id", "stars"], b)
             } else {
-                mig.add_ingredient("rating", &["user", "id", "stars"], Base::default())
+                mig.add_ingredient("rating", &["user", "id", "stars"], b)
             };
 
             let total = if self.stupid {
