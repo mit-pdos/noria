@@ -248,7 +248,7 @@ fn client(i: usize,
             let dst;
             let src;
             if is_transfer_deterministic {
-                dst = num_requests % (naccounts - 1) + 1;
+                dst = num_requests % (naccounts - 2) + 2;
                 src = dst - 1;
                 num_requests += 1;
             } else {
