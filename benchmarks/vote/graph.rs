@@ -12,10 +12,12 @@ pub struct Graph {
     pub graph: Blender,
 }
 
-pub fn make(transactions: bool, durability: Option<BaseDurabilityLevel>) -> Graph {
+pub fn make(log: bool, transactions: bool, durability: Option<BaseDurabilityLevel>) -> Graph {
     // set up graph
     let mut g = Blender::new();
-    g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+    if log {
+        g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+    }
 
     let (article, vote, vc, end) = {
         // migrate
