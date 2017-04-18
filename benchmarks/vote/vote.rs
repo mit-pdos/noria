@@ -512,11 +512,11 @@ impl MigrationHandle for Migrator {
                 let upgrade =
                     mig.add_ingredient("upvote",
                                        &["id", "one"],
-                                       Project::new(vote, &[0], Some(vec![1.into()])));
+                                       Project::new(vote, &[1], Some(vec![1.into()])));
 
                 // take a union of votes and ratings
                 let mut emits = HashMap::new();
-                emits.insert(rating, vec![0, 2]);
+                emits.insert(rating, vec![1, 2]);
                 emits.insert(upgrade, vec![0, 1]);
                 let u = Union::new(emits);
                 let both = mig.add_ingredient("both", &["id", "value"], u);
