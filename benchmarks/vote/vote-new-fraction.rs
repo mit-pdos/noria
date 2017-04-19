@@ -19,8 +19,8 @@ mod graph;
 #[allow(dead_code)]
 mod common;
 
-const READ_RATE: u64 = 1_500_000;
-const WRITE_RATE: u64 = 150_000;
+const READ_RATE: u64 = 100_000;
+const WRITE_RATE: u64 = 200_000;
 
 use zipf::ZipfDistribution;
 
