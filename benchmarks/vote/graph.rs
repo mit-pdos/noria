@@ -111,12 +111,14 @@ impl Graph {
             mig.add_ingredient("rating", &["user", "id", "stars"], b)
         };
 
+        let taildomain = mig.add_domain();
         let total = if stupid {
             // project on 1 to votes
             let upgrade =
                 mig.add_ingredient("upvote",
                                    &["id", "one"],
                                    Project::new(vote, &[1], Some(vec![1.into()])));
+            mig.assign_domain(upgrade, taildomain);
 
             // take a union of votes and ratings
             let mut emits = HashMap::new();
@@ -124,12 +126,7 @@ impl Graph {
             emits.insert(upgrade, vec![0, 1]);
             let u = Union::new(emits);
             let both = mig.add_ingredient("both", &["id", "value"], u);
-
-            // we want all these to be in the same domain
-            let domain = mig.add_domain();
-            mig.assign_domain(rating, domain);
-            mig.assign_domain(upgrade, domain);
-            mig.assign_domain(both, domain);
+            mig.assign_domain(both, taildomain);
 
             // add sum of combined ratings
             mig.add_ingredient("total",
@@ -148,12 +145,15 @@ impl Graph {
             let u = Union::new(emits);
             let both = mig.add_ingredient("both", &["id", "value"], u);
 
-            // we want ratings, rsum, and the union to be in the same domain,
-            // because only rsum is really costly
+            // we want ratings and rsum to be in the same domain, because only rsum is really
+            // costly
             let domain = mig.add_domain();
             mig.assign_domain(rating, domain);
             mig.assign_domain(rs, domain);
-            mig.assign_domain(both, domain);
+
+            // the union should be in the tail domain, so that ratings and votes are treated
+            // equally
+            mig.assign_domain(both, taildomain);
 
             // sum them by article id
             mig.add_ingredient("total",
@@ -169,9 +169,8 @@ impl Graph {
 
         // and then we want the total sum and the join in the same domain,
         // to avoid duplicating the total state
-        let domain = mig.add_domain();
-        mig.assign_domain(total, domain);
-        mig.assign_domain(newend, domain);
+        mig.assign_domain(total, taildomain);
+        mig.assign_domain(newend, taildomain);
 
         // start processing
         mig.commit();
