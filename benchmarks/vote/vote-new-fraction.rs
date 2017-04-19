@@ -261,7 +261,7 @@ fn main() {
                          hits as f64 / count as f64);
                 hits = 0;
             }
-            thread::yield_now();
+            thread::sleep(time::Duration::new(0, 10_000));
         }
     });
 
