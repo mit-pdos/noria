@@ -23,7 +23,6 @@ use rand::Rng;
 
 use timekeeper::{Source, RealTime};
 
-type TxPut = Box<Fn(Vec<DataType>, Token) -> Result<i64, ()> + Send + 'static>;
 #[allow(dead_code)]
 type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send>;
 
@@ -42,12 +41,12 @@ EXAMPLES:
 
 pub struct Bank {
     blender: Blender,
-    transfers: Vec<Mutator>,
+    transfers: distributary::NodeAddress,
     balances: distributary::NodeAddress,
     transactions: bool,
 }
 
-pub fn setup(num_putters: usize, transactions: bool, durable: bool) -> Box<Bank> {
+pub fn setup(transactions: bool, durable: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -101,10 +100,6 @@ pub fn setup(num_putters: usize, transactions: bool, durable: bool) -> Box<Bank>
         mig.commit();
     };
 
-    let transfers = (0..num_putters)
-        .into_iter()
-        .map(|_| g.get_mutator(transfers))
-        .collect();
     Box::new(Bank {
                  blender: g,
                  transfers: transfers,
@@ -125,19 +120,6 @@ impl Bank {
             Box::new(b)
         }
     }
-    fn putter(&mut self) -> Box<Putter> {
-        let m = self.transfers.pop().unwrap();
-        let p: TxPut = if self.transactions {
-            Box::new(move |u: Vec<DataType>, t: Token| m.transactional_put(u, t))
-        } else {
-            Box::new(move |u: Vec<DataType>, _: Token| {
-                         m.put(u);
-                         Ok(0)
-                     })
-        };
-
-        Box::new(p)
-    }
     pub fn migrate(&mut self) {
         let mut mig = self.blender.start_migration();
         let identity =
@@ -146,18 +128,6 @@ impl Bank {
                                distributary::Identity::new(self.balances));
         mig.maintain(identity, 0);
         mig.commit();
-    }
-}
-
-pub trait Putter: Send {
-    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> Result<i64, ()> + 'a>;
-}
-
-impl Putter for TxPut {
-    fn transfer<'a>(&'a mut self) -> Box<FnMut(i64, i64, i64, Token) -> Result<i64, ()> + 'a> {
-        Box::new(move |src, dst, amount, token| {
-                     self(vec![src.into(), dst.into(), amount.into()], token.into())
-                 })
     }
 }
 
@@ -185,23 +155,20 @@ impl Getter for TxGet {
     }
 }
 
-fn populate(naccounts: i64, transfers_put: &mut Box<Putter>, transactions: bool) {
+fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
     println!("Connected. Setting up {} accounts.", naccounts);
     {
-        // let accounts_put = bank.accounts.as_ref().unwrap();
-        let mut money_put = transfers_put.transfer();
         for i in 0..naccounts {
-            // accounts_put(vec![DataType::Number(i as i64), format!("user {}", i).into()]);
-            money_put(0, i, 1000, Token::empty()).unwrap();
-            money_put(i, 0, 1, Token::empty()).unwrap();
+            mutator.put(vec![0.into(), i.into(), 1000.into()]);
+            mutator.put(vec![i.into(), 0.into(), 1.into()]);
         }
 
         if !transactions {
             // Insert a bunch of empty transfers to make sure any buffers are flushed
             for _ in 0..1024 {
-                money_put(0, 0, 0, Token::empty()).unwrap();
+                mutator.put(vec![0.into(), 0.into(), 0.into()]);
             }
             thread::sleep(time::Duration::new(0, 50000000));
         }
@@ -211,7 +178,7 @@ fn populate(naccounts: i64, transfers_put: &mut Box<Putter>, transactions: bool)
 }
 
 fn client(i: usize,
-          mut transfers_put: Box<Putter>,
+          mutator: Mutator,
           balances_get: Box<Getter>,
           naccounts: i64,
           start: time::Instant,
@@ -241,7 +208,6 @@ fn client(i: usize,
 
     {
         let mut get = balances_get.get();
-        let mut put = transfers_put.transfer();
 
         let mut num_requests = 1;
         while start.elapsed() < runtime {
@@ -281,7 +247,13 @@ fn client(i: usize,
                 }
 
                 let write_start = clock.get_time();
-                let res = put(src, dst, 100, token);
+                let res = if transactions {
+                    mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
+                                              token.into())
+                } else {
+                    mutator.put(vec![src.into(), dst.into(), 100.into()]);
+                    Ok(0)
+                };
                 let write_end = clock.get_time();
 
                 match res {
@@ -487,15 +459,15 @@ fn main() {
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
-        setup(nthreads + 2, transactions, durable)
+        setup(transactions, durable)
     } else {
-        setup(nthreads + 1, transactions, durable)
+        setup(transactions, durable)
     };
 
 
     {
-        let mut transfers_put = bank.putter();
-        populate(naccounts, &mut transfers_put, transactions);
+        let mutator = bank.blender.get_mutator(bank.transfers);
+        populate(naccounts, mutator, transactions);
     }
 
     // let system settle
@@ -507,14 +479,14 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                     let transfers_put = bank.putter();
+                     let mutator = bank.blender.get_mutator(bank.transfers);
                      let balances_get: Box<Getter> = bank.getter();
 
                      thread::Builder::new()
                          .name(format!("bank{}", i))
                          .spawn(move || -> Vec<f64> {
                     client(i,
-                           transfers_put,
+                           mutator,
                            balances_get,
                            naccounts,
                            start,
@@ -533,14 +505,14 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-                 let transfers_put = bank.putter();
+                 let mutator = bank.blender.get_mutator(bank.transfers);
                  let balances_get: Box<Getter> = bank.getter();
 
                  thread::Builder::new()
                      .name(format!("bank{}", nthreads))
                      .spawn(move || -> Vec<f64> {
                 client(nthreads,
-                       transfers_put,
+                       mutator,
                        balances_get,
                        naccounts,
                        start,
