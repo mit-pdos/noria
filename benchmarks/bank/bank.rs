@@ -177,7 +177,7 @@ fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
     println!("Done with account creation");
 }
 
-fn client(i: usize,
+fn client(_i: usize,
           mut mutator: Mutator,
           balances_get: Box<Getter>,
           naccounts: i64,
@@ -200,7 +200,6 @@ fn client(i: usize,
     let mut read_latencies: Vec<u64> = Vec::new();
     let mut write_latencies = Vec::new();
     let mut settle_latencies = Vec::new();
-    let mut write_start_to_txn_end_latencies = Vec::new();
 
     let mut t_rng = rand::thread_rng();
 
@@ -225,23 +224,11 @@ fn client(i: usize,
 
             let transaction_start = clock.get_time();
             let (balance, mut token) = get(src).unwrap().unwrap();
-            if verbose {
-                println!("t{} read {}: {} @ {:#?} (for {})",
-                         i,
-                         src,
-                         balance,
-                         token,
-                         dst);
-            }
 
             assert!(balance >= 0 || !transactions,
                     format!("{} balance is {}", src, balance));
 
             if balance >= 100 {
-                if verbose {
-                    println!("trying {} -> {} of {}", src, dst, 100);
-                }
-
                 if coarse {
                     token.make_coarse();
                 }
@@ -265,47 +252,35 @@ fn client(i: usize,
                 mutator.stop_tracing();
 
                 match res {
-                    Ok(ts) => {
-                        if verbose {
-                            println!("commit @ {}", ts);
-                        }
+                    Ok(_) => {
                         if audit {
                             successful_transfers.push((src, dst, 100));
                         }
+                        // Skip the first sample since it is frequently an outlier
+                        let mut transaction_end = None;
                         if measure_latency && count > 0 {
-                            let tracer = tracer.unwrap();
-                            for event in tracer.into_iter() {
-                                use distributary::PacketEvent::*;
-                                match event {
-                                    ExitInputChannel(i) |
-                                    Handle(i) |
-                                    Process(i) |
-                                    ReachedReader(i) => {
-                                        let dt = dur_to_ns!(i.duration_since(last_instant)) as f64;
-                                        println!("{:.3} μs: {:?}", dt * 0.001, event);
-                                        last_instant = i;
-                                    }
+                            for (instant, event) in tracer.unwrap() {
+                                if verbose {
+                                    let dt = dur_to_ns!(instant.duration_since(last_instant)) as
+                                             f64;
+                                    println!("{:.3} μs: {:?}", dt * 0.001, event);
+                                    last_instant = instant;
+                                }
+                                if let distributary::PacketEvent::ReachedReader = event {
+                                    transaction_end = Some(clock.get_time());
                                 }
                             }
-                            let transaction_end = clock.get_time();
-                            let dt = dur_to_ns!(last_instant.elapsed()) as f64;
-                            println!("{:.3} μs: Channel closed", dt * 0.001);
+
                             read_latencies.push(write_start - transaction_start);
                             write_latencies.push(write_end - write_start);
-                            settle_latencies.push(transaction_end - write_end);
-                            write_start_to_txn_end_latencies.push(transaction_end - write_start);
+                            settle_latencies.push(transaction_end.unwrap() - write_end);
                         }
                         if measure_latency {
                             thread::sleep(time::Duration::new(0, 1_000_000_000));
                         }
                         committed += 1;
                     }
-                    Err(_) => {
-                        if verbose {
-                            println!("abort");
-                        }
-                        aborted += 1
-                    }
+                    Err(_) => aborted += 1,
                 }
 
                 count += 1;
@@ -361,16 +336,17 @@ fn client(i: usize,
         let rl: u64 = read_latencies.iter().sum();
         let wl: u64 = write_latencies.iter().sum();
         let sl: u64 = settle_latencies.iter().sum();
-        let wsl: u64 = write_start_to_txn_end_latencies.iter().sum();
 
         let n = write_latencies.len() as f64;
         println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
         println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
         println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-        println!("write + settle latency: {:.3} μs", wsl as f64 / n * 0.001);
+        println!("write + settle latency: {:.3} μs",
+                 (wl + sl) as f64 / n * 0.001);
 
         let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
-        for sample_nanos in write_start_to_txn_end_latencies {
+        for i in 0..write_latencies.len() {
+            let sample_nanos = write_latencies[i] + settle_latencies[i];
             let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
             latencies_hist.record(sample_micros).unwrap();
         }
