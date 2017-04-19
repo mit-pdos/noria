@@ -201,8 +201,9 @@ fn main() {
     // we now need to wait for migrate_after
     // instead, we spend the interrim generating random numbers
     println!("Preparing migration while running");
-    let w_random = randomness(dist, narticles, WRITE_RATE * runtime.as_secs());
-    let r_random = randomness(dist, narticles, READ_RATE * runtime.as_secs());
+    let post_migration_time = (runtime - migrate_after).as_secs();
+    let w_random = randomness(dist, narticles, WRITE_RATE * post_migration_time);
+    let r_random = randomness(dist, narticles, READ_RATE * post_migration_time);
     // then we wait
     if start.elapsed() > migrate_after {
         println!("Migration preparation overran by {}s -- starting immediately",
