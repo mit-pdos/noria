@@ -272,14 +272,15 @@ fn client(i: usize,
                         if audit {
                             successful_transfers.push((src, dst, 100));
                         }
-                        if measure_latency {
+                        if measure_latency && count > 0 {
                             let tracer = tracer.unwrap();
                             for event in tracer.into_iter() {
                                 use distributary::PacketEvent::*;
                                 match event {
                                     ExitInputChannel(i) |
                                     Handle(i) |
-                                    Process(i) => {
+                                    Process(i) |
+                                    ReachedReader(i) => {
                                         let dt = dur_to_ns!(i.duration_since(last_instant)) as f64;
                                         println!("{:.3} μs: {:?}", dt * 0.001, event);
                                         last_instant = i;
@@ -287,11 +288,14 @@ fn client(i: usize,
                                 }
                             }
                             let transaction_end = clock.get_time();
+                            let dt = dur_to_ns!(last_instant.elapsed()) as f64;
+                            println!("{:.3} μs: Channel closed", dt * 0.001);
                             read_latencies.push(write_start - transaction_start);
                             write_latencies.push(write_end - write_start);
                             settle_latencies.push(transaction_end - write_end);
                             write_start_to_txn_end_latencies.push(transaction_end - write_start);
-                            mutator.stop_tracing();
+                        }
+                        if measure_latency {
                             thread::sleep(time::Duration::new(0, 1_000_000_000));
                         }
                         committed += 1;
