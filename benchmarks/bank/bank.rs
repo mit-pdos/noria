@@ -178,7 +178,7 @@ fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
 }
 
 fn client(i: usize,
-          mutator: Mutator,
+          mut mutator: Mutator,
           balances_get: Box<Getter>,
           naccounts: i64,
           start: time::Instant,
@@ -246,6 +246,13 @@ fn client(i: usize,
                     token.make_coarse();
                 }
 
+                let tracer = if measure_latency {
+                    Some(mutator.start_tracing())
+                } else {
+                    None
+                };
+
+                let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
                     mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
@@ -255,6 +262,7 @@ fn client(i: usize,
                     Ok(0)
                 };
                 let write_end = clock.get_time();
+                mutator.stop_tracing();
 
                 match res {
                     Ok(ts) => {
@@ -265,17 +273,17 @@ fn client(i: usize,
                             successful_transfers.push((src, dst, 100));
                         }
                         if measure_latency {
-                            if transactions {
-                                let mut token = get(src).unwrap().unwrap().1;
-                                while token.get_timestamp() < ts {
-                                    token = get(src).unwrap().unwrap().1;
-                                }
-                            } else {
-                                // spin until balance is different from the
-                                // start of the transaction
-                                let mut new_balance = get(src).unwrap().unwrap().0;
-                                while new_balance == balance {
-                                    new_balance = get(src).unwrap().unwrap().0;
+                            let tracer = tracer.unwrap();
+                            for event in tracer.into_iter() {
+                                use distributary::PacketEvent::*;
+                                match event {
+                                    ExitInputChannel(i) |
+                                    Handle(i) |
+                                    Process(i) => {
+                                        let dt = dur_to_ns!(i.duration_since(last_instant)) as f64;
+                                        println!("{:.3} μs: {:?}", dt * 0.001, event);
+                                        last_instant = i;
+                                    }
                                 }
                             }
                             let transaction_end = clock.get_time();
@@ -283,6 +291,8 @@ fn client(i: usize,
                             write_latencies.push(write_end - write_start);
                             settle_latencies.push(transaction_end - write_end);
                             write_start_to_txn_end_latencies.push(transaction_end - write_start);
+                            mutator.stop_tracing();
+                            thread::sleep(time::Duration::new(0, 1_000_000_000));
                         }
                         committed += 1;
                     }
