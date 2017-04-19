@@ -177,8 +177,8 @@ fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
     println!("Done with account creation");
 }
 
-fn client(i: usize,
-          mutator: Mutator,
+fn client(_i: usize,
+          mut mutator: Mutator,
           balances_get: Box<Getter>,
           naccounts: i64,
           start: time::Instant,
@@ -200,7 +200,6 @@ fn client(i: usize,
     let mut read_latencies: Vec<u64> = Vec::new();
     let mut write_latencies = Vec::new();
     let mut settle_latencies = Vec::new();
-    let mut write_start_to_txn_end_latencies = Vec::new();
 
     let mut t_rng = rand::thread_rng();
 
@@ -225,27 +224,22 @@ fn client(i: usize,
 
             let transaction_start = clock.get_time();
             let (balance, mut token) = get(src).unwrap().unwrap();
-            if verbose {
-                println!("t{} read {}: {} @ {:#?} (for {})",
-                         i,
-                         src,
-                         balance,
-                         token,
-                         dst);
-            }
 
             assert!(balance >= 0 || !transactions,
                     format!("{} balance is {}", src, balance));
 
             if balance >= 100 {
-                if verbose {
-                    println!("trying {} -> {} of {}", src, dst, 100);
-                }
-
                 if coarse {
                     token.make_coarse();
                 }
 
+                let tracer = if measure_latency {
+                    Some(mutator.start_tracing())
+                } else {
+                    None
+                };
+
+                let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
                     mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
@@ -255,43 +249,38 @@ fn client(i: usize,
                     Ok(0)
                 };
                 let write_end = clock.get_time();
+                mutator.stop_tracing();
 
                 match res {
-                    Ok(ts) => {
-                        if verbose {
-                            println!("commit @ {}", ts);
-                        }
+                    Ok(_) => {
                         if audit {
                             successful_transfers.push((src, dst, 100));
                         }
-                        if measure_latency {
-                            if transactions {
-                                let mut token = get(src).unwrap().unwrap().1;
-                                while token.get_timestamp() < ts {
-                                    token = get(src).unwrap().unwrap().1;
+                        // Skip the first sample since it is frequently an outlier
+                        let mut transaction_end = None;
+                        if measure_latency && count > 0 {
+                            for (instant, event) in tracer.unwrap() {
+                                if verbose {
+                                    let dt = dur_to_ns!(instant.duration_since(last_instant)) as
+                                             f64;
+                                    println!("{:.3} μs: {:?}", dt * 0.001, event);
+                                    last_instant = instant;
                                 }
-                            } else {
-                                // spin until balance is different from the
-                                // start of the transaction
-                                let mut new_balance = get(src).unwrap().unwrap().0;
-                                while new_balance == balance {
-                                    new_balance = get(src).unwrap().unwrap().0;
+                                if let distributary::PacketEvent::ReachedReader = event {
+                                    transaction_end = Some(clock.get_time());
                                 }
                             }
-                            let transaction_end = clock.get_time();
+
                             read_latencies.push(write_start - transaction_start);
                             write_latencies.push(write_end - write_start);
-                            settle_latencies.push(transaction_end - write_end);
-                            write_start_to_txn_end_latencies.push(transaction_end - write_start);
+                            settle_latencies.push(transaction_end.unwrap() - write_end);
+                        }
+                        if measure_latency {
+                            thread::sleep(time::Duration::new(0, 1_000_000_000));
                         }
                         committed += 1;
                     }
-                    Err(_) => {
-                        if verbose {
-                            println!("abort");
-                        }
-                        aborted += 1
-                    }
+                    Err(_) => aborted += 1,
                 }
 
                 count += 1;
@@ -347,16 +336,17 @@ fn client(i: usize,
         let rl: u64 = read_latencies.iter().sum();
         let wl: u64 = write_latencies.iter().sum();
         let sl: u64 = settle_latencies.iter().sum();
-        let wsl: u64 = write_start_to_txn_end_latencies.iter().sum();
 
         let n = write_latencies.len() as f64;
         println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
         println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
         println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-        println!("write + settle latency: {:.3} μs", wsl as f64 / n * 0.001);
+        println!("write + settle latency: {:.3} μs",
+                 (wl + sl) as f64 / n * 0.001);
 
         let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
-        for sample_nanos in write_start_to_txn_end_latencies {
+        for i in 0..write_latencies.len() {
+            let sample_nanos = write_latencies[i] + settle_latencies[i];
             let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
             latencies_hist.record(sample_micros).unwrap();
         }
