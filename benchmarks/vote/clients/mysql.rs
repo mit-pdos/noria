@@ -35,7 +35,7 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
         drop(conn);
 
         // create tables with indices
-        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
+        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(16), votes bigint, \
                         PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();

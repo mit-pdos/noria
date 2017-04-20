@@ -46,7 +46,7 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
         drop(conn);
 
         // create tables with indices
-        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(255), votes bigint, \
+        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(16), \
                         PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
@@ -95,13 +95,13 @@ impl Writer for RW {
             let args: Vec<_> = articles
                 .iter()
                 .flat_map(|&(ref aid, ref title, _, _)| {
-                              vals.push("(?, ?, 0)");
+                              vals.push("(?, ?)");
                               vec![aid as &_, title as &_]
                           })
                 .collect();
             let vals = vals.join(", ");
             self.conn
-                .prep_exec(format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
+                .prep_exec(format!("INSERT INTO art (id, title) VALUES {}", vals),
                            &args[..])
                 .unwrap();
         }
