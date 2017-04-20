@@ -414,9 +414,10 @@ fn main() {
                  .long("nontransactional")
                  .takes_value(false)
                  .help("Use non-transactional writes"))
-        .arg(Arg::with_name("durable")
+        .arg(Arg::with_name("durability")
                  .long("durability")
                  .takes_value(true)
+                 .possible_values(&["buffered", "immediate"])
                  .help("Durability level used for Base nodes"))
         .arg(Arg::with_name("deterministic")
                  .long("deterministic")
@@ -437,22 +438,22 @@ fn main() {
     let measure_latency = args.is_present("latency");
     let coarse_checktables = args.is_present("coarse");
     let transactions = !args.is_present("nontransactional");
-    let durability = args.value_of("durability");
     let is_transfer_deterministic = args.is_present("deterministic");
+
+    let durability_level;
+    match args.value_of("durability") {
+        Some("buffered") => {
+            durability_level = Some(BaseDurabilityLevel::Buffered)
+        },
+        Some("immediate") => {
+            durability_level = Some(BaseDurabilityLevel::SyncImmediately)
+        },
+        None | Some(&_) => durability_level = None
+    }
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
     }
-
-    let durability_level;
-    if durability == Some("buffered") {
-        durability_level = Some(BaseDurabilityLevel::Buffered);
-    } else if durability == Some("immediate") {
-        durability_level = Some(BaseDurabilityLevel::SyncImmediately);
-    } else {
-        durability_level = None
-    }
-
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
