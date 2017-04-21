@@ -46,7 +46,7 @@ pub struct Bank {
     transactions: bool,
 }
 
-pub fn setup(transactions: bool, durable: bool) -> Box<Bank> {
+pub fn setup(transactions: bool, durability_level: Option<BaseDurabilityLevel>) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -59,12 +59,10 @@ pub fn setup(transactions: bool, durable: bool) -> Box<Bank> {
         let mut mig = g.start_migration();
 
         // add transfers base table
-        let base = if !durable {
+        let base = if durability_level.is_none() {
             Base::default()
-        } else if transactions {
-            Base::default().with_durability(BaseDurabilityLevel::SyncImmediately)
         } else {
-            Base::default().with_durability(BaseDurabilityLevel::Buffered)
+            Base::default().with_durability(durability_level.unwrap())
         };
 
         transfers = if transactions {
@@ -416,10 +414,11 @@ fn main() {
                  .long("nontransactional")
                  .takes_value(false)
                  .help("Use non-transactional writes"))
-        .arg(Arg::with_name("durable")
-                 .long("durable")
-                 .takes_value(false)
-                 .help("Use durable writes"))
+        .arg(Arg::with_name("durability")
+                 .long("durability")
+                 .takes_value(true)
+                 .possible_values(&["buffered", "immediate"])
+                 .help("Durability level used for Base nodes"))
         .arg(Arg::with_name("deterministic")
                  .long("deterministic")
                  .takes_value(false)
@@ -439,19 +438,28 @@ fn main() {
     let measure_latency = args.is_present("latency");
     let coarse_checktables = args.is_present("coarse");
     let transactions = !args.is_present("nontransactional");
-    let durable = args.is_present("durable");
     let is_transfer_deterministic = args.is_present("deterministic");
+
+    let durability_level;
+    match args.value_of("durability") {
+        Some("buffered") => {
+            durability_level = Some(BaseDurabilityLevel::Buffered)
+        },
+        Some("immediate") => {
+            durability_level = Some(BaseDurabilityLevel::SyncImmediately)
+        },
+        None | Some(&_) => durability_level = None
+    }
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
     }
-
     // setup db
     println!("Attempting to set up bank");
     let mut bank = if measure_latency {
-        setup(transactions, durable)
+        setup(transactions, durability_level)
     } else {
-        setup(transactions, durable)
+        setup(transactions, durability_level)
     };
 
 
