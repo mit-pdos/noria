@@ -30,7 +30,7 @@ echo "Generating countries..."
 ./tpcw -t country > ../data/countries.tsv
 echo "Generating authors..."
 # authors = 0.25 * ITEM, and for weird reasons must be at least 12
-SF_ITEMS_ROUNDED=$(python -c "from math import ceil; print max(12, int(ceil(${SF_ITEMS}*0.25)))")
+SF_ITEMS_ROUNDED=$(python -c "from math import ceil; print(max(12, int(ceil(${SF_ITEMS}*0.25))))")
 ./tpcw -t author -i ${SF_ITEMS_ROUNDED} > ../data/authors.tsv
 echo "Generating customers..."
 ./tpcw -t customer -c ${CUST} > ../data/customers.tsv
