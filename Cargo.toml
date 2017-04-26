@@ -17,7 +17,7 @@ binaries = ["default"]
 [dependencies]
 chrono = "0.3.0"
 itertools = "0.5"
-petgraph = "0.4"
+petgraph = { git = "https://github.com/fintelia/petgraph.git", rev = "50c99b8f9f58a5bd29ac30656c80a8baf33409fc" }
 regex = "0.1"
 fnv = "1.0"
 serde = "0.9"
@@ -32,6 +32,9 @@ vec_map = "0.7.0"
 
 spmc = "0.2.1"
 nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "e57d50300e104fee4ed5b1650563782bda875a33" }
+
+mio = "0.6"
+byteorder = "1.0"
 
 # for benchmarks
 # cli
@@ -95,6 +98,10 @@ path = "src/lib.rs"
 [[example]]
 name = "basic-recipe"
 required-features = ["binaries"]
+
+[[bin]]
+name = "daemon"
+path = "src/daemon/daemon.rs"
 
 [[bin]]
 name = "web"

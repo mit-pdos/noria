@@ -20,6 +20,7 @@ macro_rules! broadcast {
     }}
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct NodeDescriptor {
     pub index: NodeIndex,
     pub inner: Node,

@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 use std::ops::{Deref, DerefMut};
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use checktable;
 
 use flow::domain;
@@ -96,6 +98,7 @@ impl Default for Reader {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) enum NodeHandle {
     Owned(Type),
     Taken(Type),
@@ -206,6 +209,50 @@ impl<I> From<I> for Type
     }
 }
 
+/// Variant of Type used for serialization
+#[derive(Serialize, Deserialize)]
+enum TypeDef {
+    Ingress,
+    Internal,
+    Egress,
+    Reader,
+    Hook,
+    Source,
+}
+
+impl Serialize for Type {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let def = match *self {
+            Type::Ingress => TypeDef::Ingress,
+            Type::Internal(_) => TypeDef::Internal,
+            Type::Egress {..} => TypeDef::Egress,
+            Type::Reader(..) => TypeDef::Reader,
+            Type::Hook(_) => TypeDef::Hook,
+            Type::Source => TypeDef::Source,
+        };
+
+        def.serialize(serializer)
+    }
+}
+
+impl Deserialize for Type {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer
+    {
+        TypeDef::deserialize(deserializer).map(|def|match def {
+            TypeDef::Ingress => Type::Ingress,
+            TypeDef::Internal => unimplemented!(),
+            TypeDef::Egress => unimplemented!(),
+            TypeDef::Reader => unimplemented!(),
+            TypeDef::Hook => unimplemented!(),
+            TypeDef::Source => Type::Source,
+        })
+    }
+}
+
+
+#[derive(Serialize, Deserialize)]
 pub struct Node {
     name: String,
     domain: Option<domain::Index>,
