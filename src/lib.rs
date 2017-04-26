@@ -340,6 +340,8 @@ extern crate nom_sql;
 extern crate timekeeper;
 
 extern crate memcached;
+extern crate mio;
+extern crate byteorder;
 
 #[cfg(feature="web")]
 extern crate rustc_serialize;
@@ -349,13 +351,13 @@ extern crate rustc_serialize;
 extern crate rustful;
 
 #[macro_use]
-#[cfg(feature="b_netsoup")]
+//#[cfg(feature="b_netsoup")]
 extern crate tarpc;
 #[cfg(feature="b_netsoup")]
 extern crate futures;
 #[cfg(feature="b_netsoup")]
 extern crate vec_map;
-#[cfg(feature="b_netsoup")]
+//#[cfg(feature="b_netsoup")]
 extern crate tokio_core;
 
 extern crate buf_redux;
@@ -366,6 +368,7 @@ extern crate time;
 
 mod backlog;
 mod checktable;
+mod daemon;
 mod flow;
 mod mir;
 mod ops;
@@ -373,6 +376,7 @@ mod recipe;
 mod sql;
 
 pub use checktable::{Token, TransactionResult};
+pub use daemon::WorkerDaemon;
 pub use flow::{Blender, Migration, Mutator};
 pub use flow::core::{NodeAddress, DataType, Datas};
 pub use flow::node::StreamUpdate;
