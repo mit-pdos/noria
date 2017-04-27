@@ -20,8 +20,8 @@ use checktable;
 
 service! {
     rpc start_domain(domain_index: domain::Index, nodes: DomainNodes);
-    // rpc recv_packet(domain_index: domain::Index, packet: Packet);
-    // rpc recv_input_packet(domain_index: domain::Index, packet: Packet);
+    rpc recv_packet(domain_index: domain::Index, packet: Packet);
+    rpc recv_input_packet(domain_index: domain::Index, packet: Packet);
 }
 
 struct DaemonServerInner {
@@ -67,24 +67,24 @@ impl FutureService for DaemonServer {
         Ok(())
     }
 
-    // type RecvPacketFut = Result<(), Never>;
-    // fn recv_packet(&self, domain_index: domain::Index, packet: Packet) -> Self::RecvPacketFut {
-    //     let mut inner = self.inner.lock().unwrap();
-    //     inner.domain_rxs[&domain_index].send(packet).unwrap();
-    //     Ok(())
-    // }
+    type RecvPacketFut = Result<(), Never>;
+    fn recv_packet(&self, domain_index: domain::Index, packet: Packet) -> Self::RecvPacketFut {
+        let mut inner = self.inner.lock().unwrap();
+        inner.domain_rxs[&domain_index].send(packet).unwrap();
+        Ok(())
+    }
 
-    // type RecvInputPacketFut = Result<(), Never>;
-    // fn recv_input_packet(&self,
-    //                      domain_index: domain::Index,
-    //                      packet: Packet)
-    //                      -> Self::RecvInputPacketFut {
-    //     let mut inner = self.inner.lock().unwrap();
-    //     inner.domain_input_rxs[&domain_index]
-    //         .send(packet)
-    //         .unwrap();
-    //     Ok(())
-    // }
+    type RecvInputPacketFut = Result<(), Never>;
+    fn recv_input_packet(&self,
+                         domain_index: domain::Index,
+                         packet: Packet)
+                         -> Self::RecvInputPacketFut {
+        let mut inner = self.inner.lock().unwrap();
+        inner.domain_input_rxs[&domain_index]
+            .send(packet)
+            .unwrap();
+        Ok(())
+    }
 }
 
 pub struct Daemon {
@@ -120,19 +120,19 @@ impl Daemon {
             .unwrap();
     }
 
-    // pub fn send_packet(&self, peer: &SocketAddr, domain: domain::Index, packet: Packet) {
-    //     self.peers[peer]
-    //         .recv_packet(domain, packet)
-    //         .wait()
-    //         .unwrap();
-    // }
+    pub fn send_packet(&self, peer: &SocketAddr, domain: domain::Index, packet: Packet) {
+        self.peers[peer]
+            .recv_packet(domain, packet)
+            .wait()
+            .unwrap();
+    }
 
-    // pub fn send_input_packet(&self, peer: &SocketAddr, domain: domain::Index, packet: Packet) {
-    //     self.peers[peer]
-    //         .recv_input_packet(domain, packet)
-    //         .wait()
-    //         .unwrap();
-    // }
+    pub fn send_input_packet(&self, peer: &SocketAddr, domain: domain::Index, packet: Packet) {
+        self.peers[peer]
+            .recv_input_packet(domain, packet)
+            .wait()
+            .unwrap();
+    }
 }
 
 /// A worker Daemon listens for incoming connections, and starts up domains as requested.
