@@ -4,7 +4,7 @@ extern crate clap;
 extern crate distributary;
 extern crate mio;
 
-use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::net::SocketAddr;
 
 use distributary::SoupletDaemon;
 
@@ -17,9 +17,13 @@ pub fn main() {
                  .long("port")
                  .default_value("1025")
                  .help("port to listen on"))
+        .arg(Arg::with_name("ip")
+                 .long("ip")
+                 .default_value("127.0.0.1")
+                 .help("port to listen on"))
         .get_matches();
 
-    let ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    let ip = args.value_of("ip").unwrap().parse().unwrap();
     let port = value_t_or_exit!(args, "port", u16);
     SoupletDaemon::start(SocketAddr::new(ip, port));
 }
