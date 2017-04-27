@@ -101,7 +101,7 @@ required-features = ["binaries"]
 
 [[bin]]
 name = "daemon"
-path = "src/daemon/daemon.rs"
+path = "src/souplet/daemon.rs"
 
 [[bin]]
 name = "web"

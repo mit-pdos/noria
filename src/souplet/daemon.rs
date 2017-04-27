@@ -6,7 +6,7 @@ extern crate mio;
 
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 
-use distributary::WorkerDaemon;
+use distributary::SoupletDaemon;
 
 pub fn main() {
     use clap::{Arg, App};
@@ -21,5 +21,5 @@ pub fn main() {
 
     let ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
     let port = value_t_or_exit!(args, "port", u16);
-    WorkerDaemon::start(SocketAddr::new(ip, port));
+    SoupletDaemon::start(SocketAddr::new(ip, port));
 }

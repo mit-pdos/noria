@@ -369,7 +369,7 @@ extern crate time;
 mod backlog;
 mod channel;
 mod checktable;
-mod daemon;
+mod souplet;
 mod flow;
 mod mir;
 mod ops;
@@ -377,7 +377,7 @@ mod recipe;
 mod sql;
 
 pub use checktable::{Token, TransactionResult};
-pub use daemon::WorkerDaemon;
+pub use souplet::SoupletDaemon;
 pub use flow::{Blender, Migration, Mutator};
 pub use flow::core::{NodeAddress, DataType, Datas};
 pub use flow::node::StreamUpdate;

@@ -24,19 +24,19 @@ service! {
     rpc recv_input_packet(domain_index: domain::Index, packet: Packet);
 }
 
-struct DaemonServerInner {
+struct SoupletServerInner {
     pub domain_rxs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
     pub domain_input_rxs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
 }
 
 #[derive(Clone)]
-struct DaemonServer {
-    inner: Arc<Mutex<DaemonServerInner>>,
+struct SoupletServer {
+    inner: Arc<Mutex<SoupletServerInner>>,
 }
 
-impl DaemonServer {
+impl SoupletServer {
     pub fn new() -> Self {
-        let inner = DaemonServerInner {
+        let inner = SoupletServerInner {
             domain_rxs: HashMap::new(),
             domain_input_rxs: HashMap::new(),
         };
@@ -45,7 +45,7 @@ impl DaemonServer {
     }
 }
 
-impl FutureService for DaemonServer {
+impl FutureService for SoupletServer {
     type StartDomainFut = Result<(), Never>;
     fn start_domain(&self,
                     domain_index: domain::Index,
@@ -87,15 +87,15 @@ impl FutureService for DaemonServer {
     }
 }
 
-pub struct Daemon {
+pub struct Souplet {
     reactor: reactor::Core,
     peers: HashMap<SocketAddr, FutureClient>,
 }
 
-impl Daemon {
+impl Souplet {
     pub fn new(addr: SocketAddr) -> Self {
         let reactor = reactor::Core::new().unwrap();
-        let (_handle, server) = DaemonServer::new()
+        let (_handle, server) = SoupletServer::new()
             .listen(addr, &reactor.handle(), server::Options::default())
             .unwrap();
         reactor.handle().spawn(server);
@@ -133,18 +133,19 @@ impl Daemon {
             .wait()
             .unwrap();
     }
+
+    pub fn listen(&mut self) {
+        loop {
+            self.reactor.turn(None)
+        }
+    }
 }
 
-/// A worker Daemon listens for incoming connections, and starts up domains as requested.
-pub struct WorkerDaemon {}
-
-impl WorkerDaemon {
+/// A `SoupletDaemon` listens for incoming connections, and starts up domains as requested.
+pub struct SoupletDaemon {}
+impl SoupletDaemon {
     /// Start a new WorkerDaemon instance.
     pub fn start(addr: SocketAddr) {
-        let _inner = Daemon::new(addr);
-        loop {
-            // I feel like we should be doing something here, but not sure what...
-            thread::sleep(Duration::from_millis(1000));
-        }
+        Souplet::new(addr).listen();
     }
 }
