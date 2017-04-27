@@ -153,7 +153,7 @@ impl Mutator {
         let m = payload::Packet::Transaction {
             link: payload::Link::new(self.src, self.addr),
             data: rs,
-            state: payload::TransactionState::Pending(t, send),
+            state: payload::TransactionState::Pending(t, send.into()),
             tracer: self.tracer.clone(),
         };
         self.tx.clone().send(m).unwrap();
@@ -233,9 +233,9 @@ impl Mutator {
     /// Attach a tracer to all packets sent until `stop_tracing` is called. The tracer will cause
     /// events to be sent to the returned Receiver indicating the progress of the packet through the
     /// graph.
-    pub fn start_tracing(&mut self) -> mpsc::Receiver<(time::Instant, prelude::PacketEvent)> {
+    pub fn start_tracing(&mut self) -> mpsc::Receiver<(payload::TimeInstant, prelude::PacketEvent)> {
         let (tx, rx) = mpsc::channel();
-        self.tracer = Some(tx);
+        self.tracer = Some(tx.into());
         rx
     }
 
@@ -482,7 +482,7 @@ impl Blender {
             .iter()
             .map(|(di, s)| {
                 let (tx, rx) = mpsc::sync_channel(1);
-                s.send(payload::Packet::GetStatistics(tx)).unwrap();
+                s.send(payload::Packet::GetStatistics(tx.into())).unwrap();
 
                 let (domain_stats, node_stats) = rx.recv().unwrap();
                 let node_map = node_stats
@@ -858,7 +858,7 @@ impl<'a> Migration<'a> {
         let reader = &self.mainline.ingredients[self.readers[n.as_global()]];
         self.mainline.txs[&reader.domain()].send(payload::Packet::AddStreamer{
             node: reader.addr().as_local().clone(),
-            new_streamer: tx,
+            new_streamer: tx.into(),
         }).unwrap();
 
         rx
@@ -1098,14 +1098,14 @@ impl<'a> Migration<'a> {
                             node: *n.addr().as_local(),
                             field: field,
                             default: default,
-                            ack: tx,
+                            ack: tx.into(),
                         }
                     }
                     ColumnChange::Drop(column) => {
                         payload::Packet::DropBaseColumn {
                             node: *n.addr().as_local(),
                             column: column,
-                            ack: tx,
+                            ack: tx.into(),
                         }
                     }
                 };

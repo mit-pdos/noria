@@ -17,6 +17,8 @@ use std::collections::{HashSet, HashMap};
 use std::sync::mpsc;
 use std::sync;
 
+use serde::{Serialize, Deserialize};
+
 use slog::Logger;
 
 const FILTER_SPECIFICITY: usize = 10;
@@ -32,7 +34,7 @@ macro_rules! dur_to_ns {
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 static TAG_GENERATOR: AtomicUsize = ATOMIC_USIZE_INIT;
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub struct Tag(u32);
 
 impl Tag {
@@ -385,7 +387,7 @@ pub fn initialize(log: &Logger,
                 .send(Packet::Ready {
                           node: *addr.as_local(),
                           index: index_on,
-                          ack: ack_tx,
+                          ack: ack_tx.into(),
                       })
                 .unwrap();
             match ack_rx.recv() {
@@ -745,7 +747,7 @@ pub fn reconstruct(log: &Logger,
                 path: locals,
                 done_tx: None,
                 trigger: TriggerEndpoint::None,
-                ack: wait_tx.clone(),
+                ack: wait_tx.clone().into(),
             };
             if i == 0 {
                 // first domain also gets to know source node
@@ -767,7 +769,7 @@ pub fn reconstruct(log: &Logger,
                         // otherwise, should know what how to trigger partial replay
                         let (tx, rx) = mpsc::channel();
                         txs[&segments[0].0]
-                            .send(Packet::RequestUnboundedTx(tx))
+                            .send(Packet::RequestUnboundedTx(tx.into()))
                             .unwrap();
                         let root_unbounded_tx = rx.recv().unwrap();
                         *trigger = TriggerEndpoint::End(root_unbounded_tx);
@@ -780,7 +782,7 @@ pub fn reconstruct(log: &Logger,
                     // last domain should report when it's done if it is to be fully replayed
                     if let Packet::SetupReplayPath { ref mut done_tx, .. } = setup {
                         assert!(main_done_tx.is_some());
-                        *done_tx = main_done_tx.take();
+                        *done_tx = main_done_tx.take().map(|s|s.into());
                     } else {
                         unreachable!();
                     }
@@ -813,7 +815,7 @@ pub fn reconstruct(log: &Logger,
                 .send(Packet::StartReplay {
                           tag: tag,
                           from: graph[segments[0].1[0].0].addr(),
-                          ack: wait_tx.clone(),
+                          ack: wait_tx.clone().into(),
                       })
                 .unwrap();
 
@@ -963,7 +965,7 @@ fn cost_fn<'a, T>(log: &'a Logger,
                 txs[&stateful.domain()]
                     .send(Packet::StateSizeProbe {
                               node: *stateful.addr().as_local(),
-                              ack: tx,
+                              ack: tx.into(),
                           })
                     .unwrap();
                 let mut size = rx.recv().expect("stateful parent should have state");

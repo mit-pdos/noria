@@ -367,6 +367,7 @@ extern crate snowflake;
 extern crate time;
 
 mod backlog;
+mod channel;
 mod checktable;
 mod daemon;
 mod flow;

@@ -22,7 +22,7 @@ use flow::hook;
 use backlog;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum StreamUpdate {
     /// Indicates the addition of a new row
     AddRow(sync::Arc<Vec<DataType>>),

@@ -11,9 +11,13 @@ use std::fmt;
 use std::sync::mpsc;
 use std::collections::HashMap;
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use std::time;
 
-#[derive(Clone)]
+use channel;
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Link {
     pub src: NodeAddress,
     pub dst: NodeAddress,
@@ -30,21 +34,56 @@ impl fmt::Debug for Link {
         write!(f, "{:?} -> {:?}", self.src, self.dst)
     }
 }
+
+#[derive(Serialize, Deserialize)]
 pub enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
-    End(mpsc::Sender<Packet>),
+    End(channel::Sender<Packet>),
     Local(Vec<usize>),
 }
 
+#[derive(Serialize, Deserialize)]
+enum InitialStateDef {
+    PartialLocal(usize),
+    IndexedLocal(Vec<Vec<usize>>),
+    PartialGlobal,
+    Global,
+}
 pub enum InitialState {
     PartialLocal(usize),
     IndexedLocal(Vec<Vec<usize>>),
     PartialGlobal(backlog::WriteHandle, backlog::ReadHandle),
     Global,
 }
+impl Serialize for InitialState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let def = match *self {
+            InitialState::PartialLocal(u) => InitialStateDef::PartialLocal(u),
+            InitialState::IndexedLocal(ref v) => InitialStateDef::IndexedLocal(v.clone()),
+            InitialState::PartialGlobal(..) => unimplemented!(),
+            InitialState::Global => InitialStateDef::Global,
+        };
+        def.serialize(serializer)
+    }
+}
+impl Deserialize for InitialState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let def = try!(InitialStateDef::deserialize(deserializer));
+        match def {
+            InitialStateDef::PartialLocal(u) => Ok(InitialState::PartialLocal(u)),
+            InitialStateDef::IndexedLocal(v) => Ok(InitialState::IndexedLocal(v)),
+            InitialStateDef::PartialGlobal => unimplemented!(),
+            InitialStateDef::Global => Ok(InitialState::Global),
+        }
+    }
+}
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum ReplayPieceContext {
     Partial {
         for_key: Vec<DataType>,
@@ -53,21 +92,21 @@ pub enum ReplayPieceContext {
     Regular { last: bool },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum TransactionState {
     Committed(i64, petgraph::graph::NodeIndex, Option<HashMap<domain::Index, i64>>),
-    Pending(checktable::Token, mpsc::Sender<Result<i64, ()>>),
+    Pending(checktable::Token, channel::Sender<Result<i64, ()>>),
     WillCommit,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ReplayTransactionState {
     pub ts: i64,
     pub prevs: Option<HashMap<domain::Index, i64>>,
 }
 
 /// Different events that can occur as a packet is being processed.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PacketEvent {
     /// The packet has been pulled off the input channel.
     ExitInputChannel,
@@ -79,8 +118,10 @@ pub enum PacketEvent {
     ReachedReader,
 }
 
-pub type Tracer = Option<mpsc::Sender<(time::Instant, PacketEvent)>>;
+pub type TimeInstant = u64;
+pub type Tracer = Option<channel::Sender<(TimeInstant, PacketEvent)>>;
 
+#[derive(Serialize, Deserialize)]
 pub enum Packet {
     // Data messages
     //
@@ -129,27 +170,27 @@ pub enum Packet {
         node: LocalNodeIndex,
         field: String,
         default: DataType,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Drops an existing column from a `Base` node.
     DropBaseColumn {
         node: LocalNodeIndex,
         column: usize,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Update Egress node.
     UpdateEgress {
         node: LocalNodeIndex,
-        new_tx: Option<(NodeAddress, NodeAddress, mpsc::SyncSender<Packet>)>,
+        new_tx: Option<(NodeAddress, NodeAddress, channel::SyncSender<Packet>)>,
         new_tag: Option<(Tag, NodeAddress)>,
     },
 
     /// Add a streamer to an existing reader node.
     AddStreamer {
         node: LocalNodeIndex,
-        new_streamer: mpsc::Sender<Vec<node::StreamUpdate>>,
+        new_streamer: channel::Sender<Vec<node::StreamUpdate>>,
     },
 
     /// Request a handle to an unbounded channel to this domain.
@@ -157,7 +198,7 @@ pub enum Packet {
     /// We need these channels to send replay requests, as using the bounded channels could easily
     /// result in a deadlock. Since the unbounded channel is only used for requests as a result of
     /// processing, it is essentially self-clocking.
-    RequestUnboundedTx(mpsc::Sender<mpsc::Sender<Packet>>),
+    RequestUnboundedTx(channel::Sender<channel::Sender<Packet>>),
 
     /// Set up a fresh, empty state for a node, indexed by a particular column.
     ///
@@ -170,7 +211,7 @@ pub enum Packet {
     /// Probe for the number of records in the given node's state
     StateSizeProbe {
         node: LocalNodeIndex,
-        ack: mpsc::SyncSender<usize>,
+        ack: channel::SyncSender<usize>,
     },
 
     /// Inform domain about a new replay path.
@@ -178,9 +219,9 @@ pub enum Packet {
         tag: Tag,
         source: Option<NodeAddress>,
         path: Vec<(NodeAddress, Option<usize>)>,
-        done_tx: Option<mpsc::SyncSender<()>>,
+        done_tx: Option<channel::SyncSender<()>>,
         trigger: TriggerEndpoint,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Ask domain (nicely) to replay a particular key.
@@ -190,7 +231,7 @@ pub enum Packet {
     StartReplay {
         tag: Tag,
         from: NodeAddress,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Sent to instruct a domain that a particular node should be considered ready to process
@@ -198,7 +239,7 @@ pub enum Packet {
     Ready {
         node: LocalNodeIndex,
         index: Vec<Vec<usize>>,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Notification from Blender for domain to terminate
@@ -214,7 +255,7 @@ pub enum Packet {
     StartMigration {
         at: i64,
         prev_ts: i64,
-        ack: mpsc::SyncSender<()>,
+        ack: channel::SyncSender<()>,
     },
 
     /// Notify a domain about a completion timestamp for an ongoing migration.
@@ -230,8 +271,9 @@ pub enum Packet {
     },
 
     /// Request that a domain send usage statistics on the given sender.
-    GetStatistics(mpsc::SyncSender<(statistics::DomainStats,
-                                     HashMap<petgraph::graph::NodeIndex, statistics::NodeStats>)>),
+    GetStatistics(channel::SyncSender<(statistics::DomainStats,
+                                        HashMap<petgraph::graph::NodeIndex,
+                                                statistics::NodeStats>)>),
 
     /// The packet was captured awaiting the receipt of other replays.
     Captured,
@@ -355,7 +397,7 @@ impl Packet {
         match *self {
             Packet::Message { tracer: Some(ref sender), .. } |
             Packet::Transaction { tracer: Some(ref sender), .. } => {
-                let _ = sender.send((time::Instant::now(), event));
+                let _ = sender.send((0, event));
             }
             _ => {}
         }

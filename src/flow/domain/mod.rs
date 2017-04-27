@@ -7,6 +7,8 @@ use std::time;
 
 use std::collections::hash_map::Entry;
 
+use serde::{Serialize, Deserialize};
+
 use timekeeper::{Timer, TimerSet, SimpleTracker, RealTime, ThreadTime};
 
 use flow::prelude::*;
@@ -475,8 +477,8 @@ impl Domain {
                                              ref mut txs,
                                              ref mut tags,
                                          })) = *n.inner {
-                    if let Some(new_tx) = new_tx {
-                        txs.push(new_tx);
+                    if let Some((a, b, new_tx)) = new_tx {
+                        txs.push((a, b, new_tx.into()));
                     }
                     if let Some(new_tag) = new_tag {
                         tags.insert(new_tag.0, new_tag.1);
@@ -489,7 +491,7 @@ impl Domain {
                 use flow::node::{Type, Reader};
                 let mut n = self.nodes[&node].borrow_mut();
                 if let Type::Reader(_, Reader { ref mut streamers, .. }) = *n.inner {
-                    streamers.as_mut().unwrap().push(new_streamer);
+                    streamers.as_mut().unwrap().push(new_streamer.into());
                 } else {
                     unreachable!();
                 }
@@ -561,7 +563,7 @@ impl Domain {
                             ReplayPath {
                                 source,
                                 path,
-                                done_tx,
+                                done_tx: done_tx.map(|s|s.into()),
                                 trigger,
                             });
             }
@@ -1567,7 +1569,7 @@ impl Domain {
                         Err(_) => break,
                         Ok(Packet::Quit) => break,
                         Ok(Packet::RequestUnboundedTx(ack)) => {
-                            ack.send(back_tx.clone()).unwrap();
+                            ack.send(back_tx.clone().into()).unwrap();
                         }
                         Ok(m) => self.handle(m),
                     }

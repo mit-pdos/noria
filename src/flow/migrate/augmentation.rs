@@ -35,7 +35,7 @@ pub fn inform(log: &Logger,
         let _ = ctx.send(Packet::StartMigration {
                              at: ts,
                              prev_ts: prevs[&domain],
-                             ack: ready_tx,
+                             ack: ready_tx.into(),
                          });
         let _ = ready_rx.recv();
         trace!(log, "domain ready for migration");

@@ -300,7 +300,7 @@ pub fn connect(log: &Logger,
                                   node: egress_node.addr().as_local().clone(),
                                   new_tx: Some((node.into(),
                                                 n.addr(),
-                                                main_txs[&n.domain()].clone())),
+                                                main_txs[&n.domain()].clone().into())),
                                   new_tag: None,
                               })
                         .unwrap();
