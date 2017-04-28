@@ -410,6 +410,58 @@ impl Packet {
             _ => None,
         }
     }
+
+    pub fn make_serializable(&mut self) {
+        match *self {
+            Packet::Message { ref mut tracer, .. } |
+            Packet::Transaction { ref mut tracer, .. } => {
+                *tracer = None;
+            }
+            Packet::AddNode { ref mut node, .. } => {
+                unimplemented!();
+            }
+            Packet::AddBaseColumn { ref mut ack, .. } |
+            Packet::DropBaseColumn { ref mut ack, .. } |
+            Packet::StartReplay { ref mut ack, .. } |
+            Packet::Ready { ref mut ack, .. } |
+            Packet::StartMigration { ref mut ack, .. } => {
+                ack.make_serializable();
+            }
+            Packet::StateSizeProbe { ref mut ack, .. } => {
+                ack.make_serializable();
+            }
+            Packet::UpdateEgress { new_tx: Some((_, _, ref mut new_tx)), .. } => {
+                new_tx.make_serializable();
+            }
+            Packet::AddStreamer { ref mut new_streamer, .. } => {
+                unimplemented!();
+            }
+            Packet::RequestUnboundedTx(..) => {
+                unimplemented!();
+            }
+            Packet::SetupReplayPath {
+                ref mut done_tx,
+                ref mut ack,
+                ..
+            } => {
+                if done_tx.is_some() {
+                    done_tx.as_mut().unwrap().make_serializable();
+                }
+                ack.make_serializable();
+            }
+            Packet::FullReplay { .. } |
+            Packet::ReplayPiece { .. } |
+            Packet::Finish(..) |
+            Packet::UpdateEgress { new_tx: None, .. } |
+            Packet::PrepareState { .. } |
+            Packet::RequestPartialReplay { .. } |
+            Packet::Quit |
+            Packet::CompleteMigration { .. } |
+            Packet::GetStatistics { .. } |
+            Packet::Captured |
+            Packet::None => {}
+        }
+    }
 }
 
 impl fmt::Debug for Packet {

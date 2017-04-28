@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
-use flow::domain;
-
 #[derive(Serialize, Deserialize)]
 struct SenderDef<T> {
     phantom: PhantomData<T>,
@@ -22,6 +20,9 @@ impl<T: Send + Serialize + Deserialize> SyncSender<T> {
             SyncSender::Local(ref s) => s.send(t),
             SyncSender::Remote => unreachable!(),
         }
+    }
+    pub fn make_serializable(&mut self) {
+        unimplemented!();
     }
 }
 impl<T: Send + Serialize + Deserialize> Serialize for SyncSender<T> {
@@ -72,6 +73,9 @@ impl<T: Send + Serialize + Deserialize> Sender<T> {
             Sender::Remote => unreachable!(),
         }
     }
+    pub fn make_serializable(&mut self) {
+        unimplemented!();
+    }
 }
 impl<T: Send + Serialize + Deserialize> Serialize for Sender<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -109,47 +113,47 @@ impl<T: Send + Serialize + Deserialize> Into<mpsc::Sender<T>> for Sender<T> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct ReceiverDef<T> {
-    phantom: PhantomData<T>,
-}
+// #[derive(Serialize, Deserialize)]
+// struct ReceiverDef<T> {
+//     phantom: PhantomData<T>,
+// }
 
-#[derive(Debug)]
-pub enum Receiver<T: Send + Serialize + Deserialize> {
-    Local(mpsc::Receiver<T>),
-    Remote,
-}
-impl<T: Send + Serialize + Deserialize> Receiver<T> {
-    pub fn recv(&self) -> Result<T, mpsc::RecvError> {
-        match *self {
-            Receiver::Local(ref r) => r.recv(),
-            Receiver::Remote => unreachable!(),
-        }
-    }
-}
-impl<T: Send + Serialize + Deserialize> Serialize for Receiver<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        match *self {
-            Receiver::Remote => {
-                let def = ReceiverDef::<T> { phantom: PhantomData };
-                def.serialize(serializer)
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-impl<T: Send + Serialize + Deserialize> Deserialize for Receiver<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let def = ReceiverDef::<T>::deserialize(deserializer);
-        Ok(Receiver::Remote)
-    }
-}
-impl<T: Send + Serialize + Deserialize> From<mpsc::Receiver<T>> for Receiver<T> {
-    fn from(r: mpsc::Receiver<T>) -> Self {
-        Receiver::Local(r)
-    }
-}
+// #[derive(Debug)]
+// pub enum Receiver<T: Send + Serialize + Deserialize> {
+//     Local(mpsc::Receiver<T>),
+//     Remote,
+// }
+// impl<T: Send + Serialize + Deserialize> Receiver<T> {
+//     pub fn recv(&self) -> Result<T, mpsc::RecvError> {
+//         match *self {
+//             Receiver::Local(ref r) => r.recv(),
+//             Receiver::Remote => unreachable!(),
+//         }
+//     }
+// }
+// impl<T: Send + Serialize + Deserialize> Serialize for Receiver<T> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//         where S: Serializer
+//     {
+//         match *self {
+//             Receiver::Remote => {
+//                 let def = ReceiverDef::<T> { phantom: PhantomData };
+//                 def.serialize(serializer)
+//             }
+//             _ => unreachable!(),
+//         }
+//     }
+// }
+// impl<T: Send + Serialize + Deserialize> Deserialize for Receiver<T> {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//         where D: Deserializer
+//     {
+//         let def = ReceiverDef::<T>::deserialize(deserializer);
+//         Ok(Receiver::Remote)
+//     }
+// }
+// impl<T: Send + Serialize + Deserialize> From<mpsc::Receiver<T>> for Receiver<T> {
+//     fn from(r: mpsc::Receiver<T>) -> Self {
+//         Receiver::Local(r)
+//     }
+// }
