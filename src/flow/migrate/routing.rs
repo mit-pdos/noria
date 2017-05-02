@@ -6,6 +6,7 @@
 //!  - Egress nodes must be added to nodes that now have children in a different domain
 //!  - Egress nodes that gain new children must gain channels to facilitate forwarding
 
+use channel;
 use flow::prelude::*;
 use flow::domain;
 use flow::node;
@@ -274,7 +275,7 @@ pub fn add(log: &Logger,
 
 pub fn connect(log: &Logger,
                graph: &mut Graph,
-               main_txs: &HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+               main_txs: &HashMap<domain::Index, channel::PacketSender>,
                new: &HashSet<NodeIndex>) {
 
     // ensure all egress nodes contain the tx channel of the domains of their child ingress nodes
@@ -295,12 +296,16 @@ pub fn connect(log: &Logger,
                            "egress" => egress.index(),
                            "ingress" => node.index()
                     );
+
+                    // TODO(jonathan): handle case of remote domain
+                    let new_tx = main_txs[&n.domain()].as_local().map(|s|{
+                        (node.into(), n.addr(), s.into())
+                    });
+
                     main_txs[&egress_node.domain()]
                         .send(Packet::UpdateEgress {
                                   node: egress_node.addr().as_local().clone(),
-                                  new_tx: Some((node.into(),
-                                                n.addr(),
-                                                main_txs[&n.domain()].clone().into())),
+                                  new_tx,
                                   new_tag: None,
                               })
                         .unwrap();

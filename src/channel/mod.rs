@@ -1,159 +1,135 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use std::marker::PhantomData;
+use std::mem;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde_json;
+use tokio_core::reactor;
+
+mod packet;
+pub use self::packet::PacketSender;
+
+pub type DemuxTable = Arc<Mutex<(u64, HashMap<u64, Box<BytesEndpoint>>)>>;
 
 #[derive(Serialize, Deserialize)]
 struct SenderDef<T> {
+    addr: SocketAddr,
+    tag: u64,
+
     phantom: PhantomData<T>,
 }
 
 #[derive(Clone, Debug)]
-pub enum SyncSender<T: Send + Serialize + Deserialize> {
-    Local(mpsc::SyncSender<T>),
-    Remote,
+pub enum GenericSender<T, TS>
+    where TS: TypedSender<T> + BytesEndpoint
+{
+    Local(TS),
+    Serialized(SocketAddr, u64),
+    Invalid(PhantomData<T>),
 }
-impl<T: Send + Serialize + Deserialize> SyncSender<T> {
+impl<T: Send + Serialize + Deserialize + 'static, TS: TypedSender<T> + BytesEndpoint + 'static>
+    GenericSender<T, TS> {
     pub fn send(&self, t: T) -> Result<(), mpsc::SendError<T>> {
         match *self {
-            SyncSender::Local(ref s) => s.send(t),
-            SyncSender::Remote => unreachable!(),
+            GenericSender::Local(ref s) => s.tsend(t),
+            GenericSender::Serialized(..) => unreachable!(),
+            GenericSender::Invalid(..) => unreachable!(),
         }
     }
-    pub fn make_serializable(&mut self) {
-        unimplemented!();
-    }
-}
-impl<T: Send + Serialize + Deserialize> Serialize for SyncSender<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        match *self {
-            SyncSender::Remote => {
-                let def = SenderDef::<T> { phantom: PhantomData };
-                def.serialize(serializer)
+
+    pub fn make_serializable(&mut self, local_addr: SocketAddr, demux_table: &DemuxTable) {
+        match mem::replace(self, GenericSender::Invalid(PhantomData)) {
+            GenericSender::Local(s) => {
+                let (ref mut ntag, ref mut dt) = *demux_table.lock().unwrap();
+                let tag = *ntag;
+                dt.insert(tag, Box::new(s));
+                *ntag += 1;
+                *self = GenericSender::Serialized(local_addr, tag);
             }
-            _ => unreachable!(),
+            s @ GenericSender::Serialized(..) => {
+                *self = s;
+            }
+            GenericSender::Invalid(..) => unreachable!(),
         }
     }
-}
-impl<T: Send + Serialize + Deserialize> Deserialize for SyncSender<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let def = SenderDef::<T>::deserialize(deserializer);
-        Ok(SyncSender::Remote)
+    pub fn complete_deserialize(&mut self, remote: &reactor::Remote) {
+        unimplemented!()
     }
-}
-impl<T: Send + Serialize + Deserialize> From<mpsc::SyncSender<T>> for SyncSender<T> {
-    fn from(s: mpsc::SyncSender<T>) -> Self {
-        SyncSender::Local(s)
-    }
-}
-impl<T: Send + Serialize + Deserialize> Into<mpsc::SyncSender<T>> for SyncSender<T> {
-    fn into(self) -> mpsc::SyncSender<T> {
-        if let SyncSender::Local(s) = self {
+    pub fn unwrap_local(self) -> TS {
+        if let GenericSender::Local(s) = self {
             s
         } else {
             unreachable!()
         }
     }
 }
-
-#[derive(Clone, Debug)]
-pub enum Sender<T: Send + Serialize + Deserialize> {
-    Local(mpsc::Sender<T>),
-    Remote,
-}
-impl<T: Send + Serialize + Deserialize> Sender<T> {
-    pub fn send(&self, t: T) -> Result<(), mpsc::SendError<T>> {
-        match *self {
-            Sender::Local(ref s) => s.send(t),
-            Sender::Remote => unreachable!(),
-        }
-    }
-    pub fn make_serializable(&mut self) {
-        unimplemented!();
-    }
-}
-impl<T: Send + Serialize + Deserialize> Serialize for Sender<T> {
+impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Serialize
+    for GenericSender<T, TS> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         match *self {
-            Sender::Remote => {
-                let def = SenderDef::<T> { phantom: PhantomData };
+            GenericSender::Serialized(addr, tag) => {
+                let def = SenderDef::<T> {
+                    addr,
+                    tag,
+                    phantom: PhantomData,
+                };
                 def.serialize(serializer)
             }
             _ => unreachable!(),
         }
     }
 }
-impl<T: Send + Serialize + Deserialize> Deserialize for Sender<T> {
+impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Deserialize
+    for GenericSender<T, TS> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         let def = SenderDef::<T>::deserialize(deserializer);
-        Ok(Sender::Remote)
+        def.map(|d| GenericSender::Serialized(d.addr, d.tag))
     }
 }
-impl<T: Send + Serialize + Deserialize> From<mpsc::Sender<T>> for Sender<T> {
-    fn from(s: mpsc::Sender<T>) -> Self {
-        Sender::Local(s)
-    }
-}
-impl<T: Send + Serialize + Deserialize> Into<mpsc::Sender<T>> for Sender<T> {
-    fn into(self) -> mpsc::Sender<T> {
-        if let Sender::Local(s) = self {
-            s
-        } else {
-            unreachable!()
-        }
+impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> From<TS>
+    for GenericSender<T, TS> {
+    fn from(s: TS) -> Self {
+        GenericSender::Local(s)
     }
 }
 
-// #[derive(Serialize, Deserialize)]
-// struct ReceiverDef<T> {
-//     phantom: PhantomData<T>,
-// }
+pub type Sender<T> = GenericSender<T, mpsc::Sender<T>>;
+pub type SyncSender<T> = GenericSender<T, mpsc::SyncSender<T>>;
 
-// #[derive(Debug)]
-// pub enum Receiver<T: Send + Serialize + Deserialize> {
-//     Local(mpsc::Receiver<T>),
-//     Remote,
-// }
-// impl<T: Send + Serialize + Deserialize> Receiver<T> {
-//     pub fn recv(&self) -> Result<T, mpsc::RecvError> {
-//         match *self {
-//             Receiver::Local(ref r) => r.recv(),
-//             Receiver::Remote => unreachable!(),
-//         }
-//     }
-// }
-// impl<T: Send + Serialize + Deserialize> Serialize for Receiver<T> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//         where S: Serializer
-//     {
-//         match *self {
-//             Receiver::Remote => {
-//                 let def = ReceiverDef::<T> { phantom: PhantomData };
-//                 def.serialize(serializer)
-//             }
-//             _ => unreachable!(),
-//         }
-//     }
-// }
-// impl<T: Send + Serialize + Deserialize> Deserialize for Receiver<T> {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//         where D: Deserializer
-//     {
-//         let def = ReceiverDef::<T>::deserialize(deserializer);
-//         Ok(Receiver::Remote)
-//     }
-// }
-// impl<T: Send + Serialize + Deserialize> From<mpsc::Receiver<T>> for Receiver<T> {
-//     fn from(r: mpsc::Receiver<T>) -> Self {
-//         Receiver::Local(r)
-//     }
-// }
+pub trait BytesEndpoint: Send {
+    fn recv_bytes(&self, data: &[u8]) -> Result<(), ()>;
+}
+
+impl<T: Deserialize + Send> BytesEndpoint for mpsc::Sender<T> {
+    fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
+        let t = serde_json::from_slice(data).unwrap();
+        self.send(t).map_err(|_| {})
+    }
+}
+impl<T: Deserialize + Send> BytesEndpoint for mpsc::SyncSender<T> {
+    fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
+        let t = serde_json::from_slice(data).unwrap();
+        self.send(t).map_err(|_| {})
+    }
+}
+
+pub trait TypedSender<T> {
+    fn tsend(&self, t: T) -> Result<(), mpsc::SendError<T>>;
+}
+impl<T: Send> TypedSender<T> for mpsc::Sender<T> {
+    fn tsend(&self, t: T) -> Result<(), mpsc::SendError<T>> {
+        self.send(t)
+    }
+}
+impl<T: Send> TypedSender<T> for mpsc::SyncSender<T> {
+    fn tsend(&self, t: T) -> Result<(), mpsc::SendError<T>> {
+        self.send(t)
+    }
+}

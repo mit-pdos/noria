@@ -10,8 +10,10 @@ use flow::prelude::*;
 use std::fmt;
 use std::sync::mpsc;
 use std::collections::HashMap;
+use std::net::SocketAddr;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use tokio_core::reactor;
 
 use std::time;
 
@@ -411,7 +413,7 @@ impl Packet {
         }
     }
 
-    pub fn make_serializable(&mut self) {
+    pub fn make_serializable(&mut self, local_addr: SocketAddr, demux_table: &channel::DemuxTable) {
         match *self {
             Packet::Message { ref mut tracer, .. } |
             Packet::Transaction { ref mut tracer, .. } => {
@@ -425,13 +427,13 @@ impl Packet {
             Packet::StartReplay { ref mut ack, .. } |
             Packet::Ready { ref mut ack, .. } |
             Packet::StartMigration { ref mut ack, .. } => {
-                ack.make_serializable();
+                ack.make_serializable(local_addr, demux_table);
             }
             Packet::StateSizeProbe { ref mut ack, .. } => {
-                ack.make_serializable();
+                ack.make_serializable(local_addr, demux_table);
             }
             Packet::UpdateEgress { new_tx: Some((_, _, ref mut new_tx)), .. } => {
-                new_tx.make_serializable();
+                new_tx.make_serializable(local_addr, demux_table);
             }
             Packet::AddStreamer { ref mut new_streamer, .. } => {
                 unimplemented!();
@@ -445,9 +447,61 @@ impl Packet {
                 ..
             } => {
                 if done_tx.is_some() {
-                    done_tx.as_mut().unwrap().make_serializable();
+                    done_tx.as_mut().unwrap().make_serializable(local_addr, demux_table);
                 }
-                ack.make_serializable();
+                ack.make_serializable(local_addr, demux_table);
+            }
+            Packet::FullReplay { .. } |
+            Packet::ReplayPiece { .. } |
+            Packet::Finish(..) |
+            Packet::UpdateEgress { new_tx: None, .. } |
+            Packet::PrepareState { .. } |
+            Packet::RequestPartialReplay { .. } |
+            Packet::Quit |
+            Packet::CompleteMigration { .. } |
+            Packet::GetStatistics { .. } |
+            Packet::Captured |
+            Packet::None => {}
+        }
+    }
+
+    fn complete_deserialize(&mut self, remote: &reactor::Remote) {
+        match *self {
+            Packet::Message { ref mut tracer, .. } |
+            Packet::Transaction { ref mut tracer, .. } => {
+                *tracer = None;
+            }
+            Packet::AddNode { ref mut node, .. } => {
+                unimplemented!();
+            }
+            Packet::AddBaseColumn { ref mut ack, .. } |
+            Packet::DropBaseColumn { ref mut ack, .. } |
+            Packet::StartReplay { ref mut ack, .. } |
+            Packet::Ready { ref mut ack, .. } |
+            Packet::StartMigration { ref mut ack, .. } => {
+                ack.complete_deserialize(remote);
+            }
+            Packet::StateSizeProbe { ref mut ack, .. } => {
+                ack.complete_deserialize(remote);
+            }
+            Packet::UpdateEgress { new_tx: Some((_, _, ref mut new_tx)), .. } => {
+                new_tx.complete_deserialize(remote);
+            }
+            Packet::AddStreamer { ref mut new_streamer, .. } => {
+                unimplemented!();
+            }
+            Packet::RequestUnboundedTx(..) => {
+                unimplemented!();
+            }
+            Packet::SetupReplayPath {
+                ref mut done_tx,
+                ref mut ack,
+                ..
+            } => {
+                if done_tx.is_some() {
+                    done_tx.as_mut().unwrap().complete_deserialize(remote);
+                }
+                ack.complete_deserialize(remote);
             }
             Packet::FullReplay { .. } |
             Packet::ReplayPiece { .. } |

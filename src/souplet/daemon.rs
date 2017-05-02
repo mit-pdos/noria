@@ -15,7 +15,7 @@ pub fn main() {
         .arg(Arg::with_name("port")
                  .short("p")
                  .long("port")
-                 .default_value("1025")
+                 .default_value("1026")
                  .help("port to listen on"))
         .arg(Arg::with_name("ip")
                  .long("ip")

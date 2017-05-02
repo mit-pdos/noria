@@ -217,7 +217,9 @@ impl DomainState {
                         .unwrap_or(1);
                     let bundle = match m {
                         Packet::Transaction { .. } => Bundle::Messages(count, vec![m]),
-                        Packet::StartMigration { ack, .. } => Bundle::MigrationStart(ack.into()),
+                        Packet::StartMigration { ack, .. } => {
+                            Bundle::MigrationStart(ack.unwrap_local())
+                        }
                         Packet::CompleteMigration { ingress_from_base, .. } => {
                             Bundle::MigrationEnd(ingress_from_base)
                         }
@@ -233,7 +235,9 @@ impl DomainState {
         } else {
             let transaction = match m {
                 Packet::Transaction { .. } => BufferedTransaction::Transaction(base.unwrap(), m),
-                Packet::StartMigration { ack, .. } => BufferedTransaction::MigrationStart(ack.into()),
+                Packet::StartMigration { ack, .. } => {
+                    BufferedTransaction::MigrationStart(ack.unwrap_local())
+                }
                 Packet::CompleteMigration { ingress_from_base, .. } => {
                     BufferedTransaction::MigrationEnd(ingress_from_base)
                 }

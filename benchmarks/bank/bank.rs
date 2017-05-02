@@ -258,6 +258,7 @@ fn client(_i: usize,
                         let mut transaction_end = None;
                         if measure_latency && count > 0 {
                             for (instant, event) in tracer.unwrap() {
+                                let instant = time::Instant::now(); // TODO(jonathan): remove this hack
                                 if verbose {
                                     let dt = dur_to_ns!(instant.duration_since(last_instant)) as
                                              f64;

@@ -6,6 +6,7 @@
 //!  - Existing egress nodes that gain new children must gain channels to facilitate forwarding
 //!  - State must be replayed for materializations in other domains that need it
 
+use channel;
 use flow::prelude::*;
 use flow::domain;
 
@@ -20,7 +21,7 @@ use slog::Logger;
 pub fn inform(log: &Logger,
               graph: &mut Graph,
               source: NodeIndex,
-              txs: &mut HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+              txs: &mut HashMap<domain::Index, channel::PacketSender>,
               nodes: HashMap<domain::Index, Vec<(NodeIndex, bool)>>,
               ts: i64,
               prevs: HashMap<domain::Index, i64>) {

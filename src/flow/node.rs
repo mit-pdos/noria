@@ -223,7 +223,7 @@ impl<I> From<I> for Type
 #[derive(Serialize, Deserialize)]
 enum TypeDef {
     Ingress,
-    Internal,
+    Internal(Vec<NodeAddress>),
     Egress,
     Reader,
     Hook,
@@ -236,7 +236,7 @@ impl Serialize for Type {
     {
         let def = match *self {
             Type::Ingress => TypeDef::Ingress,
-            Type::Internal(_) => TypeDef::Internal,
+            Type::Internal(ref i) => TypeDef::Internal(i.ancestors()),
             Type::Egress {..} => TypeDef::Egress,
             Type::Reader(..) => TypeDef::Reader,
             Type::Hook(_) => TypeDef::Hook,
@@ -252,7 +252,12 @@ impl Deserialize for Type {
     {
         TypeDef::deserialize(deserializer).map(|def|match def {
             TypeDef::Ingress => Type::Ingress,
-            TypeDef::Internal => unimplemented!(),
+            TypeDef::Internal(ancestors) => {
+                assert_eq!(ancestors.len(), 1);
+
+                use ops::identity::Identity;
+                Type::Internal(Box::new(Identity::new(ancestors[0])))
+            }
             TypeDef::Egress => unimplemented!(),
             TypeDef::Reader => unimplemented!(),
             TypeDef::Hook => unimplemented!(),

@@ -1,3 +1,4 @@
+use channel;
 use flow::domain;
 use flow::prelude::*;
 
@@ -57,7 +58,7 @@ pub fn analyze_graph(graph: &Graph,
 
 pub fn finalize(ingresses_from_base: HashMap<domain::Index, HashMap<NodeIndex, usize>>,
                 log: &Logger,
-                txs: &mut HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+                txs: &mut HashMap<domain::Index, channel::PacketSender>,
                 at: i64) {
     for (domain, ingress_from_base) in ingresses_from_base {
         trace!(log, "notifying domain of migration completion"; "domain" => domain.index());

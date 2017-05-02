@@ -478,7 +478,7 @@ impl Domain {
                                              ref mut tags,
                                          })) = *n.inner {
                     if let Some((a, b, new_tx)) = new_tx {
-                        txs.push((a, b, new_tx.into()));
+                        txs.push((a, b, new_tx.unwrap_local()));
                     }
                     if let Some(new_tag) = new_tag {
                         tags.insert(new_tag.0, new_tag.1);
@@ -491,7 +491,7 @@ impl Domain {
                 use flow::node::{Type, Reader};
                 let mut n = self.nodes[&node].borrow_mut();
                 if let Type::Reader(_, Reader { ref mut streamers, .. }) = *n.inner {
-                    streamers.as_mut().unwrap().push(new_streamer.into());
+                    streamers.as_mut().unwrap().push(new_streamer.unwrap_local());
                 } else {
                     unreachable!();
                 }
@@ -563,7 +563,7 @@ impl Domain {
                             ReplayPath {
                                 source,
                                 path,
-                                done_tx: done_tx.map(|s|s.into()),
+                                done_tx: done_tx.map(|s|s.unwrap_local()),
                                 trigger,
                             });
             }

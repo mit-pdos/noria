@@ -5,6 +5,7 @@
 //! domains, but does not perform that copying itself (that is the role of the `augmentation`
 //! module).
 
+use channel;
 use flow;
 use flow::keys;
 use flow::domain;
@@ -336,7 +337,7 @@ pub fn initialize(log: &Logger,
                   partial_ok: bool,
                   mut materialize: HashMap<domain::Index,
                                            HashMap<LocalNodeIndex, Vec<Vec<usize>>>>,
-                  txs: &mut HashMap<domain::Index, mpsc::SyncSender<Packet>>)
+                  txs: &mut HashMap<domain::Index, channel::PacketSender>)
                   -> HashMap<Tag, Vec<domain::Index>> {
     let mut topo_list = Vec::with_capacity(new.len());
     let mut topo = petgraph::visit::Topo::new(&*graph);
@@ -380,7 +381,7 @@ pub fn initialize(log: &Logger,
         // the change. this is important so that we don't ready a child in a different domain
         // before the parent has been readied. it's also important to avoid us returning before the
         // graph is actually fully operational.
-        let ready = |txs: &mut HashMap<_, mpsc::SyncSender<_>>, index_on: Vec<Vec<usize>>| {
+        let ready = |txs: &mut HashMap<_, channel::PacketSender>, index_on: Vec<Vec<usize>>| {
             let (ack_tx, ack_rx) = mpsc::sync_channel(0);
             trace!(log, "readying node"; "node" => node.index());
             txs[&d]
@@ -446,7 +447,7 @@ pub fn reconstruct(log: &Logger,
                    mut partial_ok: bool,
                    materialized: &HashMap<domain::Index,
                                           HashMap<LocalNodeIndex, Vec<Vec<usize>>>>,
-                   txs: &mut HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+                   txs: &mut HashMap<domain::Index, channel::PacketSender>,
                    node: NodeIndex,
                    mut index_on: Vec<Vec<usize>>)
                    -> HashMap<Tag, Vec<domain::Index>> {
@@ -835,7 +836,7 @@ fn cost_fn<'a, T>(log: &'a Logger,
                   empty: &'a HashSet<NodeIndex>,
                   partial: &'a HashSet<NodeIndex>,
                   materialized: &'a HashMap<domain::Index, HashMap<LocalNodeIndex, T>>,
-                  txs: &'a mut HashMap<domain::Index, mpsc::SyncSender<Packet>>)
+                  txs: &'a mut HashMap<domain::Index, channel::PacketSender>)
                   -> Box<FnMut(NodeIndex, &[NodeIndex]) -> Option<NodeIndex> + 'a> {
 
     Box::new(move |node, parents| {

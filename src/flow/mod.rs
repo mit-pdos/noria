@@ -9,12 +9,16 @@ use std::sync::{Arc, Mutex};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::net::SocketAddr;
 use std::fmt;
 use std::time;
 use std::thread;
 use std::io;
 
 use slog;
+
+use souplet;
+use channel;
 
 pub mod domain;
 pub mod prelude;
@@ -233,7 +237,8 @@ impl Mutator {
     /// Attach a tracer to all packets sent until `stop_tracing` is called. The tracer will cause
     /// events to be sent to the returned Receiver indicating the progress of the packet through the
     /// graph.
-    pub fn start_tracing(&mut self) -> mpsc::Receiver<(payload::TimeInstant, prelude::PacketEvent)> {
+    pub fn start_tracing(&mut self)
+                         -> mpsc::Receiver<(payload::TimeInstant, prelude::PacketEvent)> {
         let (tx, rx) = mpsc::channel();
         self.tracer = Some(tx.into());
         rx
@@ -259,9 +264,12 @@ pub struct Blender {
     partial: HashSet<NodeIndex>,
     partial_enabled: bool,
 
-    txs: HashMap<domain::Index, mpsc::SyncSender<payload::Packet>>,
+    souplet: Option<souplet::Souplet>,
+    remote_domains: HashMap<domain::Index, SocketAddr>,
+
+    txs: HashMap<domain::Index, channel::PacketSender>,
     in_txs: HashMap<domain::Index, mpsc::SyncSender<payload::Packet>>,
-    domains: Vec<thread::JoinHandle<()>>,
+    domains: Vec<Option<thread::JoinHandle<()>>>,
 
     log: slog::Logger,
 }
@@ -281,6 +289,9 @@ impl Default for Blender {
             partial: Default::default(),
             partial_enabled: true,
 
+            souplet: None,
+            remote_domains: HashMap::default(),
+
             txs: HashMap::default(),
             in_txs: HashMap::default(),
             domains: Vec::new(),
@@ -294,6 +305,23 @@ impl Blender {
     /// Construct a new, empty `Blender`
     pub fn new() -> Self {
         Blender::default()
+    }
+
+    /// Construct a blender containing a souplet.
+    pub fn with_souplet() -> Self {
+        let mut blender = Blender::default();
+        blender.souplet = Some(souplet::Souplet::new("127.0.0.1:1025".parse().unwrap()));
+
+        blender
+    }
+
+    /// Connect to a daemon running on another machine.
+    pub fn connect_to_daemon(&mut self, addr: SocketAddr) {
+        self.souplet
+            .as_mut()
+            .unwrap()
+            .connect_to_peer(addr)
+            .unwrap();
     }
 
     /// Disable partial materialization for all subsequent migrations
@@ -482,7 +510,8 @@ impl Blender {
             .iter()
             .map(|(di, s)| {
                 let (tx, rx) = mpsc::sync_channel(1);
-                s.send(payload::Packet::GetStatistics(tx.into())).unwrap();
+                s.send(payload::Packet::GetStatistics(tx.into()))
+                    .unwrap();
 
                 let (domain_stats, node_stats) = rx.recv().unwrap();
                 let node_map = node_stats
@@ -856,10 +885,12 @@ impl<'a> Migration<'a> {
 
         // Otherwise, send a message to the reader's domain to have it add the streamer.
         let reader = &self.mainline.ingredients[self.readers[n.as_global()]];
-        self.mainline.txs[&reader.domain()].send(payload::Packet::AddStreamer{
-            node: reader.addr().as_local().clone(),
-            new_streamer: tx.into(),
-        }).unwrap();
+        self.mainline.txs[&reader.domain()]
+            .send(payload::Packet::AddStreamer {
+                      node: reader.addr().as_local().clone(),
+                      new_streamer: tx.into(),
+                  })
+            .unwrap();
 
         rx
     }
@@ -941,19 +972,6 @@ impl<'a> Migration<'a> {
                 dns.entry(d).or_insert_with(Vec::new).push((ni, new));
                 dns
             });
-
-        let mut rxs = HashMap::new();
-
-        // Set up input channels for new domains
-        for domain in domain_nodes.keys() {
-            if !mainline.txs.contains_key(domain) {
-                let (in_tx, in_rx) = mpsc::sync_channel(256);
-                let (tx, rx) = mpsc::sync_channel(1);
-                rxs.insert(*domain, (rx, in_rx));
-                mainline.txs.insert(*domain, tx);
-                mainline.in_txs.insert(*domain, in_tx);
-            }
-        }
 
         // Assign local addresses to all new nodes, and initialize them
         for (domain, nodes) in &mut domain_nodes {
@@ -1057,24 +1075,43 @@ impl<'a> Migration<'a> {
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
         for domain in changed_domains {
-            if !rxs.contains_key(&domain) {
+            if mainline.txs.contains_key(&domain) {
                 // this is not a new domain
                 continue;
             }
 
-            // Start up new domain
-            let (rx, in_rx) = rxs.remove(&domain).unwrap();
-            let jh = migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
+            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let remote = mainline.souplet.is_some() &&
+                         migrate::booting::can_be_remote(&mainline.ingredients, &nodes);
+
+            let jh = if remote {
+                // TODO: create input channel and add it to mainline.in_txs
+                let addr = migrate::booting::boot_remote(domain.index().into(),
+                                                         &mut mainline.ingredients,
+                                                         nodes,
+                                                         mainline.souplet.as_mut().unwrap(),
+                                                         &mut mainline.txs);
+
+                mainline.remote_domains.insert(domain, addr);
+
+                None
+            } else {
+                let (in_tx, in_rx) = mpsc::sync_channel(256);
+                mainline.in_txs.insert(domain, in_tx);
+
+                // Start up new domain
+                Some(migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
                                                 domain.index().into(),
                                                 &mut mainline.ingredients,
-                                                uninformed_domain_nodes.remove(&domain).unwrap(),
+                                                nodes,
                                                 mainline.checktable.clone(),
-                                                rx,
+                                                &mut mainline.txs,
                                                 in_rx,
-                                                start_ts);
+                                                start_ts))
+            };
+
             mainline.domains.push(jh);
         }
-        drop(rxs);
 
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
         debug!(log, "mutating existing domains");
@@ -1159,7 +1196,9 @@ impl Drop for Blender {
             drop(tx.send(payload::Packet::Quit));
         }
         for d in self.domains.drain(..) {
-            d.join().unwrap();
+            if d.is_some() {
+                d.unwrap().join().unwrap();
+            }
         }
     }
 }
