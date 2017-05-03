@@ -7,8 +7,6 @@ use std::time;
 
 use std::collections::hash_map::Entry;
 
-use serde::{Serialize, Deserialize};
-
 use timekeeper::{Timer, TimerSet, SimpleTracker, RealTime, ThreadTime};
 
 use flow::prelude::*;
@@ -334,12 +332,11 @@ impl Domain {
         assert!(!messages.is_empty());
 
         let mut egress_messages = HashMap::new();
-        let (ts, tracer) = if let Some(&Packet::Transaction {
+        let ts = if let Some(&Packet::Transaction {
                                             state: ref ts @ TransactionState::Committed(..),
-                                            ref tracer,
                                             ..
                                         }) = messages.iter().next() {
-            (ts.clone(), tracer.clone())
+            ts.clone()
         } else {
             unreachable!();
         };
@@ -368,7 +365,7 @@ impl Domain {
                     link: Link::new(addr, addr),
                     data: data,
                     state: ts.clone(),
-                    tracer: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             } else {
                 // The packet is about to hit a non-transactional output node (which could be an
@@ -376,7 +373,7 @@ impl Domain {
                 Packet::Message {
                     link: Link::new(addr, addr),
                     data: data,
-                    tracer: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             };
 

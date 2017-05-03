@@ -7,7 +7,6 @@ use petgraph::graph::NodeIndex;
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::sync::mpsc;
 
 use slog::Logger;
 

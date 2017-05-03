@@ -236,7 +236,7 @@ impl Base {
 impl Clone for Base {
     fn clone(&self) -> Base {
         Base {
-            buffered_tracer: self.buffered_tracer.clone(),
+            buffered_tracer: None, // TODO replace with: self.buffered_tracer.clone(),
             buffered_writes: self.buffered_writes.clone(),
             durability: self.durability,
             durable_log: None,

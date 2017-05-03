@@ -18,8 +18,6 @@ use std::collections::{HashSet, HashMap};
 use std::sync::mpsc;
 use std::sync;
 
-use serde::{Serialize, Deserialize};
-
 use slog::Logger;
 
 const FILTER_SPECIFICITY: usize = 10;

@@ -10,8 +10,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 
-use serde::{Serialize, Deserialize};
-
 use flow::domain;
 use flow::prelude::*;
 use flow::migrate::materialization::Tag as ReplayPath;

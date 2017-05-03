@@ -136,13 +136,13 @@ impl Mutator {
                 link: payload::Link::new(self.src, self.addr),
                 data: rs,
                 state: payload::TransactionState::WillCommit,
-                tracer: self.tracer.clone(),
+                tracer: None, // TODO replace with: self.tracer.clone(),
             }
         } else {
             payload::Packet::Message {
                 link: payload::Link::new(self.src, self.addr),
                 data: rs,
-                tracer: self.tracer.clone(),
+                tracer: None, // TODO replace with: self.tracer.clone(),
             }
         };
 
@@ -158,7 +158,7 @@ impl Mutator {
             link: payload::Link::new(self.src, self.addr),
             data: rs,
             state: payload::TransactionState::Pending(t, send.into()),
-            tracer: self.tracer.clone(),
+            tracer: None, // TODO replace with: self.tracer.clone(),
         };
         self.tx.clone().send(m).unwrap();
         loop {

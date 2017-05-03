@@ -15,7 +15,6 @@ use petgraph;
 use petgraph::graph::NodeIndex;
 
 use std::collections::{HashSet, HashMap};
-use std::sync::mpsc;
 
 use slog::Logger;
 

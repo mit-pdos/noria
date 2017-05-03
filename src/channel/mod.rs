@@ -5,12 +5,16 @@ use std::sync::mpsc;
 use std::marker::PhantomData;
 use std::mem;
 
+use tarpc::sync::client;
+use tarpc::sync::client::ClientExt;
+
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde_json;
-use tokio_core::reactor;
 
 mod packet;
 pub use self::packet::PacketSender;
+
+use souplet;
 
 pub type DemuxTable = Arc<Mutex<(u64, HashMap<u64, Box<BytesEndpoint>>)>>;
 
@@ -22,47 +26,72 @@ struct SenderDef<T> {
     phantom: PhantomData<T>,
 }
 
-#[derive(Clone, Debug)]
-pub enum GenericSender<T, TS>
-    where TS: TypedSender<T> + BytesEndpoint
-{
+#[derive(Debug)]
+enum GenericSenderInner<T, TS: TypedSender<T> + BytesEndpoint> {
     Local(TS),
+    Remote(SocketAddr, u64, souplet::SyncClient),
     Serialized(SocketAddr, u64),
     Invalid(PhantomData<T>),
 }
+
+#[derive(Debug)]
+pub struct GenericSender<T, TS: TypedSender<T> + BytesEndpoint> {
+    inner: GenericSenderInner<T, TS>,
+}
+
 impl<T: Send + Serialize + Deserialize + 'static, TS: TypedSender<T> + BytesEndpoint + 'static>
     GenericSender<T, TS> {
     pub fn send(&self, t: T) -> Result<(), mpsc::SendError<T>> {
-        match *self {
-            GenericSender::Local(ref s) => s.tsend(t),
-            GenericSender::Serialized(..) => unreachable!(),
-            GenericSender::Invalid(..) => unreachable!(),
+        match self.inner {
+            GenericSenderInner::Local(ref s) => s.tsend(t),
+            GenericSenderInner::Remote(_, tag, ref client) => {
+                client
+                    .recv_on_channel(tag, serde_json::to_vec(&t).unwrap())
+                    .unwrap();
+                Ok(())
+            }
+            GenericSenderInner::Serialized(..) => unreachable!(),
+            GenericSenderInner::Invalid(..) => unreachable!(),
         }
     }
 
     pub fn make_serializable(&mut self, local_addr: SocketAddr, demux_table: &DemuxTable) {
-        match mem::replace(self, GenericSender::Invalid(PhantomData)) {
-            GenericSender::Local(s) => {
+        match mem::replace(&mut self.inner, GenericSenderInner::Invalid(PhantomData)) {
+            GenericSenderInner::Local(s) => {
                 let (ref mut ntag, ref mut dt) = *demux_table.lock().unwrap();
                 let tag = *ntag;
                 dt.insert(tag, Box::new(s));
                 *ntag += 1;
-                *self = GenericSender::Serialized(local_addr, tag);
+                self.inner = GenericSenderInner::Serialized(local_addr, tag);
             }
-            s @ GenericSender::Serialized(..) => {
-                *self = s;
+            GenericSenderInner::Remote(addr, tag, _) => {
+                self.inner = GenericSenderInner::Serialized(addr, tag);
             }
-            GenericSender::Invalid(..) => unreachable!(),
+            s @ GenericSenderInner::Serialized(..) => {
+                self.inner = s;
+            }
+            GenericSenderInner::Invalid(..) => unreachable!(),
         }
     }
-    pub fn complete_deserialize(&mut self, remote: &reactor::Remote) {
-        unimplemented!()
-    }
-    pub fn unwrap_local(self) -> TS {
-        if let GenericSender::Local(s) = self {
+    pub fn unwrap_local(mut self) -> TS {
+        if let GenericSenderInner::Local(s) =
+            mem::replace(&mut self.inner, GenericSenderInner::Invalid(PhantomData)) {
+            mem::forget(self);
             s
         } else {
             unreachable!()
+        }
+    }
+}
+impl<T, TS: TypedSender<T> + BytesEndpoint> Drop for GenericSender<T, TS> {
+    fn drop(&mut self) {
+        match self.inner {
+            GenericSenderInner::Remote(_, tag, ref client) => {
+                client.close_channel(tag).unwrap();
+            }
+            GenericSenderInner::Local(..) |
+            GenericSenderInner::Serialized(..) => {}
+            GenericSenderInner::Invalid(..) => unreachable!(),
         }
     }
 }
@@ -71,8 +100,8 @@ impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Seri
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        match *self {
-            GenericSender::Serialized(addr, tag) => {
+        match self.inner {
+            GenericSenderInner::Serialized(addr, tag) => {
                 let def = SenderDef::<T> {
                     addr,
                     tag,
@@ -90,13 +119,17 @@ impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Dese
         where D: Deserializer
     {
         let def = SenderDef::<T>::deserialize(deserializer);
-        def.map(|d| GenericSender::Serialized(d.addr, d.tag))
+        def.map(|d| {
+                    let client = souplet::SyncClient::connect(d.addr, client::Options::default())
+                        .unwrap();
+                    Self { inner: GenericSenderInner::Remote(d.addr, d.tag, client) }
+                })
     }
 }
 impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> From<TS>
     for GenericSender<T, TS> {
     fn from(s: TS) -> Self {
-        GenericSender::Local(s)
+        Self { inner: GenericSenderInner::Local(s) }
     }
 }
 

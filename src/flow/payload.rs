@@ -8,14 +8,10 @@ use flow::statistics;
 use flow::prelude::*;
 
 use std::fmt;
-use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use tokio_core::reactor;
-
-use std::time;
 
 use channel;
 
@@ -94,11 +90,21 @@ pub enum ReplayPieceContext {
     Regular { last: bool },
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub enum TransactionState {
     Committed(i64, petgraph::graph::NodeIndex, Option<HashMap<domain::Index, i64>>),
     Pending(checktable::Token, channel::Sender<Result<i64, ()>>),
     WillCommit,
+}
+
+impl Clone for TransactionState {
+    fn clone(&self) -> Self {
+        match *self {
+            TransactionState::Committed(ts, ni, ref prevs) => TransactionState::Committed(ts, ni, prevs.clone()),
+            TransactionState::Pending(..) => unreachable!(),
+            TransactionState::WillCommit => TransactionState::WillCommit,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -370,25 +376,25 @@ impl Packet {
             Packet::Message {
                 ref link,
                 ref data,
-                ref tracer,
+                ..
             } => {
                 Packet::Message {
                     link: link.clone(),
                     data: data.clone(),
-                    tracer: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             Packet::Transaction {
                 ref link,
                 ref data,
                 ref state,
-                ref tracer,
+                ..
             } => {
                 Packet::Transaction {
                     link: link.clone(),
                     data: data.clone(),
                     state: state.clone(),
-                    tracer: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             _ => unreachable!(),
@@ -450,58 +456,6 @@ impl Packet {
                     done_tx.as_mut().unwrap().make_serializable(local_addr, demux_table);
                 }
                 ack.make_serializable(local_addr, demux_table);
-            }
-            Packet::FullReplay { .. } |
-            Packet::ReplayPiece { .. } |
-            Packet::Finish(..) |
-            Packet::UpdateEgress { new_tx: None, .. } |
-            Packet::PrepareState { .. } |
-            Packet::RequestPartialReplay { .. } |
-            Packet::Quit |
-            Packet::CompleteMigration { .. } |
-            Packet::GetStatistics { .. } |
-            Packet::Captured |
-            Packet::None => {}
-        }
-    }
-
-    fn complete_deserialize(&mut self, remote: &reactor::Remote) {
-        match *self {
-            Packet::Message { ref mut tracer, .. } |
-            Packet::Transaction { ref mut tracer, .. } => {
-                *tracer = None;
-            }
-            Packet::AddNode { ref mut node, .. } => {
-                unimplemented!();
-            }
-            Packet::AddBaseColumn { ref mut ack, .. } |
-            Packet::DropBaseColumn { ref mut ack, .. } |
-            Packet::StartReplay { ref mut ack, .. } |
-            Packet::Ready { ref mut ack, .. } |
-            Packet::StartMigration { ref mut ack, .. } => {
-                ack.complete_deserialize(remote);
-            }
-            Packet::StateSizeProbe { ref mut ack, .. } => {
-                ack.complete_deserialize(remote);
-            }
-            Packet::UpdateEgress { new_tx: Some((_, _, ref mut new_tx)), .. } => {
-                new_tx.complete_deserialize(remote);
-            }
-            Packet::AddStreamer { ref mut new_streamer, .. } => {
-                unimplemented!();
-            }
-            Packet::RequestUnboundedTx(..) => {
-                unimplemented!();
-            }
-            Packet::SetupReplayPath {
-                ref mut done_tx,
-                ref mut ack,
-                ..
-            } => {
-                if done_tx.is_some() {
-                    done_tx.as_mut().unwrap().complete_deserialize(remote);
-                }
-                ack.complete_deserialize(remote);
             }
             Packet::FullReplay { .. } |
             Packet::ReplayPiece { .. } |
