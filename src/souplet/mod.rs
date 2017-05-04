@@ -128,7 +128,6 @@ impl FutureService for SoupletServer {
 }
 
 pub struct Souplet {
-    reactor: reactor::Remote,
     reactor_thread: thread::JoinHandle<()>,
     peers: HashMap<SocketAddr, SyncClient>,
     demux_table: channel::DemuxTable,
@@ -148,7 +147,7 @@ impl Souplet {
             let mut reactor = reactor::Core::new().unwrap();
 
             let server = SoupletServer::new(addr2, demux_table2, reactor.remote());
-            tx.send((reactor.remote(), server.get_inner())).unwrap();
+            tx.send(server.get_inner()).unwrap();
 
             let listener = server
                 .listen(addr, &reactor.handle(), server::Options::default())
@@ -162,10 +161,9 @@ impl Souplet {
             }
         });
 
-        let (reactor, server_inner) = rx.recv().unwrap();
+        let server_inner = rx.recv().unwrap();
 
         Self {
-            reactor,
             reactor_thread,
             peers: HashMap::new(),
             demux_table,

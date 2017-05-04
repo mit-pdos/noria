@@ -430,7 +430,7 @@ tracer: None, // TODO replace with: tracer.clone(),
             Packet::Transaction { ref mut tracer, .. } => {
                 *tracer = None;
             }
-            Packet::AddNode { ref mut node, .. } => {
+            Packet::AddNode { node: _, .. } => {
                 unimplemented!();
             }
             Packet::AddBaseColumn { ref mut ack, .. } |
@@ -446,7 +446,7 @@ tracer: None, // TODO replace with: tracer.clone(),
             Packet::UpdateEgress { ref new_tx, .. } => {
                 assert!(new_tx.is_none());
             }
-            Packet::AddStreamer { ref mut new_streamer, .. } => {
+            Packet::AddStreamer { .. } => {
                 unimplemented!();
             }
             Packet::RequestUnboundedTx(..) => {
@@ -468,7 +468,6 @@ tracer: None, // TODO replace with: tracer.clone(),
             Packet::FullReplay { .. } |
             Packet::ReplayPiece { .. } |
             Packet::Finish(..) |
-            Packet::UpdateEgress { new_tx: None, .. } |
             Packet::PrepareState { .. } |
             Packet::RequestPartialReplay { .. } |
             Packet::Quit |

@@ -1294,9 +1294,6 @@ fn make_topk_node(name: &str,
                   offset: usize,
                   mut mig: &mut Migration)
                   -> FlowNode {
-    use std::cmp::Ordering;
-    use std::sync::Arc;
-
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = columns.iter().map(|c| &c.name).collect::<Vec<_>>();
 
@@ -1317,6 +1314,7 @@ fn make_topk_node(name: &str,
             .collect::<Vec<_>>()
     };
 
+    assert_eq!(offset, 0); // Non-zero offset not supported
     let cmp_rows = order
         .as_ref()
         .map(|v| {
