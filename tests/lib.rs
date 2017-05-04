@@ -1769,8 +1769,8 @@ fn distributed() {
         let c = mig.add_ingredient("c", &["X", "Y"], distributary::Identity::new(a));
 
         let mut emits = HashMap::new();
-        emits.insert(a, vec![0, 1]);
         emits.insert(b, vec![0, 1]);
+        emits.insert(c, vec![0, 1]);
         let d = mig.add_ingredient("d", &["X", "Y"], distributary::Union::new(emits));
 
         mig.maintain(d, 0);

@@ -8,8 +8,9 @@ use std::io;
 use std::process;
 
 use futures::Future;
-use tarpc::future::{client, server};
-use tarpc::future::client::ClientExt;
+use tarpc::future::server;
+use tarpc::sync::client::ClientExt;
+use tarpc::sync::client;
 use tarpc::util::Never;
 use tokio_core::reactor;
 
@@ -30,8 +31,8 @@ service! {
 }
 
 struct SoupletServerInner {
-    pub domain_rxs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
-    pub domain_input_rxs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+    pub domain_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
+    pub domain_input_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
 }
 
 #[derive(Clone)]
@@ -39,16 +40,29 @@ struct SoupletServer {
     inner: Arc<Mutex<SoupletServerInner>>,
     demux_table: channel::DemuxTable,
     remote: reactor::Remote,
+    local_addr: SocketAddr,
 }
 
 impl SoupletServer {
-    pub fn new(demux_table: channel::DemuxTable, remote: reactor::Remote) -> Self {
+    pub fn new(local_addr: SocketAddr,
+               demux_table: channel::DemuxTable,
+               remote: reactor::Remote)
+               -> Self {
         let inner = SoupletServerInner {
-            domain_rxs: HashMap::new(),
-            domain_input_rxs: HashMap::new(),
+            domain_txs: HashMap::new(),
+            domain_input_txs: HashMap::new(),
         };
 
-        Self { inner: Arc::new(Mutex::new(inner)), demux_table, remote }
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
+            demux_table,
+            remote,
+            local_addr,
+        }
+    }
+
+    pub fn get_inner(&self) -> Arc<Mutex<SoupletServerInner>> {
+        self.inner.clone()
     }
 }
 
@@ -68,28 +82,27 @@ impl FutureService for SoupletServer {
         domain.boot(rx, in_rx);
 
         let mut inner = self.inner.lock().unwrap();
-        inner.domain_rxs.insert(domain_index, tx);
-        inner.domain_input_rxs.insert(domain_index, in_tx);
-
-        println!("Started Domain");
+        inner.domain_txs.insert(domain_index, tx);
+        inner.domain_input_txs.insert(domain_index, in_tx);
         Ok(())
     }
 
     type RecvPacketFut = Result<(), Never>;
-    fn recv_packet(&self, domain_index: domain::Index, packet: Packet) -> Self::RecvPacketFut {
-        println!("Received Packet: {:?}", packet);
+    fn recv_packet(&self, domain_index: domain::Index, mut packet: Packet) -> Self::RecvPacketFut {
+        packet.complete_deserialize(self.local_addr.clone(), &self.demux_table);
         let inner = self.inner.lock().unwrap();
-        inner.domain_rxs[&domain_index].send(packet).unwrap();
+        inner.domain_txs[&domain_index].send(packet).unwrap();
         Ok(())
     }
 
     type RecvInputPacketFut = Result<(), Never>;
     fn recv_input_packet(&self,
                          domain_index: domain::Index,
-                         packet: Packet)
+                         mut packet: Packet)
                          -> Self::RecvInputPacketFut {
+        packet.complete_deserialize(self.local_addr.clone(), &self.demux_table);
         let inner = self.inner.lock().unwrap();
-        inner.domain_input_rxs[&domain_index]
+        inner.domain_input_txs[&domain_index]
             .send(packet)
             .unwrap();
         Ok(())
@@ -113,89 +126,95 @@ impl FutureService for SoupletServer {
         demux_table.remove(&tag);
         Ok(())
     }
-
 }
 
 pub struct Souplet {
     reactor: reactor::Remote,
     reactor_thread: thread::JoinHandle<()>,
-    peers: HashMap<SocketAddr, FutureClient>,
+    peers: HashMap<SocketAddr, SyncClient>,
     demux_table: channel::DemuxTable,
     local_addr: SocketAddr,
+    server_inner: Arc<Mutex<SoupletServerInner>>,
 }
 
 impl Souplet {
     pub fn new(addr: SocketAddr) -> Self {
         let (tx, rx) = mpsc::channel();
 
+        let addr2 = addr;
         let demux_table = Arc::new(Mutex::new((0, HashMap::new())));
         let demux_table2 = demux_table.clone();
 
-        let reactor_thread = thread::spawn(move ||{
+        let reactor_thread = thread::spawn(move || {
             let mut reactor = reactor::Core::new().unwrap();
-            tx.send(reactor.remote()).unwrap();
 
-            let (_handle, server) = SoupletServer::new(demux_table2, reactor.remote())
+            let server = SoupletServer::new(addr2, demux_table2, reactor.remote());
+            tx.send((reactor.remote(), server.get_inner())).unwrap();
+
+            let listener = server
                 .listen(addr, &reactor.handle(), server::Options::default())
-                .unwrap();
-            reactor.handle().spawn(server);
+                .unwrap()
+                .1;
+            reactor.handle().spawn(listener);
+
 
             loop {
                 reactor.turn(None)
             }
         });
 
+        let (reactor, server_inner) = rx.recv().unwrap();
+
         Self {
-            reactor: rx.recv().unwrap(),
+            reactor,
             reactor_thread,
             peers: HashMap::new(),
             demux_table,
             local_addr: addr,
+            server_inner,
         }
     }
 
     pub fn connect_to_peer(&mut self, addr: SocketAddr) -> io::Result<()> {
-        let options = client::Options::default().remote(self.reactor.clone());
-        FutureClient::connect(addr, options).map(|fc| {
-            self.peers.insert(addr, fc);
-        }).wait()
+        SyncClient::connect(addr, client::Options::default()).map(|c| {
+                                                                      self.peers.insert(addr, c);
+                                                                  })
     }
 
     pub fn start_domain(&self,
-                        peer: &SocketAddr,
+                        peer_addr: &SocketAddr,
                         domain: domain::Index,
                         nodes: DomainNodes)
                         -> channel::PacketSender {
-        let peer = &self.peers[peer];
-        peer.start_domain(domain, nodes).wait().unwrap();
+        let peer = &self.peers[peer_addr];
+        peer.start_domain(domain, nodes).unwrap();
 
-        channel::PacketSender::make_remote(domain, peer.clone(), self.demux_table.clone(),self.local_addr)
+        channel::PacketSender::make_remote(domain,
+                                           peer.clone(),
+                                           peer_addr.clone(),
+                                           self.demux_table.clone(),
+                                           self.local_addr)
     }
 
-    // pub fn send_packet(&self, peer: &SocketAddr, domain: domain::Index, mut packet: Packet) {
-    //     packet.make_serializable();
-
-    //     self.peers[peer]
-    //         .recv_packet(domain, packet)
-    //         .wait()
-    //         .unwrap();
-    // }
-
-    // pub fn send_input_packet(&self, peer: &SocketAddr, domain: domain::Index, mut packet: Packet) {
-    //     packet.make_serializable();
-
-    //     self.peers[peer]
-    //         .recv_input_packet(domain, packet)
-    //         .wait()
-    //         .unwrap();
-    // }
+    pub fn add_local_domain(&self,
+                            index: domain::Index,
+                            tx: mpsc::SyncSender<Packet>,
+                            input_tx: mpsc::SyncSender<Packet>) {
+        let mut inner = self.server_inner.lock().unwrap();
+        inner.domain_txs.insert(index.clone(), tx);
+        inner.domain_input_txs.insert(index.clone(), input_tx);
+    }
 
     pub fn listen(self) {
         self.reactor_thread.join().unwrap();
     }
 
-    pub fn get_peers(&self) -> Keys<SocketAddr, FutureClient> {
+    pub fn get_peers(&self) -> Keys<SocketAddr, SyncClient> {
         self.peers.keys()
+    }
+
+    pub fn get_local_addr(&self) -> SocketAddr {
+        self.local_addr.clone()
     }
 }
 

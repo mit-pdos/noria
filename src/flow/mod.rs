@@ -1084,7 +1084,7 @@ impl<'a> Migration<'a> {
             let remote = mainline.souplet.is_some() &&
                          migrate::booting::can_be_remote(&mainline.ingredients, &nodes);
 
-            let jh = if remote {
+            if remote {
                 // TODO: create input channel and add it to mainline.in_txs
                 let addr = migrate::booting::boot_remote(domain.index().into(),
                                                          &mut mainline.ingredients,
@@ -1094,23 +1094,34 @@ impl<'a> Migration<'a> {
 
                 mainline.remote_domains.insert(domain, addr);
 
-                None
+                mainline.domains.push(None);
             } else {
                 let (in_tx, in_rx) = mpsc::sync_channel(256);
                 mainline.in_txs.insert(domain, in_tx);
 
+                let domain_index = domain.index().into();
+
                 // Start up new domain
-                Some(migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
-                                                domain.index().into(),
-                                                &mut mainline.ingredients,
-                                                nodes,
-                                                mainline.checktable.clone(),
-                                                &mut mainline.txs,
-                                                in_rx,
-                                                start_ts))
+                let jh = migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
+                                                    domain_index,
+                                                    &mut mainline.ingredients,
+                                                    nodes,
+                                                    mainline.checktable.clone(),
+                                                    &mut mainline.txs,
+                                                    in_rx,
+                                                    start_ts);
+                if mainline.souplet.is_some() {
+                    mainline
+                        .souplet
+                        .as_mut()
+                        .unwrap()
+                        .add_local_domain(domain_index,
+                                          mainline.txs[&domain_index].as_local().unwrap(),
+                                          mainline.in_txs[&domain_index].clone());
+                }
+                mainline.domains.push(Some(jh));
             };
 
-            mainline.domains.push(jh);
         }
 
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
@@ -1159,7 +1170,11 @@ impl<'a> Migration<'a> {
         // Set up inter-domain connections
         // NOTE: once we do this, we are making existing domains block on new domains!
         info!(log, "bringing up inter-domain connections");
-        migrate::routing::connect(&log, &mut mainline.ingredients, &mainline.txs, &new);
+        migrate::routing::connect(&log,
+                                  &mut mainline.ingredients,
+                                  &mainline.txs,
+                                  &new,
+                                  mainline.souplet.as_ref().map(|s| s.get_local_addr()));
 
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");

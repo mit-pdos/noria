@@ -1,14 +1,13 @@
 
-use futures::Future;
-
 use std::sync::mpsc;
 use std::net::SocketAddr;
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use flow::payload::Packet;
 use flow::domain;
 use souplet;
 use channel;
-
 
 #[derive(Debug)]
 pub enum Error {
@@ -20,21 +19,25 @@ pub enum PacketSender {
     Local(mpsc::SyncSender<Packet>),
     Remote {
         domain: domain::Index,
-        client: souplet::FutureClient,
-        local_addr: SocketAddr,
+        client: souplet::SyncClient,
+        client_addr: SocketAddr,
+
         demux_table: channel::DemuxTable,
+        local_addr: SocketAddr,
     },
 }
 
 impl PacketSender {
     pub fn make_remote(domain: domain::Index,
-                       client: souplet::FutureClient,
+                       client: souplet::SyncClient,
+                       client_addr: SocketAddr,
                        demux_table: channel::DemuxTable,
                        local_addr: SocketAddr)
                        -> Self {
         PacketSender::Remote {
             domain,
             client,
+            client_addr,
             demux_table,
             local_addr,
         }
@@ -48,10 +51,11 @@ impl PacketSender {
                 ref client,
                 local_addr,
                 ref demux_table,
+                ..
             } => {
                 packet.make_serializable(local_addr, demux_table);
-                client.recv_packet(domain, packet)
-                    .wait()
+                client
+                    .recv_packet(domain, packet)
                     .map_err(|_| Error::Unknown)
             }
         }
@@ -63,10 +67,32 @@ impl PacketSender {
             _ => None,
         }
     }
+
+    pub fn get_client_addr(&self) -> Option<SocketAddr> {
+        match *self {
+            PacketSender::Remote { ref client_addr, .. } => Some(client_addr.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl From<mpsc::SyncSender<Packet>> for PacketSender {
     fn from(s: mpsc::SyncSender<Packet>) -> Self {
         PacketSender::Local(s)
+    }
+}
+
+impl Serialize for PacketSender {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        unreachable!()
+    }
+}
+impl Deserialize for PacketSender {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        unreachable!()
     }
 }

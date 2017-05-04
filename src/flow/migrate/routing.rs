@@ -15,6 +15,7 @@ use petgraph;
 use petgraph::graph::NodeIndex;
 
 use std::collections::{HashSet, HashMap};
+use std::net::SocketAddr;
 
 use slog::Logger;
 
@@ -275,7 +276,8 @@ pub fn add(log: &Logger,
 pub fn connect(log: &Logger,
                graph: &mut Graph,
                main_txs: &HashMap<domain::Index, channel::PacketSender>,
-               new: &HashSet<NodeIndex>) {
+               new: &HashSet<NodeIndex>,
+               local_addr: Option<SocketAddr>) {
 
     // ensure all egress nodes contain the tx channel of the domains of their child ingress nodes
     for &node in new {
@@ -296,18 +298,34 @@ pub fn connect(log: &Logger,
                            "ingress" => node.index()
                     );
 
-                    // TODO(jonathan): handle case of remote domain
-                    let new_tx = main_txs[&n.domain()].as_local().map(|s|{
-                        (node.into(), n.addr(), s.into())
-                    });
+                    let egress_tx = &main_txs[&egress_node.domain()];
+                    let ingress_tx = &main_txs[&n.domain()];
 
-                    main_txs[&egress_node.domain()]
-                        .send(Packet::UpdateEgress {
-                                  node: egress_node.addr().as_local().clone(),
-                                  new_tx,
-                                  new_tag: None,
-                              })
-                        .unwrap();
+                    let egress_tx_addr = egress_tx.get_client_addr();
+                    let ingress_tx_addr = ingress_tx.get_client_addr();
+
+                    if egress_tx_addr.is_none() {
+                        egress_tx
+                            .send(Packet::UpdateEgress {
+                                      node: egress_node.addr().as_local().clone(),
+                                      new_tx: Some((node.into(), n.addr(), ingress_tx.clone())),
+                                      new_tag: None,
+                                      new_remote_tx: None,
+                                  })
+                            .unwrap();
+
+                    } else {
+                        egress_tx.send(Packet::UpdateEgress {
+                                      node: egress_node.addr().as_local().clone(),
+                                      new_tx: None,
+                                      new_tag: None,
+                                      new_remote_tx: Some((node.into(),
+                                                           n.addr(),
+                                                           ingress_tx_addr.or(local_addr).unwrap(),
+                                                           n.domain())),
+                                  })
+                            .unwrap();
+                    }
                 }
                 node::Type::Source => {}
                 _ => unreachable!("ingress parent is not egress"),

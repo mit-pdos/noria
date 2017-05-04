@@ -13,7 +13,11 @@ use std::net::SocketAddr;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
+use tarpc::sync::client;
+use tarpc::sync::client::ClientExt;
+
 use channel;
+use souplet;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Link {
@@ -100,7 +104,9 @@ pub enum TransactionState {
 impl Clone for TransactionState {
     fn clone(&self) -> Self {
         match *self {
-            TransactionState::Committed(ts, ni, ref prevs) => TransactionState::Committed(ts, ni, prevs.clone()),
+            TransactionState::Committed(ts, ni, ref prevs) => {
+                TransactionState::Committed(ts, ni, prevs.clone())
+            }
             TransactionState::Pending(..) => unreachable!(),
             TransactionState::WillCommit => TransactionState::WillCommit,
         }
@@ -191,7 +197,8 @@ pub enum Packet {
     /// Update Egress node.
     UpdateEgress {
         node: LocalNodeIndex,
-        new_tx: Option<(NodeAddress, NodeAddress, channel::SyncSender<Packet>)>,
+        new_remote_tx: Option<(NodeAddress, NodeAddress, SocketAddr, domain::Index)>,
+        new_tx: Option<(NodeAddress, NodeAddress, channel::PacketSender)>,
         new_tag: Option<(Tag, NodeAddress)>,
     },
 
@@ -373,15 +380,11 @@ impl Packet {
 
     pub fn clone_data(&self) -> Self {
         match *self {
-            Packet::Message {
-                ref link,
-                ref data,
-                ..
-            } => {
+            Packet::Message { ref link, ref data, .. } => {
                 Packet::Message {
                     link: link.clone(),
                     data: data.clone(),
-                    tracer: None, // TODO replace with: tracer.clone(),
+tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             Packet::Transaction {
@@ -394,7 +397,7 @@ impl Packet {
                     link: link.clone(),
                     data: data.clone(),
                     state: state.clone(),
-                    tracer: None, // TODO replace with: tracer.clone(),
+tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             _ => unreachable!(),
@@ -419,7 +422,9 @@ impl Packet {
         }
     }
 
-    pub fn make_serializable(&mut self, local_addr: SocketAddr, demux_table: &channel::DemuxTable) {
+    pub fn make_serializable(&mut self,
+                             local_addr: SocketAddr,
+                             demux_table: &channel::DemuxTable) {
         match *self {
             Packet::Message { ref mut tracer, .. } |
             Packet::Transaction { ref mut tracer, .. } => {
@@ -438,8 +443,8 @@ impl Packet {
             Packet::StateSizeProbe { ref mut ack, .. } => {
                 ack.make_serializable(local_addr, demux_table);
             }
-            Packet::UpdateEgress { new_tx: Some((_, _, ref mut new_tx)), .. } => {
-                new_tx.make_serializable(local_addr, demux_table);
+            Packet::UpdateEgress { ref new_tx, .. } => {
+                assert!(new_tx.is_none());
             }
             Packet::AddStreamer { ref mut new_streamer, .. } => {
                 unimplemented!();
@@ -453,7 +458,10 @@ impl Packet {
                 ..
             } => {
                 if done_tx.is_some() {
-                    done_tx.as_mut().unwrap().make_serializable(local_addr, demux_table);
+                    done_tx
+                        .as_mut()
+                        .unwrap()
+                        .make_serializable(local_addr, demux_table);
                 }
                 ack.make_serializable(local_addr, demux_table);
             }
@@ -468,6 +476,30 @@ impl Packet {
             Packet::GetStatistics { .. } |
             Packet::Captured |
             Packet::None => {}
+        }
+    }
+
+    pub fn complete_deserialize(&mut self,
+                                local_addr: SocketAddr,
+                                demux_table: &channel::DemuxTable) {
+        if let Packet::UpdateEgress {
+                   ref mut new_remote_tx,
+                   ref mut new_tx,
+                   ..
+               } = *self {
+            if let Some((a, b, client_addr, domain)) = new_remote_tx.take() {
+                assert!(new_tx.is_none());
+
+                let client = souplet::SyncClient::connect(client_addr, client::Options::default())
+                    .unwrap();
+
+                let packet_sender = channel::PacketSender::make_remote(domain,
+                                                                       client,
+                                                                       client_addr,
+                                                                       demux_table.clone(),
+                                                                       local_addr);
+                *new_tx = Some((a, b, packet_sender));
+            }
         }
     }
 }

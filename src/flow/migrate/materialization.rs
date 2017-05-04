@@ -794,6 +794,7 @@ pub fn reconstruct(log: &Logger,
                     node: graph[nodes.last().unwrap().0].addr().as_local().clone(),
                     new_tx: None,
                     new_tag: Some((tag, segments[i + 1].1[0].0.into())),
+                    new_remote_tx: None,
                 }).unwrap();
             }
 

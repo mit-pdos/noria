@@ -467,6 +467,7 @@ impl Domain {
                 node,
                 new_tx,
                 new_tag,
+                new_remote_tx,
             } => {
                 use flow::node::{Type, Egress};
                 let mut n = self.nodes[&node].borrow_mut();
@@ -475,11 +476,12 @@ impl Domain {
                                              ref mut tags,
                                          })) = *n.inner {
                     if let Some((a, b, new_tx)) = new_tx {
-                        txs.push((a, b, new_tx.unwrap_local()));
+                        txs.push((a, b, new_tx));
                     }
                     if let Some(new_tag) = new_tag {
                         tags.insert(new_tag.0, new_tag.1);
                     }
+                    assert!(new_remote_tx.is_none());
                 } else {
                     unreachable!();
                 }

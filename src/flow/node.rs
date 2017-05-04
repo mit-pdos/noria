@@ -10,6 +10,7 @@ use std::ops::{Deref, DerefMut};
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
+use channel;
 use checktable;
 
 use flow::domain;
@@ -107,7 +108,7 @@ impl Default for Reader {
 }
 
 pub struct Egress {
-    pub txs: Vec<(NodeAddress, NodeAddress, mpsc::SyncSender<Packet>)>,
+    pub txs: Vec<(NodeAddress, NodeAddress, channel::PacketSender)>,
     pub tags: HashMap<Tag, NodeAddress>,
 }
 
@@ -224,7 +225,7 @@ impl<I> From<I> for Type
 enum TypeDef {
     Ingress,
     Internal(Vec<NodeAddress>),
-    Egress,
+    Egress(HashMap<Tag, NodeAddress>),
     Reader,
     Hook,
     Source,
@@ -237,7 +238,11 @@ impl Serialize for Type {
         let def = match *self {
             Type::Ingress => TypeDef::Ingress,
             Type::Internal(ref i) => TypeDef::Internal(i.ancestors()),
-            Type::Egress {..} => TypeDef::Egress,
+            Type::Egress(None) => unreachable!(),
+            Type::Egress(Some(Egress{ ref txs, ref tags })) => {
+                assert_eq!(txs.len(), 0);
+                TypeDef::Egress(tags.clone())
+            }
             Type::Reader(..) => TypeDef::Reader,
             Type::Hook(_) => TypeDef::Hook,
             Type::Source => TypeDef::Source,
@@ -258,7 +263,9 @@ impl Deserialize for Type {
                 use ops::identity::Identity;
                 Type::Internal(Box::new(Identity::new(ancestors[0])))
             }
-            TypeDef::Egress => unimplemented!(),
+            TypeDef::Egress(tags) => {
+                Type::Egress(Some(Egress{txs: Default::default(), tags}))
+            }
             TypeDef::Reader => unimplemented!(),
             TypeDef::Hook => unimplemented!(),
             TypeDef::Source => Type::Source,
