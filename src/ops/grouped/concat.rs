@@ -259,9 +259,9 @@ mod tests {
         let s = g.add_base("source", &["x", "y"]);
 
         let c = GroupConcat::new(s,
-                                 vec![TextComponent::Literal("."),
+                                 vec![TextComponent::Literal(".".into()),
                                       TextComponent::Column(1),
-                                      TextComponent::Literal(";")],
+                                      TextComponent::Literal(";".into())],
                                  String::from("#"));
         g.set_op("concat", &["x", "ys"], c, mat);
         g

@@ -361,11 +361,9 @@ mod tests {
 
     fn setup(reversed: bool) -> (ops::test::MockGraph, NodeAddress) {
         let cmp_rows = if !reversed {
-            Box::new(|a: &&Arc<Vec<DataType>>, b: &&Arc<Vec<DataType>>| a[2].cmp(&b[2])) as
-            Box<OrderedRecordComparator>
+            vec![(2, OrderType::OrderAscending)]
         } else {
-            Box::new(|a: &&Arc<Vec<DataType>>, b: &&Arc<Vec<DataType>>| b[2].cmp(&a[2])) as
-            Box<OrderedRecordComparator>
+            vec![(2, OrderType::OrderDescending)]
         };
 
         let mut g = ops::test::MockGraph::new();
