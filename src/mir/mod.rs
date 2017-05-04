@@ -85,7 +85,7 @@ impl MirQuery {
                 };
                 assert!(in_edges >= 1, format!("{} has no incoming edges!", nd));
                 if in_edges == 1 {
-                    // last edge removed
+        // last edge removed
                     node_queue.push_back(child.clone());
                 }
                 in_edge_counts.insert(nd, in_edges - 1);
@@ -126,7 +126,7 @@ impl MirQuery {
                 };
                 assert!(in_edges >= 1);
                 if in_edges == 1 {
-                    // last edge removed
+        // last edge removed
                     node_queue.push_back(child.clone());
                 }
                 in_edge_counts.insert(nd, in_edges - 1);
@@ -200,7 +200,7 @@ impl Display for MirQuery {
                 };
                 assert!(in_edges >= 1);
                 if in_edges == 1 {
-                    // last edge removed
+        // last edge removed
                     node_queue.push_back(child.clone());
                 }
                 in_edge_counts.insert(nd, in_edges - 1);
@@ -272,7 +272,7 @@ impl MirNode {
             inner: MirNodeType::Reuse { node: rcn },
             ancestors: node.borrow().ancestors.clone(),
             children: node.borrow().children.clone(),
-            flow_node: None, // will be set in `into_flow_parts`
+flow_node: None, // will be set in `into_flow_parts`
         };
 
         let rc_mn = Rc::new(RefCell::new(mn));
@@ -364,7 +364,7 @@ impl MirNode {
         // aliased columns further up in the MIR graph.
         let mut columns: Vec<Column> = self.columns
             .iter()
-            .filter(|c| c.alias.is_none() || c.function.is_some()) // alias ok if computed column
+.filter(|c| c.alias.is_none() || c.function.is_some()) // alias ok if computed column
             .cloned()
             .collect();
 
@@ -373,14 +373,14 @@ impl MirNode {
             MirNodeType::Aggregation { ref on, .. } |
             MirNodeType::Extremum { ref on, .. } |
             MirNodeType::GroupConcat { ref on, .. } => {
-                // need the "over" column
+        // need the "over" column
                 if !columns.contains(on) {
                     columns.push(on.clone());
                 }
             }
             MirNodeType::Filter { .. } => {
                 let parent = self.ancestors.iter().next().unwrap();
-                // need all parent columns
+        // need all parent columns
                 for c in parent.borrow().columns() {
                     if !columns.contains(&c) {
                         columns.push(c.clone());
@@ -503,9 +503,9 @@ impl MirNode {
                         assert_eq!(self.ancestors.len(), 1);
                         let parent = self.ancestors[0].clone();
                         materialize_leaf_node(&parent, keys, mig);
-                        // TODO(malte): below is yucky, but required to satisfy the type system:
-                        // each match arm must return a `FlowNode`, so we use the parent's one
-                        // here.
+        // TODO(malte): below is yucky, but required to satisfy the type system:
+        // each match arm must return a `FlowNode`, so we use the parent's one
+        // here.
                         let node = match *parent.borrow().flow_node.as_ref().unwrap() {
                             FlowNode::New(na) => FlowNode::Existing(na),
                             ref n @ FlowNode::Existing(..) => n.clone(),
@@ -553,11 +553,11 @@ impl MirNode {
                            .flow_node
                            .as_ref()
                            .expect("Reused MirNode must have FlowNode") {
-                               // "New" => flow node was originally created for the node that we
-                               // are reusing
+        // "New" => flow node was originally created for the node that we
+        // are reusing
                                FlowNode::New(na) |
-                               // "Existing" => flow node was already reused from some other
-                               // MIR node
+        // "Existing" => flow node was already reused from some other
+        // MIR node
                                FlowNode::Existing(na) => FlowNode::Existing(na),
                         }
                     }
@@ -565,7 +565,7 @@ impl MirNode {
                         assert_eq!(self.ancestors.len(), 2);
                         let _left = self.ancestors[0].clone();
                         let _right = self.ancestors[1].clone();
-                        // XXX(malte): fix
+        // XXX(malte): fix
                         unimplemented!()
                     }
                     MirNodeType::TopK {
@@ -587,9 +587,9 @@ impl MirNode {
                     }
                 };
 
-                // any new flow nodes have been instantiated by now, so we replace them with
-                // existing ones, but still return `FlowNode::New` below in order to notify higher
-                // layers of the new nodes.
+        // any new flow nodes have been instantiated by now, so we replace them with
+        // existing ones, but still return `FlowNode::New` below in order to notify higher
+        // layers of the new nodes.
                 self.flow_node = match flow_node {
                     FlowNode::New(na) => Some(FlowNode::Existing(na)),
                     ref n @ FlowNode::Existing(..) => Some(n.clone()),
@@ -609,7 +609,10 @@ pub enum MirNodeType {
         kind: AggregationKind,
     },
     /// columns, keys (non-compound)
-    Base { keys: Vec<Column>, transactional: bool },
+    Base {
+        keys: Vec<Column>,
+        transactional: bool,
+    },
     /// over column, group_by columns
     Extremum {
         on: Column,
@@ -704,23 +707,23 @@ impl MirNodeType {
 
     fn can_reuse_as(&self, other: &MirNodeType) -> bool {
         match *self {
-            MirNodeType::Reuse { .. } => (),  // handled below
+MirNodeType::Reuse { .. } => (), // handled below
             _ => {
-                // we're not a `Reuse` ourselves, but the other side might be
+        // we're not a `Reuse` ourselves, but the other side might be
                 match *other {
-                    // it is, so dig deeper
+        // it is, so dig deeper
                     MirNodeType::Reuse { ref node } => {
-                        // this does not check the projected columns of the inner node for two reasons:
-                        // 1) our own projected columns aren't accessible on `MirNodeType`, but only on
-                        //    the outer `MirNode`, which isn't accessible here; but more importantly
-                        // 2) since this is already a node reuse, the inner, reused node must have *at
-                        //    least* a superset of our own (inaccessible) projected columns.
-                        // Hence, it is sufficient to check the projected columns on the parent
-                        // `MirNode`, and if that check passes, it also holds for the nodes reused
-                        // here.
+        // this does not check the projected columns of the inner node for two reasons:
+        // 1) our own projected columns aren't accessible on `MirNodeType`, but only on
+        //    the outer `MirNode`, which isn't accessible here; but more importantly
+        // 2) since this is already a node reuse, the inner, reused node must have *at
+        //    least* a superset of our own (inaccessible) projected columns.
+        // Hence, it is sufficient to check the projected columns on the parent
+        // `MirNode`, and if that check passes, it also holds for the nodes reused
+        // here.
                         return self.can_reuse_as(&node.borrow().inner);
                     }
-                    _ => (),  // handled below
+_ => (), // handled below
                 }
             }
         }
@@ -737,8 +740,8 @@ impl MirNodeType {
                         ref group_by,
                         ref kind,
                     } => {
-                        // TODO(malte): this is stricter than it needs to be, as it could cover
-                        // COUNT-as-SUM-style relationships.
+        // TODO(malte): this is stricter than it needs to be, as it could cover
+        // COUNT-as-SUM-style relationships.
                         our_on == on && our_group_by == group_by && our_kind == kind
                     }
                     _ => false,
@@ -770,8 +773,8 @@ impl MirNodeType {
                         ref on_right,
                         ref project,
                     } => {
-                        // TODO(malte): column order does not actually need to match, but this only
-                        // succeeds if it does.
+        // TODO(malte): column order does not actually need to match, but this only
+        // succeeds if it does.
                         our_on_left == on_left && our_on_right == on_right && our_project == project
                     }
                     _ => false,
@@ -791,13 +794,13 @@ impl MirNodeType {
             }
             MirNodeType::Reuse { node: ref us } => {
                 match *other {
-                    // both nodes are `Reuse` nodes, so we simply compare the both sides' reuse
-                    // target
+        // both nodes are `Reuse` nodes, so we simply compare the both sides' reuse
+        // target
                     MirNodeType::Reuse { ref node } => us.borrow().can_reuse_as(&*node.borrow()),
-                    // we're a `Reuse`, the other side isn't, so see if our reuse target's `inner`
-                    // can be reused for the other side. It's sufficient to check the target's
-                    // `inner` because reuse implies that our target has at least a superset of our
-                    // projected columns (see earlier comment).
+        // we're a `Reuse`, the other side isn't, so see if our reuse target's `inner`
+        // can be reused for the other side. It's sufficient to check the target's
+        // `inner` because reuse implies that our target has at least a superset of our
+        // projected columns (see earlier comment).
                     _ => us.borrow().inner.can_reuse_as(other),
                 }
             }
@@ -1013,7 +1016,7 @@ fn make_base_node(name: &str,
         let pkey_column_ids = pkey_columns
             .iter()
             .map(|pkc| {
-                     //assert_eq!(pkc.table.as_ref().unwrap(), name);
+    //assert_eq!(pkc.table.as_ref().unwrap(), name);
                      columns.iter().position(|c| c == pkc).unwrap()
                  })
             .collect();
@@ -1168,7 +1171,7 @@ fn make_join_node(name: &str,
                      JoinSource::B(find_column_id(&left, c),
                                    find_column_id(&right, &on_right[pos]))
                  }
-                 // WTF, rustfmt?
+    // WTF, rustfmt?
                  None => {
                      if projected_cols_left.contains(c) {
                          JoinSource::L(find_column_id(&left, c))
@@ -1298,7 +1301,7 @@ fn make_topk_node(name: &str,
     let column_names = columns.iter().map(|c| &c.name).collect::<Vec<_>>();
 
     let group_by_indx = if group_by.is_empty() {
-        // no query parameters, so we index on the first column
+    // no query parameters, so we index on the first column
         vec![0 as usize]
     } else {
         group_by
@@ -1314,41 +1317,21 @@ fn make_topk_node(name: &str,
             .collect::<Vec<_>>()
     };
 
-    let cmp_rows = match *order {
-        Some(ref o) => {
-            assert_eq!(offset, 0); // Non-zero offset not supported
-
-            let columns: Vec<_> = o.iter()
+    let cmp_rows = order
+        .as_ref()
+        .map(|v| {
+            v.iter()
                 .map(|&(ref c, ref order_type)| {
-                    (order_type.clone(),
-                     parent
+                    (parent
                          .borrow()
                          .columns()
                          .iter()
                          .position(|pc| pc == c)
-                         .unwrap())
+                         .unwrap(),
+                     order_type.clone())
                 })
-                .collect();
-
-            Box::new(move |a: &&Arc<Vec<DataType>>, b: &&Arc<Vec<DataType>>| {
-                let mut ret = Ordering::Equal;
-                for &(ref o, c) in columns.iter() {
-                    ret = match *o {
-                        OrderType::OrderAscending => a[c].cmp(&b[c]),
-                        OrderType::OrderDescending => b[c].cmp(&a[c]),
-                    };
-                    if ret != Ordering::Equal {
-                        return ret;
-                    }
-                }
-                ret
-            }) as Box<Fn(&&_, &&_) -> Ordering + Send + 'static>
-        }
-        None => {
-            Box::new(|_: &&_, _: &&_| Ordering::Equal) as
-            Box<Fn(&&_, &&_) -> Ordering + Send + 'static>
-        }
-    };
+                .collect()
+        }).unwrap_or_default();
 
     // make the new operator and record its metadata
     let na =
@@ -1369,9 +1352,9 @@ fn materialize_leaf_node(node: &MirNodeRef, key_cols: &Vec<Column>, mut mig: &mu
     // TODO(malte): consider the case when the projected columns need reordering
 
     if !key_cols.is_empty() {
-        // TODO(malte): this does not yet cover the case when there are multiple query
-        // parameters, which requires compound key support on Reader nodes.
-        //assert_eq!(key_cols.len(), 1);
+    // TODO(malte): this does not yet cover the case when there are multiple query
+    // parameters, which requires compound key support on Reader nodes.
+    //assert_eq!(key_cols.len(), 1);
         let first_key_col_id = node.borrow()
             .columns()
             .iter()
@@ -1379,7 +1362,7 @@ fn materialize_leaf_node(node: &MirNodeRef, key_cols: &Vec<Column>, mut mig: &mu
             .unwrap();
         mig.maintain(na, first_key_col_id);
     } else {
-        // if no key specified, default to the first column
+    // if no key specified, default to the first column
         mig.maintain(na, 0);
     }
 }

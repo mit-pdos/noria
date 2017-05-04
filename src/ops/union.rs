@@ -240,6 +240,10 @@ impl Ingredient for Union {
             .map(|(src, emit)| (*src, Some(emit[col])))
             .collect()
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Union {emit: self.emit.clone()}
+    }
 }
 
 #[cfg(test)]

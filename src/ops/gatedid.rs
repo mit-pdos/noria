@@ -88,6 +88,10 @@ impl Ingredient for GatedIdentity {
     fn parent_columns(&self, column: usize) -> Vec<(NodeAddress, Option<usize>)> {
         vec![(self.src, Some(column))]
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Identity
+    }
 }
 
 #[cfg(test)]

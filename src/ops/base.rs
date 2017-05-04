@@ -461,6 +461,9 @@ impl Ingredient for Base {
     fn parent_columns(&self, _: usize) -> Vec<(NodeAddress, Option<usize>)> {
         unreachable!();
     }
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Base
+    }
 }
 
 #[cfg(test)]

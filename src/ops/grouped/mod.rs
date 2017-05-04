@@ -267,4 +267,8 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
     fn is_selective(&self) -> bool {
         true
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::GroupedOperation
+    }
 }

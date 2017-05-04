@@ -55,7 +55,7 @@ impl Ingredient for Latest {
     }
 
     fn will_query(&self, _: bool) -> bool {
-        true // because the latest may be retracted
+true // because the latest may be retracted
     }
 
     fn on_connected(&mut self, _: &Graph) {}
@@ -83,9 +83,9 @@ impl Ingredient for Latest {
         let mut out = Vec::with_capacity(rs.len());
         {
             let currents = rs.into_iter().filter_map(|r| {
-            // We don't allow standalone negatives as input to a latest. This is because it would
-            // be very computationally expensive (and currently impossible) to find what the
-            // *previous* latest was if the current latest was revoked.
+        // We don't allow standalone negatives as input to a latest. This is because it would
+        // be very computationally expensive (and currently impossible) to find what the
+        // *previous* latest was if the current latest was revoked.
             if !r.is_positive() {
                 return None;
             }
@@ -96,9 +96,9 @@ impl Ingredient for Latest {
                     Some((r, rs.get(0)))
                 }
                 LookupResult::Missing => {
-                    // we don't actively materialize holes unless requested by a read. this can't
-                    // be a read, because reads cause replay, which fill holes with an empty set
-                    // before processing!
+        // we don't actively materialize holes unless requested by a read. this can't
+        // be a read, because reads cause replay, which fill holes with an empty set
+        // before processing!
                     misses.push(Miss{
                         node: *self.us.unwrap().as_local(),
                         key: vec![r[self.key[0]].clone()],
@@ -108,13 +108,13 @@ impl Ingredient for Latest {
             }
         });
 
-            // buffer emitted records
+        // buffer emitted records
             for (r, current) in currents {
                 if let Some(current) = current {
                     out.push(Record::Negative(current.clone()));
                 }
 
-                // if there was a previous latest for this key, revoke old record
+        // if there was a previous latest for this key, revoke old record
                 out.push(r);
             }
         }
@@ -147,6 +147,10 @@ impl Ingredient for Latest {
 
     fn parent_columns(&self, column: usize) -> Vec<(NodeAddress, Option<usize>)> {
         vec![(self.src, Some(column))]
+    }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Latest { keys: self.key.clone() }
     }
 }
 
@@ -235,7 +239,7 @@ mod tests {
 
         // negatives and positives should still result in only one new current for each group
         let rs = c.narrow_one(u, true);
-        assert_eq!(rs.len(), 4); // one - and one + for each group
+assert_eq!(rs.len(), 4); // one - and one + for each group
         // group 1 lost 2 and gained 3
         assert!(rs.iter()
                     .any(|r| if let Record::Negative(ref r) = *r {

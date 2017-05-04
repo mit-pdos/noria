@@ -168,6 +168,10 @@ impl Ingredient for Filter {
     fn is_selective(&self) -> bool {
         true
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Filter { filter: self.filter.as_ref().clone() }
+    }
 }
 
 #[cfg(test)]

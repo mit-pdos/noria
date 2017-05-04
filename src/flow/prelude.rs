@@ -6,6 +6,7 @@ use flow::core;
 pub use flow::core::{NodeAddress, LocalNodeIndex};
 pub use flow::core::{DataType, Record, Records, Datas};
 pub use flow::core::{Ingredient, ProcessingResult, Miss, RawProcessingResult};
+pub use flow::core::processing::SerializableIngredient;
 
 // graph types
 pub use flow::node::Node;

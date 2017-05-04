@@ -6,7 +6,7 @@ use std::sync::Arc;
 use flow::prelude::*;
 
 /// Kind of join
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum JoinType {
     /// Left join between two views
     Left,
@@ -15,7 +15,7 @@ pub enum JoinType {
 }
 
 /// Where to source a join column
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum JoinSource {
     /// Column in left parent
     L(usize),
@@ -154,9 +154,9 @@ impl Ingredient for Join {
         let mut misses = Vec::new();
 
         if from == self.right && self.kind == JoinType::Left {
-            // If records are being received from the right, then populate self.right_counts
-            // with the number of records that existed for each key *before* this batch of
-            // records was processed.
+        // If records are being received from the right, then populate self.right_counts
+        // with the number of records that existed for each key *before* this batch of
+        // records was processed.
             self.right_counts.clear();
             for r in rs.iter() {
                 let ref key = r.rec()[self.on.1];
@@ -174,7 +174,7 @@ impl Ingredient for Join {
                                      state)
                     .unwrap();
                 if rc.is_none() {
-                    // we got something from right, but that row's key is not in right??
+        // we got something from right, but that row's key is not in right??
                     unreachable!();
                 }
                 self.right_counts
@@ -216,7 +216,7 @@ impl Ingredient for Join {
             let mut other_rows = other_rows.unwrap().peekable();
 
             if self.kind == JoinType::Left {
-                // emit null rows if necessary for left join
+        // emit null rows if necessary for left join
                 if from == self.right {
                     let rc = {
                         let rc = self.right_counts.get_mut(&row[self.on.0]).unwrap();
@@ -298,10 +298,31 @@ impl Ingredient for Join {
     fn parent_columns(&self, col: usize) -> Vec<(NodeAddress, Option<usize>)> {
         let pcol = self.emit[col];
         if (pcol.0 && pcol.1 == self.on.0) || (pcol.0 && pcol.1 == self.on.1) {
-            // Join column comes from both parents
+        // Join column comes from both parents
             vec![(self.left, Some(self.on.0)), (self.right, Some(self.on.1))]
         } else {
             vec![(if pcol.0 { self.left } else { self.right }, Some(pcol.1))]
+        }
+    }
+    fn into_serializable(&self) -> SerializableIngredient {
+        let emit = self.emit
+            .iter()
+            .map(|&(from_left, col)| {
+        // rustfmt
+                if from_left && self.on.0 == col || !from_left && self.on.1 == col {
+                    JoinSource::B(self.on.0, self.on.1)
+                } else if from_left {
+                    JoinSource::L(col)
+                } else {
+                    JoinSource::R(col)
+                }
+            }).collect();
+
+        SerializableIngredient::Join {
+            left: self.left,
+            right: self.right,
+            kind: self.kind.clone(),
+            emit,
         }
     }
 }
@@ -407,8 +428,9 @@ mod tests {
         use std::collections::HashMap;
         let me = NodeAddress::mock_global(2.into());
         let (g, l, r) = setup();
-        let hm: HashMap<_, _> = vec![(l, vec![0]), /* join column for left */
-                                     (r, vec![0]) /* join column for right */]
+let hm: HashMap<_, _> = vec![(l, vec![0]), /* join column for left */
+(r, vec![0]) /* join column for right */
+]
                 .into_iter()
                 .collect();
         assert_eq!(g.node().suggest_indexes(me), hm);

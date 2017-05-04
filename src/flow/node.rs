@@ -15,7 +15,6 @@ use checktable;
 
 use flow::domain;
 use flow::keys;
-use flow::payload::Packet;
 use flow::migrate::materialization::Tag;
 use flow::prelude::*;
 use flow::hook;
@@ -173,7 +172,7 @@ impl Type {
         keys::provenance_of(graph, index, column, |_, _| None)
             .into_iter()
             .map(|path| {
-        // we want the base node corresponding to each path
+                     // we want the base node corresponding to each path
                      path.into_iter().last().unwrap()
                  })
             .collect()
@@ -224,7 +223,7 @@ impl<I> From<I> for Type
 #[derive(Serialize, Deserialize)]
 enum TypeDef {
     Ingress,
-    Internal(Vec<NodeAddress>),
+    Internal(Vec<NodeAddress>, SerializableIngredient),
     Egress(HashMap<Tag, NodeAddress>),
     Reader,
     Hook,
@@ -237,9 +236,9 @@ impl Serialize for Type {
     {
         let def = match *self {
             Type::Ingress => TypeDef::Ingress,
-            Type::Internal(ref i) => TypeDef::Internal(i.ancestors()),
+            Type::Internal(ref i) => TypeDef::Internal(i.ancestors(), i.into_serializable()),
             Type::Egress(None) => unreachable!(),
-            Type::Egress(Some(Egress{ ref txs, ref tags })) => {
+            Type::Egress(Some(Egress { ref txs, ref tags })) => {
                 assert_eq!(txs.len(), 0);
                 TypeDef::Egress(tags.clone())
             }
@@ -253,23 +252,28 @@ impl Serialize for Type {
 }
 
 impl Deserialize for Type {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer
     {
-        TypeDef::deserialize(deserializer).map(|def|match def {
-            TypeDef::Ingress => Type::Ingress,
-            TypeDef::Internal(ancestors) => {
-                assert_eq!(ancestors.len(), 1);
+        let def = TypeDef::deserialize(deserializer);
+        if let Err(err) = def {
+            return Err(err);
+        }
 
-                use ops::identity::Identity;
-                Type::Internal(Box::new(Identity::new(ancestors[0])))
-            }
+       let t = match def.unwrap() {
+            TypeDef::Ingress => Type::Ingress,
+            TypeDef::Internal(ancestors, si) => Type::Internal(si.into_ingredient(ancestors)),
             TypeDef::Egress(tags) => {
-                Type::Egress(Some(Egress{txs: Default::default(), tags}))
+                Type::Egress(Some(Egress {
+                                      txs: Default::default(),
+                                      tags,
+                                  }))
             }
             TypeDef::Reader => unimplemented!(),
             TypeDef::Hook => unimplemented!(),
             TypeDef::Source => Type::Source,
-        })
+        };
+        Ok(t)
     }
 }
 
@@ -411,25 +415,25 @@ impl Node {
             Type::Internal(ref i) => {
                 write!(f, "{{")?;
 
-        // Output node name and description. First row.
+                // Output node name and description. First row.
                 write!(f,
                        "{{ {} / {} | {} }}",
                        idx.index(),
                        escape(self.name()),
                        escape(&i.description()))?;
 
-        // Output node outputs. Second row.
+                // Output node outputs. Second row.
                 write!(f, " | {}", self.fields().join(", \\n"))?;
 
-        // Maybe output node's HAVING conditions. Optional third row.
-        // TODO
-        // if let Some(conds) = n.node().unwrap().having_conditions() {
-        //     let conds = conds.iter()
-        //         .map(|c| format!("{}", c))
-        //         .collect::<Vec<_>>()
-        //         .join(" ∧ ");
-        //     write!(f, " | σ({})", escape(&conds))?;
-        // }
+                // Maybe output node's HAVING conditions. Optional third row.
+                // TODO
+                // if let Some(conds) = n.node().unwrap().having_conditions() {
+                //     let conds = conds.iter()
+                //         .map(|c| format!("{}", c))
+                //         .collect::<Vec<_>>()
+                //         .join(" ∧ ");
+                //     write!(f, " | σ({})", escape(&conds))?;
+                // }
 
                 write!(f, " }}")
             }

@@ -155,8 +155,8 @@ pub trait Ingredient
                           prelude::LookupResult::Missing => Some(None),
                       })
             .or_else(|| {
-                // this is a long-shot.
-                // if our ancestor can be queried *through*, then we just use that state instead
+        // this is a long-shot.
+        // if our ancestor can be queried *through*, then we just use that state instead
                 let parent = domain.get(parent.as_local()).unwrap().borrow();
                 if parent.is_internal() {
                     parent.query_through(columns, key, states)
@@ -175,5 +175,80 @@ pub trait Ingredient
     /// Performance hint: should return true if this operator reduces the size of its input
     fn is_selective(&self) -> bool {
         false
+    }
+
+    fn into_serializable(&self) -> SerializableIngredient;
+}
+
+use nom_sql;
+use ops::join;
+#[derive(Serialize, Deserialize)]
+pub enum SerializableIngredient {
+    Join {
+        left: prelude::NodeAddress,
+        right: prelude::NodeAddress,
+        kind: join::JoinType,
+        emit: Vec<join::JoinSource>,
+    },
+    Latest { keys: Vec<usize> },
+    Permute { emit: Vec<usize> },
+    Project {
+        emit: Vec<usize>,
+        additional: Option<Vec<prelude::DataType>>,
+    },
+    Union { emit: HashMap<prelude::NodeAddress, Vec<usize>>, },
+    Filter { filter: Vec<Option<(nom_sql::Operator, prelude::DataType)>>, },
+    TopK {
+        order: Vec<(usize, nom_sql::OrderType)>,
+        group_by: Vec<usize>,
+        k: usize,
+    },
+    Base,
+    Identity,
+    GroupedOperation,
+}
+
+impl SerializableIngredient {
+    pub fn expected_ancestors(&self) -> usize {
+        match *self {
+            SerializableIngredient::Join {..} |
+            SerializableIngredient::Union {..} => 2,
+            _ => 1
+        }
+    }
+
+    pub fn into_ingredient(self, ancestors: Vec<prelude::NodeAddress>) -> Box<Ingredient> {
+        assert_eq!(ancestors.len(), self.expected_ancestors());
+
+        use ops;
+        match self {
+            SerializableIngredient::Identity => {
+                Box::new(ops::identity::Identity::new(ancestors[0])) as Box<Ingredient>
+            }
+            SerializableIngredient::Join {
+                left,
+                right,
+                kind,
+                emit,
+            } => Box::new(ops::join::Join::new(left, right, kind, emit)) as Box<Ingredient>,
+            SerializableIngredient::Latest { keys } => {
+                Box::new(ops::latest::Latest::new(ancestors[0], keys)) as Box<Ingredient>
+            }
+            SerializableIngredient::Permute { emit } => {
+                Box::new(ops::permute::Permute::new(ancestors[0], &emit[..]))
+            }
+            SerializableIngredient::Project { emit, additional } => {
+                Box::new(ops::project::Project::new(ancestors[0], &emit[..], additional))
+            }
+            SerializableIngredient::Union { emit } => Box::new(ops::union::Union::new(emit)),
+            SerializableIngredient::Filter { filter } => {
+                Box::new(ops::filter::Filter::new(ancestors[0], &filter[..]))
+            }
+            SerializableIngredient::TopK  {order, group_by, k} => {
+                Box::new(ops::topk::TopK::new(ancestors[0], order, group_by, k))
+            }
+            SerializableIngredient::Base |
+            SerializableIngredient::GroupedOperation => unimplemented!(),
+        }
     }
 }

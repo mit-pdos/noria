@@ -150,6 +150,13 @@ impl Ingredient for Project {
         };
         vec![(self.src, result)]
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Project {
+            emit: self.emit.as_ref().unwrap().clone(),
+            additional: self.additional.clone(),
+        }
+    }
 }
 
 #[cfg(test)]

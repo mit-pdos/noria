@@ -123,6 +123,10 @@ impl Ingredient for Permute {
     fn parent_columns(&self, column: usize) -> Vec<(NodeAddress, Option<usize>)> {
         vec![(self.src, Some(self.resolve_col(column)))]
     }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::Permute { emit: self.emit.as_ref().unwrap().clone() }
+    }
 }
 
 #[cfg(test)]

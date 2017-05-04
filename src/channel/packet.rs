@@ -83,14 +83,14 @@ impl From<mpsc::SyncSender<Packet>> for PacketSender {
 }
 
 impl Serialize for PacketSender {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         unreachable!()
     }
 }
 impl Deserialize for PacketSender {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         unreachable!()

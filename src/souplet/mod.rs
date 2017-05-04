@@ -7,7 +7,6 @@ use std::sync::mpsc;
 use std::io;
 use std::process;
 
-use futures::Future;
 use tarpc::future::server;
 use tarpc::sync::client::ClientExt;
 use tarpc::sync::client;
