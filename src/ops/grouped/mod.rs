@@ -54,6 +54,8 @@ pub trait GroupedOperation: fmt::Debug + Clone {
     fn apply(&self, current: Option<&DataType>, diffs: Vec<Self::Diff>) -> DataType;
 
     fn description(&self) -> String;
+
+    fn into_serializable(&self) -> SerializableIngredient;
 }
 
 #[derive(Debug, Clone)]
@@ -269,6 +271,6 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::GroupedOperation
+        self.inner.into_serializable()
     }
 }

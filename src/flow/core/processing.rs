@@ -182,6 +182,7 @@ pub trait Ingredient
 
 use nom_sql;
 use ops::join;
+use ops::grouped;
 #[derive(Serialize, Deserialize)]
 pub enum SerializableIngredient {
     Join {
@@ -205,7 +206,9 @@ pub enum SerializableIngredient {
     },
     Base,
     Identity,
-    GroupedOperation,
+    Aggregation(grouped::aggregate::Aggregator),
+    GroupConcant(grouped::concat::GroupConcat),
+    Extremum(grouped::extremum::ExtremumOperator),
 }
 
 impl SerializableIngredient {
@@ -244,11 +247,13 @@ impl SerializableIngredient {
             SerializableIngredient::Filter { filter } => {
                 Box::new(ops::filter::Filter::new(ancestors[0], &filter[..]))
             }
-            SerializableIngredient::TopK  {order, group_by, k} => {
+            SerializableIngredient::TopK { order, group_by, k } => {
                 Box::new(ops::topk::TopK::new(ancestors[0], order, group_by, k))
             }
-            SerializableIngredient::Base |
-            SerializableIngredient::GroupedOperation => unimplemented!(),
+            SerializableIngredient::Aggregation(a) => Box::new(grouped::GroupedOperator::new(ancestors[0], a)),
+            SerializableIngredient::GroupConcant(c) => Box::new(grouped::GroupedOperator::new(ancestors[0], c)),
+            SerializableIngredient::Extremum(e) => Box::new(grouped::GroupedOperator::new(ancestors[0], e)),
+            SerializableIngredient::Base => unimplemented!(),
         }
     }
 }

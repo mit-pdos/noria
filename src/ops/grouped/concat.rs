@@ -6,13 +6,40 @@ use std::collections::HashSet;
 use flow::prelude::*;
 
 /// Designator for what a given position in a group concat output should contain.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TextComponent {
     /// Emit a literal string.
-    Literal(&'static str),
+    Literal(String),
     /// Emit the string representation of the given column in the current record.
     Column(usize),
 }
+
+// #[derive(Serialize, Deserialize)]
+// enum TextComponentDef {
+//     Literal(String),
+//     Column(usize),
+// }
+// impl Serialize for TextComponent {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//         where S: Serializer
+//     {
+//         match *self {
+//             TextComponent::Literal(s) => TextComponentDef::Literal(s.into()).serialize(serializer),
+//             TextComponent::Column(c) => TextComponentDef::Column(c).serialize(serializer),
+//         }
+//     }
+// }
+
+// impl Deserialize for TextComponent {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//         where D: Deserializer
+//     {
+//         let def = TextComponentDef::deserialize(deserializer);
+//         match def {
+//             TextComponentDef::Literal(s) => 
+//         }
+//     }
+// }
 
 pub enum Modify {
     Add(String),
@@ -38,7 +65,7 @@ pub enum Modify {
 /// is the primary reason for the "separator as sentinel" behavior mentioned above, and may be made
 /// optional in the future such that more efficient incremental updating and relaxed separator
 /// semantics can be implemented.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupConcat {
     components: Vec<TextComponent>,
     separator: String,
@@ -79,8 +106,8 @@ impl GroupConcat {
         let mut s = String::with_capacity(self.slen);
         for tc in &self.components {
             match *tc {
-                TextComponent::Literal(l) => {
-                    s.push_str(l);
+                TextComponent::Literal(ref l) => {
+                    s.push_str(l.as_str());
                 }
                 TextComponent::Column(i) => {
                     match rec[i] {
@@ -124,7 +151,7 @@ impl GroupedOperation for GroupConcat {
         self.slen = 0;
         // well, the length of all literal components
         for tc in &self.components {
-            if let TextComponent::Literal(l) = *tc {
+            if let TextComponent::Literal(ref l) = *tc {
                 self.slen += l.len();
             }
         }
@@ -195,7 +222,7 @@ impl GroupedOperation for GroupConcat {
         let fields = self.components
             .iter()
             .map(|c| match *c {
-                     TextComponent::Literal(s) => format!("\"{}\"", s),
+                     TextComponent::Literal(ref s) => format!("\"{}\"", s),
                      TextComponent::Column(i) => i.to_string(),
                  })
             .collect::<Vec<_>>()
@@ -214,6 +241,10 @@ impl GroupedOperation for GroupConcat {
                 fields,
                 self.separator,
                 group_cols)
+    }
+
+    fn into_serializable(&self) -> SerializableIngredient {
+        SerializableIngredient::GroupConcant(self.clone())
     }
 }
 
