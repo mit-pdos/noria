@@ -1,7 +1,6 @@
 use petgraph::graph::NodeIndex;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc;
 
 use std::cmp::Ordering;
 
@@ -11,12 +10,13 @@ use flow::prelude::*;
 use flow::payload::{TransactionState, ReplayTransactionState};
 use flow::domain;
 
+use channel;
 use checktable;
 
 
 enum BufferedTransaction {
     Transaction(NodeIndex, Packet),
-    MigrationStart(mpsc::SyncSender<()>),
+    MigrationStart(channel::SyncSender<()>),
     MigrationEnd(HashMap<NodeIndex, usize>),
     Replay(Packet),
     SeedReplay(Tag, Vec<DataType>, ReplayTransactionState),
@@ -50,7 +50,7 @@ impl Eq for BufferEntry {}
 enum Bundle {
     Empty,
     Messages(usize, Vec<Packet>),
-    MigrationStart(mpsc::SyncSender<()>),
+    MigrationStart(channel::SyncSender<()>),
     MigrationEnd(HashMap<NodeIndex, usize>),
     Replay(Packet),
     SeedReplay(Tag, Vec<DataType>, ReplayTransactionState),
@@ -218,7 +218,7 @@ impl DomainState {
                     let bundle = match m {
                         Packet::Transaction { .. } => Bundle::Messages(count, vec![m]),
                         Packet::StartMigration { ack, .. } => {
-                            Bundle::MigrationStart(ack.unwrap_local())
+                            Bundle::MigrationStart(ack)
                         }
                         Packet::CompleteMigration { ingress_from_base, .. } => {
                             Bundle::MigrationEnd(ingress_from_base)
@@ -236,7 +236,7 @@ impl DomainState {
             let transaction = match m {
                 Packet::Transaction { .. } => BufferedTransaction::Transaction(base.unwrap(), m),
                 Packet::StartMigration { ack, .. } => {
-                    BufferedTransaction::MigrationStart(ack.unwrap_local())
+                    BufferedTransaction::MigrationStart(ack)
                 }
                 Packet::CompleteMigration { ingress_from_base, .. } => {
                     BufferedTransaction::MigrationEnd(ingress_from_base)

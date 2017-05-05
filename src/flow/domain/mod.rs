@@ -18,6 +18,7 @@ use slog::Logger;
 
 use flow::transactions;
 
+use channel;
 use checktable;
 
 const BATCH_SIZE: usize = 256;
@@ -68,7 +69,7 @@ enum DomainMode {
 struct ReplayPath {
     source: Option<NodeAddress>,
     path: Vec<(NodeAddress, Option<usize>)>,
-    done_tx: Option<mpsc::SyncSender<()>>,
+    done_tx: Option<channel::SyncSender<()>>,
     trigger: TriggerEndpoint,
 }
 
@@ -333,9 +334,8 @@ impl Domain {
 
         let mut egress_messages = HashMap::new();
         let ts = if let Some(&Packet::Transaction {
-                                            state: ref ts @ TransactionState::Committed(..),
-                                            ..
-                                        }) = messages.iter().next() {
+                                  state: ref ts @ TransactionState::Committed(..), ..
+                              }) = messages.iter().next() {
             ts.clone()
         } else {
             unreachable!();
@@ -490,7 +490,10 @@ impl Domain {
                 use flow::node::{Type, Reader};
                 let mut n = self.nodes[&node].borrow_mut();
                 if let Type::Reader(_, Reader { ref mut streamers, .. }) = *n.inner {
-                    streamers.as_mut().unwrap().push(new_streamer.unwrap_local());
+                    streamers
+                        .as_mut()
+                        .unwrap()
+                        .push(new_streamer.unwrap_local());
                 } else {
                     unreachable!();
                 }
@@ -562,7 +565,7 @@ impl Domain {
                             ReplayPath {
                                 source,
                                 path,
-                                done_tx: done_tx.map(|s|s.unwrap_local()),
+                                done_tx,
                                 trigger,
                             });
             }
