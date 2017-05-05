@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use std::io;
 use std::process;
+use std::time;
 
 use tarpc::future::server;
 use tarpc::sync::client::ClientExt;
@@ -83,6 +84,7 @@ impl FutureService for SoupletServer {
         let mut inner = self.inner.lock().unwrap();
         inner.domain_txs.insert(domain_index, tx);
         inner.domain_input_txs.insert(domain_index, in_tx);
+        println!("Started domain #{}", domain_index.index());
         Ok(())
     }
 
@@ -133,35 +135,36 @@ pub struct Souplet {
     demux_table: channel::DemuxTable,
     local_addr: SocketAddr,
     server_inner: Arc<Mutex<SoupletServerInner>>,
+    shutdown_tx: mpsc::Sender<()>,
 }
 
 impl Souplet {
     pub fn new(addr: SocketAddr) -> Self {
         let (tx, rx) = mpsc::channel();
+        let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
-        let addr2 = addr;
         let demux_table = Arc::new(Mutex::new((0, HashMap::new())));
         let demux_table2 = demux_table.clone();
 
         let reactor_thread = thread::spawn(move || {
             let mut reactor = reactor::Core::new().unwrap();
 
-            let server = SoupletServer::new(addr2, demux_table2, reactor.remote());
-            tx.send(server.get_inner()).unwrap();
+            let server = SoupletServer::new(addr, demux_table2, reactor.remote());
+            let server_inner = server.get_inner();
 
             let listener = server
                 .listen(addr, &reactor.handle(), server::Options::default())
-                .unwrap()
-                .1;
-            reactor.handle().spawn(listener);
+                .unwrap();
 
+            tx.send((server_inner, listener.0.addr())).unwrap();
+            reactor.handle().spawn(listener.1);
 
-            loop {
+            while shutdown_rx.try_recv().is_err() {
                 reactor.turn(None)
             }
         });
 
-        let server_inner = rx.recv().unwrap();
+        let (server_inner, addr) = rx.recv().unwrap();
 
         Self {
             reactor_thread,
@@ -169,6 +172,7 @@ impl Souplet {
             demux_table,
             local_addr: addr,
             server_inner,
+            shutdown_tx,
         }
     }
 
@@ -202,8 +206,10 @@ impl Souplet {
         inner.domain_input_txs.insert(index.clone(), input_tx);
     }
 
-    pub fn listen(self) {
-        self.reactor_thread.join().unwrap();
+    pub fn listen(&mut self) {
+        loop {
+            thread::sleep(time::Duration::from_millis(1000));
+        }
     }
 
     pub fn get_peers(&self) -> Keys<SocketAddr, SyncClient> {
@@ -212,6 +218,12 @@ impl Souplet {
 
     pub fn get_local_addr(&self) -> SocketAddr {
         self.local_addr.clone()
+    }
+}
+
+impl Drop for Souplet {
+    fn drop(&mut self) {
+        let _ = self.shutdown_tx.send(());
     }
 }
 

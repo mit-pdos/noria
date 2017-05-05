@@ -31,7 +31,7 @@ fn build_descriptors(graph: &mut Graph, nodes: Vec<(NodeIndex, bool)>) -> Domain
 
 pub fn can_be_remote(graph: &Graph, nodes: &Vec<(NodeIndex, bool)>) -> bool {
     for &(ni, _) in nodes {
-        if graph[ni].is_internal() && graph[ni].get_base().is_some() {
+        if graph[ni].is_reader() || graph[ni].is_internal() && graph[ni].get_base().is_some() {
             return false;
         }
     }

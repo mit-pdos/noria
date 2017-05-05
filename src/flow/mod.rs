@@ -281,6 +281,20 @@ impl Default for Blender {
                                                 &["because-type-inference"],
                                                 node::Type::Source,
                                                 true));
+
+        use std::env;
+        let souplet = env::var_os("SOUPLETS").into_iter().filter_map(|worker_list| {
+            if worker_list.len() == 0 {
+                return None;
+            }
+
+            let mut s = souplet::Souplet::new("127.0.0.1:0".parse().unwrap());
+            for worker in worker_list.into_string().unwrap().split(",") {
+                s.connect_to_peer(worker.parse().unwrap()).expect("failed to connect to worker");
+            }
+            Some(s)
+        }).next();
+
         Blender {
             ingredients: g,
             source: source,
@@ -289,7 +303,7 @@ impl Default for Blender {
             partial: Default::default(),
             partial_enabled: true,
 
-            souplet: None,
+            souplet,
             remote_domains: HashMap::default(),
 
             txs: HashMap::default(),

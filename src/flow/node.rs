@@ -466,6 +466,14 @@ impl Node {
         }
     }
 
+    pub fn is_reader(&self) -> bool {
+        if let Type::Reader(..) = *self.inner {
+            true
+        } else {
+            false
+        }
+    }
+
     /// A node is considered to be an output node if changes to its state are visible outside of
     /// its domain.
     pub fn is_output(&self) -> bool {
