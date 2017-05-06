@@ -1,69 +1,75 @@
 use distributary::srv;
 use distributary::DataType;
-use tarpc;
-use tarpc::util::FirstSocketAddr;
-use tarpc::future::client::{ClientExt, Options};
-use tokio_core::reactor;
-use futures;
 
 use common::{Writer, Reader, ArticleResult, Period};
+
+use std::io;
+use std::io::prelude::*;
+use std::net::TcpStream;
+use bufstream::BufStream;
+use bincode;
 
 const ARTICLE_NODE: usize = 1;
 const VOTE_NODE: usize = 2;
 const END_NODE: usize = 4;
 
-pub struct C(srv::ext::FutureClient, reactor::Core);
-use std::ops::{Deref, DerefMut};
-impl Deref for C {
-    type Target = srv::ext::FutureClient;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for C {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+pub struct C(BufStream<TcpStream>);
 impl C {
-    pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
-        let &mut C(ref client, ref mut core) = self;
-        let fut = futures::future::join_all(data.into_iter().map(|row| client.insert(view, row)));
-        core.run(fut).unwrap();
-    }
-    pub fn query(&mut self,
-                 view: usize,
-                 keys: Vec<DataType>)
-                 -> Result<Vec<Vec<Vec<DataType>>>, tarpc::Error<()>> {
-        let &mut C(ref client, ref mut core) = self;
-        let fut = futures::future::join_all(keys.into_iter().map(|key| client.query(view, key)));
-        core.run(fut)
-    }
-}
-unsafe impl Send for C {}
-
-fn mkc(addr: &str) -> C {
-    use self::srv::ext::FutureClient;
-    let mut core = reactor::Core::new().unwrap();
-    for _ in 0..3 {
-        let c = FutureClient::connect(addr.first_socket_addr(),
-                                      Options::default().handle(core.handle()));
-        match core.run(c) {
-            Ok(client) => {
-                return C(client, core);
+    pub fn mput(&mut self, view: usize, mut data: Vec<Vec<DataType>>) {
+        let &mut C(ref mut bs) = self;
+        let n = data.len();
+        let mut method = srv::Method::Insert {
+            view,
+            args: Vec::new(),
+        };
+        for r in &mut data {
+            if let srv::Method::Insert { ref mut args, .. } = method {
+                use std::mem;
+                mem::swap(args, r);
             }
-            Err(_) => {
-                use std::thread;
-                use std::time::Duration;
-                thread::sleep(Duration::from_millis(100));
-            }
+            bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
+        }
+        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
+        bs.flush().unwrap();
+        for _ in 0..n {
+            let _: i64 = bincode::deserialize_from(bs, bincode::Infinite).unwrap();
         }
     }
-    panic!("Failed to connect to netsoup server");
+
+    pub fn query(&mut self,
+                 view: usize,
+                 mut keys: Vec<DataType>)
+                 -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
+        let &mut C(ref mut bs) = self;
+        let n = keys.len();
+        let mut method = srv::Method::Query {
+            view,
+            key: DataType::None,
+        };
+        for q_key in &mut keys {
+            if let srv::Method::Query { ref mut key, .. } = method {
+                use std::mem;
+                mem::swap(key, q_key);
+            }
+            bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
+        }
+        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
+        bs.flush()?;
+        Ok((0..n)
+               .map(|_| {
+                        let result: Result<Vec<Vec<DataType>>, ()> =
+                            bincode::deserialize_from(bs, bincode::Infinite).unwrap();
+                        result.unwrap_or_default()
+                    })
+               .collect())
+    }
 }
 
 pub fn make(addr: &str) -> C {
-    mkc(addr)
+    let stream = TcpStream::connect(addr).unwrap();
+    stream.set_nodelay(true).unwrap();
+    let stream = BufStream::new(stream);
+    C(stream)
 }
 
 impl Writer for C {

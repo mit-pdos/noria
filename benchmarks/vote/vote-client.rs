@@ -1,14 +1,11 @@
-#![cfg_attr(feature="b_netsoup", feature(conservative_impl_trait, plugin))]
-#![cfg_attr(feature="b_netsoup", plugin(tarpc_plugins))]
-
 #[macro_use]
 extern crate clap;
 
 extern crate rand;
 
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
+#[cfg(feature="b_mssql")]
 extern crate futures;
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
+#[cfg(feature="b_mssql")]
 extern crate tokio_core;
 
 #[cfg(feature="b_mssql")]
@@ -22,7 +19,9 @@ extern crate mysql;
 extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
-extern crate tarpc;
+extern crate bincode;
+#[cfg(feature="b_netsoup")]
+extern crate bufstream;
 
 #[cfg(any(feature="b_memcached", feature="b_hybrid"))]
 extern crate memcached;
