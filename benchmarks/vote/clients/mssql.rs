@@ -175,9 +175,7 @@ impl Writer for RW {
             .and_then(|r| r)
             .collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
-        let fut = conn.exec(&a2_prep, &a2_vals[..])
-            .and_then(|r| r)
-            .collect();
+        let fut = conn.exec(&a2_prep, &a2_vals[..]).and_then(|r| r).collect();
         let (_, conn) = self.client.core.run(fut).unwrap();
         self.client.conn = Some(conn);
     }

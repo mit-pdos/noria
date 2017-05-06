@@ -40,9 +40,7 @@ impl Writer for Memcache {
         let keys: Vec<_> = ids.iter()
             .map(|&(_, article_id)| format!("article_{}_vc", article_id))
             .collect();
-        let ids: HashMap<_, _> = keys.iter()
-            .map(|key| (key.as_bytes(), (1, 0, 0)))
-            .collect();
+        let ids: HashMap<_, _> = keys.iter().map(|key| (key.as_bytes(), (1, 0, 0))).collect();
         //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
         drop(self.0.increment_multi(ids));
         Period::PreMigration

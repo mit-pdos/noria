@@ -112,9 +112,7 @@ impl<'a> Writer for RW<'a> {
         self.v_prep_1.execute(&values_1[..]).unwrap();
 
         // update vote counts
-        let values_2 = ids.iter()
-            .map(|&(_, ref a)| a as &_)
-            .collect::<Vec<_>>();
+        let values_2 = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
         self.v_prep_2.execute(&values_2[..]).unwrap();
 
         Period::PreMigration

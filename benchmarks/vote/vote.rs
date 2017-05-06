@@ -164,10 +164,7 @@ fn main() {
                     .unwrap()
             })
             .collect();
-        get_stats = getters
-            .into_iter()
-            .map(|jh| jh.join().unwrap())
-            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     } else {
         // put & get
         // TODO: how do we start getters after prepopulate?
@@ -201,10 +198,7 @@ fn main() {
             .collect();
 
         put_stats = putter.join().unwrap();
-        get_stats = getters
-            .into_iter()
-            .map(|jh| jh.join().unwrap())
-            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     }
 
     print_stats("PUT", false, &put_stats.pre, avg);
@@ -452,8 +446,7 @@ impl Writer for Spoon {
             Period::PostMigration
         } else {
             for &(user_id, article_id) in ids {
-                self.vote_pre
-                    .put(vec![user_id.into(), article_id.into()]);
+                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
             }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration
@@ -468,10 +461,7 @@ impl Writer for Spoon {
             graph: self.graph.clone(),
             mut_tx: tx,
             stupid: self.stupid,
-            getters: self.getters
-                .iter()
-                .map(|g| unsafe { g.clone() })
-                .collect(),
+            getters: self.getters.iter().map(|g| unsafe { g.clone() }).collect(),
             transactions: self.transactions,
         }
     }

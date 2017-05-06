@@ -240,8 +240,8 @@ fn client(_i: usize,
                 let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
-                    mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
-                                              token.into())
+                    mutator
+                        .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
                 } else {
                     mutator.put(vec![src.into(), dst.into(), 100.into()]);
                     Ok(0)
@@ -442,13 +442,9 @@ fn main() {
 
     let durability_level;
     match args.value_of("durability") {
-        Some("buffered") => {
-            durability_level = Some(BaseDurabilityLevel::Buffered)
-        },
-        Some("immediate") => {
-            durability_level = Some(BaseDurabilityLevel::SyncImmediately)
-        },
-        None | Some(&_) => durability_level = None
+        Some("buffered") => durability_level = Some(BaseDurabilityLevel::Buffered),
+        Some("immediate") => durability_level = Some(BaseDurabilityLevel::SyncImmediately),
+        None | Some(&_) => durability_level = None,
     }
 
     if let Some(ref migrate_after) = migrate_after {

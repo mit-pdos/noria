@@ -273,10 +273,8 @@ pub fn prep_writer<W: Writer>(writer: &mut W,
         assert_eq!(config.narticles % pop_batch_size, 0);
         for i in 0..config.narticles / pop_batch_size {
             let reali = pop_batch_size * i;
-            writer.make_articles((reali..reali + pop_batch_size).map(|i| {
-                                                                         (i as i64,
-                                                                          format!("Article #{}", i))
-                                                                     }));
+            writer.make_articles((reali..reali + pop_batch_size)
+                                     .map(|i| (i as i64, format!("Article #{}", i))));
         }
         println!("Done with prepopulation");
     }

@@ -83,10 +83,7 @@ impl Backend {
                 rng.gen_range(1, self.prepop_counts["customers"] as i32)
                     .into()
             }
-            "getBook" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getCustomer" => "".into(), // XXX(malte): fix username string generation
             "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
             "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
@@ -95,14 +92,10 @@ impl Backend {
                     .into()
             }
             "getPassword" => "".into(), // XXX(malte): fix username string generation
-            "getRelated1" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
             "getMostRecentOrderLines" => {
-                rng.gen_range(1, self.prepop_counts["orders"] as i32)
-                    .into()
+                rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
             }
             "createEmptyCart" => 0i32.into(),
             "addItem" => 0.into(), // XXX(malte): dual parameter query, need SCL ID range
@@ -127,10 +120,7 @@ impl Backend {
             }
             "enterAddressMaxId" => 0i32.into(),
             "enterOrderMaxId" => 0i32.into(),
-            "getStock" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "verifyDBConsistencyCustId" => 0i32.into(),
             "verifyDBConsistencyItemId" => 0i32.into(),
             "verifyDBConsistencyAddrId" => 0i32.into(),
@@ -203,13 +193,9 @@ fn main() {
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("addresses".into(), num_addr);
+    backend.prepop_counts.insert("addresses".into(), num_addr);
     let num_authors = populate_authors(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("authors".into(), num_authors);
+    backend.prepop_counts.insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc);
     backend
         .prepop_counts
