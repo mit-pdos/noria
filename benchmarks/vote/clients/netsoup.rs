@@ -29,6 +29,7 @@ impl C {
             }
             bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
         }
+        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
         bs.flush().unwrap();
         for _ in 0..n {
             let _: i64 = bincode::deserialize_from(bs, bincode::Infinite).unwrap();
@@ -52,6 +53,7 @@ impl C {
             }
             bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
         }
+        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
         bs.flush()?;
         Ok((0..n)
                .map(|_| {
