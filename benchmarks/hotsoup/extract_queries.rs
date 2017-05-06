@@ -1,11 +1,11 @@
 extern crate clap;
 extern crate nom_sql;
 extern crate regex;
+
 #[macro_use]
 extern crate slog;
-extern crate slog_term;
+extern crate distributary;
 
-use slog::DrainExt;
 use std::path::{Path, PathBuf};
 
 fn traverse(path: &Path) -> Vec<PathBuf> {
@@ -49,7 +49,7 @@ fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
     let mut queries = Vec::new();
     let mut h = DefaultHasher::new();
     for cap in query_regex.captures_iter(&s) {
-        let qstr = cap.at(1).unwrap();
+        let qstr = &cap[1];
         qstr.hash(&mut h);
         let qid = h.finish();
         queries.push((format!("{}_{:x}", git_rev, qid), String::from(qstr)));
@@ -72,18 +72,18 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     queries
         .into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
-        .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc")))
-        .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "")))
-        .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?")))
-        .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ")))
-        .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?")))
-        .map(|(qn, q)| (qn, braces_question_mark.replace_all(&q, "?")))
-        .map(|(qn, q)| (qn, question_mark_a.replace_all(&q, "=?")))
-        .map(|(qn, q)| (qn, unclosed_quote.replace_all(&q, "=?")))
+        .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc").to_string()))
+        .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "").to_string()))
+        .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?").to_string()))
+        .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ").to_string()))
+        .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?").to_string()))
+        .map(|(qn, q)| (qn, braces_question_mark.replace_all(&q, "?").to_string()))
+        .map(|(qn, q)| (qn, question_mark_a.replace_all(&q, "=?").to_string()))
+        .map(|(qn, q)| (qn, unclosed_quote.replace_all(&q, "=?").to_string()))
         .map(|(qn, q)| if !q.ends_with(";") {
                  (qn, format!("{};", q))
              } else {
-                 (qn, q)
+                 (qn, q.to_string())
              })
         .collect()
 }
@@ -95,7 +95,7 @@ fn main() {
     use std::io::Write;
     use std::fs::File;
 
-    let log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
+    let log = distributary::logger_pls();
 
     let matches = App::new("extract_queries")
         .version("0.1")
@@ -152,7 +152,7 @@ fn main() {
 
     info!(log, "Writing {} rejected queries...", rejected.len());
     for (ql, q) in rejected {
-        trace!(log, "failed to parse"; "query" => q, "name" => ql);
+        trace!(log, "failed to parse"; "query" => &q, "name" => &ql);
         assert!(write!(f, "# FAIL {}:\n# {}\n", ql, q).is_ok());
     }
 }

@@ -4,9 +4,6 @@
 #[macro_use]
 extern crate clap;
 
-extern crate slog;
-extern crate slog_term;
-
 extern crate rand;
 
 #[cfg(any(feature="b_mssql", feature="b_netsoup"))]
@@ -220,13 +217,13 @@ fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool)
     let stats = &stats.pre;
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
         if mix.does_read() {
-            for (v, p, _, _) in r_perc {
-                println!("percentile GET {:.2} {:.2}", v, p);
+            for iv in r_perc {
+                println!("percentile GET {:.2} {:.2}", iv.value(), iv.percentile());
             }
         }
         if mix.does_write() {
-            for (v, p, _, _) in w_perc {
-                println!("percentile PUT {:.2} {:.2}", v, p);
+            for iv in w_perc {
+                println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
             }
         }
     }

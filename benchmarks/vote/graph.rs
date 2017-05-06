@@ -1,8 +1,5 @@
 use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, NodeAddress};
-
-use slog;
-use slog_term;
-use slog::DrainExt;
+use distributary;
 
 pub struct Graph {
     pub vote: NodeAddress,
@@ -16,7 +13,7 @@ pub fn make(log: bool, transactions: bool, durability: Option<BaseDurabilityLeve
     // set up graph
     let mut g = Blender::new();
     if log {
-        g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+        g.log_with(distributary::logger_pls());
     }
 
     let (article, vote, vc, end) = {

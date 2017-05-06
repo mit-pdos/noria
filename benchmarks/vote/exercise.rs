@@ -14,7 +14,7 @@ use std::time;
 
 use rand;
 use rand::Rng as StdRng;
-use hdrsample::Histogram;
+use hdrsample::{Histogram, RecordError};
 use hdrsample::iterators::{HistogramIterator, recorded};
 use zipf::ZipfDistribution;
 
@@ -76,7 +76,7 @@ impl BenchmarkResults {
         }
     }
 
-    fn record_latency(&mut self, read: bool, p: Period, value: i64) -> Result<(), ()> {
+    fn record_latency(&mut self, read: bool, p: Period, value: u64) -> Result<(), RecordError> {
         if let Some((ref mut r_samples, ref mut w_samples)) = self.pick(p).samples {
             if read {
                 r_samples.record(value)
@@ -158,7 +158,7 @@ fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> Be
                 } else {
                     do_write(w.as_mut().unwrap(), &mut config, &start, &batch[..bs])
                 };
-                let t = (dur_to_ns!(t.elapsed()) / 1000) as i64;
+                let t = (dur_to_ns!(t.elapsed()) / 1000) as u64;
                 if stats.record_latency(read, period, t).is_err() {
                     let desc = if read { "GET" } else { "PUT" };
                     println!("failed to record slow {} ({}μs)", desc, t);

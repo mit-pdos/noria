@@ -342,16 +342,16 @@ fn client(_i: usize,
         println!("write + settle latency: {:.3} μs",
                  (wl + sl) as f64 / n * 0.001);
 
-        let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
+        let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
         for i in 0..write_latencies.len() {
             let sample_nanos = write_latencies[i] + settle_latencies[i];
-            let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
+            let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
             latencies_hist.record(sample_micros).unwrap();
         }
 
-        for (v, p, _, _) in latencies_hist.iter_recorded() {
+        for iv in latencies_hist.iter_recorded() {
             // XXX: Print CDF in the format expected by the print_latency_cdf script.
-            println!("percentile PUT {:.2} {:.2}", v, p);
+            println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
         }
     }
     throughputs

@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate clap;
 
-extern crate slog;
-extern crate slog_term;
-
 extern crate rand;
 
 extern crate distributary;
@@ -246,8 +243,11 @@ fn main() {
 fn print_stats<S: AsRef<str>>(desc: S, read: bool, stats: &exercise::BenchmarkResult, avg: bool) {
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
         let perc = if read { r_perc } else { w_perc };
-        for (v, p, _, _) in perc {
-            println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
+        for iv in perc {
+            println!("percentile {} {:.2} {:.2}",
+                     desc.as_ref(),
+                     iv.value(),
+                     iv.percentile());
         }
     }
     if avg {

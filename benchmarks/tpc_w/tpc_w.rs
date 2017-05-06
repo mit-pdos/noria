@@ -5,13 +5,13 @@ mod populate;
 
 extern crate clap;
 extern crate rand;
+
+#[macro_use]
 extern crate slog;
-extern crate slog_term;
 
 use rand::Rng;
 use std::{thread, time};
 use std::collections::HashMap;
-use slog::DrainExt;
 
 use std::sync::{Arc, Barrier};
 
@@ -39,8 +39,8 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
 
     // set up graph
     let mut g = Blender::new();
-    let main_log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
-    let recipe_log = main_log.new(None);
+    let main_log = distributary::logger_pls();
+    let recipe_log = main_log.new(o!());
     g.log_with(main_log);
 
     let recipe;
