@@ -54,7 +54,11 @@ impl C {
         }
         bs.flush()?;
         Ok((0..n)
-               .map(|_| bincode::deserialize_from(bs, bincode::Infinite).unwrap())
+               .map(|_| {
+                        let result: Result<Vec<Vec<DataType>>, ()> =
+                            bincode::deserialize_from(bs, bincode::Infinite).unwrap();
+                        result.unwrap_or_default()
+                    })
                .collect())
     }
 }
