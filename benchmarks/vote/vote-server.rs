@@ -1,10 +1,6 @@
-#![feature(conservative_impl_trait, plugin)]
-#![plugin(tarpc_plugins)]
-
 extern crate clap;
 
 extern crate distributary;
-extern crate tarpc;
 
 extern crate slog;
 extern crate slog_term;
@@ -12,7 +8,8 @@ extern crate slog_term;
 mod graph;
 
 use distributary::srv;
-use tarpc::util::FirstSocketAddr;
+
+use std::net::ToSocketAddrs;
 
 fn main() {
     use clap::{Arg, App};
@@ -34,5 +31,5 @@ fn main() {
 
     // start processing
     // TODO: what about the node indices?
-    srv::run(g.graph, addr.first_socket_addr());
+    srv::run(g.graph, addr.to_socket_addrs().unwrap().next().unwrap());
 }
