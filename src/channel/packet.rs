@@ -146,6 +146,14 @@ impl PacketSender {
             _ => None,
         }
     }
+
+    pub fn is_local(&self) -> bool {
+        if let PacketSender::Local(_) = *self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl From<mpsc::SyncSender<Packet>> for PacketSender {

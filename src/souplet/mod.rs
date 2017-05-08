@@ -5,7 +5,6 @@ use std::thread;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use std::io;
-use std::process;
 use std::time;
 
 use tarpc::future::server;
@@ -29,7 +28,7 @@ service! {
 
     rpc recv_on_channel(tag: u64, data: Vec<u8>);
     rpc close_channel(tag: u64);
-    rpc shutdown();
+    rpc reset();
 }
 
 struct SoupletServerInner {
@@ -130,7 +129,8 @@ impl FutureService for SoupletServer {
                 .unwrap();
             inner
                 .domain_unbounded_txs
-                .insert(domain_index.clone(), rx.recv().unwrap().as_local_unbounded().unwrap());
+                .insert(domain_index.clone(),
+                        rx.recv().unwrap().as_local_unbounded().unwrap());
         }
 
         inner.domain_unbounded_txs[&domain_index]
@@ -139,9 +139,18 @@ impl FutureService for SoupletServer {
         Ok(())
     }
 
-    type ShutdownFut = Result<(), Never>;
-    fn shutdown(&self) -> Self::ShutdownFut {
-        process::exit(0)
+    type ResetFut = Result<(), Never>;
+    fn reset(&self) -> Self::ResetFut {
+        let mut inner = self.inner.lock().unwrap();
+
+        for (_, tx) in &mut inner.domain_txs {
+            // don't unwrap, because given domain may already have terminated
+            drop(tx.send(Packet::Quit));
+        }
+        inner.domain_txs.clear();
+        inner.domain_input_txs.clear();
+        inner.domain_unbounded_txs.clear();
+        Ok(())
     }
 
     type RecvOnChannelFut = Result<(), Never>;
@@ -208,6 +217,7 @@ impl Souplet {
 
     pub fn connect_to_peer(&mut self, addr: SocketAddr) -> io::Result<()> {
         SyncClient::connect(addr, client::Options::default()).map(|c| {
+                                                                      c.reset().unwrap();
                                                                       self.peers.insert(addr, c);
                                                                   })
     }
