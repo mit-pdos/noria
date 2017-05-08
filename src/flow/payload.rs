@@ -430,9 +430,6 @@ tracer: None, // TODO replace with: tracer.clone(),
             Packet::Transaction { ref mut tracer, .. } => {
                 *tracer = None;
             }
-            Packet::AddNode { node: _, .. } => {
-                unimplemented!();
-            }
             Packet::AddBaseColumn { ref mut ack, .. } |
             Packet::DropBaseColumn { ref mut ack, .. } |
             Packet::StartReplay { ref mut ack, .. } |
@@ -464,6 +461,9 @@ tracer: None, // TODO replace with: tracer.clone(),
                         .make_serializable(local_addr, demux_table);
                 }
                 ack.make_serializable(local_addr, demux_table);
+            }
+            Packet::AddNode { ref node, .. } => {
+                assert!(!node.is_reader());
             }
             Packet::FullReplay { .. } |
             Packet::ReplayPiece { .. } |

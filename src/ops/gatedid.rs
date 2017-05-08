@@ -90,7 +90,7 @@ impl Ingredient for GatedIdentity {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Identity
+        unimplemented!()
     }
 }
 

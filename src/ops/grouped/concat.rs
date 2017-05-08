@@ -243,8 +243,15 @@ impl GroupedOperation for GroupConcat {
                 group_cols)
     }
 
-    fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::GroupConcant(self.clone())
+    fn from_serialized(s: SerializableGrouped) -> Self {
+        if let SerializableGrouped::GroupConcat(c) = s {
+            c
+        } else {
+            unreachable!()
+        }
+    }
+    fn into_serializable(&self) -> SerializableGrouped {
+        SerializableGrouped::GroupConcat(self.clone())
     }
 }
 

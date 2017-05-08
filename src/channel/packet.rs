@@ -24,6 +24,8 @@ pub enum PacketSender {
 
         demux_table: channel::DemuxTable,
         local_addr: SocketAddr,
+
+        input: bool,
     },
 }
 
@@ -40,6 +42,23 @@ impl PacketSender {
             client_addr,
             demux_table,
             local_addr,
+            input: false,
+        }
+    }
+
+    pub fn make_remote_input(domain: domain::Index,
+                             client: souplet::SyncClient,
+                             client_addr: SocketAddr,
+                             demux_table: channel::DemuxTable,
+                             local_addr: SocketAddr)
+                             -> Self {
+        PacketSender::Remote {
+            domain,
+            client,
+            client_addr,
+            demux_table,
+            local_addr,
+            input: true,
         }
     }
 
@@ -51,12 +70,19 @@ impl PacketSender {
                 ref client,
                 local_addr,
                 ref demux_table,
+                input,
                 ..
             } => {
                 packet.make_serializable(local_addr, demux_table);
-                client
-                    .recv_packet(domain, packet)
-                    .map_err(|_| Error::Unknown)
+                if input {
+                    client
+                        .recv_input_packet(domain, packet)
+                        .map_err(|_| Error::Unknown)
+                } else {
+                    client
+                        .recv_packet(domain, packet)
+                        .map_err(|_| Error::Unknown)
+                }
             }
         }
     }

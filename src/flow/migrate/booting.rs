@@ -31,7 +31,7 @@ fn build_descriptors(graph: &mut Graph, nodes: Vec<(NodeIndex, bool)>) -> Domain
 
 pub fn can_be_remote(graph: &Graph, nodes: &Vec<(NodeIndex, bool)>) -> bool {
     for &(ni, _) in nodes {
-        if graph[ni].is_reader() || graph[ni].is_internal() && graph[ni].get_base().is_some() {
+        if graph[ni].is_reader() {
             return false;
         }
     }
@@ -44,11 +44,14 @@ pub fn boot_new(log: Logger,
                 nodes: Vec<(NodeIndex, bool)>,
                 checktable: Arc<Mutex<checktable::CheckTable>>,
                 txs: &mut HashMap<domain::Index, channel::PacketSender>,
-                input_rx: mpsc::Receiver<Packet>,
+                input_txs: &mut HashMap<domain::Index, channel::PacketSender>,
                 ts: i64)
                 -> thread::JoinHandle<()> {
     let (tx, rx) = mpsc::sync_channel(1);
     txs.insert(index, tx.into());
+
+    let (input_tx, input_rx) = mpsc::sync_channel(256);
+    input_txs.insert(index, input_tx.into());
 
     let nodes = build_descriptors(graph, nodes);
     let domain = domain::Domain::new(log, index, nodes, checktable, ts);
@@ -59,11 +62,15 @@ pub fn boot_remote(index: domain::Index,
                    graph: &mut Graph,
                    nodes: Vec<(NodeIndex, bool)>,
                    souplet: &mut Souplet,
-                   txs: &mut HashMap<domain::Index, channel::PacketSender>) -> SocketAddr {
+                   txs: &mut HashMap<domain::Index, channel::PacketSender>,
+                   input_txs: &mut HashMap<domain::Index, channel::PacketSender>)
+                   -> SocketAddr {
     let peer = &souplet.get_peers().next().unwrap();
     let nodes = build_descriptors(graph, nodes);
-    let tx = souplet.start_domain(peer, index, nodes);
+    let (tx, input_tx) = souplet.start_domain(peer, index, nodes);
+
     txs.insert(index, tx);
+    input_txs.insert(index, input_tx);
 
     *peer.clone()
 }

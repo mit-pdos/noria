@@ -26,7 +26,7 @@ pub enum JoinSource {
 }
 
 /// Join provides a left outer join between two views.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Join {
     left: NodeAddress,
     right: NodeAddress,
@@ -305,29 +305,7 @@ impl Ingredient for Join {
         }
     }
     fn into_serializable(&self) -> SerializableIngredient {
-        let mut emitted_join = false;
-        let emit = self.emit
-            .iter()
-            .map(|&(from_left, col)| {
-                // rustfmt
-                if !emitted_join &&
-                   (from_left && self.on.0 == col || !from_left && self.on.1 == col) {
-                    emitted_join = true;
-                    JoinSource::B(self.on.0, self.on.1)
-                } else if from_left {
-                    JoinSource::L(col)
-                } else {
-                    JoinSource::R(col)
-                }
-            })
-            .collect();
-
-        SerializableIngredient::Join {
-            left: self.left,
-            right: self.right,
-            kind: self.kind.clone(),
-            emit,
-        }
+        SerializableIngredient::Join(self.clone())
     }
 }
 

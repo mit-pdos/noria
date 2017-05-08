@@ -4,7 +4,7 @@ use std::sync;
 use flow::prelude::*;
 
 /// Permutes or omits columns from its source node, or adds additional literal value columns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
     us: Option<NodeAddress>,
     emit: Option<Vec<usize>>,
@@ -152,10 +152,7 @@ impl Ingredient for Project {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Project {
-            emit: self.emit.as_ref().unwrap().clone(),
-            additional: self.additional.clone(),
-        }
+        SerializableIngredient::Project(self.clone())
     }
 }
 

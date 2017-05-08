@@ -345,11 +345,7 @@ impl Ingredient for TopK {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::TopK {
-            order: self.order.clone(),
-            group_by: self.group_by.clone(),
-            k: self.k,
-        }
+        unimplemented!();
     }
 }
 

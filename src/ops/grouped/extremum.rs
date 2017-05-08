@@ -146,9 +146,15 @@ impl GroupedOperation for ExtremumOperator {
             .join(", ");
         format!("{} γ[{}]", op_string, group_cols)
     }
-
-    fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Extremum(self.clone())
+    fn from_serialized(s: SerializableGrouped) -> Self {
+        if let SerializableGrouped::Extremum(e) = s {
+            e
+        } else {
+            unreachable!()
+        }
+    }
+    fn into_serializable(&self) -> SerializableGrouped {
+        SerializableGrouped::Extremum(self.clone())
     }
 }
 

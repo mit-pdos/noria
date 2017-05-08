@@ -4,7 +4,7 @@ use std::sync;
 use flow::prelude::*;
 
 /// A union of a set of views.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Union {
     emit: HashMap<NodeAddress, Vec<usize>>,
     cols: HashMap<NodeAddress, usize>,
@@ -242,7 +242,7 @@ impl Ingredient for Union {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Union {emit: self.emit.clone()}
+        SerializableIngredient::Union(self.clone())
     }
 }
 

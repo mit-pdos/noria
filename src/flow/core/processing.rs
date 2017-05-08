@@ -180,43 +180,52 @@ pub trait Ingredient
     fn into_serializable(&self) -> SerializableIngredient;
 }
 
-use nom_sql;
-use ops::join;
+#[derive(Serialize, Deserialize)]
+pub enum SerializableGrouped {
+    Aggregation(grouped::aggregate::Aggregator),
+    Extremum(grouped::extremum::ExtremumOperator),
+    GroupConcat(grouped::concat::GroupConcat),
+}
+
+use ops;
 use ops::grouped;
 #[derive(Serialize, Deserialize)]
 pub enum SerializableIngredient {
-    Join {
-        left: prelude::NodeAddress,
-        right: prelude::NodeAddress,
-        kind: join::JoinType,
-        emit: Vec<join::JoinSource>,
-    },
-    Latest { keys: Vec<usize> },
-    Permute { emit: Vec<usize> },
-    Project {
-        emit: Vec<usize>,
-        additional: Option<Vec<prelude::DataType>>,
-    },
-    Union { emit: HashMap<prelude::NodeAddress, Vec<usize>>, },
-    Filter { filter: Vec<Option<(nom_sql::Operator, prelude::DataType)>>, },
-    TopK {
-        order: Vec<(usize, nom_sql::OrderType)>,
+    Filter(ops::filter::Filter),
+    Identity(ops::identity::Identity),
+    Join(ops::join::Join),
+    Latest(ops::latest::Latest),
+    Permute(ops::permute::Permute),
+    Project(ops::project::Project),
+    Union(ops::union::Union),
+
+    Grouped {
+        src: prelude::NodeAddress,
+        inner: SerializableGrouped,
+
+        us: Option<prelude::NodeAddress>,
+        cols: usize,
+
         group_by: Vec<usize>,
-        k: usize,
+        out_key: Vec<usize>,
+        colfix: Vec<usize>,
     },
-    Base,
-    Identity,
-    Aggregation(grouped::aggregate::Aggregator),
-    GroupConcant(grouped::concat::GroupConcat),
-    Extremum(grouped::extremum::ExtremumOperator),
+
+    Base {
+        defaults: Vec<prelude::DataType>,
+        primary_key: Option<Vec<usize>>,
+        durability: Option<ops::base::BaseDurabilityLevel>,
+        us: prelude::NodeAddress,
+    },
 }
 
 impl SerializableIngredient {
     pub fn expected_ancestors(&self) -> usize {
         match *self {
-            SerializableIngredient::Join {..} |
-            SerializableIngredient::Union {..} => 2,
-            _ => 1
+            SerializableIngredient::Join { .. } |
+            SerializableIngredient::Union { .. } => 2,
+            SerializableIngredient::Base {..} => 0,
+            _ => 1,
         }
     }
 
@@ -225,35 +234,38 @@ impl SerializableIngredient {
 
         use ops;
         match self {
-            SerializableIngredient::Identity => {
-                Box::new(ops::identity::Identity::new(ancestors[0])) as Box<Ingredient>
+            SerializableIngredient::Identity(i) => Box::new(i),
+            SerializableIngredient::Join(i) => Box::new(i),
+            SerializableIngredient::Latest(i) => Box::new(i),
+            SerializableIngredient::Permute(i) => Box::new(i),
+            SerializableIngredient::Project(i) => Box::new(i),
+            SerializableIngredient::Union(i) => Box::new(i),
+            SerializableIngredient::Filter(i) => Box::new(i),
+            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::Aggregation(..), ..} => {
+                Box::new(grouped::GroupedOperator::<grouped::aggregate::Aggregator>::from_serialized(g))
             }
-            SerializableIngredient::Join {
-                left,
-                right,
-                kind,
-                emit,
-            } => Box::new(ops::join::Join::new(left, right, kind, emit)) as Box<Ingredient>,
-            SerializableIngredient::Latest { keys } => {
-                Box::new(ops::latest::Latest::new(ancestors[0], keys)) as Box<Ingredient>
+            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::GroupConcat(..), ..} => {
+                Box::new(grouped::GroupedOperator::<grouped::concat::GroupConcat>::from_serialized(g))
             }
-            SerializableIngredient::Permute { emit } => {
-                Box::new(ops::permute::Permute::new(ancestors[0], &emit[..]))
+            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::Extremum(..), ..} => {
+                Box::new(grouped::GroupedOperator::<grouped::extremum::ExtremumOperator>::from_serialized(g))
             }
-            SerializableIngredient::Project { emit, additional } => {
-                Box::new(ops::project::Project::new(ancestors[0], &emit[..], additional))
+            SerializableIngredient::Base {
+                defaults,
+                primary_key,
+                durability,
+                us,
+            } => {
+                let mut base = ops::base::Base::new(defaults);
+                if primary_key.is_some() {
+                    base = base.with_key(primary_key.unwrap());
+                }
+                if durability.is_some() {
+                    base = base.with_durability(durability.unwrap());
+                }
+                base.on_commit(us, &HashMap::new());
+                Box::new(base)
             }
-            SerializableIngredient::Union { emit } => Box::new(ops::union::Union::new(emit)),
-            SerializableIngredient::Filter { filter } => {
-                Box::new(ops::filter::Filter::new(ancestors[0], &filter[..]))
-            }
-            SerializableIngredient::TopK { order, group_by, k } => {
-                Box::new(ops::topk::TopK::new(ancestors[0], order, group_by, k))
-            }
-            SerializableIngredient::Aggregation(a) => Box::new(grouped::GroupedOperator::new(ancestors[0], a)),
-            SerializableIngredient::GroupConcant(c) => Box::new(grouped::GroupedOperator::new(ancestors[0], c)),
-            SerializableIngredient::Extremum(e) => Box::new(grouped::GroupedOperator::new(ancestors[0], e)),
-            SerializableIngredient::Base => unimplemented!(),
         }
     }
 }

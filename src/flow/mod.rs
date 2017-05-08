@@ -44,7 +44,7 @@ pub type Edge = bool; // should the edge be materialized?
 /// A `Mutator` is used to perform reads and writes to base nodes.
 pub struct Mutator {
     src: core::NodeAddress,
-    tx: mpsc::SyncSender<payload::Packet>,
+    tx: channel::PacketSender,
     addr: core::NodeAddress,
     primary_key: Vec<usize>,
     tx_reply_channel: (mpsc::Sender<Result<i64, ()>>, mpsc::Receiver<Result<i64, ()>>),
@@ -268,7 +268,7 @@ pub struct Blender {
     remote_domains: HashMap<domain::Index, SocketAddr>,
 
     txs: HashMap<domain::Index, channel::PacketSender>,
-    in_txs: HashMap<domain::Index, mpsc::SyncSender<payload::Packet>>,
+    in_txs: HashMap<domain::Index, channel::PacketSender>,
     domains: Vec<Option<thread::JoinHandle<()>>>,
 
     log: slog::Logger,
@@ -283,17 +283,21 @@ impl Default for Blender {
                                                 true));
 
         use std::env;
-        let souplet = env::var_os("SOUPLETS").into_iter().filter_map(|worker_list| {
-            if worker_list.len() == 0 {
-                return None;
-            }
+        let souplet = env::var_os("SOUPLETS")
+            .into_iter()
+            .filter_map(|worker_list| {
+                if worker_list.len() == 0 {
+                    return None;
+                }
 
-            let mut s = souplet::Souplet::new("127.0.0.1:0".parse().unwrap());
-            for worker in worker_list.into_string().unwrap().split(",") {
-                s.connect_to_peer(worker.parse().unwrap()).expect("failed to connect to worker");
-            }
-            Some(s)
-        }).next();
+                let mut s = souplet::Souplet::new("127.0.0.1:0".parse().unwrap());
+                for worker in worker_list.into_string().unwrap().split(",") {
+                    s.connect_to_peer(worker.parse().unwrap())
+                        .expect("failed to connect to worker");
+                }
+                Some(s)
+            })
+            .next();
 
         Blender {
             ingredients: g,
@@ -1104,15 +1108,13 @@ impl<'a> Migration<'a> {
                                                          &mut mainline.ingredients,
                                                          nodes,
                                                          mainline.souplet.as_mut().unwrap(),
-                                                         &mut mainline.txs);
+                                                         &mut mainline.txs,
+                                                         &mut mainline.in_txs);
 
                 mainline.remote_domains.insert(domain, addr);
 
                 mainline.domains.push(None);
             } else {
-                let (in_tx, in_rx) = mpsc::sync_channel(256);
-                mainline.in_txs.insert(domain, in_tx);
-
                 let domain_index = domain.index().into();
 
                 // Start up new domain
@@ -1122,7 +1124,7 @@ impl<'a> Migration<'a> {
                                                     nodes,
                                                     mainline.checktable.clone(),
                                                     &mut mainline.txs,
-                                                    in_rx,
+                                                    &mut mainline.in_txs,
                                                     start_ts);
                 if mainline.souplet.is_some() {
                     mainline
@@ -1131,7 +1133,7 @@ impl<'a> Migration<'a> {
                         .unwrap()
                         .add_local_domain(domain_index,
                                           mainline.txs[&domain_index].as_local().unwrap(),
-                                          mainline.in_txs[&domain_index].clone());
+                                          mainline.in_txs[&domain_index].as_local().unwrap());
                 }
                 mainline.domains.push(Some(jh));
             };

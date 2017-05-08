@@ -55,7 +55,8 @@ pub trait GroupedOperation: fmt::Debug + Clone {
 
     fn description(&self) -> String;
 
-    fn into_serializable(&self) -> SerializableIngredient;
+    fn from_serialized(s: SerializableGrouped) -> Self;
+    fn into_serializable(&self) -> SerializableGrouped;
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +85,35 @@ impl<T: GroupedOperation> GroupedOperator<T> {
             group_by: Vec::new(),
             out_key: Vec::new(),
             colfix: Vec::new(),
+        }
+    }
+
+    pub fn from_serialized(s: SerializableIngredient) -> Self {
+        if let SerializableIngredient::Grouped {
+                   src,
+                   inner,
+
+                   us,
+                   cols,
+
+                   group_by,
+                   out_key,
+                   colfix,
+               } = s {
+
+            Self {
+                src,
+                inner: T::from_serialized(inner),
+
+                us,
+                cols,
+
+                group_by,
+                out_key,
+                colfix,
+            }
+        } else {
+            unreachable!()
         }
     }
 }
@@ -124,11 +154,11 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             .into_iter()
             .filter_map(|col| {
                 if self.group_by.iter().any(|c| c == &col) {
-                    // since the generated value goes at the end,
-                    // this is the n'th output value
+        // since the generated value goes at the end,
+        // this is the n'th output value
                     Some(col)
                 } else {
-                    // this column does not appear in output
+        // this column does not appear in output
                     None
                 }
             })
@@ -184,7 +214,7 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
         let mut misses = Vec::new();
         let mut out = Vec::with_capacity(2 * consolidate.len());
         for (group, diffs) in consolidate {
-            // find the current value for this group
+        // find the current value for this group
             let db = state
                 .get(self.us.as_ref().unwrap().as_local())
                 .expect("grouped operators must have their own state materialized");
@@ -206,27 +236,27 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             let (current, new) = {
                 use std::borrow::Cow;
 
-                // current value is in the last output column
-                // or "" if there is no current group
+        // current value is in the last output column
+        // or "" if there is no current group
                 let current = old.map(|r| Cow::Borrowed(&r[r.len() - 1]));
 
-                // new is the result of applying all diffs for the group to the current value
+        // new is the result of applying all diffs for the group to the current value
                 let new = self.inner.apply(current.as_ref().map(|v| &**v), diffs);
                 (current, new)
             };
 
             match current {
                 Some(ref current) if new == **current => {
-                    // no change
+        // no change
                 }
                 _ => {
                     if let Some(old) = old {
-                        // revoke old value
+        // revoke old value
                         debug_assert!(current.is_some());
                         out.push(Record::Negative(old.clone()));
                     }
 
-                    // emit positive, which is group + new.
+        // emit positive, which is group + new.
                     let rec: Vec<_> = group
                         .into_iter()
                         .cloned()
@@ -271,6 +301,16 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        self.inner.into_serializable()
+        SerializableIngredient::Grouped {
+            src: self.src,
+            inner: self.inner.into_serializable(),
+
+            us: self.us,
+            cols: self.cols,
+
+            group_by: self.group_by.clone(),
+            out_key: self.out_key.clone(),
+            colfix: self.colfix.clone(),
+        }
     }
 }

@@ -104,9 +104,17 @@ impl GroupedOperation for Aggregator {
         format!("{} γ[{}]", op_string, group_cols)
     }
 
-    fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Aggregation(self.clone())
+    fn from_serialized(s: SerializableGrouped) -> Self {
+        if let SerializableGrouped::Aggregation(a) = s {
+            a
+        } else {
+            unreachable!()
+        }
     }
+    fn into_serializable(&self) -> SerializableGrouped {
+        SerializableGrouped::Aggregation(self.clone())
+    }
+
 }
 
 #[cfg(test)]

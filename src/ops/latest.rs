@@ -6,7 +6,7 @@ use flow::prelude::*;
 ///
 /// Whenever a new record arrives for a group, the latest operator will negative the previous
 /// latest for that group.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Latest {
     us: Option<NodeAddress>,
     src: NodeAddress,
@@ -150,7 +150,7 @@ true // because the latest may be retracted
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Latest { keys: self.key.clone() }
+        SerializableIngredient::Latest(self.clone())
     }
 }
 

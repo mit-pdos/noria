@@ -57,7 +57,7 @@ pub struct Base {
 
 /// Specifies the level of durability that this base node should offer. Stronger guarantees imply a
 /// reduced write performance.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BaseDurabilityLevel {
     /// Buffered writes: records are accumulated in an in-memory buffer and occasionally flushed to
     /// the durable log, which may itself buffer in the file system. Results in large batched
@@ -102,7 +102,7 @@ impl Base {
     /// Drop a column from this base node.
     pub fn drop_column(&mut self, column: usize) {
         assert!(!self.defaults.is_empty(),
-                "cannot add columns to base nodes without setting default values for initial columns");
+                "cannot add columns to base nodes without default values for initial columns");
         assert!(column < self.defaults.len());
         self.unmodified = false;
 
@@ -462,7 +462,12 @@ impl Ingredient for Base {
         unreachable!();
     }
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Base
+        SerializableIngredient::Base {
+            defaults: self.defaults.clone(),
+            primary_key: self.primary_key.clone(),
+            durability: self.durability,
+            us: self.us.clone().unwrap(),
+        }
     }
 }
 

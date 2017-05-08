@@ -5,7 +5,7 @@ pub use nom_sql::Operator;
 use flow::prelude::*;
 
 /// Filters incoming records according to some filter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Filter {
     src: NodeAddress,
     filter: sync::Arc<Vec<Option<(Operator, DataType)>>>,
@@ -170,7 +170,7 @@ impl Ingredient for Filter {
     }
 
     fn into_serializable(&self) -> SerializableIngredient {
-        SerializableIngredient::Filter { filter: self.filter.as_ref().clone() }
+        SerializableIngredient::Filter(self.clone())
     }
 }
 

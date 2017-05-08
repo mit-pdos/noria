@@ -186,15 +186,21 @@ impl Souplet {
                         peer_addr: &SocketAddr,
                         domain: domain::Index,
                         nodes: DomainNodes)
-                        -> channel::PacketSender {
+                        -> (channel::PacketSender, channel::PacketSender) {
         let peer = &self.peers[peer_addr];
         peer.start_domain(domain, nodes).unwrap();
 
-        channel::PacketSender::make_remote(domain,
-                                           peer.clone(),
-                                           peer_addr.clone(),
-                                           self.demux_table.clone(),
-                                           self.local_addr)
+        let tx = channel::PacketSender::make_remote(domain,
+                                                    peer.clone(),
+                                                    peer_addr.clone(),
+                                                    self.demux_table.clone(),
+                                                    self.local_addr);
+        let input_tx = channel::PacketSender::make_remote_input(domain,
+                                                                peer.clone(),
+                                                                peer_addr.clone(),
+                                                                self.demux_table.clone(),
+                                                                self.local_addr);
+        (tx, input_tx)
     }
 
     pub fn add_local_domain(&self,
