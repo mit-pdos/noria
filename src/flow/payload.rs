@@ -41,7 +41,7 @@ impl fmt::Debug for Link {
 pub enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
-    End(channel::Sender<Packet>),
+    End(channel::PacketSender),
     Local(Vec<usize>),
 }
 
@@ -213,7 +213,7 @@ pub enum Packet {
     /// We need these channels to send replay requests, as using the bounded channels could easily
     /// result in a deadlock. Since the unbounded channel is only used for requests as a result of
     /// processing, it is essentially self-clocking.
-    RequestUnboundedTx(channel::Sender<channel::Sender<Packet>>),
+    RequestUnboundedTx(channel::Sender<channel::PacketSender>),
 
     /// Set up a fresh, empty state for a node, indexed by a particular column.
     ///
@@ -447,7 +447,7 @@ tracer: None, // TODO replace with: tracer.clone(),
                 unimplemented!();
             }
             Packet::RequestUnboundedTx(..) => {
-                unimplemented!();
+                unreachable!();
             }
             Packet::SetupReplayPath {
                 ref mut done_tx,
