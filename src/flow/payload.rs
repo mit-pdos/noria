@@ -42,6 +42,7 @@ pub enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
     End(channel::PacketSender),
+    SerializedEnd(domain::Index, Option<SocketAddr>),    // None means local address
     Local(Vec<usize>),
 }
 
@@ -213,8 +214,7 @@ pub enum Packet {
     /// We need these channels to send replay requests, as using the bounded channels could easily
     /// result in a deadlock. Since the unbounded channel is only used for requests as a result of
     /// processing, it is essentially self-clocking.
-    RequestUnboundedTx(channel::Sender<channel::PacketSender>),
-
+    // RequestUnboundedTx(channel::Sender<channel::Sender<Packet>>),
     /// Set up a fresh, empty state for a node, indexed by a particular column.
     ///
     /// This is done in preparation of a subsequent state replay.
@@ -384,7 +384,7 @@ impl Packet {
                 Packet::Message {
                     link: link.clone(),
                     data: data.clone(),
-tracer: None, // TODO replace with: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             Packet::Transaction {
@@ -397,7 +397,7 @@ tracer: None, // TODO replace with: tracer.clone(),
                     link: link.clone(),
                     data: data.clone(),
                     state: state.clone(),
-tracer: None, // TODO replace with: tracer.clone(),
+                    tracer: None, // TODO replace with: tracer.clone(),
                 }
             }
             _ => unreachable!(),
@@ -446,14 +446,22 @@ tracer: None, // TODO replace with: tracer.clone(),
             Packet::AddStreamer { .. } => {
                 unimplemented!();
             }
-            Packet::RequestUnboundedTx(..) => {
-                unreachable!();
-            }
+            // Packet::RequestUnboundedTx(ref mut reply) => {
+            //    unreachable!();
+            // }
             Packet::SetupReplayPath {
                 ref mut done_tx,
                 ref mut ack,
+                ref mut trigger,
                 ..
             } => {
+                if let TriggerEndpoint::End(..) = *trigger {
+                    unreachable!();
+                }
+                if let TriggerEndpoint::SerializedEnd(_, ref mut addr @ None) = *trigger {
+                    *addr = Some(local_addr);
+                }
+
                 if done_tx.is_some() {
                     done_tx
                         .as_mut()
@@ -499,6 +507,27 @@ tracer: None, // TODO replace with: tracer.clone(),
                                                                        local_addr);
                 *new_tx = Some((a, b, packet_sender));
             }
+        }
+
+        if let Packet::SetupReplayPath {
+            trigger: ref mut trigger @ TriggerEndpoint::SerializedEnd(_,_),
+            ..
+        } = *self {
+            let (domain_index, client_addr) = if let TriggerEndpoint::SerializedEnd(d, c) = *trigger {
+                (d, c.unwrap())
+            } else {
+                unreachable!()
+            };
+
+            let client = souplet::SyncClient::connect(client_addr, client::Options::default())
+                    .unwrap();
+
+            let packet_sender = channel::PacketSender::make_remote(domain_index,
+                client,
+                client_addr,
+                demux_table.clone(),
+                local_addr);
+            *trigger = TriggerEndpoint::End(packet_sender);
         }
     }
 }

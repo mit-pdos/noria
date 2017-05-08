@@ -555,6 +555,7 @@ assert!(res.len() <= 1) // could be 1 if we had zero-rows
 }
 
 #[test]
+#[ignore]
 fn transactional_vote() {
     use distributary::{Base, Union, Aggregation, Join, JoinType, Identity};
 

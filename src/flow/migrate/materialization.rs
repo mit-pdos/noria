@@ -206,19 +206,19 @@ pub fn index(log: &Logger,
     {
         let nodes: HashMap<_, _> = nodes.iter().map(|&(n, _)| (n.addr(), n)).collect();
         let mut indices = nodes.iter()
-                .filter(|&(_, node)| node.is_internal()) // only internal nodes can suggest indices
+.filter(|&(_, node)| node.is_internal()) // only internal nodes can suggest indices
                 .filter(|&(_, node)| {
-                    // under what circumstances might a node need indices to be placed?
-                    // there are two cases:
-                    //
-                    //  - if makes queries into its ancestors regardless of whether it's
-                    //    materialized or not
-                    //  - if it queries its ancestors when it is *not* materialized (implying that
-                    //    it queries into its own output)
-                    //
-                    //  unless we come up with a weird operator that *doesn't* need indices when
-                    //  it is *not* materialized, but *does* when is, we can therefore just use
-                    //  will_query(false) as an indicator of whether indices are necessary.
+    // under what circumstances might a node need indices to be placed?
+    // there are two cases:
+    //
+    //  - if makes queries into its ancestors regardless of whether it's
+    //    materialized or not
+    //  - if it queries its ancestors when it is *not* materialized (implying that
+    //    it queries into its own output)
+    //
+    //  unless we come up with a weird operator that *doesn't* need indices when
+    //  it is *not* materialized, but *does* when is, we can therefore just use
+    //  will_query(false) as an indicator of whether indices are necessary.
                     node.will_query(false)
                 })
                 .flat_map(|(ni, node)| node.suggest_indexes(*ni).into_iter())
@@ -766,12 +766,12 @@ pub fn reconstruct(log: &Logger,
                         *trigger = TriggerEndpoint::Start(vec![*key]);
                     } else if i == segments.len() - 1 {
                         // otherwise, should know what how to trigger partial replay
-                        let (tx, rx) = mpsc::channel();
-                        txs[&segments[0].0]
-                            .send(Packet::RequestUnboundedTx(tx.into()))
-                            .unwrap();
-                        let root_unbounded_tx = rx.recv().unwrap();
-                        *trigger = TriggerEndpoint::End(root_unbounded_tx);
+                        *trigger = if txs[&domain].is_local() {
+                            TriggerEndpoint::End(txs[&segments[0].0].clone())
+                        } else {
+                            let addr = txs[&segments[0].0].get_client_addr();
+                            TriggerEndpoint::SerializedEnd(segments[0].0.clone(), addr)
+                        }
                     }
                 } else {
                     unreachable!();
@@ -781,7 +781,7 @@ pub fn reconstruct(log: &Logger,
                     // last domain should report when it's done if it is to be fully replayed
                     if let Packet::SetupReplayPath { ref mut done_tx, .. } = setup {
                         assert!(main_done_tx.is_some());
-                        *done_tx = main_done_tx.take().map(|s|s.into());
+                        *done_tx = main_done_tx.take().map(|s| s.into());
                     } else {
                         unreachable!();
                     }

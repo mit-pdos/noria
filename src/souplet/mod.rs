@@ -24,7 +24,6 @@ service! {
     rpc start_domain(domain_index: domain::Index, nodes: DomainNodes);
     rpc recv_packet(domain_index: domain::Index, packet: Packet);
     rpc recv_input_packet(domain_index: domain::Index, packet: Packet);
-    rpc recv_unbounded_packet(domain_index: domain::Index, packet: Packet);
 
     rpc recv_on_channel(tag: u64, data: Vec<u8>);
     rpc close_channel(tag: u64);
@@ -108,32 +107,6 @@ impl FutureService for SoupletServer {
         packet.complete_deserialize(self.local_addr.clone(), &self.demux_table);
         let inner = self.inner.lock().unwrap();
         inner.domain_input_txs[&domain_index]
-            .send(packet)
-            .unwrap();
-        Ok(())
-    }
-
-    type RecvUnboundedPacketFut = Result<(), Never>;
-    fn recv_unbounded_packet(&self,
-                             domain_index: domain::Index,
-                             mut packet: Packet)
-                             -> Self::RecvUnboundedPacketFut {
-
-        packet.complete_deserialize(self.local_addr.clone(), &self.demux_table);
-        let mut inner = self.inner.lock().unwrap();
-
-        if !inner.domain_unbounded_txs.contains_key(&domain_index) {
-            let (tx, rx) = mpsc::channel();
-            inner.domain_txs[&domain_index]
-                .send(Packet::RequestUnboundedTx(tx.into()))
-                .unwrap();
-            inner
-                .domain_unbounded_txs
-                .insert(domain_index.clone(),
-                        rx.recv().unwrap().as_local_unbounded().unwrap());
-        }
-
-        inner.domain_unbounded_txs[&domain_index]
             .send(packet)
             .unwrap();
         Ok(())

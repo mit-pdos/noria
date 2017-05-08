@@ -202,6 +202,7 @@ impl Domain {
                 }
                 TriggerEndpoint::Start(..) => unreachable!(),
                 TriggerEndpoint::None => unreachable!("asked to replay along non-existing path"),
+                TriggerEndpoint::SerializedEnd(..) => unreachable!(),
             }
         }
     }
@@ -547,6 +548,10 @@ impl Domain {
                 trigger,
                 ack,
             } => {
+                if let TriggerEndpoint::SerializedEnd(..) = trigger {
+                    unreachable!();
+                }
+
                 // let coordinator know that we've registered the tagged path
                 ack.send(()).unwrap();
 
@@ -739,10 +744,10 @@ impl Domain {
             }
             Packet::None => unreachable!("None packets should never be sent around"),
             Packet::Captured => unreachable!("captured packets should never be sent around"),
-            Packet::RequestUnboundedTx(_) => {
-                //rustfmt
-                unreachable!("Requests for unbounded tx channel are handled by event loop")
-            }
+            // Packet::RequestUnboundedTx(..) => {
+            //     //rustfmt
+            //     unreachable!("Requests for unbounded tx channel are handled by event loop")
+            // }
             Packet::Quit => unreachable!("Quit messages are handled by event loop"),
         }
     }
@@ -1570,9 +1575,9 @@ impl Domain {
                     match m {
                         Err(_) => break,
                         Ok(Packet::Quit) => break,
-                        Ok(Packet::RequestUnboundedTx(ack)) => {
-                            ack.send(back_tx.clone().into()).unwrap();
-                        }
+                        // Ok(Packet::RequestUnboundedTx(ack)) => {
+                        //    ack.send(back_tx.clone().into()).unwrap();
+                        // }
                         Ok(m) => self.handle(m),
                     }
                 }

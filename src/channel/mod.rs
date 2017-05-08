@@ -82,6 +82,13 @@ impl<T: Send + Serialize + Deserialize + 'static, TS: TypedSender<T> + BytesEndp
             unreachable!()
         }
     }
+    pub fn is_local(&self) -> bool {
+        if let GenericSenderInner::Local(_) = self.inner {
+            true
+        } else {
+            false
+        }
+    }
 }
 impl<T, TS: TypedSender<T> + BytesEndpoint> Drop for GenericSender<T, TS> {
     fn drop(&mut self) {
