@@ -6,14 +6,36 @@ use flow::prelude::*;
 use std::cmp::Ordering;
 
 use nom_sql::OrderType;
-pub type OrderedRecordComparator =
-    Fn(&&Arc<Vec<DataType>>, &&Arc<Vec<DataType>>) -> Ordering + Send + 'static;
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Order(Vec<(usize, OrderType)>);
+impl Order {
+    fn cmp(&self, a: &&Arc<Vec<DataType>>, b: &&Arc<Vec<DataType>>) -> Ordering {
+        for &(c, ref order_type) in &self.0 {
+            let result = match *order_type {
+                OrderType::OrderAscending => a[c].cmp(&b[c]),
+                OrderType::OrderDescending => b[c].cmp(&a[c]),
+            };
+            if result != Ordering::Equal {
+                return result;
+            }
+        }
+        Ordering::Equal
+    }
+}
+
+impl From<Vec<(usize, OrderType)>> for Order {
+    fn from(other: Vec<(usize, OrderType)>) -> Self {
+        Order(other)
+    }
+}
 
 /// TopK provides an operator that will produce the top k elements for each group.
 ///
 /// Positives are generally fast to process, while negative records can trigger expensive backwards
 /// queries. It is also worth noting that due the nature of Soup, the results of this operator are
 /// unordered.
+#[derive(Serialize, Deserialize)]
 pub struct TopK {
     src: NodeAddress,
 
@@ -24,8 +46,7 @@ pub struct TopK {
     // precomputed datastructures
     group_by: Vec<usize>,
 
-    cmp_rows: Box<OrderedRecordComparator>,
-    order: Vec<(usize, OrderType)>,
+    order: Order,
 
     k: usize,
 
@@ -33,23 +54,6 @@ pub struct TopK {
 }
 
 impl TopK {
-    fn make_cmp_rows(order: &Vec<(usize, OrderType)>) -> Box<OrderedRecordComparator> {
-        let order = order.clone();
-
-        Box::new(move |a: &&Arc<Vec<DataType>>, b: &&Arc<Vec<DataType>>| {
-            for &(c, ref order_type) in order.iter() {
-                let result = match *order_type {
-                    OrderType::OrderAscending => a[c].cmp(&b[c]),
-                    OrderType::OrderDescending => b[c].cmp(&a[c]),
-                };
-                if result != Ordering::Equal {
-                    return result;
-                }
-            }
-            Ordering::Equal
-        })
-    }
-
     /// Construct a new TopK operator.
     ///
     /// `src` is this operator's ancestor, `over` is the column to compute the top K over,
@@ -71,8 +75,7 @@ impl TopK {
 
             group_by,
 
-            cmp_rows: Self::make_cmp_rows(&order),
-            order,
+            order: order.into(),
 
             k,
 
@@ -96,10 +99,10 @@ impl TopK {
 
         let mut delta: Vec<Record> = Vec::new();
         let mut current: Vec<&Arc<Vec<DataType>>> = current_topk.iter().collect();
-        current.sort_by(self.cmp_rows.as_ref());
+        current.sort_by(|a, b| self.order.cmp(a, b));
         for r in new.iter() {
             if let &Record::Negative(ref a) = r {
-                let idx = current.binary_search_by(|row| (self.cmp_rows)(&row, &&a));
+                let idx = current.binary_search_by(|row| self.order.cmp(&row, &&a));
                 if let Ok(idx) = idx {
                     current.remove(idx);
                     delta.push(r.clone())
@@ -114,7 +117,7 @@ impl TopK {
                         })
             .chain(current.into_iter().map(|a| (a, true)))
             .collect();
-        output_rows.sort_by(|a, b| (self.cmp_rows)(&a.0, &b.0));
+        output_rows.sort_by(|a, b| self.order.cmp(&a.0, &b.0));
 
         let src_db = state
             .get(self.src.as_local())
@@ -128,7 +131,7 @@ impl TopK {
         // Get the minimum element of output_rows.
             if let Some((min, _)) = output_rows.iter().cloned().next() {
                 let is_min = |&&(ref r, _): &&(&Arc<Vec<DataType>>, bool)| {
-                    (self.cmp_rows)(&&r, &&min) == Ordering::Equal
+                    self.order.cmp(&&r, &&min) == Ordering::Equal
                 };
 
                 let mut current_mins: Vec<_> = output_rows.iter().filter(is_min).cloned().collect();
@@ -139,7 +142,7 @@ impl TopK {
         // by the fact that it currently contains all rows greater than `min`, and
         // none less than it. The only complication are rows which compare equal to
         // `min`: they get added except if there is already an identical row.
-                        match (self.cmp_rows)(&r, &&min) {
+                        match self.order.cmp(&r, &&min) {
                             Ordering::Less => Some((r, false)),
                             Ordering::Equal => {
                                 let e = current_mins.iter().position(|&(ref s, _)| *s == r);
@@ -159,7 +162,7 @@ impl TopK {
             } else {
                 output_rows = rs.iter().map(|rs| (rs, false)).collect();
             }
-            output_rows.sort_by(|a, b| (self.cmp_rows)(&a.0, &b.0));
+            output_rows.sort_by(|a, b| self.order.cmp(&a.0, &b.0));
         }
 
         if output_rows.len() > self.k {
@@ -200,7 +203,6 @@ impl Ingredient for TopK {
                      group_by: self.group_by.clone(),
 
                      order: self.order.clone(),
-                     cmp_rows: Self::make_cmp_rows(&self.order),
 
                      k: self.k,
 
