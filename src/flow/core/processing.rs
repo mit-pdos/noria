@@ -198,6 +198,7 @@ pub enum SerializableIngredient {
     Permute(ops::permute::Permute),
     Project(ops::project::Project),
     Union(ops::union::Union),
+    TopK(ops::topk::TopK),
 
     Grouped {
         src: prelude::NodeAddress,
@@ -241,6 +242,7 @@ impl SerializableIngredient {
             SerializableIngredient::Project(i) => Box::new(i),
             SerializableIngredient::Union(i) => Box::new(i),
             SerializableIngredient::Filter(i) => Box::new(i),
+            SerializableIngredient::TopK(i) => Box::new(i),
             g @ SerializableIngredient::Grouped{inner: SerializableGrouped::Aggregation(..), ..} => {
                 Box::new(grouped::GroupedOperator::<grouped::aggregate::Aggregator>::from_serialized(g))
             }
