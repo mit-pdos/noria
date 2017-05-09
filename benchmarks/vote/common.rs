@@ -191,7 +191,7 @@ impl Mix {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct RuntimeConfig {
     pub narticles: isize,
     pub runtime: Option<time::Duration>,
@@ -201,6 +201,7 @@ pub struct RuntimeConfig {
     pub migrate_after: Option<time::Duration>,
     pub reuse: bool,
     pub verbose: bool,
+    pub bind_to: Option<String>,
 }
 
 impl RuntimeConfig {
@@ -214,7 +215,13 @@ impl RuntimeConfig {
             migrate_after: None,
             reuse: false,
             verbose: false,
+            bind_to: None,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn prefer_addr<S: ToString>(&mut self, addr: S) {
+        self.bind_to = Some(addr.to_string());
     }
 
     #[allow(dead_code)]

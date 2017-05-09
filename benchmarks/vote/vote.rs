@@ -149,13 +149,14 @@ fn main() {
     let get_stats: Vec<_>;
     if stage {
         // put then get
-        let mut pconfig = config;
+        let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
         put_stats = exercise::launch(None::<exercise::NullClient>, Some(putter), pconfig, None);
         let getters: Vec<_> = getters
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
+                let config = config.clone();
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
@@ -169,7 +170,7 @@ fn main() {
         // put & get
         // TODO: how do we start getters after prepopulate?
         let (tx, prepop) = mpsc::sync_channel(0);
-        let mut pconfig = config;
+        let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
         let putter = thread::Builder::new()
             .name("PUT0".to_string())
@@ -188,6 +189,7 @@ fn main() {
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
+                let config = config.clone();
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {

@@ -1,11 +1,12 @@
 use distributary::srv;
 use distributary::DataType;
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{Writer, Reader, RuntimeConfig, ArticleResult, Period};
 
 use std::io;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use net2::TcpBuilder;
 use bufstream::BufStream;
 use bincode;
 
@@ -65,8 +66,12 @@ impl C {
     }
 }
 
-pub fn make(addr: &str) -> C {
-    let stream = TcpStream::connect(addr).unwrap();
+pub fn make(addr: &str, config: &RuntimeConfig) -> C {
+    let stream = TcpBuilder::new_v4().unwrap();
+    if let Some(ref addr) = config.bind_to {
+        stream.bind(addr).unwrap();
+    }
+    let stream = stream.only_v6(false).unwrap().connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
     C(stream)

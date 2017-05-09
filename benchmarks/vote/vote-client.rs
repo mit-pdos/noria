@@ -22,6 +22,8 @@ extern crate distributary;
 extern crate bincode;
 #[cfg(feature="b_netsoup")]
 extern crate bufstream;
+#[cfg(feature="b_netsoup")]
+extern crate net2;
 
 #[cfg(any(feature="b_memcached", feature="b_hybrid"))]
 extern crate memcached;
@@ -95,6 +97,10 @@ fn main() {
             .takes_value(true)
             .default_value("uniform")
             .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
+        .arg(Arg::with_name("bind")
+            .short("B")
+            .takes_value(true)
+            .help("bind to the given local address when possible"))
         .arg(Arg::with_name("runtime")
             .short("r")
             .long("runtime")
@@ -167,6 +173,14 @@ fn main() {
     let client = dbn.next().unwrap();
     let addr = dbn.next().unwrap();
 
+    if let Some(addr) = args.value_of("bind") {
+        if client != "netsoup" {
+            unimplemented!();
+        }
+        config.prefer_addr(addr);
+    }
+
+    let cfg = config.clone();
     let stats = match client {
         // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
         #[cfg(feature="b_mssql")]
@@ -200,7 +214,7 @@ fn main() {
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
         "netsoup" => {
-            let c = clients::netsoup::make(addr);
+            let c = clients::netsoup::make(addr, &config);
             exercise::launch_mix(c, config)
         }
         // garbage
@@ -209,7 +223,7 @@ fn main() {
                    t)
         }
     };
-    print_stats(&config.mix, &stats, avg);
+    print_stats(&cfg.mix, &stats, avg);
 }
 
 fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool) {
