@@ -140,8 +140,8 @@ pub fn pick(log: &Logger, graph: &Graph, nodes: &[(NodeIndex, bool)]) -> HashSet
                    .any(|child| inquisitive_children.contains(&child)) {
                 // we have children that may query us, so our output should be materialized
                 trace!(log,
-                       format!("querying children force materialization of node {}",
-                               ni.index()));
+                       "querying children force materialization of node {}",
+                       ni.index());
                 materialize.insert(*n.addr().as_local());
             }
         }
@@ -189,10 +189,7 @@ pub fn index(log: &Logger,
         .iter()
         .map(|&(ni, _)| (*graph[ni].addr().as_local(), ni))
         .collect();
-    let nodes: Vec<_> = nodes
-        .iter()
-        .map(|&(ni, new)| (&graph[ni], new))
-        .collect();
+    let nodes: Vec<_> = nodes.iter().map(|&(ni, new)| (&graph[ni], new)).collect();
 
     let mut state: HashMap<_, Option<Vec<Vec<usize>>>> =
         materialize.into_iter().map(|n| (n, None)).collect();
@@ -289,9 +286,7 @@ pub fn index(log: &Logger,
                                        v,
                                        col,
                                        n);
-                                tmp.entry(n)
-                                    .or_insert_with(HashSet::new)
-                                    .insert(vec![col]);
+                                tmp.entry(n).or_insert_with(HashSet::new).insert(vec![col]);
                             }
                         }
                     }
@@ -668,7 +663,7 @@ pub fn reconstruct(log: &Logger,
         let tag = first_tag
             .take()
             .unwrap_or_else(|| Tag(TAG_GENERATOR.fetch_add(1, Ordering::SeqCst) as u32));
-        trace!(log, "tag" => tag.id(); "replaying along path {:?}", path);
+        trace!(log, "replaying along path {:?}", path; "tag" => tag.id());
 
         // partial materialization possible?
         let mut partial = None;
@@ -698,7 +693,7 @@ pub fn reconstruct(log: &Logger,
             segments.last_mut().unwrap().1.push((node, key));
         }
 
-        debug!(log, "tag" => tag.id(); "domain replay path is {:?}", segments);
+        debug!(log, "domain replay path is {:?}", segments; "tag" => tag.id());
 
         let locals = |i: usize| -> Vec<(NodeAddress, Option<usize>)> {
             let mut skip = 0;
@@ -884,9 +879,7 @@ fn cost_fn<'a, T>(log: &'a Logger,
         // must indeed be), and therefore that we can just pick that parent and get a free full
         // materialization. *however*, this would cause the node to be marked as fully
         // materialized, which is *not* okay if it has partially a materialized ancestor!
-        if let Some(&parent) = parents
-               .iter()
-               .find(|&&p| empty.contains(&graph[p].addr())) {
+        if let Some(&parent) = parents.iter().find(|&&p| empty.contains(&graph[p].addr())) {
             if !parents.iter().any(|p| partial.contains(p)) {
                 // no partial ancestors!
                 return Some(parent);
@@ -988,7 +981,7 @@ fn cost_fn<'a, T>(log: &'a Logger,
             })
             .min_by_key(|&(_, cost)| cost)
             .map(|(node, cost)| {
-                     debug!(log, "cost" => cost; "picked replay source {:?}", node);
+                     debug!(log, "picked replay source {:?}", node; "cost" => cost);
                      node
                  })
     })

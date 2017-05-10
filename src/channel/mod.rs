@@ -9,6 +9,7 @@ use tarpc::sync::client;
 use tarpc::sync::client::ClientExt;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::DeserializeOwned;
 use serde_json;
 
 mod packet;
@@ -39,7 +40,7 @@ pub struct GenericSender<T, TS: TypedSender<T> + BytesEndpoint> {
     inner: GenericSenderInner<T, TS>,
 }
 
-impl<T: Send + Serialize + Deserialize + 'static, TS: TypedSender<T> + BytesEndpoint + 'static>
+impl<'de, T: Send + Serialize + Deserialize<'de> + 'static, TS: TypedSender<T> + BytesEndpoint + 'static>
     GenericSender<T, TS> {
     pub fn send(&self, t: T) -> Result<(), mpsc::SendError<T>> {
         match self.inner {
@@ -102,7 +103,7 @@ impl<T, TS: TypedSender<T> + BytesEndpoint> Drop for GenericSender<T, TS> {
         }
     }
 }
-impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Serialize
+impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndpoint> Serialize
     for GenericSender<T, TS> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
@@ -120,10 +121,10 @@ impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Seri
         }
     }
 }
-impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Deserialize
+impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndpoint> Deserialize<'de>
     for GenericSender<T, TS> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         let def = SenderDef::<T>::deserialize(deserializer);
         def.map(|d| {
@@ -133,7 +134,7 @@ impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> Dese
                 })
     }
 }
-impl<T: Send + Serialize + Deserialize, TS: TypedSender<T> + BytesEndpoint> From<TS>
+impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndpoint> From<TS>
     for GenericSender<T, TS> {
     fn from(s: TS) -> Self {
         Self { inner: GenericSenderInner::Local(s) }
@@ -147,13 +148,13 @@ pub trait BytesEndpoint: Send {
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()>;
 }
 
-impl<T: Deserialize + Send> BytesEndpoint for mpsc::Sender<T> {
+impl<T> BytesEndpoint for mpsc::Sender<T> where T: DeserializeOwned + Send {
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
         let t = serde_json::from_slice(data).unwrap();
         self.send(t).map_err(|_| {})
     }
 }
-impl<T: Deserialize + Send> BytesEndpoint for mpsc::SyncSender<T> {
+impl<T> BytesEndpoint for mpsc::SyncSender<T> where T: DeserializeOwned + Send {
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
         let t = serde_json::from_slice(data).unwrap();
         self.send(t).map_err(|_| {})

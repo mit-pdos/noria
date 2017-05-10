@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate clap;
 
-extern crate slog;
-extern crate slog_term;
-
 extern crate rand;
 
 extern crate distributary;
@@ -152,13 +149,14 @@ fn main() {
     let get_stats: Vec<_>;
     if stage {
         // put then get
-        let mut pconfig = config;
+        let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
         put_stats = exercise::launch(None::<exercise::NullClient>, Some(putter), pconfig, None);
         let getters: Vec<_> = getters
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
+                let config = config.clone();
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
@@ -167,15 +165,12 @@ fn main() {
                     .unwrap()
             })
             .collect();
-        get_stats = getters
-            .into_iter()
-            .map(|jh| jh.join().unwrap())
-            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     } else {
         // put & get
         // TODO: how do we start getters after prepopulate?
         let (tx, prepop) = mpsc::sync_channel(0);
-        let mut pconfig = config;
+        let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
         let putter = thread::Builder::new()
             .name("PUT0".to_string())
@@ -194,6 +189,7 @@ fn main() {
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
+                let config = config.clone();
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
@@ -204,10 +200,7 @@ fn main() {
             .collect();
 
         put_stats = putter.join().unwrap();
-        get_stats = getters
-            .into_iter()
-            .map(|jh| jh.join().unwrap())
-            .collect();
+        get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     }
 
     print_stats("PUT", false, &put_stats.pre, avg);
@@ -246,8 +239,11 @@ fn main() {
 fn print_stats<S: AsRef<str>>(desc: S, read: bool, stats: &exercise::BenchmarkResult, avg: bool) {
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
         let perc = if read { r_perc } else { w_perc };
-        for (v, p, _, _) in perc {
-            println!("percentile {} {:.2} {:.2}", desc.as_ref(), v, p);
+        for iv in perc {
+            println!("percentile {} {:.2} {:.2}",
+                     desc.as_ref(),
+                     iv.value(),
+                     iv.percentile());
         }
     }
     if avg {
@@ -452,8 +448,7 @@ impl Writer for Spoon {
             Period::PostMigration
         } else {
             for &(user_id, article_id) in ids {
-                self.vote_pre
-                    .put(vec![user_id.into(), article_id.into()]);
+                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
             }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration
@@ -468,10 +463,7 @@ impl Writer for Spoon {
             graph: self.graph.clone(),
             mut_tx: tx,
             stupid: self.stupid,
-            getters: self.getters
-                .iter()
-                .map(|g| unsafe { g.clone() })
-                .collect(),
+            getters: self.getters.iter().map(|g| unsafe { g.clone() }).collect(),
             transactions: self.transactions,
         }
     }

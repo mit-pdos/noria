@@ -1,17 +1,11 @@
-#![cfg_attr(feature="b_netsoup", feature(conservative_impl_trait, plugin))]
-#![cfg_attr(feature="b_netsoup", plugin(tarpc_plugins))]
-
 #[macro_use]
 extern crate clap;
 
-extern crate slog;
-extern crate slog_term;
-
 extern crate rand;
 
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
+#[cfg(feature="b_mssql")]
 extern crate futures;
-#[cfg(any(feature="b_mssql", feature="b_netsoup"))]
+#[cfg(feature="b_mssql")]
 extern crate tokio_core;
 
 #[cfg(feature="b_mssql")]
@@ -25,7 +19,11 @@ extern crate mysql;
 extern crate distributary;
 
 #[cfg(feature="b_netsoup")]
-extern crate tarpc;
+extern crate bincode;
+#[cfg(feature="b_netsoup")]
+extern crate bufstream;
+#[cfg(feature="b_netsoup")]
+extern crate net2;
 
 #[cfg(any(feature="b_memcached", feature="b_hybrid"))]
 extern crate memcached;
@@ -99,6 +97,10 @@ fn main() {
             .takes_value(true)
             .default_value("uniform")
             .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
+        .arg(Arg::with_name("bind")
+            .short("B")
+            .takes_value(true)
+            .help("bind to the given local address when possible"))
         .arg(Arg::with_name("runtime")
             .short("r")
             .long("runtime")
@@ -171,6 +173,14 @@ fn main() {
     let client = dbn.next().unwrap();
     let addr = dbn.next().unwrap();
 
+    if let Some(addr) = args.value_of("bind") {
+        if client != "netsoup" {
+            unimplemented!();
+        }
+        config.prefer_addr(addr);
+    }
+
+    let cfg = config.clone();
     let stats = match client {
         // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
         #[cfg(feature="b_mssql")]
@@ -204,7 +214,7 @@ fn main() {
         // netsoup://127.0.0.1:7777
         #[cfg(feature="b_netsoup")]
         "netsoup" => {
-            let c = clients::netsoup::make(addr);
+            let c = clients::netsoup::make(addr, &config);
             exercise::launch_mix(c, config)
         }
         // garbage
@@ -213,20 +223,20 @@ fn main() {
                    t)
         }
     };
-    print_stats(&config.mix, &stats, avg);
+    print_stats(&cfg.mix, &stats, avg);
 }
 
 fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool) {
     let stats = &stats.pre;
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
         if mix.does_read() {
-            for (v, p, _, _) in r_perc {
-                println!("percentile GET {:.2} {:.2}", v, p);
+            for iv in r_perc {
+                println!("percentile GET {:.2} {:.2}", iv.value(), iv.percentile());
             }
         }
         if mix.does_write() {
-            for (v, p, _, _) in w_perc {
-                println!("percentile PUT {:.2} {:.2}", v, p);
+            for iv in w_perc {
+                println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
             }
         }
     }

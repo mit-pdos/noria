@@ -72,9 +72,9 @@ impl Serialize for InitialState {
         def.serialize(serializer)
     }
 }
-impl Deserialize for InitialState {
+impl<'de> Deserialize<'de> for InitialState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         let def = try!(InitialStateDef::deserialize(deserializer));
         match def {

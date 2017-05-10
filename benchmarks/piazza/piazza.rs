@@ -2,13 +2,10 @@ extern crate distributary;
 
 #[macro_use]
 extern crate clap;
-extern crate slog;
-extern crate slog_term;
 
 use std::{thread, time};
 use std::fs::{OpenOptions, File};
 use std::io::Write;
-use slog::DrainExt;
 
 use distributary::{DataType, Join, JoinType, Blender, Base, NodeAddress, Filter, Mutator, Index};
 
@@ -36,7 +33,7 @@ impl Piazza {
     // Create the base nodes for our Piazza application
     pub fn new() -> Self {
         let mut g = Blender::new();
-        g.log_with(slog::Logger::root(slog_term::streamer().full().build().fuse(), None));
+        g.log_with(distributary::logger_pls());
 
         let (user, post, class, taking);
 

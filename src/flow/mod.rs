@@ -314,7 +314,7 @@ impl Default for Blender {
             in_txs: HashMap::default(),
             domains: Vec::new(),
 
-            log: slog::Logger::root(slog::Discard, None),
+            log: slog::Logger::root(slog::Discard, o!()),
         }
     }
 }
@@ -357,7 +357,7 @@ impl Blender {
     /// Start setting up a new `Migration`.
     pub fn start_migration(&mut self) -> Migration {
         info!(self.log, "starting migration");
-        let miglog = self.log.new(None);
+        let miglog = self.log.new(o!());
         Migration {
             mainline: self,
             added: Default::default(),
@@ -799,9 +799,7 @@ impl<'a> Migration<'a> {
             let r = node::Type::Reader(None, Default::default());
             let r = self.mainline.ingredients[*n.as_global()].mirror(r);
             let r = self.mainline.ingredients.add_node(r);
-            self.mainline
-                .ingredients
-                .add_edge(*n.as_global(), r, false);
+            self.mainline.ingredients.add_edge(*n.as_global(), r, false);
             self.readers.insert(*n.as_global(), r);
         }
     }
@@ -817,9 +815,8 @@ impl<'a> Migration<'a> {
         }
 
         let base_columns: Vec<(_, Option<_>)> =
-            self.mainline.ingredients[*n.as_global()].base_columns(key,
-                                                                   &self.mainline.ingredients,
-                                                                   *n.as_global());
+            self.mainline.ingredients[*n.as_global()]
+                .base_columns(key, &self.mainline.ingredients, *n.as_global());
 
         let coarse_parents = base_columns
             .iter()
@@ -924,9 +921,7 @@ impl<'a> Migration<'a> {
         let h = node::Type::Hook(Some(h));
         let h = self.mainline.ingredients[*n.as_global()].mirror(h);
         let h = self.mainline.ingredients.add_node(h);
-        self.mainline
-            .ingredients
-            .add_edge(*n.as_global(), h, false);
+        self.mainline.ingredients.add_edge(*n.as_global(), h, false);
         Ok(h.into())
     }
 
@@ -1251,8 +1246,8 @@ mod tests {
     fn it_works_blender_with_migration() {
         use Recipe;
 
-        let r_txt = "INSERT INTO a (x, y, z) VALUES (?, ?, ?);\n
-                     INSERT INTO b (r, s) VALUES (?, ?);\n";
+        let r_txt = "CREATE TABLE a (x int, y int, z int);\n
+                     CREATE TABLE b (r int, s int);\n";
         let mut r = Recipe::from_str(r_txt, None).unwrap();
 
         let mut b = Blender::new();

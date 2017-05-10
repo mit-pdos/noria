@@ -25,16 +25,16 @@ use backlog;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum StreamUpdate {
     /// Indicates the addition of a new row
-    AddRow(sync::Arc<Vec<DataType>>),
+    AddRow(Vec<DataType>),
     /// Indicates the removal of an existing row
-    DeleteRow(sync::Arc<Vec<DataType>>),
+    DeleteRow(Vec<DataType>),
 }
 
 impl From<Record> for StreamUpdate {
     fn from(other: Record) -> Self {
         match other {
-            Record::Positive(u) => StreamUpdate::AddRow(u),
-            Record::Negative(u) => StreamUpdate::DeleteRow(u),
+            Record::Positive(u) => StreamUpdate::AddRow((*u).clone()),
+            Record::Negative(u) => StreamUpdate::DeleteRow((*u).clone()),
             Record::DeleteRequest(..) => unreachable!(),
         }
     }
@@ -42,7 +42,7 @@ impl From<Record> for StreamUpdate {
 
 impl From<Vec<DataType>> for StreamUpdate {
     fn from(other: Vec<DataType>) -> Self {
-        StreamUpdate::AddRow(sync::Arc::new(other))
+        StreamUpdate::AddRow(other)
     }
 }
 
@@ -251,9 +251,9 @@ impl Serialize for Type {
     }
 }
 
-impl Deserialize for Type {
+impl<'de> Deserialize<'de> for Type {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         let def = TypeDef::deserialize(deserializer);
         if let Err(err) = def {
@@ -384,7 +384,12 @@ impl Node {
     pub fn describe(&self, f: &mut fmt::Write, idx: NodeIndex) -> fmt::Result {
         use regex::Regex;
 
-        let escape = |s: &str| Regex::new("([\"|{}])").unwrap().replace_all(s, "\\$1");
+        let escape = |s: &str| {
+            Regex::new("([\"|{}])")
+                .unwrap()
+                .replace_all(s, "\\$1")
+                .to_string()
+        };
         write!(f,
                " [style=filled, fillcolor={}, label=\"",
                self.domain

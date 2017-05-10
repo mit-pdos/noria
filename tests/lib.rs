@@ -303,11 +303,13 @@ fn it_works_streaming() {
 
     // send a value on a
     muta.put(vec![id.clone(), 2.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 2.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 2.into()].into()]));
 
     // update value again
     mutb.put(vec![id.clone(), 4.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 4.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 4.into()].into()]));
 }
 
 #[test]
@@ -343,16 +345,16 @@ fn shared_interdomain_ancestor() {
 
     // send a value on a
     muta.put(vec![id.clone(), 2.into()]);
-    assert_eq!(bq.recv_timeout(time::Duration::from_millis(100)),
+    assert_eq!(bq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), 2.into()].into()]));
-    assert_eq!(cq.recv_timeout(time::Duration::from_millis(100)),
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), 2.into()].into()]));
 
     // update value again
     muta.put(vec![id.clone(), 4.into()]);
-    assert_eq!(bq.recv_timeout(time::Duration::from_millis(100)),
+    assert_eq!(bq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), 4.into()].into()]));
-    assert_eq!(cq.recv_timeout(time::Duration::from_millis(100)),
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), 4.into()].into()]));
 }
 
@@ -443,18 +445,20 @@ fn it_works_deletion() {
 
     // send a value on a
     muta.put(vec![1.into(), 2.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![1.into(), 2.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![1.into(), 2.into()].into()]));
 
     // update value again
     mutb.put(vec![0.into(), 1.into(), 4.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![1.into(), 4.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![1.into(), 4.into()].into()]));
 
     // delete first value
     use std::sync::Arc;
     use distributary::StreamUpdate::*;
     muta.delete(vec![2.into()]);
-    assert_eq!(cq.recv(),
-               Ok(vec![DeleteRow(Arc::new(vec![1.into(), 2.into()]))]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![DeleteRow(vec![1.into(), 2.into()])]));
 }
 
 #[test]
@@ -537,8 +541,7 @@ fn votes() {
 
     // query vote count to see that the count was updated
     let res = vcq(&a1, true).unwrap();
-    assert!(res.iter()
-                .all(|r| r[0] == a1.clone() && r[1] == 1.into()));
+    assert!(res.iter().all(|r| r[0] == a1.clone() && r[1] == 1.into()));
     assert_eq!(res.len(), 1);
 
     // check that article 1 appears in the join view with a vote count of one
@@ -686,8 +689,7 @@ fn transactional_vote() {
 
     // query vote count to see that the count was updated
     let res = vcq(&a1, true).unwrap();
-    assert!(res.iter()
-                .all(|r| r[0] == a1.clone() && r[1] == 1.into()));
+    assert!(res.iter().all(|r| r[0] == a1.clone() && r[1] == 1.into()));
     assert_eq!(res.len(), 1);
 
     // check that article 1 appears in the join view with a vote count of one
@@ -822,7 +824,8 @@ fn add_columns() {
     muta.put(vec![id.clone(), "y".into()]);
 
     // check that a got it
-    assert_eq!(aq.recv(), Ok(vec![vec![id.clone(), "y".into()].into()]));
+    assert_eq!(aq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), "y".into()].into()]));
 
     // add a third column to a
     {
@@ -835,14 +838,14 @@ fn add_columns() {
     muta.put(vec![id.clone(), "z".into()]);
 
     // check that a got it, and added the new, third column's default
-    assert_eq!(aq.recv(),
+    assert_eq!(aq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "z".into(), 3.into()].into()]));
 
     // send a new value on a
     muta.put(vec![id.clone(), "a".into(), 10.into()]);
 
     // check that a got it, and included the third column
-    assert_eq!(aq.recv(),
+    assert_eq!(aq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "a".into(), 10.into()].into()]));
 }
 
@@ -948,14 +951,15 @@ fn migrate_drop_columns() {
     // using putter that knows of neither b nor c should result in defaults for both
     muta2.put(vec![id.clone()]);
 
-    assert_eq!(stream.recv(),
+    assert_eq!(stream.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "bx".into()].into()]));
-    assert_eq!(stream.recv(), Ok(vec![vec![id.clone(), "b".into()].into()]));
-    assert_eq!(stream.recv(),
+    assert_eq!(stream.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), "b".into()].into()]));
+    assert_eq!(stream.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "b".into(), "cy".into()].into()]));
-    assert_eq!(stream.recv(),
+    assert_eq!(stream.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "bz".into(), "c".into()].into()]));
-    assert_eq!(stream.recv(),
+    assert_eq!(stream.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![id.clone(), "b".into(), "c".into()].into()]));
     assert_eq!(stream.try_recv(), Err(mpsc::TryRecvError::Empty));
 }
@@ -1101,11 +1105,13 @@ fn crossing_migration() {
 
     // send a value on a
     muta.put(vec![id.clone(), 2.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 2.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 2.into()].into()]));
 
     // update value again
     mutb.put(vec![id.clone(), 4.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 4.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 4.into()].into()]));
 }
 
 #[test]
@@ -1195,11 +1201,13 @@ fn domain_amend_migration() {
 
     // send a value on a
     muta.put(vec![id.clone(), 2.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 2.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 2.into()].into()]));
 
     // update value again
     mutb.put(vec![id.clone(), 4.into()]);
-    assert_eq!(cq.recv(), Ok(vec![vec![id.clone(), 4.into()].into()]));
+    assert_eq!(cq.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
+               Ok(vec![vec![id.clone(), 4.into()].into()]));
 }
 
 #[test]
@@ -1264,7 +1272,8 @@ fn state_replay_migration_stream() {
     // there are (/should be) two records in a with x == 1
     mutb.put(vec![1.into(), "n".into()]);
     // they may arrive in any order
-    let res = out.recv().unwrap();
+    let res = out.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS))
+        .unwrap();
     assert!(res.iter()
                 .any(|r| r == &vec![1.into(), "a".into(), "n".into()].into()));
     assert!(res.iter()
@@ -1272,7 +1281,7 @@ fn state_replay_migration_stream() {
 
     // there are (/should be) one record in a with x == 2
     mutb.put(vec![2.into(), "o".into()]);
-    assert_eq!(out.recv(),
+    assert_eq!(out.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
                Ok(vec![vec![2.into(), "c".into(), "o".into()].into()]));
 
     // there should now be no more records
@@ -1674,8 +1683,8 @@ fn recipe_activates_and_migrates() {
 
 #[test]
 fn recipe_activates_and_migrates_with_join() {
-    let r_txt = "INSERT INTO a (x, y, z) VALUES (?, ?, ?);\n
-                 INSERT INTO b (r, s) VALUES (?, ?);\n";
+    let r_txt = "CREATE TABLE a (x int, y int, z int);\n
+                 CREATE TABLE b (r int, s int);\n";
     let mut r = distributary::Recipe::from_str(r_txt, None).unwrap();
     assert_eq!(r.version(), 0);
     assert_eq!(r.expressions().len(), 2);

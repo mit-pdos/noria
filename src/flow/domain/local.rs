@@ -2,6 +2,9 @@ use flow::prelude::*;
 use std::ops::Index;
 use std::iter::FromIterator;
 use std::collections::hash_map::Entry;
+use std::collections::HashSet;
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 #[derive(Serialize, Deserialize)]
 pub struct Map<T> {
@@ -160,7 +163,7 @@ pub enum KeyType<'a, T: 'a> {
     Quad((T, T, T, T)),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 enum KeyedState<T: Eq + Hash> {
     Single(FnvHashMap<T, Vec<Arc<Vec<T>>>>),
     Double(FnvHashMap<(T, T), Vec<Arc<Vec<T>>>>),
@@ -252,6 +255,74 @@ pub enum LookupResult<'a, T: 'a> {
     Missing,
 }
 
+/// Variant of Record used for serialization
+#[derive(Serialize, Deserialize)]
+enum KeyedStateDef<T: Eq + Hash> {
+    Single(HashSet<T>),
+    Double(HashSet<(T, T)>),
+    Tri(HashSet<(T, T, T)>),
+    Quad(HashSet<(T, T, T, T)>),
+}
+
+impl<T: Eq + Hash + Clone + Serialize> Serialize for KeyedState<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let def = match *self {
+            KeyedState::Single(ref s) => {
+                let mut keys = s.iter().map(|(k, v)|{
+                    assert!(v.is_empty());
+                    k.clone()
+                }).collect();
+                KeyedStateDef::Single(keys)
+            }
+            KeyedState::Double(ref s) => {
+                let mut keys = s.iter().map(|(k, v)|{
+                    assert!(v.is_empty());
+                    k.clone()
+                }).collect();
+                KeyedStateDef::Double(keys)
+            }
+            KeyedState::Tri(ref s) => {
+                let mut keys = s.iter().map(|(k, v)|{
+                    assert!(v.is_empty());
+                    k.clone()
+                }).collect();
+                KeyedStateDef::Tri(keys)
+            }
+            KeyedState::Quad(ref s) => {
+                let mut keys = s.iter().map(|(k, v)|{
+                    assert!(v.is_empty());
+                    (*k).clone()
+                }).collect();
+                KeyedStateDef::Quad(keys)
+            }
+        };
+
+        def.serialize(serializer)
+    }
+}
+
+impl<'de, T: Eq + Hash + Clone + Deserialize<'de>> Deserialize<'de> for KeyedState<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let def = KeyedStateDef::deserialize(deserializer);
+        if let Err(err) = def {
+            return Err(err);
+        }
+
+        let t = match def.unwrap() {
+            KeyedStateDef::Single(s) => KeyedState::Single(s.into_iter().map(|k| (k, Vec::new())).collect()),
+            KeyedStateDef::Double(s) => KeyedState::Double(s.into_iter().map(|k| (k, Vec::new())).collect()),
+            KeyedStateDef::Tri(s) => KeyedState::Tri(s.into_iter().map(|k| (k, Vec::new())).collect()),
+            KeyedStateDef::Quad(s) => KeyedState::Quad(s.into_iter().map(|k| (k, Vec::new())).collect()),
+        };
+        Ok(t)
+    }
+}
+
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct State<T: Hash + Eq + Clone> {
     state: Vec<(Vec<usize>, KeyedState<T>, bool)>,
@@ -279,12 +350,12 @@ impl<T: Hash + Eq + Clone> State<T> {
 
     pub fn add_key(&mut self, columns: &[usize], partial: bool) {
         if self.state_for(columns).is_some() {
-            // already keyed
+        // already keyed
             return;
         }
 
         if !self.state.is_empty() && !self.state[0].1.is_empty() {
-            // we'd need to *construct* the index!
+        // we'd need to *construct* the index!
             unimplemented!();
         }
 
@@ -306,9 +377,7 @@ impl<T: Hash + Eq + Clone> State<T> {
 
     pub fn insert(&mut self, r: Arc<Vec<T>>) {
         let mut rclones = Vec::with_capacity(self.state.len());
-        rclones.extend((0..(self.state.len() - 1))
-                           .into_iter()
-                           .map(|_| r.clone()));
+        rclones.extend((0..(self.state.len() - 1)).into_iter().map(|_| r.clone()));
         rclones.push(r);
 
         self.rows = self.rows.saturating_add(1);
@@ -317,15 +386,15 @@ impl<T: Hash + Eq + Clone> State<T> {
 
             match s.1 {
                 KeyedState::Single(ref mut map) => {
-                    // treat this specially to avoid the extra Vec
+        // treat this specially to avoid the extra Vec
                     debug_assert_eq!(s.0.len(), 1);
-                    // i *wish* we could use the entry API here, but it would mean an extra clone
-                    // in the common case of an entry already existing for the given key...
+        // i *wish* we could use the entry API here, but it would mean an extra clone
+        // in the common case of an entry already existing for the given key...
                     if let Some(ref mut rs) = map.get_mut(&r[s.0[0]]) {
                         rs.push(r);
                         return;
                     } else if s.2 {
-                        // trying to insert a record into partial materialization hole!
+        // trying to insert a record into partial materialization hole!
                         unimplemented!();
                     }
                     map.insert(r[s.0[0]].clone(), vec![r]);
@@ -369,7 +438,7 @@ impl<T: Hash + Eq + Clone> State<T> {
     pub fn remove(&mut self, r: &[T]) {
         let mut removed = 0;
         for s in &mut self.state {
-            removed = 0; // otherwise we'd count every removal multiple times
+removed = 0; // otherwise we'd count every removal multiple times
             let keep = |rsr: &Arc<Vec<T>>| if &rsr[..] == r {
                 removed += 1;
                 false
@@ -386,7 +455,7 @@ impl<T: Hash + Eq + Clone> State<T> {
                 _ => {
                     match s.1 {
                         KeyedState::Double(ref mut map) => {
-                            // TODO: can we avoid the Clone here?
+        // TODO: can we avoid the Clone here?
                             let key = (r[s.0[0]].clone(), r[s.0[1]].clone());
                             if let Some(ref mut rs) = map.get_mut(&key) {
                                 rs.retain(keep);
@@ -536,7 +605,7 @@ impl<T: Hash + Eq + Clone> State<T> {
             LookupResult::Some(&rs[..])
         } else {
             if state.2 {
-                // partially materialized, so this is a hole (empty results would be vec![])
+        // partially materialized, so this is a hole (empty results would be vec![])
                 LookupResult::Missing
             } else {
                 LookupResult::Some(&[])

@@ -216,15 +216,15 @@ impl ImpliedTableExpansion for SqlQuery {
             SqlQuery::CreateTable(mut ctq) => {
                 let table = ctq.table.clone();
                 let transform_key = |key_cols: Vec<Column>| {
-                    key_cols
-                        .into_iter()
-                        .map(|k| set_table(k, &table))
-                        .collect()
+                    key_cols.into_iter().map(|k| set_table(k, &table)).collect()
                 };
                 // Expand within field list
                 ctq.fields = ctq.fields
                     .into_iter()
-                    .map(|tf| (set_table(tf.0, &table), tf.1))
+                    .map(|mut tfs| {
+                             tfs.column = set_table(tfs.column, &table);
+                             tfs
+                         })
                     .collect();
                 // Expand tables for key specification
                 if ctq.keys.is_some() {
@@ -263,7 +263,7 @@ impl ImpliedTableExpansion for SqlQuery {
 
 #[cfg(test)]
 mod tests {
-    use nom_sql::{Column, FieldExpression, SqlQuery, SqlType, Table};
+    use nom_sql::{Column, ColumnSpecification, FieldExpression, SqlQuery, SqlType, Table};
     use std::collections::HashMap;
     use super::ImpliedTableExpansion;
 
@@ -276,9 +276,8 @@ mod tests {
         // CREATE TABLE address (address.addr_id, address.addr_street1);
         let q = CreateTableStatement {
             table: Table::from("address"),
-
-            fields: vec![(Column::from("addr_id"), SqlType::Text),
-                         (Column::from("addr_street1"), SqlType::Text)],
+            fields: vec![ColumnSpecification::new(Column::from("addr_id"), SqlType::Text),
+                         ColumnSpecification::new(Column::from("addr_street1"), SqlType::Text)],
             ..Default::default()
         };
 
@@ -288,8 +287,10 @@ mod tests {
         match res {
             SqlQuery::CreateTable(tq) => {
                 assert_eq!(tq.fields,
-                           vec![(Column::from("address.addr_id"), SqlType::Text),
-                                (Column::from("address.addr_street1"), SqlType::Text)]);
+                           vec![ColumnSpecification::new(Column::from("address.addr_id"),
+                                                         SqlType::Text),
+                                ColumnSpecification::new(Column::from("address.addr_street1"),
+                                                         SqlType::Text)]);
                 assert_eq!(tq.table, Table::from("address"));
             }
             // if we get anything other than a table creation query back,

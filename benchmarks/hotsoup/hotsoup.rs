@@ -6,9 +6,6 @@ mod populate;
 extern crate clap;
 #[macro_use]
 extern crate slog;
-extern crate slog_term;
-
-use slog::DrainExt;
 
 use distributary::{Blender, Recipe};
 
@@ -35,7 +32,7 @@ fn make(blacklist: &str) -> Box<Backend> {
 
     // set up graph
     let mut g = Blender::new();
-    let log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
+    let log = distributary::logger_pls();
     let blender_log = log.clone();
     g.log_with(blender_log);
 

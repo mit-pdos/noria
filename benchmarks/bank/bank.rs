@@ -240,8 +240,8 @@ fn client(_i: usize,
                 let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
-                    mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
-                                              token.into())
+                    mutator
+                        .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
                 } else {
                     mutator.put(vec![src.into(), dst.into(), 100.into()]);
                     Ok(0)
@@ -343,16 +343,16 @@ fn client(_i: usize,
         println!("write + settle latency: {:.3} μs",
                  (wl + sl) as f64 / n * 0.001);
 
-        let mut latencies_hist = Histogram::<i64>::new_with_bounds(10, 10000000, 4).unwrap();
+        let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
         for i in 0..write_latencies.len() {
             let sample_nanos = write_latencies[i] + settle_latencies[i];
-            let sample_micros = (sample_nanos as f64 * 0.001).round() as i64;
+            let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
             latencies_hist.record(sample_micros).unwrap();
         }
 
-        for (v, p, _, _) in latencies_hist.iter_recorded() {
+        for iv in latencies_hist.iter_recorded() {
             // XXX: Print CDF in the format expected by the print_latency_cdf script.
-            println!("percentile PUT {:.2} {:.2}", v, p);
+            println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
         }
     }
     throughputs
@@ -443,13 +443,9 @@ fn main() {
 
     let durability_level;
     match args.value_of("durability") {
-        Some("buffered") => {
-            durability_level = Some(BaseDurabilityLevel::Buffered)
-        },
-        Some("immediate") => {
-            durability_level = Some(BaseDurabilityLevel::SyncImmediately)
-        },
-        None | Some(&_) => durability_level = None
+        Some("buffered") => durability_level = Some(BaseDurabilityLevel::Buffered),
+        Some("immediate") => durability_level = Some(BaseDurabilityLevel::SyncImmediately),
+        None | Some(&_) => durability_level = None,
     }
 
     if let Some(ref migrate_after) = migrate_after {

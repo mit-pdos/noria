@@ -56,7 +56,7 @@ pub struct SqlIncorporator {
 impl Default for SqlIncorporator {
     fn default() -> Self {
         SqlIncorporator {
-            log: slog::Logger::root(slog::Discard, None),
+            log: slog::Logger::root(slog::Discard, o!()),
             mir_converter: SqlToMirConverter::default(),
             leaf_addresses: HashMap::default(),
             num_queries: 0,
@@ -87,7 +87,7 @@ impl SqlIncorporator {
     /// Incorporates a single query into via the flow graph migration in `mig`. The `query`
     /// argument is a string that holds a parameterized SQL query, and the `name` argument supplies
     /// an optional name for the query. If no `name` is specified, the table name is used in the
-    /// case of INSERT queries, and a deterministic, unique name is generated and returned
+    /// case of CREATE TABLE queries, and a deterministic, unique name is generated and returned
     /// otherwise.
     ///
     /// The return value is a tuple containing the query name (specified or computing) and a `Vec`
@@ -102,8 +102,8 @@ impl SqlIncorporator {
 
     /// Incorporates a single query into via the flow graph migration in `mig`. The `query`
     /// argument is a `SqlQuery` structure, and the `name` argument supplies an optional name for
-    /// the query. If no `name` is specified, the table name is used in the case of INSERT queries,
-    /// and a deterministic, unique name is generated and returned otherwise.
+    /// the query. If no `name` is specified, the table name is used in the case of CREATE TABLE
+    /// queries, and a deterministic, unique name is generated and returned otherwise.
     ///
     /// The return value is a tuple containing the query name (specified or computing) and a `Vec`
     /// of `NodeAddress`es representing the nodes added to support the query.
@@ -135,15 +135,15 @@ impl SqlIncorporator {
                             query_name: &str,
                             st: &SelectStatement)
                             -> (QueryGraph, QueryGraphReuse) {
-        debug!(self.log, format!("Making QG for \"{}\"", query_name));
-        trace!(self.log, format!("Query \"{}\": {:#?}", query_name, st));
+        debug!(self.log, "Making QG for \"{}\"", query_name);
+        trace!(self.log, "Query \"{}\": {:#?}", query_name, st);
 
         let qg = match to_query_graph(st) {
             Ok(qg) => qg,
             Err(e) => panic!(e),
         };
 
-        trace!(self.log, format!("QG for \"{}\": {:#?}", query_name, qg));
+        trace!(self.log, "QG for \"{}\": {:#?}", query_name, qg);
 
         // Do we already have this exact query or a subset of it?
         // TODO(malte): make this an O(1) lookup by QG signature
@@ -232,12 +232,7 @@ impl SqlIncorporator {
                                   -> QueryFlowParts {
         // We want to hang the new leaf off the last non-leaf node of the query, so backtrack one
         // step here.
-        let final_node_of_query = leaf.borrow()
-            .ancestors()
-            .iter()
-            .next()
-            .unwrap()
-            .clone();
+        let final_node_of_query = leaf.borrow().ancestors().iter().next().unwrap().clone();
 
         let mut mir = self.mir_converter
             .add_leaf_below(final_node_of_query, query_name, params);
@@ -258,8 +253,7 @@ impl SqlIncorporator {
             .collect::<Vec<_>>();
 
         // TODO(malte): get rid of duplication and figure out where to track this state
-        self.view_schemas
-            .insert(String::from(query_name), fields);
+        self.view_schemas.insert(String::from(query_name), fields);
 
         // We made a new query, so store the query graph and the corresponding leaf MIR query
         //self.query_graphs.insert(qg.signature().hash, (qg, mir));
@@ -293,8 +287,7 @@ impl SqlIncorporator {
         let qfp = mir.into_flow_parts(&mut mig);
 
         // TODO(malte): get rid of duplication and figure out where to track this state
-        self.view_schemas
-            .insert(String::from(query_name), fields);
+        self.view_schemas.insert(String::from(query_name), fields);
 
         qfp
     }
@@ -330,8 +323,7 @@ impl SqlIncorporator {
         let qfp = mir.into_flow_parts(&mut mig);
 
         // TODO(malte): get rid of duplication and figure out where to track this state
-        self.view_schemas
-            .insert(String::from(query_name), fields);
+        self.view_schemas.insert(String::from(query_name), fields);
 
         // We made a new query, so store the query graph and the corresponding leaf MIR node
         self.query_graphs.insert(qg.signature().hash, (qg, mir));
@@ -355,11 +347,15 @@ impl SqlIncorporator {
         // TODO(malte): should we run the MIR-level optimizations here?
         let new_opt_mir = new_query_mir.optimize();
 
+        trace!(self.log, "Optimized MIR: {}", new_opt_mir);
+
         // compare to existing query MIR and reuse prefix
         let (reused_mir, num_reused_nodes) =
             merge_mir_for_queries(&self.log, &new_opt_mir, &extend_mir);
 
         let mut post_reuse_opt_mir = reused_mir.optimize_post_reuse();
+
+        trace!(self.log, "Post-reuse optimized MIR: {}", post_reuse_opt_mir);
 
         let qfp = post_reuse_opt_mir.into_flow_parts(&mut mig);
 
@@ -378,8 +374,8 @@ impl SqlIncorporator {
     fn nodes_for_query(&mut self, q: SqlQuery, mig: &mut Migration) -> QueryFlowParts {
         let name = match q {
             SqlQuery::CreateTable(ref ctq) => ctq.table.name.clone(),
-            SqlQuery::Insert(ref iq) => iq.table.name.clone(),
             SqlQuery::Select(_) => format!("q_{}", self.num_queries),
+            _ => panic!("only CREATE TABLE and SELECT queries can be added to the graph!"),
         };
         self.nodes_for_named_query(q, name, mig)
     }
@@ -429,8 +425,8 @@ impl SqlIncorporator {
                     QueryGraphReuse::None => self.add_query_via_mir(&query_name, sq, qg, mig),
                 }
             }
-            ref q @ SqlQuery::CreateTable { .. } |
-            ref q @ SqlQuery::Insert { .. } => self.add_base_via_mir(&query_name, q, mig),
+            ref q @ SqlQuery::CreateTable { .. } => self.add_base_via_mir(&query_name, q, mig),
+            ref q @ _ => panic!("unhandled query type in recipe: {:?}", q),
         };
 
         // record info about query
@@ -542,7 +538,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Must have a base node for type inference to work, so make one manually
-        assert!("INSERT INTO users (id, name) VALUES (?, ?);"
+        assert!("CREATE TABLE users (id int, name varchar(40));"
                     .to_flow_parts(&mut inc, None, &mut mig)
                     .is_ok());
 
@@ -574,7 +570,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type for "users"
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
@@ -585,7 +581,7 @@ mod tests {
         assert_eq!(get_node(&inc, &mig, "users").description(), "B");
 
         // Establish a base write type for "articles"
-        assert!(inc.add_query("INSERT INTO articles (id, author, title) VALUES (?, ?, ?);",
+        assert!(inc.add_query("CREATE TABLE articles (id int, author int, title varchar(255));",
                               None,
                               &mut mig)
                     .is_ok());
@@ -627,7 +623,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
@@ -664,9 +660,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write types
-        assert!(inc.add_query("INSERT INTO votes (aid, userid) VALUES (?, ?);",
-                              None,
-                              &mut mig)
+        assert!(inc.add_query("CREATE TABLE votes (aid int, userid int);", None, &mut mig)
                     .is_ok());
         // Should have source and "users" base table node
         assert_eq!(mig.graph().node_count(), 2);
@@ -688,11 +682,11 @@ mod tests {
         let qid = query_id_hash(&["computed_columns", "votes"],
                                 &[&Column::from("votes.aid")],
                                 &[&Column {
-                                       name: String::from("votes"),
-                                       alias: Some(String::from("votes")),
-                                       table: None,
-                                       function: Some(f),
-                                   }]);
+                                     name: String::from("votes"),
+                                     alias: Some(String::from("votes")),
+                                     table: None,
+                                     function: Some(f),
+                                 }]);
         let agg_view = get_node(&inc, &mig, &format!("q_{:x}_n0", qid));
         assert_eq!(agg_view.fields(), &["aid", "votes"]);
         assert_eq!(agg_view.description(), format!("|*| γ[0]"));
@@ -710,7 +704,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
@@ -749,7 +743,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
@@ -790,9 +784,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type
-        assert!(inc.add_query("INSERT INTO votes (aid, userid) VALUES (?, ?);",
-                              None,
-                              &mut mig)
+        assert!(inc.add_query("CREATE TABLE votes (aid int, userid int);", None, &mut mig)
                     .is_ok());
         // Should have source and "users" base table node
         assert_eq!(mig.graph().node_count(), 2);
@@ -811,11 +803,11 @@ mod tests {
         let qid = query_id_hash(&["computed_columns", "votes"],
                                 &[],
                                 &[&Column {
-                                       name: String::from("count"),
-                                       alias: Some(String::from("count")),
-                                       table: None,
-                                       function: Some(f),
-                                   }]);
+                                     name: String::from("count"),
+                                     alias: Some(String::from("count")),
+                                     table: None,
+                                     function: Some(f),
+                                 }]);
         let proj_helper_view = get_node(&inc, &mig, &format!("q_{:x}_n0_prj_hlpr", qid));
         assert_eq!(proj_helper_view.fields(), &["userid", "grp"]);
         assert_eq!(proj_helper_view.description(), format!("π[1, lit: 0]"));
@@ -838,9 +830,7 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish a base write type
-        assert!(inc.add_query("INSERT INTO votes (userid, aid) VALUES (?, ?);",
-                              None,
-                              &mut mig)
+        assert!(inc.add_query("CREATE TABLE votes (userid int, aid int);", None, &mut mig)
                     .is_ok());
         // Should have source and "users" base table node
         assert_eq!(mig.graph().node_count(), 2);
@@ -859,11 +849,11 @@ mod tests {
         let qid = query_id_hash(&["computed_columns", "votes"],
                                 &[&Column::from("votes.userid")],
                                 &[&Column {
-                                       name: String::from("count"),
-                                       alias: Some(String::from("count")),
-                                       table: None,
-                                       function: Some(f),
-                                   }]);
+                                     name: String::from("count"),
+                                     alias: Some(String::from("count")),
+                                     table: None,
+                                     function: Some(f),
+                                 }]);
         let agg_view = get_node(&inc, &mig, &format!("q_{:x}_n0", qid));
         assert_eq!(agg_view.fields(), &["userid", "count"]);
         assert_eq!(agg_view.description(), format!("|*| γ[0]"));
@@ -882,15 +872,13 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish base write types for "users" and "articles" and "votes"
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
-        assert!(inc.add_query("INSERT INTO votes (aid, uid) VALUES (?, ?);",
-                              None,
-                              &mut mig)
+        assert!(inc.add_query("CREATE TABLE votes (aid int, uid int);", None, &mut mig)
                     .is_ok());
-        assert!(inc.add_query("INSERT INTO articles (aid, title, author) VALUES (?, ?, ?);",
+        assert!(inc.add_query("CREATE TABLE articles (aid int, title varchar(255), author int);",
                               None,
                               &mut mig)
                     .is_ok());
@@ -925,15 +913,13 @@ mod tests {
         let mut mig = g.start_migration();
 
         // Establish base write types for "users" and "articles" and "votes"
-        assert!(inc.add_query("INSERT INTO users (id, name) VALUES (?, ?);",
+        assert!(inc.add_query("CREATE TABLE users (id int, name varchar(40));",
                               None,
                               &mut mig)
                     .is_ok());
-        assert!(inc.add_query("INSERT INTO votes (aid, uid) VALUES (?, ?);",
-                              None,
-                              &mut mig)
+        assert!(inc.add_query("CREATE TABLE votes (aid int, uid int);", None, &mut mig)
                     .is_ok());
-        assert!(inc.add_query("INSERT INTO articles (aid, title, author) VALUES (?, ?, ?);",
+        assert!(inc.add_query("CREATE TABLE articles (aid int, title varchar(255), author int);",
                               None,
                               &mut mig)
                     .is_ok());

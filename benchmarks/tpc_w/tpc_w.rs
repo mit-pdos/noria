@@ -5,13 +5,13 @@ mod populate;
 
 extern crate clap;
 extern crate rand;
+
+#[macro_use]
 extern crate slog;
-extern crate slog_term;
 
 use rand::Rng;
 use std::{thread, time};
 use std::collections::HashMap;
-use slog::DrainExt;
 
 use std::sync::{Arc, Barrier};
 
@@ -39,8 +39,8 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
 
     // set up graph
     let mut g = Blender::new();
-    let main_log = slog::Logger::root(slog_term::streamer().full().build().fuse(), None);
-    let recipe_log = main_log.new(None);
+    let main_log = distributary::logger_pls();
+    let recipe_log = main_log.new(o!());
     g.log_with(main_log);
 
     let recipe;
@@ -83,10 +83,7 @@ impl Backend {
                 rng.gen_range(1, self.prepop_counts["customers"] as i32)
                     .into()
             }
-            "getBook" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getCustomer" => "".into(), // XXX(malte): fix username string generation
             "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
             "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
@@ -95,14 +92,10 @@ impl Backend {
                     .into()
             }
             "getPassword" => "".into(), // XXX(malte): fix username string generation
-            "getRelated1" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
             "getMostRecentOrderLines" => {
-                rng.gen_range(1, self.prepop_counts["orders"] as i32)
-                    .into()
+                rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
             }
             "createEmptyCart" => 0i32.into(),
             "addItem" => 0.into(), // XXX(malte): dual parameter query, need SCL ID range
@@ -127,10 +120,7 @@ impl Backend {
             }
             "enterAddressMaxId" => 0i32.into(),
             "enterOrderMaxId" => 0i32.into(),
-            "getStock" => {
-                rng.gen_range(1, self.prepop_counts["items"] as i32)
-                    .into()
-            }
+            "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "verifyDBConsistencyCustId" => 0i32.into(),
             "verifyDBConsistencyItemId" => 0i32.into(),
             "verifyDBConsistencyAddrId" => 0i32.into(),
@@ -203,13 +193,9 @@ fn main() {
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("addresses".into(), num_addr);
+    backend.prepop_counts.insert("addresses".into(), num_addr);
     let num_authors = populate_authors(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("authors".into(), num_authors);
+    backend.prepop_counts.insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc);
     backend
         .prepop_counts

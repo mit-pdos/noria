@@ -140,9 +140,9 @@ impl Serialize for PacketSender {
         unreachable!()
     }
 }
-impl Deserialize for PacketSender {
+impl<'de> Deserialize<'de> for PacketSender {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         unreachable!()
     }

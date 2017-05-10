@@ -74,7 +74,7 @@ impl FutureService for SoupletServer {
                     domain_index: domain::Index,
                     nodes: DomainNodes)
                     -> Self::StartDomainFut {
-        let mock_logger = slog::Logger::root(slog::Discard, None);
+        let mock_logger = slog::Logger::root(slog::Discard, o!());
         let mock_checktable = Arc::new(Mutex::new(checktable::CheckTable::new()));
 
         let (in_tx, in_rx) = mpsc::sync_channel(256);

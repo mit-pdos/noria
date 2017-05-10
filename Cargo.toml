@@ -8,7 +8,7 @@ web = ["rustful", "rustc-serialize"]
 b_memcached = ["memcached-rs"]
 b_mysql = ["mysql"]
 b_mssql = ["futures", "futures-state-stream", "tiberius", "tokio-core"]
-b_netsoup = ["futures", "tokio-core", "tarpc", "tarpc-plugins"]
+b_netsoup = ["bincode", "net2", "bufstream"]
 b_hybrid = ["mysql", "memcached-rs"]
 default = ["web", "b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
 profiling = ["timekeeper/default"]
@@ -16,58 +16,61 @@ binaries = ["default"]
 
 [dependencies]
 chrono = "0.3.0"
-itertools = "0.5"
-petgraph = { git = "https://github.com/fintelia/petgraph.git", rev = "50c99b8f9f58a5bd29ac30656c80a8baf33409fc" }
-regex = "0.1"
-fnv = "1.0"
-serde = "0.9"
-serde_derive = "0.9"
-slog = "1.5.2"
-#slog = { version = "1.5.2", features = ["max_level_trace", "release_max_level_debug"] }
-slog-term = "1.5.0"
+itertools = "0.6.0"
+petgraph = { git = "https://github.com/fintelia/petgraph.git", rev = "a6767a3f2e8dcb811d12e1b862e9b56e388328f6" }
+regex = "0.2.1"
+fnv = "1.0.3"
+serde = "1.0"
+serde_derive = "1.0"
+slog = "2.0.2"
+#slog = { version = "2.0.2", features = ["max_level_trace", "release_max_level_debug"] }
+slog-term = "2.0.0"
 
-evmap = "0.6.0"
-arccstr = "0.3.2"
-vec_map = "0.7.0"
+evmap = "0.6.4"
+arccstr = "0.4.0"
+vec_map = "0.8.0"
 
 spmc = "0.2.1"
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "1fb0c0b221326031ffb407dcab71711c2081d49d" }
-
+nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "af05981093b74c6e5c0b875008539b0e117e72de" }
 mio = "0.6"
 byteorder = "1.0"
 
 # for benchmarks
 # cli
-clap = "2.13"
+clap = "2.24.0"
 # distributions
 rand = "0.3"
 zipf = "0.2.0"
 # sampling
-hdrsample = "2.1"
+hdrsample = "4.0.0"
 # mssql
 futures-state-stream = { version = "0.1", optional = true }
 tiberius = { git = "https://github.com/ms705/tiberius/", optional = true }
 # mysql
-mysql = { version = "10.0", optional = true }
+mysql = { version = "11.0.0", optional = true }
 # memcached
 memcached-rs = { git = "https://github.com/jonhoo/memcached-rs.git", branch = "expose-multi", optional = true }
 # netsoup
+bincode = { version = "0.8.0", optional = true }
+net2 = { version = "0.2.29", optional = true }
+bufstream = { version = "0.1", optional = true }
+# futures
 futures = { version ="0.1.9", optional = true }
-tokio-core = { version = "0.1", optional = true }
-tarpc = {git="https://github.com/jonhoo/tarpc.git", branch = "hack", optional = true}
-tarpc-plugins = { git = "https://github.com/jonhoo/tarpc", branch = "hack", optional = true }
+tarpc = "0.8"
+tarpc-plugins = "0.1.1"
+tokio-core = { version = "0.1.6", optional = true }
 
 # for web
-rustc-serialize = { version = "0.3", optional = true }
+rustc-serialize = { version = "0.3.0", optional = true }
 
 # durable log
 snowflake = "1.2.0"
-serde_json = "0.9.8"
+serde_json = "1.0.1"
 buf_redux = "0.6.1"
 time = "0.1"
 
 [dependencies.rustful]
-version = "0.9"
+version = "0.9.0"
 default-features = false
 features = ["rustc_json_body", "multipart"]
 optional = true
@@ -83,10 +86,6 @@ codegen-units = 1
 
 [profile.test]
 codegen-units = 1
-
-[replace]
-# override for MAX_IN_FLIGHT = 4096
-"tokio-proto:0.1.1" = { git = 'https://github.com/jonhoo/tokio-proto', branch = 'bigger-max-in-flight' }
 
 [profile.release]
 debug=true

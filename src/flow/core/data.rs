@@ -3,6 +3,8 @@ use arccstr::ArcCStr;
 #[cfg(feature="web")]
 use rustc_serialize::json::{ToJson, Json};
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use std::ops::{Deref, DerefMut};
 use std::sync;
 use std::fmt;
@@ -194,7 +196,7 @@ impl fmt::Display for DataType {
 }
 
 /// A record is a single positive or negative data record with an associated time stamp.
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Record {
     Positive(sync::Arc<Vec<DataType>>),
     Negative(sync::Arc<Vec<DataType>>),
@@ -365,6 +367,47 @@ impl Into<Records> for Vec<(Vec<DataType>, bool)> {
         Records(self.into_iter().map(|r| r.into()).collect())
     }
 }
+
+/// Variant of Record used for serialization
+#[derive(Serialize, Deserialize)]
+enum RecordDef {
+    Positive(Vec<DataType>),
+    Negative(Vec<DataType>),
+    DeleteRequest(Vec<DataType>),
+}
+
+impl Serialize for Record {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let def = match *self {
+            Record::Positive(ref v) => RecordDef::Positive((**v).clone()),
+            Record::Negative(ref v) => RecordDef::Negative((**v).clone()),
+            Record::DeleteRequest(ref v) => RecordDef::DeleteRequest(v.clone()),
+        };
+
+        def.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Record {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let def = RecordDef::deserialize(deserializer);
+        if let Err(err) = def {
+            return Err(err);
+        }
+
+        let t = match def.unwrap() {
+            RecordDef::Positive(v) => Record::Positive(sync::Arc::new(v)),
+            RecordDef::Negative(v) => Record::Negative(sync::Arc::new(v)),
+            RecordDef::DeleteRequest(v) => Record::DeleteRequest(v),
+        };
+        Ok(t)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

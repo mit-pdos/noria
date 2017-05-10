@@ -103,10 +103,7 @@ impl Ingredient for Union {
 
                 // yield selected columns for this source
                 // TODO: if emitting all in same order then avoid clone
-                let res = self.emit[&from]
-                    .iter()
-                    .map(|&col| r[col].clone())
-                    .collect();
+                let res = self.emit[&from].iter().map(|&col| r[col].clone()).collect();
 
                 // return new row with appropriate sign
                 if pos {
@@ -138,30 +135,29 @@ impl Ingredient for Union {
                 }
 
                 // partial replays are flowing through us, and at least one piece is being waited
-                // for. we need to take out any records that should be buffered (i.e., those that
-                // are for a replay piece that is still waiting for its other half).
-                let rs = rs.into_iter().filter_map(|r| {
+                // for. we need to keep track of any records that succeed a replay piece (and thus
+                // aren't included in it) before the other pieces come in. note that it's perfectly
+                // safe for us to also forward them, since they'll just be dropped when they miss
+                // in the downstream node. in fact, we *must* forward them, becuase there may be
+                // *other* nodes downstream that do *not* have holes for the key in question.
+                for r in &rs {
                     let k = self.replay_key.as_ref().unwrap()[from.as_local()];
-                    // TODO: should we steal the tracer if we take some records?
                     if let Some(ref mut pieces) = self.replay_pieces.get_mut(&r[k]) {
                         if let Some(ref mut rs) = pieces.get_mut(from.as_local()) {
-                            // we've received a replay piece from this ancestor already, and are
-                            // waiting for replay pieces from other ancestors. we need to
-                            // incorporate this record into the replay piece so that it doesn't end
-                            // up getting lost.
-                            rs.push(r);
+                            // we've received a replay piece from this ancestor already for this
+                            // key, and are waiting for replay pieces from other ancestors. we need
+                            // to incorporate this record into the replay piece so that it doesn't
+                            // end up getting lost.
+                            rs.push(r.clone());
                         } else {
-                            // we haven't received a replay piece for this key from this ancestor.
-                            // note however that this will *definitely* miss downstream, since
-                            // we're awaiting a replay for the key. we can therefore safely drop it
-                            // here.
+                            // we haven't received a replay piece for this key from this ancestor
+                            // yet, so we know that the eventual replay piece must include this
+                            // record.
                         }
-                        None
                     } else {
                         // we're not waiting on replay pieces for this key
-                        Some(r)
                     }
-                }).collect();
+                }
 
                 RawProcessingResult::Regular(self.on_input(from, rs, tracer, n, s))
             }
@@ -299,22 +295,10 @@ mod tests {
     fn it_resolves() {
         let (u, l, r) = setup();
         let r0 = u.node().resolve(0);
-        assert!(r0.as_ref()
-                    .unwrap()
-                    .iter()
-                    .any(|&(n, c)| n == l && c == 0));
-        assert!(r0.as_ref()
-                    .unwrap()
-                    .iter()
-                    .any(|&(n, c)| n == r && c == 0));
+        assert!(r0.as_ref().unwrap().iter().any(|&(n, c)| n == l && c == 0));
+        assert!(r0.as_ref().unwrap().iter().any(|&(n, c)| n == r && c == 0));
         let r1 = u.node().resolve(1);
-        assert!(r1.as_ref()
-                    .unwrap()
-                    .iter()
-                    .any(|&(n, c)| n == l && c == 1));
-        assert!(r1.as_ref()
-                    .unwrap()
-                    .iter()
-                    .any(|&(n, c)| n == r && c == 2));
+        assert!(r1.as_ref().unwrap().iter().any(|&(n, c)| n == l && c == 1));
+        assert!(r1.as_ref().unwrap().iter().any(|&(n, c)| n == r && c == 2));
     }
 }

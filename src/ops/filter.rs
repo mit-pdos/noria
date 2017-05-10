@@ -8,7 +8,7 @@ use flow::prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Filter {
     src: NodeAddress,
-    filter: sync::Arc<Vec<Option<(Operator, DataType)>>>,
+    filter: Vec<Option<(Operator, DataType)>>,
 }
 
 impl Filter {
@@ -18,7 +18,7 @@ impl Filter {
     pub fn new(src: NodeAddress, filter: &[Option<(Operator, DataType)>]) -> Filter {
         Filter {
             src: src,
-            filter: sync::Arc::new(Vec::from(filter)),
+            filter: Vec::from(filter),
         }
     }
 }
@@ -99,7 +99,12 @@ impl Ingredient for Filter {
     fn description(&self) -> String {
         use regex::Regex;
 
-        let escape = |s: &str| Regex::new("([<>])").unwrap().replace_all(s, "\\$1");
+        let escape = |s: &str| {
+            Regex::new("([<>])")
+                .unwrap()
+                .replace_all(s, "\\$1")
+                .to_string()
+        };
         format!("σ[{}]",
                 self.filter
                     .iter()
