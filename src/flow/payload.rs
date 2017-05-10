@@ -10,6 +10,7 @@ use flow::prelude::*;
 use std::fmt;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::borrow::BorrowMut;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
@@ -443,8 +444,8 @@ impl Packet {
             Packet::UpdateEgress { ref new_tx, .. } => {
                 assert!(new_tx.is_none());
             }
-            Packet::AddStreamer { .. } => {
-                unimplemented!();
+            Packet::AddStreamer { ref mut new_streamer, .. } => {
+                new_streamer.make_serializable(local_addr, demux_table);
             }
             // Packet::RequestUnboundedTx(ref mut reply) => {
             //    unreachable!();
@@ -470,8 +471,18 @@ impl Packet {
                 }
                 ack.make_serializable(local_addr, demux_table);
             }
-            Packet::AddNode { ref node, .. } => {
-                assert!(!node.is_reader());
+            Packet::AddNode { ref mut node, .. } => {
+                use flow::node::*;
+                use flow::domain::single::NodeDescriptor;
+                let node:&mut NodeDescriptor = &mut *node.borrow_mut();
+                let node:&mut Node = &mut node.inner;
+                let node:&mut Type = &mut **node;
+                if let Type::Reader(_, Reader{streamers: Some(ref mut streamers), ..}) = *node {
+                    assert!(streamers.is_empty());
+                    // for s in streamers.iter_mut() {
+                    //     s.make_serializable(local_addr, demux_table);
+                    // }
+                }
             }
             Packet::FullReplay { .. } |
             Packet::ReplayPiece { .. } |

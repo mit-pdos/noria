@@ -95,7 +95,7 @@ impl<T, TS: TypedSender<T> + BytesEndpoint> Drop for GenericSender<T, TS> {
     fn drop(&mut self) {
         match self.inner {
             GenericSenderInner::Remote(_, tag, ref client) => {
-                client.close_channel(tag).unwrap();
+                let _ = client.close_channel(tag);
             }
             GenericSenderInner::Local(..) |
             GenericSenderInner::Serialized(..) => {}

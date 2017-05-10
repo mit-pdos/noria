@@ -30,11 +30,11 @@ fn build_descriptors(graph: &mut Graph, nodes: Vec<(NodeIndex, bool)>) -> Domain
 }
 
 pub fn can_be_remote(graph: &Graph, nodes: &Vec<(NodeIndex, bool)>) -> bool {
-    for &(ni, _) in nodes {
-        if graph[ni].is_reader() {
-            return false;
-        }
-    }
+    // for &(ni, _) in nodes {
+    //     if graph[ni].is_reader() {
+    //         return false;
+    //     }
+    // }
     true
 }
 

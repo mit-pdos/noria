@@ -605,18 +605,23 @@ pub fn reconstruct(log: &Logger,
             // we need to give it a way to trigger replays.
             use backlog;
             let tag = first_tag.unwrap();
-            let tx = sync::Mutex::new(txs[&last_domain.unwrap()].clone());
-            let (r_part, w_part) = backlog::new_partial(cols, state.key(), move |key| {
-                tx.lock()
-                    .unwrap()
-                    .send(Packet::RequestPartialReplay {
-                              key: vec![key.clone()],
-                              tag: tag,
-                          })
-                    .unwrap();
-            });
-            *state = r_part.clone();
-            InitialState::PartialGlobal(w_part, r_part)
+            let tx = &txs[&last_domain.unwrap()];
+            if tx.is_local() {
+                let tx = sync::Mutex::new(tx.clone());
+                let (r_part, w_part) = backlog::new_partial(cols, state.key(), move |key| {
+                    tx.lock()
+                        .unwrap()
+                        .send(Packet::RequestPartialReplay {
+                            key: vec![key.clone()],
+                            tag: tag,
+                        })
+                        .unwrap();
+                });
+                *state = r_part.clone();
+                InitialState::PartialGlobal(w_part, r_part)
+            } else {
+                unimplemented!()
+            }
         }
         NodeHandle::Taken(Type::Reader(..)) => InitialState::Global,
         NodeHandle::Owned(..) => unreachable!(),

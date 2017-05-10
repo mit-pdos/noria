@@ -494,7 +494,7 @@ impl Domain {
                     streamers
                         .as_mut()
                         .unwrap()
-                        .push(new_streamer.unwrap_local());
+                        .push(new_streamer);
                 } else {
                     unreachable!();
                 }

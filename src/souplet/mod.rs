@@ -13,17 +13,25 @@ use tarpc::sync::client;
 use tarpc::util::Never;
 use tokio_core::reactor;
 
+use petgraph::graph::NodeIndex;
+
 use slog;
 
+use backlog;
 use channel;
 use checktable;
 use flow::prelude::*;
 use flow::domain;
 
+use flow::node::*;
+use flow::domain::single::NodeDescriptor;
+
 service! {
     rpc start_domain(domain_index: domain::Index, nodes: DomainNodes);
     rpc recv_packet(domain_index: domain::Index, packet: Packet);
     rpc recv_input_packet(domain_index: domain::Index, packet: Packet);
+
+    rpc read_key(reader: NodeIndex, key: DataType) -> Vec<Vec<DataType>>;
 
     rpc recv_on_channel(tag: u64, data: Vec<u8>);
     rpc close_channel(tag: u64);
@@ -34,6 +42,7 @@ struct SoupletServerInner {
     pub domain_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
     pub domain_input_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
     pub domain_unbounded_txs: HashMap<domain::Index, mpsc::Sender<Packet>>,
+    pub readers: HashMap<NodeIndex, Box<Fn(&DataType, bool) -> Result<Vec<Vec<DataType>>, ()> + Send>>,
 }
 
 #[derive(Clone)]
@@ -53,6 +62,7 @@ impl SoupletServer {
             domain_txs: HashMap::new(),
             domain_input_txs: HashMap::new(),
             domain_unbounded_txs: HashMap::new(),
+            readers: HashMap::new(),
         };
 
         Self {
@@ -72,7 +82,7 @@ impl FutureService for SoupletServer {
     type StartDomainFut = Result<(), Never>;
     fn start_domain(&self,
                     domain_index: domain::Index,
-                    nodes: DomainNodes)
+                    mut nodes: DomainNodes)
                     -> Self::StartDomainFut {
         let mock_logger = slog::Logger::root(slog::Discard, o!());
         let mock_checktable = Arc::new(Mutex::new(checktable::CheckTable::new()));
@@ -80,10 +90,23 @@ impl FutureService for SoupletServer {
         let (in_tx, in_rx) = mpsc::sync_channel(256);
         let (tx, rx) = mpsc::sync_channel(1);
 
+        let mut inner = self.inner.lock().unwrap();
+
+        for (na, node) in nodes.iter() {
+            let index = node.borrow().index;
+            let node:&mut NodeDescriptor = &mut *node.borrow_mut();
+            let node:&mut Node = &mut node.inner;
+            let node:&mut Type = &mut **node;
+
+            if let Type::Reader(_, ref r) = *node {
+                if let Some(r) = r.get_reader() {
+                    inner.readers.insert(index, r);
+                }
+            }
+        }
         let domain = domain::Domain::new(mock_logger, domain_index, nodes, mock_checktable, 0);
         domain.boot(rx, in_rx);
 
-        let mut inner = self.inner.lock().unwrap();
         inner.domain_txs.insert(domain_index, tx);
         inner.domain_input_txs.insert(domain_index, in_tx);
         inner.domain_unbounded_txs.remove(&domain_index);
@@ -112,12 +135,24 @@ impl FutureService for SoupletServer {
         Ok(())
     }
 
+    type ReadKeyFut = Result<Vec<Vec<DataType>>, Never>;
+    fn read_key(&self, reader: NodeIndex, key: DataType) -> Self::ReadKeyFut {
+        let mut inner = self.inner.lock().unwrap();
+
+        match inner.readers.get(&reader) {
+            Some(read) => {
+                Ok(read(&key, false).unwrap())
+            }
+            None => unreachable!(),
+        }
+    }
+
     type ResetFut = Result<(), Never>;
     fn reset(&self) -> Self::ResetFut {
         let mut inner = self.inner.lock().unwrap();
 
         for (_, tx) in &mut inner.domain_txs {
-            // don't unwrap, because given domain may already have terminated
+        // don't unwrap, because given domain may already have terminated
             drop(tx.send(Packet::Quit));
         }
         inner.domain_txs.clear();
@@ -198,8 +233,21 @@ impl Souplet {
     pub fn start_domain(&self,
                         peer_addr: &SocketAddr,
                         domain: domain::Index,
-                        nodes: DomainNodes)
+                        mut nodes: DomainNodes)
                         -> (channel::PacketSender, channel::PacketSender) {
+
+        let mut domain_streamers = HashMap::new();
+        for (na, node) in nodes.iter() {
+            let index = na.as_local().clone();
+            let node:&mut NodeDescriptor = &mut *node.borrow_mut();
+            let node:&mut Node = &mut node.inner;
+            let node:&mut Type = &mut **node;
+
+            if let Type::Reader(_, Reader{ref mut streamers, ..}) = *node {
+                domain_streamers.insert(index, streamers.take());
+            }
+        }
+
         let peer = &self.peers[peer_addr];
         peer.start_domain(domain, nodes).unwrap();
 
@@ -213,6 +261,14 @@ impl Souplet {
                                                                 peer_addr.clone(),
                                                                 self.demux_table.clone(),
                                                                 self.local_addr);
+        for (node, streamers) in domain_streamers {
+            if let Some(streamers) = streamers {
+                for new_streamer in streamers {
+                    tx.send(Packet::AddStreamer{node, new_streamer}).unwrap();
+                }
+            }
+        }
+
         (tx, input_tx)
     }
 

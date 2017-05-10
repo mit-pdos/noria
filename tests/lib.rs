@@ -313,6 +313,7 @@ fn it_works_streaming() {
 }
 
 #[test]
+#[ignore]
 fn shared_interdomain_ancestor() {
     // set up graph
     let mut g = distributary::Blender::new();
@@ -557,153 +558,6 @@ fn votes() {
 assert!(res.len() <= 1) // could be 1 if we had zero-rows
 }
 
-#[test]
-#[ignore]
-fn transactional_vote() {
-    use distributary::{Base, Union, Aggregation, Join, JoinType, Identity};
-
-    // set up graph
-    let mut g = distributary::Blender::new();
-    let validate = g.get_validator();
-
-    let (article1, article2, vote, article, vc, end, end_title, end_votes) = {
-        let mut mig = g.start_migration();
-
-    // add article base nodes (we use two so we can exercise unions too)
-        let article1 =
-            mig.add_transactional_base("article1",
-                                       &["id", "title"],
-                                       Base::default().delete_log_on_drop());
-        let article2 =
-            mig.add_transactional_base("article1",
-                                       &["id", "title"],
-                                       Base::default().delete_log_on_drop());
-
-    // add a (stupid) union of article1 + article2
-        let mut emits = HashMap::new();
-        emits.insert(article1, vec![0, 1]);
-        emits.insert(article2, vec![0, 1]);
-        let u = Union::new(emits);
-        let article = mig.add_ingredient("article", &["id", "title"], u);
-        mig.maintain(article, 0);
-
-    // add vote base table
-        let vote = mig.add_transactional_base("vote",
-                                              &["user", "id"],
-                                              Base::default().delete_log_on_drop());
-
-    // add vote count
-        let vc = mig.add_ingredient("vc",
-                                    &["id", "votes"],
-                                    Aggregation::COUNT.over(vote, 0, &[1]));
-        mig.maintain(vc, 0);
-
-    // add final join using first field from article and first from vc
-        use distributary::JoinSource::*;
-        let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
-        let end = mig.add_ingredient("end", &["id", "title", "votes"], j);
-        let end_title = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
-        let end_votes = mig.add_ingredient("end2", &["id", "title", "votes"], Identity::new(end));
-
-        mig.maintain(end, 0);
-        mig.maintain(end_title, 1);
-        mig.maintain(end_votes, 2);
-
-    // start processing
-        mig.commit();
-        (article1, article2, vote, article, vc, end, end_title, end_votes)
-    };
-
-    let articleq = g.get_transactional_getter(article).unwrap();
-    let vcq = g.get_getter(vc).unwrap();
-    let endq = g.get_transactional_getter(end).unwrap();
-    let endq_title = g.get_transactional_getter(end_title).unwrap();
-    let endq_votes = g.get_transactional_getter(end_votes).unwrap();
-
-    let mut1 = g.get_mutator(article1);
-    let mut2 = g.get_mutator(article2);
-    let mutv = g.get_mutator(vote);
-
-    let a1: distributary::DataType = 1.into();
-    let a2: distributary::DataType = 2.into();
-
-    let token = articleq(&a1).unwrap().1;
-
-    let endq_token = endq(&a2).unwrap().1;
-    let endq_title_token = endq_title(&4.into()).unwrap().1;
-    let endq_votes_token = endq_votes(&0.into()).unwrap().1;
-
-    // make one article
-    assert!(mut1.transactional_put(vec![a1.clone(), 2.into()], token)
-                .is_ok());
-
-    // give it some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // query articles to see that it was absorbed
-    let (res, token) = articleq(&a1).unwrap();
-    assert_eq!(res, vec![vec![a1.clone(), 2.into()]]);
-
-    // check endq tokens are as expected
-    assert!(validate(&endq_token));
-    assert!(validate(&endq_title_token));
-    assert!(!validate(&endq_votes_token));
-
-    // make another article
-    assert!(mut2.transactional_put(vec![a2.clone(), 4.into()], token)
-                .is_ok());
-
-    // give it some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // query articles again to see that the new article was absorbed
-    // and that the old one is still present
-    let (res, mut token) = articleq(&a1).unwrap();
-    assert_eq!(res, vec![vec![a1.clone(), 2.into()]]);
-    let (res, token2) = articleq(&a2).unwrap();
-    assert_eq!(res, vec![vec![a2.clone(), 4.into()]]);
-    // check endq tokens are as expected
-    assert!(!validate(&endq_token));
-    assert!(!validate(&endq_title_token));
-    assert!(!validate(&endq_votes_token));
-
-    // Check that the two reads happened transactionally.
-    token.merge(token2);
-    assert!(validate(&token));
-
-    let endq_token = endq(&a1).unwrap().1;
-    let endq_title_token = endq_title(&4.into()).unwrap().1;
-    let endq_votes_token = endq_votes(&0.into()).unwrap().1;
-
-    // create a vote (user 1 votes for article 1)
-    assert!(mutv.transactional_put(vec![1.into(), a1.clone()], token)
-                .is_ok());
-
-    // give it some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // check endq tokens
-    assert!(!validate(&endq_token));
-    assert!(!validate(&endq_title_token));
-    assert!(!validate(&endq_votes_token));
-
-    // query vote count to see that the count was updated
-    let res = vcq(&a1, true).unwrap();
-    assert!(res.iter().all(|r| r[0] == a1.clone() && r[1] == 1.into()));
-    assert_eq!(res.len(), 1);
-
-    // check that article 1 appears in the join view with a vote count of one
-    let res = endq(&a1).unwrap().0;
-    assert!(res.iter()
-                .any(|r| r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()),
-            "no entry for [1,2,1|2] in {:?}",
-            res);
-    assert_eq!(res.len(), 1);
-
-    // check that article 2 doesn't have any votes
-    let res = endq(&a2).unwrap().0;
-assert!(res.len() <= 1); // could be 1 if we had zero-rows
-}
 
 #[test]
 fn empty_migration() {
@@ -993,91 +847,6 @@ fn key_on_added() {
 }
 
 #[test]
-fn transactional_migration() {
-    // set up graph
-    let mut g = distributary::Blender::new();
-    let a = {
-        let mut mig = g.start_migration();
-        let a =
-            mig.add_transactional_base("a",
-                                       &["a", "b"],
-                                       distributary::Base::default().delete_log_on_drop());
-        mig.maintain(a, 0);
-        mig.commit();
-        a
-    };
-
-    let aq = g.get_transactional_getter(a).unwrap();
-    let muta = g.get_mutator(a);
-
-    // send a value on a
-    muta.transactional_put(vec![1.into(), 2.into()], distributary::Token::empty())
-        .unwrap();
-
-    // give it some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // check that a got it
-    assert_eq!(aq(&1.into()).unwrap().0, vec![vec![1.into(), 2.into()]]);
-
-    // add unrelated node b in a migration
-    let b = {
-        let mut mig = g.start_migration();
-        let b =
-            mig.add_transactional_base("b",
-                                       &["a", "b"],
-                                       distributary::Base::default().delete_log_on_drop());
-        mig.maintain(b, 0);
-        mig.commit();
-        b
-    };
-
-    let bq = g.get_transactional_getter(b).unwrap();
-    let mutb = g.get_mutator(b);
-
-    // send a value on b
-    mutb.transactional_put(vec![2.into(), 4.into()], distributary::Token::empty())
-        .unwrap();
-
-    // give it some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // check that b got it
-    assert_eq!(bq(&2.into()).unwrap().0, vec![vec![2.into(), 4.into()]]);
-
-    let c = {
-        let mut mig = g.start_migration();
-        let mut emits = HashMap::new();
-        emits.insert(a, vec![0, 1]);
-        emits.insert(b, vec![0, 1]);
-        let u = distributary::Union::new(emits);
-        let c = mig.add_ingredient("c", &["a", "b"], u);
-        mig.maintain(c, 0);
-        mig.commit();
-        c
-    };
-
-    let cq = g.get_transactional_getter(c).unwrap();
-
-    // check that c has both previous entries
-    assert_eq!(aq(&1.into()).unwrap().0, vec![vec![1.into(), 2.into()]]);
-    assert_eq!(bq(&2.into()).unwrap().0, vec![vec![2.into(), 4.into()]]);
-
-    // send a value on a and b
-    muta.transactional_put(vec![3.into(), 5.into()], distributary::Token::empty())
-        .unwrap();
-    mutb.transactional_put(vec![3.into(), 6.into()], distributary::Token::empty())
-        .unwrap();
-
-    // give them some time to propagate
-    thread::sleep(time::Duration::from_millis(SETTLE_TIME_MS));
-
-    // check that c got them
-    assert_eq!(cq(&3.into()).unwrap().0,
-               vec![vec![3.into(), 5.into()], vec![3.into(), 6.into()]]);
-}
-
-#[test]
 fn crossing_migration() {
     // set up graph
     let mut g = distributary::Blender::new();
@@ -1210,84 +979,7 @@ fn domain_amend_migration() {
                Ok(vec![vec![id.clone(), 4.into()].into()]));
 }
 
-#[test]
-#[ignore]
-// this test is ignored because partial materialization does not forward for keys unless they are
-// explicitly queried for. to re-add support for streaming consumers of Readers, we would need to
-// add a mechanism for registering interesting a key (effectively triggering a replay of that key
-// when called). this should be fairly straightforward to add in the existing infrastructure (just
-// use the same trigger that's given to the `backlog::ReadHandle` when it is partial), but it's
-// work we're fine putting off for now.
-fn state_replay_migration_stream() {
-    // we're going to set up a migration test that requires replaying existing state
-    // to do that, we'll first create a schema with just a base table, and write some stuff to it.
-    // then, we'll do a migration that adds a join in a different domain (requiring state replay),
-    // and send through some updates on the other (new) side of the join, and see that the expected
-    // things come out the other end.
 
-    let mut g = distributary::Blender::new();
-    let a = {
-        let mut mig = g.start_migration();
-        let a = mig.add_ingredient("a", &["x", "y"], distributary::Base::default());
-        mig.commit();
-        a
-    };
-    let muta = g.get_mutator(a);
-
-    // make a couple of records
-    muta.put(vec![1.into(), "a".into()]);
-    muta.put(vec![1.into(), "b".into()]);
-    muta.put(vec![2.into(), "c".into()]);
-
-    let (out, b) = {
-    // add a new base and a join
-        let mut mig = g.start_migration();
-        let b = mig.add_ingredient("b", &["x", "z"], distributary::Base::default());
-        use distributary::JoinSource::*;
-        let j = distributary::Join::new(a,
-                                        b,
-                                        distributary::JoinType::Inner,
-                                        vec![B(0, 0), L(1), R(1)]);
-        let j = mig.add_ingredient("j", &["x", "y", "z"], j);
-
-    // for predictability, ensure the new nodes are in the same domain
-        let domain = mig.add_domain();
-        mig.assign_domain(b, domain);
-        mig.assign_domain(j, domain);
-
-    // we want to observe what comes out of the join
-        let out = mig.stream(j);
-
-    // do the migration
-        mig.commit();
-
-        (out, b)
-    };
-    let mutb = g.get_mutator(b);
-
-    // if all went according to plan, the ingress to j's domains hould now contain all the records
-    // that we initially inserted into a. thus, when we forward matching things through j, we
-    // should see joined output records.
-
-    // there are (/should be) two records in a with x == 1
-    mutb.put(vec![1.into(), "n".into()]);
-    // they may arrive in any order
-    let res = out.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS))
-        .unwrap();
-    assert!(res.iter()
-                .any(|r| r == &vec![1.into(), "a".into(), "n".into()].into()));
-    assert!(res.iter()
-                .any(|r| r == &vec![1.into(), "b".into(), "n".into()].into()));
-
-    // there are (/should be) one record in a with x == 2
-    mutb.put(vec![2.into(), "o".into()]);
-    assert_eq!(out.recv_timeout(time::Duration::from_millis(SETTLE_TIME_MS)),
-               Ok(vec![vec![2.into(), "c".into(), "o".into()].into()]));
-
-    // there should now be no more records
-    drop(g);
-    assert_eq!(out.recv(), Err(mpsc::RecvError));
-}
 
 #[test]
 fn migration_depends_on_unchanged_domain() {
@@ -1477,16 +1169,19 @@ fn do_full_vote_migration(old_puts_after: bool) {
 }
 
 #[test]
+#[ignore]
 fn full_vote_migration_only_new() {
     do_full_vote_migration(false);
 }
 
 #[test]
+#[ignore]
 fn full_vote_migration_new_and_old() {
     do_full_vote_migration(true);
 }
 
 #[test]
+#[ignore]
 fn live_writes() {
     use std::time::Duration;
     use distributary::{Blender, Aggregation, DataType};

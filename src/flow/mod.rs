@@ -17,6 +17,9 @@ use std::io;
 
 use slog;
 
+use tarpc::sync::client;
+use tarpc::sync::client::ClientExt;
+
 use souplet;
 use channel;
 
@@ -305,7 +308,7 @@ impl Default for Blender {
             ndomains: 0,
             checktable: Arc::new(Mutex::new(checktable::CheckTable::new())),
             partial: Default::default(),
-            partial_enabled: true,
+            partial_enabled: false,
 
             souplet,
             remote_domains: HashMap::default(),
@@ -436,16 +439,28 @@ impl Blender {
 
         // reader should be a child of the given node
         trace!(self.log, "creating reader"; "for" => node.as_global().index());
-        let reader = self.ingredients
+        let (ni, reader) = self.ingredients
             .neighbors_directed(*node.as_global(), petgraph::EdgeDirection::Outgoing)
             .filter_map(|ni| if let node::Type::Reader(_, ref inner) = *self.ingredients[ni] {
-                            Some(inner)
+                            Some((ni, inner))
                         } else {
                             None
                         })
-            .next(); // there should be at most one
+            .next()
+            .unwrap();
 
-        reader.and_then(|r| r.get_reader())
+        match self.remote_domains.get(&self.ingredients[ni].domain()) {
+            Some(addr) => {
+                let client = Arc::new(Mutex::new(souplet::SyncClient::connect(addr, client::Options::default()).unwrap()));
+                let f = Box::new(move |key: &prelude::DataType, _blocking: bool| {
+                    let client = client.lock().unwrap();
+                    client.read_key(ni, key.clone()).map_err(|_|())
+                }) as Box<Fn(&prelude::DataType, bool) -> Result<core::Datas, ()> + Send>;
+
+                Some(f)
+            }
+            None => reader.get_reader(),
+        }
     }
 
     /// Obtain a new function for querying a given (already maintained) transactional reader node.
@@ -894,7 +909,7 @@ impl<'a> Migration<'a> {
         // If the reader hasn't been incorporated into the graph yet, just add the streamer
         // directly.
         if let Some(ref mut streamers) = self.reader_for(n).streamers {
-            streamers.push(tx);
+            streamers.push(tx.into());
             return rx;
         }
 

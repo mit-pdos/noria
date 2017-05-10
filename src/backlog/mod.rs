@@ -85,6 +85,14 @@ impl WriteHandle {
     pub fn mark_hole(&mut self, key: &DataType) {
         self.handle.empty(key.clone());
     }
+
+    pub fn key(&self) -> usize {
+        self.key
+    }
+
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
 }
 
 #[derive(Clone)]

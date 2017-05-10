@@ -83,6 +83,16 @@ impl<T> Map<T> {
                                  }))
     }
 
+    pub fn iter_mut<'a>(&'a mut self) -> Box<Iterator<Item = (NodeAddress, &'a mut T)> + 'a> {
+        Box::new(self.things
+                     .iter_mut()
+                     .enumerate()
+                     .filter_map(|(i, t)| {
+                                     t.as_mut()
+                                         .map(|v| (unsafe { NodeAddress::make_local(i) }, v))
+                                 }))
+    }
+
     pub fn values<'a>(&'a self) -> Box<Iterator<Item = &'a T> + 'a> {
         Box::new(self.things.iter().filter_map(|t| t.as_ref()))
     }
@@ -258,10 +268,10 @@ pub enum LookupResult<'a, T: 'a> {
 /// Variant of Record used for serialization
 #[derive(Serialize, Deserialize)]
 enum KeyedStateDef<T: Eq + Hash> {
-    Single(HashSet<T>),
-    Double(HashSet<(T, T)>),
-    Tri(HashSet<(T, T, T)>),
-    Quad(HashSet<(T, T, T, T)>),
+    Single(FnvHashMap<T, Vec<Vec<T>>>),
+    Double(FnvHashMap<(T, T), Vec<Vec<T>>>),
+    Tri(FnvHashMap<(T, T, T), Vec<Vec<T>>>),
+    Quad(FnvHashMap<(T, T, T, T), Vec<Vec<T>>>),
 }
 
 impl<T: Eq + Hash + Clone + Serialize> Serialize for KeyedState<T> {
@@ -271,29 +281,25 @@ impl<T: Eq + Hash + Clone + Serialize> Serialize for KeyedState<T> {
         let def = match *self {
             KeyedState::Single(ref s) => {
                 let mut keys = s.iter().map(|(k, v)|{
-                    assert!(v.is_empty());
-                    k.clone()
+                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
                 }).collect();
                 KeyedStateDef::Single(keys)
             }
             KeyedState::Double(ref s) => {
                 let mut keys = s.iter().map(|(k, v)|{
-                    assert!(v.is_empty());
-                    k.clone()
+                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
                 }).collect();
                 KeyedStateDef::Double(keys)
             }
             KeyedState::Tri(ref s) => {
                 let mut keys = s.iter().map(|(k, v)|{
-                    assert!(v.is_empty());
-                    k.clone()
+                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
                 }).collect();
                 KeyedStateDef::Tri(keys)
             }
             KeyedState::Quad(ref s) => {
                 let mut keys = s.iter().map(|(k, v)|{
-                    assert!(v.is_empty());
-                    (*k).clone()
+                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
                 }).collect();
                 KeyedStateDef::Quad(keys)
             }
@@ -313,10 +319,26 @@ impl<'de, T: Eq + Hash + Clone + Deserialize<'de>> Deserialize<'de> for KeyedSta
         }
 
         let t = match def.unwrap() {
-            KeyedStateDef::Single(s) => KeyedState::Single(s.into_iter().map(|k| (k, Vec::new())).collect()),
-            KeyedStateDef::Double(s) => KeyedState::Double(s.into_iter().map(|k| (k, Vec::new())).collect()),
-            KeyedStateDef::Tri(s) => KeyedState::Tri(s.into_iter().map(|k| (k, Vec::new())).collect()),
-            KeyedStateDef::Quad(s) => KeyedState::Quad(s.into_iter().map(|k| (k, Vec::new())).collect()),
+            KeyedStateDef::Single(s) => {
+                KeyedState::Single(s.into_iter()
+                                       .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                       .collect())
+            }
+            KeyedStateDef::Double(s) => {
+                KeyedState::Double(s.into_iter()
+                                       .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                       .collect())
+            }
+            KeyedStateDef::Tri(s) => {
+                KeyedState::Tri(s.into_iter()
+                                    .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                    .collect())
+            }
+            KeyedStateDef::Quad(s) => {
+                KeyedState::Quad(s.into_iter()
+                                     .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                     .collect())
+            }
         };
         Ok(t)
     }
