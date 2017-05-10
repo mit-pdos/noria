@@ -963,9 +963,9 @@ impl SqlToMirConverter {
 
                             let (group_cols, parent_node) = if proj_cols_from_target_table
                                    .is_empty() {
-                                // slightly messy hack: if there are no group columns and the table on
-                                // which we compute has no projected columns in the output, we make one
-                                // up a group column by adding an extra projection node
+                                // slightly messy hack: if there are no group columns and the table
+                                // on which we compute has no projected columns in the output, we
+                                // make one up a group column by adding an extra projection node
                                 let proj_name = format!("{}_prj_hlpr", agg_node_name);
                                 let proj = self.make_projection_helper(&proj_name,
                                                                        parent_node,

@@ -612,9 +612,9 @@ pub fn reconstruct(log: &Logger,
                     tx.lock()
                         .unwrap()
                         .send(Packet::RequestPartialReplay {
-                            key: vec![key.clone()],
-                            tag: tag,
-                        })
+                                  key: vec![key.clone()],
+                                  tag: tag,
+                              })
                         .unwrap();
                 });
                 *state = r_part.clone();
@@ -790,12 +790,14 @@ pub fn reconstruct(log: &Logger,
 
             if i != segments.len() - 1 {
                 // the last node *must* be an egress node since there's a later domain
-                txs[domain].send(Packet::UpdateEgress{
-                    node: graph[nodes.last().unwrap().0].addr().as_local().clone(),
-                    new_tx: None,
-                    new_tag: Some((tag, segments[i + 1].1[0].0.into())),
-                    new_remote_tx: None,
-                }).unwrap();
+                txs[domain]
+                    .send(Packet::UpdateEgress {
+                              node: graph[nodes.last().unwrap().0].addr().as_local().clone(),
+                              new_tx: None,
+                              new_tag: Some((tag, segments[i + 1].1[0].0.into())),
+                              new_remote_tx: None,
+                          })
+                    .unwrap();
             }
 
             trace!(log, "telling domain about replay path"; "domain" => domain.index());

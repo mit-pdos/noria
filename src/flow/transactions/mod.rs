@@ -216,9 +216,7 @@ impl DomainState {
                     let count = base.map(|b| self.ingress_from_base[b.index()]).unwrap_or(1);
                     let bundle = match m {
                         Packet::Transaction { .. } => Bundle::Messages(count, vec![m]),
-                        Packet::StartMigration { ack, .. } => {
-                            Bundle::MigrationStart(ack)
-                        }
+                        Packet::StartMigration { ack, .. } => Bundle::MigrationStart(ack),
                         Packet::CompleteMigration { ingress_from_base, .. } => {
                             Bundle::MigrationEnd(ingress_from_base)
                         }
@@ -234,9 +232,7 @@ impl DomainState {
         } else {
             let transaction = match m {
                 Packet::Transaction { .. } => BufferedTransaction::Transaction(base.unwrap(), m),
-                Packet::StartMigration { ack, .. } => {
-                    BufferedTransaction::MigrationStart(ack)
-                }
+                Packet::StartMigration { ack, .. } => BufferedTransaction::MigrationStart(ack),
                 Packet::CompleteMigration { ingress_from_base, .. } => {
                     BufferedTransaction::MigrationEnd(ingress_from_base)
                 }

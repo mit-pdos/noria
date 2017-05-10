@@ -451,11 +451,15 @@ impl Blender {
 
         match self.remote_domains.get(&self.ingredients[ni].domain()) {
             Some(addr) => {
-                let client = Arc::new(Mutex::new(souplet::SyncClient::connect(addr, client::Options::default()).unwrap()));
+                let client =
+                    Arc::new(Mutex::new(souplet::SyncClient::connect(addr,
+                                                                     client::Options::default())
+                                                .unwrap()));
                 let f = Box::new(move |key: &prelude::DataType, _blocking: bool| {
-                    let client = client.lock().unwrap();
-                    client.read_key(ni, key.clone()).map_err(|_|())
-                }) as Box<Fn(&prelude::DataType, bool) -> Result<core::Datas, ()> + Send>;
+                                     let client = client.lock().unwrap();
+                                     client.read_key(ni, key.clone()).map_err(|_| ())
+                                 }) as
+                        Box<Fn(&prelude::DataType, bool) -> Result<core::Datas, ()> + Send>;
 
                 Some(f)
             }
@@ -543,8 +547,7 @@ impl Blender {
             .iter()
             .map(|(di, s)| {
                 let (tx, rx) = mpsc::sync_channel(1);
-                s.send(payload::Packet::GetStatistics(tx.into()))
-                    .unwrap();
+                s.send(payload::Packet::GetStatistics(tx.into())).unwrap();
 
                 let (domain_stats, node_stats) = rx.recv().unwrap();
                 let node_map = node_stats

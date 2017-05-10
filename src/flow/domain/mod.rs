@@ -335,8 +335,8 @@ impl Domain {
 
         let mut egress_messages = HashMap::new();
         let ts = if let Some(&Packet::Transaction {
-                                  state: ref ts @ TransactionState::Committed(..), ..
-                              }) = messages.iter().next() {
+                                 state: ref ts @ TransactionState::Committed(..), ..
+                             }) = messages.iter().next() {
             ts.clone()
         } else {
             unreachable!();
@@ -491,10 +491,7 @@ impl Domain {
                 use flow::node::{Type, Reader};
                 let mut n = self.nodes[&node].borrow_mut();
                 if let Type::Reader(_, Reader { ref mut streamers, .. }) = *n.inner {
-                    streamers
-                        .as_mut()
-                        .unwrap()
-                        .push(new_streamer);
+                    streamers.as_mut().unwrap().push(new_streamer);
                 } else {
                     unreachable!();
                 }

@@ -114,7 +114,6 @@ impl GroupedOperation for Aggregator {
     fn into_serializable(&self) -> SerializableGrouped {
         SerializableGrouped::Aggregation(self.clone())
     }
-
 }
 
 #[cfg(test)]

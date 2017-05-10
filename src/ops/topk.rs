@@ -128,7 +128,7 @@ impl TopK {
                 LookupResult::Missing => unreachable!(),
             };
 
-        // Get the minimum element of output_rows.
+            // Get the minimum element of output_rows.
             if let Some((min, _)) = output_rows.iter().cloned().next() {
                 let is_min = |&&(ref r, _): &&(&Arc<Vec<DataType>>, bool)| {
                     self.order.cmp(&&r, &&min) == Ordering::Equal
@@ -138,10 +138,10 @@ impl TopK {
 
                 output_rows = rs.iter()
                     .filter_map(|r| {
-        // Make sure that no duplicates are added to output_rows. This is simplified
-        // by the fact that it currently contains all rows greater than `min`, and
-        // none less than it. The only complication are rows which compare equal to
-        // `min`: they get added except if there is already an identical row.
+                        // Make sure that no duplicates are added to output_rows. This is simplified
+                        // by the fact that it currently contains all rows greater than `min`, and
+                        // none less than it. The only complication are rows which compare equal to
+                        // `min`: they get added except if there is already an identical row.
                         match self.order.cmp(&r, &&min) {
                             Ordering::Less => Some((r, false)),
                             Ordering::Equal => {
@@ -166,16 +166,16 @@ impl TopK {
         }
 
         if output_rows.len() > self.k {
-        // Remove the topk elements from `output_rows`, splitting them off into `rows`. Then
-        // swap and rename so that `output_rows` contains the top K elements, and `bottom_rows`
-        // contains the rest.
+            // Remove the topk elements from `output_rows`, splitting them off into `rows`. Then
+            // swap and rename so that `output_rows` contains the top K elements, and `bottom_rows`
+            // contains the rest.
             let i = output_rows.len() - self.k;
             let mut rows = output_rows.split_off(i);
             mem::swap(&mut output_rows, &mut rows);
             let bottom_rows = rows;
 
-        // Emit negatives for any elements in `bottom_rows` that were originally in
-        // current_topk.
+            // Emit negatives for any elements in `bottom_rows` that were originally in
+            // current_topk.
             delta.extend(bottom_rows
                              .into_iter()
                              .filter(|p| p.1)
@@ -298,7 +298,7 @@ impl Ingredient for TopK {
                 });
 
             for (group, mut diffs, old_rs) in current {
-        // Retrieve then update the number of times in this group
+                // Retrieve then update the number of times in this group
                 let count: i64 = *self.counts.get(&group).unwrap_or(&0) as i64;
                 let count_diff: i64 = diffs
                     .iter()

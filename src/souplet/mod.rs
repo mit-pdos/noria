@@ -42,7 +42,8 @@ struct SoupletServerInner {
     pub domain_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
     pub domain_input_txs: HashMap<domain::Index, mpsc::SyncSender<Packet>>,
     pub domain_unbounded_txs: HashMap<domain::Index, mpsc::Sender<Packet>>,
-    pub readers: HashMap<NodeIndex, Box<Fn(&DataType, bool) -> Result<Vec<Vec<DataType>>, ()> + Send>>,
+    pub readers:
+        HashMap<NodeIndex, Box<Fn(&DataType, bool) -> Result<Vec<Vec<DataType>>, ()> + Send>>,
 }
 
 #[derive(Clone)]
@@ -94,9 +95,9 @@ impl FutureService for SoupletServer {
 
         for (na, node) in nodes.iter() {
             let index = node.borrow().index;
-            let node:&mut NodeDescriptor = &mut *node.borrow_mut();
-            let node:&mut Node = &mut node.inner;
-            let node:&mut Type = &mut **node;
+            let node: &mut NodeDescriptor = &mut *node.borrow_mut();
+            let node: &mut Node = &mut node.inner;
+            let node: &mut Type = &mut **node;
 
             if let Type::Reader(_, ref r) = *node {
                 if let Some(r) = r.get_reader() {
@@ -129,9 +130,7 @@ impl FutureService for SoupletServer {
                          -> Self::RecvInputPacketFut {
         packet.complete_deserialize(self.local_addr.clone(), &self.demux_table);
         let inner = self.inner.lock().unwrap();
-        inner.domain_input_txs[&domain_index]
-            .send(packet)
-            .unwrap();
+        inner.domain_input_txs[&domain_index].send(packet).unwrap();
         Ok(())
     }
 
@@ -140,9 +139,7 @@ impl FutureService for SoupletServer {
         let mut inner = self.inner.lock().unwrap();
 
         match inner.readers.get(&reader) {
-            Some(read) => {
-                Ok(read(&key, false).unwrap())
-            }
+            Some(read) => Ok(read(&key, false).unwrap()),
             None => unreachable!(),
         }
     }
@@ -152,7 +149,7 @@ impl FutureService for SoupletServer {
         let mut inner = self.inner.lock().unwrap();
 
         for (_, tx) in &mut inner.domain_txs {
-        // don't unwrap, because given domain may already have terminated
+            // don't unwrap, because given domain may already have terminated
             drop(tx.send(Packet::Quit));
         }
         inner.domain_txs.clear();
@@ -239,11 +236,11 @@ impl Souplet {
         let mut domain_streamers = HashMap::new();
         for (na, node) in nodes.iter() {
             let index = na.as_local().clone();
-            let node:&mut NodeDescriptor = &mut *node.borrow_mut();
-            let node:&mut Node = &mut node.inner;
-            let node:&mut Type = &mut **node;
+            let node: &mut NodeDescriptor = &mut *node.borrow_mut();
+            let node: &mut Node = &mut node.inner;
+            let node: &mut Type = &mut **node;
 
-            if let Type::Reader(_, Reader{ref mut streamers, ..}) = *node {
+            if let Type::Reader(_, Reader { ref mut streamers, .. }) = *node {
                 domain_streamers.insert(index, streamers.take());
             }
         }
@@ -264,7 +261,7 @@ impl Souplet {
         for (node, streamers) in domain_streamers {
             if let Some(streamers) = streamers {
                 for new_streamer in streamers {
-                    tx.send(Packet::AddStreamer{node, new_streamer}).unwrap();
+                    tx.send(Packet::AddStreamer { node, new_streamer }).unwrap();
                 }
             }
         }

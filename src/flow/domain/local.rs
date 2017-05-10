@@ -280,27 +280,35 @@ impl<T: Eq + Hash + Clone + Serialize> Serialize for KeyedState<T> {
     {
         let def = match *self {
             KeyedState::Single(ref s) => {
-                let mut keys = s.iter().map(|(k, v)|{
-                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
-                }).collect();
+                let mut keys = s.iter()
+                    .map(|(k, v)| {
+                             (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
+                         })
+                    .collect();
                 KeyedStateDef::Single(keys)
             }
             KeyedState::Double(ref s) => {
-                let mut keys = s.iter().map(|(k, v)|{
-                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
-                }).collect();
+                let mut keys = s.iter()
+                    .map(|(k, v)| {
+                             (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
+                         })
+                    .collect();
                 KeyedStateDef::Double(keys)
             }
             KeyedState::Tri(ref s) => {
-                let mut keys = s.iter().map(|(k, v)|{
-                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
-                }).collect();
+                let mut keys = s.iter()
+                    .map(|(k, v)| {
+                             (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
+                         })
+                    .collect();
                 KeyedStateDef::Tri(keys)
             }
             KeyedState::Quad(ref s) => {
-                let mut keys = s.iter().map(|(k, v)|{
-                    (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
-                }).collect();
+                let mut keys = s.iter()
+                    .map(|(k, v)| {
+                             (k.clone(), v.iter().map(|v: &Arc<Vec<_>>| (**v).clone()).collect())
+                         })
+                    .collect();
                 KeyedStateDef::Quad(keys)
             }
         };
@@ -321,12 +329,16 @@ impl<'de, T: Eq + Hash + Clone + Deserialize<'de>> Deserialize<'de> for KeyedSta
         let t = match def.unwrap() {
             KeyedStateDef::Single(s) => {
                 KeyedState::Single(s.into_iter()
-                                       .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                       .map(|(k, v)| {
+                                                (k, v.into_iter().map(Arc::new).collect())
+                                            })
                                        .collect())
             }
             KeyedStateDef::Double(s) => {
                 KeyedState::Double(s.into_iter()
-                                       .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+                                       .map(|(k, v)| {
+                                                (k, v.into_iter().map(Arc::new).collect())
+                                            })
                                        .collect())
             }
             KeyedStateDef::Tri(s) => {
@@ -372,12 +384,12 @@ impl<T: Hash + Eq + Clone> State<T> {
 
     pub fn add_key(&mut self, columns: &[usize], partial: bool) {
         if self.state_for(columns).is_some() {
-        // already keyed
+            // already keyed
             return;
         }
 
         if !self.state.is_empty() && !self.state[0].1.is_empty() {
-        // we'd need to *construct* the index!
+            // we'd need to *construct* the index!
             unimplemented!();
         }
 
@@ -408,15 +420,15 @@ impl<T: Hash + Eq + Clone> State<T> {
 
             match s.1 {
                 KeyedState::Single(ref mut map) => {
-        // treat this specially to avoid the extra Vec
+                    // treat this specially to avoid the extra Vec
                     debug_assert_eq!(s.0.len(), 1);
-        // i *wish* we could use the entry API here, but it would mean an extra clone
-        // in the common case of an entry already existing for the given key...
+                    // i *wish* we could use the entry API here, but it would mean an extra clone
+                    // in the common case of an entry already existing for the given key...
                     if let Some(ref mut rs) = map.get_mut(&r[s.0[0]]) {
                         rs.push(r);
                         return;
                     } else if s.2 {
-        // trying to insert a record into partial materialization hole!
+                        // trying to insert a record into partial materialization hole!
                         unimplemented!();
                     }
                     map.insert(r[s.0[0]].clone(), vec![r]);
@@ -460,7 +472,7 @@ impl<T: Hash + Eq + Clone> State<T> {
     pub fn remove(&mut self, r: &[T]) {
         let mut removed = 0;
         for s in &mut self.state {
-removed = 0; // otherwise we'd count every removal multiple times
+            removed = 0; // otherwise we'd count every removal multiple times
             let keep = |rsr: &Arc<Vec<T>>| if &rsr[..] == r {
                 removed += 1;
                 false
@@ -477,7 +489,7 @@ removed = 0; // otherwise we'd count every removal multiple times
                 _ => {
                     match s.1 {
                         KeyedState::Double(ref mut map) => {
-        // TODO: can we avoid the Clone here?
+                            // TODO: can we avoid the Clone here?
                             let key = (r[s.0[0]].clone(), r[s.0[1]].clone());
                             if let Some(ref mut rs) = map.get_mut(&key) {
                                 rs.retain(keep);
@@ -627,7 +639,7 @@ removed = 0; // otherwise we'd count every removal multiple times
             LookupResult::Some(&rs[..])
         } else {
             if state.2 {
-        // partially materialized, so this is a hole (empty results would be vec![])
+                // partially materialized, so this is a hole (empty results would be vec![])
                 LookupResult::Missing
             } else {
                 LookupResult::Some(&[])

@@ -155,8 +155,8 @@ pub trait Ingredient
                           prelude::LookupResult::Missing => Some(None),
                       })
             .or_else(|| {
-        // this is a long-shot.
-        // if our ancestor can be queried *through*, then we just use that state instead
+                // this is a long-shot.
+                // if our ancestor can be queried *through*, then we just use that state instead
                 let parent = domain.get(parent.as_local()).unwrap().borrow();
                 if parent.is_internal() {
                     parent.query_through(columns, key, states)
@@ -225,7 +225,7 @@ impl SerializableIngredient {
         match *self {
             SerializableIngredient::Join { .. } |
             SerializableIngredient::Union { .. } => 2,
-            SerializableIngredient::Base {..} => 0,
+            SerializableIngredient::Base { .. } => 0,
             _ => 1,
         }
     }
@@ -234,6 +234,8 @@ impl SerializableIngredient {
         assert_eq!(ancestors.len(), self.expected_ancestors());
 
         use ops;
+        use self::SerializableGrouped::*;
+        use ops::grouped::*;
         match self {
             SerializableIngredient::Identity(i) => Box::new(i),
             SerializableIngredient::Join(i) => Box::new(i),
@@ -243,14 +245,14 @@ impl SerializableIngredient {
             SerializableIngredient::Union(i) => Box::new(i),
             SerializableIngredient::Filter(i) => Box::new(i),
             SerializableIngredient::TopK(i) => Box::new(i),
-            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::Aggregation(..), ..} => {
-                Box::new(grouped::GroupedOperator::<grouped::aggregate::Aggregator>::from_serialized(g))
+            g @ SerializableIngredient::Grouped { inner: Aggregation(..), .. } => {
+                Box::new(GroupedOperator::<grouped::aggregate::Aggregator>::from_serialized(g))
             }
-            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::GroupConcat(..), ..} => {
-                Box::new(grouped::GroupedOperator::<grouped::concat::GroupConcat>::from_serialized(g))
+            g @ SerializableIngredient::Grouped { inner: GroupConcat(..), .. } => {
+                Box::new(GroupedOperator::<grouped::concat::GroupConcat>::from_serialized(g))
             }
-            g @ SerializableIngredient::Grouped{inner: SerializableGrouped::Extremum(..), ..} => {
-                Box::new(grouped::GroupedOperator::<grouped::extremum::ExtremumOperator>::from_serialized(g))
+            g @ SerializableIngredient::Grouped { inner: Extremum(..), .. } => {
+                Box::new(GroupedOperator::<grouped::extremum::ExtremumOperator>::from_serialized(g))
             }
             SerializableIngredient::Base {
                 defaults,

@@ -40,8 +40,9 @@ pub struct GenericSender<T, TS: TypedSender<T> + BytesEndpoint> {
     inner: GenericSenderInner<T, TS>,
 }
 
-impl<'de, T: Send + Serialize + Deserialize<'de> + 'static, TS: TypedSender<T> + BytesEndpoint + 'static>
-    GenericSender<T, TS> {
+impl<'de,
+     T: Send + Serialize + Deserialize<'de> + 'static,
+     TS: TypedSender<T> + BytesEndpoint + 'static> GenericSender<T, TS> {
     pub fn send(&self, t: T) -> Result<(), mpsc::SendError<T>> {
         match self.inner {
             GenericSenderInner::Local(ref s) => s.tsend(t),
@@ -121,8 +122,8 @@ impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndp
         }
     }
 }
-impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndpoint> Deserialize<'de>
-    for GenericSender<T, TS> {
+impl<'de, T: Send + Serialize + Deserialize<'de>, TS: TypedSender<T> + BytesEndpoint>
+    Deserialize<'de> for GenericSender<T, TS> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
     {
@@ -148,13 +149,17 @@ pub trait BytesEndpoint: Send {
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()>;
 }
 
-impl<T> BytesEndpoint for mpsc::Sender<T> where T: DeserializeOwned + Send {
+impl<T> BytesEndpoint for mpsc::Sender<T>
+    where T: DeserializeOwned + Send
+{
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
         let t = serde_json::from_slice(data).unwrap();
         self.send(t).map_err(|_| {})
     }
 }
-impl<T> BytesEndpoint for mpsc::SyncSender<T> where T: DeserializeOwned + Send {
+impl<T> BytesEndpoint for mpsc::SyncSender<T>
+    where T: DeserializeOwned + Send
+{
     fn recv_bytes(&self, data: &[u8]) -> Result<(), ()> {
         let t = serde_json::from_slice(data).unwrap();
         self.send(t).map_err(|_| {})

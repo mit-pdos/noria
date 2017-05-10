@@ -315,13 +315,16 @@ pub fn connect(log: &Logger,
                             .unwrap();
 
                     } else {
-                        egress_tx.send(Packet::UpdateEgress {
+                        egress_tx
+                            .send(Packet::UpdateEgress {
                                       node: egress_node.addr().as_local().clone(),
                                       new_tx: None,
                                       new_tag: None,
                                       new_remote_tx: Some((node.into(),
                                                            n.addr(),
-                                                           ingress_tx_addr.or(local_addr).unwrap(),
+                                                           ingress_tx_addr
+                                                               .or(local_addr)
+                                                               .unwrap(),
                                                            n.domain())),
                                   })
                             .unwrap();

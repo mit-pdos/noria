@@ -335,7 +335,7 @@ fn shared_interdomain_ancestor() {
         let domain = mig.add_domain();
         mig.assign_domain(b, domain);
         mig.assign_domain(c, domain);
-    // domain now has two incoming edges from the same node in a different domain
+        // domain now has two incoming edges from the same node in a different domain
 
         mig.commit();
         (a, bq, cq)
@@ -471,11 +471,11 @@ fn votes() {
     let (article1, article2, vote, article, vc, end) = {
         let mut mig = g.start_migration();
 
-    // add article base nodes (we use two so we can exercise unions too)
+        // add article base nodes (we use two so we can exercise unions too)
         let article1 = mig.add_ingredient("article1", &["id", "title"], Base::default());
         let article2 = mig.add_ingredient("article1", &["id", "title"], Base::default());
 
-    // add a (stupid) union of article1 + article2
+        // add a (stupid) union of article1 + article2
         let mut emits = HashMap::new();
         emits.insert(article1, vec![0, 1]);
         emits.insert(article2, vec![0, 1]);
@@ -483,22 +483,22 @@ fn votes() {
         let article = mig.add_ingredient("article", &["id", "title"], u);
         mig.maintain(article, 0);
 
-    // add vote base table
+        // add vote base table
         let vote = mig.add_ingredient("vote", &["user", "id"], Base::default());
 
-    // add vote count
+        // add vote count
         let vc = mig.add_ingredient("vc",
                                     &["id", "votes"],
                                     Aggregation::COUNT.over(vote, 0, &[1]));
         mig.maintain(vc, 0);
 
-    // add final join using first field from article and first from vc
+        // add final join using first field from article and first from vc
         use distributary::JoinSource::*;
         let j = Join::new(article, vc, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("end", &["id", "title", "votes"], j);
         mig.maintain(end, 0);
 
-    // start processing
+        // start processing
         mig.commit();
         (article1, article2, vote, article, vc, end)
     };
@@ -555,7 +555,7 @@ fn votes() {
 
     // check that article 2 doesn't have any votes
     let res = endq(&a2, true).unwrap();
-assert!(res.len() <= 1) // could be 1 if we had zero-rows
+    assert!(res.len() <= 1) // could be 1 if we had zero-rows
 }
 
 
@@ -994,13 +994,13 @@ fn migration_depends_on_unchanged_domain() {
     let left = {
         let mut mig = g.start_migration();
 
-    // base node, so will be materialized
+        // base node, so will be materialized
         let left = mig.add_ingredient("foo", &["a", "b"], distributary::Base::default());
 
-    // node in different domain that depends on foo causes egress to be added
+        // node in different domain that depends on foo causes egress to be added
         mig.add_ingredient("bar", &["a", "b"], distributary::Identity::new(left));
 
-    // start processing
+        // start processing
         mig.commit();
         left
     };
@@ -1039,21 +1039,21 @@ fn do_full_vote_migration(old_puts_after: bool) {
         let vc;
         let end;
         let (article, vote) = {
-    // migrate
+            // migrate
             let mut mig = g.start_migration();
 
-    // add article base node
+            // add article base node
             article = mig.add_ingredient("article", &["id", "title"], Base::default());
 
-    // add vote base table
+            // add vote base table
             vote = mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]));
 
-    // add vote count
+            // add vote count
             vc = mig.add_ingredient("votecount",
                                     &["id", "votes"],
                                     Aggregation::COUNT.over(vote, 0, &[1]));
 
-    // add final join using first field from article and first from vc
+            // add final join using first field from article and first from vc
             use distributary::JoinSource::*;
             let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
             end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
@@ -1067,7 +1067,7 @@ fn do_full_vote_migration(old_puts_after: bool) {
 
             mig.maintain(end, 0);
 
-    // start processing
+            // start processing
             mig.commit();
 
             (article, vote)
@@ -1100,21 +1100,21 @@ fn do_full_vote_migration(old_puts_after: bool) {
             assert_eq!(row[2], 1.into(), "all articles should have one vote");
         }
 
-    // migrate
+        // migrate
         let (rating, last) = {
             let mut mig = g.start_migration();
 
             let domain = mig.add_domain();
 
-    // add new "ratings" base table
+            // add new "ratings" base table
             let rating = mig.add_ingredient("rating", &["user", "id", "stars"], Base::default());
 
-    // add sum of ratings
+            // add sum of ratings
             let rs = mig.add_ingredient("rsum",
                                         &["id", "total"],
                                         Aggregation::SUM.over(rating, 2, &[1]));
 
-    // join vote count and rsum (and in theory, sum them)
+            // join vote count and rsum (and in theory, sum them)
             use distributary::JoinSource::*;
             let j = Join::new(rs, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
             let total = mig.add_ingredient("total", &["id", "ratings", "votes"], j);
@@ -1123,7 +1123,7 @@ fn do_full_vote_migration(old_puts_after: bool) {
             mig.assign_domain(rs, domain);
             mig.assign_domain(total, domain);
 
-    // finally, produce end result
+            // finally, produce end result
             let j = Join::new(article,
                               total,
                               JoinType::Inner,
@@ -1131,7 +1131,7 @@ fn do_full_vote_migration(old_puts_after: bool) {
             let newend = mig.add_ingredient("awr", &["id", "title", "ratings", "votes"], j);
             mig.maintain(newend, 0);
 
-    // start processing
+            // start processing
             mig.commit();
 
             (rating, newend)
@@ -1189,20 +1189,20 @@ fn live_writes() {
     let vote;
     let vc;
     {
-    // migrate
+        // migrate
         let mut mig = g.start_migration();
 
-    // add vote base table
+        // add vote base table
         vote = mig.add_ingredient("vote", &["user", "id"], distributary::Base::default());
 
-    // add vote count
+        // add vote count
         vc = mig.add_ingredient("votecount",
                                 &["id", "votes"],
                                 Aggregation::COUNT.over(vote, 0, &[1]));
 
         mig.maintain(vc, 0);
 
-    // start processing
+        // start processing
         mig.commit();
     }
 
@@ -1285,7 +1285,7 @@ fn state_replay_migration_query() {
     mutb.put(vec![2.into(), "o".into()]);
 
     let out = {
-    // add join and a reader node
+        // add join and a reader node
         let mut mig = g.start_migration();
         use distributary::JoinSource::*;
         let j = distributary::Join::new(a,
@@ -1294,10 +1294,10 @@ fn state_replay_migration_query() {
                                         vec![B(0, 0), L(1), R(1)]);
         let j = mig.add_ingredient("j", &["x", "y", "z"], j);
 
-    // we want to observe what comes out of the join
+        // we want to observe what comes out of the join
         mig.maintain(j, 0);
 
-    // do the migration
+        // do the migration
         mig.commit();
 
         j
@@ -1426,7 +1426,7 @@ fn tpc_w() {
         let mut f = File::open("tests/tpc-w-queries.txt").unwrap();
         let mut s = String::new();
 
-    // Load queries
+        // Load queries
         f.read_to_string(&mut s).unwrap();
         let lines: Vec<String> = s.lines()
             .filter(|l| !l.is_empty() && !l.starts_with('#'))
@@ -1437,7 +1437,7 @@ fn tpc_w() {
                  })
             .collect();
 
-    // Add them one by one
+        // Add them one by one
         for (i, q) in lines.iter().enumerate() {
             println!("{}: {}", i, q);
             let or = r.clone();

@@ -171,7 +171,7 @@ impl Type {
         keys::provenance_of(graph, index, column, |_, _| None)
             .into_iter()
             .map(|path| {
-        // we want the base node corresponding to each path
+                     // we want the base node corresponding to each path
                      path.into_iter().last().unwrap()
                  })
             .collect()
@@ -224,9 +224,7 @@ enum TypeDef {
     Ingress,
     Internal(Vec<NodeAddress>, SerializableIngredient),
     Egress(HashMap<Tag, NodeAddress>),
-    Reader {
-        cols_key: Option<(usize, usize)>,
-    },
+    Reader { cols_key: Option<(usize, usize)> },
     Source,
 }
 
@@ -251,9 +249,7 @@ impl Serialize for Type {
                 assert!(token_generator.is_none());
                 assert!(streamers.is_none());
 
-                TypeDef::Reader {
-                    cols_key: wr.as_ref().map(|wr| (wr.cols(), wr.key())),
-                }
+                TypeDef::Reader { cols_key: wr.as_ref().map(|wr| (wr.cols(), wr.key())) }
             }
             Type::Hook(_) => unimplemented!(),
             Type::Source => TypeDef::Source,
@@ -281,20 +277,22 @@ impl<'de> Deserialize<'de> for Type {
                                       tags,
                                   }))
             }
-            TypeDef::Reader{cols_key} => {
+            TypeDef::Reader { cols_key } => {
                 if let Some((cols, key)) = cols_key {
                     let (read, write) = backlog::new(cols, key);
-                    Type::Reader(Some(write), Reader {
-                        streamers: Some(Vec::new()),
-                        state: Some(read),
-                        token_generator: None,
-                    })
+                    Type::Reader(Some(write),
+                                 Reader {
+                                     streamers: Some(Vec::new()),
+                                     state: Some(read),
+                                     token_generator: None,
+                                 })
                 } else {
-                    Type::Reader(None, Reader {
-                        streamers: Some(Vec::new()),
-                        state: None,
-                        token_generator: None,
-                    })
+                    Type::Reader(None,
+                                 Reader {
+                                     streamers: Some(Vec::new()),
+                                     state: None,
+                                     token_generator: None,
+                                 })
                 }
             }
             TypeDef::Source => Type::Source,
@@ -446,25 +444,25 @@ impl Node {
             Type::Internal(ref i) => {
                 write!(f, "{{")?;
 
-        // Output node name and description. First row.
+                // Output node name and description. First row.
                 write!(f,
                        "{{ {} / {} | {} }}",
                        idx.index(),
                        escape(self.name()),
                        escape(&i.description()))?;
 
-        // Output node outputs. Second row.
+                // Output node outputs. Second row.
                 write!(f, " | {}", self.fields().join(", \\n"))?;
 
-        // Maybe output node's HAVING conditions. Optional third row.
-        // TODO
-        // if let Some(conds) = n.node().unwrap().having_conditions() {
-        //     let conds = conds.iter()
-        //         .map(|c| format!("{}", c))
-        //         .collect::<Vec<_>>()
-        //         .join(" ∧ ");
-        //     write!(f, " | σ({})", escape(&conds))?;
-        // }
+                // Maybe output node's HAVING conditions. Optional third row.
+                // TODO
+                // if let Some(conds) = n.node().unwrap().having_conditions() {
+                //     let conds = conds.iter()
+                //         .map(|c| format!("{}", c))
+                //         .collect::<Vec<_>>()
+                //         .join(" ∧ ");
+                //     write!(f, " | σ({})", escape(&conds))?;
+                // }
 
                 write!(f, " }}")
             }

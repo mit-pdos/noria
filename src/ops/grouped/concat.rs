@@ -14,33 +14,6 @@ pub enum TextComponent {
     Column(usize),
 }
 
-// #[derive(Serialize, Deserialize)]
-// enum TextComponentDef {
-//     Literal(String),
-//     Column(usize),
-// }
-// impl Serialize for TextComponent {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//         where S: Serializer
-//     {
-//         match *self {
-//             TextComponent::Literal(s) => TextComponentDef::Literal(s.into()).serialize(serializer),
-//             TextComponent::Column(c) => TextComponentDef::Column(c).serialize(serializer),
-//         }
-//     }
-// }
-
-// impl Deserialize for TextComponent {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//         where D: Deserializer
-//     {
-//         let def = TextComponentDef::deserialize(deserializer);
-//         match def {
-//             TextComponentDef::Literal(s) => 
-//         }
-//     }
-// }
-
 pub enum Modify {
     Add(String),
     Remove(String),

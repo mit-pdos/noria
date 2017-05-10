@@ -153,11 +153,11 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             .into_iter()
             .filter_map(|col| {
                 if self.group_by.iter().any(|c| c == &col) {
-        // since the generated value goes at the end,
-        // this is the n'th output value
+                    // since the generated value goes at the end,
+                    // this is the n'th output value
                     Some(col)
                 } else {
-        // this column does not appear in output
+                    // this column does not appear in output
                     None
                 }
             })
@@ -210,7 +210,7 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
         let mut misses = Vec::new();
         let mut out = Vec::with_capacity(2 * consolidate.len());
         for (group, diffs) in consolidate {
-        // find the current value for this group
+            // find the current value for this group
             let db = state
                 .get(self.us.as_ref().unwrap().as_local())
                 .expect("grouped operators must have their own state materialized");
@@ -232,27 +232,27 @@ impl<T: GroupedOperation + Send + 'static> Ingredient for GroupedOperator<T> {
             let (current, new) = {
                 use std::borrow::Cow;
 
-        // current value is in the last output column
-        // or "" if there is no current group
+                // current value is in the last output column
+                // or "" if there is no current group
                 let current = old.map(|r| Cow::Borrowed(&r[r.len() - 1]));
 
-        // new is the result of applying all diffs for the group to the current value
+                // new is the result of applying all diffs for the group to the current value
                 let new = self.inner.apply(current.as_ref().map(|v| &**v), diffs);
                 (current, new)
             };
 
             match current {
                 Some(ref current) if new == **current => {
-        // no change
+                    // no change
                 }
                 _ => {
                     if let Some(old) = old {
-        // revoke old value
+                        // revoke old value
                         debug_assert!(current.is_some());
                         out.push(Record::Negative(old.clone()));
                     }
 
-        // emit positive, which is group + new.
+                    // emit positive, which is group + new.
                     let rec: Vec<_> = group
                         .into_iter()
                         .cloned()

@@ -43,7 +43,7 @@ pub enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
     End(channel::PacketSender),
-    SerializedEnd(domain::Index, Option<SocketAddr>),    // None means local address
+    SerializedEnd(domain::Index, Option<SocketAddr>), // None means local address
     Local(Vec<usize>),
 }
 
@@ -474,10 +474,10 @@ impl Packet {
             Packet::AddNode { ref mut node, .. } => {
                 use flow::node::*;
                 use flow::domain::single::NodeDescriptor;
-                let node:&mut NodeDescriptor = &mut *node.borrow_mut();
-                let node:&mut Node = &mut node.inner;
-                let node:&mut Type = &mut **node;
-                if let Type::Reader(_, Reader{streamers: Some(ref mut streamers), ..}) = *node {
+                let node: &mut NodeDescriptor = &mut *node.borrow_mut();
+                let node: &mut Node = &mut node.inner;
+                let node: &mut Type = &mut **node;
+                if let Type::Reader(_, Reader { streamers: Some(ref mut streamers), .. }) = *node {
                     assert!(streamers.is_empty());
                     // for s in streamers.iter_mut() {
                     //     s.make_serializable(local_addr, demux_table);
@@ -521,23 +521,23 @@ impl Packet {
         }
 
         if let Packet::SetupReplayPath {
-            trigger: ref mut trigger @ TriggerEndpoint::SerializedEnd(_,_),
-            ..
-        } = *self {
-            let (domain_index, client_addr) = if let TriggerEndpoint::SerializedEnd(d, c) = *trigger {
+                   trigger: ref mut trigger @ TriggerEndpoint::SerializedEnd(_, _), ..
+               } = *self {
+            let (domain_index, client_addr) = if let TriggerEndpoint::SerializedEnd(d, c) =
+                *trigger {
                 (d, c.unwrap())
             } else {
                 unreachable!()
             };
 
             let client = souplet::SyncClient::connect(client_addr, client::Options::default())
-                    .unwrap();
+                .unwrap();
 
             let packet_sender = channel::PacketSender::make_remote(domain_index,
-                client,
-                client_addr,
-                demux_table.clone(),
-                local_addr);
+                                                                   client,
+                                                                   client_addr,
+                                                                   demux_table.clone(),
+                                                                   local_addr);
             *trigger = TriggerEndpoint::End(packet_sender);
         }
     }
