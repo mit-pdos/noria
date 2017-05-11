@@ -1112,44 +1112,45 @@ impl<'a> Migration<'a> {
             }
 
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
-            let remote = mainline.souplet.is_some() &&
-                         migrate::booting::can_be_remote(&mainline.ingredients, &nodes);
 
-            if remote {
-                // TODO: create input channel and add it to mainline.in_txs
-                let addr = migrate::booting::boot_remote(domain.index().into(),
-                                                         &mut mainline.ingredients,
-                                                         nodes,
-                                                         mainline.souplet.as_mut().unwrap(),
-                                                         &mut mainline.txs,
-                                                         &mut mainline.in_txs);
+            match mainline.souplet {
+                Some(ref mut souplet) => {
+                    let addr = migrate::booting::boot_remote(domain.index().into(),
+                                                             &mut mainline.ingredients,
+                                                             nodes,
+                                                             souplet,
+                                                             &mut mainline.txs,
+                                                             &mut mainline.in_txs);
 
-                mainline.remote_domains.insert(domain, addr);
-
-                mainline.domains.push(None);
-            } else {
-                let domain_index = domain.index().into();
-
-                // Start up new domain
-                let jh = migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
-                                                    domain_index,
-                                                    &mut mainline.ingredients,
-                                                    nodes,
-                                                    mainline.checktable.clone(),
-                                                    &mut mainline.txs,
-                                                    &mut mainline.in_txs,
-                                                    start_ts);
-                if mainline.souplet.is_some() {
-                    mainline
-                        .souplet
-                        .as_mut()
-                        .unwrap()
-                        .add_local_domain(domain_index,
-                                          mainline.txs[&domain_index].as_local().unwrap(),
-                                          mainline.in_txs[&domain_index].as_local().unwrap());
+                    mainline.remote_domains.insert(domain, addr);
+                    mainline.domains.push(None);
                 }
-                mainline.domains.push(Some(jh));
-            };
+                None => {
+                    let domain_index = domain.index().into();
+
+                    // Start up new domain
+                    let jh = migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
+                                                        domain_index,
+                                                        &mut mainline.ingredients,
+                                                        nodes,
+                                                        mainline.checktable.clone(),
+                                                        &mut mainline.txs,
+                                                        &mut mainline.in_txs,
+                                                        start_ts);
+                    // TODO: support mix of local and remote domains?
+                    //
+                    // if mainline.souplet.is_some() {
+                    //     mainline
+                    //         .souplet
+                    //         .as_mut()
+                    //         .unwrap()
+                    //         .add_local_domain(domain_index,
+                    //                           mainline.txs[&domain_index].as_local().unwrap(),
+                    //                           mainline.in_txs[&domain_index].as_local().unwrap());
+                    // }
+                    mainline.domains.push(Some(jh));
+                }
+            }
 
         }
 

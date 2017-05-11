@@ -29,15 +29,6 @@ fn build_descriptors(graph: &mut Graph, nodes: Vec<(NodeIndex, bool)>) -> Domain
         .collect()
 }
 
-pub fn can_be_remote(graph: &Graph, nodes: &Vec<(NodeIndex, bool)>) -> bool {
-    // for &(ni, _) in nodes {
-    //     if graph[ni].is_reader() {
-    //         return false;
-    //     }
-    // }
-    true
-}
-
 pub fn boot_new(log: Logger,
                 index: domain::Index,
                 graph: &mut Graph,
@@ -65,12 +56,15 @@ pub fn boot_remote(index: domain::Index,
                    txs: &mut HashMap<domain::Index, channel::PacketSender>,
                    input_txs: &mut HashMap<domain::Index, channel::PacketSender>)
                    -> SocketAddr {
-    let peer = &souplet.get_peers().next().unwrap();
+    let mut peers = souplet.get_peers();
+    let peer = index.index() % peers.len();
+    let peer = peers.nth(peer).unwrap();
+
     let nodes = build_descriptors(graph, nodes);
     let (tx, input_tx) = souplet.start_domain(peer, index, nodes);
 
     txs.insert(index, tx);
     input_txs.insert(index, input_tx);
 
-    *peer.clone()
+    peer.clone()
 }
