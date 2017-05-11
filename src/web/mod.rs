@@ -1,6 +1,8 @@
 use rustful::{Server, Handler, Context, Response, TreeRouter, HttpResult};
 use rustful::server::Listening;
 use rustful::server::Global;
+use rustful::header::AccessControlAllowOrigin;
+
 use std::sync::{Arc, Mutex};
 
 use flow::Blender;
@@ -115,6 +117,7 @@ pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
             "graph" => Get: Box::new(move |ctx: Context, mut res: Response| {
                 let m: &Arc<Mutex<Blender>> = ctx.global.get().unwrap();
                 res.headers_mut().set(ContentType::plaintext());
+                res.headers_mut().set(AccessControlAllowOrigin::Any);
                 res.send(format!("{}", *m.lock().unwrap()));
             }) as Box<Handler>,
         }
