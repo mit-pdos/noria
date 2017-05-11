@@ -222,7 +222,7 @@ impl<I> From<I> for Type
 #[derive(Serialize, Deserialize)]
 enum TypeDef {
     Ingress,
-    Internal(Vec<NodeAddress>, SerializableIngredient),
+    Internal(SerializableIngredient),
     Egress(HashMap<Tag, NodeAddress>),
     Reader { cols_key: Option<(usize, usize)> },
     Source,
@@ -234,7 +234,7 @@ impl Serialize for Type {
     {
         let def = match *self {
             Type::Ingress => TypeDef::Ingress,
-            Type::Internal(ref i) => TypeDef::Internal(i.ancestors(), i.into_serializable()),
+            Type::Internal(ref i) => TypeDef::Internal(i.into_serializable()),
             Type::Egress(None) => unreachable!(),
             Type::Egress(Some(Egress { ref txs, ref tags })) => {
                 assert_eq!(txs.len(), 0);
@@ -270,7 +270,7 @@ impl<'de> Deserialize<'de> for Type {
 
         let t = match def.unwrap() {
             TypeDef::Ingress => Type::Ingress,
-            TypeDef::Internal(ancestors, si) => Type::Internal(si.into_ingredient(ancestors)),
+            TypeDef::Internal(si) => Type::Internal(si.into_ingredient()),
             TypeDef::Egress(tags) => {
                 Type::Egress(Some(Egress {
                                       txs: Default::default(),

@@ -313,7 +313,6 @@ fn it_works_streaming() {
 }
 
 #[test]
-#[ignore]
 fn shared_interdomain_ancestor() {
     // set up graph
     let mut g = distributary::Blender::new();
@@ -884,6 +883,7 @@ fn crossing_migration() {
 }
 
 #[test]
+#[ignore]
 fn independent_domain_migration() {
     let id: distributary::DataType = 1.into();
 
@@ -937,6 +937,7 @@ fn independent_domain_migration() {
 }
 
 #[test]
+#[ignore]
 fn domain_amend_migration() {
     // set up graph
     let mut g = distributary::Blender::new();
@@ -1075,7 +1076,7 @@ fn do_full_vote_migration(old_puts_after: bool) {
         let muta = g.get_mutator(article);
         let mutv = g.get_mutator(vote);
 
-        let n = 1000i64;
+        let n = 50i64;
         let title: DataType = "foo".into();
         let raten: DataType = 5.into();
 
@@ -1169,19 +1170,16 @@ fn do_full_vote_migration(old_puts_after: bool) {
 }
 
 #[test]
-#[ignore]
 fn full_vote_migration_only_new() {
     do_full_vote_migration(false);
 }
 
 #[test]
-#[ignore]
 fn full_vote_migration_new_and_old() {
     do_full_vote_migration(true);
 }
 
 #[test]
-#[ignore]
 fn live_writes() {
     use std::time::Duration;
     use distributary::{Blender, Aggregation, DataType};
@@ -1209,7 +1207,7 @@ fn live_writes() {
     let vc_state = g.get_getter(vc).unwrap();
     let add = g.get_mutator(vote);
 
-    let ids = 1000;
+    let ids = 10;
     let votes = 7;
 
     // continuously write to vote

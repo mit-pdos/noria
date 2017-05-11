@@ -146,15 +146,20 @@ impl FutureService for SoupletServer {
 
     type ResetFut = Result<(), Never>;
     fn reset(&self) -> Self::ResetFut {
+        print!("Resetting");
         let mut inner = self.inner.lock().unwrap();
-
+        print!(".");
         for (_, tx) in &mut inner.domain_txs {
             // don't unwrap, because given domain may already have terminated
             drop(tx.send(Packet::Quit));
         }
+        print!(".");
         inner.domain_txs.clear();
+        print!(".");
         inner.domain_input_txs.clear();
+        print!(".");
         inner.domain_unbounded_txs.clear();
+        println!(" Done");
         Ok(())
     }
 

@@ -221,18 +221,7 @@ pub enum SerializableIngredient {
 }
 
 impl SerializableIngredient {
-    pub fn expected_ancestors(&self) -> usize {
-        match *self {
-            SerializableIngredient::Join { .. } |
-            SerializableIngredient::Union { .. } => 2,
-            SerializableIngredient::Base { .. } => 0,
-            _ => 1,
-        }
-    }
-
-    pub fn into_ingredient(self, ancestors: Vec<prelude::NodeAddress>) -> Box<Ingredient> {
-        assert_eq!(ancestors.len(), self.expected_ancestors());
-
+    pub fn into_ingredient(self) -> Box<Ingredient> {
         use ops;
         use self::SerializableGrouped::*;
         use ops::grouped::*;

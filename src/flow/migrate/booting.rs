@@ -47,7 +47,7 @@ pub fn boot_new(log: Logger,
                 input_txs: &mut HashMap<domain::Index, channel::PacketSender>,
                 ts: i64)
                 -> thread::JoinHandle<()> {
-    let (tx, rx) = mpsc::sync_channel(1);
+    let (tx, rx) = mpsc::sync_channel(256);
     txs.insert(index, tx.into());
 
     let (input_tx, input_rx) = mpsc::sync_channel(256);
