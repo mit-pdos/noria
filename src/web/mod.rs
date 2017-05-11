@@ -1,7 +1,7 @@
 use rustful::{Server, Handler, Context, Response, TreeRouter, HttpResult};
 use rustful::server::Listening;
 use rustful::server::Global;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use flow::Blender;
 use flow::prelude::DataType;
@@ -26,7 +26,7 @@ struct PutEndpoint<Mutator> {
 /// All nodes are available for reading by GETing from `localhost:8080/<view>?key=<key>`. A JSON
 /// array with all matching records is returned. Each record is represented as a JSON object with
 /// field names as dictated by those passed to `new()` for the view being queried.
-pub fn run(soup: Blender) -> HttpResult<Listening> {
+pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
     use rustc_serialize::json::ToJson;
     use rustful::header::ContentType;
 
@@ -34,25 +34,27 @@ pub fn run(soup: Blender) -> HttpResult<Listening> {
 
     // Figure out what inputs and outputs to expose
     let (ins, outs) = {
+        let soup = soup.lock().unwrap();
+
         let ins: Vec<_> = soup.inputs()
             .into_iter()
             .map(|(ni, n)| {
-                     (n.name().to_owned(),
-                      PutEndpoint {
-                          arguments: n.fields().iter().cloned().collect(),
-                          mutator: soup.get_mutator(ni),
-                      })
+                (n.name().to_owned(),
+                 PutEndpoint {
+                     arguments: n.fields().iter().cloned().collect(),
+                     mutator: soup.get_mutator(ni),
                  })
+            })
             .collect();
         let outs: Vec<_> = soup.outputs()
             .into_iter()
             .map(|(_, n, r)| {
-                     (n.name().to_owned(),
-                      GetEndpoint {
-                          arguments: n.fields().iter().cloned().collect(),
-                          f: r.get_reader().unwrap(),
-                      })
+                (n.name().to_owned(),
+                 GetEndpoint {
+                     arguments: n.fields().iter().cloned().collect(),
+                     f: r.get_reader().unwrap(),
                  })
+            })
             .collect();
         (ins, outs)
     };
@@ -111,7 +113,7 @@ pub fn run(soup: Blender) -> HttpResult<Listening> {
     insert_routes! {
         &mut router => {
             "graph" => Get: Box::new(move |ctx: Context, mut res: Response| {
-                let m: &Mutex<Blender> = ctx.global.get().unwrap();
+                let m: &Arc<Mutex<Blender>> = ctx.global.get().unwrap();
                 res.headers_mut().set(ContentType::plaintext());
                 res.send(format!("{}", *m.lock().unwrap()));
             }) as Box<Handler>,
@@ -121,7 +123,7 @@ pub fn run(soup: Blender) -> HttpResult<Listening> {
     Server {
             handlers: router,
             host: 8080.into(),
-            global: Global::from(Box::new(Mutex::new(soup))),
+            global: Global::from(Box::new(soup)),
             ..Server::default()
         }
         .run()
