@@ -465,7 +465,7 @@ fn main() {
     }
 
     // let system settle
-    // thread::sleep(time::Duration::new(2, 0));
+    thread::sleep(time::Duration::from_millis(100));
     let start = time::Instant::now();
 
     // benchmark
