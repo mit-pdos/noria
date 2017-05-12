@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<script src="js/require.js"></script>
+<div id="graph"><div /></div>
+<script>
+
+  requirejs.config({
+	//By default load any module IDs from js/lib
+	baseUrl: 'js',
+	//except, if the module ID starts with "app",
+	//load it from the js/app directory. paths
+	//config is relative to the baseUrl, and
+	//never includes a ".js" extension since
+	//the paths config could be for a directory.
+	paths: {
+		d3: 'd3',
+		"dot-checker": 'dot-checker',
+		"layout-worker": 'layout-worker',
+		worker: 'worker',
+        renderer: 'renderer',
+        jquery: 'jquery',
+	}
+  });
+
+require(["renderer", "jquery"], function (renderer, $) {
+	renderer.init("#graph");
+
+	$.ajax({
+		url: "http://localhost:8080/graph",
+		dataType: "text",
+		crossDomain: true,
+		success: function(data) {
+			renderer.render(data);
+		},
+		error: function(e) {
+			renderer.render('digraph {}');
+		}
+	});
+
+	setInterval(function(){
+		$.ajax({
+			url: "http://localhost:8080/graph",
+			dataType: "text",
+			crossDomain: true,
+			success: function(data) {
+				renderer.render(data);
+			},
+		});
+	}, 1000);
+});
+</script>
+
