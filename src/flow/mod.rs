@@ -44,6 +44,18 @@ macro_rules! dur_to_ns {
 
 pub type Edge = bool; // should the edge be materialized?
 
+/// Enum indicating what type of error occurred when attempting to write.
+#[derive(Debug)]
+pub enum WriteError {
+    /// Wrong number of columns specified.
+    WrongNumberOfColumns {
+        /// How many columns were expected.
+        expected: usize,
+        /// How many were received.
+        got: usize,
+    },
+}
+
 /// A `Mutator` is used to perform reads and writes to base nodes.
 pub struct Mutator {
     src: core::NodeAddress,
@@ -54,6 +66,7 @@ pub struct Mutator {
     transactional: bool,
     dropped: VecMap<prelude::DataType>,
     tracer: payload::Tracer,
+    expected_columns: usize,
 }
 
 impl Clone for Mutator {
@@ -67,6 +80,7 @@ impl Clone for Mutator {
             transactional: self.transactional,
             dropped: self.dropped.clone(),
             tracer: None,
+            expected_columns: self.expected_columns,
         }
     }
 }
@@ -173,17 +187,36 @@ impl Mutator {
     }
 
     /// Perform a non-transactional write to the base node this Mutator was generated for.
-    pub fn put<V>(&self, u: V)
+    pub fn put<V>(&self, u: V) -> Result<(), WriteError>
         where V: Into<Vec<prelude::DataType>>
     {
-        self.send(vec![u.into()].into())
+        let u = u.into();
+        if u.len() != self.expected_columns {
+            Err(WriteError::WrongNumberOfColumns {
+                    expected: self.expected_columns,
+                    got: u.len(),
+                })
+        } else {
+            Ok(self.send(vec![u].into()))
+        }
     }
 
     /// Perform a transactional write to the base node this Mutator was generated for.
-    pub fn transactional_put<V>(&self, u: V, t: checktable::Token) -> Result<i64, ()>
+    pub fn transactional_put<V>(&self,
+                                u: V,
+                                t: checktable::Token)
+                                -> Result<Result<i64, ()>, WriteError>
         where V: Into<Vec<prelude::DataType>>
     {
-        self.tx_send(vec![u.into()].into(), t)
+        let u = u.into();
+        if u.len() != self.expected_columns {
+            Err(WriteError::WrongNumberOfColumns {
+                    expected: self.expected_columns,
+                    got: u.len(),
+                })
+        } else {
+            Ok(self.tx_send(vec![u].into(), t))
+        }
     }
 
     /// Perform a non-transactional delete frome the base node this Mutator was generated for.
@@ -522,7 +555,9 @@ impl Blender {
 
         trace!(self.log, "creating mutator"; "for" => n.index());
 
-        let base_n = self.ingredients[*base.as_global()]
+        let ref base_n = self.ingredients[*base.as_global()];
+        let num_fields = base_n.fields().len();
+        let base_n = base_n
             .get_base()
             .expect("asked to get mutator for non-base node");
         Mutator {
@@ -537,6 +572,7 @@ impl Blender {
             transactional: self.ingredients[*base.as_global()].is_transactional(),
             dropped: base_n.get_dropped(),
             tracer: None,
+            expected_columns: num_fields - base_n.get_dropped().len(),
         }
     }
 
@@ -1146,7 +1182,8 @@ impl<'a> Migration<'a> {
                     //         .unwrap()
                     //         .add_local_domain(domain_index,
                     //                           mainline.txs[&domain_index].as_local().unwrap(),
-                    //                           mainline.in_txs[&domain_index].as_local().unwrap());
+                    //                           mainline.in_txs[&domain_index].as_local()
+                    //                                   .unwrap());
                     // }
                     mainline.domains.push(Some(jh));
                 }

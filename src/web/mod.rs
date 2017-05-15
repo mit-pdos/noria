@@ -41,22 +41,22 @@ pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
         let ins: Vec<_> = soup.inputs()
             .into_iter()
             .map(|(ni, n)| {
-                (n.name().to_owned(),
-                 PutEndpoint {
-                     arguments: n.fields().iter().cloned().collect(),
-                     mutator: soup.get_mutator(ni),
+                     (n.name().to_owned(),
+                      PutEndpoint {
+                          arguments: n.fields().iter().cloned().collect(),
+                          mutator: soup.get_mutator(ni),
+                      })
                  })
-            })
             .collect();
         let outs: Vec<_> = soup.outputs()
             .into_iter()
             .map(|(_, n, r)| {
-                (n.name().to_owned(),
-                 GetEndpoint {
-                     arguments: n.fields().iter().cloned().collect(),
-                     f: r.get_reader().unwrap(),
+                     (n.name().to_owned(),
+                      GetEndpoint {
+                          arguments: n.fields().iter().cloned().collect(),
+                          f: r.get_reader().unwrap(),
+                      })
                  })
-            })
             .collect();
         (ins, outs)
     };
@@ -77,7 +77,7 @@ pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
                         }
                     })).collect::<Vec<DataType>>());
                     res.headers_mut().set(ContentType::json());
-                    res.send(format!("{}", ts.to_json()));
+                    res.send(format!("{}", ts.unwrap().to_json()));
                 }) as Box<Handler>,
             }
         };

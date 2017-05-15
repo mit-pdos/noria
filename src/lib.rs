@@ -381,7 +381,7 @@ mod sql;
 
 pub use checktable::{Token, TransactionResult};
 pub use souplet::SoupletDaemon;
-pub use flow::{Blender, Migration, Mutator};
+pub use flow::{Blender, Migration, Mutator, WriteError};
 pub use flow::core::{NodeAddress, DataType, Datas};
 pub use flow::node::StreamUpdate;
 pub use flow::domain::Index;
