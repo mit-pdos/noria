@@ -405,7 +405,7 @@ impl Node {
         self.inner.on_commit(self.addr.unwrap(), remap)
     }
 
-    pub fn describe(&self, f: &mut fmt::Write, idx: NodeIndex) -> fmt::Result {
+    pub fn describe(&self, f: &mut fmt::Write, idx: NodeIndex, domain_colors: &HashMap<domain::Index, usize>) -> fmt::Result {
         use regex::Regex;
 
         let escape = |s: &str| {
@@ -417,9 +417,9 @@ impl Node {
         write!(f,
                " [style=filled, fillcolor={}, label=\"",
                self.domain
-                   .map(|d| -> usize { d.into() })
-                   .map(|d| format!("\"/set312/{}\"", (d % 12) + 1))
-                   .unwrap_or("white".into()))?;
+               .and_then(|d| domain_colors.get(&d))
+               .map(|d| format!("\"/set312/{}\"", (d % 12) + 1))
+               .unwrap_or("white".into()))?;
 
         match *self.inner {
             Type::Source => write!(f, "(source)"),

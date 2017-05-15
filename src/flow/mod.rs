@@ -90,10 +90,10 @@ impl Mutator {
         // NOTE: this is pretty expensive until https://github.com/contain-rs/vec-map/pull/33 lands
         let ndropped = self.dropped.len();
         if ndropped != 0 {
-            // inject defaults for dropped columns
+        // inject defaults for dropped columns
             let dropped = self.dropped.iter().rev();
             for r in rs.iter_mut() {
-                // get a handle to the underlying data vector
+        // get a handle to the underlying data vector
                 use std::sync::Arc;
                 let v = match *r {
                     prelude::Record::Positive(ref mut v) |
@@ -102,20 +102,20 @@ impl Mutator {
                 };
                 let r = Arc::get_mut(v).expect("send should have complete ownership of records");
 
-                // we want to iterate over all the dropped columns
+        // we want to iterate over all the dropped columns
                 let dropped = dropped.clone();
 
-                // we want to be a bit careful here to avoid shifting elements multiple times. we
-                // do this by moving from the back, and swapping the tail element to the end of the
-                // vector until we hit each index.
+        // we want to be a bit careful here to avoid shifting elements multiple times. we
+        // do this by moving from the back, and swapping the tail element to the end of the
+        // vector until we hit each index.
 
-                // make room in the record
+        // make room in the record
                 r.reserve(ndropped);
                 let mut free = r.len() + ndropped;
                 let mut last_unmoved = r.len() - 1;
                 unsafe { r.set_len(free) };
 
-                // keep trying to insert the next dropped column
+        // keep trying to insert the next dropped column
                 'next: for (next_insert, default) in dropped {
                     // think of this being at the bottom of the loop
                     // we just hoist it here to avoid underflow if we ever insert at 0
@@ -139,8 +139,8 @@ impl Mutator {
                     // we're at the right index -- insert the dropped value
                     *r.get_mut(next_insert).unwrap() = default.clone();
 
-                    // here, I'll help:
-                    // free -= 1;
+        // here, I'll help:
+        // free -= 1;
                 }
             }
         }
@@ -153,13 +153,13 @@ impl Mutator {
                 link: payload::Link::new(self.src, self.addr),
                 data: rs,
                 state: payload::TransactionState::WillCommit,
-                tracer: None, // TODO replace with: self.tracer.clone(),
+tracer: None, // TODO replace with: self.tracer.clone(),
             }
         } else {
             payload::Packet::Message {
                 link: payload::Link::new(self.src, self.addr),
                 data: rs,
-                tracer: None, // TODO replace with: self.tracer.clone(),
+tracer: None, // TODO replace with: self.tracer.clone(),
             }
         };
 
@@ -175,7 +175,7 @@ impl Mutator {
             link: payload::Link::new(self.src, self.addr),
             data: rs,
             state: payload::TransactionState::Pending(t, send.into()),
-            tracer: None, // TODO replace with: self.tracer.clone(),
+tracer: None, // TODO replace with: self.tracer.clone(),
         };
         self.tx.clone().send(m).unwrap();
         loop {
@@ -450,8 +450,8 @@ impl Blender {
             .filter_map(|n| {
                 use flow::node;
                 if let node::Type::Reader(_, ref inner) = *self.ingredients[n] {
-                    // we want to give the the node that is being materialized
-                    // not the reader node itself
+        // we want to give the the node that is being materialized
+        // not the reader node itself
                     let src = self.ingredients
                         .neighbors_directed(n, petgraph::EdgeDirection::Incoming)
                         .next()
@@ -521,7 +521,7 @@ impl Blender {
                         } else {
                             None
                         })
-            .next(); // there should be at most one
+.next(); // there should be at most one
 
         reader.map_or(Err(()), |inner| {
             let arc = inner.state.as_ref().unwrap().clone();
@@ -601,6 +601,14 @@ impl Blender {
 
 impl fmt::Display for Blender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let addrs: HashSet<SocketAddr> = self.remote_domains.values().cloned().collect();
+        let addr_colors: HashMap<SocketAddr, usize> =
+            addrs.into_iter().enumerate().map(|(n, s)| (s, n)).collect();
+        let domain_colors: HashMap<domain::Index, usize> = self.remote_domains
+            .iter()
+            .map(|(d, s)| (d.clone(), addr_colors[s]))
+            .collect();
+
         let indentln = |f: &mut fmt::Formatter| write!(f, "    ");
 
         // Output header.
@@ -614,7 +622,7 @@ impl fmt::Display for Blender {
         for index in self.ingredients.node_indices() {
             indentln(f)?;
             write!(f, "{}", index.index())?;
-            self.ingredients[index].describe(f, index)?;
+            self.ingredients[index].describe(f, index, &domain_colors)?;
         }
 
         // Output edges.
@@ -622,7 +630,7 @@ impl fmt::Display for Blender {
             indentln(f)?;
             write!(f, "{} -> {}", edge.source().index(), edge.target().index())?;
             if !edge.weight {
-                // not materialized
+        // not materialized
                 writeln!(f, " [style=\"dashed\"]")?;
             } else {
                 writeln!(f, "")?;
@@ -826,9 +834,9 @@ impl<'a> Migration<'a> {
         let mut e = self.mainline.ingredients.edge_weight_mut(e).unwrap();
         if !*e {
             *e = true;
-            // it'd be nice if we could just store the EdgeIndex here, but unfortunately that's not
-            // guaranteed by petgraph to be stable in the presence of edge removals (which we do in
-            // commit())
+        // it'd be nice if we could just store the EdgeIndex here, but unfortunately that's not
+        // guaranteed by petgraph to be stable in the presence of edge removals (which we do in
+        // commit())
             self.materialize
                 .insert((*src.as_global(), *dst.as_global()));
         }
@@ -849,7 +857,7 @@ impl<'a> Migration<'a> {
 
     fn ensure_reader_for(&mut self, n: core::NodeAddress) {
         if !self.readers.contains_key(n.as_global()) {
-            // make a reader
+        // make a reader
             let r = node::Type::Reader(None, Default::default());
             let r = self.mainline.ingredients[*n.as_global()].mirror(r);
             let r = self.mainline.ingredients.add_node(r);
@@ -995,9 +1003,9 @@ impl<'a> Migration<'a> {
         // Make sure all new nodes are assigned to a domain
         for (node, domain) in self.added {
             let domain = domain.unwrap_or_else(|| {
-                // new node that doesn't belong to a domain
-                // create a new domain just for that node
-                // NOTE: this is the same code as in add_domain(), but we can't use self here
+        // new node that doesn't belong to a domain
+        // create a new domain just for that node
+        // NOTE: this is the same code as in add_domain(), but we can't use self here
                 trace!(log,
                        "node automatically added to domain";
                        "node" => node.index(),
@@ -1042,17 +1050,17 @@ impl<'a> Migration<'a> {
 
         // Assign local addresses to all new nodes, and initialize them
         for (domain, nodes) in &mut domain_nodes {
-            // Number of pre-existing nodes
+        // Number of pre-existing nodes
             let mut nnodes = nodes.iter().filter(|&&(_, new)| !new).count();
 
             if nnodes == nodes.len() {
-                // Nothing to do here
+        // Nothing to do here
                 continue;
             }
 
             let log = log.new(o!("domain" => domain.index()));
 
-            // Give local addresses to every (new) node
+        // Give local addresses to every (new) node
             for &(ni, new) in nodes.iter() {
                 if new {
                     debug!(log,
@@ -1067,19 +1075,19 @@ impl<'a> Migration<'a> {
                 }
             }
 
-            // Figure out all the remappings that have happened
+        // Figure out all the remappings that have happened
             let mut remap = HashMap::new();
-            // The global address of each node in this domain is now a local one
+        // The global address of each node in this domain is now a local one
             for &(ni, _) in nodes.iter() {
                 remap.insert(ni.into(), mainline.ingredients[ni].addr());
             }
-            // Parents in other domains have been swapped for ingress nodes.
-            // Those ingress nodes' indices are now local.
+        // Parents in other domains have been swapped for ingress nodes.
+        // Those ingress nodes' indices are now local.
             for (from, to) in swapped.remove(domain).unwrap_or_else(HashMap::new) {
                 remap.insert(from.into(), mainline.ingredients[to].addr());
             }
 
-            // Initialize each new node
+        // Initialize each new node
             for &(ni, new) in nodes.iter() {
                 if new && mainline.ingredients[ni].is_internal() {
                     trace!(log, "initializing new node"; "node" => ni.index());
@@ -1143,7 +1151,7 @@ impl<'a> Migration<'a> {
         debug!(log, "booting new domains");
         for domain in changed_domains {
             if mainline.txs.contains_key(&domain) {
-                // this is not a new domain
+        // this is not a new domain
                 continue;
             }
 
@@ -1164,7 +1172,7 @@ impl<'a> Migration<'a> {
                 None => {
                     let domain_index = domain.index().into();
 
-                    // Start up new domain
+        // Start up new domain
                     let jh = migrate::booting::boot_new(log.new(o!("domain" => domain.index())),
                                                         domain_index,
                                                         &mut mainline.ingredients,
@@ -1173,18 +1181,18 @@ impl<'a> Migration<'a> {
                                                         &mut mainline.txs,
                                                         &mut mainline.in_txs,
                                                         start_ts);
-                    // TODO: support mix of local and remote domains?
-                    //
-                    // if mainline.souplet.is_some() {
-                    //     mainline
-                    //         .souplet
-                    //         .as_mut()
-                    //         .unwrap()
-                    //         .add_local_domain(domain_index,
-                    //                           mainline.txs[&domain_index].as_local().unwrap(),
-                    //                           mainline.in_txs[&domain_index].as_local()
-                    //                                   .unwrap());
-                    // }
+        // TODO: support mix of local and remote domains?
+        //
+        // if mainline.souplet.is_some() {
+        //     mainline
+        //         .souplet
+        //         .as_mut()
+        //         .unwrap()
+        //         .add_local_domain(domain_index,
+        //                           mainline.txs[&domain_index].as_local().unwrap(),
+        //                           mainline.in_txs[&domain_index].as_local()
+        //                                   .unwrap());
+        // }
                     mainline.domains.push(Some(jh));
                 }
             }
@@ -1274,7 +1282,7 @@ impl<'a> Migration<'a> {
 impl Drop for Blender {
     fn drop(&mut self) {
         for (_, tx) in &mut self.txs {
-            // don't unwrap, because given domain may already have terminated
+        // don't unwrap, because given domain may already have terminated
             drop(tx.send(payload::Packet::Quit));
         }
         for d in self.domains.drain(..) {
