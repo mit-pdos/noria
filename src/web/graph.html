@@ -25,9 +25,8 @@ require(["renderer", "jquery"], function (renderer, $) {
 	renderer.init("#graph");
 
 	$.ajax({
-		url: "http://localhost:8080/graph",
+		url: "graph",
 		dataType: "text",
-		crossDomain: true,
 		success: function(data) {
 			renderer.render(data);
 		},
@@ -38,9 +37,8 @@ require(["renderer", "jquery"], function (renderer, $) {
 
 	setInterval(function(){
 		$.ajax({
-			url: "http://localhost:8080/graph",
+			url: "graph",
 			dataType: "text",
-			crossDomain: true,
 			success: function(data) {
 				renderer.render(data);
 			},
