@@ -278,11 +278,13 @@ impl NodeDescriptor {
                     *t = tracer.take();
                 }
 
-                m.map_data(|rs| {
-                               misses.extend(materialize(rs,
-                                                         *addr.as_local(),
-                                                         state.get_mut(addr.as_local())));
-                           });
+                if m.is_regular() || i.get_base().is_none() {
+                    m.map_data(|rs| {
+                                   misses.extend(materialize(rs,
+                                                             *addr.as_local(),
+                                                             state.get_mut(addr.as_local())));
+                               });
+                }
 
                 misses
             }
