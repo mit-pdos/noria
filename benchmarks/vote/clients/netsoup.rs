@@ -71,7 +71,7 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
     if let Some(ref addr) = config.bind_to {
         stream.bind(addr).unwrap();
     }
-    let stream = stream.only_v6(false).unwrap().connect(addr).unwrap();
+    let stream = stream.connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
     C(stream)
