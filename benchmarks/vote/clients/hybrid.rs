@@ -3,6 +3,7 @@ use memcached::proto::{Operation, MultiOperation, ProtoType};
 use mysql::{self, OptsBuilder};
 
 use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
+use std::net::ToSocketAddrs;
 
 pub struct Pool {
     sql: mysql::Pool,
@@ -28,6 +29,9 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
     if config.mix.does_write() && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
+        if let Some(ref addr) = config.bind_to {
+            opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
+        }
         opts.db_name(Some(db));
         // allow larger in-memory tables (4 GB)
         opts.init(vec!["SET max_heap_table_size = 4294967296;",
@@ -56,6 +60,9 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
     }
 
     let mut opts = OptsBuilder::from_opts(opts.clone());
+    if let Some(ref addr) = config.bind_to {
+        opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
+    }
     opts.db_name(Some(db));
     // allow larger in-memory tables (4 GB)
     opts.init(vec!["SET max_heap_table_size = 4294967296;",

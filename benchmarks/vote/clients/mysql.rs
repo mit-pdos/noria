@@ -1,6 +1,7 @@
 use mysql::{self, OptsBuilder};
 
 use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
+use std::net::ToSocketAddrs;
 
 pub struct RW<'a> {
     v_prep_1: mysql::conn::Stmt<'a>,
@@ -19,6 +20,9 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
     if config.mix.does_write() && !config.should_reuse() {
         // clear the db (note that we strip of /db so we get default)
         let mut opts = OptsBuilder::from_opts(opts.clone());
+        if let Some(ref addr) = config.bind_to {
+            opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
+        }
         opts.db_name(Some(db));
         opts.init(vec!["SET max_heap_table_size = 4294967296;",
                        "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
@@ -46,6 +50,9 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
 
     // now we connect for real
     let mut opts = OptsBuilder::from_opts(opts);
+    if let Some(ref addr) = config.bind_to {
+        opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
+    }
     opts.db_name(Some(db));
     opts.init(vec!["SET max_heap_table_size = 4294967296;",
                    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
