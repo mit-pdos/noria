@@ -208,7 +208,7 @@ impl DomainState {
             _ => unreachable!(),
         };
 
-        if self.ts == prev_ts {
+        if self.ts == prev_ts || true {
             self.ts = ts - 1;
 
             match self.next_transaction {
