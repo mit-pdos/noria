@@ -66,3 +66,7 @@ for l in $(git log --abbrev=8 --oneline --follow src/schema.sql | cut -d' ' -f1 
   # clean up
   docker exec ${container_name} /bin/bash -c "service mysql stop; rm /var/log/mysql/queries.log; service mysql start"
 done
+
+# get rid of the container
+docker kill ${container_name}
+docker rm ${container_name}
