@@ -49,6 +49,12 @@ for l in $(git log --abbrev=8 --oneline --follow src/schema.sql | cut -d' ' -f1 
   echo "Upgrading to git revision $l"
   docker exec ${container_name} /bin/bash -c "cd /root/hotcrp; cp Code/options.inc Code/options.bak; git reset --hard; git checkout ${l}; cp Code/options.bak Code/options.inc"
 
+  # also move to the same revision locally to find the schema version
+  git checkout ${l}
+  schema_file=$(find . -name schema.sql)
+  res=$(grep "values ('allowPaperOption" ${schema_file})
+  cur_schema_ver=$(echo ${res} | cut -d' ' -f 8 | sed -e "s/);//" | tr -d [:space:])
+
   # log in
   wget --load-cookies cookies.txt \
        --delete-after \
@@ -61,7 +67,7 @@ for l in $(git log --abbrev=8 --oneline --follow src/schema.sql | cut -d' ' -f1 
        "http://${hotcrp_base_url}/search.php?q=&s=t"
 
   # grab the queries
-  docker cp ${container_name}:/var/log/mysql/queries.log ${out_dir}/${l}.log
+  docker cp ${container_name}:/var/log/mysql/queries.log ${out_dir}/hotcrp_v${cur_schema_ver}_${l}.log
 
   # clean up
   docker exec ${container_name} /bin/bash -c "service mysql stop; rm /var/log/mysql/queries.log; service mysql start"
