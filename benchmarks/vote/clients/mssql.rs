@@ -29,9 +29,9 @@ fn mkc(addr: &str) -> Client {
     match core.run(fc) {
         Ok((_, conn)) => {
             return Client {
-                       conn: Some(conn),
-                       core: core,
-                   }
+                conn: Some(conn),
+                core: core,
+            }
         }
         Err(_) => panic!("Failed to connect to SQL server"),
     }
@@ -181,12 +181,11 @@ impl Writer for RW {
     }
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        let data = ids.iter()
-            .fold(Vec::new(), |mut acc, &(ref u, ref a)| {
-                acc.push(u as &_);
-                acc.push(a as &_);
-                acc
-            });
+        let data = ids.iter().fold(Vec::new(), |mut acc, &(ref u, ref a)| {
+            acc.push(u as &_);
+            acc.push(a as &_);
+            acc
+        });
         let fut = self.client
             .conn
             .take()

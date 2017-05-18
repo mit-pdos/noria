@@ -81,7 +81,7 @@ impl Backend {
                 qf.read_to_string(&mut s).unwrap();
                 rs.push_str("\n");
                 rs.push_str(&s.lines()
-                                 .filter(|ref l| {
+                                .filter(|ref l| {
                     // make sure to skip blacklisted queries
                     for ref q in blacklist {
                         if l.contains(*q) {
@@ -91,8 +91,8 @@ impl Backend {
                     }
                     true
                 })
-                                 .collect::<Vec<_>>()
-                                 .join("\n"))
+                                .collect::<Vec<_>>()
+                                .join("\n"))
             }
         }
 
