@@ -102,38 +102,36 @@ impl Reader for C {
         let aids = ids.iter()
             .map(|&(_, article_id)| article_id.into())
             .collect();
-        let res = self.query(END_NODE, aids)
-            .map_err(|_| ())
-            .map(|rows| {
-                assert_eq!(ids.len(), rows.len());
-                rows.into_iter()
-                    .map(|rows| {
-                        // rustfmt
-                        match rows.into_iter().next() {
-                            Some(row) => {
-                                match row[1] {
-                                    DataType::TinyText(..) |
-                                    DataType::Text(..) => {
-                                        use std::borrow::Cow;
-                                        let t: Cow<_> = (&row[1]).into();
-                                        let count: i64 = match row[2].clone() {
-                                            DataType::None => 0,
-                                            d => d.into(),
-                                        };
-                                        ArticleResult::Article {
-                                            id: row[0].clone().into(),
-                                            title: t.to_string(),
-                                            votes: count,
-                                        }
+        let res = self.query(END_NODE, aids).map_err(|_| ()).map(|rows| {
+            assert_eq!(ids.len(), rows.len());
+            rows.into_iter()
+                .map(|rows| {
+                    // rustfmt
+                    match rows.into_iter().next() {
+                        Some(row) => {
+                            match row[1] {
+                                DataType::TinyText(..) |
+                                DataType::Text(..) => {
+                                    use std::borrow::Cow;
+                                    let t: Cow<_> = (&row[1]).into();
+                                    let count: i64 = match row[2].clone() {
+                                        DataType::None => 0,
+                                        d => d.into(),
+                                    };
+                                    ArticleResult::Article {
+                                        id: row[0].clone().into(),
+                                        title: t.to_string(),
+                                        votes: count,
                                     }
-                                    _ => unreachable!(),
                                 }
+                                _ => unreachable!(),
                             }
-                            None => ArticleResult::NoSuchArticle,
                         }
-                    })
-                    .collect()
-            });
+                        None => ArticleResult::NoSuchArticle,
+                    }
+                })
+                .collect()
+        });
         (res, Period::PreMigration)
     }
 }

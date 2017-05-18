@@ -135,11 +135,10 @@ impl Writer for RW {
         let keys: Vec<_> = ids.iter()
             .map(|&(_, a)| format!("article_{}_vc", a))
             .collect();
-        drop(self.mc
-                 .delete_multi(keys.iter()
-                                   .map(String::as_bytes)
-                                   .collect::<Vec<_>>()
-                                   .as_slice()));
+        drop(self.mc.delete_multi(keys.iter()
+                                      .map(String::as_bytes)
+                                      .collect::<Vec<_>>()
+                                      .as_slice()));
 
         Period::PreMigration
     }
@@ -192,11 +191,10 @@ impl Reader for RW {
                 let id = rr.get(0).unwrap();
                 let title = rr.get(1).unwrap();
                 let vc = rr.get(2).unwrap();
-                drop(self.mc
-                         .set(format!("article_{}_vc", id).as_bytes(),
-                              format!("{};{};{}", id, title, vc).as_bytes(),
-                              0,
-                              0));
+                drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
+                                 format!("{};{};{}", id, title, vc).as_bytes(),
+                                 0,
+                                 0));
                 res.push(ArticleResult::Article {
                              id: id,
                              title: title,

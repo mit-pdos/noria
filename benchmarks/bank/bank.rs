@@ -138,16 +138,14 @@ impl Getter for TxGet {
         Box::new(move |id| {
             self(&id.into()).map(|(res, token)| {
                 assert_eq!(res.len(), 1);
-                res.into_iter()
-                    .next()
-                    .map(|row| {
-                             // we only care about the first result
-                             let mut row = row.into_iter();
-                             let _: i64 = row.next().unwrap().into();
-                             let credit: i64 = row.next().unwrap().into();
-                             let debit: i64 = row.next().unwrap().into();
-                             (credit - debit, token)
-                         })
+                res.into_iter().next().map(|row| {
+                    // we only care about the first result
+                    let mut row = row.into_iter();
+                    let _: i64 = row.next().unwrap().into();
+                    let credit: i64 = row.next().unwrap().into();
+                    let debit: i64 = row.next().unwrap().into();
+                    (credit - debit, token)
+                })
             })
         })
     }
