@@ -88,12 +88,6 @@ pub fn setup(transactions: bool, durability_level: Option<BaseDurabilityLevel>) 
         balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
         mig.maintain(balances, 0);
 
-        let d = mig.add_domain();
-        mig.assign_domain(transfers, d);
-        mig.assign_domain(credits, d);
-        mig.assign_domain(debits, d);
-        mig.assign_domain(balances, d);
-
         // start processing
         mig.commit();
     };
