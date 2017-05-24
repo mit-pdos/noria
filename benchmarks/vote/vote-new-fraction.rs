@@ -11,8 +11,6 @@ extern crate distributary;
 extern crate hdrsample;
 extern crate zipf;
 
-extern crate spmc;
-
 mod graph;
 
 #[macro_use]
