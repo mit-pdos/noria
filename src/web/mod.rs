@@ -124,17 +124,9 @@ pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
                 res.headers_mut().set(ContentType::html());
                 res.send(include_str!("graph.html"));
             }) as Box<Handler>,
-            "js/d3.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
-                res.headers_mut().set(ContentType::plaintext());
-                res.send(include_str!("js/d3.js"));
-            }) as Box<Handler>,
             "js/dot-checker.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
                 res.headers_mut().set(ContentType::plaintext());
                 res.send(include_str!("js/dot-checker.js"));
-            }) as Box<Handler>,
-            "js/jquery.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
-                res.headers_mut().set(ContentType::plaintext());
-                res.send(include_str!("js/jquery.js"));
             }) as Box<Handler>,
             "js/layout-worker.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
                 res.headers_mut().set(ContentType::plaintext());
@@ -143,10 +135,6 @@ pub fn run(soup: Arc<Mutex<Blender>>) -> HttpResult<Listening> {
             "js/renderer.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
                 res.headers_mut().set(ContentType::plaintext());
                 res.send(include_str!("js/renderer.js"));
-            }) as Box<Handler>,
-            "js/require.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
-                res.headers_mut().set(ContentType::plaintext());
-                res.send(include_str!("js/require.js"));
             }) as Box<Handler>,
             "js/worker.js" => Get: Box::new(move |_ctx: Context, mut res: Response| {
                 res.headers_mut().set(ContentType::plaintext());
