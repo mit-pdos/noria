@@ -31,8 +31,6 @@ extern crate memcached;
 extern crate hdrsample;
 extern crate zipf;
 
-extern crate spmc;
-
 mod clients;
 mod common;
 mod exercise;

@@ -52,24 +52,6 @@ pub fn make(log: bool, transactions: bool, durability: Option<BaseDurabilityLeve
         let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
         let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
-        // let's try to be clever about this.
-        //
-        // article and the join should certainly be together, since article is dormant after
-        // setup, this is purely a win. plus it avoids duplicating the article state
-        //
-        // NOTE: this domain will become dormant once migration has finished, which is good!
-        let ad = mig.add_domain();
-        mig.assign_domain(article, ad);
-        mig.assign_domain(end, ad);
-        // vote and votecount may as well be together since that's where the most number of
-        // puts will flow.
-        let vd = mig.add_domain();
-        mig.assign_domain(vote, vd);
-        mig.assign_domain(vc, vd);
-        // the real question is whether these *two* domains should be joined.
-        // it's not entirely clear. for now, let's keep them separate to allow the aggregation
-        // and the join to occur in parallel.
-
         mig.maintain(end, 0);
 
         // start processing
@@ -108,14 +90,12 @@ impl Graph {
             mig.add_ingredient("rating", &["user", "id", "stars"], b)
         };
 
-        let taildomain = mig.add_domain();
         let total = if stupid {
             // project on 1 to votes
             let upgrade =
                 mig.add_ingredient("upvote",
                                    &["id", "one"],
                                    Project::new(vote, &[1], Some(vec![1.into()])));
-            mig.assign_domain(upgrade, taildomain);
 
             // take a union of votes and ratings
             let mut emits = HashMap::new();
@@ -123,7 +103,6 @@ impl Graph {
             emits.insert(upgrade, vec![0, 1]);
             let u = Union::new(emits);
             let both = mig.add_ingredient("both", &["id", "value"], u);
-            mig.assign_domain(both, taildomain);
 
             // add sum of combined ratings
             mig.add_ingredient("total",
@@ -142,16 +121,6 @@ impl Graph {
             let u = Union::new(emits);
             let both = mig.add_ingredient("both", &["id", "value"], u);
 
-            // we want ratings and rsum to be in the same domain, because only rsum is really
-            // costly
-            let domain = mig.add_domain();
-            mig.assign_domain(rating, domain);
-            mig.assign_domain(rs, domain);
-
-            // the union should be in the tail domain, so that ratings and votes are treated
-            // equally
-            mig.assign_domain(both, taildomain);
-
             // sum them by article id
             mig.add_ingredient("total",
                                &["id", "total"],
@@ -163,11 +132,6 @@ impl Graph {
         let j = Join::new(article, total, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
         let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
         mig.maintain(newend, 0);
-
-        // and then we want the total sum and the join in the same domain,
-        // to avoid duplicating the total state
-        mig.assign_domain(total, taildomain);
-        mig.assign_domain(newend, taildomain);
 
         // start processing
         mig.commit();
