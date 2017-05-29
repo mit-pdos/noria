@@ -143,7 +143,9 @@ fn main() {
     // prepopulate
     println!("Prepopulating with {} articles", narticles);
     for i in 0..(narticles as i64) {
-        articles.put(vec![i.into(), format!("Article #{}", i).into()]);
+        articles
+            .put(vec![i.into(), format!("Article #{}", i).into()])
+            .unwrap();
     }
 
     // keep track of when randomness is ready
@@ -162,7 +164,7 @@ fn main() {
             let start = time::Instant::now();
             let mut reporter = Reporter::new(every);
             while start.elapsed() < runtime {
-                votes.put(vec![0.into(), random[i].into()]);
+                votes.put(vec![0.into(), random[i].into()]).unwrap();
                 i = (i + 1) % random.len();
 
                 if let Some(count) = reporter.report() {
@@ -225,7 +227,9 @@ fn main() {
         let mut i = 0;
         let mut reporter = Reporter::new(every);
         while start.elapsed() < runtime {
-            ratings.put(vec![0.into(), w_random[i].into(), 5.into()]);
+            ratings
+                .put(vec![0.into(), w_random[i].into(), 5.into()])
+                .unwrap();
             i = (i + 1) % w_random.len();
 
             if let Some(count) = reporter.report() {

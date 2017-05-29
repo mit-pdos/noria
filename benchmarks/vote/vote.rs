@@ -416,7 +416,9 @@ impl Writer for Spoon {
               I: Iterator<Item = (i64, String)>
     {
         for (article_id, title) in articles {
-            self.article.put(vec![article_id.into(), title.into()]);
+            self.article
+                .put(vec![article_id.into(), title.into()])
+                .unwrap();
         }
     }
 
@@ -441,12 +443,15 @@ impl Writer for Spoon {
                 self.vote_post
                     .as_mut()
                     .unwrap()
-                    .put(vec![user_id.into(), article_id.into(), 5.into()]);
+                    .put(vec![user_id.into(), article_id.into(), 5.into()])
+                    .unwrap();
             }
             Period::PostMigration
         } else {
             for &(user_id, article_id) in ids {
-                self.vote_pre.put(vec![user_id.into(), article_id.into()]);
+                self.vote_pre
+                    .put(vec![user_id.into(), article_id.into()])
+                    .unwrap();
             }
             // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
             Period::PostMigration

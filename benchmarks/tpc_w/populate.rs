@@ -30,7 +30,7 @@ fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r);
+            mutator.put(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());

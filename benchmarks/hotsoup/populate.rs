@@ -17,7 +17,7 @@ macro_rules! dur_to_fsec {
 fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
     match tx {
         true => Box::new(move |v| assert!(mutator.transactional_put(v, Token::empty()).is_ok())),
-        false => Box::new(move |v| mutator.put(v)),
+        false => Box::new(move |v| assert!(mutator.put(v).is_ok())),
     }
 }
 

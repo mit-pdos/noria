@@ -151,14 +151,14 @@ fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
     println!("Connected. Setting up {} accounts.", naccounts);
     {
         for i in 0..naccounts {
-            mutator.put(vec![0.into(), i.into(), 1000.into()]);
-            mutator.put(vec![i.into(), 0.into(), 1.into()]);
+            mutator.put(vec![0.into(), i.into(), 1000.into()]).unwrap();
+            mutator.put(vec![i.into(), 0.into(), 1.into()]).unwrap();
         }
 
         if !transactions {
             // Insert a bunch of empty transfers to make sure any buffers are flushed
             for _ in 0..1024 {
-                mutator.put(vec![0.into(), 0.into(), 0.into()]);
+                mutator.put(vec![0.into(), 0.into(), 0.into()]).unwrap();
             }
             thread::sleep(time::Duration::new(0, 50000000));
         }
@@ -235,7 +235,9 @@ fn client(_i: usize,
                     mutator.transactional_put(vec![src.into(), dst.into(), 100.into()],
                                               token.into())
                 } else {
-                    mutator.put(vec![src.into(), dst.into(), 100.into()]);
+                    mutator
+                        .put(vec![src.into(), dst.into(), 100.into()])
+                        .unwrap();
                     Ok(0)
                 };
                 let write_end = clock.get_time();

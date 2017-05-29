@@ -92,13 +92,15 @@ impl Piazza {
 
 fn populate_users(nusers: i64, users_putter: Mutator) {
     for i in 0..nusers {
-        users_putter.put(vec![i.into(), "user".into(), "pass".into()]);
+        users_putter
+            .put(vec![i.into(), "user".into(), "pass".into()])
+            .unwrap();
     }
 }
 
 fn populate_classes(nclasses: i64, class_putter: Mutator) {
     for i in 0..nclasses {
-        class_putter.put(vec![i.into(), i.into()]);
+        class_putter.put(vec![i.into(), i.into()]).unwrap();
     }
 }
 
@@ -108,14 +110,14 @@ fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: F
             for j in 0..nusers {
                 for i in 0..10 {
                     let cid = (j * 10 + i) % nclasses;
-                    taking_putter.put(vec![cid.into(), j.into()]);
+                    taking_putter.put(vec![cid.into(), j.into()]).unwrap();
                 }
             }
         }
         Fanout::All => {
             for j in 0..nusers {
                 for i in 0..nclasses {
-                    taking_putter.put(vec![i.into(), j.into()]);
+                    taking_putter.put(vec![i.into(), j.into()]).unwrap();
                 }
             }
         }
@@ -193,10 +195,12 @@ fn main() {
 
     if benchmark == "migration" {
         for pid in 0..nposts {
-            post_putter.put(vec![pid.into(),
-                                 (pid % nclasses).into(),
-                                 (pid % nusers).into(),
-                                 "post".into()]);
+            post_putter
+                .put(vec![pid.into(),
+                          (pid % nclasses).into(),
+                          (pid % nusers).into(),
+                          "post".into()])
+                .unwrap();
         }
     }
 
@@ -222,10 +226,12 @@ fn main() {
             }
             "write" => {
                 for i in 0..1000 {
-                    post_putter.put(vec![i.into(),
-                                         (i % nclasses).into(),
-                                         (i % nusers).into(),
-                                         "post".into()]);
+                    post_putter
+                        .put(vec![i.into(),
+                                  (i % nclasses).into(),
+                                  (i % nusers).into(),
+                                  "post".into()])
+                        .unwrap();
                 }
                 end = time::Instant::now().duration_since(start);
 
