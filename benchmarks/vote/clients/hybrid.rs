@@ -20,7 +20,7 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
 
     let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
                                         ProtoType::Binary)
-            .unwrap();
+        .unwrap();
 
     let addr = format!("mysql://{}", mysql_dbn);
     let db = &addr[addr.rfind("/").unwrap() + 1..];
