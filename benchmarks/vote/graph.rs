@@ -1,5 +1,7 @@
-use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, NodeAddress};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress};
 use distributary;
+
+use std::time;
 
 pub struct Graph {
     pub vote: NodeAddress,
@@ -9,11 +11,15 @@ pub struct Graph {
     pub graph: Blender,
 }
 
-pub fn make(log: bool, transactions: bool, durability: Option<BaseDurabilityLevel>) -> Graph {
+pub fn make(log: bool, transactions: bool, durability: Option<(usize, time::Duration)>) -> Graph {
     // set up graph
     let mut g = Blender::new();
     if log {
         g.log_with(distributary::logger_pls());
+    }
+
+    if let Some((queue_capacity, flush_timeout)) = durability {
+        g.enable_temporary_persistence(queue_capacity, flush_timeout);
     }
 
     let (article, vote, vc, end) = {
@@ -21,25 +27,17 @@ pub fn make(log: bool, transactions: bool, durability: Option<BaseDurabilityLeve
         let mut mig = g.start_migration();
 
         // add article base node
-        let mut b = Base::default();
-        if let Some(d) = durability {
-            b = b.with_durability(d).delete_log_on_drop();
-        }
         let article = if transactions {
-            mig.add_transactional_base("article", &["id", "title"], b)
+            mig.add_transactional_base("article", &["id", "title"], Base::default())
         } else {
-            mig.add_ingredient("article", &["id", "title"], b)
+            mig.add_ingredient("article", &["id", "title"], Base::default())
         };
 
         // add vote base table
-        let mut b = Base::default().with_key(vec![1]);
-        if let Some(d) = durability {
-            b = b.with_durability(d).delete_log_on_drop();
-        }
         let vote = if transactions {
-            mig.add_transactional_base("vote", &["user", "id"], b)
+            mig.add_transactional_base("vote", &["user", "id"], Base::default().with_key(vec![1]))
         } else {
-            mig.add_ingredient("vote", &["user", "id"], b)
+            mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
         };
 
         // add vote count
