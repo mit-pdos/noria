@@ -16,8 +16,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, BaseDurabilityLevel, Aggregation, Join, JoinType, Datas,
-                   DataType, Token, Mutator};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
 
 use rand::Rng;
 
@@ -46,7 +45,7 @@ pub struct Bank {
     transactions: bool,
 }
 
-pub fn setup(transactions: bool, durability_level: Option<BaseDurabilityLevel>) -> Box<Bank> {
+pub fn setup(transactions: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
 
@@ -59,16 +58,14 @@ pub fn setup(transactions: bool, durability_level: Option<BaseDurabilityLevel>) 
         let mut mig = g.start_migration();
 
         // add transfers base table
-        let base = if durability_level.is_none() {
-            Base::default()
-        } else {
-            Base::default().with_durability(durability_level.unwrap())
-        };
-
         transfers = if transactions {
-            mig.add_transactional_base("transfers", &["src_acct", "dst_acct", "amount"], base)
+            mig.add_transactional_base("transfers",
+                                       &["src_acct", "dst_acct", "amount"],
+                                       Base::default())
         } else {
-            mig.add_ingredient("transfers", &["src_acct", "dst_acct", "amount"], base)
+            mig.add_ingredient("transfers",
+                               &["src_acct", "dst_acct", "amount"],
+                               Base::default())
         };
 
         // add all debits
@@ -408,11 +405,6 @@ fn main() {
                  .long("nontransactional")
                  .takes_value(false)
                  .help("Use non-transactional writes"))
-        .arg(Arg::with_name("durability")
-                 .long("durability")
-                 .takes_value(true)
-                 .possible_values(&["buffered", "immediate"])
-                 .help("Durability level used for Base nodes"))
         .arg(Arg::with_name("deterministic")
                  .long("deterministic")
                  .takes_value(false)
@@ -434,24 +426,12 @@ fn main() {
     let transactions = !args.is_present("nontransactional");
     let is_transfer_deterministic = args.is_present("deterministic");
 
-    let durability_level;
-    match args.value_of("durability") {
-        Some("buffered") => durability_level = Some(BaseDurabilityLevel::Buffered),
-        Some("immediate") => durability_level = Some(BaseDurabilityLevel::SyncImmediately),
-        None | Some(&_) => durability_level = None,
-    }
-
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
     }
     // setup db
     println!("Attempting to set up bank");
-    let mut bank = if measure_latency {
-        setup(transactions, durability_level)
-    } else {
-        setup(transactions, durability_level)
-    };
-
+    let mut bank = setup(transactions);
 
     {
         let mutator = bank.blender.get_mutator(bank.transfers);

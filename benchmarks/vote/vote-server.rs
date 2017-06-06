@@ -10,6 +10,7 @@ mod graph;
 use distributary::srv;
 
 use std::net::ToSocketAddrs;
+use std::time;
 
 fn main() {
     use clap::{Arg, App};
@@ -27,7 +28,7 @@ fn main() {
     println!("Attempting to start soup on {}", addr);
     let g = graph::make(true,
                         false,
-                        Some(distributary::BaseDurabilityLevel::Buffered));
+                        Some((512, time::Duration::from_millis(10))));
 
     // start processing
     // TODO: what about the node indices?
