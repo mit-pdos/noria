@@ -84,7 +84,7 @@ impl Backend {
                                 .filter(|ref l| {
                     // make sure to skip blacklisted queries
                     for ref q in blacklist {
-                        if l.contains(*q) {
+                        if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
                             blacklisted += 1;
                             return false;
                         }
