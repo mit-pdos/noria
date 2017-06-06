@@ -89,6 +89,9 @@ fn main() {
             .short("q")
             .long("quiet")
             .help("No noisy output while running"))
+        .arg(Arg::with_name("durability")
+             .long("durability")
+             .help("Enable durability for Base nodes"))
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -119,8 +122,14 @@ fn main() {
     }
     config.use_distribution(dist);
 
+    let durability = if args.is_present("durability") {
+        Some((512, time::Duration::from_millis(10)))
+    } else {
+        None
+    };
+
     // setup db
-    let g = graph::make(!args.is_present("quiet"), transactions, None);
+    let g = graph::make(!args.is_present("quiet"), transactions, durability);
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
