@@ -15,18 +15,17 @@ fn mkc(addr: &str) -> Client {
     let cfg_string = &addr[0..addr.rfind("/").unwrap()];
 
     let mut core = reactor::Core::new().unwrap();
-    let fc = tiberius::SqlConnection::connect(core.handle(), cfg_string)
-        .and_then(|conn| {
-            conn.simple_exec(format!("USE {}; \
+    let fc = tiberius::SqlConnection::connect(core.handle(), cfg_string).and_then(|conn| {
+        conn.simple_exec(format!("USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
                                       QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                                       SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                                     db))
-                .and_then(|r| r)
-                .collect()
-        });
+                                 db))
+            .and_then(|r| r)
+            .collect()
+    });
     match core.run(fc) {
         Ok((_, conn)) => {
             return Client {
@@ -215,7 +214,8 @@ impl Reader for RW {
                 .query(&self.prep, data.as_slice())
                 .for_each(|qs| {
                     let q_res: Vec<ArticleResult> = qs.wait()
-                        .map(|row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
+                        .map(|row: Result<tiberius::query::QueryRow,
+                                     tiberius::TdsError>| {
                             let row = row.unwrap();
                             let aid: i64 = row.get(0);
                             let title: &str = row.get(1);

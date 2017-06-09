@@ -63,8 +63,7 @@ fn parse_ymd_to_timestamp(s: &str) -> i64 {
 }
 
 pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/addresses.tsv", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating addresses...");
@@ -96,8 +95,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
 }
 
 pub fn populate_authors(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/authors.tsv", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating authors...");
@@ -127,8 +125,7 @@ pub fn populate_authors(backend: &Backend, data_location: &str) -> usize {
 }
 
 pub fn populate_cc_xacts(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/cc_xacts.data", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/cc_xacts.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating cc_xacts...");
@@ -165,8 +162,7 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str) -> usize {
 }
 
 pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/countries.tsv", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating countries...");
@@ -192,8 +188,7 @@ pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
 }
 
 pub fn populate_customers(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/customers.tsv", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating customers...");
@@ -352,8 +347,7 @@ pub fn populate_orders(backend: &Backend, data_location: &str) -> usize {
 }
 
 pub fn populate_order_line(backend: &Backend, data_location: &str) -> usize {
-    let f = File::open(format!("{}/order_line.data", data_location))
-        .unwrap();
+    let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
     println!("Prepopulating order_line...");

@@ -262,8 +262,7 @@ fn main() {
         // on the first auto-upgradeable schema, populate with test data
         if schema_version == populate_at_schema {
             info!(backend.log, "Populating database!");
-            populate::populate(&backend, dataloc, transactional)
-                .unwrap();
+            populate::populate(&backend, dataloc, transactional).unwrap();
         }
     }
 }
