@@ -142,7 +142,7 @@ impl Getter for TxGet {
     }
 }
 
-fn populate(naccounts: i64, mutator: Mutator, transactions: bool) {
+fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
     println!("Connected. Setting up {} accounts.", naccounts);

@@ -136,8 +136,8 @@ fn main() {
     }
 
     // we need a putter and a getter
-    let articles = g.graph.get_mutator(g.article);
-    let votes = g.graph.get_mutator(g.vote);
+    let mut articles = g.graph.get_mutator(g.article);
+    let mut votes = g.graph.get_mutator(g.vote);
     let read_old = g.graph.get_getter(g.end).unwrap();
 
     // prepopulate
@@ -217,7 +217,7 @@ fn main() {
 
     // all right, migration time
     let (ratings, read_new) = g.transition(args.is_present("stupid"), false);
-    let ratings = g.graph.get_mutator(ratings);
+    let mut ratings = g.graph.get_mutator(ratings);
     let read_new = g.graph.get_getter(read_new).unwrap();
 
     println!("Starting new writer");

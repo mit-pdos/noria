@@ -90,7 +90,7 @@ impl Piazza {
     }
 }
 
-fn populate_users(nusers: i64, users_putter: Mutator) {
+fn populate_users(nusers: i64, mut users_putter: Mutator) {
     for i in 0..nusers {
         users_putter
             .put(vec![i.into(), "user".into(), "pass".into()])
@@ -98,13 +98,13 @@ fn populate_users(nusers: i64, users_putter: Mutator) {
     }
 }
 
-fn populate_classes(nclasses: i64, class_putter: Mutator) {
+fn populate_classes(nclasses: i64, mut class_putter: Mutator) {
     for i in 0..nclasses {
         class_putter.put(vec![i.into(), i.into()]).unwrap();
     }
 }
 
-fn populate_taking(nclasses: i64, nusers: i64, taking_putter: Mutator, fanout: Fanout) {
+fn populate_taking(nclasses: i64, nusers: i64, mut taking_putter: Mutator, fanout: Fanout) {
     match fanout {
         Fanout::Few => {
             for j in 0..nusers {
@@ -180,7 +180,7 @@ fn main() {
     let class_putter = app.soup.get_mutator(app.class);
     let user_putter = app.soup.get_mutator(app.user);
     let taking_putter = app.soup.get_mutator(app.taking);
-    let post_putter = app.soup.get_mutator(app.post);
+    let mut post_putter = app.soup.get_mutator(app.post);
 
     println!("Seeding...", );
     populate_users(nusers, user_putter);
