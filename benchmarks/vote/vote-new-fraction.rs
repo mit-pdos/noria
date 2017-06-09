@@ -127,8 +127,11 @@ fn main() {
     // reporting config
     let every = time::Duration::from_millis(200);
 
+    // default persistence (memory only)
+    let persistence_params = distributary::PersistenceParameters::default();
+
     // setup db
-    let mut g = graph::make(false, false, None);
+    let mut g = graph::make(false, false, persistence_params);
 
     if args.is_present("full") {
         // it's okay to change this here, since it only matters for migration

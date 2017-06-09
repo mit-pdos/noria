@@ -26,7 +26,11 @@ fn main() {
 
     let addr = args.value_of("ADDR").unwrap();
     println!("Attempting to start soup on {}", addr);
-    let g = graph::make(true, false, Some((512, time::Duration::from_millis(10))));
+    let persistence_params =
+        distributary::PersistenceParameters::new(distributary::DurabilityMode::DeleteOnExit,
+                                                 512,
+                                                 time::Duration::from_millis(1));
+    let g = graph::make(true, false, persistence_params);
 
     // start processing
     // TODO: what about the node indices?
