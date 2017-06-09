@@ -14,7 +14,7 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn do_put<'a>(mutator: &'a Mutator, tx: bool) -> Box<Fn(Vec<DataType>) + 'a> {
+fn do_put<'a>(mutator: &'a mut Mutator, tx: bool) -> Box<FnMut(Vec<DataType>) + 'a> {
     match tx {
         true => Box::new(move |v| assert!(mutator.transactional_put(v, Token::empty()).is_ok())),
         false => Box::new(move |v| assert!(mutator.put(v).is_ok())),
@@ -25,7 +25,7 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     use std::str::FromStr;
 
     let table_name = data.file_stem().unwrap().to_str().unwrap();
-    let putter = backend.g.get_mutator(backend
+    let mut putter = backend.g.get_mutator(backend
                                            .r
                                            .as_ref()
                                            .unwrap()
@@ -49,7 +49,7 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
                          Err(_) => s.into(),
                      })
                 .collect();
-            do_put(&putter, use_txn)(rec);
+            do_put(&mut putter, use_txn)(rec);
         }
         i += 1;
         s.clear();

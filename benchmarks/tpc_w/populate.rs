@@ -19,7 +19,7 @@ macro_rules! dur_to_fsec {
 }
 
 fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-    let mutator = backend
+    let mut mutator = backend
         .g
         .get_mutator(backend.r.node_addr_for(name).unwrap());
 
