@@ -1,13 +1,13 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeAddress};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeIndex};
 use distributary;
 
 use std::time;
 
 pub struct Graph {
-    pub vote: NodeAddress,
-    pub article: NodeAddress,
-    pub vc: NodeAddress,
-    pub end: NodeAddress,
+    pub vote: NodeIndex,
+    pub article: NodeIndex,
+    pub vc: NodeIndex,
+    pub end: NodeIndex,
     pub graph: Blender,
 }
 
@@ -68,7 +68,7 @@ pub fn make(log: bool, transactions: bool, durability: Option<(usize, time::Dura
 
 impl Graph {
     #[allow(dead_code)]
-    pub fn transition(&mut self, stupid: bool, transactions: bool) -> (NodeAddress, NodeAddress) {
+    pub fn transition(&mut self, stupid: bool, transactions: bool) -> (NodeIndex, NodeIndex) {
         use distributary::{Base, Aggregation, Join, JoinType, Union, Project};
         use std::collections::HashMap;
 

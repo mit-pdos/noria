@@ -40,8 +40,8 @@ EXAMPLES:
 
 pub struct Bank {
     blender: Blender,
-    transfers: distributary::NodeAddress,
-    balances: distributary::NodeAddress,
+    transfers: distributary::NodeIndex,
+    balances: distributary::NodeIndex,
     transactions: bool,
 }
 

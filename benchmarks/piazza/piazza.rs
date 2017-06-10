@@ -7,14 +7,14 @@ use std::{thread, time};
 use std::fs::{OpenOptions, File};
 use std::io::Write;
 
-use distributary::{DataType, Join, JoinType, Blender, Base, NodeAddress, Filter, Mutator};
+use distributary::{DataType, Join, JoinType, Blender, Base, NodeIndex, Filter, Mutator};
 
 pub struct Piazza {
     pub soup: Blender,
-    user: NodeAddress,
-    post: NodeAddress,
-    class: NodeAddress,
-    taking: NodeAddress,
+    user: NodeIndex,
+    post: NodeIndex,
+    class: NodeIndex,
+    taking: NodeIndex,
 }
 
 enum Fanout {
