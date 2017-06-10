@@ -62,29 +62,30 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
                                    conn.simple_exec(format!("DROP DATABASE {};", db))
                                        .and_then(|r| r)
                                        .collect()
-                               })
-            .and_then(|(_, conn)| {
+                               }).and_then(|(_, conn)| {
                           conn.simple_exec(format!("CREATE DATABASE {};", db))
                               .and_then(|r| r)
                               .collect()
                       })
             .and_then(|(_, conn)| fixconn(conn))
             .and_then(|(_, conn)| {
-                          conn.simple_exec("CREATE TABLE art (
+                conn.simple_exec(
+                    "CREATE TABLE art (
                              id bigint PRIMARY KEY NONCLUSTERED,
                              title varchar(16)
-                             );")
-                              .and_then(|r| r)
-                              .collect()
-                      })
+                             );",
+                ).and_then(|r| r)
+                    .collect()
+            })
             .and_then(|(_, conn)| {
-                          conn.simple_exec("CREATE TABLE vt (
+                conn.simple_exec(
+                    "CREATE TABLE vt (
                              u bigint,
                              id bigint index vt_article_idx
-                             );")
-                              .and_then(|r| r)
-                              .collect()
-                      })
+                             );",
+                ).and_then(|r| r)
+                    .collect()
+            })
             .and_then(|(_, conn)| {
                 conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes

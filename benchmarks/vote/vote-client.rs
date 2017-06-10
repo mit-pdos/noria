@@ -3,29 +3,29 @@ extern crate clap;
 
 extern crate rand;
 
-#[cfg(feature="b_mssql")]
+#[cfg(feature = "b_mssql")]
 extern crate futures;
-#[cfg(feature="b_mssql")]
+#[cfg(feature = "b_mssql")]
 extern crate tokio_core;
 
-#[cfg(feature="b_mssql")]
+#[cfg(feature = "b_mssql")]
 extern crate futures_state_stream;
-#[cfg(feature="b_mssql")]
+#[cfg(feature = "b_mssql")]
 extern crate tiberius;
 
-#[cfg(any(feature="b_mysql", feature="b_hybrid"))]
+#[cfg(any(feature = "b_mysql", feature = "b_hybrid"))]
 extern crate mysql;
 
 extern crate distributary;
 
-#[cfg(feature="b_netsoup")]
+#[cfg(feature = "b_netsoup")]
 extern crate bincode;
-#[cfg(feature="b_netsoup")]
+#[cfg(feature = "b_netsoup")]
 extern crate bufstream;
-#[cfg(feature="b_netsoup")]
+#[cfg(feature = "b_netsoup")]
 extern crate net2;
 
-#[cfg(any(feature="b_memcached", feature="b_hybrid"))]
+#[cfg(any(feature = "b_memcached", feature = "b_hybrid"))]
 extern crate memcached;
 
 extern crate hdrsample;
@@ -181,20 +181,20 @@ fn main() {
     let cfg = config.clone();
     let stats = match client {
         // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
-        #[cfg(feature="b_mssql")]
+        #[cfg(feature = "b_mssql")]
         "mssql" => {
             let c = clients::mssql::make(addr, &config);
             exercise::launch_mix(c, config)
         }
         // mysql://soup@127.0.0.1/bench_mysql
-        #[cfg(feature="b_mysql")]
+        #[cfg(feature = "b_mysql")]
         "mysql" => {
             let c = clients::mysql::setup(addr, &config);
             let c = clients::mysql::make(&c, &config);
             exercise::launch_mix(c, config)
         }
         // hybrid://mysql=soup@127.0.0.1/bench_mysql,memcached=127.0.0.1:11211
-        #[cfg(feature="b_hybrid")]
+        #[cfg(feature = "b_hybrid")]
         "hybrid" => {
             let mut split_dbn = addr.splitn(2, ",");
             let mysql_dbn = &split_dbn.next().unwrap()[6..];
@@ -204,13 +204,13 @@ fn main() {
             exercise::launch_mix(c, config)
         }
         // memcached://127.0.0.1:11211
-        #[cfg(feature="b_memcached")]
+        #[cfg(feature = "b_memcached")]
         "memcached" => {
             let c = clients::memcached::make(addr);
             exercise::launch_mix(c, config)
         }
         // netsoup://127.0.0.1:7777
-        #[cfg(feature="b_netsoup")]
+        #[cfg(feature = "b_netsoup")]
         "netsoup" => {
             let c = clients::netsoup::make(addr, &config);
             exercise::launch_mix(c, config)
