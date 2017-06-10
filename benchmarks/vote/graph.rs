@@ -1,7 +1,5 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeIndex};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeIndex, PersistenceParameters};
 use distributary;
-
-use std::time;
 
 pub struct Graph {
     pub vote: NodeIndex,
@@ -11,16 +9,14 @@ pub struct Graph {
     pub graph: Blender,
 }
 
-pub fn make(log: bool, transactions: bool, durability: Option<(usize, time::Duration)>) -> Graph {
+pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParameters) -> Graph {
     // set up graph
     let mut g = Blender::new();
     if log {
         g.log_with(distributary::logger_pls());
     }
 
-    if let Some((queue_capacity, flush_timeout)) = durability {
-        g.enable_temporary_persistence(queue_capacity, flush_timeout);
-    }
+    g.with_persistence_options(persistence_params);
 
     let (article, vote, vc, end) = {
         // migrate

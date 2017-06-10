@@ -15,7 +15,7 @@ mod graph;
 mod common;
 
 use common::{Writer, Reader, ArticleResult, Period, MigrationHandle, RuntimeConfig, Distribution};
-use distributary::{Mutator, DataType};
+use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
 
 use std::sync::mpsc;
 use std::thread;
@@ -91,7 +91,18 @@ fn main() {
             .help("No noisy output while running"))
         .arg(Arg::with_name("durability")
              .long("durability")
+             .takes_value(false)
              .help("Enable durability for Base nodes"))
+        .arg(Arg::with_name("retain-logs-on-exit")
+             .long("retain-logs-on-exit")
+             .takes_value(false)
+             .requires("durability")
+             .help("Do not delete the base node logs on exit."))
+        .arg(Arg::with_name("write-batch-size")
+             .long("write-batch-size")
+             .takes_value(true)
+             .default_value("512")
+             .help("Size of batches processed at base nodes."))
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -108,6 +119,9 @@ fn main() {
         .map(time::Duration::from_secs);
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
+    let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
+    let flush_timeout = time::Duration::from_millis(10);
+
     assert!(ngetters > 0);
 
     if let Some(ref migrate_after) = migrate_after {
@@ -122,14 +136,20 @@ fn main() {
     }
     config.use_distribution(dist);
 
-    let durability = if args.is_present("durability") {
-        Some((512, time::Duration::from_millis(10)))
+    let mode = if args.is_present("durability") {
+        if args.is_present("retain-logs-on-exit") {
+            DurabilityMode::Permanent
+        } else {
+            DurabilityMode::DeleteOnExit
+        }
     } else {
-        None
+        DurabilityMode::MemoryOnly
     };
 
+    let persistence_params = PersistenceParameters::new(mode, queue_length, flush_timeout);
+
     // setup db
-    let g = graph::make(!args.is_present("quiet"), transactions, durability);
+    let g = graph::make(!args.is_present("quiet"), transactions, persistence_params);
     let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
