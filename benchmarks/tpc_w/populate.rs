@@ -79,7 +79,7 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
             let addr_city = fields[3];
             let addr_state = fields[4];
             let addr_zip = fields[5];
-            let addr_co_id = fields[6];
+            let addr_co_id = i32::from_str(fields[6]).unwrap();
             records.push(vec![addr_id.into(),
                               addr_street1.into(),
                               addr_street2.into(),
@@ -140,7 +140,7 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str) -> usize {
             let cx_num = fields[2];
             let cx_name = fields[3];
             let cx_expire = parse_ymd_to_timestamp(fields[4]);
-            let cx_auth_id = fields[5];
+            let cx_auth_id = i32::from_str(fields[5]).unwrap();
             let cx_amt = f64::from_str(fields[6]).unwrap();
             let xact_date = NaiveDateTime::parse_from_str(fields[7], "%Y-%m-%d %H:%M:%S");
             let cx_xact_date = xact_date.unwrap().timestamp();
