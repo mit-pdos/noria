@@ -1,13 +1,16 @@
 use chrono::naive::date::NaiveDate;
 use chrono::naive::time::NaiveTime;
 use chrono::naive::datetime::NaiveDateTime;
+use std::sync::{Arc, Barrier};
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::str::FromStr;
 use std::time;
 use std::thread;
 
-use distributary::DataType;
+use hdrsample::Histogram;
+
+use distributary::{DataType, PacketEvent};
 use super::Backend;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -375,4 +378,153 @@ pub fn populate_order_line(backend: &Backend, data_location: &str) -> usize {
     }
 
     populate(backend, "order_line", records)
+}
+
+pub fn trace_customers(backend: &Backend,
+                       data_location: &str,
+                       runtime: time::Duration,
+                       clients: usize) {
+    let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
+    let mut reader = BufReader::new(f);
+
+    let mut s = String::new();
+    let mut records = Vec::new();
+    while reader.read_line(&mut s).unwrap() > 0 {
+        {
+            let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
+            let c_id = i32::from_str(fields[0]).unwrap();
+            let c_uname = fields[1];
+            let c_passwd = fields[2];
+            let c_fname = fields[3];
+            let c_lname = fields[4];
+            let c_addr_id = i32::from_str(fields[5]).unwrap();
+            let c_phone = fields[6];
+            let c_email = fields[7];
+            let c_since = parse_ymd_to_timestamp(fields[8]);
+            let c_last_login = parse_ymd_to_timestamp(fields[9]);
+            let c_login = fields[10];
+            let c_expiration = fields[11];
+            let c_discount = f64::from_str(fields[12]).unwrap();
+            let c_balance = f64::from_str(fields[13]).unwrap();
+            let c_ytd_pmt = f64::from_str(fields[14]).unwrap();
+            let c_birthdate = parse_ymd_to_timestamp(fields[15]);
+            let c_data = fields[16];
+            records.push(vec![c_id.into(),
+                              c_uname.into(),
+                              c_passwd.into(),
+                              c_fname.into(),
+                              c_lname.into(),
+                              c_addr_id.into(),
+                              c_phone.into(),
+                              c_email.into(),
+                              c_since.into(),
+                              c_last_login.into(),
+                              c_login.into(),
+                              c_expiration.into(),
+                              c_discount.into(),
+                              c_balance.into(),
+                              c_ytd_pmt.into(),
+                              c_birthdate.into(),
+                              c_data.into()]);
+        }
+        s.clear();
+    }
+
+    let barrier = Arc::new(Barrier::new(clients + 1));
+    let mut client_threads = Vec::new();
+    for _ in 0..clients {
+        let mut mutator = backend
+            .g
+            .get_mutator(backend.r.node_addr_for("customer").unwrap());
+        let records = records.clone();
+        let runtime = runtime.clone();
+        let barrier = Arc::clone(&barrier);
+        let background_client = move || {
+            let mut n = 0;
+            barrier.wait();
+            let start = time::Instant::now();
+            for r in records.iter().cycle() {
+                if start.elapsed() >= runtime {
+                    break;
+                }
+                mutator.put(r.clone()).unwrap();
+                n += 1;
+            }
+            let dur = dur_to_fsec!(start.elapsed());
+            println!("CLIENT: Inserted {} customer in {:.2}s ({:.2} PUTs/sec)!",
+                     n,
+                     dur,
+                     n as f64 / dur);
+        };
+        client_threads.push(thread::spawn(background_client));
+    }
+
+    let mut mutator = backend
+        .g
+        .get_mutator(backend.r.node_addr_for("customer").unwrap());
+
+    let mut first_reader_hist = Histogram::<u64>::new_with_bounds(1, 1000_000, 2).unwrap();
+    let mut last_reader_hist = Histogram::<u64>::new_with_bounds(1, 1000_000, 2).unwrap();
+
+    barrier.wait();
+    println!("Tracing...\n");
+    let start = time::Instant::now();
+
+    let mut tracer = None;
+    let mut trace_start = None;
+    for (i, r) in records.iter().cycle().enumerate() {
+        if start.elapsed() >= runtime {
+            break;
+        }
+
+        let r = r.clone();
+        if i % 2048 == 1024 {
+            tracer = Some(mutator.start_tracing());
+            trace_start = Some(time::Instant::now());
+            mutator.put(r).unwrap();
+            mutator.stop_tracing();
+        } else {
+            mutator.put(r).unwrap();
+        }
+
+        if i % 2048 == 2047 {
+            // Instants packet reached first and last reader respectively.
+            let mut reader_instants: Option<(time::Instant, time::Instant)> = None;
+            for (time, event) in tracer.take().unwrap() {
+                if let PacketEvent::ReachedReader = event {
+                    if reader_instants.is_none() {
+                        reader_instants = Some((time, time))
+                    } else {
+                        reader_instants.as_mut().unwrap().1 = time;
+                    }
+                }
+            }
+
+            if let Some((first, last)) = reader_instants {
+                let start = trace_start.take().unwrap();
+                first_reader_hist
+                    .record((dur_to_fsec!(first.duration_since(start)) * 1e6).round() as u64)
+                    .unwrap();
+                last_reader_hist
+                    .record((dur_to_fsec!(last.duration_since(start)) * 1e6).round() as u64)
+                    .unwrap();
+            }
+        }
+    }
+
+    for c in client_threads {
+        c.join().unwrap();
+    }
+
+    println!("\nLatency to First Reader");
+    println!("--------------------------");
+    for iv in first_reader_hist.iter_recorded() {
+        println!("percentile PUT {} {:.2}", iv.value(), iv.percentile());
+    }
+    println!("\nLatency to Last Reader");
+    println!("--------------------------");
+    for iv in last_reader_hist.iter_recorded() {
+        println!("percentile PUT {} {:.2}", iv.value(), iv.percentile());
+    }
+
 }

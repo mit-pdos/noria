@@ -8,6 +8,7 @@ extern crate rand;
 
 #[macro_use]
 extern crate slog;
+extern crate hdrsample;
 
 use rand::Rng;
 use std::{thread, time};
@@ -181,12 +182,17 @@ fn main() {
         .arg(Arg::with_name("transactional")
                  .short("t")
                  .help("Use transactional writes."))
+        .arg(Arg::with_name("trace-customer-latency")
+                 .long("trace-customer-latency")
+                 .help("Trace the latency of writes to the customer table, \
+                        instead of benchmarking reads."))
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
     let transactions = matches.is_present("transactional");
     let parallel_prepop = matches.is_present("parallel_prepopulation");
+    let trace_customer_latency = matches.is_present("trace-customer-latency");
 
     println!("Loading TPC-W recipe from {}", rloc);
     let mut backend = make(&rloc, transactions, parallel_prepop);
@@ -200,10 +206,12 @@ fn main() {
     backend
         .prepop_counts
         .insert("countries".into(), num_countries);
-    let num_customers = populate_customers(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("customers".into(), num_customers);
+    if !trace_customer_latency {
+        let num_customers = populate_customers(&backend, &ploc);
+        backend
+            .prepop_counts
+            .insert("customers".into(), num_customers);
+    }
     let num_items = populate_items(&backend, &ploc);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc);
@@ -224,11 +232,15 @@ fn main() {
 
     //println!("{}", backend.g);
 
-    println!("Finished writing! Sleeping for 1 second...");
+    println!("Finished prepopulating! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
 
-    println!("Reading...");
-    for nq in backend.r.aliases().iter() {
-        backend.read(nq, 1_000_000);
+    if trace_customer_latency {
+        trace_customers(&backend, &ploc, time::Duration::from_millis(10000), 0);
+    } else {
+        println!("Reading...");
+        for nq in backend.r.aliases().iter() {
+            backend.read(nq, 1_000_000);
+        }
     }
 }
