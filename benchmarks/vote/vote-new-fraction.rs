@@ -32,8 +32,10 @@ fn randomness(distribution: common::Distribution, range: usize, n: u64) -> Vec<i
     // random article ids with distribution. we pre-generate these to avoid overhead at
     // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
     // means it might also do vector resizing.
-    println!("Generating ~{}M random numbers; this'll take a few seconds...",
-             n / 1_000_000);
+    println!(
+        "Generating ~{}M random numbers; this'll take a few seconds...",
+        n / 1_000_000
+    );
     match distribution {
         common::Distribution::Uniform => {
             let mut u = rand::thread_rng();
@@ -84,38 +86,50 @@ fn main() {
 
     let args = App::new("vote")
         .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
-        .arg(Arg::with_name("distribution")
-            .short("d")
-            .takes_value(true)
-            .required(true)
-            .default_value("uniform")
-            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
-        .arg(Arg::with_name("narticles")
-            .short("a")
-            .long("articles")
-            .value_name("N")
-            .default_value("100000")
-            .help("Number of articles to prepopulate the database with"))
-        .arg(Arg::with_name("runtime")
-            .short("r")
-            .long("runtime")
-            .value_name("N")
-            .default_value("60")
-            .help("Benchmark runtime in seconds"))
-        .arg(Arg::with_name("stupid")
-             .long("stupid")
-            .help("Make the migration stupid"))
-        .arg(Arg::with_name("full")
-             .long("full")
-            .help("Disable partial materialization"))
-        .arg(Arg::with_name("migrate")
-            .short("m")
-            .long("migrate")
-            .value_name("N")
-            .required(true)
-            .help("Perform a migration after this many seconds")
-            .conflicts_with("stage"))
+        .about(
+            "Benchmarks user-curated news aggregator throughput for in-memory Soup",
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .takes_value(true)
+                .required(true)
+                .default_value("uniform")
+                .help(
+                    "run benchmark with the given article id distribution [uniform|zipf:exponent]",
+                ),
+        )
+        .arg(
+            Arg::with_name("narticles")
+                .short("a")
+                .long("articles")
+                .value_name("N")
+                .default_value("100000")
+                .help("Number of articles to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("runtime")
+                .short("r")
+                .long("runtime")
+                .value_name("N")
+                .default_value("60")
+                .help("Benchmark runtime in seconds"),
+        )
+        .arg(Arg::with_name("stupid").long("stupid").help(
+            "Make the migration stupid",
+        ))
+        .arg(Arg::with_name("full").long("full").help(
+            "Disable partial materialization",
+        ))
+        .arg(
+            Arg::with_name("migrate")
+                .short("m")
+                .long("migrate")
+                .value_name("N")
+                .required(true)
+                .help("Perform a migration after this many seconds")
+                .conflicts_with("stage"),
+        )
         .get_matches();
 
     let dist = value_t_or_exit!(args, "distribution", common::Distribution);
@@ -209,11 +223,15 @@ fn main() {
     let r_random = randomness(dist, narticles, READ_RATE * post_migration_time);
     // then we wait
     if start.elapsed() > migrate_after {
-        println!("Migration preparation overran by {}s -- starting immediately",
-                 (start.elapsed() - migrate_after).as_secs());
+        println!(
+            "Migration preparation overran by {}s -- starting immediately",
+            (start.elapsed() - migrate_after).as_secs()
+        );
     } else {
-        println!("Preparation finished; waiting for another {}s",
-                 (migrate_after - start.elapsed()).as_secs());
+        println!(
+            "Preparation finished; waiting for another {}s",
+            (migrate_after - start.elapsed()).as_secs()
+        );
         thread::sleep(migrate_after - start.elapsed());
         println!("Starting migration");
     }
@@ -262,9 +280,11 @@ fn main() {
             i = (i + 1) % r_random.len();
 
             if let Some(count) = reporter.report() {
-                println!("{:?} HITF: {:.2}",
-                         dur_to_ns!(start.elapsed()),
-                         hits as f64 / count as f64);
+                println!(
+                    "{:?} HITF: {:.2}",
+                    dur_to_ns!(start.elapsed()),
+                    hits as f64 / count as f64
+                );
                 hits = 0;
             }
             thread::sleep(time::Duration::new(0, 10_000));

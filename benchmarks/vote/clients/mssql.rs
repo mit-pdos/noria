@@ -16,14 +16,15 @@ fn mkc(addr: &str) -> Client {
 
     let mut core = reactor::Core::new().unwrap();
     let fc = tiberius::SqlConnection::connect(core.handle(), cfg_string).and_then(|conn| {
-        conn.simple_exec(format!("USE {}; \
+        conn.simple_exec(format!(
+            "USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
                                       QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                                       SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                                 db))
-            .and_then(|r| r)
+            db
+        )).and_then(|r| r)
             .collect()
     });
     match core.run(fc) {
@@ -44,14 +45,15 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
     let db = &addr[addr.rfind("/").unwrap() + 1..];
 
     let fixconn = |conn: tiberius::SqlConnection<Box<tiberius::BoxableIo>>| {
-        conn.simple_exec(format!("USE {}; \
+        conn.simple_exec(format!(
+            "USE {}; \
                                       SET NUMERIC_ROUNDABORT OFF; \
                                       SET ANSI_PADDING, ANSI_WARNINGS, \
                                       CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
                                       QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                                       SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                                 db))
-            .and_then(|r| r)
+            db
+        )).and_then(|r| r)
             .collect()
     };
 
@@ -59,14 +61,14 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string);
     if config.mix.does_write() && !config.should_reuse() {
         let fut = fut.and_then(|conn| {
-                                   conn.simple_exec(format!("DROP DATABASE {};", db))
-                                       .and_then(|r| r)
-                                       .collect()
-                               }).and_then(|(_, conn)| {
-                          conn.simple_exec(format!("CREATE DATABASE {};", db))
-                              .and_then(|r| r)
-                              .collect()
-                      })
+            conn.simple_exec(format!("DROP DATABASE {};", db))
+                .and_then(|r| r)
+                .collect()
+        }).and_then(|(_, conn)| {
+                conn.simple_exec(format!("CREATE DATABASE {};", db))
+                    .and_then(|r| r)
+                    .collect()
+            })
             .and_then(|(_, conn)| fixconn(conn))
             .and_then(|(_, conn)| {
                 conn.simple_exec(
@@ -87,19 +89,20 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
                     .collect()
             })
             .and_then(|(_, conn)| {
-                conn.simple_exec("CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
+                conn.simple_exec(
+                    "CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
                                 FROM dbo.art AS art, dbo.vt AS vt
                                 WHERE art.id = vt.id
-                                GROUP BY art.id, art.title;")
-                    .and_then(|r| r)
+                                GROUP BY art.id, art.title;",
+                ).and_then(|r| r)
                     .collect()
             })
             .and_then(|(_, conn)| {
-                          conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
-                              .and_then(|r| r)
-                              .collect()
-                      });
+                conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
+                    .and_then(|r| r)
+                    .collect()
+            });
         core.run(fut).unwrap();
     } else {
         core.run(fut.and_then(fixconn)).unwrap();
@@ -117,9 +120,11 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
 
     let qstring = (1..config.mix.read_size().unwrap_or(1) + 1)
         .map(|i| {
-                 format!("SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{}",
-                         i)
-             })
+            format!(
+                "SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id = @P{}",
+                i
+            )
+        })
         .collect::<Vec<_>>()
         .join(" UNION ");
     let prep = client.conn.as_ref().unwrap().prepare(qstring);
@@ -140,8 +145,9 @@ pub struct RW {
 impl Writer for RW {
     type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator,
     {
         let articles: Vec<_> = articles.collect();
         let narticles = articles.len();
@@ -215,8 +221,10 @@ impl Reader for RW {
                 .query(&self.prep, data.as_slice())
                 .for_each(|qs| {
                     let q_res: Vec<ArticleResult> = qs.wait()
-                        .map(|row: Result<tiberius::query::QueryRow,
-                                     tiberius::TdsError>| {
+                        .map(|row: Result<
+                            tiberius::query::QueryRow,
+                            tiberius::TdsError,
+                        >| {
                             let row = row.unwrap();
                             let aid: i64 = row.get(0);
                             let title: &str = row.get(1);

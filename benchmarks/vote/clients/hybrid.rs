@@ -18,9 +18,10 @@ pub struct RW {
 pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Pool {
     use mysql::Opts;
 
-    let mc = memcached::Client::connect(&[(&format!("tcp://{}", memcached_dbn), 1)],
-                                        ProtoType::Binary)
-        .unwrap();
+    let mc = memcached::Client::connect(
+        &[(&format!("tcp://{}", memcached_dbn), 1)],
+        ProtoType::Binary,
+    ).unwrap();
 
     let addr = format!("mysql://{}", mysql_dbn);
     let db = &addr[addr.rfind("/").unwrap() + 1..];
@@ -34,8 +35,10 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
         }
         opts.db_name(Some(db));
         // allow larger in-memory tables (4 GB)
-        opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                       "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
+        opts.init(vec![
+            "SET max_heap_table_size = 4294967296;",
+            "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+        ]);
 
         let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
@@ -50,10 +53,11 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
         drop(conn);
 
         // create tables with indices
-        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(16), \
+        pool.prep_exec(
+            "CREATE TABLE art (id bigint, title varchar(16), \
                         PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
-                       ())
-            .unwrap();
+            (),
+        ).unwrap();
         pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
                        ())
             .unwrap();
@@ -65,8 +69,10 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
     }
     opts.db_name(Some(db));
     // allow larger in-memory tables (4 GB)
-    opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                   "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
+    opts.init(vec![
+        "SET max_heap_table_size = 4294967296;",
+        "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+    ]);
 
     Pool {
         sql: mysql::Pool::new_manual(1, 4, opts).unwrap(),
@@ -87,14 +93,20 @@ impl Writer for RW {
     type Migrator = ();
 
     fn make_articles<I>(&mut self, articles: I)
-        where I: ExactSizeIterator,
-              I: Iterator<Item = (i64, String)>
+    where
+        I: ExactSizeIterator,
+        I: Iterator<Item = (i64, String)>,
     {
         let articles: Vec<_> = articles
             .map(|(article_id, title)| {
-                     let init = format!("{};{};0", article_id, title);
-                     (article_id, title, format!("article_{}_vc", article_id), init)
-                 })
+                let init = format!("{};{};0", article_id, title);
+                (
+                    article_id,
+                    title,
+                    format!("article_{}_vc", article_id),
+                    init,
+                )
+            })
             .collect();
 
         {
@@ -102,14 +114,16 @@ impl Writer for RW {
             let args: Vec<_> = articles
                 .iter()
                 .flat_map(|&(ref aid, ref title, _, _)| {
-                              vals.push("(?, ?)");
-                              vec![aid as &_, title as &_]
-                          })
+                    vals.push("(?, ?)");
+                    vec![aid as &_, title as &_]
+                })
                 .collect();
             let vals = vals.join(", ");
             self.conn
-                .prep_exec(format!("INSERT INTO art (id, title) VALUES {}", vals),
-                           &args[..])
+                .prep_exec(
+                    format!("INSERT INTO art (id, title) VALUES {}", vals),
+                    &args[..],
+                )
                 .unwrap();
         }
 
@@ -135,10 +149,14 @@ impl Writer for RW {
         let keys: Vec<_> = ids.iter()
             .map(|&(_, a)| format!("article_{}_vc", a))
             .collect();
-        drop(self.mc.delete_multi(keys.iter()
-                                      .map(String::as_bytes)
-                                      .collect::<Vec<_>>()
-                                      .as_slice()));
+        drop(
+            self.mc.delete_multi(
+                keys.iter()
+                    .map(String::as_bytes)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            ),
+        );
 
         Period::PreMigration
     }
@@ -160,17 +178,17 @@ impl Reader for RW {
         };
 
         let mut res = Vec::new();
-        let (hits, misses): (Vec<_>, Vec<_>) = keys.into_iter()
-            .enumerate()
-            .partition(|&(_, k)| vals.contains_key(k));
+        let (hits, misses): (Vec<_>, Vec<_>) = keys.into_iter().enumerate().partition(|&(_, k)| {
+            vals.contains_key(k)
+        });
         for (_, k) in hits {
             let s = String::from_utf8_lossy(vals.get(k).unwrap().0.as_slice());
             let mut parts = s.split(";");
             res.push(ArticleResult::Article {
-                         id: parts.next().unwrap().parse().unwrap(),
-                         title: String::from(parts.next().unwrap()),
-                         votes: parts.next().unwrap().parse().unwrap(),
-                     });
+                id: parts.next().unwrap().parse().unwrap(),
+                title: String::from(parts.next().unwrap()),
+                votes: parts.next().unwrap().parse().unwrap(),
+            });
         }
 
         if !misses.is_empty() {
@@ -178,12 +196,14 @@ impl Reader for RW {
             let qstring = misses
                 .into_iter()
                 .map(|(i, _)| {
-                         format!("SELECT art.id, title, COUNT(vt.u) as votes \
+                    format!(
+                        "SELECT art.id, title, COUNT(vt.u) as votes \
                                   FROM art, vt \
                                   WHERE art.id = vt.id AND art.id = {} \
                                   GROUP BY vt.id, title",
-                                 ids[i].1)
-                     })
+                        ids[i].1
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(" UNION ");
             for row in self.conn.query(qstring).unwrap() {
@@ -191,15 +211,17 @@ impl Reader for RW {
                 let id = rr.get(0).unwrap();
                 let title = rr.get(1).unwrap();
                 let vc = rr.get(2).unwrap();
-                drop(self.mc.set(format!("article_{}_vc", id).as_bytes(),
-                                 format!("{};{};{}", id, title, vc).as_bytes(),
-                                 0,
-                                 0));
+                drop(self.mc.set(
+                    format!("article_{}_vc", id).as_bytes(),
+                    format!("{};{};{}", id, title, vc).as_bytes(),
+                    0,
+                    0,
+                ));
                 res.push(ArticleResult::Article {
-                             id: id,
-                             title: title,
-                             votes: vc,
-                         });
+                    id: id,
+                    title: title,
+                    votes: vc,
+                });
             }
         }
 

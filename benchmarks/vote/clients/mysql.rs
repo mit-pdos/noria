@@ -24,8 +24,10 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
             opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
         }
         opts.db_name(Some(db));
-        opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                       "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
+        opts.init(vec![
+            "SET max_heap_table_size = 4294967296;",
+            "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+        ]);
         let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
         let mut conn = pool.get_conn().unwrap();
         if conn.query(format!("USE {}", db)).is_ok() {
@@ -54,8 +56,10 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
         opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
     }
     opts.db_name(Some(db));
-    opts.init(vec!["SET max_heap_table_size = 4294967296;",
-                   "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"]);
+    opts.init(vec![
+        "SET max_heap_table_size = 4294967296;",
+        "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+    ]);
     mysql::Pool::new_manual(1, 4, opts).unwrap()
 }
 
@@ -91,23 +95,26 @@ pub fn make<'a>(pool: &'a mysql::Pool, config: &RuntimeConfig) -> RW<'a> {
 impl<'a> Writer for RW<'a> {
     type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator,
     {
         let mut vals = Vec::with_capacity(articles.len());
         let args: Vec<_> = articles
             .map(|(aid, title)| {
-                     vals.push("(?, ?, 0)");
-                     (aid, title)
-                 })
+                vals.push("(?, ?, 0)");
+                (aid, title)
+            })
             .collect();
         let args: Vec<_> = args.iter()
             .flat_map(|&(ref aid, ref title)| vec![aid as &_, title as &_])
             .collect();
         let vals = vals.join(", ");
         self.pool
-            .prep_exec(format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
-                       &args[..])
+            .prep_exec(
+                format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
+                &args[..],
+            )
             .unwrap();
     }
 
@@ -136,10 +143,10 @@ impl<'a> Reader for RW<'a> {
             for row in qresult.by_ref() {
                 let mut rr = row.unwrap();
                 res.push(ArticleResult::Article {
-                             id: rr.get(0).unwrap(),
-                             title: rr.get(1).unwrap(),
-                             votes: rr.get(2).unwrap(),
-                         });
+                    id: rr.get(0).unwrap(),
+                    title: rr.get(1).unwrap(),
+                    votes: rr.get(2).unwrap(),
+                });
             }
         }
         (Ok(res), Period::PreMigration)

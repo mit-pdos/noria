@@ -67,12 +67,12 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
     //println!("{}", g);
 
     Box::new(Backend {
-                 r: recipe,
-                 g: g,
-                 parallel_prepop: parallel,
-                 prepop_counts: HashMap::new(),
-                 barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
-             })
+        r: recipe,
+        g: g,
+        parallel_prepop: parallel,
+        prepop_counts: HashMap::new(),
+        barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
+    })
 }
 
 
@@ -149,10 +149,12 @@ impl Backend {
                     }
                 }
                 let dur = dur_to_fsec!(start.elapsed());
-                println!("{}: ({:.2} GETs/sec) (ok: {})!",
-                         query_name,
-                         f64::from(1_000_000) / dur,
-                         ok);
+                println!(
+                    "{}: ({:.2} GETs/sec) (ok: {})!",
+                    query_name,
+                    f64::from(1_000_000) / dur,
+                    ok
+                );
             }
         }
     }
@@ -165,22 +167,28 @@ fn main() {
     let matches = App::new("tpc_w")
         .version("0.1")
         .about("Soup TPC-W driver.")
-        .arg(Arg::with_name("recipe")
-                 .short("r")
-                 .required(true)
-                 .default_value("tests/tpc-w-queries.txt")
-                 .help("Location of the TPC-W recipe file."))
-        .arg(Arg::with_name("populate_from")
-                 .short("p")
-                 .required(true)
-                 .default_value("benchmarks/tpc_w/data")
-                 .help("Location of the data files for TPC-W prepopulation."))
-        .arg(Arg::with_name("parallel_prepopulation")
-                 .long("parallel-prepopulation")
-                 .help("Prepopulate using parallel threads."))
-        .arg(Arg::with_name("transactional")
-                 .short("t")
-                 .help("Use transactional writes."))
+        .arg(
+            Arg::with_name("recipe")
+                .short("r")
+                .required(true)
+                .default_value("tests/tpc-w-queries.txt")
+                .help("Location of the TPC-W recipe file."),
+        )
+        .arg(
+            Arg::with_name("populate_from")
+                .short("p")
+                .required(true)
+                .default_value("benchmarks/tpc_w/data")
+                .help("Location of the data files for TPC-W prepopulation."),
+        )
+        .arg(
+            Arg::with_name("parallel_prepopulation")
+                .long("parallel-prepopulation")
+                .help("Prepopulate using parallel threads."),
+        )
+        .arg(Arg::with_name("transactional").short("t").help(
+            "Use transactional writes.",
+        ))
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
@@ -197,25 +205,29 @@ fn main() {
     let num_authors = populate_authors(&backend, &ploc);
     backend.prepop_counts.insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("countries".into(), num_countries);
+    backend.prepop_counts.insert(
+        "countries".into(),
+        num_countries,
+    );
     let num_customers = populate_customers(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("customers".into(), num_customers);
+    backend.prepop_counts.insert(
+        "customers".into(),
+        num_customers,
+    );
     let num_items = populate_items(&backend, &ploc);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
     let num_cc_xacts = populate_cc_xacts(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("cc_xacts".into(), num_cc_xacts);
+    backend.prepop_counts.insert(
+        "cc_xacts".into(),
+        num_cc_xacts,
+    );
     let num_order_line = populate_order_line(&backend, &ploc);
-    backend
-        .prepop_counts
-        .insert("order_line".into(), num_order_line);
+    backend.prepop_counts.insert(
+        "order_line".into(),
+        num_order_line,
+    );
 
     if parallel_prepop {
         backend.barrier.wait();
