@@ -37,10 +37,11 @@ impl C {
         }
     }
 
-    pub fn query(&mut self,
-                 view: usize,
-                 mut keys: Vec<DataType>)
-                 -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
+    pub fn query(
+        &mut self,
+        view: usize,
+        mut keys: Vec<DataType>,
+    ) -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
         let &mut C(ref mut bs) = self;
         let n = keys.len();
         let mut method = srv::Method::Query {
@@ -56,13 +57,15 @@ impl C {
         }
         bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
         bs.flush()?;
-        Ok((0..n)
-               .map(|_| {
-                        let result: Result<Vec<Vec<DataType>>, ()> =
-                            bincode::deserialize_from(bs, bincode::Infinite).unwrap();
-                        result.unwrap_or_default()
-                    })
-               .collect())
+        Ok(
+            (0..n)
+                .map(|_| {
+                    let result: Result<Vec<Vec<DataType>>, ()> =
+                        bincode::deserialize_from(bs, bincode::Infinite).unwrap();
+                    result.unwrap_or_default()
+                })
+                .collect(),
+        )
     }
 }
 
@@ -80,8 +83,9 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
 impl Writer for C {
     type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator,
     {
         let articles = articles
             .map(|(aid, title)| vec![aid.into(), title.into()])
@@ -90,7 +94,9 @@ impl Writer for C {
     }
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         let votes = ids.iter()
-            .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into()])
+            .map(|&(user_id, article_id)| {
+                vec![user_id.into(), article_id.into()]
+            })
             .collect();
         self.mput(VOTE_NODE, votes);
         Period::PreMigration

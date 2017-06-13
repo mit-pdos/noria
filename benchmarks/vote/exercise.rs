@@ -34,8 +34,10 @@ impl Default for BenchmarkResult {
 
 impl BenchmarkResult {
     fn keep_cdf(&mut self) {
-        self.samples = Some((Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap(),
-                             Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap()));
+        self.samples = Some((
+            Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap(),
+        ));
     }
 
     pub fn avg_throughput(&self) -> f64 {
@@ -43,12 +45,15 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
-    pub fn cdf_percentiles(&self)
-                           -> Option<(HistogramIterator<u64, recorded::Iter<u64>>,
-                                      HistogramIterator<u64, recorded::Iter<u64>>)> {
-        self.samples
-            .as_ref()
-            .map(|&(ref r, ref w)| (r.iter_recorded(), w.iter_recorded()))
+    pub fn cdf_percentiles(
+        &self,
+    ) -> Option<
+        (HistogramIterator<u64, recorded::Iter<u64>>,
+         HistogramIterator<u64, recorded::Iter<u64>>),
+    > {
+        self.samples.as_ref().map(|&(ref r, ref w)| {
+            (r.iter_recorded(), w.iter_recorded())
+        })
     }
 
     #[allow(dead_code)]
@@ -94,8 +99,9 @@ impl BenchmarkResults {
 }
 
 fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> BenchmarkResults
-    where R: Reader,
-          W: Writer
+where
+    R: Reader,
+    W: Writer,
 {
     let mut stats = BenchmarkResults::default();
     if config.cdf {
@@ -111,8 +117,10 @@ fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> Be
         let mut i = 0;
         let randomness: Vec<i64> = {
             let n = 1_000_000 * config.runtime.as_ref().unwrap().as_secs();
-            println!("Generating ~{}M random numbers; this'll take a few seconds...",
-                     n / 1_000_000);
+            println!(
+                "Generating ~{}M random numbers; this'll take a few seconds...",
+                n / 1_000_000
+            );
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
@@ -186,18 +194,22 @@ fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> Be
                 match period {
                     Period::PreMigration => {
                         if config.verbose {
-                            println!("{:?} {}: {:.2}",
-                                     dur_to_ns!(start.elapsed()),
-                                     desc,
-                                     count_per_s);
+                            println!(
+                                "{:?} {}: {:.2}",
+                                dur_to_ns!(start.elapsed()),
+                                desc,
+                                count_per_s
+                            );
                         }
                     }
                     Period::PostMigration => {
                         if config.verbose {
-                            println!("{:?} {}+: {:.2}",
-                                     dur_to_ns!(start.elapsed()),
-                                     desc,
-                                     count_per_s);
+                            println!(
+                                "{:?} {}+: {:.2}",
+                                dur_to_ns!(start.elapsed()),
+                                desc,
+                                count_per_s
+                            );
                         }
                     }
                 }
@@ -232,11 +244,12 @@ impl<W: Writer> WState<W> {
     }
 }
 
-fn do_write<W: Writer>(writer: &mut WState<W>,
-                       config: &mut RuntimeConfig,
-                       start: &time::Instant,
-                       ids: &[(i64, i64)])
-                       -> (bool, Period) {
+fn do_write<W: Writer>(
+    writer: &mut WState<W>,
+    config: &mut RuntimeConfig,
+    start: &time::Instant,
+    ids: &[(i64, i64)],
+) -> (bool, Period) {
     if let Some(migrate_after) = config.migrate_after {
         if start.elapsed() > migrate_after {
             writer.migrate_done = Some(writer.inner.migrate());
@@ -262,9 +275,11 @@ fn do_write<W: Writer>(writer: &mut WState<W>,
     }
 }
 
-pub fn prep_writer<W: Writer>(writer: &mut W,
-                              config: &RuntimeConfig,
-                              ready: Option<mpsc::SyncSender<()>>) {
+pub fn prep_writer<W: Writer>(
+    writer: &mut W,
+    config: &RuntimeConfig,
+    ready: Option<mpsc::SyncSender<()>>,
+) {
 
     // prepopulate
     if !config.should_reuse() {
@@ -273,8 +288,9 @@ pub fn prep_writer<W: Writer>(writer: &mut W,
         assert_eq!(config.narticles % pop_batch_size, 0);
         for i in 0..config.narticles / pop_batch_size {
             let reali = pop_batch_size * i;
-            writer.make_articles((reali..reali + pop_batch_size)
-                                     .map(|i| (i as i64, format!("Article #{}", i))));
+            writer.make_articles((reali..reali + pop_batch_size).map(|i| {
+                (i as i64, format!("Article #{}", i))
+            }));
         }
         println!("Done with prepopulation");
     }
@@ -284,22 +300,24 @@ pub fn prep_writer<W: Writer>(writer: &mut W,
     drop(ready);
 }
 
-fn do_read<R: Reader>(reader: &mut R,
-                      _: &RuntimeConfig,
-                      _: &time::Instant,
-                      ids: &[(i64, i64)])
-                      -> (bool, Period) {
+fn do_read<R: Reader>(
+    reader: &mut R,
+    _: &RuntimeConfig,
+    _: &time::Instant,
+    ids: &[(i64, i64)],
+) -> (bool, Period) {
     match reader.get(ids) {
         (Err(_), period) => (false, period),
         (_, period) => (true, period),
     }
 }
 
-pub fn launch<R: Reader, W: Writer>(reader: Option<R>,
-                                    mut writer: Option<W>,
-                                    config: RuntimeConfig,
-                                    ready: Option<mpsc::SyncSender<()>>)
-                                    -> BenchmarkResults {
+pub fn launch<R: Reader, W: Writer>(
+    reader: Option<R>,
+    mut writer: Option<W>,
+    config: RuntimeConfig,
+    ready: Option<mpsc::SyncSender<()>>,
+) -> BenchmarkResults {
     if let Some(ref mut writer) = writer {
         prep_writer(writer, &config, ready);
     }
@@ -311,7 +329,8 @@ pub fn launch<R: Reader, W: Writer>(reader: Option<R>,
 
 #[allow(dead_code)]
 pub fn launch_mix<T>(inner: T, config: RuntimeConfig) -> BenchmarkResults
-    where T: Reader + Writer
+where
+    T: Reader + Writer,
 {
     use std::rc::Rc;
     use std::cell::RefCell;
@@ -330,8 +349,9 @@ impl Writer for NullClient {
     type Migrator = ();
 
     fn make_articles<I>(&mut self, _: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator,
     {
         unreachable!()
     }

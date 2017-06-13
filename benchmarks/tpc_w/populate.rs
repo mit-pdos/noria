@@ -19,9 +19,9 @@ macro_rules! dur_to_fsec {
 }
 
 fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-    let mut mutator = backend
-        .g
-        .get_mutator(backend.r.node_addr_for(name).unwrap());
+    let mut mutator = backend.g.get_mutator(
+        backend.r.node_addr_for(name).unwrap(),
+    );
 
     let i = records.len();
 
@@ -34,21 +34,23 @@ fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType
         }
 
         let dur = dur_to_fsec!(start.elapsed());
-        println!("Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-                 i,
-                 name,
-                 dur,
-                 i as f64 / dur);
+        println!(
+            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+            i,
+            name,
+            dur,
+            i as f64 / dur
+        );
     };
 
     if backend.parallel_prepop {
         let barrier = backend.barrier.clone();
 
         thread::spawn(move || {
-                          barrier.wait();
-                          do_prepop();
-                          barrier.wait();
-                      });
+            barrier.wait();
+            do_prepop();
+            barrier.wait();
+        });
     } else {
         do_prepop();
     }
@@ -79,14 +81,16 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
             let addr_city = fields[3];
             let addr_state = fields[4];
             let addr_zip = fields[5];
-            let addr_co_id = fields[6];
-            records.push(vec![addr_id.into(),
-                              addr_street1.into(),
-                              addr_street2.into(),
-                              addr_city.into(),
-                              addr_state.into(),
-                              addr_zip.into(),
-                              addr_co_id.into()]);
+            let addr_co_id = i32::from_str(fields[6]).unwrap();
+            records.push(vec![
+                addr_id.into(),
+                addr_street1.into(),
+                addr_street2.into(),
+                addr_city.into(),
+                addr_state.into(),
+                addr_zip.into(),
+                addr_co_id.into(),
+            ]);
         }
         s.clear();
     }
@@ -111,12 +115,14 @@ pub fn populate_authors(backend: &Backend, data_location: &str) -> usize {
             let a_mname = fields[3];
             let a_dob = parse_ymd_to_timestamp(fields[4]);
             let a_bio = fields[5];
-            records.push(vec![a_id.into(),
-                              a_fname.into(),
-                              a_lname.into(),
-                              a_mname.into(),
-                              a_dob.into(),
-                              a_bio.into()]);
+            records.push(vec![
+                a_id.into(),
+                a_fname.into(),
+                a_lname.into(),
+                a_mname.into(),
+                a_dob.into(),
+                a_bio.into(),
+            ]);
         }
         s.clear();
     }
@@ -140,20 +146,22 @@ pub fn populate_cc_xacts(backend: &Backend, data_location: &str) -> usize {
             let cx_num = fields[2];
             let cx_name = fields[3];
             let cx_expire = parse_ymd_to_timestamp(fields[4]);
-            let cx_auth_id = fields[5];
+            let cx_auth_id = i32::from_str(fields[5]).unwrap();
             let cx_amt = f64::from_str(fields[6]).unwrap();
             let xact_date = NaiveDateTime::parse_from_str(fields[7], "%Y-%m-%d %H:%M:%S");
             let cx_xact_date = xact_date.unwrap().timestamp();
             let cx_co_id = i32::from_str(fields[8]).unwrap();
-            records.push(vec![cx_o_id.into(),
-                              cx_type.into(),
-                              cx_num.into(),
-                              cx_name.into(),
-                              cx_expire.into(),
-                              cx_auth_id.into(),
-                              cx_amt.into(),
-                              cx_xact_date.into(),
-                              cx_co_id.into()]);
+            records.push(vec![
+                cx_o_id.into(),
+                cx_type.into(),
+                cx_num.into(),
+                cx_name.into(),
+                cx_expire.into(),
+                cx_auth_id.into(),
+                cx_amt.into(),
+                cx_xact_date.into(),
+                cx_co_id.into(),
+            ]);
         }
         s.clear();
     }
@@ -176,10 +184,12 @@ pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
             let co_name = fields[1];
             let co_exchange = f64::from_str(fields[2]).unwrap();
             let co_currency = fields[3];
-            records.push(vec![co_id.into(),
-                              co_name.into(),
-                              co_exchange.into(),
-                              co_currency.into()]);
+            records.push(vec![
+                co_id.into(),
+                co_name.into(),
+                co_exchange.into(),
+                co_currency.into(),
+            ]);
         }
         s.clear();
     }
@@ -215,23 +225,25 @@ pub fn populate_customers(backend: &Backend, data_location: &str) -> usize {
             let c_ytd_pmt = f64::from_str(fields[14]).unwrap();
             let c_birthdate = parse_ymd_to_timestamp(fields[15]);
             let c_data = fields[16];
-            records.push(vec![c_id.into(),
-                              c_uname.into(),
-                              c_passwd.into(),
-                              c_fname.into(),
-                              c_lname.into(),
-                              c_addr_id.into(),
-                              c_phone.into(),
-                              c_email.into(),
-                              c_since.into(),
-                              c_last_login.into(),
-                              c_login.into(),
-                              c_expiration.into(),
-                              c_discount.into(),
-                              c_balance.into(),
-                              c_ytd_pmt.into(),
-                              c_birthdate.into(),
-                              c_data.into()]);
+            records.push(vec![
+                c_id.into(),
+                c_uname.into(),
+                c_passwd.into(),
+                c_fname.into(),
+                c_lname.into(),
+                c_addr_id.into(),
+                c_phone.into(),
+                c_email.into(),
+                c_since.into(),
+                c_last_login.into(),
+                c_login.into(),
+                c_expiration.into(),
+                c_discount.into(),
+                c_balance.into(),
+                c_ytd_pmt.into(),
+                c_birthdate.into(),
+                c_data.into(),
+            ]);
         }
         s.clear();
     }
@@ -272,28 +284,30 @@ pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
             let i_page = i32::from_str(fields[19]).unwrap();
             let i_backing = fields[20];
             let i_dimensions = fields[21];
-            records.push(vec![i_id.into(),
-                              i_title.into(),
-                              i_a_id.into(),
-                              i_pub_date.into(),
-                              i_publisher.into(),
-                              i_subject.into(),
-                              i_desc.into(),
-                              i_related1.into(),
-                              i_related2.into(),
-                              i_related3.into(),
-                              i_related4.into(),
-                              i_related5.into(),
-                              i_thumbnail.into(),
-                              i_image.into(),
-                              i_srp.into(),
-                              i_cost.into(),
-                              i_avail.into(),
-                              i_stock.into(),
-                              i_isbn.into(),
-                              i_page.into(),
-                              i_backing.into(),
-                              i_dimensions.into()]);
+            records.push(vec![
+                i_id.into(),
+                i_title.into(),
+                i_a_id.into(),
+                i_pub_date.into(),
+                i_publisher.into(),
+                i_subject.into(),
+                i_desc.into(),
+                i_related1.into(),
+                i_related2.into(),
+                i_related3.into(),
+                i_related4.into(),
+                i_related5.into(),
+                i_thumbnail.into(),
+                i_image.into(),
+                i_srp.into(),
+                i_cost.into(),
+                i_avail.into(),
+                i_stock.into(),
+                i_isbn.into(),
+                i_page.into(),
+                i_backing.into(),
+                i_dimensions.into(),
+            ]);
         }
         s.clear();
     }
@@ -328,17 +342,19 @@ pub fn populate_orders(backend: &Backend, data_location: &str) -> usize {
             let o_ship_addr_id = i32::from_str(fields[9]).unwrap();
             let o_status = fields[10];
 
-            records.push(vec![o_id.into(),
-                              o_c_id.into(),
-                              o_date.into(),
-                              o_sub_total.into(),
-                              o_tax.into(),
-                              o_total.into(),
-                              o_ship_type.into(),
-                              o_ship_date.into(),
-                              o_bill_addr_id.into(),
-                              o_ship_addr_id.into(),
-                              o_status.into()]);
+            records.push(vec![
+                o_id.into(),
+                o_c_id.into(),
+                o_date.into(),
+                o_sub_total.into(),
+                o_tax.into(),
+                o_total.into(),
+                o_ship_type.into(),
+                o_ship_date.into(),
+                o_bill_addr_id.into(),
+                o_ship_addr_id.into(),
+                o_status.into(),
+            ]);
         }
         s.clear();
     }
@@ -364,12 +380,14 @@ pub fn populate_order_line(backend: &Backend, data_location: &str) -> usize {
             let ol_discount = f64::from_str(fields[4]).unwrap();
             let ol_comments = fields[5];
 
-            records.push(vec![ol_id.into(),
-                              ol_o_id.into(),
-                              ol_i_id.into(),
-                              ol_qty.into(),
-                              ol_discount.into(),
-                              ol_comments.into()]);
+            records.push(vec![
+                ol_id.into(),
+                ol_o_id.into(),
+                ol_i_id.into(),
+                ol_qty.into(),
+                ol_discount.into(),
+                ol_comments.into(),
+            ]);
         }
         s.clear();
     }

@@ -59,24 +59,32 @@ pub fn setup(transactions: bool) -> Box<Bank> {
 
         // add transfers base table
         transfers = if transactions {
-            mig.add_transactional_base("transfers",
-                                       &["src_acct", "dst_acct", "amount"],
-                                       Base::default())
+            mig.add_transactional_base(
+                "transfers",
+                &["src_acct", "dst_acct", "amount"],
+                Base::default(),
+            )
         } else {
-            mig.add_ingredient("transfers",
-                               &["src_acct", "dst_acct", "amount"],
-                               Base::default())
+            mig.add_ingredient(
+                "transfers",
+                &["src_acct", "dst_acct", "amount"],
+                Base::default(),
+            )
         };
 
         // add all debits
-        debits = mig.add_ingredient("debits",
-                                    &["acct_id", "total"],
-                                    Aggregation::SUM.over(transfers, 2, &[0]));
+        debits = mig.add_ingredient(
+            "debits",
+            &["acct_id", "total"],
+            Aggregation::SUM.over(transfers, 2, &[0]),
+        );
 
         // add all credits
-        credits = mig.add_ingredient("credits",
-                                     &["acct_id", "total"],
-                                     Aggregation::SUM.over(transfers, 2, &[1]));
+        credits = mig.add_ingredient(
+            "credits",
+            &["acct_id", "total"],
+            Aggregation::SUM.over(transfers, 2, &[1]),
+        );
 
         // add join of credits and debits; this is a hack as we don't currently have multi-parent
         // aggregations or arithmetic on columns.
@@ -90,19 +98,21 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     };
 
     Box::new(Bank {
-                 blender: g,
-                 transfers: transfers,
-                 balances: balances,
-                 transactions: transactions,
-             })
+        blender: g,
+        transfers: transfers,
+        balances: balances,
+        transactions: transactions,
+    })
 }
 
 impl Bank {
     fn getter(&mut self) -> Box<Getter> {
         if self.transactions {
-            Box::new(self.blender
-                         .get_transactional_getter(self.balances)
-                         .unwrap())
+            Box::new(
+                self.blender
+                    .get_transactional_getter(self.balances)
+                    .unwrap(),
+            )
         } else {
             let g = self.blender.get_getter(self.balances).unwrap();
             let b = Box::new(move |d: &DataType| g(d, true).map(|r| (r, Token::empty()))) as Box<_>;
@@ -111,10 +121,11 @@ impl Bank {
     }
     pub fn migrate(&mut self) {
         let mut mig = self.blender.start_migration();
-        let identity =
-            mig.add_ingredient("identity",
-                               &["acct_id", "credit", "debit"],
-                               distributary::Identity::new(self.balances));
+        let identity = mig.add_ingredient(
+            "identity",
+            &["acct_id", "credit", "debit"],
+            distributary::Identity::new(self.balances),
+        );
         mig.maintain(identity, 0);
         mig.commit();
     }
@@ -164,19 +175,20 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
     println!("Done with account creation");
 }
 
-fn client(_i: usize,
-          mut mutator: Mutator,
-          balances_get: Box<Getter>,
-          naccounts: i64,
-          start: time::Instant,
-          runtime: time::Duration,
-          verbose: bool,
-          audit: bool,
-          measure_latency: bool,
-          coarse: bool,
-          transactions: bool,
-          is_transfer_deterministic: bool)
-          -> Vec<f64> {
+fn client(
+    _i: usize,
+    mut mutator: Mutator,
+    balances_get: Box<Getter>,
+    naccounts: i64,
+    start: time::Instant,
+    runtime: time::Duration,
+    verbose: bool,
+    audit: bool,
+    measure_latency: bool,
+    coarse: bool,
+    transactions: bool,
+    is_transfer_deterministic: bool,
+) -> Vec<f64> {
     let clock = RealTime::default();
 
     let mut count = 0;
@@ -212,8 +224,10 @@ fn client(_i: usize,
             let transaction_start = clock.get_time();
             let (balance, mut token) = get(src).unwrap().unwrap();
 
-            assert!(balance >= 0 || !transactions,
-                    format!("{} balance is {}", src, balance));
+            assert!(
+                balance >= 0 || !transactions,
+                format!("{} balance is {}", src, balance)
+            );
 
             if balance >= 100 {
                 if coarse {
@@ -229,8 +243,10 @@ fn client(_i: usize,
                 let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
-                    mutator
-                        .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
+                    mutator.transactional_put(
+                        vec![src.into(), dst.into(), 100.into()],
+                        token.into(),
+                    )
                 } else {
                     mutator
                         .put(vec![src.into(), dst.into(), 100.into()])
@@ -251,7 +267,7 @@ fn client(_i: usize,
                             for (instant, event) in tracer.unwrap() {
                                 if verbose {
                                     let dt = dur_to_ns!(instant.duration_since(last_instant)) as
-                                             f64;
+                                        f64;
                                     println!("{:.3} μs: {:?}", dt * 0.001, event);
                                     last_instant = instant;
                                 }
@@ -279,15 +295,16 @@ fn client(_i: usize,
             if !measure_latency && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
                 let throughput = committed as f64 /
-                                 (ts.as_secs() as f64 +
-                                  ts.subsec_nanos() as f64 / 1_000_000_000f64);
+                    (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
                 let commit_rate = committed as f64 / count as f64;
                 let abort_rate = aborted as f64 / count as f64;
-                println!("{:?} PUT: {:.2} {:.2} {:.2}",
-                         dur_to_ns!(start.elapsed()),
-                         throughput,
-                         commit_rate,
-                         abort_rate);
+                println!(
+                    "{:?} PUT: {:.2} {:.2} {:.2}",
+                    dur_to_ns!(start.elapsed()),
+                    throughput,
+                    commit_rate,
+                    abort_rate
+                );
                 throughputs.push(throughput);
 
                 last_reported = time::Instant::now();
@@ -330,8 +347,10 @@ fn client(_i: usize,
         println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
         println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
         println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-        println!("write + settle latency: {:.3} μs",
-                 (wl + sl) as f64 / n * 0.001);
+        println!(
+            "write + settle latency: {:.3} μs",
+            (wl + sl) as f64 / n * 0.001
+        );
 
         let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
         for i in 0..write_latencies.len() {
@@ -353,62 +372,81 @@ fn main() {
     let args = App::new("bank")
         .version("0.1")
         .about("Benchmarks Soup transactions and reports abort rate.")
-        .arg(Arg::with_name("avg")
-                 .long("avg")
-                 .takes_value(false)
-                 .help("compute average throughput at the end of benchmark"))
-        .arg(Arg::with_name("naccounts")
-                 .short("a")
-                 .long("accounts")
-                 .value_name("N")
-                 .default_value("5")
-                 .help("Number of bank accounts to prepopulate the database with"))
-        .arg(Arg::with_name("runtime")
-                 .short("r")
-                 .long("runtime")
-                 .value_name("N")
-                 .default_value("60")
-                 .help("Benchmark runtime in seconds"))
-        .arg(Arg::with_name("migrate")
-                 .short("m")
-                 .long("migrate")
-                 .value_name("M")
-                 .help("Perform a migration after this many seconds")
-                 .conflicts_with("stage"))
-        .arg(Arg::with_name("threads")
-                 .short("t")
-                 .long("threads")
-                 .value_name("T")
-                 .default_value("2")
-                 .help("Number of client threads"))
-        .arg(Arg::with_name("latency")
-                 .short("l")
-                 .long("latency")
-                 .takes_value(false)
-                 .help("Measure latency of requests"))
-        .arg(Arg::with_name("coarse")
-                 .short("c")
-                 .long("coarse")
-                 .takes_value(false)
-                 .help("Use only coarse grained checktables"))
-        .arg(Arg::with_name("verbose")
-                 .short("v")
-                 .long("verbose")
-                 .takes_value(false)
-                 .help("Verbose (debugging) output"))
-        .arg(Arg::with_name("audit")
-                 .short("A")
-                 .long("audit")
-                 .takes_value(false)
-                 .help("Audit results after benchmark completes"))
-        .arg(Arg::with_name("nontransactional")
-                 .long("nontransactional")
-                 .takes_value(false)
-                 .help("Use non-transactional writes"))
-        .arg(Arg::with_name("deterministic")
-                 .long("deterministic")
-                 .takes_value(false)
-                 .help("Use deterministic money transfers"))
+        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
+            "compute average throughput at the end of benchmark",
+        ))
+        .arg(
+            Arg::with_name("naccounts")
+                .short("a")
+                .long("accounts")
+                .value_name("N")
+                .default_value("5")
+                .help("Number of bank accounts to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("runtime")
+                .short("r")
+                .long("runtime")
+                .value_name("N")
+                .default_value("60")
+                .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("migrate")
+                .short("m")
+                .long("migrate")
+                .value_name("M")
+                .help("Perform a migration after this many seconds")
+                .conflicts_with("stage"),
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .value_name("T")
+                .default_value("2")
+                .help("Number of client threads"),
+        )
+        .arg(
+            Arg::with_name("latency")
+                .short("l")
+                .long("latency")
+                .takes_value(false)
+                .help("Measure latency of requests"),
+        )
+        .arg(
+            Arg::with_name("coarse")
+                .short("c")
+                .long("coarse")
+                .takes_value(false)
+                .help("Use only coarse grained checktables"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .takes_value(false)
+                .help("Verbose (debugging) output"),
+        )
+        .arg(
+            Arg::with_name("audit")
+                .short("A")
+                .long("audit")
+                .takes_value(false)
+                .help("Audit results after benchmark completes"),
+        )
+        .arg(
+            Arg::with_name("nontransactional")
+                .long("nontransactional")
+                .takes_value(false)
+                .help("Use non-transactional writes"),
+        )
+        .arg(
+            Arg::with_name("deterministic")
+                .long("deterministic")
+                .takes_value(false)
+                .help("Use deterministic money transfers"),
+        )
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -447,53 +485,57 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                     let mutator = bank.blender.get_mutator(bank.transfers);
-                     let balances_get: Box<Getter> = bank.getter();
+                let mutator = bank.blender.get_mutator(bank.transfers);
+                let balances_get: Box<Getter> = bank.getter();
 
-                     thread::Builder::new()
-                         .name(format!("bank{}", i))
-                         .spawn(move || -> Vec<f64> {
-                    client(i,
-                           mutator,
-                           balances_get,
-                           naccounts,
-                           start,
-                           runtime,
-                           verbose,
-                           audit,
-                           false, /* measure_latency */
-                           coarse_checktables,
-                           transactions,
-                           is_transfer_deterministic)
-                })
-                         .unwrap()
-                 })
+                thread::Builder::new()
+                    .name(format!("bank{}", i))
+                    .spawn(move || -> Vec<f64> {
+                        client(
+                            i,
+                            mutator,
+                            balances_get,
+                            naccounts,
+                            start,
+                            runtime,
+                            verbose,
+                            audit,
+                            false, /* measure_latency */
+                            coarse_checktables,
+                            transactions,
+                            is_transfer_deterministic,
+                        )
+                    })
+                    .unwrap()
+            })
         })
         .collect::<Vec<_>>();
 
     let latency_client = if measure_latency {
         Some({
-                 let mutator = bank.blender.get_mutator(bank.transfers);
-                 let balances_get: Box<Getter> = bank.getter();
+            let mutator = bank.blender.get_mutator(bank.transfers);
+            let balances_get: Box<Getter> = bank.getter();
 
-                 thread::Builder::new()
-                     .name(format!("bank{}", nthreads))
-                     .spawn(move || -> Vec<f64> {
-                client(nthreads,
-                       mutator,
-                       balances_get,
-                       naccounts,
-                       start,
-                       runtime,
-                       verbose,
-                       audit,
-                       true, /* measure_latency */
-                       coarse_checktables,
-                       transactions,
-                       is_transfer_deterministic)
-            })
-                     .unwrap()
-             })
+            thread::Builder::new()
+                .name(format!("bank{}", nthreads))
+                .spawn(move || -> Vec<f64> {
+                    client(
+                        nthreads,
+                        mutator,
+                        balances_get,
+                        naccounts,
+                        start,
+                        runtime,
+                        verbose,
+                        audit,
+                        true, /* measure_latency */
+                        coarse_checktables,
+                        transactions,
+                        is_transfer_deterministic,
+                    )
+                })
+                .unwrap()
+        })
     } else {
         None
     };
@@ -505,8 +547,10 @@ fn main() {
         bank.migrate();
         let duration = start.elapsed();
         let length = 1000000000u64 * duration.as_secs() + duration.subsec_nanos() as u64;
-        println!("----- completed migration -----\nElapsed time = {} ms",
-                 1e-6 * (length as f64));
+        println!(
+            "----- completed migration -----\nElapsed time = {} ms",
+            1e-6 * (length as f64)
+        );
     }
 
     // clean

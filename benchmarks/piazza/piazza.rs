@@ -37,9 +37,11 @@ impl Piazza {
             user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
 
             // add a post base table
-            post = mig.add_ingredient("post",
-                                      &["pid", "cid", "author", "content"],
-                                      Base::default().with_key(vec![1]));
+            post = mig.add_ingredient(
+                "post",
+                &["pid", "cid", "author", "content"],
+                Base::default().with_key(vec![1]),
+            );
 
             // add a class base table
             class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
@@ -74,10 +76,12 @@ impl Piazza {
         // add visible posts to user
         // only posts from classes the user is taking should be visible
         use distributary::JoinSource::*;
-        let j = Join::new(self.post,
-                          user_classes,
-                          JoinType::Inner,
-                          vec![L(0), B(1, 0), L(2), L(3)]);
+        let j = Join::new(
+            self.post,
+            user_classes,
+            JoinType::Inner,
+            vec![L(0), B(1, 0), L(2), L(3)],
+        );
         visible_posts =
             mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
@@ -128,41 +132,52 @@ fn main() {
     use clap::{Arg, App};
     let args = App::new("piazza")
         .version("0.1")
-        .about("Benchmarks Piazza-like application with some security policies.")
-        .arg(Arg::with_name("nclasses")
-                 .short("c")
-                 .long("classes")
-                 .value_name("N")
-                 .default_value("100")
-                 .help("Number of classes to prepopulate the database with"))
-        .arg(Arg::with_name("nusers")
-                 .short("u")
-                 .long("users")
-                 .value_name("N")
-                 .default_value("100")
-                 .help("Number of users to prepopulate the database with"))
-        .arg(Arg::with_name("nposts")
-                 .short("p")
-                 .long("posts")
-                 .value_name("N")
-                 .default_value("10000")
-                 .help("Number of posts to prepopulate the database with"))
-        .arg(Arg::with_name("csv")
-                 .long("csv")
-                 .required(false)
-                 .help("Print output in CSV format."))
-        .arg(Arg::with_name("fanout")
-                 .long("fanout")
-                 .short("f")
-                 .possible_values(&["all", "few"])
-                 .takes_value(true)
-                 .default_value("all")
-                 .help("Size of the class fanout for each user"))
-        .arg(Arg::with_name("benchmark")
-                 .possible_values(&["write", "migration"])
-                 .takes_value(true)
-                 .required(true)
-                 .help("Benchmark configuration"))
+        .about(
+            "Benchmarks Piazza-like application with some security policies.",
+        )
+        .arg(
+            Arg::with_name("nclasses")
+                .short("c")
+                .long("classes")
+                .value_name("N")
+                .default_value("100")
+                .help("Number of classes to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("nusers")
+                .short("u")
+                .long("users")
+                .value_name("N")
+                .default_value("100")
+                .help("Number of users to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("nposts")
+                .short("p")
+                .long("posts")
+                .value_name("N")
+                .default_value("10000")
+                .help("Number of posts to prepopulate the database with"),
+        )
+        .arg(Arg::with_name("csv").long("csv").required(false).help(
+            "Print output in CSV format.",
+        ))
+        .arg(
+            Arg::with_name("fanout")
+                .long("fanout")
+                .short("f")
+                .possible_values(&["all", "few"])
+                .takes_value(true)
+                .default_value("all")
+                .help("Size of the class fanout for each user"),
+        )
+        .arg(
+            Arg::with_name("benchmark")
+                .possible_values(&["write", "migration"])
+                .takes_value(true)
+                .required(true)
+                .help("Benchmark configuration"),
+        )
         .get_matches();
 
 
@@ -196,10 +211,12 @@ fn main() {
     if benchmark == "migration" {
         for pid in 0..nposts {
             post_putter
-                .put(vec![pid.into(),
-                          (pid % nclasses).into(),
-                          (pid % nusers).into(),
-                          "post".into()])
+                .put(vec![
+                    pid.into(),
+                    (pid % nclasses).into(),
+                    (pid % nusers).into(),
+                    "post".into(),
+                ])
                 .unwrap();
         }
     }
@@ -227,10 +244,12 @@ fn main() {
             "write" => {
                 for i in 0..1000 {
                     post_putter
-                        .put(vec![i.into(),
-                                  (i % nclasses).into(),
-                                  (i % nusers).into(),
-                                  "post".into()])
+                        .put(vec![
+                            i.into(),
+                            (i % nclasses).into(),
+                            (i % nusers).into(),
+                            "post".into(),
+                        ])
                         .unwrap();
                 }
                 end = time::Instant::now().duration_since(start);

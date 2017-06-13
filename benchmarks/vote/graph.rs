@@ -37,9 +37,11 @@ pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParame
         };
 
         // add vote count
-        let vc = mig.add_ingredient("votecount",
-                                    &["id", "votes"],
-                                    Aggregation::COUNT.over(vote, 0, &[1]));
+        let vc = mig.add_ingredient(
+            "votecount",
+            &["id", "votes"],
+            Aggregation::COUNT.over(vote, 0, &[1]),
+        );
 
         // add final join using first field from article and first from vc
         use distributary::JoinSource::*;
@@ -86,10 +88,11 @@ impl Graph {
 
         let total = if stupid {
             // project on 1 to votes
-            let upgrade =
-                mig.add_ingredient("upvote",
-                                   &["id", "one"],
-                                   Project::new(vote, &[1], Some(vec![1.into()])));
+            let upgrade = mig.add_ingredient(
+                "upvote",
+                &["id", "one"],
+                Project::new(vote, &[1], Some(vec![1.into()])),
+            );
 
             // take a union of votes and ratings
             let mut emits = HashMap::new();
@@ -99,14 +102,18 @@ impl Graph {
             let both = mig.add_ingredient("both", &["id", "value"], u);
 
             // add sum of combined ratings
-            mig.add_ingredient("total",
-                               &["id", "total"],
-                               Aggregation::SUM.over(both, 1, &[0]))
+            mig.add_ingredient(
+                "total",
+                &["id", "total"],
+                Aggregation::SUM.over(both, 1, &[0]),
+            )
         } else {
             // add sum of ratings
-            let rs = mig.add_ingredient("rsum",
-                                        &["id", "total"],
-                                        Aggregation::SUM.over(rating, 2, &[1]));
+            let rs = mig.add_ingredient(
+                "rsum",
+                &["id", "total"],
+                Aggregation::SUM.over(rating, 2, &[1]),
+            );
 
             // take a union of vote count and rsum
             let mut emits = HashMap::new();
@@ -116,9 +123,11 @@ impl Graph {
             let both = mig.add_ingredient("both", &["id", "value"], u);
 
             // sum them by article id
-            mig.add_ingredient("total",
-                               &["id", "total"],
-                               Aggregation::SUM.over(both, 1, &[0]))
+            mig.add_ingredient(
+                "total",
+                &["id", "total"],
+                Aggregation::SUM.over(both, 1, &[0]),
+            )
         };
 
         // finally, produce end result

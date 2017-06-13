@@ -27,82 +27,114 @@ fn main() {
 
     let args = App::new("vote")
         .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
-        .arg(Arg::with_name("avg")
-            .long("avg")
-            .takes_value(false)
-            .help("compute average throughput at the end of benchmark"))
-        .arg(Arg::with_name("cdf")
-            .short("c")
-            .long("cdf")
-            .takes_value(false)
-            .help("produce a CDF of recorded latencies for each client at the end"))
-        .arg(Arg::with_name("stage")
-            .short("s")
-            .long("stage")
-            .takes_value(false)
-            .help("stage execution such that all writes are performed before all reads"))
-        .arg(Arg::with_name("distribution")
-            .short("d")
-            .takes_value(true)
-            .default_value("uniform")
-            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
-        .arg(Arg::with_name("ngetters")
-            .short("g")
-            .long("getters")
-            .value_name("N")
-            .default_value("1")
-            .help("Number of GET clients to start"))
-        .arg(Arg::with_name("narticles")
-            .short("a")
-            .long("articles")
-            .value_name("N")
-            .default_value("100000")
-            .help("Number of articles to prepopulate the database with"))
-        .arg(Arg::with_name("runtime")
-            .short("r")
-            .long("runtime")
-            .value_name("N")
-            .default_value("60")
-            .help("Benchmark runtime in seconds"))
-        .arg(Arg::with_name("stupid")
-             .long("stupid")
-            .help("Make the migration stupid")
-            .requires("migrate"))
-        .arg(Arg::with_name("migrate")
-            .short("m")
-            .long("migrate")
-            .value_name("N")
-            .help("Perform a migration after this many seconds")
-            .conflicts_with("stage"))
-        .arg(Arg::with_name("transactions")
-            .short("t")
-            .long("transactions")
-            .takes_value(false)
-            .help("Use transactional reads and writes"))
-        .arg(Arg::with_name("crossover")
-            .short("x")
-            .takes_value(true)
-            .help("Period for transition to new views for readers and writers")
-            .requires("migrate"))
-        .arg(Arg::with_name("quiet")
-            .short("q")
-            .long("quiet")
-            .help("No noisy output while running"))
-        .arg(Arg::with_name("durability")
-             .long("durability")
-             .takes_value(false)
-             .help("Enable durability for Base nodes"))
-        .arg(Arg::with_name("retain-logs-on-exit")
-             .long("retain-logs-on-exit")
-             .takes_value(false)
-             .requires("durability")
-             .help("Do not delete the base node logs on exit."))
-        .arg(Arg::with_name("write-batch-size")
-             .long("write-batch-size")
-             .takes_value(true)
-             .default_value("512")
-             .help("Size of batches processed at base nodes."))
+        .about(
+            "Benchmarks user-curated news aggregator throughput for in-memory Soup",
+        )
+        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
+            "compute average throughput at the end of benchmark",
+        ))
+        .arg(
+            Arg::with_name("cdf")
+                .short("c")
+                .long("cdf")
+                .takes_value(false)
+                .help(
+                    "produce a CDF of recorded latencies for each client at the end",
+                ),
+        )
+        .arg(
+            Arg::with_name("stage")
+                .short("s")
+                .long("stage")
+                .takes_value(false)
+                .help(
+                    "stage execution such that all writes are performed before all reads",
+                ),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .takes_value(true)
+                .default_value("uniform")
+                .help(
+                    "run benchmark with the given article id distribution [uniform|zipf:exponent]",
+                ),
+        )
+        .arg(
+            Arg::with_name("ngetters")
+                .short("g")
+                .long("getters")
+                .value_name("N")
+                .default_value("1")
+                .help("Number of GET clients to start"),
+        )
+        .arg(
+            Arg::with_name("narticles")
+                .short("a")
+                .long("articles")
+                .value_name("N")
+                .default_value("100000")
+                .help("Number of articles to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("runtime")
+                .short("r")
+                .long("runtime")
+                .value_name("N")
+                .default_value("60")
+                .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("stupid")
+                .long("stupid")
+                .help("Make the migration stupid")
+                .requires("migrate"),
+        )
+        .arg(
+            Arg::with_name("migrate")
+                .short("m")
+                .long("migrate")
+                .value_name("N")
+                .help("Perform a migration after this many seconds")
+                .conflicts_with("stage"),
+        )
+        .arg(
+            Arg::with_name("transactions")
+                .short("t")
+                .long("transactions")
+                .takes_value(false)
+                .help("Use transactional reads and writes"),
+        )
+        .arg(
+            Arg::with_name("crossover")
+                .short("x")
+                .takes_value(true)
+                .help("Period for transition to new views for readers and writers")
+                .requires("migrate"),
+        )
+        .arg(Arg::with_name("quiet").short("q").long("quiet").help(
+            "No noisy output while running",
+        ))
+        .arg(
+            Arg::with_name("durability")
+                .long("durability")
+                .takes_value(false)
+                .help("Enable durability for Base nodes"),
+        )
+        .arg(
+            Arg::with_name("retain-logs-on-exit")
+                .long("retain-logs-on-exit")
+                .takes_value(false)
+                .requires("durability")
+                .help("Do not delete the base node logs on exit."),
+        )
+        .arg(
+            Arg::with_name("write-batch-size")
+                .long("write-batch-size")
+                .takes_value(true)
+                .default_value("512")
+                .help("Size of batches processed at base nodes."),
+        )
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -155,7 +187,9 @@ fn main() {
     // prepare getters
     let getters: Vec<_> = (0..ngetters)
         .into_iter()
-        .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap(), crossover))
+        .map(|_| {
+            Getter::new(g.graph.get_getter(g.end).unwrap(), crossover)
+        })
         .collect();
 
     let g = sync::Arc::new(sync::Mutex::new(g));
@@ -187,8 +221,8 @@ fn main() {
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
-                               exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
-                           })
+                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                    })
                     .unwrap()
             })
             .collect();
@@ -202,11 +236,13 @@ fn main() {
         let putter = thread::Builder::new()
             .name("PUT0".to_string())
             .spawn(move || {
-                       exercise::launch(None::<exercise::NullClient>,
-                                        Some(putter),
-                                        pconfig,
-                                        Some(tx))
-                   })
+                exercise::launch(
+                    None::<exercise::NullClient>,
+                    Some(putter),
+                    pconfig,
+                    Some(tx),
+                )
+            })
             .unwrap();
 
         // wait for prepopulation to finish
@@ -220,8 +256,8 @@ fn main() {
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
-                               exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
-                           })
+                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                    })
                     .unwrap()
             })
             .collect();
@@ -235,13 +271,14 @@ fn main() {
         print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
-        let sum = get_stats
-            .iter()
-            .fold((0f64, 0usize), |(tot, count), stats| {
+        let sum = get_stats.iter().fold(
+            (0f64, 0usize),
+            |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
                 (tot + sum, count + num)
-            });
+            },
+        );
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -251,13 +288,14 @@ fn main() {
             print_stats(format!("GET{}+", i), true, &s.post, avg);
         }
         if avg {
-            let sum = get_stats
-                .iter()
-                .fold((0f64, 0usize), |(tot, count), stats| {
+            let sum = get_stats.iter().fold(
+                (0f64, 0usize),
+                |(tot, count), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.post.sum_len();
                     (tot + sum, count + num)
-                });
+                },
+            );
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -267,10 +305,12 @@ fn print_stats<S: AsRef<str>>(desc: S, read: bool, stats: &exercise::BenchmarkRe
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
         let perc = if read { r_perc } else { w_perc };
         for iv in perc {
-            println!("percentile {} {:.2} {:.2}",
-                     desc.as_ref(),
-                     iv.value(),
-                     iv.percentile());
+            println!(
+                "percentile {} {:.2} {:.2}",
+                desc.as_ref(),
+                iv.value(),
+                iv.percentile()
+            );
         }
     }
     if avg {
@@ -329,7 +369,7 @@ impl Crossover {
             }
 
             self.post = ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as
-                        usize;
+                usize;
             self.iteration = 0;
         }
 
@@ -441,8 +481,9 @@ impl Writer for Spoon {
     type Migrator = Migrator;
 
     fn make_articles<I>(&mut self, articles: I)
-        where I: ExactSizeIterator,
-              I: Iterator<Item = (i64, String)>
+    where
+        I: ExactSizeIterator,
+        I: Iterator<Item = (i64, String)>,
     {
         for (article_id, title) in articles {
             self.article
@@ -538,10 +579,10 @@ impl Reader for Getter {
                             d => d.into(),
                         };
                         Ok(ArticleResult::Article {
-                               id: id,
-                               title: title,
-                               votes: votes,
-                           })
+                            id: id,
+                            title: title,
+                            votes: votes,
+                        })
                     }
                     None => Ok(ArticleResult::NoSuchArticle),
                 }

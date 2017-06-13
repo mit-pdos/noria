@@ -7,25 +7,29 @@ unsafe impl Send for Memcache {}
 use common::{Writer, Reader, ArticleResult, Period};
 
 pub fn make(addr: &str) -> Memcache {
-    Memcache(memcached::Client::connect(&[(&format!("tcp://{}", addr), 1)], ProtoType::Binary)
-                 .unwrap())
+    Memcache(
+        memcached::Client::connect(&[(&format!("tcp://{}", addr), 1)], ProtoType::Binary).unwrap(),
+    )
 }
 
 impl Writer for Memcache {
     type Migrator = ();
 
     fn make_articles<I>(&mut self, articles: I)
-        where I: ExactSizeIterator,
-              I: Iterator<Item = (i64, String)>
+    where
+        I: ExactSizeIterator,
+        I: Iterator<Item = (i64, String)>,
     {
         use std::collections::BTreeMap;
         let articles: Vec<_> = articles
             .map(|(article_id, title)| {
-                     (format!("article_{}", article_id),
-                      title,
-                      format!("article_{}_vc", article_id),
-                      b"0")
-                 })
+                (
+                    format!("article_{}", article_id),
+                    title,
+                    format!("article_{}_vc", article_id),
+                    b"0",
+                )
+            })
             .collect();
         let mut m = BTreeMap::new();
         for &(ref tkey, ref title, ref vck, ref vc) in &articles {
@@ -52,9 +56,11 @@ impl Reader for Memcache {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let keys: Vec<_> = ids.iter()
             .flat_map(|&(_, ref article_id)| {
-                          vec![format!("article_{}", article_id),
-                               format!("article_{}_vc", article_id)]
-                      })
+                vec![
+                    format!("article_{}", article_id),
+                    format!("article_{}_vc", article_id),
+                ]
+            })
             .collect();
         let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
 

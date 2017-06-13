@@ -64,64 +64,85 @@ fn main() {
     if cfg!(feature = "b_hybrid") {
         backends.push("hybrid");
     }
-    let backends = format!("Which database backend to use [{}]://<params>",
-                           backends.join(", "));
+    let backends = format!(
+        "Which database backend to use [{}]://<params>",
+        backends.join(", ")
+    );
 
     let args = App::new("vote")
         .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for different storage \
-                backends.")
-        .arg(Arg::with_name("avg")
-            .long("avg")
-            .takes_value(false)
-            .help("compute average throughput at the end of benchmark"))
-        .arg(Arg::with_name("reuse")
-            .long("reuse")
-            .takes_value(false)
-            .help("do not prepopulate"))
-        .arg(Arg::with_name("cdf")
-            .short("c")
-            .long("cdf")
-            .takes_value(false)
-            .help("produce a CDF of recorded latencies for each client at the end"))
-        .arg(Arg::with_name("narticles")
-            .short("a")
-            .long("articles")
-            .value_name("N")
-            .default_value("100000")
-            .help("Number of articles to prepopulate the database with"))
-        .arg(Arg::with_name("distribution")
-            .short("d")
-            .takes_value(true)
-            .default_value("uniform")
-            .help("run benchmark with the given article id distribution [uniform|zipf:exponent]"))
-        .arg(Arg::with_name("bind")
-            .short("B")
-            .takes_value(true)
-            .help("bind to the given local address when possible"))
-        .arg(Arg::with_name("runtime")
-            .short("r")
-            .long("runtime")
-            .value_name("N")
-            .default_value("60")
-            .help("Benchmark runtime in seconds"))
-        .arg(Arg::with_name("batch")
-            .short("b")
-            .takes_value(true)
-            .default_value("1")
-            .help("Number of operations per batch (if supported)"))
-        .arg(Arg::with_name("quiet")
-            .short("q")
-            .long("quiet")
-            .help("No noisy output while running"))
-        .arg(Arg::with_name("MODE")
-            .index(1)
-            .help("Mode to run this client in [read|write|mix:rw_ratio]")
-            .required(true))
-        .arg(Arg::with_name("BACKEND")
-            .index(2)
-            .help(&backends)
-            .required(true))
+        .about(
+            "Benchmarks user-curated news aggregator throughput for different storage \
+                backends.",
+        )
+        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
+            "compute average throughput at the end of benchmark",
+        ))
+        .arg(
+            Arg::with_name("reuse")
+                .long("reuse")
+                .takes_value(false)
+                .help("do not prepopulate"),
+        )
+        .arg(
+            Arg::with_name("cdf")
+                .short("c")
+                .long("cdf")
+                .takes_value(false)
+                .help(
+                    "produce a CDF of recorded latencies for each client at the end",
+                ),
+        )
+        .arg(
+            Arg::with_name("narticles")
+                .short("a")
+                .long("articles")
+                .value_name("N")
+                .default_value("100000")
+                .help("Number of articles to prepopulate the database with"),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .takes_value(true)
+                .default_value("uniform")
+                .help(
+                    "run benchmark with the given article id distribution [uniform|zipf:exponent]",
+                ),
+        )
+        .arg(Arg::with_name("bind").short("B").takes_value(true).help(
+            "bind to the given local address when possible",
+        ))
+        .arg(
+            Arg::with_name("runtime")
+                .short("r")
+                .long("runtime")
+                .value_name("N")
+                .default_value("60")
+                .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("batch")
+                .short("b")
+                .takes_value(true)
+                .default_value("1")
+                .help("Number of operations per batch (if supported)"),
+        )
+        .arg(Arg::with_name("quiet").short("q").long("quiet").help(
+            "No noisy output while running",
+        ))
+        .arg(
+            Arg::with_name("MODE")
+                .index(1)
+                .help("Mode to run this client in [read|write|mix:rw_ratio]")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("BACKEND")
+                .index(2)
+                .help(&backends)
+                .required(true),
+        )
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -217,8 +238,10 @@ fn main() {
         }
         // garbage
         t => {
-            panic!("backend not supported -- make sure you compiled with --features b_{}",
-                   t)
+            panic!(
+                "backend not supported -- make sure you compiled with --features b_{}",
+                t
+            )
         }
     };
     print_stats(&cfg.mix, &stats, avg);

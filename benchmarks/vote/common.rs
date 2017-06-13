@@ -26,8 +26,9 @@ pub trait Writer {
     type Migrator: MigrationHandle + 'static;
 
     fn make_articles<I>(&mut self, articles: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator;
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator;
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period;
 
@@ -44,11 +45,11 @@ pub trait Writer {
         thread::Builder::new()
             .name("migrator".to_string())
             .spawn(move || {
-                       handle.execute();
-                       let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
-                       println!("Migration completed in {:.4}s", mig_duration);
-                       drop(tx);
-                   })
+                handle.execute();
+                let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
+                println!("Migration completed in {:.4}s", mig_duration);
+                drop(tx);
+            })
             .unwrap();
         rx
     }
@@ -72,12 +73,14 @@ pub trait Reader {
 use std::rc::Rc;
 use std::cell::RefCell;
 impl<T> Writer for Rc<RefCell<T>>
-    where T: Writer
+where
+    T: Writer,
 {
     type Migrator = T::Migrator;
     fn make_articles<I>(&mut self, articles: I)
-        where I: Iterator<Item = (i64, String)>,
-              I: ExactSizeIterator
+    where
+        I: Iterator<Item = (i64, String)>,
+        I: ExactSizeIterator,
     {
         self.borrow_mut().make_articles(articles)
     }
@@ -95,7 +98,8 @@ impl<T> Writer for Rc<RefCell<T>>
     }
 }
 impl<T> Reader for Rc<RefCell<T>>
-    where T: Reader
+where
+    T: Reader,
 {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         self.borrow_mut().get(ids)
@@ -119,9 +123,9 @@ impl FromStr for Distribution {
             str::parse::<f64>(s)
                 .map(|exp| Distribution::Zipf(exp))
                 .map_err(|e| {
-                             use std::error::Error;
-                             e.description().to_string()
-                         })
+                    use std::error::Error;
+                    e.description().to_string()
+                })
         } else {
             Err(format!("unknown distribution '{}'", s))
         }

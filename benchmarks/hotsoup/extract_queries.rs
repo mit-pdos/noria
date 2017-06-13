@@ -72,19 +72,31 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     queries
         .into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
-        .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc").to_string()))
-        .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "").to_string()))
+        .map(|(qn, q)| {
+            (qn, php_str_concat_inset.replace_all(&q, "$cc").to_string())
+        })
+        .map(|(qn, q)| {
+            (qn, php_str_concat.replace_all(&q, "").to_string())
+        })
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?").to_string()))
-        .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ").to_string()))
+        .map(|(qn, q)| {
+            (qn, linebreaks_tabs.replace_all(&q, " ").to_string())
+        })
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?").to_string()))
-        .map(|(qn, q)| (qn, braces_question_mark.replace_all(&q, "?").to_string()))
-        .map(|(qn, q)| (qn, question_mark_a.replace_all(&q, "=?").to_string()))
-        .map(|(qn, q)| (qn, unclosed_quote.replace_all(&q, "=?").to_string()))
+        .map(|(qn, q)| {
+            (qn, braces_question_mark.replace_all(&q, "?").to_string())
+        })
+        .map(|(qn, q)| {
+            (qn, question_mark_a.replace_all(&q, "=?").to_string())
+        })
+        .map(|(qn, q)| {
+            (qn, unclosed_quote.replace_all(&q, "=?").to_string())
+        })
         .map(|(qn, q)| if !q.ends_with(";") {
-                 (qn, format!("{};", q))
-             } else {
-                 (qn, q.to_string())
-             })
+            (qn, format!("{};", q))
+        } else {
+            (qn, q.to_string())
+        })
         .collect()
 }
 
@@ -100,22 +112,28 @@ fn main() {
     let matches = App::new("extract_queries")
         .version("0.1")
         .about("Extracts queries from HotCRP code.")
-        .arg(Arg::with_name("source")
-                 .index(1)
-                 .help("Location of the HotCRP code to work on.")
-                 .required(true))
-        .arg(Arg::with_name("output")
-                 .short("o")
-                 .long("output")
-                 .value_name("FILE")
-                 .help("Location to write output recipe to.")
-                 .required(true))
-        .arg(Arg::with_name("git_rev")
-                 .short("g")
-                 .long("git_rev")
-                 .value_name("REV")
-                 .help("Git revision that we're extracting for.")
-                 .required(true))
+        .arg(
+            Arg::with_name("source")
+                .index(1)
+                .help("Location of the HotCRP code to work on.")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .value_name("FILE")
+                .help("Location to write output recipe to.")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("git_rev")
+                .short("g")
+                .long("git_rev")
+                .value_name("REV")
+                .help("Git revision that we're extracting for.")
+                .required(true),
+        )
         .get_matches();
 
     let path = matches.value_of("source").unwrap();
