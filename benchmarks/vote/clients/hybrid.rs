@@ -33,7 +33,7 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
         if let Some(ref addr) = config.bind_to {
             opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
         }
-        opts.db_name(Some(db));
+        opts.db_name(None::<&str>);
         // allow larger in-memory tables (4 GB)
         opts.init(vec![
             "SET max_heap_table_size = 4294967296;",
