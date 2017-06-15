@@ -118,6 +118,9 @@ fn main() {
         .arg(Arg::with_name("stupid").long("stupid").help(
             "Make the migration stupid",
         ))
+        .arg(Arg::with_name("unsharded").long("unsharded").help(
+            "Run without sharding",
+        ))
         .arg(Arg::with_name("full").long("full").help(
             "Disable partial materialization",
         ))
@@ -150,6 +153,11 @@ fn main() {
     if args.is_present("full") {
         // it's okay to change this here, since it only matters for migration
         g.graph.disable_partial();
+    }
+
+    if args.is_present("unsharded") {
+        // it's okay to change this here, since it only matters for migration
+        g.graph.disable_sharding();
     }
 
     // we need a putter and a getter
