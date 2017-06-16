@@ -53,9 +53,9 @@ impl BenchmarkResult {
             HistogramIterator<u64, recorded::Iter<u64>>,
         ),
     > {
-        self.samples.as_ref().map(|&(ref r, ref w)| {
-            (r.iter_recorded(), w.iter_recorded())
-        })
+        self.samples
+            .as_ref()
+            .map(|&(ref r, ref w)| (r.iter_recorded(), w.iter_recorded()))
     }
 
     #[allow(dead_code)]
@@ -290,9 +290,9 @@ pub fn prep_writer<W: Writer>(
         assert_eq!(config.narticles % pop_batch_size, 0);
         for i in 0..config.narticles / pop_batch_size {
             let reali = pop_batch_size * i;
-            writer.make_articles((reali..reali + pop_batch_size).map(|i| {
-                (i as i64, format!("Article #{}", i))
-            }));
+            writer.make_articles(
+                (reali..reali + pop_batch_size).map(|i| (i as i64, format!("Article #{}", i))),
+            );
         }
         println!("Done with prepopulation");
     }

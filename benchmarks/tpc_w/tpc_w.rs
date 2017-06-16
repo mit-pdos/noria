@@ -186,9 +186,11 @@ fn main() {
                 .long("parallel-prepopulation")
                 .help("Prepopulate using parallel threads."),
         )
-        .arg(Arg::with_name("transactional").short("t").help(
-            "Use transactional writes.",
-        ))
+        .arg(
+            Arg::with_name("transactional")
+                .short("t")
+                .help("Use transactional writes."),
+        )
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();

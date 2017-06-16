@@ -30,9 +30,12 @@ fn main() {
         .about(
             "Benchmarks user-curated news aggregator throughput for in-memory Soup",
         )
-        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
-            "compute average throughput at the end of benchmark",
-        ))
+        .arg(
+            Arg::with_name("avg")
+                .long("avg")
+                .takes_value(false)
+                .help("compute average throughput at the end of benchmark"),
+        )
         .arg(
             Arg::with_name("cdf")
                 .short("c")
@@ -112,9 +115,12 @@ fn main() {
                 .help("Period for transition to new views for readers and writers")
                 .requires("migrate"),
         )
-        .arg(Arg::with_name("quiet").short("q").long("quiet").help(
-            "No noisy output while running",
-        ))
+        .arg(
+            Arg::with_name("quiet")
+                .short("q")
+                .long("quiet")
+                .help("No noisy output while running"),
+        )
         .arg(
             Arg::with_name("durability")
                 .long("durability")

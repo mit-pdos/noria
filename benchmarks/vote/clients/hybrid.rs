@@ -178,9 +178,9 @@ impl Reader for RW {
         };
 
         let mut res = Vec::new();
-        let (hits, misses): (Vec<_>, Vec<_>) = keys.into_iter().enumerate().partition(|&(_, k)| {
-            vals.contains_key(k)
-        });
+        let (hits, misses): (Vec<_>, Vec<_>) = keys.into_iter()
+            .enumerate()
+            .partition(|&(_, k)| vals.contains_key(k));
         for (_, k) in hits {
             let s = String::from_utf8_lossy(vals.get(k).unwrap().0.as_slice());
             let mut parts = s.split(";");

@@ -75,9 +75,12 @@ fn main() {
             "Benchmarks user-curated news aggregator throughput for different storage \
                 backends.",
         )
-        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
-            "compute average throughput at the end of benchmark",
-        ))
+        .arg(
+            Arg::with_name("avg")
+                .long("avg")
+                .takes_value(false)
+                .help("compute average throughput at the end of benchmark"),
+        )
         .arg(
             Arg::with_name("reuse")
                 .long("reuse")
@@ -110,9 +113,12 @@ fn main() {
                     "run benchmark with the given article id distribution [uniform|zipf:exponent]",
                 ),
         )
-        .arg(Arg::with_name("bind").short("B").takes_value(true).help(
-            "bind to the given local address when possible",
-        ))
+        .arg(
+            Arg::with_name("bind")
+                .short("B")
+                .takes_value(true)
+                .help("bind to the given local address when possible"),
+        )
         .arg(
             Arg::with_name("runtime")
                 .short("r")
@@ -128,9 +134,12 @@ fn main() {
                 .default_value("1")
                 .help("Number of operations per batch (if supported)"),
         )
-        .arg(Arg::with_name("quiet").short("q").long("quiet").help(
-            "No noisy output while running",
-        ))
+        .arg(
+            Arg::with_name("quiet")
+                .short("q")
+                .long("quiet")
+                .help("No noisy output while running"),
+        )
         .arg(
             Arg::with_name("MODE")
                 .index(1)
