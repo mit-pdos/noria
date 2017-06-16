@@ -23,7 +23,7 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
         if let Some(ref addr) = config.bind_to {
             opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
         }
-        opts.db_name(Some(db));
+        opts.db_name(None::<&str>);
         opts.init(vec![
             "SET max_heap_table_size = 4294967296;",
             "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",

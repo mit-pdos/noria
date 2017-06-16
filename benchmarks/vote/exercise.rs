@@ -48,8 +48,10 @@ impl BenchmarkResult {
     pub fn cdf_percentiles(
         &self,
     ) -> Option<
-        (HistogramIterator<u64, recorded::Iter<u64>>,
-         HistogramIterator<u64, recorded::Iter<u64>>),
+        (
+            HistogramIterator<u64, recorded::Iter<u64>>,
+            HistogramIterator<u64, recorded::Iter<u64>>,
+        ),
     > {
         self.samples.as_ref().map(|&(ref r, ref w)| {
             (r.iter_recorded(), w.iter_recorded())
