@@ -372,9 +372,12 @@ fn main() {
     let args = App::new("bank")
         .version("0.1")
         .about("Benchmarks Soup transactions and reports abort rate.")
-        .arg(Arg::with_name("avg").long("avg").takes_value(false).help(
-            "compute average throughput at the end of benchmark",
-        ))
+        .arg(
+            Arg::with_name("avg")
+                .long("avg")
+                .takes_value(false)
+                .help("compute average throughput at the end of benchmark"),
+        )
         .arg(
             Arg::with_name("naccounts")
                 .short("a")

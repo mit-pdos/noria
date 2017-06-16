@@ -185,12 +185,16 @@ fn main() {
                     "Schema version to stop at; versions after this will be skipped.",
                 ),
         )
-        .arg(Arg::with_name("base_only").long("base_only").help(
-            "Only add base tables, not queries.",
-        ))
-        .arg(Arg::with_name("transactional").short("t").help(
-            "Use transactional writes.",
-        ))
+        .arg(
+            Arg::with_name("base_only")
+                .long("base_only")
+                .help("Only add base tables, not queries."),
+        )
+        .arg(
+            Arg::with_name("transactional")
+                .short("t")
+                .help("Use transactional writes."),
+        )
         .get_matches();
 
     let blloc = matches.value_of("blacklist").unwrap();

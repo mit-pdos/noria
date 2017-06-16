@@ -159,9 +159,12 @@ fn main() {
                 .default_value("10000")
                 .help("Number of posts to prepopulate the database with"),
         )
-        .arg(Arg::with_name("csv").long("csv").required(false).help(
-            "Print output in CSV format.",
-        ))
+        .arg(
+            Arg::with_name("csv")
+                .long("csv")
+                .required(false)
+                .help("Print output in CSV format."),
+        )
         .arg(
             Arg::with_name("fanout")
                 .long("fanout")

@@ -115,15 +115,21 @@ fn main() {
                 .default_value("60")
                 .help("Benchmark runtime in seconds"),
         )
-        .arg(Arg::with_name("stupid").long("stupid").help(
-            "Make the migration stupid",
-        ))
-        .arg(Arg::with_name("unsharded").long("unsharded").help(
-            "Run without sharding",
-        ))
-        .arg(Arg::with_name("full").long("full").help(
-            "Disable partial materialization",
-        ))
+        .arg(
+            Arg::with_name("stupid")
+                .long("stupid")
+                .help("Make the migration stupid"),
+        )
+        .arg(
+            Arg::with_name("unsharded")
+                .long("unsharded")
+                .help("Run without sharding"),
+        )
+        .arg(
+            Arg::with_name("full")
+                .long("full")
+                .help("Disable partial materialization"),
+        )
         .arg(
             Arg::with_name("migrate")
                 .short("m")
