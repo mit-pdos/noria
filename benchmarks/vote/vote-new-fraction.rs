@@ -145,7 +145,9 @@ fn main() {
     let every = time::Duration::from_millis(200);
 
     // default persistence (memory only)
-    let persistence_params = distributary::PersistenceParameters::default();
+    let mut persistence_params = distributary::PersistenceParameters::default();
+    persistence_params.queue_capacity = 1;
+    persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // setup db
     let mut g = graph::make(false, false, persistence_params);
