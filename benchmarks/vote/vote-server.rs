@@ -18,7 +18,7 @@ fn main() {
         .version("0.1")
         .about(
             "Benchmarks user-curated news aggregator throughput for different storage \
-                backends.",
+             backends.",
         )
         .arg(
             Arg::with_name("ADDR")

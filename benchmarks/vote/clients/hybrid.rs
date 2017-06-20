@@ -55,12 +55,13 @@ pub fn setup(mysql_dbn: &str, memcached_dbn: &str, config: &RuntimeConfig) -> Po
         // create tables with indices
         pool.prep_exec(
             "CREATE TABLE art (id bigint, title varchar(16), \
-                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
+             PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
             (),
         ).unwrap();
-        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
-                       ())
-            .unwrap();
+        pool.prep_exec(
+            "CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
+            (),
+        ).unwrap();
     }
 
     let mut opts = OptsBuilder::from_opts(opts.clone());
@@ -198,9 +199,9 @@ impl Reader for RW {
                 .map(|(i, _)| {
                     format!(
                         "SELECT art.id, title, COUNT(vt.u) as votes \
-                                  FROM art, vt \
-                                  WHERE art.id = vt.id AND art.id = {} \
-                                  GROUP BY vt.id, title",
+                         FROM art, vt \
+                         WHERE art.id = vt.id AND art.id = {} \
+                         GROUP BY vt.id, title",
                         ids[i].1
                     )
                 })

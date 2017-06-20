@@ -18,11 +18,11 @@ fn mkc(addr: &str) -> Client {
     let fc = tiberius::SqlConnection::connect(core.handle(), cfg_string).and_then(|conn| {
         conn.simple_exec(format!(
             "USE {}; \
-                                      SET NUMERIC_ROUNDABORT OFF; \
-                                      SET ANSI_PADDING, ANSI_WARNINGS, \
-                                      CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
-                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+             SET NUMERIC_ROUNDABORT OFF; \
+             SET ANSI_PADDING, ANSI_WARNINGS, \
+             CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
+             QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+             SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
             db
         )).and_then(|r| r)
             .collect()
@@ -47,11 +47,11 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
     let fixconn = |conn: tiberius::SqlConnection<Box<tiberius::BoxableIo>>| {
         conn.simple_exec(format!(
             "USE {}; \
-                                      SET NUMERIC_ROUNDABORT OFF; \
-                                      SET ANSI_PADDING, ANSI_WARNINGS, \
-                                      CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                                      QUOTED_IDENTIFIER, ANSI_NULLS ON; \
-                                      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+             SET NUMERIC_ROUNDABORT OFF; \
+             SET ANSI_PADDING, ANSI_WARNINGS, \
+             CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
+             QUOTED_IDENTIFIER, ANSI_NULLS ON; \
+             SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
             db
         )).and_then(|r| r)
             .collect()
@@ -221,20 +221,19 @@ impl Reader for RW {
                 .query(&self.prep, data.as_slice())
                 .for_each(|qs| {
                     let q_res: Vec<ArticleResult> = qs.wait()
-                        .map(|row: Result<
-                            tiberius::query::QueryRow,
-                            tiberius::TdsError,
-                        >| {
-                            let row = row.unwrap();
-                            let aid: i64 = row.get(0);
-                            let title: &str = row.get(1);
-                            let votes: i64 = row.get(2);
-                            ArticleResult::Article {
-                                id: aid,
-                                title: String::from(title),
-                                votes: votes,
-                            }
-                        })
+                        .map(
+                            |row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
+                                let row = row.unwrap();
+                                let aid: i64 = row.get(0);
+                                let title: &str = row.get(1);
+                                let votes: i64 = row.get(2);
+                                ArticleResult::Article {
+                                    id: aid,
+                                    title: String::from(title),
+                                    votes: votes,
+                                }
+                            },
+                        )
                         .collect();
                     res.extend(q_res);
                     Ok(())

@@ -207,29 +207,25 @@ fn main() {
     let num_authors = populate_authors(&backend, &ploc);
     backend.prepop_counts.insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc);
-    backend.prepop_counts.insert(
-        "countries".into(),
-        num_countries,
-    );
+    backend
+        .prepop_counts
+        .insert("countries".into(), num_countries);
     let num_customers = populate_customers(&backend, &ploc);
-    backend.prepop_counts.insert(
-        "customers".into(),
-        num_customers,
-    );
+    backend
+        .prepop_counts
+        .insert("customers".into(), num_customers);
     let num_items = populate_items(&backend, &ploc);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
     let num_cc_xacts = populate_cc_xacts(&backend, &ploc);
-    backend.prepop_counts.insert(
-        "cc_xacts".into(),
-        num_cc_xacts,
-    );
+    backend
+        .prepop_counts
+        .insert("cc_xacts".into(), num_cc_xacts);
     let num_order_line = populate_order_line(&backend, &ploc);
-    backend.prepop_counts.insert(
-        "order_line".into(),
-        num_order_line,
-    );
+    backend
+        .prepop_counts
+        .insert("order_line".into(), num_order_line);
 
     if parallel_prepop {
         backend.barrier.wait();

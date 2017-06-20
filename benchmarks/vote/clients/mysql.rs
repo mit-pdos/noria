@@ -41,13 +41,15 @@ pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
         drop(conn);
 
         // create tables with indices
-        pool.prep_exec("CREATE TABLE art (id bigint, title varchar(16), votes bigint, \
-                        PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
-                       ())
-            .unwrap();
-        pool.prep_exec("CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
-                       ())
-            .unwrap();
+        pool.prep_exec(
+            "CREATE TABLE art (id bigint, title varchar(16), votes bigint, \
+             PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
+            (),
+        ).unwrap();
+        pool.prep_exec(
+            "CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
+            (),
+        ).unwrap();
     }
 
     // now we connect for real

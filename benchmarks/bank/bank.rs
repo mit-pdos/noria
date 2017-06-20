@@ -243,10 +243,8 @@ fn client(
                 let mut last_instant = time::Instant::now();
                 let write_start = clock.get_time();
                 let res = if transactions {
-                    mutator.transactional_put(
-                        vec![src.into(), dst.into(), 100.into()],
-                        token.into(),
-                    )
+                    mutator
+                        .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
                 } else {
                     mutator
                         .put(vec![src.into(), dst.into(), 100.into()])
