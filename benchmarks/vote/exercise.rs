@@ -191,7 +191,11 @@ where
                 let desc = if config.mix.is_mixed() {
                     "MIX"
                 } else {
-                    if read { "GET" } else { "PUT" }
+                    if read {
+                        "GET"
+                    } else {
+                        "PUT"
+                    }
                 };
                 match period {
                     Period::PreMigration => {

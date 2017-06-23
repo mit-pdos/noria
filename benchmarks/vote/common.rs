@@ -174,7 +174,11 @@ impl Mix {
     }
 
     pub fn is_mixed(&self) -> bool {
-        if let Mix::RW(..) = *self { true } else { false }
+        if let Mix::RW(..) = *self {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn does_read(&self) -> bool {

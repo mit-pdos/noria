@@ -200,7 +200,7 @@ fn main() {
     let taking_putter = app.soup.get_mutator(app.taking);
     let mut post_putter = app.soup.get_mutator(app.post);
 
-    println!("Seeding...", );
+    println!("Seeding...",);
     populate_users(nusers, user_putter);
     populate_classes(nclasses, class_putter);
     match fanout.as_ref() {
