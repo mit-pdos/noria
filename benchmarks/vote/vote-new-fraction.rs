@@ -220,7 +220,7 @@ fn main() {
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                read_old(&random[i].into(), true).unwrap();
+                read_old.lookup(&random[i].into(), true).unwrap();
                 i = (i + 1) % random.len();
                 thread::yield_now();
             }
@@ -285,7 +285,7 @@ fn main() {
         let mut hits = 0;
         let mut reporter = Reporter::new(every);
         while start.elapsed() < runtime {
-            match read_new(&r_random[i].into(), false) {
+            match read_new.lookup(&r_random[i].into(), false) {
                 Ok(ref rs) if !rs.is_empty() => {
                     hits += 1;
                 }

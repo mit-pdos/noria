@@ -383,7 +383,7 @@ impl Crossover {
     }
 }
 
-type G = Box<Fn(&DataType, bool) -> Result<Vec<Vec<DataType>>, ()> + Send + 'static>;
+type G = distributary::Getter;
 
 // A more dangerous AtomicPtr that also derefs into the inner type
 use std::sync::atomic::AtomicPtr;
@@ -572,7 +572,11 @@ impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let res = ids.iter()
             .map(|&(_, article_id)| {
-                let rows = try!((self.call())(&article_id.into(), true).map_err(|_| ()));
+                let rows = try!(
+                    (self.call())
+                        .lookup(&article_id.into(), true)
+                        .map_err(|_| ())
+                );
                 debug_assert_eq!(rows.len(), 1);
                 match rows.into_iter().last() {
                     Some(row) => {

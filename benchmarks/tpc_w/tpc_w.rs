@@ -139,7 +139,7 @@ impl Backend {
                 let mut ok = 0;
                 for _ in 0..num {
                     let param = self.generate_parameter(query_name, &mut rng);
-                    match g(&param, true) {
+                    match g.lookup(&param, true) {
                         Err(_) => panic!(),
                         Ok(datas) => {
                             if datas.len() > 0 {
