@@ -16,14 +16,11 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, Join, JoinType, Datas, DataType, Token, Mutator};
+use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
 
 use rand::Rng;
 
 use timekeeper::{Source, RealTime};
-
-#[allow(dead_code)]
-type TxGet = Box<Fn(&DataType) -> Result<(Datas, Token), ()> + Send>;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -42,7 +39,6 @@ pub struct Bank {
     blender: Blender,
     transfers: distributary::NodeIndex,
     balances: distributary::NodeIndex,
-    transactions: bool,
 }
 
 pub fn setup(transactions: bool) -> Box<Bank> {
@@ -101,23 +97,12 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         blender: g,
         transfers: transfers,
         balances: balances,
-        transactions: transactions,
     })
 }
 
 impl Bank {
-    fn getter(&mut self) -> Box<Getter> {
-        if self.transactions {
-            Box::new(
-                self.blender
-                    .get_transactional_getter(self.balances)
-                    .unwrap(),
-            )
-        } else {
-            let g = self.blender.get_getter(self.balances).unwrap();
-            let b = Box::new(move |d: &DataType| g(d, true).map(|r| (r, Token::empty()))) as Box<_>;
-            Box::new(b)
-        }
+    fn getter(&mut self) -> distributary::Getter {
+        self.blender.get_getter(self.balances).unwrap()
     }
     pub fn migrate(&mut self) {
         let mut mig = self.blender.start_migration();
@@ -128,28 +113,6 @@ impl Bank {
         );
         mig.maintain(identity, 0);
         mig.commit();
-    }
-}
-
-pub trait Getter: Send {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a>;
-}
-
-impl Getter for TxGet {
-    fn get<'a>(&'a self) -> Box<FnMut(i64) -> Result<Option<(i64, Token)>, ()> + 'a> {
-        Box::new(move |id| {
-            self(&id.into()).map(|(res, token)| {
-                assert_eq!(res.len(), 1);
-                res.into_iter().next().map(|row| {
-                    // we only care about the first result
-                    let mut row = row.into_iter();
-                    let _: i64 = row.next().unwrap().into();
-                    let credit: i64 = row.next().unwrap().into();
-                    let debit: i64 = row.next().unwrap().into();
-                    (credit - debit, token)
-                })
-            })
-        })
     }
 }
 
@@ -178,7 +141,7 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
 fn client(
     _i: usize,
     mut mutator: Mutator,
-    balances_get: Box<Getter>,
+    balances_get: distributary::Getter,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -205,7 +168,26 @@ fn client(
     let mut successful_transfers = Vec::new();
 
     {
-        let mut get = balances_get.get();
+        let f = |(res, token): (distributary::Datas, _)| {
+            assert_eq!(res.len(), 1);
+            res.into_iter().next().map(|row| {
+                // we only care about the first result
+                let mut row = row.into_iter();
+                let _: i64 = row.next().unwrap().into();
+                let credit: i64 = row.next().unwrap().into();
+                let debit: i64 = row.next().unwrap().into();
+                (credit - debit, token)
+            })
+        };
+
+        let get = |id: &DataType| if balances_get.supports_transactions() {
+            balances_get.transactional_lookup(id).map(&f)
+        } else {
+            balances_get
+                .lookup(id, true)
+                .map(|rs| f((rs, Token::empty())))
+        };
+
 
         let mut num_requests = 1;
         while start.elapsed() < runtime {
@@ -222,7 +204,7 @@ fn client(
             assert_ne!(dst, src);
 
             let transaction_start = clock.get_time();
-            let (balance, mut token) = get(src).unwrap().unwrap();
+            let (balance, mut token) = get(&src.into()).unwrap().unwrap();
 
             assert!(
                 balance >= 0 || !transactions,
@@ -329,7 +311,7 @@ fn client(
             }
 
             for (account, balance) in target_balances {
-                assert_eq!(get(account).unwrap().unwrap().0, balance);
+                assert_eq!(get(&account.into()).unwrap().unwrap().0, balance);
             }
             println!("Audit found no irregularities");
         }
@@ -487,7 +469,7 @@ fn main() {
         .map(|i| {
             Some({
                 let mutator = bank.blender.get_mutator(bank.transfers);
-                let balances_get: Box<Getter> = bank.getter();
+                let balances_get = bank.getter();
 
                 thread::Builder::new()
                     .name(format!("bank{}", i))
@@ -515,7 +497,7 @@ fn main() {
     let latency_client = if measure_latency {
         Some({
             let mutator = bank.blender.get_mutator(bank.transfers);
-            let balances_get: Box<Getter> = bank.getter();
+            let balances_get = bank.getter();
 
             thread::Builder::new()
                 .name(format!("bank{}", nthreads))

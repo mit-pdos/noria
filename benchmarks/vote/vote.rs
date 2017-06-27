@@ -383,7 +383,7 @@ impl Crossover {
     }
 }
 
-type G = Box<Fn(&DataType, bool) -> Result<Vec<Vec<DataType>>, ()> + Send + 'static>;
+type G = distributary::Getter;
 
 // A more dangerous AtomicPtr that also derefs into the inner type
 use std::sync::atomic::AtomicPtr;
@@ -572,26 +572,34 @@ impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         let res = ids.iter()
             .map(|&(_, article_id)| {
-                let rows = try!((self.call())(&article_id.into(), true).map_err(|_| ()));
-                debug_assert_eq!(rows.len(), 1);
-                match rows.into_iter().last() {
-                    Some(row) => {
-                        // we only care about the first result
-                        let mut row = row.into_iter();
-                        let id: i64 = row.next().unwrap().into();
-                        let title: String = row.next().unwrap().into();
-                        let votes: i64 = match row.next().unwrap() {
-                            DataType::None => 42,
-                            d => d.into(),
-                        };
-                        Ok(ArticleResult::Article {
-                            id: id,
-                            title: title,
-                            votes: votes,
-                        })
-                    }
-                    None => Ok(ArticleResult::NoSuchArticle),
-                }
+                (self.call())
+                    .lookup_map(
+                        &article_id.into(),
+                        |rows| match rows.len() {
+                            0 => ArticleResult::NoSuchArticle,
+                            1 => {
+                                let row = &rows[0];
+                                let id: i64 = row[0].clone().into();
+                                let title: String = row[1].deep_clone().into();
+                                let votes: i64 = match row[2] {
+                                    DataType::None => 42,
+                                    ref d => d.clone().into(),
+                                };
+                                ArticleResult::Article {
+                                    id: id,
+                                    title: title,
+                                    votes: votes,
+                                }
+                            }
+                            _ => unreachable!(),
+                        },
+                        true,
+                    )
+                    .map(|r| {
+                        // r.is_none() if partial and not yet ready
+                        // but that can't happen since we use blocking
+                        r.unwrap()
+                    })
             })
             .collect();
 
