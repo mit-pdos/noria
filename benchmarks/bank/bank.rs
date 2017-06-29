@@ -141,7 +141,7 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
 fn client(
     _i: usize,
     mut mutator: Mutator,
-    balances_get: distributary::Getter,
+    mut balances_get: distributary::Getter,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -180,7 +180,7 @@ fn client(
             })
         };
 
-        let get = |id: &DataType| if balances_get.supports_transactions() {
+        let mut get = |id: &DataType| if balances_get.supports_transactions() {
             balances_get.transactional_lookup(id).map(&f)
         } else {
             balances_get
