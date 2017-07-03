@@ -7,6 +7,7 @@ extern crate distributary;
 
 extern crate hdrsample;
 extern crate zipf;
+extern crate bus;
 
 mod exercise;
 mod graph;
@@ -14,10 +15,9 @@ mod graph;
 #[macro_use]
 mod common;
 
-use common::{Writer, Reader, ArticleResult, Period, MigrationHandle, RuntimeConfig, Distribution};
+use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
 use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
 
-use std::sync::mpsc;
 use std::thread;
 use std::sync;
 use std::time;
@@ -70,6 +70,14 @@ fn main() {
                 .value_name("N")
                 .default_value("1")
                 .help("Number of GET clients to start"),
+        )
+        .arg(
+            Arg::with_name("nputters")
+                .short("p")
+                .long("putters")
+                .value_name("N")
+                .default_value("1")
+                .help("Number of PUT clients to start"),
         )
         .arg(
             Arg::with_name("narticles")
@@ -156,6 +164,7 @@ fn main() {
         .map(|_| value_t_or_exit!(args, "crossover", u64))
         .map(time::Duration::from_secs);
     let ngetters = value_t_or_exit!(args, "ngetters", usize);
+    let nputters = value_t_or_exit!(args, "nputters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
@@ -169,9 +178,6 @@ fn main() {
     let mut config = RuntimeConfig::new(narticles, common::Mix::Read(1), Some(runtime));
     config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
-    if let Some(migrate_after) = migrate_after {
-        config.perform_migration_at(migrate_after);
-    }
     config.use_distribution(dist);
 
     let mode = if args.is_present("durability") {
@@ -188,7 +194,6 @@ fn main() {
 
     // setup db
     let g = graph::make(!args.is_present("quiet"), transactions, persistence_params);
-    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
     // prepare getters
     let getters: Vec<_> = (0..ngetters)
@@ -198,36 +203,74 @@ fn main() {
         })
         .collect();
 
-    let g = sync::Arc::new(sync::Mutex::new(g));
-    let putter = Spoon {
-        graph: g.clone(),
-        getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
-        article: putters.0,
-        vote_pre: putters.1,
-        vote_post: None,
-        new_vote: None,
-        stupid: args.is_present("stupid"),
-        i: 0,
-        x: Crossover::new(crossover),
-        transactions: transactions,
-    };
+    let mut new_votes = migrate_after.map(|t| (t, bus::Bus::new(nputters)));
+    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
 
-    let put_stats;
+    // prepare putters
+    let putters: Vec<_> = (0..nputters)
+        .into_iter()
+        .map(|_| {
+            Spoon {
+                article: putters.0.clone(),
+                vote_pre: putters.1.clone(),
+                vote_post: None,
+                new_vote: new_votes.as_mut().map(|&mut (_, ref mut bus)| bus.add_rx()),
+                x: Crossover::new(crossover),
+                i: 0,
+            }
+        })
+        .collect();
+
+    let put_stats: Vec<_>;
     let get_stats: Vec<_>;
     if stage {
-        // put then get
+        let start = sync::Arc::new(sync::Barrier::new(putters.len()));
+        let prepop = Some(sync::Arc::new(sync::Barrier::new(putters.len() + 1)));
         let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
-        put_stats = exercise::launch(None::<exercise::NullClient>, Some(putter), pconfig, None);
+        // put first
+        let putters: Vec<_> = putters
+            .into_iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let start = start.clone();
+                let prepop = prepop.clone();
+                let mut pconfig = pconfig.clone();
+                if i != 0 {
+                    // only one thread does prepopulation
+                    pconfig.set_reuse(true);
+                }
+                thread::Builder::new()
+                    .name(format!("PUT{}", i))
+                    .spawn(move || {
+                        exercise::launch(
+                            None::<exercise::NullClient>,
+                            Some(p),
+                            pconfig,
+                            prepop,
+                            start,
+                        )
+                    })
+                    .unwrap()
+            })
+            .collect();
+
+        prepop.map(|b| b.wait());
+        // prepop finished, now wait for them to finish
+        put_stats = putters.into_iter().map(|jh| jh.join().unwrap()).collect();
+
+        // then get
+        let start = sync::Arc::new(sync::Barrier::new(getters.len()));
         let getters: Vec<_> = getters
             .into_iter()
             .enumerate()
             .map(|(i, g)| {
+                let start = start.clone();
                 let config = config.clone();
                 thread::Builder::new()
                     .name(format!("GET{}", i))
                     .spawn(move || {
-                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None, start)
                     })
                     .unwrap()
             })
@@ -235,48 +278,109 @@ fn main() {
         get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
     } else {
         // put & get
-        // TODO: how do we start getters after prepopulate?
-        let (tx, prepop) = mpsc::sync_channel(0);
+        let mut n = putters.len() + getters.len();
+        if new_votes.is_some() {
+            n += 1;
+        }
+        let start = sync::Arc::new(sync::Barrier::new(n));
+        let barrier = Some(sync::Arc::new(sync::Barrier::new(putters.len() + 1)));
         let mut pconfig = config.clone();
         pconfig.mix = common::Mix::Write(1);
-        let putter = thread::Builder::new()
-            .name("PUT0".to_string())
-            .spawn(move || {
-                exercise::launch(
-                    None::<exercise::NullClient>,
-                    Some(putter),
-                    pconfig,
-                    Some(tx),
-                )
-            })
-            .unwrap();
-
-        // wait for prepopulation to finish
-        prepop.recv().is_err();
-
-        let getters: Vec<_> = getters
+        let putters: Vec<_> = putters
             .into_iter()
             .enumerate()
-            .map(|(i, g)| {
-                let config = config.clone();
+            .map(|(i, p)| {
+                let start = start.clone();
+                let barrier = barrier.clone();
+                let mut pconfig = pconfig.clone();
+                if i != 0 {
+                    // only one thread does prepopulation
+                    pconfig.set_reuse(true);
+                }
                 thread::Builder::new()
-                    .name(format!("GET{}", i))
+                    .name(format!("PUT{}", i))
                     .spawn(move || {
-                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None)
+                        exercise::launch(
+                            None::<exercise::NullClient>,
+                            Some(p),
+                            pconfig,
+                            barrier,
+                            start,
+                        )
                     })
                     .unwrap()
             })
             .collect();
 
-        put_stats = putter.join().unwrap();
+        // wait for prepopulation to finish
+        barrier.map(|b| b.wait());
+
+        // start migrator
+        // we need a barrier to make sure the migrator doesn't drop the graph too early
+        let drop = sync::Arc::new(sync::Barrier::new(2));
+        let mig = if let Some((dur, bus)) = new_votes {
+            let m = Migrator {
+                graph: g,
+                barrier: drop.clone(),
+                getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
+                bus: bus,
+                stupid: args.is_present("stupid"),
+                transactions: transactions,
+            };
+            let start = start.clone();
+            Some((
+                drop,
+                thread::Builder::new()
+                    .name("migrator".to_string())
+                    .spawn(move || {
+                        start.wait();
+                        m.run(dur)
+                    })
+                    .unwrap(),
+            ))
+        } else {
+            None
+        };
+
+        let getters: Vec<_> = getters
+            .into_iter()
+            .enumerate()
+            .map(|(i, g)| {
+                let start = start.clone();
+                let config = config.clone();
+                thread::Builder::new()
+                    .name(format!("GET{}", i))
+                    .spawn(move || {
+                        exercise::launch(Some(g), None::<exercise::NullClient>, config, None, start)
+                    })
+                    .unwrap()
+            })
+            .collect();
+
+        put_stats = putters.into_iter().map(|jh| jh.join().unwrap()).collect();
         get_stats = getters.into_iter().map(|jh| jh.join().unwrap()).collect();
+        if let Some((drop, mig)) = mig {
+            drop.wait();
+            mig.join().unwrap();
+        }
     }
 
-    print_stats("PUT", false, &put_stats.pre, avg);
+    for (i, s) in put_stats.iter().enumerate() {
+        print_stats(format!("PUT{}", i), true, &s.pre, avg);
+    }
     for (i, s) in get_stats.iter().enumerate() {
         print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
+        let sum = put_stats.iter().fold(
+            (0f64, 0usize),
+            |(tot, count), stats| {
+                // TODO: do we *really* want an average of averages?
+                let (sum, num) = stats.pre.sum_len();
+                (tot + sum, count + num)
+            },
+        );
+        println!("avg PUT: {:.2}", sum.0 as f64 / sum.1 as f64);
         let sum = get_stats.iter().fold(
             (0f64, 0usize),
             |(tot, count), stats| {
@@ -289,11 +393,22 @@ fn main() {
     }
 
     if migrate_after.is_some() {
-        print_stats("PUT+", false, &put_stats.post, avg);
+        for (i, s) in put_stats.iter().enumerate() {
+            print_stats(format!("PUT{}+", i), true, &s.post, avg);
+        }
         for (i, s) in get_stats.iter().enumerate() {
             print_stats(format!("GET{}+", i), true, &s.post, avg);
         }
         if avg {
+            let sum = put_stats.iter().fold(
+                (0f64, 0usize),
+                |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.post.sum_len();
+                    (tot + sum, count + num)
+                },
+            );
+            println!("avg PUT+: {:.2}", sum.0 as f64 / sum.1 as f64);
             let sum = get_stats.iter().fold(
                 (0f64, 0usize),
                 |(tot, count), stats| {
@@ -471,21 +586,15 @@ impl Drop for Getter {
 }
 
 struct Spoon {
-    graph: sync::Arc<sync::Mutex<graph::Graph>>,
     article: Mutator,
-    getters: Vec<Getter>,
     vote_pre: Mutator,
     vote_post: Option<Mutator>,
-    stupid: bool,
     i: usize,
     x: Crossover,
-    new_vote: Option<mpsc::Receiver<Mutator>>,
-    transactions: bool,
+    new_vote: Option<bus::BusReader<Mutator>>,
 }
 
 impl Writer for Spoon {
-    type Migrator = Migrator;
-
     fn make_articles<I>(&mut self, articles: I)
     where
         I: ExactSizeIterator,
@@ -502,7 +611,7 @@ impl Writer for Spoon {
         if self.new_vote.is_some() {
             self.i += 1;
             // don't try too eagerly
-            if self.i & 16384 == 0 {
+            if self.i & 65536 == 0 {
                 // we may have been given a new putter
                 if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
@@ -529,42 +638,39 @@ impl Writer for Spoon {
                     .put(vec![user_id.into(), article_id.into()])
                     .unwrap();
             }
-            // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
-            Period::PostMigration
-        }
-    }
-
-    fn prepare_migration(&mut self) -> Self::Migrator {
-        let (tx, rx) = mpsc::sync_channel(0);
-        self.new_vote = Some(rx);
-        self.i = 1;
-        Migrator {
-            graph: self.graph.clone(),
-            mut_tx: tx,
-            stupid: self.stupid,
-            getters: self.getters.iter().map(|g| unsafe { g.clone() }).collect(),
-            transactions: self.transactions,
+            if !self.x.has_swapped() {
+                Period::PreMigration
+            } else {
+                // XXX: unclear if this should be Pre- or Post- if self.x.has_swapped()
+                Period::PostMigration
+            }
         }
     }
 }
 
 struct Migrator {
-    graph: sync::Arc<sync::Mutex<graph::Graph>>,
-    mut_tx: mpsc::SyncSender<Mutator>,
+    graph: graph::Graph,
+    bus: bus::Bus<Mutator>,
     getters: Vec<Getter>,
+    barrier: sync::Arc<sync::Barrier>,
     transactions: bool,
     stupid: bool,
 }
 
-impl MigrationHandle for Migrator {
-    fn execute(&mut self) {
-        let mut g = self.graph.lock().unwrap();
-        let (rating, newend) = g.transition(self.stupid, self.transactions);
-        let mutator = g.graph.get_mutator(rating);
-        self.mut_tx.send(mutator).unwrap();
-        for getter in &mut self.getters {
-            unsafe { getter.replace(g.graph.get_getter(newend).unwrap()) };
+impl Migrator {
+    pub fn run(mut self, migrate_after: time::Duration) {
+        thread::sleep(migrate_after);
+        println!("Starting migration");
+        let mig_start = time::Instant::now();
+        let (rating, newend) = self.graph.transition(self.stupid, self.transactions);
+        let mutator = self.graph.graph.get_mutator(rating);
+        self.bus.broadcast(mutator);
+        for mut getter in self.getters {
+            unsafe { getter.replace(self.graph.graph.get_getter(newend).unwrap()) };
         }
+        let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
+        println!("Migration completed in {:.4}s", mig_duration);
+        self.barrier.wait();
     }
 }
 
@@ -598,7 +704,7 @@ impl Reader for Getter {
                     .map(|r| {
                         // r.is_none() if partial and not yet ready
                         // but that can't happen since we use blocking
-                        r.unwrap()
+                        r.expect("blocking read returned None")
                     })
             })
             .collect();

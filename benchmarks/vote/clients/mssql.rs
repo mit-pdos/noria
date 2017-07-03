@@ -143,7 +143,6 @@ pub struct RW {
 }
 
 impl Writer for RW {
-    type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
     where
         I: Iterator<Item = (i64, String)>,

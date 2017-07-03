@@ -8,7 +8,7 @@ macro_rules! dur_to_ns {
     }}
 }
 
-use std::sync::mpsc;
+use std::sync;
 use std::thread;
 use std::time;
 
@@ -100,7 +100,12 @@ impl BenchmarkResults {
     }
 }
 
-fn driver<R, W>(mut config: RuntimeConfig, mut r: Option<R>, w: Option<W>) -> BenchmarkResults
+fn driver<R, W>(
+    mut config: RuntimeConfig,
+    mut r: Option<R>,
+    mut w: Option<W>,
+    start: sync::Arc<sync::Barrier>,
+) -> BenchmarkResults
 where
     R: Reader,
     W: Writer,
@@ -111,8 +116,6 @@ where
     }
 
     {
-        let mut w = w.map(|w| WState::new(w));
-
         // random article ids with distribution. we pre-generate these to avoid overhead at
         // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
         // means it might also do vector resizing.
@@ -141,6 +144,8 @@ where
             }
         };
 
+        start.wait();
+
         let mut read = config.mix.does_read();
         let mut count = 0usize;
         let start = time::Instant::now();
@@ -166,7 +171,7 @@ where
                 let (reg, period) = if read {
                     do_read(r.as_mut().unwrap(), &mut config, &start, &batch[..bs])
                 } else {
-                    do_write(w.as_mut().unwrap(), &mut config, &start, &batch[..bs])
+                    (true, w.as_mut().unwrap().vote(&batch[..bs]))
                 };
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as u64;
                 if stats.record_latency(read, period, t).is_err() {
@@ -177,7 +182,7 @@ where
             } else if read {
                 do_read(r.as_mut().unwrap(), &mut config, &start, &batch[..bs])
             } else {
-                do_write(w.as_mut().unwrap(), &mut config, &start, &batch[..bs])
+                (true, w.as_mut().unwrap().vote(&batch[..bs]))
             };
             if register {
                 count += bs;
@@ -234,58 +239,7 @@ where
     stats
 }
 
-struct WState<W: Writer> {
-    inner: W,
-    post: bool,
-    migrate_done: Option<mpsc::Receiver<()>>,
-}
-
-impl<W: Writer> WState<W> {
-    pub fn new(writer: W) -> Self {
-        WState {
-            inner: writer,
-            post: false,
-            migrate_done: None,
-        }
-    }
-}
-
-fn do_write<W: Writer>(
-    writer: &mut WState<W>,
-    config: &mut RuntimeConfig,
-    start: &time::Instant,
-    ids: &[(i64, i64)],
-) -> (bool, Period) {
-    if let Some(migrate_after) = config.migrate_after {
-        if start.elapsed() > migrate_after {
-            writer.migrate_done = Some(writer.inner.migrate());
-            config.migrate_after.take(); // so we don't migrate again
-        }
-    }
-
-    if writer.migrate_done.is_some() {
-        match writer.migrate_done.as_mut().unwrap().try_recv() {
-            Err(mpsc::TryRecvError::Empty) => {}
-            _ => {
-                writer.migrate_done = None;
-                writer.post = true;
-            }
-        }
-    }
-
-    writer.inner.vote(ids);
-    if writer.post {
-        (true, Period::PostMigration)
-    } else {
-        (true, Period::PreMigration)
-    }
-}
-
-pub fn prep_writer<W: Writer>(
-    writer: &mut W,
-    config: &RuntimeConfig,
-    ready: Option<mpsc::SyncSender<()>>,
-) {
+pub fn prep_writer<W: Writer>(writer: &mut W, config: &RuntimeConfig) {
 
     // prepopulate
     if !config.should_reuse() {
@@ -303,7 +257,6 @@ pub fn prep_writer<W: Writer>(
 
     // let system settle
     thread::sleep(time::Duration::new(1, 0));
-    drop(ready);
 }
 
 fn do_read<R: Reader>(
@@ -322,15 +275,18 @@ pub fn launch<R: Reader, W: Writer>(
     reader: Option<R>,
     mut writer: Option<W>,
     config: RuntimeConfig,
-    ready: Option<mpsc::SyncSender<()>>,
+    ready: Option<sync::Arc<sync::Barrier>>,
+    start: sync::Arc<sync::Barrier>,
 ) -> BenchmarkResults {
     if let Some(ref mut writer) = writer {
-        prep_writer(writer, &config, ready);
+        prep_writer(writer, &config);
+        ready.map(|b| b.wait());
+
     }
     if config.runtime.is_none() {
         return BenchmarkResults::default();
     }
-    driver(config, reader, writer)
+    driver(config, reader, writer, start)
 }
 
 #[allow(dead_code)]
@@ -341,7 +297,13 @@ where
     use std::rc::Rc;
     use std::cell::RefCell;
     let inner = Rc::new(RefCell::new(inner));
-    launch(Some(inner.clone()), Some(inner), config, None)
+    launch(
+        Some(inner.clone()),
+        Some(inner),
+        config,
+        None,
+        sync::Arc::new(sync::Barrier::new(1)),
+    )
 }
 
 #[allow(dead_code)]
@@ -352,8 +314,6 @@ impl Reader for NullClient {
     }
 }
 impl Writer for NullClient {
-    type Migrator = ();
-
     fn make_articles<I>(&mut self, _: I)
     where
         I: Iterator<Item = (i64, String)>,

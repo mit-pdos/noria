@@ -13,8 +13,6 @@ pub fn make(addr: &str) -> Memcache {
 }
 
 impl Writer for Memcache {
-    type Migrator = ();
-
     fn make_articles<I>(&mut self, articles: I)
     where
         I: ExactSizeIterator,

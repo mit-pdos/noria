@@ -91,8 +91,6 @@ pub fn make(pool: &mut Pool) -> RW {
 }
 
 impl Writer for RW {
-    type Migrator = ();
-
     fn make_articles<I>(&mut self, articles: I)
     where
         I: ExactSizeIterator,

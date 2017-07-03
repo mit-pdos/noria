@@ -95,7 +95,6 @@ pub fn make<'a>(pool: &'a mysql::Pool, config: &RuntimeConfig) -> RW<'a> {
 }
 
 impl<'a> Writer for RW<'a> {
-    type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
     where
         I: Iterator<Item = (i64, String)>,

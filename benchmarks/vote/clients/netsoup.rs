@@ -81,7 +81,6 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
 }
 
 impl Writer for C {
-    type Migrator = ();
     fn make_articles<I>(&mut self, articles: I)
     where
         I: Iterator<Item = (i64, String)>,

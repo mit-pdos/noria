@@ -1,5 +1,3 @@
-use std::sync::mpsc;
-use std::thread;
 use std::time;
 
 #[allow(dead_code)]
@@ -12,47 +10,13 @@ macro_rules! dur_to_ns {
     }}
 }
 
-pub trait MigrationHandle: Send {
-    fn execute(&mut self);
-}
-
-impl MigrationHandle for () {
-    fn execute(&mut self) {
-        unimplemented!()
-    }
-}
-
 pub trait Writer {
-    type Migrator: MigrationHandle + 'static;
-
     fn make_articles<I>(&mut self, articles: I)
     where
         I: Iterator<Item = (i64, String)>,
         I: ExactSizeIterator;
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period;
-
-    fn prepare_migration(&mut self) -> Self::Migrator {
-        unimplemented!()
-    }
-
-    fn migrate(&mut self) -> mpsc::Receiver<()> {
-        use std::time;
-        let (tx, rx) = mpsc::sync_channel(0);
-        println!("Starting migration");
-        let mig_start = time::Instant::now();
-        let mut handle = self.prepare_migration();
-        thread::Builder::new()
-            .name("migrator".to_string())
-            .spawn(move || {
-                handle.execute();
-                let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
-                println!("Migration completed in {:.4}s", mig_duration);
-                drop(tx);
-            })
-            .unwrap();
-        rx
-    }
 }
 
 pub enum ArticleResult {
@@ -63,6 +27,7 @@ pub enum ArticleResult {
 #[derive(Clone, Copy)]
 pub enum Period {
     PreMigration,
+    #[allow(dead_code)]
     PostMigration,
 }
 
@@ -76,7 +41,6 @@ impl<T> Writer for Rc<RefCell<T>>
 where
     T: Writer,
 {
-    type Migrator = T::Migrator;
     fn make_articles<I>(&mut self, articles: I)
     where
         I: Iterator<Item = (i64, String)>,
@@ -87,14 +51,6 @@ where
 
     fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
         self.borrow_mut().vote(ids)
-    }
-
-    fn prepare_migration(&mut self) -> Self::Migrator {
-        self.borrow_mut().prepare_migration()
-    }
-
-    fn migrate(&mut self) -> mpsc::Receiver<()> {
-        self.borrow_mut().migrate()
     }
 }
 impl<T> Reader for Rc<RefCell<T>>
@@ -206,7 +162,6 @@ pub struct RuntimeConfig {
     pub distribution: Distribution,
     pub cdf: bool,
     pub mix: Mix,
-    pub migrate_after: Option<time::Duration>,
     pub reuse: bool,
     pub verbose: bool,
     pub bind_to: Option<String>,
@@ -220,7 +175,6 @@ impl RuntimeConfig {
             distribution: Distribution::Uniform,
             mix: mix,
             cdf: true,
-            migrate_after: None,
             reuse: false,
             verbose: false,
             bind_to: None,
@@ -253,10 +207,5 @@ impl RuntimeConfig {
 
     pub fn produce_cdf(&mut self, yes: bool) {
         self.cdf = yes;
-    }
-
-    #[allow(dead_code)]
-    pub fn perform_migration_at(&mut self, t: time::Duration) {
-        self.migrate_after = Some(t);
     }
 }
