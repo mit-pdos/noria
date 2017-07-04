@@ -1,0 +1,6 @@
+[
+	{ 
+		"table": "posts", 
+		"predicate": "WHERE posts.private = 1" 
+	}
+]
