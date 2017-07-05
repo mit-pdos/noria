@@ -1,14 +1,9 @@
 version = 2
 
 [uniform]
-command = "cargo"
-args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30"]
-regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
-
-[space-use]
 command = "/usr/bin/time"
 args = ["-v", "cargo", "run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30"]
-regexs = [".*Maximum (resident set size).*: ([0-9.]+)"]
+regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)", ".*Maximum (resident set size).*: ([0-9.]+)"]
 
 [staged]
 command = "cargo"
