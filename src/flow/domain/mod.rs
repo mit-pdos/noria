@@ -4,13 +4,14 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time;
 use std::collections::hash_map::Entry;
-use channel::ChannelSender;
+use channel::{TraceSender, ChannelSender};
 use flow::prelude::*;
 use flow::payload::{TransactionState, ReplayTransactionState, ReplayPieceContext,
                     ControlReplyPacket};
 use flow::statistics;
 use flow::transactions;
 use flow::persistence;
+use flow::debug;
 use flow;
 use checktable;
 use slog::Logger;
@@ -118,6 +119,7 @@ pub struct Domain {
     replay_request_queue: VecDeque<(Tag, Vec<DataType>)>,
 
     readers: flow::Readers,
+    debug_tx: Option<mpsc::Sender<debug::DebugEvent>>,
     inject_tx: Option<mpsc::SyncSender<Box<Packet>>>,
     control_reply_tx: Option<mpsc::SyncSender<ControlReplyPacket>>,
     channel_coordinator: Arc<ChannelCoordinator>,
@@ -163,6 +165,7 @@ impl Domain {
             replay_paths: HashMap::new(),
 
             readers: readers.clone(),
+            debug_tx: None,
             inject_tx: None,
             control_reply_tx: None,
             channel_coordinator,
@@ -611,7 +614,12 @@ impl Domain {
         }
     }
 
-    fn handle(&mut self, m: Box<Packet>) {
+    fn handle(&mut self, mut m: Box<Packet>) {
+        if let Some(&mut Some((_, ref mut tx @ None))) = m.tracer() {
+            *tx = self.debug_tx
+                .as_ref()
+                .map(|tx| TraceSender::from_local(tx.clone()));
+        };
         m.trace(PacketEvent::Handle);
 
         match *m {
@@ -1816,6 +1824,7 @@ impl Domain {
         input_rx: mpsc::Receiver<Box<Packet>>,
         back_rx: mpsc::Receiver<Box<Packet>>,
         control_reply_tx: mpsc::SyncSender<ControlReplyPacket>,
+        debug_tx: Option<mpsc::Sender<debug::DebugEvent>>,
     ) -> thread::JoinHandle<()> {
         info!(self.log, "booting domain"; "nodes" => self.nodes.iter().count());
         let name: usize = self.nodes.values().next().unwrap().borrow().domain().into();
@@ -1847,6 +1856,7 @@ impl Domain {
                     input_rx_handle.add();
                 }
 
+                self.debug_tx = debug_tx;
                 self.inject_tx = Some(inject_tx);
                 self.control_reply_tx = Some(control_reply_tx);
 
@@ -1905,9 +1915,15 @@ impl Domain {
                         } else if id == back_rx_handle.id() {
                             back_rx_handle.recv()
                         } else if id == input_rx_handle.id() {
-                            let m = input_rx_handle.recv();
+                            let mut m = input_rx_handle.recv();
                             debug_assert!(m.is_err() || m.as_ref().unwrap().is_regular());
-                            if let Ok(ref p) = m {
+                            if let Ok(ref mut p) = m {
+                                if let Some(&mut Some((_, ref mut tx))) = p.tracer() {
+                                    assert!(tx.is_none());
+                                    *tx = self.debug_tx
+                                        .as_ref()
+                                        .map(|tx| TraceSender::from_local(tx.clone()));
+                                };
                                 p.trace(PacketEvent::ExitInputChannel);
                             }
                             m

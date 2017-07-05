@@ -2,6 +2,7 @@ use petgraph;
 
 use channel;
 use checktable;
+use flow::debug::{DebugEvent, DebugEventType};
 use flow::domain;
 use flow::node;
 use flow::statistics;
@@ -9,7 +10,6 @@ use flow::prelude::*;
 
 use std::fmt;
 use std::collections::HashMap;
-
 use std::time;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -79,7 +79,7 @@ pub struct ReplayTransactionState {
 }
 
 /// Different events that can occur as a packet is being processed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum PacketEvent {
     /// The packet has been pulled off the input channel.
     ExitInputChannel,
@@ -89,9 +89,11 @@ pub enum PacketEvent {
     Process,
     /// The packet has reached some reader node.
     ReachedReader,
+    /// The packet has been merged with another, and will no longer trigger events.
+    Merged(u64),
 }
 
-pub type Tracer = Option<Vec<channel::TraceSender<(time::Instant, PacketEvent)>>>;
+pub type Tracer = Option<(u64, Option<channel::TraceSender<DebugEvent>>)>;
 pub type IngressFromBase = HashMap<petgraph::graph::NodeIndex, usize>;
 pub type EgressForBase = HashMap<petgraph::graph::NodeIndex, Vec<LocalNodeIndex>>;
 
@@ -367,12 +369,14 @@ impl Packet {
 
     pub fn trace(&self, event: PacketEvent) {
         match *self {
-            Packet::Message { tracer: Some(ref senders), .. } |
-            Packet::Transaction { tracer: Some(ref senders), .. } => {
-                let msg = (time::Instant::now(), event);
-                for sender in senders {
-                    let _ = sender.send(msg.clone());
-                }
+            Packet::Message { tracer: Some((tag, Some(ref sender))), .. } |
+            Packet::Transaction { tracer: Some((tag, Some(ref sender))), .. } => {
+                sender
+                    .send(DebugEvent {
+                        instant: time::Instant::now(),
+                        event: DebugEventType::PacketEvent(event, tag),
+                    })
+                    .unwrap();
             }
             _ => {}
         }
