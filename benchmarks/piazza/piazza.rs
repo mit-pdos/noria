@@ -5,7 +5,8 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, Recipe};
+use distributary::{Blender, Recipe, DataType};
+use std::collections::HashMap;
 
 pub struct Backend {
     recipe: Option<Recipe>,
@@ -27,6 +28,24 @@ impl Backend {
             log: log,
             g: g,
         }
+    }
+
+    fn login(&mut self, 
+        user_context: HashMap<String, DataType>
+    ) -> Result<(), String> {
+        let mut mig = self.g.add_universe(user_context);
+        let mut recipe = self.recipe.take().unwrap();
+        recipe.next();
+        match recipe.activate(&mut mig, false) {
+            Ok(ar) => {
+                info!(self.log, "{} expressions added", ar.expressions_added);
+                info!(self.log, "{} expressions removed", ar.expressions_removed);
+            }
+            Err(e) => panic!("failed to activate recipe: {}", e),
+        };
+        mig.commit();
+        self.recipe = Some(recipe);
+        Ok(())
     }
 
     fn migrate(
@@ -60,15 +79,16 @@ impl Backend {
         }
 
         let mut p = String::new();
-        match policy_file {
-            None => (),
+        let pstr: Option<&str> = match policy_file {
+            None => None,
             Some(pf) => { 
                 let mut pf = File::open(pf).unwrap();
                 pf.read_to_string(&mut p).unwrap();
+                Some(&p)
             },
-        }
+        };
 
-        let new_recipe = Recipe::from_str_with_policy(&rs, Some(&p), Some(self.log.clone()))?;
+        let new_recipe = Recipe::from_str_with_policy(&rs, pstr, Some(self.log.clone()))?;
         let cur_recipe = self.recipe.take().unwrap();
         let updated_recipe = match cur_recipe.replace(new_recipe) {
             Ok(mut recipe) => {
@@ -90,6 +110,13 @@ impl Backend {
 
     }
     
+}
+
+fn make_user(id: i32) -> HashMap<String, DataType> {
+    let mut user = HashMap::new();
+    user.insert(String::from("id"), id.into());
+
+    user
 }
 
 fn main() {
@@ -130,9 +157,16 @@ fn main() {
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
 
-    // Initiliaze backend application
+    // Initiliaze backend application with some queries and policies
+    println!("Initiliazing database schema...");
     let mut backend = Backend::new();
-    backend.migrate(sloc, Some(qloc), Some(ploc));
+    backend.migrate(sloc, None, None);
+    backend.migrate(sloc, None, Some(ploc));
+    backend.migrate(sloc, Some(qloc), None);
+
+    // Login a user
+    println!("Login in users...");
+    backend.login(make_user(0));
 
     println!("Done with benchmark.");
 

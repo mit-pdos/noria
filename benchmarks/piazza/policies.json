@@ -1,6 +1,7 @@
-[
+[	
 	{ 
-		"table": "posts", 
-		"predicate": "WHERE posts.private = 1" 
+		"table": "Post", 
+		"predicate": "WHERE Post.private = 1 AND UserContext.id = Post.authorId",
+		"description": "users are allowed to see their own private posts"
 	}
 ]
