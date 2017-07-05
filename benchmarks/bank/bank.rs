@@ -329,6 +329,7 @@ fn process_latencies(
                     }
                     break;
                 }
+                DebugEventType::PacketEvent(PacketEvent::Merged(_), _) => unimplemented!(),
                 _ => {}
             }
         }
