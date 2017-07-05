@@ -1,16 +1,13 @@
 #[macro_use]
 extern crate clap;
-
 extern crate rand;
-
-extern crate distributary;
-
 extern crate hdrsample;
-
-extern crate timekeeper;
+extern crate distributary;
 
 use hdrsample::Histogram;
 
+use std::cmp;
+use std::sync::mpsc;
 use std::thread;
 use std::time;
 
@@ -19,8 +16,6 @@ use std::collections::HashMap;
 use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
 
 use rand::Rng;
-
-use timekeeper::{Source, RealTime};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -39,11 +34,13 @@ pub struct Bank {
     blender: Blender,
     transfers: distributary::NodeIndex,
     balances: distributary::NodeIndex,
+    debug_channel: Option<mpsc::Receiver<distributary::DebugEvent>>,
 }
 
 pub fn setup(transactions: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
+    let debug_channel = g.create_debug_channel();
 
     let transfers;
     let credits;
@@ -97,6 +94,7 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         blender: g,
         transfers: transfers,
         balances: balances,
+        debug_channel: Some(debug_channel),
     })
 }
 
@@ -145,23 +143,19 @@ fn client(
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
-    verbose: bool,
+    _verbose: bool,
     audit: bool,
-    measure_latency: bool,
+    measure_latency: Option<mpsc::Receiver<distributary::DebugEvent>>,
     coarse: bool,
     transactions: bool,
     is_transfer_deterministic: bool,
 ) -> Vec<f64> {
-    let clock = RealTime::default();
-
-    let mut count = 0;
-    let mut committed = 0;
-    let mut aborted = 0;
+    let mut count = 0u64;
+    let mut committed = 0u64;
+    let mut aborted = 0u64;
     let mut last_reported = start;
     let mut throughputs = Vec::new();
-    let mut read_latencies: Vec<u64> = Vec::new();
-    let mut write_latencies = Vec::new();
-    let mut settle_latencies = Vec::new();
+    let mut event_times = Vec::new();
 
     let mut t_rng = rand::thread_rng();
 
@@ -188,7 +182,6 @@ fn client(
                 .map(|rs| f((rs, Token::empty())))
         };
 
-
         let mut num_requests = 1;
         while start.elapsed() < runtime {
             let dst;
@@ -203,7 +196,7 @@ fn client(
             }
             assert_ne!(dst, src);
 
-            let transaction_start = clock.get_time();
+            let transaction_start = time::Instant::now();
             let (balance, mut token) = get(&src.into()).unwrap().unwrap();
 
             assert!(
@@ -216,14 +209,11 @@ fn client(
                     token.make_coarse();
                 }
 
-                let tracer = if measure_latency {
-                    Some(mutator.start_tracing())
-                } else {
-                    None
+                if measure_latency.is_some() {
+                    mutator.start_tracing(count);
                 };
 
-                let mut last_instant = time::Instant::now();
-                let write_start = clock.get_time();
+                let write_start = time::Instant::now();
                 let res = if transactions {
                     mutator
                         .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
@@ -233,7 +223,7 @@ fn client(
                         .unwrap();
                     Ok(0)
                 };
-                let write_end = clock.get_time();
+                let write_end = time::Instant::now();
                 mutator.stop_tracing();
 
                 match res {
@@ -242,37 +232,25 @@ fn client(
                             successful_transfers.push((src, dst, 100));
                         }
                         // Skip the first sample since it is frequently an outlier
-                        let mut transaction_end = None;
-                        if measure_latency && count > 0 {
-                            for (instant, event) in tracer.unwrap() {
-                                if verbose {
-                                    let dt = dur_to_ns!(instant.duration_since(last_instant)) as
-                                        f64;
-                                    println!("{:.3} μs: {:?}", dt * 0.001, event);
-                                    last_instant = instant;
-                                }
-                                if let distributary::PacketEvent::ReachedReader = event {
-                                    transaction_end = Some(clock.get_time());
-                                }
-                            }
-
-                            read_latencies.push(write_start - transaction_start);
-                            write_latencies.push(write_end - write_start);
-                            settle_latencies.push(transaction_end.unwrap() - write_end);
-                        }
-                        if measure_latency {
+                        if measure_latency.is_some() {
+                            event_times.push(Some((transaction_start, write_start, write_end)));
                             thread::sleep(time::Duration::new(0, 1_000_000_000));
                         }
                         committed += 1;
                     }
-                    Err(_) => aborted += 1,
+                    Err(_) => {
+                        if measure_latency.is_some() {
+                            event_times.push(None);
+                        }
+                        aborted += 1;
+                    }
                 }
 
                 count += 1;
             }
 
             // check if we should report
-            if !measure_latency && last_reported.elapsed() > time::Duration::from_secs(1) {
+            if measure_latency.is_none() && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
                 let throughput = committed as f64 /
                     (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
@@ -316,35 +294,72 @@ fn client(
             println!("Audit found no irregularities");
         }
     }
+    if let Some(debug_channel) = measure_latency {
+        process_latencies(event_times, debug_channel);
+    }
 
-    if measure_latency {
-        // Print average latencies.
-        let rl: u64 = read_latencies.iter().sum();
-        let wl: u64 = write_latencies.iter().sum();
-        let sl: u64 = settle_latencies.iter().sum();
+    throughputs
+}
 
-        let n = write_latencies.len() as f64;
-        println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
-        println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
-        println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-        println!(
-            "write + settle latency: {:.3} μs",
-            (wl + sl) as f64 / n * 0.001
-        );
+/// Given a Vec of (transaction_start, write_start) and the global debug channel, compute and output
+/// latency statistics.
+fn process_latencies(
+    times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
+    debug_channel: mpsc::Receiver<distributary::DebugEvent>,
+) {
+    use distributary::{DebugEvent, DebugEventType, PacketEvent};
 
-        let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
-        for i in 0..write_latencies.len() {
-            let sample_nanos = write_latencies[i] + settle_latencies[i];
-            let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
-            latencies_hist.record(sample_micros).unwrap();
-        }
+    let mut read_latencies: Vec<u64> = Vec::new();
+    let mut write_latencies = Vec::new();
+    let mut settle_latencies = Vec::new();
 
-        for iv in latencies_hist.iter_recorded() {
-            // XXX: Print CDF in the format expected by the print_latency_cdf script.
-            println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+    for _ in 0..(times.iter().filter(|t|t.is_some()).count()) {
+        for DebugEvent { instant, event } in debug_channel.iter() {
+            // if verbose {
+            //     let dt = dur_to_ns!(instant.duration_since(last_instant)) as f64;
+            //     println!("{:.3} μs: {:?}", dt * 0.001, event);
+            //     last_instant = instant;
+            // }
+            match event {
+                DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
+                    if let Some((transaction_start, write_start, write_end)) = times[tag as usize] {
+                        read_latencies.push(dur_to_ns!(write_start - transaction_start));
+                        write_latencies.push(dur_to_ns!(write_end - write_start));
+                        settle_latencies.push(dur_to_ns!(cmp::max(instant, write_end) - write_end));
+                    }
+                    break;
+                }
+                _ => {}
+            }
         }
     }
-    throughputs
+
+
+    // Print average latencies.
+    let rl: u64 = read_latencies.iter().sum();
+    let wl: u64 = write_latencies.iter().sum();
+    let sl: u64 = settle_latencies.iter().sum();
+
+    let n = write_latencies.len() as f64;
+    println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
+    println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
+    println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
+    println!(
+        "write + settle latency: {:.3} μs",
+        (wl + sl) as f64 / n * 0.001
+    );
+
+    let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
+    for i in 0..write_latencies.len() {
+        let sample_nanos = write_latencies[i] + settle_latencies[i];
+        let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
+        latencies_hist.record(sample_micros).unwrap();
+    }
+
+    for iv in latencies_hist.iter_recorded() {
+        // XXX: Print CDF in the format expected by the print_latency_cdf script.
+        println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+    }
 }
 
 fn main() {
@@ -483,7 +498,7 @@ fn main() {
                             runtime,
                             verbose,
                             audit,
-                            false, /* measure_latency */
+                            None, /* measure_latency */
                             coarse_checktables,
                             transactions,
                             is_transfer_deterministic,
@@ -498,6 +513,8 @@ fn main() {
         Some({
             let mutator = bank.blender.get_mutator(bank.transfers);
             let balances_get = bank.getter();
+            let debug_channel = bank.debug_channel.take();
+            assert!(debug_channel.is_some());
 
             thread::Builder::new()
                 .name(format!("bank{}", nthreads))
@@ -511,7 +528,7 @@ fn main() {
                         runtime,
                         verbose,
                         audit,
-                        true, /* measure_latency */
+                        debug_channel,
                         coarse_checktables,
                         transactions,
                         is_transfer_deterministic,
@@ -536,6 +553,10 @@ fn main() {
         );
     }
 
+    if let Some(c) = latency_client {
+        c.join().unwrap();
+    }
+
     // clean
     let mut throughput = 0.0;
     for c in clients {
@@ -554,7 +575,4 @@ fn main() {
         println!("avg PUT: {:.2}", throughput);
     }
 
-    if let Some(c) = latency_client {
-        c.join().unwrap();
-    }
 }
