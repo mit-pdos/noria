@@ -1,32 +1,34 @@
+version = 2
+
 [uniform]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [staged]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--stage", "--runtime=30"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--stage", "--runtime=30"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [multiclient]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--getters=8"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--getters=8"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [tx-bank]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
 regexs = ["(avg PUT): ([0-9.]+)"]
 
 [vote-migration]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30"]
 regexs = ["(Migration) completed in ([0-9.]+)s"]
 lower_better = true
 
 [post-migration]
-command = "run"
-args = ["--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--migrate=10"]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--migrate=10"]
 regexs = ["avg (GET)\\+: ([0-9.]+)", "avg (PUT)\\+: ([0-9.]+)"]
 
 [slack-aliases]
