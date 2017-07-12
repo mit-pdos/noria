@@ -9,6 +9,7 @@ dependencies = [
  "buf_redux 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bufstream 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bus 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "channel 0.1.0",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "diff 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -200,6 +201,15 @@ dependencies = [
 name = "cfg-if"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "channel"
+version = "0.1.0"
+dependencies = [
+ "bincode 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "chrono"
