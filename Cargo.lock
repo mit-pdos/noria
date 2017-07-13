@@ -207,6 +207,9 @@ name = "channel"
 version = "0.1.0"
 dependencies = [
  "bincode 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bufstream 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
