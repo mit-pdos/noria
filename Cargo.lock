@@ -21,6 +21,7 @@ dependencies = [
  "hurdles 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
+ "mio 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mysql 11.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=38a973891d31ab935204231c8733a30162916e6e)",
