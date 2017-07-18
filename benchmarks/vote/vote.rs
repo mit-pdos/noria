@@ -17,6 +17,7 @@ mod common;
 
 use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
 use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
+use std::sync::mpsc;
 
 use std::thread;
 use std::sync;
@@ -203,18 +204,24 @@ fn main() {
         })
         .collect();
 
-    let mut new_votes = migrate_after.map(|t| (t, bus::Bus::new(nputters)));
-    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
+    let mut new_vote_senders = Vec::new();
+    let mut new_vote_receivers = Vec::new();
+    for _ in 0..nputters {
+        let (tx, rx) = mpsc::channel();
+        new_vote_receivers.push(rx);
+        new_vote_senders.push(tx);
+    }
+
+    let new_votes = migrate_after.map(|t| (t, new_vote_senders));
 
     // prepare putters
-    let putters: Vec<_> = (0..nputters)
-        .into_iter()
-        .map(|_| {
+    let putters: Vec<_> = new_vote_receivers.into_iter()
+        .map(|new_vote| {
             Spoon {
-                article: putters.0.clone(),
-                vote_pre: putters.1.clone(),
+                article: g.graph.get_mutator(g.article),
+                vote_pre: g.graph.get_mutator(g.vote),
                 vote_post: None,
-                new_vote: new_votes.as_mut().map(|&mut (_, ref mut bus)| bus.add_rx()),
+                new_vote: new_votes.as_ref().and(Some(new_vote)),
                 x: Crossover::new(crossover),
                 i: 0,
             }
@@ -591,7 +598,7 @@ struct Spoon {
     vote_post: Option<Mutator>,
     i: usize,
     x: Crossover,
-    new_vote: Option<bus::BusReader<Mutator>>,
+    new_vote: Option<mpsc::Receiver<Mutator>>,
 }
 
 impl Writer for Spoon {
@@ -650,7 +657,7 @@ impl Writer for Spoon {
 
 struct Migrator {
     graph: graph::Graph,
-    bus: bus::Bus<Mutator>,
+    bus: Vec<mpsc::Sender<Mutator>>,
     getters: Vec<Getter>,
     barrier: sync::Arc<sync::Barrier>,
     transactions: bool,
@@ -663,8 +670,9 @@ impl Migrator {
         println!("Starting migration");
         let mig_start = time::Instant::now();
         let (rating, newend) = self.graph.transition(self.stupid, self.transactions);
-        let mutator = self.graph.graph.get_mutator(rating);
-        self.bus.broadcast(mutator);
+        for sender in self.bus {
+            sender.send(self.graph.graph.get_mutator(rating)).unwrap();
+        }
         for mut getter in self.getters {
             unsafe { getter.replace(self.graph.graph.get_getter(newend).unwrap()) };
         }

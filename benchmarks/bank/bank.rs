@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate clap;
+extern crate mio;
 extern crate rand;
+extern crate channel;
 extern crate hdrsample;
 extern crate distributary;
 
@@ -13,6 +15,9 @@ use std::time;
 
 use std::collections::HashMap;
 
+use mio::net::TcpListener;
+
+use channel::TcpReceiver;
 use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
 
 use rand::Rng;
@@ -34,7 +39,7 @@ pub struct Bank {
     blender: Blender,
     transfers: distributary::NodeIndex,
     balances: distributary::NodeIndex,
-    debug_channel: Option<mpsc::Receiver<distributary::DebugEvent>>,
+    debug_channel: Option<TcpListener>,
 }
 
 pub fn setup(transactions: bool) -> Box<Bank> {
@@ -145,7 +150,7 @@ fn client(
     runtime: time::Duration,
     _verbose: bool,
     audit: bool,
-    measure_latency: Option<mpsc::Receiver<distributary::DebugEvent>>,
+    measure_latency: Option<TcpListener>,
     coarse: bool,
     transactions: bool,
     is_transfer_deterministic: bool,
@@ -305,7 +310,7 @@ fn client(
 /// latency statistics.
 fn process_latencies(
     times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
-    debug_channel: mpsc::Receiver<distributary::DebugEvent>,
+    debug_channel: TcpListener,
 ) {
     use distributary::{DebugEvent, DebugEventType, PacketEvent};
 
@@ -313,27 +318,23 @@ fn process_latencies(
     let mut write_latencies = Vec::new();
     let mut settle_latencies = Vec::new();
 
-    for _ in 0..(times.iter().filter(|t|t.is_some()).count()) {
-        for DebugEvent { instant, event } in debug_channel.iter() {
-            // if verbose {
-            //     let dt = dur_to_ns!(instant.duration_since(last_instant)) as f64;
-            //     println!("{:.3} μs: {:?}", dt * 0.001, event);
-            //     last_instant = instant;
-            // }
-            match event {
-                DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
-                    if let Some((transaction_start, write_start, write_end)) = times[tag as usize] {
-                        read_latencies.push(dur_to_ns!(write_start - transaction_start));
-                        write_latencies.push(dur_to_ns!(write_end - write_start));
-                        settle_latencies.push(dur_to_ns!(cmp::max(instant, write_end) - write_end));
-                    }
-                    break;
-                }
-                DebugEventType::PacketEvent(PacketEvent::Merged(_), _) => unimplemented!(),
-                _ => {}
-            }
-        }
-    }
+    unimplemented!();
+    // for _ in 0..(times.iter().filter(|t| t.is_some()).count()) {
+    //     for DebugEvent { instant, event } in debug_channel.iter() {
+    //         match event {
+    //             DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
+    //                 if let Some((transaction_start, write_start, write_end)) = times[tag as usize] {
+    //                     read_latencies.push(dur_to_ns!(write_start - transaction_start));
+    //                     write_latencies.push(dur_to_ns!(write_end - write_start));
+    //                     settle_latencies.push(dur_to_ns!(cmp::max(instant, write_end) - write_end));
+    //                 }
+    //                 break;
+    //             }
+    //             DebugEventType::PacketEvent(PacketEvent::Merged(_), _) => unimplemented!(),
+    //             _ => {}
+    //         }
+    //     }
+    // }
 
 
     // Print average latencies.
