@@ -1269,7 +1269,7 @@ dependencies = [
 [[package]]
 name = "tiberius"
 version = "0.2.2"
-source = "git+https://github.com/ms705/tiberius/#b7b88629e1625a4bfe4e2950c49585324ae4c2e9"
+source = "git+https://github.com/ms705/tiberius/#377a521d8b6b76f8eb8a432a5589322c496d0b92"
 dependencies = [
  "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
