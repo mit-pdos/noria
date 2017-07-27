@@ -321,6 +321,7 @@ dependencies = [
  "bincode 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
  "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "distributary 0.1.0",
  "hostname 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
