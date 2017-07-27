@@ -58,6 +58,12 @@ f5077848_d1247076f848ea67: select PaperReview.contactId, count(reviewSubmitted),
 6f0a41d1_929abaedd32ee211: select count(paperId) from PaperConflict where paperId=? and conflictType=?;
 
 ######################
+# SCHEMA v8
+
+# OR expression with query parameter
+60008016_97bd27a08a3aa46a: select count(commentId) from PaperComment where paperId=? and (forReviewers>0 or contactId=?);
+
+######################
 # SCHEMA v15
 
 # count(paperId) only projects one column, and no group by bogocol is created, but can't group by agg col
