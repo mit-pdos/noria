@@ -7,6 +7,8 @@ extern crate slog;
 
 use distributary::{Blender, Recipe, DataType};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 
 pub struct Backend {
     recipe: Option<Recipe>,
@@ -30,7 +32,7 @@ impl Backend {
         }
     }
 
-    fn login(&mut self, 
+    fn login(&mut self,
         user_context: HashMap<String, DataType>
     ) -> Result<(), String> {
         let mut mig = self.g.add_universe(user_context);
@@ -49,14 +51,14 @@ impl Backend {
     }
 
     fn migrate(
-        &mut self, 
+        &mut self,
         schema_file: &str,
         query_file: Option<&str>,
         policy_file: Option<&str>,
     ) -> Result<(), String> {
         use std::fs::File;
         use std::io::Read;
-        
+
         // Start migration
         let mut mig = self.g.start_migration();
 
@@ -81,7 +83,7 @@ impl Backend {
         let mut p = String::new();
         let pstr: Option<&str> = match policy_file {
             None => None,
-            Some(pf) => { 
+            Some(pf) => {
                 let mut pf = File::open(pf).unwrap();
                 pf.read_to_string(&mut p).unwrap();
                 Some(&p)
@@ -109,7 +111,7 @@ impl Backend {
         Ok(())
 
     }
-    
+
 }
 
 fn make_user(id: i32) -> HashMap<String, DataType> {
@@ -147,6 +149,12 @@ fn main() {
                 .default_value("Benchmarks/piazza/policies.json")
                 .help("Security policies file for Piazza application")
         )
+        .arg(
+            Arg::with_name("graph")
+                .short("g")
+                .default_value("pgraph.gv")
+                .help("File to dump application's soup graph, if set")
+        )
         .get_matches();
 
 
@@ -156,13 +164,12 @@ fn main() {
     let sloc = args.value_of("schema").unwrap();
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
+    let gloc = args.value_of("graph");
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
     let mut backend = Backend::new();
-    backend.migrate(sloc, None, None);
-    backend.migrate(sloc, None, Some(ploc));
-    backend.migrate(sloc, Some(qloc), None);
+    backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
 
     // Login a user
     println!("Login in users...");
@@ -170,6 +177,10 @@ fn main() {
 
     println!("Done with benchmark.");
 
-    println!("{}", backend.g);
+    if gloc.is_some() {
+        let graph_fname = gloc.unwrap();
+        let mut gf = File::create(graph_fname).unwrap();
+        assert!(write!(gf, "{}", backend.g).is_ok());
+    }
 
 }
