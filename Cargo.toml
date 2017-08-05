@@ -5,12 +5,13 @@ authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 
 [features]
 web = ["rustful"]
+b_dd = ["differential-dataflow"]
 b_memcached = ["memcached-rs"]
 b_mysql = ["mysql"]
 b_mssql = ["futures", "futures-state-stream", "tiberius", "tokio-core"]
 b_netsoup = ["bincode", "net2", "bufstream"]
 b_hybrid = ["mysql", "memcached-rs"]
-default = ["web", "b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
+default = ["web", "b_dd", "b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
 profiling = ["timekeeper/default"]
 binaries = ["default"]
 generate_mysql_tests = ["default"]
@@ -45,6 +46,9 @@ rand = "0.3.15"
 zipf = "0.2.0"
 # sampling
 hdrsample = "4.0.0"
+# differential + timely dataflow
+differential-dataflow = { git = "https://github.com/frankmcsherry/differential-dataflow.git", optional = true }
+timely = { git = "https://github.com/frankmcsherry/timely-dataflow.git", optional = true }
 # mssql
 futures-state-stream = { version = "0.1", optional = true }
 tiberius = { git = "https://github.com/ms705/tiberius/", optional = true }
