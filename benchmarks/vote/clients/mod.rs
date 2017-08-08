@@ -1,3 +1,5 @@
+#[cfg(feature = "b_dd")]
+pub mod differential_dataflow;
 #[cfg(feature = "b_mysql")]
 pub mod mysql;
 #[cfg(feature = "b_mssql")]

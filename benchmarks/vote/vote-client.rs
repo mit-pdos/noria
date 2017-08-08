@@ -3,6 +3,11 @@ extern crate clap;
 
 extern crate rand;
 
+#[cfg(feature = "b_dd")]
+extern crate abomonation;
+#[cfg(feature = "b_dd")]
+extern crate timely;
+
 #[cfg(feature = "b_mssql")]
 extern crate futures;
 #[cfg(feature = "b_mssql")]
@@ -44,11 +49,15 @@ EXAMPLES:
   vote-client [read|write] memcached://127.0.0.1:11211
   vote-client [read|write] mssql://server=tcp:127.0.0.1,1433;username=user;pwd=pwd;/database
   vote-client [read|write] mysql://user@127.0.0.1/database
-  vote-client [read|write] hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
+  vote-client [read|write] hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211
+  vote-client [read|write] dd://127.0.0.1:7777";
 
 fn main() {
     use clap::{Arg, App};
     let mut backends = vec![];
+    if cfg!(feature = "b_dd") {
+        backends.push("dd");
+    }
     if cfg!(feature = "b_mssql") {
         backends.push("mssql");
     }
@@ -210,6 +219,12 @@ fn main() {
 
     let cfg = config.clone();
     let stats = match client {
+        // dd://127.0.0.1:7777
+        #[cfg(feature = "b_dd")]
+        "dd" => {
+            let c = clients::differential_dataflow::make(addr, &config);
+            exercise::launch_mix(c, config)
+        }
         // mssql://server=tcp:127.0.0.1,1433;user=user;pwd=password/bench_mssql
         #[cfg(feature = "b_mssql")]
         "mssql" => {
