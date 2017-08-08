@@ -5,7 +5,7 @@ authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 
 [features]
 web = ["rustful"]
-b_dd = ["differential-dataflow"]
+b_dd = ["abomonation", "differential-dataflow", "timely"]
 b_memcached = ["memcached-rs"]
 b_mysql = ["mysql"]
 b_mssql = ["futures", "futures-state-stream", "tiberius", "tokio-core"]
@@ -47,6 +47,7 @@ zipf = "0.2.0"
 # sampling
 hdrsample = "4.0.0"
 # differential + timely dataflow
+abomonation = { version = "0.4.5", optional = true }
 differential-dataflow = { git = "https://github.com/frankmcsherry/differential-dataflow.git", optional = true }
 timely = { git = "https://github.com/frankmcsherry/timely-dataflow.git", optional = true }
 # mssql
