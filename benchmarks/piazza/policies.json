@@ -1,12 +1,32 @@
-[	
-	{ 
-		"table": "Post", 
+[
+	{
+		"table": "Post",
 		"predicate": "WHERE Post.private = 0",
 		"description": "users are allowed to see public posts"
 	},
-	{ 
-		"table": "Post", 
+	{
+		"table": "Post",
 		"predicate": "WHERE Post.private = 1 AND UserContext.id = Post.authorId",
-		"description": "users are allowed to see their own private posts"
+		"description": "users are allowed to see their private posts they authored"
+	},
+	{
+		"table": "Post",
+		"predicate": "WHERE Post.private = 1 AND Post.classId in (select classId from Role where role = 1 and Role.userId = UserContext.id);",
+		"description": "users are allowed to see private posts from classes they TA"
+	},
+	{
+		"table": "Role",
+		"predicate": "WHERE Role.userId = UserContext.id;",
+		"description": "users are allowed to see their enrollement information"
+	},
+	{
+		"table": "Role",
+		"predicate": "WHERE Role.classId in (select classId from Role where role = 1 and Role.userId = UserContext.id);",
+		"description": "users are allowed to see enrollement information of classes they TA"
+	},
+	{
+		"table": "Role",
+		"predicate": "WHERE Role.role = 1 and Role.classId in (select classId from Role where Role.userId = UserContext.id);",
+		"description": "users are allowed to see TAs of the classes they are enrolled"
 	}
 ]
