@@ -36,9 +36,20 @@ fn process_file(fp: &Path) -> Vec<String> {
     f.read_to_string(&mut s).unwrap();
 
     let mut queries = Vec::new();
-    for cap in query_regex.captures_iter(&s) {
-        let qstr = &cap[1];
-        queries.push(String::from(qstr));
+    let mut start = false;
+    for l in s.lines() {
+        if l.contains("### CHAIR PAPER LIST") {
+            start = true;
+        }
+
+        if !start {
+            continue;
+        }
+
+        for cap in query_regex.captures_iter(&l) {
+            let qstr = &cap[1];
+            queries.push(String::from(qstr));
+        }
     }
     queries
 }
