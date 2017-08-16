@@ -27,8 +27,10 @@ fn process_file(fp: &Path) -> Vec<String> {
     use std::io::Read;
     use std::fs::File;
 
-    let re = "\\s+ [0-9]+ Query\t(.*)+";
-    let query_regex = Regex::new(re).unwrap();
+    let e_re = "\\s+ [0-9]+ .+\t(.*)+";
+    let q_re = "\\s+ [0-9]+ Query\t(.*)+";
+    let entry_regex = Regex::new(e_re).unwrap();
+    let query_regex = Regex::new(q_re).unwrap();
 
     let mut f = File::open(fp).unwrap();
     let mut s = String::new();
@@ -37,6 +39,8 @@ fn process_file(fp: &Path) -> Vec<String> {
 
     let mut queries = Vec::new();
     let mut start = false;
+    let mut capturing = false;
+    let mut buffer = String::new();
     for l in s.lines() {
         if l.contains("### CHAIR PAPER LIST") {
             start = true;
@@ -46,9 +50,26 @@ fn process_file(fp: &Path) -> Vec<String> {
             continue;
         }
 
-        for cap in query_regex.captures_iter(&l) {
-            let qstr = &cap[1];
-            queries.push(String::from(qstr));
+        if query_regex.is_match(&l) {
+            if !buffer.is_empty() {
+                queries.push(buffer.clone());
+                buffer.clear();
+            }
+            for cap in query_regex.captures_iter(&l) {
+                let qstr = &cap[1];
+                buffer.push_str(qstr);
+                buffer.push_str(" ");
+                capturing = true;
+            }
+        } else if entry_regex.is_match(&l) && capturing {
+            if !buffer.is_empty() {
+                queries.push(buffer.clone());
+                buffer.clear();
+            }
+            capturing = false;
+        } else if capturing {
+            buffer.push_str(&l);
+            buffer.push_str(" ");
         }
     }
     queries
