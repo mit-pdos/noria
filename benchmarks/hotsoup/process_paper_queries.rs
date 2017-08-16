@@ -103,8 +103,8 @@ fn main() {
 
         for q in queries {
             match nom_sql::parse_query(&q) {
-                Ok(_) => println!("OK -- {}", q),
-                Err(e) => println!("FAIL -- {}: {:?}", q, e),
+                Ok(_) => info!(log, "OK: {}", q),
+                Err(e) => error!(log, "FAIL: {}: {:?}", q, e),
             }
         }
     }
