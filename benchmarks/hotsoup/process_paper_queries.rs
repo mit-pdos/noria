@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate clap;
 extern crate nom_sql;
 extern crate regex;
@@ -6,17 +7,27 @@ extern crate regex;
 extern crate slog;
 extern crate distributary;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-fn traverse(path: &Path) -> Vec<PathBuf> {
+fn traverse(path: &Path, start: usize, stop: usize) -> HashMap<usize, PathBuf> {
     use std::fs;
+    use std::str::FromStr;
 
-    let mut files = Vec::new();
+    let mut files = HashMap::new();
     for entry in fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         if path.is_file() {
-            files.push(path.clone())
+            let fname = path.file_name().unwrap().to_str().unwrap();
+            if fname.starts_with("hotcrp_v") {
+                let sv = usize::from_str(
+                    &fname[fname.find("_").unwrap() + 2..fname.rfind("_").unwrap()],
+                ).unwrap();
+                if sv >= start && sv <= stop {
+                    files.insert(sv, path.clone());
+                }
+            }
         }
     }
     files
@@ -91,13 +102,40 @@ fn main() {
                 )
                 .required(true),
         )
+        .arg(
+            Arg::with_name("start_at")
+                .default_value("10")
+                .long("start_at")
+                .help(
+                    "Schema version to start at; versions prior to this will be skipped.",
+                ),
+        )
+        .arg(
+            Arg::with_name("stop_at")
+                .default_value("163")
+                .long("stop_at")
+                .help(
+                    "Schema version to stop at; versions after this will be skipped.",
+                ),
+        )
         .get_matches();
 
     let path = matches.value_of("source").unwrap();
+    let start_at_schema = value_t_or_exit!(matches, "start_at", usize);
+    let stop_at_schema = value_t_or_exit!(matches, "stop_at", usize);
 
-    let files = traverse(Path::new(path));
+    let files = traverse(Path::new(path), start_at_schema, stop_at_schema);
 
-    for fname in files {
+    for sv in start_at_schema..stop_at_schema + 1 {
+        let e = files.get(&sv);
+        let fname = match e {
+            None => {
+                warn!(log, "skipping non-existent schema version {}", sv);
+                continue;
+            }
+            Some(f) => f,
+        };
+
         info!(log, "Processing {:?}", fname);
         let queries = process_file(fname.as_path());
 
