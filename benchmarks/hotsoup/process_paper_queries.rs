@@ -61,10 +61,17 @@ fn process_file(fp: &Path) -> Vec<String> {
             continue;
         }
 
+        let flush = |buf: &mut String, queries: &mut Vec<String>| {
+            if !buf.ends_with(";") {
+                buf.push_str(";");
+            }
+            queries.push(buf.clone());
+            buf.clear();
+        };
+
         if query_regex.is_match(&l) {
             if !buffer.is_empty() {
-                queries.push(buffer.clone());
-                buffer.clear();
+                flush(&mut buffer, &mut queries);
             }
             for cap in query_regex.captures_iter(&l) {
                 let qstr = &cap[1];
@@ -74,8 +81,7 @@ fn process_file(fp: &Path) -> Vec<String> {
             }
         } else if entry_regex.is_match(&l) && capturing {
             if !buffer.is_empty() {
-                queries.push(buffer.clone());
-                buffer.clear();
+                flush(&mut buffer, &mut queries);
             }
             capturing = false;
         } else if capturing {
