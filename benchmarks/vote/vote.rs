@@ -7,7 +7,6 @@ extern crate distributary;
 
 extern crate hdrsample;
 extern crate zipf;
-extern crate bus;
 
 mod exercise;
 mod graph;
