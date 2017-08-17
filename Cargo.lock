@@ -360,6 +360,7 @@ dependencies = [
  "itertools 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mysql 11.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=13744adf972e42741b5e7146db46e8ed7353a15d)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
