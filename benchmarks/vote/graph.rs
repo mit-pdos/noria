@@ -1,24 +1,33 @@
 use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeIndex, PersistenceParameters};
 use distributary;
 
+use std::sync::{Arc, Mutex};
+
 pub struct Graph {
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub vc: NodeIndex,
     pub end: NodeIndex,
-    pub graph: Blender,
+    pub graph: Arc<Mutex<Blender>>,
 }
 
-pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParameters) -> Graph {
-    // set up graph
-    let mut g = Blender::new();
-    if log {
-        g.log_with(distributary::logger_pls());
-    }
-
-    g.with_persistence_options(persistence_params);
-
+pub fn make(
+    blender: Arc<Mutex<Blender>>,
+    log: bool,
+    transactions: bool,
+    persistence_params: PersistenceParameters,
+) -> Graph {
     let (article, vote, vc, end) = {
+        // set up graph
+        let mut g = blender.lock().unwrap();
+
+        if log {
+            g.log_with(distributary::logger_pls());
+        }
+
+        g.with_persistence_options(persistence_params);
+        g.disable_sharding();
+
         // migrate
         let mut mig = g.start_migration();
 
@@ -60,7 +69,7 @@ pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParame
         article: article.into(),
         vc: vc.into(),
         end: end.into(),
-        graph: g,
+        graph: blender,
     }
 }
 
@@ -76,7 +85,8 @@ impl Graph {
         let article = self.article;
 
         // migrate
-        let mut mig = self.graph.start_migration();
+        let mut g = self.graph.lock().unwrap();
+        let mut mig = g.start_migration();
 
         // add new "ratings" base table
         let b = Base::default().with_key(vec![1]);
