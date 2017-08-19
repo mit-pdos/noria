@@ -79,6 +79,6 @@ path = "hotsoup/extract_queries.rs"
 name = "piazza"
 path = "piazza/piazza.rs"
 
-# [[bin]]
-# name = "vote-new-fraction"
-# path = "vote/vote-new-fraction.rs"
+[[bin]]
+name = "vote-new-fraction"
+path = "vote/vote-new-fraction.rs"
