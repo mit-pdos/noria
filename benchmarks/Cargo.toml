@@ -51,9 +51,9 @@ tokio-core = { version = "0.1.8", optional = true }
 name = "bank"
 path = "bank/bank.rs"
 
-# [[bin]]
-# name = "vote"
-# path = "vote/vote.rs"
+[[bin]]
+name = "vote"
+path = "vote/vote.rs"
 
 [[bin]]
 name = "vote-server"
