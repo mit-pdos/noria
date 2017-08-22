@@ -38,7 +38,7 @@ impl Backend {
         let mut mig = self.g.add_universe(user_context);
         let mut recipe = self.recipe.take().unwrap();
         recipe.next();
-        match recipe.activate(&mut mig, false) {
+        match recipe.create_universe(&mut mig) {
             Ok(ar) => {
                 info!(self.log, "{} expressions added", ar.expressions_added);
                 info!(self.log, "{} expressions removed", ar.expressions_removed);
@@ -180,7 +180,7 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g).is_ok());
+        assert!(write!(gf, "{:x}", backend.g).is_ok());
     }
 
 }
