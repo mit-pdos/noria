@@ -53,6 +53,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
 
     // set up graph
     let mut g = Blender::new();
+
     let main_log = distributary::logger_pls();
     let recipe_log = main_log.new(o!());
     g.log_with(main_log);
