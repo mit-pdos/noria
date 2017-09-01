@@ -3,7 +3,7 @@ use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
 
-use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
+use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
 pub struct Client {
     conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
@@ -60,16 +60,22 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> RW {
     // Check whether database already exists, or whether we need to create it
     let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string);
     if config.mix.does_write() && !config.should_reuse() {
-        let fut = fut.and_then(|conn| {
+        // drop database if possible
+        let x = core.run(fut.and_then(|conn| {
             conn.simple_exec(format!("DROP DATABASE {};", db))
                 .and_then(|r| r)
                 .collect()
-        }).and_then(|(_, conn)| {
-                conn.simple_exec(format!("CREATE DATABASE {};", db))
-                    .and_then(|r| r)
-                    .collect()
-            })
-            .and_then(|(_, conn)| fixconn(conn))
+        }));
+        // we don't care if dropping failed
+        drop(x);
+
+        // we need to connect again because there's no way to recover the conn if drop fails
+        let fut = tiberius::SqlConnection::connect(core.handle(), cfg_string);
+        let fut = fut.and_then(|conn| {
+            conn.simple_exec(format!("CREATE DATABASE {};", db))
+                .and_then(|r| r)
+                .collect()
+        }).and_then(|(_, conn)| fixconn(conn))
             .and_then(|(_, conn)| {
                 conn.simple_exec(
                     "CREATE TABLE art (
