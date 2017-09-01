@@ -1,4 +1,4 @@
-use futures::{Future, Stream};
+use futures::Future;
 use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
@@ -218,29 +218,23 @@ impl Reader for RW {
         // scope needed so that the compiler realizes that `fut` goes out of scope, thus returning
         // the borrow of `res`
         {
+            use tiberius::stmt::ResultStreamExt;
             let data: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
             let fut = self.client
                 .conn
                 .take()
                 .unwrap()
                 .query(&self.prep, data.as_slice())
-                .for_each(|qs| {
-                    let q_res: Vec<ArticleResult> = qs.wait()
-                        .map(
-                            |row: Result<tiberius::query::QueryRow, tiberius::TdsError>| {
-                                let row = row.unwrap();
-                                let aid: i64 = row.get(0);
-                                let title: &str = row.get(1);
-                                let votes: i64 = row.get(2);
-                                ArticleResult::Article {
-                                    id: aid,
-                                    title: String::from(title),
-                                    votes: votes,
-                                }
-                            },
-                        )
-                        .collect();
-                    res.extend(q_res);
+                .for_each_row(|row| {
+                    let aid: i64 = row.get(0);
+                    let title: &str = row.get(1);
+                    let votes: i64 = row.get(2);
+                    let q_res = ArticleResult::Article {
+                        id: aid,
+                        title: String::from(title),
+                        votes: votes,
+                    };
+                    res.push(q_res);
                     Ok(())
                 });
             conn = self.client.core.run(fut).unwrap();
