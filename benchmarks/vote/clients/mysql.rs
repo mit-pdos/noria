@@ -4,9 +4,9 @@ use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
 use std::net::ToSocketAddrs;
 
 pub struct RW<'a> {
-    v_prep_1: mysql::conn::Stmt<'a>,
-    v_prep_2: mysql::conn::Stmt<'a>,
-    r_prep: mysql::conn::Stmt<'a>,
+    v_prep_1: mysql::Stmt<'a>,
+    v_prep_2: mysql::Stmt<'a>,
+    r_prep: mysql::Stmt<'a>,
     pool: &'a mysql::Pool,
 }
 
