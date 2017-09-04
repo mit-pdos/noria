@@ -22,7 +22,7 @@ const WRITE_RATE: u64 = 200_000;
 
 use zipf::ZipfDistribution;
 
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
 use std::time;
 
@@ -156,22 +156,29 @@ fn main() {
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // setup db
-    let mut g = graph::make(false, false, persistence_params);
+    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
+    let mut g = graph::make(blender, false, false, persistence_params);
 
-    if args.is_present("full") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_partial();
-    }
+    let (mut articles, mut votes, read_old) = {
+        let mut b = g.graph.lock().unwrap();
 
-    if args.is_present("unsharded") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_sharding();
-    }
+        if args.is_present("full") {
+            // it's okay to change this here, since it only matters for migration
+            b.disable_partial();
+        }
 
-    // we need a putter and a getter
-    let mut articles = g.graph.get_mutator(g.article);
-    let mut votes = g.graph.get_mutator(g.vote);
-    let read_old = g.graph.get_getter(g.end).unwrap();
+        if args.is_present("unsharded") {
+            // it's okay to change this here, since it only matters for migration
+            b.disable_sharding();
+        }
+
+        // we need a putter and a getter
+        (
+            b.get_mutator(g.article),
+            b.get_mutator(g.vote),
+            b.get_getter(g.end).unwrap(),
+        )
+    };
 
     // prepopulate
     println!("Prepopulating with {} articles", narticles);
@@ -254,8 +261,10 @@ fn main() {
 
     // all right, migration time
     let (ratings, read_new) = g.transition(args.is_present("stupid"), false);
-    let mut ratings = g.graph.get_mutator(ratings);
-    let read_new = g.graph.get_getter(read_new).unwrap();
+    let (mut ratings, read_new) = {
+        let b = g.graph.lock().unwrap();
+        (b.get_mutator(ratings), b.get_getter(read_new).unwrap())
+    };
 
     println!("Starting new writer");
 

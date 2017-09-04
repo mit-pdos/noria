@@ -7,7 +7,6 @@ extern crate distributary;
 
 extern crate hdrsample;
 extern crate zipf;
-extern crate bus;
 
 mod exercise;
 mod graph;
@@ -20,7 +19,7 @@ use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
 use std::sync::mpsc;
 
 use std::thread;
-use std::sync;
+use std::sync::{self, Arc, Mutex};
 use std::time;
 
 fn main() {
@@ -194,15 +193,19 @@ fn main() {
     let persistence_params = PersistenceParameters::new(mode, queue_length, flush_timeout);
 
     // setup db
-    let g = graph::make(!args.is_present("quiet"), transactions, persistence_params);
+    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
+    let g = graph::make(blender, false, false, persistence_params);
 
     // prepare getters
-    let getters: Vec<_> = (0..ngetters)
+    let getters: Vec<_> = {
+        let b = g.graph.lock().unwrap();
+        (0..ngetters)
         .into_iter()
         .map(|_| {
-            Getter::new(g.graph.get_getter(g.end).unwrap(), crossover)
+            Getter::new(b.get_getter(g.end).unwrap(), crossover)
         })
-        .collect();
+        .collect()
+    };
 
     let mut new_vote_senders = Vec::new();
     let mut new_vote_receivers = Vec::new();
@@ -215,18 +218,21 @@ fn main() {
     let new_votes = migrate_after.map(|t| (t, new_vote_senders));
 
     // prepare putters
-    let putters: Vec<_> = new_vote_receivers.into_iter()
+    let putters: Vec<_> = {
+        let b = g.graph.lock().unwrap();
+        new_vote_receivers.into_iter()
         .map(|new_vote| {
             Spoon {
-                article: g.graph.get_mutator(g.article),
-                vote_pre: g.graph.get_mutator(g.vote),
+                article: b.get_mutator(g.article),
+                vote_pre: b.get_mutator(g.vote),
                 vote_post: None,
                 new_vote: new_votes.as_ref().and(Some(new_vote)),
                 x: Crossover::new(crossover),
                 i: 0,
             }
         })
-        .collect();
+        .collect()
+    };
 
     let put_stats: Vec<_>;
     let get_stats: Vec<_>;
@@ -670,11 +676,12 @@ impl Migrator {
         println!("Starting migration");
         let mig_start = time::Instant::now();
         let (rating, newend) = self.graph.transition(self.stupid, self.transactions);
+        let b = self.graph.graph.lock().unwrap();
         for sender in self.bus {
-            sender.send(self.graph.graph.get_mutator(rating)).unwrap();
+            sender.send(b.get_mutator(rating)).unwrap();
         }
         for mut getter in self.getters {
-            unsafe { getter.replace(self.graph.graph.get_getter(newend).unwrap()) };
+            unsafe { getter.replace(b.get_getter(newend).unwrap()) };
         }
         let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
         println!("Migration completed in {:.4}s", mig_duration);
