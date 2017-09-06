@@ -29,6 +29,7 @@ extern crate net2;
 extern crate memcached;
 
 extern crate hdrsample;
+extern crate vec_map;
 extern crate zipf;
 
 mod clients;

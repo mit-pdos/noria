@@ -142,6 +142,7 @@ dependencies = [
  "slog-term 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiberius 0.2.2 (git+https://github.com/ms705/tiberius/)",
  "tokio-core 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
