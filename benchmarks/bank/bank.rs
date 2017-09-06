@@ -2,14 +2,8 @@
 extern crate clap;
 extern crate mio;
 extern crate rand;
-extern crate channel;
-extern crate hdrsample;
 extern crate distributary;
 
-use hdrsample::Histogram;
-
-use std::cmp;
-use std::sync::mpsc;
 use std::thread;
 use std::time;
 
@@ -17,7 +11,6 @@ use std::collections::HashMap;
 
 use mio::net::TcpListener;
 
-use channel::TcpReceiver;
 use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
 
 use rand::Rng;
@@ -309,16 +302,16 @@ fn client(
 /// Given a Vec of (transaction_start, write_start) and the global debug channel, compute and output
 /// latency statistics.
 fn process_latencies(
-    times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
-    debug_channel: TcpListener,
+    _times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
+    _debug_channel: TcpListener,
 ) {
-    use distributary::{DebugEvent, DebugEventType, PacketEvent};
-
-    let mut read_latencies: Vec<u64> = Vec::new();
-    let mut write_latencies = Vec::new();
-    let mut settle_latencies = Vec::new();
-
     unimplemented!();
+
+    // use distributary::{DebugEvent, DebugEventType, PacketEvent};
+
+    // let mut read_latencies: Vec<u64> = Vec::new();
+    // let mut write_latencies = Vec::new();
+    // let mut settle_latencies = Vec::new();
     // for _ in 0..(times.iter().filter(|t| t.is_some()).count()) {
     //     for DebugEvent { instant, event } in debug_channel.iter() {
     //         match event {
@@ -337,31 +330,31 @@ fn process_latencies(
     // }
 
 
-    // Print average latencies.
-    let rl: u64 = read_latencies.iter().sum();
-    let wl: u64 = write_latencies.iter().sum();
-    let sl: u64 = settle_latencies.iter().sum();
+    // // Print average latencies.
+    // let rl: u64 = read_latencies.iter().sum();
+    // let wl: u64 = write_latencies.iter().sum();
+    // let sl: u64 = settle_latencies.iter().sum();
 
-    let n = write_latencies.len() as f64;
-    println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
-    println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
-    println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-    println!(
-        "write + settle latency: {:.3} μs",
-        (wl + sl) as f64 / n * 0.001
-    );
+    // let n = write_latencies.len() as f64;
+    // println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
+    // println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
+    // println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
+    // println!(
+    //     "write + settle latency: {:.3} μs",
+    //     (wl + sl) as f64 / n * 0.001
+    // );
 
-    let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
-    for i in 0..write_latencies.len() {
-        let sample_nanos = write_latencies[i] + settle_latencies[i];
-        let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
-        latencies_hist.record(sample_micros).unwrap();
-    }
+    // let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
+    // for i in 0..write_latencies.len() {
+    //     let sample_nanos = write_latencies[i] + settle_latencies[i];
+    //     let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
+    //     latencies_hist.record(sample_micros).unwrap();
+    // }
 
-    for iv in latencies_hist.iter_recorded() {
-        // XXX: Print CDF in the format expected by the print_latency_cdf script.
-        println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
-    }
+    // for iv in latencies_hist.iter_recorded() {
+    //     // XXX: Print CDF in the format expected by the print_latency_cdf script.
+    //     println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+    // }
 }
 
 fn main() {
