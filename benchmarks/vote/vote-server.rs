@@ -1,10 +1,6 @@
 extern crate clap;
-
 extern crate distributary;
 extern crate gulaschkanone;
-
-extern crate slog;
-extern crate slog_term;
 
 mod graph;
 
