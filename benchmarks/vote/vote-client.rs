@@ -48,7 +48,7 @@ EXAMPLES:
   vote-client [read|write] hybrid://mysql=user@127.0.0.1/database,memcached=127.0.0.1:11211";
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let mut backends = vec![];
     if cfg!(feature = "b_mssql") {
         backends.push("mssql");
@@ -247,12 +247,10 @@ fn main() {
             exercise::launch_mix(c, config)
         }
         // garbage
-        t => {
-            panic!(
-                "backend not supported -- make sure you compiled with --features b_{}",
-                t
-            )
-        }
+        t => panic!(
+            "backend not supported -- make sure you compiled with --features b_{}",
+            t
+        ),
     };
     print_stats(&cfg.mix, &stats, avg);
 }

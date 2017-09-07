@@ -8,10 +8,10 @@ use distributary::{srv, Blender};
 
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
-use std::{time, thread};
+use std::{thread, time};
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("vote")
         .version("0.1")
         .about(
@@ -67,7 +67,9 @@ fn main() {
         );
 
         // run controller in the background
-        let _ = thread::spawn(move || { controller.listen(); });
+        let _ = thread::spawn(move || {
+            controller.listen();
+        });
 
         // wait for a worker to connect
         println!("waiting 10s for a worker to connect...");

@@ -1,7 +1,7 @@
 use distributary::srv;
 use distributary::{DataType, Mutator, MutatorBuilder};
 
-use common::{Writer, Reader, RuntimeConfig, ArticleResult, Period};
+use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
 use std::io;
 use std::io::prelude::*;
@@ -19,18 +19,18 @@ pub struct C(BufStream<TcpStream>, VecMap<Mutator>);
 impl C {
     pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
         let stream = &mut self.0;
-        let mutator = self.1
-            .entry(view)
-            .or_insert_with(||{
-                bincode::serialize_into(stream,
-                                        &srv::Method::GetMutatorBuilder {view},
-                                        bincode::Infinite).unwrap();
-                bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
-                stream.flush().unwrap();
-                let builder: MutatorBuilder =
-                    bincode::deserialize_from(stream, bincode::Infinite).unwrap();
-                builder.build()
-            });
+        let mutator = self.1.entry(view).or_insert_with(|| {
+            bincode::serialize_into(
+                stream,
+                &srv::Method::GetMutatorBuilder { view },
+                bincode::Infinite,
+            ).unwrap();
+            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
+            stream.flush().unwrap();
+            let builder: MutatorBuilder =
+                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
+            builder.build()
+        });
 
         for r in data {
             mutator.put(r).unwrap();
@@ -112,25 +112,22 @@ impl Reader for C {
                 .map(|rows| {
                     // rustfmt
                     match rows.into_iter().next() {
-                        Some(row) => {
-                            match row[1] {
-                                DataType::TinyText(..) |
-                                DataType::Text(..) => {
-                                    use std::borrow::Cow;
-                                    let t: Cow<_> = (&row[1]).into();
-                                    let count: i64 = match row[2].clone() {
-                                        DataType::None => 0,
-                                        d => d.into(),
-                                    };
-                                    ArticleResult::Article {
-                                        id: row[0].clone().into(),
-                                        title: t.to_string(),
-                                        votes: count,
-                                    }
+                        Some(row) => match row[1] {
+                            DataType::TinyText(..) | DataType::Text(..) => {
+                                use std::borrow::Cow;
+                                let t: Cow<_> = (&row[1]).into();
+                                let count: i64 = match row[2].clone() {
+                                    DataType::None => 0,
+                                    d => d.into(),
+                                };
+                                ArticleResult::Article {
+                                    id: row[0].clone().into(),
+                                    title: t.to_string(),
+                                    votes: count,
                                 }
-                                _ => unreachable!(),
                             }
-                        }
+                            _ => unreachable!(),
+                        },
                         None => ArticleResult::NoSuchArticle,
                     }
                 })

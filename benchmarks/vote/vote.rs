@@ -14,8 +14,8 @@ mod graph;
 #[macro_use]
 mod common;
 
-use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
-use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
+use common::{ArticleResult, Distribution, Period, Reader, RuntimeConfig, Writer};
+use distributary::{DataType, DurabilityMode, Mutator, PersistenceParameters};
 use std::sync::mpsc;
 
 use std::thread;
@@ -23,7 +23,7 @@ use std::sync::{self, Arc, Mutex};
 use std::time;
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
 
     let args = App::new("vote")
         .version("0.1")
@@ -200,11 +200,9 @@ fn main() {
     let getters: Vec<_> = {
         let b = g.graph.lock().unwrap();
         (0..ngetters)
-        .into_iter()
-        .map(|_| {
-            Getter::new(b.get_getter(g.end).unwrap(), crossover)
-        })
-        .collect()
+            .into_iter()
+            .map(|_| Getter::new(b.get_getter(g.end).unwrap(), crossover))
+            .collect()
     };
 
     let mut new_vote_senders = Vec::new();
@@ -220,18 +218,19 @@ fn main() {
     // prepare putters
     let putters: Vec<_> = {
         let b = g.graph.lock().unwrap();
-        new_vote_receivers.into_iter()
-        .map(|new_vote| {
-            Spoon {
-                article: b.get_mutator(g.article),
-                vote_pre: b.get_mutator(g.vote),
-                vote_post: None,
-                new_vote: new_votes.as_ref().and(Some(new_vote)),
-                x: Crossover::new(crossover),
-                i: 0,
-            }
-        })
-        .collect()
+        new_vote_receivers
+            .into_iter()
+            .map(|new_vote| {
+                Spoon {
+                    article: b.get_mutator(g.article),
+                    vote_pre: b.get_mutator(g.vote),
+                    vote_post: None,
+                    new_vote: new_votes.as_ref().and(Some(new_vote)),
+                    x: Crossover::new(crossover),
+                    i: 0,
+                }
+            })
+            .collect()
     };
 
     let put_stats: Vec<_>;
@@ -385,23 +384,21 @@ fn main() {
         print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
-        let sum = put_stats.iter().fold(
-            (0f64, 0usize),
-            |(tot, count), stats| {
+        let sum = put_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
                 (tot + sum, count + num)
-            },
-        );
+            });
         println!("avg PUT: {:.2}", sum.0 as f64 / sum.1 as f64);
-        let sum = get_stats.iter().fold(
-            (0f64, 0usize),
-            |(tot, count), stats| {
+        let sum = get_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
                 (tot + sum, count + num)
-            },
-        );
+            });
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -413,23 +410,21 @@ fn main() {
             print_stats(format!("GET{}+", i), true, &s.post, avg);
         }
         if avg {
-            let sum = put_stats.iter().fold(
-                (0f64, 0usize),
-                |(tot, count), stats| {
+            let sum = put_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.post.sum_len();
                     (tot + sum, count + num)
-                },
-            );
+                });
             println!("avg PUT+: {:.2}", sum.0 as f64 / sum.1 as f64);
-            let sum = get_stats.iter().fold(
-                (0f64, 0usize),
-                |(tot, count), stats| {
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.post.sum_len();
                     (tot + sum, count + num)
-                },
-            );
+                });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -502,8 +497,8 @@ impl Crossover {
                 return true;
             }
 
-            self.post = ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as
-                usize;
+            self.post =
+                ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as usize;
             self.iteration = 0;
         }
 

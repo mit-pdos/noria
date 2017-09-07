@@ -1,4 +1,4 @@
-use distributary::{Blender, Base, Aggregation, Join, JoinType, NodeIndex, PersistenceParameters};
+use distributary::{Aggregation, Base, Blender, Join, JoinType, NodeIndex, PersistenceParameters};
 use distributary;
 
 use std::sync::{Arc, Mutex};
@@ -76,7 +76,7 @@ pub fn make(
 impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self, stupid: bool, transactions: bool) -> (NodeIndex, NodeIndex) {
-        use distributary::{Base, Aggregation, Join, JoinType, Union, Project};
+        use distributary::{Aggregation, Base, Join, JoinType, Project, Union};
         use std::collections::HashMap;
 
         // get all the ids since migration will borrow self

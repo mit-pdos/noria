@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate clap;
+extern crate distributary;
 extern crate mio;
 extern crate rand;
-extern crate distributary;
 
 use std::thread;
 use std::time;
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use mio::net::TcpListener;
 
-use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
+use distributary::{Aggregation, Base, Blender, DataType, Join, JoinType, Mutator, Token};
 
 use rand::Rng;
 
@@ -358,7 +358,7 @@ fn process_latencies(
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("bank")
         .version("0.1")
         .about("Benchmarks Soup transactions and reports abort rate.")
@@ -569,5 +569,4 @@ fn main() {
     if avg {
         println!("avg PUT: {:.2}", throughput);
     }
-
 }
