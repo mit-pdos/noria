@@ -5,9 +5,9 @@ extern crate rand;
 
 extern crate distributary;
 
+extern crate bus;
 extern crate hdrsample;
 extern crate zipf;
-extern crate bus;
 
 mod exercise;
 mod graph;
@@ -15,15 +15,15 @@ mod graph;
 #[macro_use]
 mod common;
 
-use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
-use distributary::{Mutator, DataType, DurabilityMode, PersistenceParameters};
+use common::{ArticleResult, Distribution, Period, Reader, RuntimeConfig, Writer};
+use distributary::{DataType, DurabilityMode, Mutator, PersistenceParameters};
 
 use std::thread;
 use std::sync;
 use std::time;
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
 
     let args = App::new("vote")
         .version("0.1")
@@ -372,23 +372,21 @@ fn main() {
         print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
-        let sum = put_stats.iter().fold(
-            (0f64, 0usize),
-            |(tot, count), stats| {
+        let sum = put_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
                 (tot + sum, count + num)
-            },
-        );
+            });
         println!("avg PUT: {:.2}", sum.0 as f64 / sum.1 as f64);
-        let sum = get_stats.iter().fold(
-            (0f64, 0usize),
-            |(tot, count), stats| {
+        let sum = get_stats
+            .iter()
+            .fold((0f64, 0usize), |(tot, count), stats| {
                 // TODO: do we *really* want an average of averages?
                 let (sum, num) = stats.pre.sum_len();
                 (tot + sum, count + num)
-            },
-        );
+            });
         println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
     }
 
@@ -400,23 +398,21 @@ fn main() {
             print_stats(format!("GET{}+", i), true, &s.post, avg);
         }
         if avg {
-            let sum = put_stats.iter().fold(
-                (0f64, 0usize),
-                |(tot, count), stats| {
+            let sum = put_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.post.sum_len();
                     (tot + sum, count + num)
-                },
-            );
+                });
             println!("avg PUT+: {:.2}", sum.0 as f64 / sum.1 as f64);
-            let sum = get_stats.iter().fold(
-                (0f64, 0usize),
-                |(tot, count), stats| {
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.post.sum_len();
                     (tot + sum, count + num)
-                },
-            );
+                });
             println!("avg GET+: {:.2}", sum.0 as f64 / sum.1 as f64);
         }
     }
@@ -489,8 +485,8 @@ impl Crossover {
                 return true;
             }
 
-            self.post = ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as
-                usize;
+            self.post =
+                ((elapsed as f64 / self.crossover.unwrap() as f64) * (1 << 12) as f64) as usize;
             self.iteration = 0;
         }
 

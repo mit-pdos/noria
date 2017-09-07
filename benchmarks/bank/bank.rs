@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate clap;
-extern crate rand;
-extern crate hdrsample;
 extern crate distributary;
+extern crate hdrsample;
+extern crate rand;
 
 use hdrsample::Histogram;
 
@@ -13,7 +13,7 @@ use std::time;
 
 use std::collections::HashMap;
 
-use distributary::{Blender, Base, Aggregation, Join, JoinType, DataType, Token, Mutator};
+use distributary::{Aggregation, Base, Blender, DataType, Join, JoinType, Mutator, Token};
 
 use rand::Rng;
 
@@ -313,7 +313,7 @@ fn process_latencies(
     let mut write_latencies = Vec::new();
     let mut settle_latencies = Vec::new();
 
-    for _ in 0..(times.iter().filter(|t|t.is_some()).count()) {
+    for _ in 0..(times.iter().filter(|t| t.is_some()).count()) {
         for DebugEvent { instant, event } in debug_channel.iter() {
             // if verbose {
             //     let dt = dur_to_ns!(instant.duration_since(last_instant)) as f64;
@@ -364,7 +364,7 @@ fn process_latencies(
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("bank")
         .version("0.1")
         .about("Benchmarks Soup transactions and reports abort rate.")
@@ -575,5 +575,4 @@ fn main() {
     if avg {
         println!("avg PUT: {:.2}", throughput);
     }
-
 }

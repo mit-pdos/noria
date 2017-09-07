@@ -5,7 +5,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, Recipe, DataType};
+use distributary::{Blender, DataType, Recipe};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -32,9 +32,7 @@ impl Backend {
         }
     }
 
-    fn login(&mut self,
-        user_context: HashMap<String, DataType>
-    ) -> Result<(), String> {
+    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
         let mut mig = self.g.add_universe(user_context);
         let mut recipe = self.recipe.take().unwrap();
         recipe.next();
@@ -87,7 +85,7 @@ impl Backend {
                 let mut pf = File::open(pf).unwrap();
                 pf.read_to_string(&mut p).unwrap();
                 Some(&p)
-            },
+            }
         };
 
         let new_recipe = Recipe::from_str_with_policy(&rs, pstr, Some(self.log.clone()))?;
@@ -109,9 +107,7 @@ impl Backend {
         mig.commit();
         self.recipe = Some(updated_recipe);
         Ok(())
-
     }
-
 }
 
 fn make_user(id: i32) -> HashMap<String, DataType> {
@@ -122,38 +118,36 @@ fn make_user(id: i32) -> HashMap<String, DataType> {
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("piazza")
         .version("0.1")
-        .about(
-            "Benchmarks Piazza-like application with security policies.",
-        )
+        .about("Benchmarks Piazza-like application with security policies.")
         .arg(
             Arg::with_name("schema")
                 .short("s")
                 .required(true)
                 .default_value("Benchmarks/piazza/schema.sql")
-                .help("Schema file for Piazza application")
+                .help("Schema file for Piazza application"),
         )
         .arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
                 .default_value("Benchmarks/piazza/queries.sql")
-                .help("Query file for Piazza application")
+                .help("Query file for Piazza application"),
         )
         .arg(
             Arg::with_name("policies")
                 .short("p")
                 .required(true)
                 .default_value("Benchmarks/piazza/policies.json")
-                .help("Security policies file for Piazza application")
+                .help("Security policies file for Piazza application"),
         )
         .arg(
             Arg::with_name("graph")
                 .short("g")
                 .default_value("pgraph.gv")
-                .help("File to dump application's soup graph, if set")
+                .help("File to dump application's soup graph, if set"),
         )
         .get_matches();
 
@@ -182,5 +176,4 @@ fn main() {
         let mut gf = File::create(graph_fname).unwrap();
         assert!(write!(gf, "{:x}", backend.g).is_ok());
     }
-
 }

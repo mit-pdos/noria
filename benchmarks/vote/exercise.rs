@@ -1,4 +1,4 @@
-use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig, Distribution};
+use common::{ArticleResult, Distribution, Period, Reader, RuntimeConfig, Writer};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -15,7 +15,7 @@ use std::time;
 use rand;
 use rand::Rng as StdRng;
 use hdrsample::{Histogram, RecordError};
-use hdrsample::iterators::{HistogramIterator, recorded};
+use hdrsample::iterators::{recorded, HistogramIterator};
 use zipf::ZipfDistribution;
 
 pub struct BenchmarkResult {
@@ -203,26 +203,22 @@ where
                     }
                 };
                 match period {
-                    Period::PreMigration => {
-                        if config.verbose {
-                            println!(
-                                "{:?} {}: {:.2}",
-                                dur_to_ns!(start.elapsed()),
-                                desc,
-                                count_per_s
-                            );
-                        }
-                    }
-                    Period::PostMigration => {
-                        if config.verbose {
-                            println!(
-                                "{:?} {}+: {:.2}",
-                                dur_to_ns!(start.elapsed()),
-                                desc,
-                                count_per_s
-                            );
-                        }
-                    }
+                    Period::PreMigration => if config.verbose {
+                        println!(
+                            "{:?} {}: {:.2}",
+                            dur_to_ns!(start.elapsed()),
+                            desc,
+                            count_per_s
+                        );
+                    },
+                    Period::PostMigration => if config.verbose {
+                        println!(
+                            "{:?} {}+: {:.2}",
+                            dur_to_ns!(start.elapsed()),
+                            desc,
+                            count_per_s
+                        );
+                    },
                 }
                 stats.record_throughput(period, count_per_s);
 
@@ -240,7 +236,6 @@ where
 }
 
 pub fn prep_writer<W: Writer>(writer: &mut W, config: &RuntimeConfig) {
-
     // prepopulate
     if !config.should_reuse() {
         println!("Prepopulating with {} articles", config.narticles);
@@ -281,7 +276,6 @@ pub fn launch<R: Reader, W: Writer>(
     if let Some(ref mut writer) = writer {
         prep_writer(writer, &config);
         ready.map(|b| b.wait());
-
     }
     if config.runtime.is_none() {
         return BenchmarkResults::default();

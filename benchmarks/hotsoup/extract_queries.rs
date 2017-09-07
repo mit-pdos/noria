@@ -2,9 +2,9 @@ extern crate clap;
 extern crate nom_sql;
 extern crate regex;
 
+extern crate distributary;
 #[macro_use]
 extern crate slog;
-extern crate distributary;
 
 use std::path::{Path, PathBuf};
 
@@ -17,11 +17,9 @@ fn traverse(path: &Path) -> Vec<PathBuf> {
         let path = entry.path();
         if path.is_file() {
             match path.extension() {
-                Some(e) => {
-                    if e.to_str().unwrap() == "php" || e.to_str().unwrap() == "inc" {
-                        files.push(path.clone())
-                    }
-                }
+                Some(e) => if e.to_str().unwrap() == "php" || e.to_str().unwrap() == "inc" {
+                    files.push(path.clone())
+                },
                 _ => (),
             }
         } else if path.is_dir() {
@@ -103,7 +101,7 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
 const SKIP_FILES: [&str; 1] = ["test02.php"];
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     use std::io::Write;
     use std::fs::File;
 
