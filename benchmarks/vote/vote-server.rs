@@ -1,6 +1,9 @@
+#[macro_use]
 extern crate clap;
 extern crate distributary;
 extern crate gulaschkanone;
+#[macro_use]
+extern crate slog;
 
 mod graph;
 
@@ -27,12 +30,22 @@ fn main() {
         .arg(
             Arg::with_name("distributed")
                 .long("distributed")
+                .requires("NUM_WORKERS")
                 .takes_value(false)
                 .help("Run in distributed mode."),
+        )
+        .arg(
+            Arg::with_name("NUM_WORKERS")
+            .long("workers")
+            .requires("distributed")
+            .takes_value(true)
+            .help("Number of workers to expect. Once this many workers are present, data-flow graph is set up."),
         )
         .get_matches();
 
     let addr = args.value_of("ADDR").unwrap();
+    let num_workers_expected = value_t_or_exit!(args, "NUM_WORKERS", usize);
+
     println!("Attempting to start soup on {}", addr);
 
     let persistence_params = distributary::PersistenceParameters::new(
@@ -75,12 +88,29 @@ fn main() {
             .unwrap();
 
         // wait for a worker to connect
-        println!("waiting 10s for a worker to connect...");
-        thread::sleep(time::Duration::from_millis(10000));
+        info!(
+            log,
+            "waiting for {} workers to connect...",
+            num_workers_expected
+        );
+
+        let mut wc = 0;
+        while wc < num_workers_expected {
+            // need this nesting so that we don't hold the lock for too long (worker
+            // registration needs it!)
+            {
+                let blender = blender.lock().unwrap();
+                wc = blender.worker_count();
+            }
+            thread::sleep(time::Duration::from_millis(1000));
+        }
+
+        info!(log, "workers are here; let's get going!");
+
         Some(jh)
     } else {
         None
-    }
+    };
 
     // scoped needed to ensure lock is released
     let g = graph::make(blender.clone(), true, false, persistence_params);
