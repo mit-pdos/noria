@@ -53,7 +53,7 @@ EXAMPLES:
   vote-client [read|write] dd://127.0.0.1:7777";
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let mut backends = vec![];
     if cfg!(feature = "b_dd") {
         backends.push("dd");
@@ -261,12 +261,10 @@ fn main() {
             exercise::launch_mix(c, config)
         }
         // garbage
-        t => {
-            panic!(
-                "backend not supported -- make sure you compiled with --features b_{}",
-                t
-            )
-        }
+        t => panic!(
+            "backend not supported -- make sure you compiled with --features b_{}",
+            t
+        ),
     };
     print_stats(&cfg.mix, &stats, avg);
 }

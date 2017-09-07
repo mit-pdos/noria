@@ -28,8 +28,7 @@ pub enum ArticleResult {
 #[derive(Clone, Copy)]
 pub enum Period {
     PreMigration,
-    #[allow(dead_code)]
-    PostMigration,
+    #[allow(dead_code)] PostMigration,
 }
 
 pub trait Reader {
@@ -93,8 +92,7 @@ impl FromStr for Distribution {
 pub enum Mix {
     Write(usize),
     Read(usize),
-    #[allow(dead_code)]
-    RW(usize, usize),
+    #[allow(dead_code)] RW(usize, usize),
 }
 
 impl Mix {

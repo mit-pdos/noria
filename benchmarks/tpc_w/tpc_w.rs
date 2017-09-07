@@ -79,18 +79,14 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
 impl Backend {
     fn generate_parameter(&self, query_name: &str, rng: &mut rand::ThreadRng) -> DataType {
         match query_name {
-            "getName" => {
-                rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                    .into()
-            }
+            "getName" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                .into(),
             "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getCustomer" => "".into(), // XXX(malte): fix username string generation
             "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
             "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
-            "getUserName" => {
-                rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                    .into()
-            }
+            "getUserName" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                .into(),
             "getPassword" => "".into(), // XXX(malte): fix username string generation
             "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
@@ -102,22 +98,14 @@ impl Backend {
             "addRandomItemToCartIfNecessary" => 0.into(), // XXX(malte): need SCL ID range
             "getCart" => 0.into(), // XXX(malte): need SCL ID range
             "createNewCustomerMaxId" => 0i32.into(),
-            "getCDiscount" => {
-                rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                    .into()
-            }
-            "getCAddrId" => {
-                rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                    .into()
-            }
-            "getCAddr" => {
-                rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                    .into()
-            }
-            "enterAddressId" => {
-                rng.gen_range(1, self.prepop_counts["countries"] as i32)
-                    .into()
-            }
+            "getCDiscount" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                .into(),
+            "getCAddrId" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                .into(),
+            "getCAddr" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
+                .into(),
+            "enterAddressId" => rng.gen_range(1, self.prepop_counts["countries"] as i32)
+                .into(),
             "enterAddressMaxId" => 0i32.into(),
             "enterOrderMaxId" => 0i32.into(),
             "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
@@ -141,11 +129,9 @@ impl Backend {
                     let param = self.generate_parameter(query_name, &mut rng);
                     match g.lookup(&param, true) {
                         Err(_) => panic!(),
-                        Ok(datas) => {
-                            if datas.len() > 0 {
-                                ok += 1;
-                            }
-                        }
+                        Ok(datas) => if datas.len() > 0 {
+                            ok += 1;
+                        },
                     }
                 }
                 let dur = dur_to_fsec!(start.elapsed());
@@ -161,7 +147,7 @@ impl Backend {
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     use populate::*;
 
     let matches = App::new("tpc_w")

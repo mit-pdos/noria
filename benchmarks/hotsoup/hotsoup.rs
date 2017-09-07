@@ -122,7 +122,7 @@ impl Backend {
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     use std::fs::{self, File};
     use std::io::Write;
     use std::path::PathBuf;
