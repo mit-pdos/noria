@@ -43,7 +43,7 @@ fn main() {
 
     let blender = Arc::new(Mutex::new(Blender::new()));
 
-    if args.is_present("distributed") {
+    let jh = if args.is_present("distributed") {
         use gulaschkanone::{Config, Controller};
 
         let config = Config {
@@ -67,13 +67,19 @@ fn main() {
         );
 
         // run controller in the background
-        let _ = thread::spawn(move || {
-            controller.listen();
-        });
+        let builder = thread::Builder::new().name("gulaschkanone-ctrl".into());
+        let jh = builder
+            .spawn(move || {
+                controller.listen();
+            })
+            .unwrap();
 
         // wait for a worker to connect
         println!("waiting 10s for a worker to connect...");
         thread::sleep(time::Duration::from_millis(10000));
+        Some(jh)
+    } else {
+        None
     }
 
     // scoped needed to ensure lock is released
@@ -82,4 +88,10 @@ fn main() {
     // start processing
     // TODO: what about the node indices?
     srv::run(g.graph, addr.to_socket_addrs().unwrap().next().unwrap());
+
+    if jh.is_some() {
+        jh.unwrap()
+            .join()
+            .expect("failed to join controller thread");
+    }
 }
