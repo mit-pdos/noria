@@ -1,8 +1,8 @@
 use memcached;
-use memcached::proto::{Operation, MultiOperation, ProtoType};
+use memcached::proto::{MultiOperation, Operation, ProtoType};
 use mysql::{self, OptsBuilder};
 
-use common::{Writer, Reader, ArticleResult, Period, RuntimeConfig};
+use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 use std::net::ToSocketAddrs;
 
 pub struct Pool {

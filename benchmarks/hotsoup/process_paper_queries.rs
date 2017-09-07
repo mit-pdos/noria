@@ -3,9 +3,9 @@ extern crate clap;
 extern crate nom_sql;
 extern crate regex;
 
+extern crate distributary;
 #[macro_use]
 extern crate slog;
-extern crate distributary;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -93,7 +93,7 @@ fn process_file(fp: &Path) -> Vec<String> {
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
 
     let log = distributary::logger_pls();
 

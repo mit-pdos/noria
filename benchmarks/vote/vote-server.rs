@@ -9,7 +9,7 @@ use std::net::ToSocketAddrs;
 use std::time;
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("vote")
         .version("0.1")
         .about(
