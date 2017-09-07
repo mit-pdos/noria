@@ -35,6 +35,12 @@ fn main() {
                 .help("Run in distributed mode."),
         )
         .arg(
+            Arg::with_name("durability")
+                .long("durability")
+                .takes_value(false)
+                .help("Enable durability for Base nodes"),
+        )
+        .arg(
             Arg::with_name("NUM_WORKERS")
                 .long("workers")
                 .requires("distributed")
@@ -48,14 +54,16 @@ fn main() {
 
     let addr = args.value_of("ADDR").unwrap();
     let num_workers_expected = value_t_or_exit!(args, "NUM_WORKERS", usize);
+    let durability = if args.is_present("durability") {
+        distributary::DurabilityMode::DeleteOnExit
+    } else {
+        distributary::DurabilityMode::MemoryOnly
+    };
 
     println!("Attempting to start soup on {}", addr);
 
-    let persistence_params = distributary::PersistenceParameters::new(
-        distributary::DurabilityMode::DeleteOnExit,
-        512,
-        time::Duration::from_millis(1),
-    );
+    let persistence_params =
+        distributary::PersistenceParameters::new(durability, 512, time::Duration::from_millis(1));
 
     let blender = Arc::new(Mutex::new(Blender::new()));
 
