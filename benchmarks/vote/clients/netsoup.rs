@@ -1,7 +1,7 @@
 use distributary::srv;
 use distributary::DataType;
 
-use common::{Writer, Reader, RuntimeConfig, ArticleResult, Period};
+use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
 use std::io;
 use std::io::prelude::*;
@@ -113,25 +113,22 @@ impl Reader for C {
                 .map(|rows| {
                     // rustfmt
                     match rows.into_iter().next() {
-                        Some(row) => {
-                            match row[1] {
-                                DataType::TinyText(..) |
-                                DataType::Text(..) => {
-                                    use std::borrow::Cow;
-                                    let t: Cow<_> = (&row[1]).into();
-                                    let count: i64 = match row[2].clone() {
-                                        DataType::None => 0,
-                                        d => d.into(),
-                                    };
-                                    ArticleResult::Article {
-                                        id: row[0].clone().into(),
-                                        title: t.to_string(),
-                                        votes: count,
-                                    }
+                        Some(row) => match row[1] {
+                            DataType::TinyText(..) | DataType::Text(..) => {
+                                use std::borrow::Cow;
+                                let t: Cow<_> = (&row[1]).into();
+                                let count: i64 = match row[2].clone() {
+                                    DataType::None => 0,
+                                    d => d.into(),
+                                };
+                                ArticleResult::Article {
+                                    id: row[0].clone().into(),
+                                    title: t.to_string(),
+                                    votes: count,
                                 }
-                                _ => unreachable!(),
                             }
-                        }
+                            _ => unreachable!(),
+                        },
                         None => ArticleResult::NoSuchArticle,
                     }
                 })

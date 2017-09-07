@@ -4,7 +4,7 @@ use memcached::proto::{MultiOperation, ProtoType};
 pub struct Memcache(memcached::Client);
 unsafe impl Send for Memcache {}
 
-use common::{Writer, Reader, ArticleResult, Period};
+use common::{ArticleResult, Period, Reader, Writer};
 
 pub fn make(addr: &str) -> Memcache {
     Memcache(
@@ -46,7 +46,6 @@ impl Writer for Memcache {
         //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
         drop(self.0.increment_multi(ids));
         Period::PreMigration
-
     }
 }
 

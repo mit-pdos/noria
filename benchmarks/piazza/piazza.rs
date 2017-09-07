@@ -4,10 +4,10 @@ extern crate distributary;
 extern crate clap;
 
 use std::{thread, time};
-use std::fs::{OpenOptions, File};
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 
-use distributary::{DataType, Join, JoinType, Blender, Base, NodeIndex, Filter, Mutator};
+use distributary::{Base, Blender, DataType, Filter, Join, JoinType, Mutator, NodeIndex};
 
 pub struct Piazza {
     pub soup: Blender,
@@ -90,7 +90,6 @@ impl Piazza {
 
         // commit migration
         mig.commit();
-
     }
 }
 
@@ -110,26 +109,22 @@ fn populate_classes(nclasses: i64, mut class_putter: Mutator) {
 
 fn populate_taking(nclasses: i64, nusers: i64, mut taking_putter: Mutator, fanout: Fanout) {
     match fanout {
-        Fanout::Few => {
-            for j in 0..nusers {
-                for i in 0..10 {
-                    let cid = (j * 10 + i) % nclasses;
-                    taking_putter.put(vec![cid.into(), j.into()]).unwrap();
-                }
+        Fanout::Few => for j in 0..nusers {
+            for i in 0..10 {
+                let cid = (j * 10 + i) % nclasses;
+                taking_putter.put(vec![cid.into(), j.into()]).unwrap();
             }
-        }
-        Fanout::All => {
-            for j in 0..nusers {
-                for i in 0..nclasses {
-                    taking_putter.put(vec![i.into(), j.into()]).unwrap();
-                }
+        },
+        Fanout::All => for j in 0..nusers {
+            for i in 0..nclasses {
+                taking_putter.put(vec![i.into(), j.into()]).unwrap();
             }
-        }
+        },
     }
 }
 
 fn main() {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     let args = App::new("piazza")
         .version("0.1")
         .about(
@@ -288,7 +283,6 @@ fn main() {
     println!("min: {:?}", min_duration(&times));
 
     println!("Done with benchmark.");
-
 }
 
 fn max_duration(stats: &Vec<f64>) -> f64 {
