@@ -2,6 +2,7 @@ use std::time;
 
 #[allow(dead_code)]
 pub const NANOS_PER_SEC: u64 = 1_000_000_000;
+#[allow(unused_macros)]
 macro_rules! dur_to_ns {
     ($d:expr) => {{
         const NANOS_PER_SEC: u64 = 1_000_000_000;
