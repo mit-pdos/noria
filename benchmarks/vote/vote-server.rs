@@ -36,10 +36,13 @@ fn main() {
         )
         .arg(
             Arg::with_name("NUM_WORKERS")
-            .long("workers")
-            .requires("distributed")
-            .takes_value(true)
-            .help("Number of workers to expect. Once this many workers are present, data-flow graph is set up."),
+                .long("workers")
+                .requires("distributed")
+                .takes_value(true)
+                .help(
+                    "Number of workers to expect. Once this many workers are present, \
+                     data-flow graph is set up.",
+                ),
         )
         .get_matches();
 
