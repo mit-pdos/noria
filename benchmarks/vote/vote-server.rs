@@ -53,7 +53,6 @@ fn main() {
         .get_matches();
 
     let addr = args.value_of("ADDR").unwrap();
-    let num_workers_expected = value_t_or_exit!(args, "NUM_WORKERS", usize);
     let durability = if args.is_present("durability") {
         distributary::DurabilityMode::DeleteOnExit
     } else {
@@ -69,6 +68,8 @@ fn main() {
 
     let jh = if args.is_present("distributed") {
         use gulaschkanone::{Config, Controller};
+
+        let num_workers_expected = value_t_or_exit!(args, "NUM_WORKERS", usize);
 
         let config = Config {
             hostname: String::from("localhost"),
