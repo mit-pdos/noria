@@ -95,6 +95,8 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
         s.clear();
     }
 
+    populate(backend, "ship", records.clone());
+    populate(backend, "bill", records.clone());
     populate(backend, "address", records)
 }
 
@@ -194,6 +196,8 @@ pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
         s.clear();
     }
 
+    populate(backend, "ship_co", records.clone());
+    populate(backend, "bill_co", records.clone());
     populate(backend, "country", records)
 }
 
