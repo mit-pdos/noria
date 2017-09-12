@@ -42,6 +42,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
     let main_log = distributary::logger_pls();
     let recipe_log = main_log.new(o!());
     g.log_with(main_log);
+    g.disable_sharding();
 
     let recipe;
     {
@@ -64,7 +65,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool) -> Box<Backen
         mig.commit();
     }
 
-    //println!("{}", g);
+    println!("{}", g);
 
     Box::new(Backend {
         r: recipe,
@@ -90,6 +91,7 @@ impl Backend {
             "getPassword" => "".into(), // XXX(malte): fix username string generation
             "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
             "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
+            "getMostRecentOrderOrder" => "".into(), // XXX(malte): fix username string generation
             "getMostRecentOrderLines" => {
                 rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
             }
