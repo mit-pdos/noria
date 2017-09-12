@@ -1,5 +1,5 @@
 use distributary::srv;
-use distributary::{DataType, Mutator, MutatorBuilder};
+use distributary::{DataType, Mutator, MutatorBuilder, RemoteGetter, RemoteGetterBuilder};
 
 use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
@@ -15,7 +15,7 @@ const ARTICLE_NODE: usize = 1;
 const VOTE_NODE: usize = 2;
 const END_NODE: usize = 4;
 
-pub struct C(BufStream<TcpStream>, VecMap<Mutator>);
+pub struct C(BufStream<TcpStream>, VecMap<Mutator>, VecMap<RemoteGetter>);
 impl C {
     pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
         let stream = &mut self.0;
@@ -40,31 +40,24 @@ impl C {
     pub fn query(
         &mut self,
         view: usize,
-        mut keys: Vec<DataType>,
+        keys: Vec<DataType>,
     ) -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
-        let n = keys.len();
-        let mut method = srv::Method::Query {
-            view,
-            key: DataType::None,
-        };
-        for q_key in &mut keys {
-            if let srv::Method::Query { ref mut key, .. } = method {
-                use std::mem;
-                mem::swap(key, q_key);
-            }
-            bincode::serialize_into(&mut self.0, &method, bincode::Infinite).unwrap();
-        }
-        bincode::serialize_into(&mut self.0, &srv::Method::Flush, bincode::Infinite).unwrap();
-        self.0.flush()?;
-        Ok(
-            (0..n)
-                .map(|_| {
-                    let result: Result<Vec<Vec<DataType>>, ()> =
-                        bincode::deserialize_from(&mut self.0, bincode::Infinite).unwrap();
-                    result.unwrap_or_default()
-                })
-                .collect(),
-        )
+        let stream = &mut self.0;
+        let getter = self.2.entry(view).or_insert_with(|| {
+            bincode::serialize_into(
+                stream,
+                &srv::Method::GetGetterBuilder { view },
+                bincode::Infinite,
+            ).unwrap();
+            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
+            stream.flush().unwrap();
+            let builder: RemoteGetterBuilder =
+                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
+            println!("Got RemoteGetterBuilder: {:?}", builder);
+            builder.build()
+        });
+
+        Ok(getter.lookup(keys, true).into_iter().map(|rs| rs.unwrap_or_default()).collect())
     }
 }
 
@@ -76,7 +69,7 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
     let stream = stream.connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
-    C(stream, VecMap::new())
+    C(stream, VecMap::new(), VecMap::new())
 }
 
 impl Writer for C {
