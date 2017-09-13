@@ -18,8 +18,8 @@ pub enum CoordinationPayload {
     Register {
         /// Address of the worker.
         addr: SocketAddr,
-        /// Address the worker will be listening on to serve reads.
-        read_listen_addr: SocketAddr,
+        /// Addresses the worker will be listening on to serve reads.
+        read_listen_addrs: Vec<SocketAddr>,
     },
     /// Worker going offline.
     Deregister,

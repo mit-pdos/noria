@@ -34,8 +34,8 @@ pub struct Controller {
     blender: Arc<Mutex<Blender>>,
     workers: HashMap<SocketAddr, WorkerStatus>,
 
-    /// Map from worker address to the address the worker is listening on for reads.
-    read_addrs: HashMap<SocketAddr, SocketAddr>,
+    /// Map from worker address to the addresses the worker is listening on for reads.
+    read_addrs: HashMap<SocketAddr, Vec<SocketAddr>>,
 
     heartbeat_every: Duration,
     healthcheck_every: Duration,
@@ -117,8 +117,8 @@ impl Controller {
         match msg.payload {
             CoordinationPayload::Register {
                 ref addr,
-                ref read_listen_addr,
-            } => self.handle_register(msg, addr, read_listen_addr.clone()),
+                ref read_listen_addrs,
+            } => self.handle_register(msg, addr, read_listen_addrs.clone()),
             CoordinationPayload::Heartbeat => self.handle_heartbeat(msg),
             CoordinationPayload::DomainBooted(ref domain, ref addr) => {
                 self.handle_domain_booted(msg, domain, addr)
@@ -149,7 +149,7 @@ impl Controller {
         &mut self,
         msg: &CoordinationMessage,
         remote: &SocketAddr,
-        read_listen_addr: SocketAddr,
+        read_listen_addrs: Vec<SocketAddr>,
     ) -> Result<(), io::Error> {
         info!(
             self.log,
@@ -161,7 +161,7 @@ impl Controller {
         let sender = Arc::new(Mutex::new(TcpSender::connect(remote, None)?));
         let ws = WorkerStatus::new(sender.clone());
         self.workers.insert(msg.source.clone(), ws);
-        self.read_addrs.insert(msg.source.clone(), read_listen_addr);
+        self.read_addrs.insert(msg.source.clone(), read_listen_addrs);
 
         let mut b = self.blender.lock().unwrap();
         b.add_worker(msg.source, sender);

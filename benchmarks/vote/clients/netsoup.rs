@@ -59,10 +59,20 @@ impl C {
             let builder: RemoteGetterBuilder =
                 bincode::deserialize_from(stream, bincode::Infinite).unwrap();
             println!("Got RemoteGetterBuilder: {:?}", builder);
-            builder.build()
+
+            let seed = ::std::env::var("SOUP_CLIENT_INDEX")
+                .map(|v| v.parse::<usize>().unwrap())
+                .unwrap_or(0);
+            builder.build(seed)
         });
 
-        Ok(getter.lookup(keys, true).into_iter().map(|rs| rs.unwrap_or_default()).collect())
+        Ok(
+            getter
+                .lookup(keys, true)
+                .into_iter()
+                .map(|rs| rs.unwrap_or_default())
+                .collect(),
+        )
     }
 }
 

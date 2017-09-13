@@ -11,6 +11,8 @@ use distributary::{ChannelCoordinator, CoordinationMessage, CoordinationPayload,
                    NodeIndex, ReadQuery, ReadReply, SingleReadHandle};
 use distributary::Index as DomainIndex;
 
+const WORKER_READ_THREADS: usize = 8;
+
 pub struct Worker {
     log: Logger,
 
@@ -20,7 +22,7 @@ pub struct Worker {
     listen_port: u16,
 
     // Read RPC handling
-    read_listen_addr: SocketAddr,
+    read_listen_addrs: Vec<SocketAddr>,
 
     receiver: Option<PollingLoop<CoordinationMessage>>,
     sender: Option<TcpSender<CoordinationMessage>>,
@@ -83,12 +85,13 @@ impl Worker {
     ) -> Worker {
         let readers = Arc::new(Mutex::new(HashMap::new()));
 
-        let readers_clone = readers.clone();
-        let read_polling_loop =
-            RpcPollingLoop::new(SocketAddr::new(listen_addr.parse().unwrap(), 0));
-        let read_listen_addr = read_polling_loop.get_listener_addr().unwrap();
-        thread::spawn(move || Self::serve_reads(read_polling_loop, readers_clone));
-        println!("Listening for reads on {:?}", read_listen_addr);
+        let read_listen_addrs = (0..WORKER_READ_THREADS).map(|_|{
+            let readers_clone = readers.clone();
+            let read_polling_loop = RpcPollingLoop::new(SocketAddr::new(listen_addr.parse().unwrap(), 0));
+            let addr = read_polling_loop.get_listener_addr().unwrap();
+            thread::spawn(move || Self::serve_reads(read_polling_loop, readers_clone));
+            addr
+        }).collect();
 
         Worker {
             log: log,
@@ -97,7 +100,7 @@ impl Worker {
             listen_port: port,
             controller_addr: String::from(controller),
 
-            read_listen_addr,
+            read_listen_addrs,
 
             receiver: None,
             sender: None,
@@ -258,7 +261,7 @@ impl Worker {
     fn register(&mut self, listen_addr: SocketAddr) -> Result<(), channel::tcp::SendError> {
         let msg = self.wrap_payload(CoordinationPayload::Register {
             addr: listen_addr,
-            read_listen_addr: self.read_listen_addr,
+            read_listen_addrs: self.read_listen_addrs.clone(),
         });
         self.sender.as_mut().unwrap().send(msg)
     }

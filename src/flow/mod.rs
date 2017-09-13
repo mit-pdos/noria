@@ -82,7 +82,7 @@ pub struct Blender {
     listen_addr: IpAddr,
     readers: Readers,
     workers: HashMap<WorkerIdentifier, WorkerEndpoint>,
-    remote_readers: HashMap<(domain::Index, usize), SocketAddr>,
+    remote_readers: HashMap<(domain::Index, usize), Vec<SocketAddr>>,
 
     log: slog::Logger,
 }
@@ -175,16 +175,15 @@ impl Blender {
         &mut self,
         index: domain::Index,
         shard: usize,
-        read_addr: SocketAddr,
+        read_addrs: Vec<SocketAddr>,
     ) {
         if !self.remote_readers.contains_key(&(index, shard)) {
             debug!(
                 self.log,
-                "added new remote domain {:?} with read_addr {:} to Blender",
+                "added new remote domain {:?} to Blender",
                 (index, shard),
-                read_addr,
             );
-            self.remote_readers.insert((index, shard), read_addr);
+            self.remote_readers.insert((index, shard), read_addrs);
         } else {
             warn!(
                 self.log,

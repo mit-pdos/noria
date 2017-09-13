@@ -29,17 +29,20 @@ pub struct ReadReply(pub Vec<Result<Vec<Vec<DataType>>, ()>>);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RemoteGetterBuilder {
     pub(crate) node: NodeIndex,
-    pub(crate) shards: Vec<SocketAddr>,
+    pub(crate) shards: Vec<Vec<SocketAddr>>,
 }
 
 impl RemoteGetterBuilder {
     /// Build a `RemoteGetter` out of a `RemoteGetterBuilder`
-    pub fn build(self) -> RemoteGetter {
+    pub fn build(self, seed: usize) -> RemoteGetter {
         RemoteGetter {
             node: self.node,
             shards: self.shards
                 .iter()
-                .map(|addr| RpcClient::connect(addr).unwrap())
+                .map(|addrs| {
+                    let len = addrs.len();
+                    RpcClient::connect(&addrs[seed % len]).unwrap()
+                })
                 .collect(),
         }
     }
