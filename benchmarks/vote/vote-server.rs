@@ -9,7 +9,7 @@ mod graph;
 
 use distributary::{srv, Blender};
 
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
@@ -64,7 +64,9 @@ fn main() {
     let persistence_params =
         distributary::PersistenceParameters::new(durability, 512, time::Duration::from_millis(1));
 
-    let blender = Arc::new(Mutex::new(Blender::new()));
+    let sock_addr: SocketAddr = addr.parse()
+        .expect("ADDR must be a valid HOST:PORT combination");
+    let blender = Arc::new(Mutex::new(Blender::with_listen(sock_addr.ip())));
 
     let jh = if args.is_present("distributed") {
         use gulaschkanone::{Config, Controller};
@@ -73,7 +75,7 @@ fn main() {
 
         let config = Config {
             hostname: String::from("localhost"),
-            addr: String::from("127.0.0.1"),
+            addr: sock_addr.ip().to_string(),
             port: 9999,
             controller: None,        // we are the controller
             heartbeat_freq: 1000,    // 1s
