@@ -5,7 +5,7 @@ use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
 use std::io;
 use std::io::prelude::*;
-use std::net::TcpStream;
+use std::net::{IpAddr, SocketAddr, TcpStream};
 use net2::TcpBuilder;
 use bufstream::BufStream;
 use bincode;
@@ -15,10 +15,17 @@ const ARTICLE_NODE: usize = 1;
 const VOTE_NODE: usize = 2;
 const END_NODE: usize = 4;
 
-pub struct C(BufStream<TcpStream>, VecMap<Mutator>, VecMap<RemoteGetter>);
+pub struct C(
+    BufStream<TcpStream>,
+    VecMap<Mutator>,
+    VecMap<RemoteGetter>,
+    IpAddr,
+);
+
 impl C {
     pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
         let stream = &mut self.0;
+        let listen_addr = self.3.clone();
         let mutator = self.1.entry(view).or_insert_with(|| {
             bincode::serialize_into(
                 stream,
@@ -29,7 +36,7 @@ impl C {
             stream.flush().unwrap();
             let builder: MutatorBuilder =
                 bincode::deserialize_from(stream, bincode::Infinite).unwrap();
-            builder.build()
+            builder.build(SocketAddr::new(listen_addr, 0))
         });
 
         for r in data {
@@ -69,7 +76,8 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
     let stream = stream.connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
-    C(stream, VecMap::new(), VecMap::new())
+    let sa: SocketAddr = addr.parse().unwrap();
+    C(stream, VecMap::new(), VecMap::new(), sa.ip())
 }
 
 impl Writer for C {
