@@ -76,7 +76,7 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
     let stream = stream.connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
-    let sa: SocketAddr = addr.parse().unwrap();
+    let sa: SocketAddr = config.bind_to.as_ref().unwrap().parse().unwrap();
     C(stream, VecMap::new(), VecMap::new(), sa.ip())
 }
 
