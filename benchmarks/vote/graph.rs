@@ -15,6 +15,7 @@ pub fn make(
     blender: Arc<Mutex<Blender>>,
     log: bool,
     transactions: bool,
+    sharded: bool,
     persistence_params: PersistenceParameters,
 ) -> Graph {
     let (article, vote, vc, end) = {
@@ -26,7 +27,9 @@ pub fn make(
         }
 
         g.with_persistence_options(persistence_params);
-        g.disable_sharding();
+        if !sharded {
+            g.disable_sharding();
+        }
 
         // migrate
         let mut mig = g.start_migration();

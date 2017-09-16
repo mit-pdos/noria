@@ -41,6 +41,12 @@ fn main() {
                 .help("Enable durability for Base nodes"),
         )
         .arg(
+            Arg::with_name("sharded")
+                .long("sharded")
+                .takes_value(false)
+                .help("Enable sharding of the graph."),
+        )
+        .arg(
             Arg::with_name("NUM_WORKERS")
                 .long("workers")
                 .requires("distributed")
@@ -58,6 +64,7 @@ fn main() {
     } else {
         distributary::DurabilityMode::MemoryOnly
     };
+    let sharded = args.is_present("sharded");
 
     println!("Attempting to start soup on {}", addr);
 
@@ -127,7 +134,7 @@ fn main() {
     };
 
     // scoped needed to ensure lock is released
-    let g = graph::make(blender.clone(), true, false, persistence_params);
+    let g = graph::make(blender.clone(), true, false, sharded, persistence_params);
 
     // start processing
     // TODO: what about the node indices?
