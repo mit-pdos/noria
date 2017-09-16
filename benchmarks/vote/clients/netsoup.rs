@@ -39,9 +39,7 @@ impl C {
             builder.build(SocketAddr::new(listen_addr, 0))
         });
 
-        for r in data {
-            mutator.put(r).unwrap();
-        }
+        mutator.multi_put(data).unwrap();
     }
 
     pub fn query(
