@@ -114,9 +114,9 @@ fn main() {
                 .help("Make the migration stupid"),
         )
         .arg(
-            Arg::with_name("unsharded")
-                .long("unsharded")
-                .help("Run without sharding"),
+            Arg::with_name("sharded")
+                .long("sharded")
+                .help("Enable sharding of the graph."),
         )
         .arg(
             Arg::with_name("full")
@@ -150,7 +150,13 @@ fn main() {
 
     // setup db
     let blender = Arc::new(Mutex::new(distributary::Blender::new()));
-    let mut g = graph::make(blender, false, false, persistence_params);
+    let mut g = graph::make(
+        blender,
+        false,
+        false,
+        args.is_present("sharded"),
+        persistence_params,
+    );
 
     let (mut articles, mut votes, read_old) = {
         let mut b = g.graph.lock().unwrap();
@@ -158,11 +164,6 @@ fn main() {
         if args.is_present("full") {
             // it's okay to change this here, since it only matters for migration
             b.disable_partial();
-        }
-
-        if args.is_present("unsharded") {
-            // it's okay to change this here, since it only matters for migration
-            b.disable_sharding();
         }
 
         // we need a putter and a getter

@@ -96,6 +96,12 @@ fn main() {
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
+            Arg::with_name("sharded")
+                .long("sharded")
+                .takes_value(false)
+                .help("Enable sharding of the graph."),
+        )
+        .arg(
             Arg::with_name("stupid")
                 .long("stupid")
                 .help("Make the migration stupid")
@@ -154,6 +160,7 @@ fn main() {
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
+    let sharded = args.is_present("sharded");
     let transactions = args.is_present("transactions");
     let dist = value_t_or_exit!(args, "distribution", Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
@@ -194,7 +201,7 @@ fn main() {
 
     // setup db
     let blender = Arc::new(Mutex::new(distributary::Blender::new()));
-    let g = graph::make(blender, false, false, persistence_params);
+    let g = graph::make(blender, false, false, sharded, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = {
