@@ -118,6 +118,7 @@ fn main() {
             Arg::with_name("bind")
                 .short("B")
                 .takes_value(true)
+                .default_value("127.0.0.1:0")
                 .help("bind to the given local address when possible"),
         )
         .arg(
