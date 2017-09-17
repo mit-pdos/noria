@@ -103,8 +103,9 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
 
 
 impl Backend {
-    fn extend(mut self, query: &str, query_name: &str, transactions: bool) -> Backend {
+    fn extend(mut self, query: &str, transactions: bool) -> Backend {
         {
+            let query_name = query.split(":").next().unwrap();
             let start = time::Instant::now();
             let mut mig = self.g.start_migration();
             let new_recipe = match self.r.extend(query) {
@@ -117,7 +118,7 @@ impl Backend {
 
             mig.commit();
             let dur = dur_to_fsec!(start.elapsed());
-            println!("{}: ({:.2} sec)", query_name, dur,);
+            println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
 
             self.r = new_recipe;
         }
@@ -315,9 +316,7 @@ fn main() {
         let queries = get_queries(&rloc);
 
         for (i, q) in queries.iter().enumerate() {
-            let query_name = q.split(":").next().unwrap();
-
-            backend = backend.extend(&q, query_name, transactions);
+            backend = backend.extend(&q, transactions);
 
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);
