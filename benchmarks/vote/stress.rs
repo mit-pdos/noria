@@ -11,7 +11,6 @@ mod common;
 
 use std::thread;
 use std::time;
-use rand::Rng;
 
 fn randomness(range: usize, n: usize) -> Vec<i64> {
     use rand::Rng;
@@ -181,13 +180,11 @@ fn main() {
     if !args.is_present("quiet") {
         println!("Doing {} reads", reads);
     }
-    let mut is: Vec<_> = (0..(narticles as i64)).collect();
-    let mut u = rand::thread_rng();
-    u.shuffle(&mut is[..]);
+    // since the votes are already random, it's fine for us to just fetch the first `reads` ids.
     let mut start = None;
-    for i in 0..reads {
+    for i in 0..(reads as i64) {
         loop {
-            match read_new.lookup(&is[i].into(), false) {
+            match read_new.lookup(&i.into(), false) {
                 Ok(ref rs) => {
                     // we know we're not requesting duplicate keys, and we haven't requested
                     // this key before, so:
@@ -208,8 +205,8 @@ fn main() {
     // now we want to wait until all the replays have completed without triggering extra replays.
     // we can't quite do that perfectly, but we'll emulate it by doing blocking reads. by the time
     // one blocking read completes, we can expect that a bunch of other ones have also completed.
-    for i in 0..reads {
-        match read_new.lookup(&random[i].into(), true) {
+    for i in 0..(reads as i64) {
+        match read_new.lookup(&i.into(), true) {
             Ok(_) => {}
             Err(_) => unreachable!(),
         }
