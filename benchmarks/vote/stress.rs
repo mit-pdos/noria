@@ -214,6 +214,4 @@ fn main() {
 
     let s = dur_to_ns!(start.elapsed()) as f64 / 1_000_000_000f64;
     println!("RATE: {:.2}", reads as f64 / s);
-
-    println!("FIN");
 }
