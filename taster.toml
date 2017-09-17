@@ -20,6 +20,11 @@ command = "cargo"
 args = ["run", "--release", "--features", "binaries", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
 regexs = ["(avg PUT): ([0-9.]+)"]
 
+[backfill]
+command = "cargo"
+args = ["run", "--release", "--features", "binaries", "--bin", "vote-stress", "--", "--articles=100000", "--votes=100000", "--reads=100000"]
+regexs = ["(OPSS): ([0-9.]+)"]
+
 [vote-migration]
 command = "cargo"
 args = ["run", "--release", "--features", "binaries", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30"]
