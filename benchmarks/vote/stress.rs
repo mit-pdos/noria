@@ -2,7 +2,6 @@
 extern crate clap;
 extern crate distributary;
 extern crate rand;
-extern crate zipf;
 
 mod graph;
 
@@ -10,11 +9,11 @@ mod graph;
 #[allow(dead_code)]
 mod common;
 
-use zipf::ZipfDistribution;
 use std::thread;
 use std::time;
+use rand::Rng;
 
-fn randomness(distribution: common::Distribution, range: usize, n: usize) -> Vec<i64> {
+fn randomness(range: usize, n: usize) -> Vec<i64> {
     use rand::Rng;
 
     // random article ids with distribution. we pre-generate these to avoid overhead at
@@ -24,20 +23,11 @@ fn randomness(distribution: common::Distribution, range: usize, n: usize) -> Vec
         "Generating ~{}M random numbers; this'll take a few seconds...",
         n / 1_000_000
     );
-    match distribution {
-        common::Distribution::Uniform => {
-            let mut u = rand::thread_rng();
-            (0..n)
-                .map(|_| u.gen_range(0, range as i64) as i64)
-                .collect()
-        }
-        common::Distribution::Zipf(e) => {
-            let mut z = ZipfDistribution::new(rand::thread_rng(), range, e).unwrap();
-            (0..n)
-                .map(|_| z.gen_range(0, range as i64) as i64)
-                .collect()
-        }
-    }
+
+    let mut u = rand::thread_rng();
+    (0..n)
+        .map(|_| u.gen_range(0, range as i64) as i64)
+        .collect()
 }
 
 fn main() {
@@ -47,16 +37,6 @@ fn main() {
         .version("0.1")
         .about(
             "Benchmarks user-curated news aggregator throughput for in-memory Soup",
-        )
-        .arg(
-            Arg::with_name("distribution")
-                .short("d")
-                .takes_value(true)
-                .required(true)
-                .default_value("uniform")
-                .help(
-                    "run benchmark with the given article id distribution [uniform|zipf:exponent]",
-                ),
         )
         .arg(
             Arg::with_name("narticles")
@@ -113,7 +93,6 @@ fn main() {
         )
         .get_matches();
 
-    let dist = value_t_or_exit!(args, "distribution", common::Distribution);
     let narticles = value_t_or_exit!(args, "narticles", usize);
     let nvotes = value_t_or_exit!(args, "nvotes", usize);
     let reads = value_t_or_exit!(args, "reads", usize);
@@ -168,7 +147,7 @@ fn main() {
             .unwrap();
     }
     println!("Prepopulating with {} old votes", nvotes);
-    let random = randomness(dist, narticles, nvotes);
+    let random = randomness(narticles, nvotes);
     for i in 0..nvotes {
         votes.put(vec![0.into(), random[i].into()]).unwrap();
     }
@@ -181,7 +160,7 @@ fn main() {
 
     // prepopulate new ratings
     println!("Prepopulating with {} new votes", nvotes);
-    let random = randomness(dist, narticles, nvotes);
+    let random = randomness(narticles, nvotes);
     for i in 0..nvotes {
         ratings
             .put(vec![0.into(), random[i].into(), 5.into()])
@@ -191,14 +170,17 @@ fn main() {
     // now we're going to do a fixed number of reads,
     // and wait until they've all completd
     println!("Doing {} reads", reads);
-    let random = randomness(dist, narticles, reads);
+    let mut is: Vec<_> = (0..(narticles as i64)).collect();
+    let mut u = rand::thread_rng();
+    u.shuffle(&mut is[..]);
     let mut start = None;
     for i in 0..reads {
         loop {
-            match read_new.lookup(&random[i].into(), false) {
-                Ok(_) => {
-                    // we may be requesting duplicate keys!
-                    // assert!(rs.is_empty());
+            match read_new.lookup(&is[i].into(), false) {
+                Ok(ref rs) => {
+                    // we know we're not requesting duplicate keys, and we haven't requested
+                    // this key before, so:
+                    assert!(rs.is_empty());
                     if start.is_none() {
                         // if this is first read when view is ready, start timing!
                         start = Some(time::Instant::now());
@@ -222,9 +204,9 @@ fn main() {
         }
     }
 
-    let ns = dur_to_ns!(start.unwrap().elapsed());
-    println!("TOTAL: {} ns", ns);
-    println!("OPSS: {:.2}", reads as f64 / (ns as f64 / 1_000_000_000f64));
+    let s = start.unwrap().elapsed().as_secs();
+    println!("TOTAL: {}", s);
+    println!("OPSS: {:.2}", reads as f64 / s as f64);
 
     println!("FIN");
 }
