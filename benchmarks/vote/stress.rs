@@ -14,15 +14,6 @@ use std::time;
 
 fn randomness(range: usize, n: usize) -> Vec<i64> {
     use rand::Rng;
-
-    // random article ids with distribution. we pre-generate these to avoid overhead at
-    // runtime. note that we don't use Iterator::cycle, since it buffers by cloning, which
-    // means it might also do vector resizing.
-    println!(
-        "Generating ~{}M random numbers; this'll take a few seconds...",
-        n / 1_000_000
-    );
-
     let mut u = rand::thread_rng();
     (0..n)
         .map(|_| u.gen_range(0, range as i64) as i64)
