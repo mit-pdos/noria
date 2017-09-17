@@ -44,12 +44,13 @@ fn main() {
                 .help("Number of votes to prepopulate the database with"),
         )
         .arg(
-            Arg::with_name("reads")
+            Arg::with_name("runtime")
                 .short("r")
-                .long("reads")
-                .value_name("N")
-                .default_value("20000")
-                .help("Number of reads to perform"),
+                .long("runtime")
+                .default_value("10")
+                .help(
+                    "Read until all keys have been read, or this time has elapsed",
+                ),
         )
         .arg(
             Arg::with_name("stupid")
@@ -86,8 +87,7 @@ fn main() {
 
     let narticles = value_t_or_exit!(args, "narticles", usize);
     let nvotes = value_t_or_exit!(args, "nvotes", usize);
-    let reads = value_t_or_exit!(args, "reads", usize);
-    assert!(reads <= narticles);
+    let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
 
     // config options
     let concurrent_replays = args.value_of("max_concurrent")
@@ -166,14 +166,14 @@ fn main() {
             .unwrap();
     }
 
-    // now we're going to do a fixed number of reads,
-    // and wait until they've all completd
     if !args.is_present("quiet") {
-        println!("Doing {} reads", reads);
+        println!("Reading for {}s", runtime.as_secs());
     }
-    // since the votes are already random, it's fine for us to just fetch the first `reads` ids.
+
+    // kick off all the replays
+    // TODO: send these in smaller batches?
     let mut start = None;
-    for i in 0..(reads as i64) {
+    for i in 0..(narticles as i64) {
         loop {
             match read_new.lookup(&i.into(), false) {
                 Ok(ref rs) => {
@@ -193,19 +193,27 @@ fn main() {
             }
         }
     }
-    // now we want to wait until all the replays have completed without triggering extra replays.
-    // we can't quite do that perfectly, but we'll emulate it by doing blocking reads. by the time
-    // one blocking read completes, we can expect that a bunch of other ones have also completed.
-    for i in 0..(reads as i64) {
+    let start = start.unwrap();
+
+    // we now want to wait until either all keys have been backfilled, or until the time runs out,
+    // whichever comes first. we do that by looping on reading the *last* value we requested a
+    // replay for (which should thus be populated last). if we read successfully, we break the
+    // loop, otherwise we just wait until the time runs out.
+    let mut reads = narticles;
+    for i in 0..(narticles as i64) {
         match read_new.lookup(&i.into(), true) {
             Ok(_) => {}
             Err(_) => unreachable!(),
         }
+
+        if start.elapsed() >= runtime {
+            reads = i as usize + 1;
+            break;
+        }
     }
 
-    let s = dur_to_ns!(start.unwrap().elapsed()) as f64 / 1_000_000_000f64;
-    println!("TOTAL: {:.1} s", s);
-    println!("OPSS: {:.2}", reads as f64 / s);
+    let s = dur_to_ns!(start.elapsed()) as f64 / 1_000_000_000f64;
+    println!("RATE: {:.2}", reads as f64 / s);
 
     println!("FIN");
 }

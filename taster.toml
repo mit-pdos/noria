@@ -22,8 +22,8 @@ regexs = ["(avg PUT): ([0-9.]+)"]
 
 [backfill]
 command = "cargo"
-args = ["run", "--release", "--features", "binaries", "--bin", "vote-stress", "--", "--articles=100000", "--votes=100000", "--reads=100000"]
-regexs = ["(OPSS): ([0-9.]+)"]
+args = ["run", "--release", "--features", "binaries", "--bin", "vote-stress", "--", "--articles=100000", "--votes=100000", "--runtime=10"]
+regexs = ["(RATE): ([0-9.]+)"]
 
 [vote-migration]
 command = "cargo"
