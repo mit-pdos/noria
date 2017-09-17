@@ -92,6 +92,21 @@ fn main() {
                 .help("Run without sharding"),
         )
         .arg(
+            Arg::with_name("max_concurrent")
+                .long("concurrent")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("replay_batch_size")
+                .long("replay_size")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("replay_batch_timeout")
+                .long("replay_timeout")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("full")
                 .long("full")
                 .help("Disable partial materialization"),
@@ -104,6 +119,15 @@ fn main() {
     let reads = value_t_or_exit!(args, "reads", usize);
     assert!(reads <= narticles);
 
+    // config options
+    let concurrent_replays = args.value_of("max_concurrent")
+        .map(|_| value_t_or_exit!(args, "max_concurrent", usize));
+    let replay_size = args.value_of("replay_batch_size")
+        .map(|_| value_t_or_exit!(args, "replay_batch_size", usize));
+    let replay_timeout = args.value_of("replay_batch_timeout")
+        .map(|_| value_t_or_exit!(args, "replay_batch_timeout", u64))
+        .map(time::Duration::from_millis);
+
     // default persistence (memory only)
     let mut persistence_params = distributary::PersistenceParameters::default();
     persistence_params.queue_capacity = 1;
@@ -111,6 +135,16 @@ fn main() {
 
     // setup db
     let mut g = graph::make(false, false, persistence_params);
+
+    if let Some(n) = concurrent_replays {
+        g.graph.set_max_concurrent_replay(n);
+    }
+    if let Some(n) = replay_size {
+        g.graph.set_partial_replay_batch_size(n);
+    }
+    if let Some(t) = replay_timeout {
+        g.graph.set_partial_replay_batch_timeout(t);
+    }
 
     if args.is_present("full") {
         // it's okay to change this here, since it only matters for migration
