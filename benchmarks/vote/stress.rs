@@ -71,6 +71,7 @@ fn main() {
                 .long("unsharded")
                 .help("Run without sharding"),
         )
+        .arg(Arg::with_name("quiet").long("quiet").short("q"))
         .arg(
             Arg::with_name("max_concurrent")
                 .long("concurrent")
@@ -140,26 +141,34 @@ fn main() {
     let mut votes = g.graph.get_mutator(g.vote);
 
     // prepopulate
-    println!("Prepopulating with {} articles", narticles);
+    if !args.is_present("quiet") {
+        println!("Prepopulating with {} articles", narticles);
+    }
     for i in 0..(narticles as i64) {
         articles
             .put(vec![i.into(), format!("Article #{}", i).into()])
             .unwrap();
     }
-    println!("Prepopulating with {} old votes", nvotes);
+    if !args.is_present("quiet") {
+        println!("Prepopulating with {} old votes", nvotes);
+    }
     let random = randomness(narticles, nvotes);
     for i in 0..nvotes {
         votes.put(vec![0.into(), random[i].into()]).unwrap();
     }
 
     // migrate
-    println!("Migrating...");
+    if !args.is_present("quiet") {
+        println!("Migrating...");
+    }
     let (ratings, read_new) = g.transition(args.is_present("stupid"), false);
     let mut ratings = g.graph.get_mutator(ratings);
     let read_new = g.graph.get_getter(read_new).unwrap();
 
     // prepopulate new ratings
-    println!("Prepopulating with {} new votes", nvotes);
+    if !args.is_present("quiet") {
+        println!("Prepopulating with {} new votes", nvotes);
+    }
     let random = randomness(narticles, nvotes);
     for i in 0..nvotes {
         ratings
@@ -169,7 +178,9 @@ fn main() {
 
     // now we're going to do a fixed number of reads,
     // and wait until they've all completd
-    println!("Doing {} reads", reads);
+    if !args.is_present("quiet") {
+        println!("Doing {} reads", reads);
+    }
     let mut is: Vec<_> = (0..(narticles as i64)).collect();
     let mut u = rand::thread_rng();
     u.shuffle(&mut is[..]);
