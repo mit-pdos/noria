@@ -48,7 +48,7 @@ fn get_queries(recipe_location: &str) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool) -> Backend {
+fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool, disable_partial: bool) -> Backend {
     use std::io::Read;
     use std::fs::File;
 
@@ -59,6 +59,9 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
     let recipe_log = main_log.new(o!());
     g.log_with(main_log);
     g.disable_sharding();
+    if disable_partial {
+        g.disable_partial();
+    }
 
     let recipe;
     {
@@ -87,7 +90,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
         mig.commit();
     }
 
-    println!("{}", g);
+    // println!("{}", g);
 
     Backend {
         r: recipe,
@@ -258,11 +261,7 @@ fn main() {
     let reuse = matches.value_of("reuse").unwrap();
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(&rloc, transactions, parallel_prepop, single_query);
-
-    if disable_partial {
-        backend.g.disable_partial();
-    }
+    let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial);
 
     match reuse.as_ref() {
         "finkelstein" => backend.r.enable_reuse(ReuseConfigType::Finkelstein),
@@ -317,8 +316,6 @@ fn main() {
 
         for (i, q) in queries.iter().enumerate() {
             let query_name = q.split(":").next().unwrap();
-            println!("Migrating query {} ({}/{}) ", query_name, i, queries.len());
-            thread::sleep(time::Duration::from_millis(1000));
 
             backend = backend.extend(&q, query_name, transactions);
 
