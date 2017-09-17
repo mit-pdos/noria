@@ -1,15 +1,16 @@
 extern crate chrono;
 extern crate distributary;
+extern crate rand;
 
 mod populate;
+mod parameters;
 
 extern crate clap;
-extern crate rand;
 
 #[macro_use]
 extern crate slog;
 
-use rand::Rng;
+use parameters::SampleKeys;
 use std::{thread, time};
 use std::collections::HashMap;
 
@@ -126,57 +127,16 @@ impl Backend {
         self
     }
 
-    fn generate_parameter(&self, query_name: &str, rng: &mut rand::ThreadRng) -> DataType {
-        match query_name {
-            "getName" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                .into(),
-            "getBook" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
-            "getCustomer" => "".into(), // XXX(malte): fix username string generation
-            "doSubjectSearch" => "".into(), // XXX(malte): fix subject string generation
-            "getNewProducts" => "".into(), // XXX(malte): fix subject string generation
-            "getUserName" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                .into(),
-            "getPassword" => "".into(), // XXX(malte): fix username string generation
-            "getRelated1" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
-            "getMostRecentOrderId" => "".into(), // XXX(malte): fix username string generation
-            "getMostRecentOrderOrder" => "".into(), // XXX(malte): fix username string generation
-            "getMostRecentOrderLines" => {
-                rng.gen_range(1, self.prepop_counts["orders"] as i32).into()
-            }
-            "createEmptyCart" => 0i32.into(),
-            "addItem" => 0.into(), // XXX(malte): dual parameter query, need SCL ID range
-            "addRandomItemToCartIfNecessary" => 0.into(), // XXX(malte): need SCL ID range
-            "getCart" => 0.into(), // XXX(malte): need SCL ID range
-            "createNewCustomerMaxId" => 0i32.into(),
-            "getCDiscount" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                .into(),
-            "getCAddrId" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                .into(),
-            "getCAddr" => rng.gen_range(1, self.prepop_counts["customers"] as i32)
-                .into(),
-            "enterAddressId" => rng.gen_range(1, self.prepop_counts["countries"] as i32)
-                .into(),
-            "enterAddressMaxId" => 0i32.into(),
-            "enterOrderMaxId" => 0i32.into(),
-            "getStock" => rng.gen_range(1, self.prepop_counts["items"] as i32).into(),
-            "verifyDBConsistencyCustId" => 0i32.into(),
-            "verifyDBConsistencyItemId" => 0i32.into(),
-            "verifyDBConsistencyAddrId" => 0i32.into(),
-            _ => unimplemented!(),
-        }
-    }
-
-    fn read(&self, query_name: &str, num: u32) {
+    fn read(&self, keys: &mut SampleKeys, query_name: &str, num: u32) {
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
                 println!("reading {}", query_name);
                 let g = self.g.get_getter(nd).unwrap();
-                let mut rng = rand::thread_rng();
                 let start = time::Instant::now();
                 let mut ok = 0;
                 for _ in 0..num {
-                    let param = self.generate_parameter(query_name, &mut rng);
+                    let param = keys.generate_parameter(query_name);
                     match g.lookup(&param, true) {
                         Err(_) => panic!(),
                         Ok(datas) => if datas.len() > 0 {
@@ -250,6 +210,11 @@ fn main() {
                 .long("disable_partial")
                 .help("Disable partial materialization"),
         )
+        .arg(
+            Arg::with_name("read")
+                .long("read")
+                .help("Reads from the application")
+        )
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
@@ -259,6 +224,7 @@ fn main() {
     let single_query = matches.is_present("single_query_migration");
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
+    let read = matches.is_present("read");
     let reuse = matches.value_of("reuse").unwrap();
 
     println!("Loading TPC-W recipe from {}", rloc);
@@ -326,8 +292,11 @@ fn main() {
         }
     }
 
-    println!("Reading...");
-    for nq in backend.r.aliases().iter() {
-        backend.read(nq, 1_000_000);
+    if read {
+        println!("Reading...");
+        let mut keys = SampleKeys::new(&ploc);
+        for nq in backend.r.aliases().iter() {
+            backend.read(&mut keys, nq, 1_000_000);
+        }
     }
 }
