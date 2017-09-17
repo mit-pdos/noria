@@ -212,9 +212,9 @@ fn main() {
         }
     }
 
-    let s = start.unwrap().elapsed().as_secs();
-    println!("TOTAL: {}", s);
-    println!("OPSS: {:.2}", reads as f64 / s as f64);
+    let s = dur_to_ns!(start.unwrap().elapsed()) as f64 / 1_000_000_000f64;
+    println!("TOTAL: {:.1} s", s);
+    println!("OPSS: {:.2}", reads as f64 / s);
 
     println!("FIN");
 }
