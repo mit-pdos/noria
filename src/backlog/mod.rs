@@ -80,6 +80,10 @@ impl WriteHandle {
         }
     }
 
+    pub fn evict(&mut self, key: DataType) {
+        self.handle.empty(key);
+    }
+
     pub fn update_ts(&mut self, ts: i64) {
         self.handle.set_meta(ts);
     }

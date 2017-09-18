@@ -3,6 +3,9 @@ use channel;
 use checktable;
 use flow::prelude::*;
 use hurdles::Barrier;
+use linked_hash_map::LinkedHashMap;
+
+const READER_CAPACITY: usize = 256 * 1024;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
 #[derive(Clone, Debug, PartialEq)]
@@ -32,12 +35,12 @@ impl From<Vec<DataType>> for StreamUpdate {
 #[derive(Serialize, Deserialize)]
 pub struct Reader {
     #[serde(skip)] writer: Option<backlog::WriteHandle>,
-
     #[serde(skip)] streamers: Option<Vec<channel::StreamSender<Vec<StreamUpdate>>>>,
-
     #[serde(skip)] token_generator: Option<checktable::TokenGenerator>,
-
     #[serde(skip)] barrier: Option<Barrier>,
+
+    #[serde(skip)] keys: LinkedHashMap<DataType, ()>,
+    capacity: usize,
 
     for_node: NodeIndex,
     state: Option<usize>,
@@ -59,6 +62,9 @@ impl Clone for Reader {
             token_generator: self.token_generator.clone(),
             for_node: self.for_node,
             barrier: self.barrier.clone(),
+
+            keys: LinkedHashMap::new(),
+            capacity: READER_CAPACITY,
         }
     }
 }
@@ -72,6 +78,8 @@ impl Reader {
             token_generator: None,
             for_node,
             barrier: None,
+            keys: LinkedHashMap::new(),
+            capacity: READER_CAPACITY,
         }
     }
 
@@ -99,6 +107,8 @@ impl Reader {
             token_generator: self.token_generator.clone(),
             for_node: self.for_node,
             barrier: self.barrier.take(),
+            keys: self.keys.clone(),
+            capacity: self.capacity,
         }
     }
 
@@ -198,6 +208,12 @@ impl Reader {
                 });
             }
 
+            if state.is_partial() {
+                for r in m.data() {
+                    self.keys.insert(r[state.key()].clone(), ());
+                }
+            }
+
             if self.streamers.as_ref().unwrap().is_empty() {
                 state.add(m.take_data());
             } else {
@@ -209,6 +225,12 @@ impl Reader {
             } = **m
             {
                 state.update_ts(ts);
+            }
+
+            if state.is_partial() {
+                while self.keys.len() > self.capacity {
+                    state.evict(self.keys.pop_front().unwrap().0);
+                }
             }
 
             if swap {

@@ -358,6 +358,7 @@ extern crate hurdles;
 extern crate vec_map;
 
 extern crate itertools;
+extern crate linked_hash_map;
 extern crate nom_sql;
 extern crate petgraph;
 extern crate regex;
