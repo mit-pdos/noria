@@ -4,6 +4,7 @@ use evmap;
 use arrayvec::ArrayVec;
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Allocate a new end-user facing result table.
 pub fn new(cols: usize, key: usize) -> (SingleReadHandle, WriteHandle) {
@@ -151,12 +152,18 @@ impl SingleReadHandle {
                     (*trigger)(key);
 
                     if block {
+                        let mut start = Instant::now();
                         // wait for result to come through
                         loop {
                             thread::yield_now();
                             match self.try_find_and(key, &mut then) {
                                 Ok((None, _)) => {}
                                 r => return r,
+                            }
+
+                            if start.elapsed() > Duration::from_millis(100) {
+                                (*trigger)(key);
+                                start = Instant::now();
                             }
                         }
                     } else {
