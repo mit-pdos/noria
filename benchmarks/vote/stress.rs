@@ -106,6 +106,8 @@ fn main() {
     // setup db
     let mut s = graph::Setup::default();
     s.stupid = args.is_present("stupid");
+    s.partial = !args.is_present("full");
+    s.sharding = !args.is_present("unsharded");
     let mut g = graph::make(s, persistence_params);
 
     if let Some(n) = concurrent_replays {
@@ -116,16 +118,6 @@ fn main() {
     }
     if let Some(t) = replay_timeout {
         g.graph.set_partial_replay_batch_timeout(t);
-    }
-
-    if args.is_present("full") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_partial();
-    }
-
-    if args.is_present("unsharded") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_sharding();
     }
 
     // we need a putter and a getter

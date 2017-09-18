@@ -14,6 +14,8 @@ pub struct Setup {
     pub log: bool,
     pub transactions: bool,
     pub stupid: bool,
+    pub partial: bool,
+    pub sharding: bool,
 }
 
 impl Default for Setup {
@@ -22,6 +24,8 @@ impl Default for Setup {
             log: false,
             transactions: false,
             stupid: false,
+            partial: true,
+            sharding: true,
         }
     }
 }
@@ -44,6 +48,18 @@ impl Setup {
         self.stupid = true;
         self
     }
+
+    #[allow(dead_code)]
+    pub fn without_partial(mut self) -> Self {
+        self.partial = false;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn without_sharding(mut self) -> Self {
+        self.sharding = false;
+        self
+    }
 }
 
 pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
@@ -51,6 +67,12 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     let mut g = Blender::new();
     if s.log {
         g.log_with(distributary::logger_pls());
+    }
+    if !s.partial {
+        g.disable_partial();
+    }
+    if !s.sharding {
+        g.disable_sharding();
     }
 
     g.with_persistence_options(persistence_params);
