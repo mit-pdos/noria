@@ -18,7 +18,7 @@ pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParame
 
     g.with_persistence_options(persistence_params);
 
-    let (article, vote, vc, end) = {
+    let (article, vote) = {
         // migrate
         let mut mig = g.start_migration();
 
@@ -36,6 +36,13 @@ pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParame
             mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
         };
 
+        mig.commit();
+        (article, vote)
+    };
+
+    let (vc, end) = {
+        let mut mig = g.start_migration();
+
         // add vote count
         let vc = mig.add_ingredient(
             "votecount",
@@ -52,7 +59,7 @@ pub fn make(log: bool, transactions: bool, persistence_params: PersistenceParame
 
         // start processing
         mig.commit();
-        (article, vote, vc, end)
+        (vc, end)
     };
 
     Graph {
