@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use std::sync::{Arc, Barrier};
 
-use distributary::{Blender, DataType, Recipe, ReuseConfigType};
+use distributary::{Blender, Recipe, ReuseConfigType};
 
 pub struct Backend {
     r: Recipe,
@@ -49,7 +49,7 @@ fn get_queries(recipe_location: &str) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool, disable_partial: bool) -> Backend {
+fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool, disable_partial: bool, reuse: &str) -> Backend {
     use std::io::Read;
     use std::fs::File;
 
@@ -63,6 +63,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
     if disable_partial {
         g.disable_partial();
     }
+
 
     let recipe;
     {
@@ -82,6 +83,13 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
         }
         recipe = match Recipe::from_str(&s, Some(recipe_log.clone())) {
             Ok(mut recipe) => {
+                match reuse.as_ref() {
+                    "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
+                    "full" => recipe.enable_reuse(ReuseConfigType::Full),
+                    "noreuse" => recipe.enable_reuse(ReuseConfigType::NoReuse),
+                    "relaxed" => recipe.enable_reuse(ReuseConfigType::Relaxed),
+                    _ => panic!("reuse configuration not supported"),
+                }
                 recipe.activate(&mut mig, transactions).unwrap();
                 recipe
             }
@@ -228,15 +236,7 @@ fn main() {
     let reuse = matches.value_of("reuse").unwrap();
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial);
-
-    match reuse.as_ref() {
-        "finkelstein" => backend.r.enable_reuse(ReuseConfigType::Finkelstein),
-        "full" => backend.r.enable_reuse(ReuseConfigType::Full),
-        "noreuse" => backend.r.enable_reuse(ReuseConfigType::NoReuse),
-        "relaxed" => backend.r.enable_reuse(ReuseConfigType::Relaxed),
-        _ => panic!("reuse configuration not supported"),
-    }
+    let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial, reuse);
 
     println!("Prepopulating from data files in {}", ploc);
     let num_addr = populate_addresses(&backend, &ploc);
