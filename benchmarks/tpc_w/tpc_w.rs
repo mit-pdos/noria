@@ -231,13 +231,19 @@ fn main() {
         .arg(
             Arg::with_name("read")
                 .long("read")
-                .default_value("0.10")
+                .default_value("0.00")
                 .help("Scale reads from the application")
         )
         .arg(
-            Arg::with_name("write")
-                .long("write")
-                .default_value("1")
+            Arg::with_name("item_write")
+                .long("item_write")
+                .default_value("1.00")
+                .help("Scale writes")
+        )
+        .arg(
+            Arg::with_name("customer_write")
+                .long("customer_write")
+                .default_value("1.00")
                 .help("Scale writes")
         )
         .arg(
@@ -255,7 +261,7 @@ fn main() {
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
     let read_scale = value_t_or_exit!(matches, "read", f32);
-    let write_scale = value_t_or_exit!(matches, "write", i32);
+    let item_write = value_t_or_exit!(matches, "item_write", f32);
     let reuse = matches.value_of("reuse").unwrap();
     let random = matches.is_present("random");
 
@@ -275,7 +281,7 @@ fn main() {
     backend
         .prepop_counts
         .insert("customers".into(), num_customers);
-    let num_items = populate_items(&backend, &ploc, 1);
+    let num_items = populate_items(&backend, &ploc, item_write, true);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
@@ -324,8 +330,8 @@ fn main() {
         }
     }
 
-    if write_scale > 0 {
+    if item_write < 1.0 {
         println!("Do some more writes...");
-        populate_items(&backend, &ploc, write_scale);
+        populate_items(&backend, &ploc, item_write, false);
     }
 }
