@@ -5,6 +5,7 @@ extern crate rand;
 mod populate;
 mod parameters;
 
+#[macro_use]
 extern crate clap;
 
 #[macro_use]
@@ -135,7 +136,7 @@ impl Backend {
         self
     }
 
-    fn read(&self, keys: &mut SampleKeys, query_name: &str) {
+    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32) {
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
@@ -143,7 +144,7 @@ impl Backend {
                 let g = self.g.get_getter(nd).unwrap();
                 let start = time::Instant::now();
                 let mut ok = 0;
-                let num = ((keys.keys_size(query_name) as f32) * 0.10) as i32;
+                let num = ((keys.keys_size(query_name) as f32) * read_scale) as i32;
                 for _ in 0..num {
                     let param = keys.generate_parameter(query_name);
                     match g.lookup(&param, true) {
@@ -222,6 +223,7 @@ fn main() {
         .arg(
             Arg::with_name("read")
                 .long("read")
+                .default_value("0.10")
                 .help("Reads from the application")
         )
         .get_matches();
@@ -233,7 +235,7 @@ fn main() {
     let single_query = matches.is_present("single_query_migration");
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
-    let read = matches.is_present("read");
+    let read_scale = value_t_or_exit!(matches, "read", f32);
     let reuse = matches.value_of("reuse").unwrap();
 
     println!("Loading TPC-W recipe from {}", rloc);
@@ -293,11 +295,11 @@ fn main() {
         }
     }
 
-    if read {
+    if read_scale > 0.0 {
         println!("Reading...");
         let mut keys = SampleKeys::new(&ploc);
         for nq in backend.r.aliases().iter() {
-            backend.read(&mut keys, nq);
+            backend.read(&mut keys, nq, read_scale);
         }
     }
 }
