@@ -232,7 +232,13 @@ fn main() {
             Arg::with_name("read")
                 .long("read")
                 .default_value("0.10")
-                .help("Reads from the application")
+                .help("Scale reads from the application")
+        )
+        .arg(
+            Arg::with_name("write")
+                .long("write")
+                .default_value("1")
+                .help("Scale writes")
         )
         .arg(
             Arg::with_name("random")
@@ -249,6 +255,7 @@ fn main() {
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
     let read_scale = value_t_or_exit!(matches, "read", f32);
+    let write_scale = value_t_or_exit!(matches, "write", i32);
     let reuse = matches.value_of("reuse").unwrap();
     let random = matches.is_present("random");
 
@@ -268,7 +275,7 @@ fn main() {
     backend
         .prepop_counts
         .insert("customers".into(), num_customers);
-    let num_items = populate_items(&backend, &ploc);
+    let num_items = populate_items(&backend, &ploc, 1);
     backend.prepop_counts.insert("items".into(), num_items);
     let num_orders = populate_orders(&backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
@@ -315,5 +322,10 @@ fn main() {
         for nq in backend.r.aliases().iter() {
             backend.read(&mut keys, nq, read_scale);
         }
+    }
+
+    if write_scale > 0 {
+        println!("Do some more writes...");
+        populate_items(&backend, &ploc, write_scale);
     }
 }

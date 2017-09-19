@@ -255,7 +255,7 @@ pub fn populate_customers(backend: &Backend, data_location: &str) -> usize {
     populate(backend, "customer", records)
 }
 
-pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
+pub fn populate_items(backend: &Backend, data_location: &str, write_scale: i32) -> usize {
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -288,30 +288,32 @@ pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
             let i_page = i32::from_str(fields[19]).unwrap();
             let i_backing = fields[20];
             let i_dimensions = fields[21];
-            records.push(vec![
-                i_id.into(),
-                i_title.into(),
-                i_a_id.into(),
-                i_pub_date.into(),
-                i_publisher.into(),
-                i_subject.into(),
-                i_desc.into(),
-                i_related1.into(),
-                i_related2.into(),
-                i_related3.into(),
-                i_related4.into(),
-                i_related5.into(),
-                i_thumbnail.into(),
-                i_image.into(),
-                i_srp.into(),
-                i_cost.into(),
-                i_avail.into(),
-                i_stock.into(),
-                i_isbn.into(),
-                i_page.into(),
-                i_backing.into(),
-                i_dimensions.into(),
-            ]);
+            for _ in 0..write_scale {
+                records.push(vec![
+                    i_id.into(),
+                    i_title.into(),
+                    i_a_id.into(),
+                    i_pub_date.into(),
+                    i_publisher.into(),
+                    i_subject.into(),
+                    i_desc.into(),
+                    i_related1.into(),
+                    i_related2.into(),
+                    i_related3.into(),
+                    i_related4.into(),
+                    i_related5.into(),
+                    i_thumbnail.into(),
+                    i_image.into(),
+                    i_srp.into(),
+                    i_cost.into(),
+                    i_avail.into(),
+                    i_stock.into(),
+                    i_isbn.into(),
+                    i_page.into(),
+                    i_backing.into(),
+                    i_dimensions.into(),
+                ]);
+            }
         }
         s.clear();
     }
