@@ -31,15 +31,15 @@ echo "Generating countries..."
 echo "Generating authors..."
 # authors = 0.25 * ITEM, and for weird reasons must be at least 12
 SF_ITEMS_ROUNDED=$(python -c "from math import ceil; print(max(12, int(ceil(${SF_ITEMS}*0.25))))")
-./tpcw -t author -i ${SF_ITEMS_ROUNDED} > ../data/authors.tsv
+./tpcw -t author -c ${CUST} -i ${SF_ITEMS_ROUNDED} > ../data/authors.tsv
 echo "Generating customers..."
-./tpcw -t customer -c ${CUST} > ../data/customers.tsv
+./tpcw -t customer -c ${CUST} -i ${SF_ITEMS} > ../data/customers.tsv
 echo "Generating addresses..."
-./tpcw -t address -c ${CUST} > ../data/addresses.tsv
+./tpcw -t address -c ${CUST} -i ${SF_ITEMS} > ../data/addresses.tsv
 echo "Generating orders..."
-./tpcw -t orders -c ${CUST} -p ../data > ../data/orders.tsv
+./tpcw -t orders -c ${CUST} -i ${SF_ITEMS} -p ../data > ../data/orders.tsv
 echo "Generating items..."
-./tpcw -t item -i ${SF_ITEMS} > ../data/items.tsv
+./tpcw -t item -c ${CUST} -i ${SF_ITEMS} > ../data/items.tsv
 
 # back to old workdir
 cd -
