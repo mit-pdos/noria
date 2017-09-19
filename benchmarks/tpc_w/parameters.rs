@@ -11,24 +11,21 @@ pub struct SampleKeys {
     order: Vec<Vec<DataType>>,
     shopping_cart: Vec<Vec<DataType>>,
     country: Vec<Vec<DataType>>,
-    address: Vec<Vec<DataType>>,
     rng: rand::ThreadRng
 }
 
 impl SampleKeys {
     pub fn new(data_location: &str) -> SampleKeys {
-        let mut rng = rand::thread_rng();
+        let rng = rand::thread_rng();
         let mut keys = SampleKeys {
             customer: vec![],
             item: vec![],
             order: vec![],
             shopping_cart: vec![],
             country: vec![],
-            address: vec![],
             rng: rng,
         };
 
-        keys.get_addresses(data_location);
         keys.get_countries(data_location);
         keys.get_customers(data_location);
         keys.get_items(data_location);
@@ -174,24 +171,6 @@ impl SampleKeys {
         }
     }
 
-
-    fn get_addresses(&mut self, data_location: &str) {
-        let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
-        let mut reader = BufReader::new(f);
-
-        let mut s = String::new();
-        while reader.read_line(&mut s).unwrap() > 0 {
-            {
-                let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
-                let addr_id = i32::from_str(fields[0]).unwrap();
-                self.address.push(vec![
-                    addr_id.into(),
-                ]);
-            }
-            s.clear();
-        }
-    }
-
     fn bogus_key(&self) -> DataType {
         0.into()
     }
@@ -222,9 +201,5 @@ impl SampleKeys {
 
     fn country_name(&mut self) -> DataType {
         self.rng.choose(self.country.as_slice()).unwrap()[0].clone()
-    }
-
-    fn address_id(&mut self) -> DataType {
-        self.rng.choose(self.address.as_slice()).unwrap()[0].clone()
     }
 }
