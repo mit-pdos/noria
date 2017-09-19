@@ -14,6 +14,7 @@ extern crate slog;
 use parameters::SampleKeys;
 use std::{thread, time};
 use std::collections::HashMap;
+use rand::Rng;
 
 use std::sync::{Arc, Barrier};
 
@@ -35,19 +36,26 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-fn get_queries(recipe_location: &str) -> Vec<String> {
+fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
     use std::io::Read;
     use std::fs::File;
 
     let mut f = File::open(recipe_location).unwrap();
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
-    s.lines()
+    let mut queries = s.lines()
         .filter(|l| {
             !l.is_empty() && !l.starts_with('#') && !l.starts_with("--") && !l.starts_with("CREATE")
         })
         .map(String::from)
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+
+    if random {
+        let mut rng = rand::thread_rng();
+        rng.shuffle(queries.as_mut_slice());
+    }
+
+    queries
 }
 
 fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool, disable_partial: bool, reuse: &str) -> Backend {
@@ -226,6 +234,11 @@ fn main() {
                 .default_value("0.10")
                 .help("Reads from the application")
         )
+        .arg(
+            Arg::with_name("random")
+                .long("random")
+                .help("Adds queries in random order (only makes sense with -s)")
+        )
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
@@ -237,6 +250,7 @@ fn main() {
     let disable_partial = matches.is_present("disable_partial");
     let read_scale = value_t_or_exit!(matches, "read", f32);
     let reuse = matches.value_of("reuse").unwrap();
+    let random = matches.is_present("random");
 
     println!("Loading TPC-W recipe from {}", rloc);
     let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial, reuse);
@@ -282,7 +296,7 @@ fn main() {
         use std::io::Write;
 
         println!("Migrating individual queries...");
-        let queries = get_queries(&rloc);
+        let queries = get_queries(&rloc, random);
 
         for (i, q) in queries.iter().enumerate() {
             backend = backend.extend(&q, transactions);
