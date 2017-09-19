@@ -69,6 +69,38 @@ impl SampleKeys {
         }
     }
 
+    pub fn keys_size(&mut self, query_name: &str) -> usize {
+        match query_name {
+            "getName" => self.customer.len(),
+            "getBook" => self.item.len(),
+            "getCustomer" => self.customer.len(),
+            "doSubjectSearch" => self.item.len(),
+            "getNewProducts" => self.item.len(),
+            "getUserName" => self.customer.len(),
+            "getPassword" => self.customer.len(),
+            "getRelated1" => self.item.len(),
+            "getMostRecentOrderId" => self.customer.len(),
+            "getMostRecentOrderOrder" => self.order.len(),
+            "getMostRecentOrderLines" => self.order.len(),
+            "createEmptyCart" => 0,
+            "addItem" => self.item.len(),
+            "addRandomItemToCartIfNecessary" => self.shopping_cart.len(),
+            "getCart" => self.shopping_cart.len(),
+            "createNewCustomerMaxId" => 0,
+            "getCDiscount" => self.customer.len(),
+            "getCAddrId" => self.customer.len(),
+            "getCAddr" => self.customer.len(),
+            "enterAddressId" => self.country.len(),
+            "enterAddressMaxId" => 0,
+            "enterOrderMaxId" => 0,
+            "getStock" => self.item.len(),
+            "verifyDBConsistencyCustId" => 0,
+            "verifyDBConsistencyItemId" => 0,
+            "verifyDBConsistencyAddrId" => 0,
+            _ => unimplemented!(),
+        }
+    }
+
     fn get_orders(&mut self, data_location: &str) {
         let f = File::open(format!("{}/orders.tsv", data_location)).unwrap();
         let mut reader = BufReader::new(f);

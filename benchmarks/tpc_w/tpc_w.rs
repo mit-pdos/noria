@@ -135,7 +135,7 @@ impl Backend {
         self
     }
 
-    fn read(&self, keys: &mut SampleKeys, query_name: &str, num: u32) {
+    fn read(&self, keys: &mut SampleKeys, query_name: &str) {
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
@@ -143,6 +143,7 @@ impl Backend {
                 let g = self.g.get_getter(nd).unwrap();
                 let start = time::Instant::now();
                 let mut ok = 0;
+                let num = ((keys.keys_size(query_name) as f32) * 0.10) as i32;
                 for _ in 0..num {
                     let param = keys.generate_parameter(query_name);
                     match g.lookup(&param, true) {
@@ -296,7 +297,7 @@ fn main() {
         println!("Reading...");
         let mut keys = SampleKeys::new(&ploc);
         for nq in backend.r.aliases().iter() {
-            backend.read(&mut keys, nq, 1_000_000);
+            backend.read(&mut keys, nq);
         }
     }
 }
