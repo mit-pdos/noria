@@ -41,6 +41,11 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
     let debug_channel = g.create_debug_channel();
+    g.with_persistence_options(distributary::PersistenceParameters::new(
+        distributary::DurabilityMode::DeleteOnExit,
+        512,
+        time::Duration::from_millis(1),
+    ));
 
     let transfers;
     let credits;
@@ -150,6 +155,9 @@ fn client(
     transactions: bool,
     is_transfer_deterministic: bool,
 ) -> Vec<f64> {
+    assert!(measure_latency.is_none());
+    assert!(!audit);
+
     let mut count = 0u64;
     let mut committed = 0u64;
     let mut aborted = 0u64;
@@ -184,70 +192,54 @@ fn client(
 
         let mut num_requests = 1;
         while start.elapsed() < runtime {
-            let dst;
-            let src;
-            if is_transfer_deterministic {
-                dst = num_requests % (naccounts - 2) + 2;
-                src = dst - 1;
-                num_requests += 1;
-            } else {
-                dst = t_rng.gen_range(1, naccounts);
-                src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
-            }
-            assert_ne!(dst, src);
-
             let transaction_start = time::Instant::now();
-            let (balance, mut token) = get(&src.into()).unwrap().unwrap();
-
-            assert!(
-                balance >= 0 || !transactions,
-                format!("{} balance is {}", src, balance)
-            );
-
-            if balance >= 100 {
-                if coarse {
-                    token.make_coarse();
-                }
-
-                if measure_latency.is_some() {
-                    mutator.start_tracing(count);
-                };
-
-                let write_start = time::Instant::now();
-                let res = if transactions {
-                    mutator
-                        .transactional_put(vec![src.into(), dst.into(), 100.into()], token.into())
-                } else {
-                    mutator
-                        .put(vec![src.into(), dst.into(), 100.into()])
-                        .unwrap();
-                    Ok(0)
-                };
-                let write_end = time::Instant::now();
-                mutator.stop_tracing();
-
-                match res {
-                    Ok(_) => {
-                        if audit {
-                            successful_transfers.push((src, dst, 100));
-                        }
-                        // Skip the first sample since it is frequently an outlier
-                        if measure_latency.is_some() {
-                            event_times.push(Some((transaction_start, write_start, write_end)));
-                            thread::sleep(time::Duration::new(0, 1_000_000_000));
-                        }
-                        committed += 1;
+            let transfers = (0..512).map(|_| {
+                    let dst;
+                    let src;
+                    if is_transfer_deterministic {
+                        dst = num_requests % (naccounts - 2) + 2;
+                        src = dst - 1;
+                        num_requests += 1;
+                    } else {
+                        dst = t_rng.gen_range(1, naccounts);
+                        src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
                     }
-                    Err(_) => {
-                        if measure_latency.is_some() {
-                            event_times.push(None);
-                        }
-                        aborted += 1;
+                    assert_ne!(dst, src);
+                    (src, dst)
+                }).filter_map(|(src, dst)| {
+                    let (balance, mut token) = get(&src.into()).unwrap().unwrap();
+                    assert!(
+                        balance >= 0 || !transactions,
+                        format!("{} balance is {}", src, balance)
+                    );
+                    if balance < 100 {
+                        return None;
                     }
-                }
+                    if coarse {
+                        token.make_coarse();
+                    }
 
-                count += 1;
+                    Some((vec![src.into(), dst.into(), 100.into()], token))
+                })
+                .collect();
+
+            let write_start = time::Instant::now();
+            if transactions {
+                for res in mutator.transactional_multi_put(transfers) {
+                    match res {
+                        Ok(_) => {
+                            committed += 1;
+                        }
+                        Err(_) => {
+                            aborted += 1;
+                        }
+                    }
+                    count += 1;
+                }
+            } else {
+                unimplemented!();
             }
+            let write_end = time::Instant::now();
 
             // check if we should report
             if measure_latency.is_none() && last_reported.elapsed() > time::Duration::from_secs(1) {
