@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use rand::Rng;
 
 use std::sync::{Arc, Barrier};
+use std::thread::JoinHandle;
 
 use distributary::{Blender, Recipe, ReuseConfigType};
 
@@ -26,7 +27,6 @@ pub struct Backend {
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
-    read_barrier: Arc<Barrier>,
 }
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -117,7 +117,6 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
         parallel_prepop: parallel,
         prepop_counts: HashMap::new(),
         barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
-        read_barrier: Arc::new(Barrier::new(8)), // number of views
     }
 }
 
@@ -146,14 +145,13 @@ impl Backend {
         self
     }
 
-    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32, parallel: bool) {
+    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32, parallel: bool) -> Option<JoinHandle<()>>{
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
                     println!("reading {}", query_name);
                     let g = self.g.get_getter(nd).unwrap();
                     let query_name = String::from(query_name);
-                    let barrier = self.read_barrier.clone();
 
                     let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
                     let params = keys.generate_parameter(&query_name, num);
@@ -180,13 +178,12 @@ impl Backend {
                     };
 
                     if parallel {
-                        thread::spawn(move || {
-                            barrier.wait();
+                        Some(thread::spawn(move || {
                             read_view();
-                            barrier.wait();
-                        });
+                        }))
                     } else {
                         read_view();
+                        None
                     }
             }
         }
@@ -360,8 +357,16 @@ fn main() {
                             "getCart",
                             "verifyDBConsistencyItemId"
         ];
+        let mut handles = Vec::new();
         for nq in item_queries.iter() {
-            backend.read(&mut keys, nq, read_scale, parallel_read);
+            handles.push(backend.read(&mut keys, nq, read_scale, parallel_read));
+        }
+
+        for h in handles {
+            match h {
+                Some(jh) => jh.join().unwrap(),
+                None => continue,
+            }
         }
     }
 
