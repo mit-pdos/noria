@@ -168,6 +168,36 @@ impl Mutator {
         }
     }
 
+    fn tx_multi_send(
+        &mut self,
+        mut rss: Vec<(Records, checktable::Token)>,
+    ) -> Vec<Result<i64, ()>> {
+        assert!(self.transactional);
+        let len = rss.len();
+
+        for (mut rs, t) in rss {
+            self.inject_dropped_cols(&mut rs);
+            let send = self.tx_reply_channel.0.clone();
+            let m = box Packet::Transaction {
+                link: Link::new(self.addr, self.addr),
+                data: rs,
+                state: TransactionState::Pending(t, send),
+                tracer: self.tracer.clone(),
+            };
+            self.tx.base_send(m, &self.key[..]).unwrap();
+        }
+
+        let mut results = Vec::new();
+        while results.len() < len {
+            match self.tx_reply_channel.1.try_recv() {
+                Ok(r) => results.push(r),
+                Err(mpsc::TryRecvError::Empty) => thread::yield_now(),
+                Err(mpsc::TryRecvError::Disconnected) => unreachable!(),
+            }
+        }
+        results
+    }
+
     /// Perform a non-transactional write to the base node this Mutator was generated for.
     pub fn put<V>(&mut self, u: V) -> Result<(), MutatorError>
     where
@@ -199,6 +229,21 @@ impl Mutator {
 
         self.tx_send(data.into(), t)
             .map_err(|()| MutatorError::TransactionFailed)
+    }
+
+    /// Perform multiple transactional writes to the base node this Mutator was generated for.
+    pub fn transactional_multi_put(
+        &mut self,
+        u: Vec<(Vec<DataType>, checktable::Token)>,
+    ) -> Vec<Result<i64, ()>> {
+        let u = u.into_iter()
+            .map(|(r, t)| {
+                assert_eq!(r.len(), self.expected_columns);
+                (vec![r].into(), t)
+            })
+            .collect();
+
+        self.tx_multi_send(u)
     }
 
     /// Perform a non-transactional delete from the base node this Mutator was generated for.
