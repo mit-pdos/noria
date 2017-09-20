@@ -119,6 +119,21 @@ fn main() {
                 .help("Enable sharding of the graph."),
         )
         .arg(
+            Arg::with_name("max_concurrent")
+                .long("concurrent")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("replay_batch_size")
+                .long("replay_size")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("replay_batch_timeout")
+                .long("replay_timeout")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("full")
                 .long("full")
                 .help("Disable partial materialization"),
@@ -140,6 +155,15 @@ fn main() {
     let migrate_after = time::Duration::from_secs(value_t_or_exit!(args, "migrate", u64));
     assert!(migrate_after < runtime);
 
+    // config options
+    let concurrent_replays = args.value_of("max_concurrent")
+        .map(|_| value_t_or_exit!(args, "max_concurrent", usize));
+    let replay_size = args.value_of("replay_batch_size")
+        .map(|_| value_t_or_exit!(args, "replay_batch_size", usize));
+    let replay_timeout = args.value_of("replay_batch_timeout")
+        .map(|_| value_t_or_exit!(args, "replay_batch_timeout", u64))
+        .map(time::Duration::from_millis);
+
     // reporting config
     let every = time::Duration::from_millis(200);
 
@@ -149,21 +173,24 @@ fn main() {
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // setup db
+    let mut s = graph::Setup::default();
+    s.stupid = args.is_present("stupid");
+    s.partial = !args.is_present("full");
+    s.sharding = args.is_present("sharded");
     let blender = Arc::new(Mutex::new(distributary::Blender::new()));
-    let mut g = graph::make(
-        blender,
-        false,
-        false,
-        args.is_present("sharded"),
-        persistence_params,
-    );
+    let mut g = graph::make(blender, s, persistence_params);
 
     let (mut articles, mut votes, read_old) = {
         let mut b = g.graph.lock().unwrap();
 
-        if args.is_present("full") {
-            // it's okay to change this here, since it only matters for migration
-            b.disable_partial();
+        if let Some(n) = concurrent_replays {
+            b.set_max_concurrent_replay(n);
+        }
+        if let Some(n) = replay_size {
+            b.set_partial_replay_batch_size(n);
+        }
+        if let Some(t) = replay_timeout {
+            b.set_partial_replay_batch_timeout(t);
         }
 
         // we need a putter and a getter
@@ -254,7 +281,7 @@ fn main() {
     }
 
     // all right, migration time
-    let (ratings, read_new) = g.transition(args.is_present("stupid"), false);
+    let (ratings, read_new) = g.transition();
     let (mut ratings, read_new) = {
         let b = g.graph.lock().unwrap();
         (b.get_mutator(ratings), b.get_getter(read_new).unwrap())

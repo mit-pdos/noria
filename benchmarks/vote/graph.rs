@@ -4,6 +4,7 @@ use distributary;
 use std::sync::{Arc, Mutex};
 
 pub struct Graph {
+    setup: Setup,
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub vc: NodeIndex,
@@ -11,38 +12,90 @@ pub struct Graph {
     pub graph: Arc<Mutex<Blender>>,
 }
 
+pub struct Setup {
+    pub log: bool,
+    pub transactions: bool,
+    pub stupid: bool,
+    pub partial: bool,
+    pub sharding: bool,
+}
+
+impl Default for Setup {
+    fn default() -> Self {
+        Setup {
+            log: false,
+            transactions: false,
+            stupid: false,
+            partial: true,
+            sharding: true,
+        }
+    }
+}
+
+impl Setup {
+    #[allow(dead_code)]
+    pub fn with_logging(mut self) -> Self {
+        self.log = true;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn with_transactions(mut self) -> Self {
+        self.transactions = true;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn with_stupidity(mut self) -> Self {
+        self.stupid = true;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn without_partial(mut self) -> Self {
+        self.partial = false;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn without_sharding(mut self) -> Self {
+        self.sharding = false;
+        self
+    }
+}
+
 pub fn make(
     blender: Arc<Mutex<Blender>>,
-    log: bool,
-    transactions: bool,
-    sharded: bool,
+    s: Setup,
     persistence_params: PersistenceParameters,
 ) -> Graph {
     let (article, vote, vc, end) = {
         // set up graph
         let mut g = blender.lock().unwrap();
-
-        if log {
+        if s.log {
             g.log_with(distributary::logger_pls());
+        }
+        if !s.partial {
+            g.disable_partial();
+        }
+        if !s.sharding {
+            g.disable_sharding();
         }
 
         g.with_persistence_options(persistence_params);
-        if !sharded {
-            g.disable_sharding();
-        }
 
         // migrate
         let mut mig = g.start_migration();
 
         // add article base node
-        let article = if transactions {
+        let article = if s.transactions {
             mig.add_transactional_base("article", &["id", "title"], Base::default())
         } else {
             mig.add_ingredient("article", &["id", "title"], Base::default())
         };
 
         // add vote base table
-        let vote = if transactions {
+        let vote = if s.transactions {
             mig.add_transactional_base("vote", &["user", "id"], Base::default().with_key(vec![1]))
         } else {
             mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
@@ -73,12 +126,13 @@ pub fn make(
         vc: vc.into(),
         end: end.into(),
         graph: blender,
+        setup: s,
     }
 }
 
 impl Graph {
     #[allow(dead_code)]
-    pub fn transition(&mut self, stupid: bool, transactions: bool) -> (NodeIndex, NodeIndex) {
+    pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
         use distributary::{Aggregation, Base, Join, JoinType, Project, Union};
         use std::collections::HashMap;
 
@@ -93,13 +147,13 @@ impl Graph {
 
         // add new "ratings" base table
         let b = Base::default().with_key(vec![1]);
-        let rating = if transactions {
+        let rating = if self.setup.transactions {
             mig.add_transactional_base("rating", &["user", "id", "stars"], b)
         } else {
             mig.add_ingredient("rating", &["user", "id", "stars"], b)
         };
 
-        let total = if stupid {
+        let total = if self.setup.stupid {
             // project on 1 to votes
             let upgrade = mig.add_ingredient(
                 "upvote",

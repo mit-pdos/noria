@@ -64,7 +64,6 @@ fn main() {
     } else {
         distributary::DurabilityMode::MemoryOnly
     };
-    let sharded = args.is_present("sharded");
 
     println!("Attempting to start soup on {}", addr);
 
@@ -134,7 +133,9 @@ fn main() {
     };
 
     // scoped needed to ensure lock is released
-    let g = graph::make(blender.clone(), true, false, sharded, persistence_params);
+    let mut s = graph::Setup::default().with_logging();
+    s.sharding = args.is_present("sharded");
+    let g = graph::make(blender.clone(), s, persistence_params);
 
     // start processing
     // TODO: what about the node indices?
