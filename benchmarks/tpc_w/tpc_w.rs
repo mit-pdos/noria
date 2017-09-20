@@ -324,7 +324,7 @@ fn main() {
 
     if read_scale > 0.0 {
         println!("Reading...");
-        let mut keys = SampleKeys::new(&ploc);
+        let mut keys = SampleKeys::new(&ploc, item_write);
         for nq in backend.r.aliases().iter() {
             backend.read(&mut keys, nq, read_scale);
         }

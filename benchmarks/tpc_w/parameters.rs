@@ -11,19 +11,20 @@ pub struct SampleKeys {
     order: Vec<Vec<DataType>>,
     shopping_cart: Vec<Vec<DataType>>,
     country: Vec<Vec<DataType>>,
-    rng: rand::ThreadRng
+    rng: rand::ThreadRng,
+    item_write: f32,
 }
 
 impl SampleKeys {
-    pub fn new(data_location: &str) -> SampleKeys {
-        let rng = rand::thread_rng();
+    pub fn new(data_location: &str, item_write: f32) -> SampleKeys {
         let mut keys = SampleKeys {
             customer: vec![],
             item: vec![],
             order: vec![],
             shopping_cart: vec![],
             country: vec![],
-            rng: rng,
+            rng: rand::thread_rng(),
+            item_write: item_write,
         };
 
         keys.get_countries(data_location);
@@ -62,6 +63,7 @@ impl SampleKeys {
             "verifyDBConsistencyCustId" => self.bogus_key(),
             "verifyDBConsistencyItemId" => self.bogus_key(),
             "verifyDBConsistencyAddrId" => self.bogus_key(),
+            "getBestSellers" => self.bogus_key(),
             _ => unimplemented!(),
         }
     }
@@ -94,6 +96,7 @@ impl SampleKeys {
             "verifyDBConsistencyCustId" => 0,
             "verifyDBConsistencyItemId" => 0,
             "verifyDBConsistencyAddrId" => 0,
+            "getBestSellers" => 0,
             _ => unimplemented!(),
         }
     }
@@ -184,11 +187,15 @@ impl SampleKeys {
     }
 
     fn item_id(&mut self) -> DataType {
-        self.rng.choose(self.item.as_slice()).unwrap()[0].clone()
+        let nrecords = ((self.item.len() as f32) * self.item_write) as usize;
+        let slice = self.item.chunks(nrecords).next().unwrap();
+        self.rng.choose(slice).unwrap()[0].clone()
     }
 
     fn item_subject(&mut self) -> DataType {
-        self.rng.choose(self.item.as_slice()).unwrap()[1].clone()
+        let nrecords = ((self.item.len() as f32) * self.item_write) as usize;
+        let slice = self.item.chunks(nrecords).next().unwrap();
+        self.rng.choose(slice).unwrap()[1].clone()
     }
 
     fn order_id(&mut self) -> DataType {
