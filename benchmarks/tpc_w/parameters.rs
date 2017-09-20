@@ -35,37 +35,44 @@ impl SampleKeys {
         keys
     }
 
-    pub fn generate_parameter(&mut self, query_name: &str) -> DataType {
-        match query_name {
-            "getName" => self.customer_id(),
-            "getBook" => self.item_id(),
-            "getCustomer" => self.customer_uname(),
-            "doSubjectSearch" => self.item_subject(),
-            "getNewProducts" => self.item_subject(),
-            "getUserName" => self.customer_id(),
-            "getPassword" => self.customer_uname(),
-            "getRelated1" => self.item_id(),
-            "getMostRecentOrderId" => self.customer_uname(),
-            "getMostRecentOrderOrder" => self.order_id(),
-            "getMostRecentOrderLines" => self.order_id(),
-            "createEmptyCart" => self.bogus_key(),
-            "addItem" => self.item_id(), // XXX(malte): dual parameter query, need SCL ID range
-            "addRandomItemToCartIfNecessary" => self.shopping_cart_id(),
-            "getCart" => self.shopping_cart_id(),
-            "createNewCustomerMaxId" => self.bogus_key(),
-            "getCDiscount" => self.customer_id(),
-            "getCAddrId" => self.customer_id(),
-            "getCAddr" => self.customer_id(),
-            "enterAddressId" => self.country_name(),
-            "enterAddressMaxId" => self.bogus_key(),
-            "enterOrderMaxId" => self.bogus_key(),
-            "getStock" => self.item_id(),
-            "verifyDBConsistencyCustId" => self.bogus_key(),
-            "verifyDBConsistencyItemId" => self.bogus_key(),
-            "verifyDBConsistencyAddrId" => self.bogus_key(),
-            "getBestSellers" => self.bogus_key(),
-            _ => unimplemented!(),
+    pub fn generate_parameter(&mut self, query_name: &str, num: usize) -> Vec<DataType> {
+        let mut params = Vec::new();
+        for _ in 0..num {
+            let p = match query_name {
+                "getName" => self.customer_id(),
+                "getBook" => self.item_id(),
+                "getCustomer" => self.customer_uname(),
+                "doSubjectSearch" => self.item_subject(),
+                "getNewProducts" => self.item_subject(),
+                "getUserName" => self.customer_id(),
+                "getPassword" => self.customer_uname(),
+                "getRelated1" => self.item_id(),
+                "getMostRecentOrderId" => self.customer_uname(),
+                "getMostRecentOrderOrder" => self.order_id(),
+                "getMostRecentOrderLines" => self.order_id(),
+                "createEmptyCart" => self.bogus_key(),
+                "addItem" => self.item_id(), // XXX(malte): dual parameter query, need SCL ID range
+                "addRandomItemToCartIfNecessary" => self.shopping_cart_id(),
+                "getCart" => self.shopping_cart_id(),
+                "createNewCustomerMaxId" => self.bogus_key(),
+                "getCDiscount" => self.customer_id(),
+                "getCAddrId" => self.customer_id(),
+                "getCAddr" => self.customer_id(),
+                "enterAddressId" => self.country_name(),
+                "enterAddressMaxId" => self.bogus_key(),
+                "enterOrderMaxId" => self.bogus_key(),
+                "getStock" => self.item_id(),
+                "verifyDBConsistencyCustId" => self.bogus_key(),
+                "verifyDBConsistencyItemId" => self.bogus_key(),
+                "verifyDBConsistencyAddrId" => self.bogus_key(),
+                "getBestSellers" => self.bogus_key(),
+                _ => unimplemented!(),
+            };
+
+            params.push(p);
         }
+
+        params
     }
 
     pub fn keys_size(&mut self, query_name: &str) -> usize {

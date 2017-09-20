@@ -26,6 +26,7 @@ pub struct Backend {
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
+    read_barrier: Arc<Barrier>,
 }
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
@@ -116,6 +117,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
         parallel_prepop: parallel,
         prepop_counts: HashMap::new(),
         barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
+        read_barrier: Arc::new(Barrier::new(8)), // number of views
     }
 }
 
@@ -144,31 +146,48 @@ impl Backend {
         self
     }
 
-    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32) {
+    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32, parallel: bool) {
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
-                println!("reading {}", query_name);
-                let g = self.g.get_getter(nd).unwrap();
-                let start = time::Instant::now();
-                let mut ok = 0;
-                let num = ((keys.keys_size(query_name) as f32) * read_scale) as i32;
-                for _ in 0..num {
-                    let param = keys.generate_parameter(query_name);
-                    match g.lookup(&param, true) {
-                        Err(_) => panic!(),
-                        Ok(datas) => if datas.len() > 0 {
-                            ok += 1;
-                        },
+                    println!("reading {}", query_name);
+                    let g = self.g.get_getter(nd).unwrap();
+                    let query_name = String::from(query_name);
+                    let barrier = self.read_barrier.clone();
+
+                    let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
+                    let params = keys.generate_parameter(&query_name, num);
+
+                    let read_view = move || {
+                        let mut ok = 0;
+
+                        let start = time::Instant::now();
+                        for i in 0..num {
+                            match g.lookup(&params[i], true) {
+                                Err(_) => continue,
+                                Ok(datas) => if datas.len() > 0 {
+                                    ok += 1;
+                                },
+                            }
+                        }
+                        let dur = dur_to_fsec!(start.elapsed());
+                        println!(
+                            "{}: ({:.2} GETs/sec) (ok: {})!",
+                            query_name,
+                            f64::from(num as i32) / dur,
+                            ok
+                        );
+                    };
+
+                    if parallel {
+                        thread::spawn(move || {
+                            barrier.wait();
+                            read_view();
+                            barrier.wait();
+                        });
+                    } else {
+                        read_view();
                     }
-                }
-                let dur = dur_to_fsec!(start.elapsed());
-                println!(
-                    "{}: ({:.2} GETs/sec) (ok: {})!",
-                    query_name,
-                    f64::from(num) / dur,
-                    ok
-                );
             }
         }
     }
@@ -251,12 +270,18 @@ fn main() {
                 .long("random")
                 .help("Adds queries in random order (only makes sense with -s)")
         )
+        .arg(
+            Arg::with_name("parallel_read")
+                .long("parallel_read")
+                .help("Reads using parallel threads")
+        )
         .get_matches();
 
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
     let transactions = matches.is_present("transactional");
     let parallel_prepop = matches.is_present("parallel_prepopulation");
+    let parallel_read = matches.is_present("parallel_read");
     let single_query = matches.is_present("single_query_migration");
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
@@ -325,7 +350,8 @@ fn main() {
     if read_scale > 0.0 {
         println!("Reading...");
         let mut keys = SampleKeys::new(&ploc, item_write);
-        let item_queries = ["getBestSellers",
+        let item_queries = [
+                            "getBestSellers",
                             "getMostRecentOrderLines",
                             "getBook",
                             "doSubjectSearch",
@@ -335,7 +361,7 @@ fn main() {
                             "verifyDBConsistencyItemId"
         ];
         for nq in item_queries.iter() {
-            backend.read(&mut keys, nq, read_scale);
+            backend.read(&mut keys, nq, read_scale, parallel_read);
         }
     }
 
