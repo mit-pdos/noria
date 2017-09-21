@@ -154,7 +154,6 @@ fn main() {
     let avg = args.is_present("avg");
     let cdf = args.is_present("cdf");
     let stage = args.is_present("stage");
-    let transactions = args.is_present("transactions");
     let dist = value_t_or_exit!(args, "distribution", Distribution);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = args.value_of("migrate")
@@ -193,7 +192,11 @@ fn main() {
     let persistence_params = PersistenceParameters::new(mode, queue_length, flush_timeout);
 
     // setup db
-    let g = graph::make(!args.is_present("quiet"), transactions, persistence_params);
+    let mut s = graph::Setup::default();
+    s.log = !args.is_present("quiet");
+    s.transactions = args.is_present("transactions");
+    s.stupid = args.is_present("stupid");
+    let g = graph::make(s, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = (0..ngetters)
@@ -324,8 +327,6 @@ fn main() {
                 barrier: drop.clone(),
                 getters: getters.iter().map(|g| unsafe { g.clone() }).collect(),
                 bus: bus,
-                stupid: args.is_present("stupid"),
-                transactions: transactions,
             };
             let start = start.clone();
             Some((
@@ -649,8 +650,6 @@ struct Migrator {
     bus: bus::Bus<Mutator>,
     getters: Vec<Getter>,
     barrier: sync::Arc<sync::Barrier>,
-    transactions: bool,
-    stupid: bool,
 }
 
 impl Migrator {
@@ -658,7 +657,7 @@ impl Migrator {
         thread::sleep(migrate_after);
         println!("Starting migration");
         let mig_start = time::Instant::now();
-        let (rating, newend) = self.graph.transition(self.stupid, self.transactions);
+        let (rating, newend) = self.graph.transition();
         let mutator = self.graph.graph.get_mutator(rating);
         self.bus.broadcast(mutator);
         for mut getter in self.getters {
