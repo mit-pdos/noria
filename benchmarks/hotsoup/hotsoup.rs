@@ -35,6 +35,7 @@ fn make(blacklist: &str) -> Box<Backend> {
     let log = distributary::logger_pls();
     let blender_log = log.clone();
     g.log_with(blender_log);
+    g.disable_sharding();
 
     let recipe = Recipe::blank(Some(log.clone()));
     Box::new(Backend {
