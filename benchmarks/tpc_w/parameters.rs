@@ -65,7 +65,7 @@ impl SampleKeys {
                 "verifyDBConsistencyCustId" => self.bogus_key(),
                 "verifyDBConsistencyItemId" => self.bogus_key(),
                 "verifyDBConsistencyAddrId" => self.bogus_key(),
-                "getBestSellers" => self.bogus_key(),
+                "getBestSellers" => self.item_subject(),
                 _ => unimplemented!(),
             };
 
@@ -103,7 +103,7 @@ impl SampleKeys {
             "verifyDBConsistencyCustId" => 0,
             "verifyDBConsistencyItemId" => 0,
             "verifyDBConsistencyAddrId" => 0,
-            "getBestSellers" => 0,
+            "getBestSellers" => self.item.len(),
             _ => unimplemented!(),
         }
     }
