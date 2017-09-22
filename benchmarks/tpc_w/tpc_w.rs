@@ -248,24 +248,27 @@ fn main() {
             Arg::with_name("read")
                 .long("read")
                 .default_value("0.00")
-                .help("Scale reads from the application")
+                .help("Reads % of keys for each query")
         )
         .arg(
-            Arg::with_name("item_write")
-                .long("item_write")
-                .default_value("1.00")
-                .help("Scale writes")
+            Arg::with_name("write_to")
+                .long("write_to")
+                .possible_values(&["item", "author", "order_line"])
+                .default_value("item")
+                .help("Base table to write to")
         )
         .arg(
-            Arg::with_name("customer_write")
-                .long("customer_write")
+            Arg::with_name("write")
+                .long("write")
+                .short("w")
                 .default_value("1.00")
-                .help("Scale writes")
+                .help("Writes % before reads and (1-%) after reads")
         )
         .arg(
             Arg::with_name("random")
                 .long("random")
-                .help("Adds queries in random order (only makes sense with -s)")
+                .help("Adds queries in random order")
+                .requires("single_query_migration")
         )
         .arg(
             Arg::with_name("parallel_read")
@@ -283,17 +286,29 @@ fn main() {
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
     let read_scale = value_t_or_exit!(matches, "read", f32);
-    let item_write = value_t_or_exit!(matches, "item_write", f32);
+    let write_to =matches.value_of("write_to").unwrap();
+    let write = value_t_or_exit!(matches, "write", f32);
     let reuse = matches.value_of("reuse").unwrap();
     let random = matches.is_present("random");
+
+    if read_scale > write {
+        panic!("can't read scale must be less or equal than write scale");
+    }
 
     println!("Loading TPC-W recipe from {}", rloc);
     let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial, reuse);
 
     println!("Prepopulating from data files in {}", ploc);
+    let (item_write, author_write, order_line_write) = match write_to.as_ref() {
+        "item" => (write, 1.0, 1.0),
+        "author" => (1.0, write, 1.0),
+        "order_line" => (1.0, 1.0, write),
+        _ => unreachable!()
+    };
+
     let num_addr = populate_addresses(&backend, &ploc);
     backend.prepop_counts.insert("addresses".into(), num_addr);
-    let num_authors = populate_authors(&backend, &ploc);
+    let num_authors = populate_authors(&backend, &ploc, author_write, true);
     backend.prepop_counts.insert("authors".into(), num_authors);
     let num_countries = populate_countries(&backend, &ploc);
     backend
@@ -311,7 +326,7 @@ fn main() {
     backend
         .prepop_counts
         .insert("cc_xacts".into(), num_cc_xacts);
-    let num_order_line = populate_order_line(&backend, &ploc);
+    let num_order_line = populate_order_line(&backend, &ploc, order_line_write, true);
     backend
         .prepop_counts
         .insert("order_line".into(), num_order_line);
@@ -370,8 +385,10 @@ fn main() {
         }
     }
 
-    if item_write < 1.0 {
-        println!("Do some more writes...");
-        populate_items(&backend, &ploc, item_write, false);
-    }
+    match write_to.as_ref() {
+        "item" => populate_items(&backend, &ploc, write, false),
+        "author" => populate_authors(&backend, &ploc, write, false),
+        "order_line" => populate_order_line(&backend, &ploc, write, false),
+        _ => unreachable!(),
+    };
 }
