@@ -136,6 +136,82 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
     println!("Done with account creation");
 }
 
+#[derive(Copy, Clone, PartialEq)]
+enum ConsistencyMode {
+    Eventual,
+    Timeline,
+    Linearizable,
+}
+impl ConsistencyMode {
+    pub fn needs_transactions(&self) -> bool {
+        match *self {
+            ConsistencyMode::Eventual => false,
+            _ => true,
+        }
+    }
+}
+
+fn run_workload(
+    mutator: Mutator,
+    balance_getters: Vec<distributary::Getter>,
+    naccounts: i64,
+    start: time::Instant,
+    runtime: time::Duration,
+    mode: ConsistencyMode,
+    nwriters: usize,
+) {
+    let readers: Vec<_> = balance_getters
+        .into_iter()
+        .map(|balances_get| {
+            thread::spawn(move || {
+                assert_eq!(
+                    mode.needs_transactions(),
+                    balances_get.supports_transactions()
+                );
+                let mut t_rng = rand::thread_rng();
+                let mut num_requests = 0;
+                while start.elapsed() < runtime {
+                    let account: DataType = t_rng.gen_range(1, naccounts).into();
+                    match mode {
+                        ConsistencyMode::Eventual | ConsistencyMode::Timeline => {
+                            balances_get.lookup(&account, true)
+                        }
+                        ConsistencyMode::Linearizable => unimplemented!(),
+                    }.unwrap();
+                    num_requests += 1;
+                }
+                (num_requests * NANOS_PER_SEC) as f32 / dur_to_ns!(runtime) as f32
+            })
+        })
+        .collect();
+
+    let writers: Vec<_> = (0..nwriters)
+        .map(|_| mutator.clone())
+        .map(|mut mutator| {
+            thread::spawn(move || {
+                let mut t_rng = rand::thread_rng();
+                let mut num_requests = 0;
+                while start.elapsed() < runtime {
+                    let dst = t_rng.gen_range(1, naccounts);
+                    let src = (dst - 1 + t_rng.gen_range(1, naccounts - 1)) % (naccounts - 1) + 1;
+
+                    mutator
+                        .put(vec![src.into(), dst.into(), 100.into()])
+                        .unwrap();
+
+                    num_requests += 1;
+                }
+                (num_requests * NANOS_PER_SEC) as f32 / dur_to_ns!(runtime) as f32
+            })
+        })
+        .collect();
+
+    let reads: f32 = readers.into_iter().map(|j| j.join().unwrap()).sum();
+    let writes: f32 = writers.into_iter().map(|j| j.join().unwrap()).sum();
+    println!("{} GET/s", reads);
+    println!("{} PUT/s", writes);
+}
+
 fn client(
     _i: usize,
     mut mutator: Mutator,
@@ -446,6 +522,7 @@ fn main() {
                 .takes_value(false)
                 .help("Use deterministic money transfers"),
         )
+        .arg(Arg::with_name("mode").long("mode").takes_value(true))
         .after_help(BENCH_USAGE)
         .get_matches();
 
@@ -460,8 +537,24 @@ fn main() {
     let audit = args.is_present("audit");
     let measure_latency = args.is_present("latency");
     let coarse_checktables = args.is_present("coarse");
-    let transactions = !args.is_present("nontransactional");
+    let mut transactions = !args.is_present("nontransactional");
     let is_transfer_deterministic = args.is_present("deterministic");
+
+    let mode = match args.value_of("mode") {
+        Some("eventual") => {
+            transactions = false;
+            Some(ConsistencyMode::Eventual)
+        }
+        Some("timeline") => {
+            transactions = true;
+            Some(ConsistencyMode::Timeline)
+        }
+        Some("linearizable") => {
+            transactions = true;
+            Some(ConsistencyMode::Linearizable)
+        }
+        _ => None,
+    };
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -478,6 +571,13 @@ fn main() {
     // let system settle
     thread::sleep(time::Duration::from_millis(100));
     let start = time::Instant::now();
+
+    if let Some(mode) = mode {
+        let mutator = bank.blender.get_mutator(bank.transfers);
+        let balance_getters = vec![bank.getter()];
+        run_workload(mutator, balance_getters, naccounts, start, runtime, mode, 3);
+        return;
+    }
 
     // benchmark
     let clients = (0..nthreads)
