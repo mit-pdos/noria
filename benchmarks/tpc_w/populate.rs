@@ -95,6 +95,8 @@ pub fn populate_addresses(backend: &Backend, data_location: &str) -> usize {
         s.clear();
     }
 
+    populate(backend, "ship", records.clone());
+    populate(backend, "bill", records.clone());
     populate(backend, "address", records)
 }
 
@@ -194,6 +196,8 @@ pub fn populate_countries(backend: &Backend, data_location: &str) -> usize {
         s.clear();
     }
 
+    populate(backend, "ship_co", records.clone());
+    populate(backend, "bill_co", records.clone());
     populate(backend, "country", records)
 }
 
@@ -251,7 +255,7 @@ pub fn populate_customers(backend: &Backend, data_location: &str) -> usize {
     populate(backend, "customer", records)
 }
 
-pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
+pub fn populate_items(backend: &Backend, data_location: &str, item_write: f32, start: bool) -> usize {
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
@@ -311,6 +315,15 @@ pub fn populate_items(backend: &Backend, data_location: &str) -> usize {
         }
         s.clear();
     }
+
+    let nrecords = if start {
+        ((records.len() as f32) * item_write) as usize
+    } else {
+        records.reverse();
+        ((records.len() as f32) * (1.0 - item_write)) as usize
+    };
+
+    records.truncate(nrecords);
 
     populate(backend, "item", records)
 }
