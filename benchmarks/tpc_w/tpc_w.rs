@@ -361,7 +361,7 @@ fn main() {
 
     if read_scale > 0.0 {
         println!("Reading...");
-        let mut keys = SampleKeys::new(&ploc, item_write);
+        let mut keys = SampleKeys::new(&ploc, item_write, order_line_write);
         let item_queries = [
                             "getBestSellers",
                             "getMostRecentOrderLines",

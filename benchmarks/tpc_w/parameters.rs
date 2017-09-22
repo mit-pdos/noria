@@ -9,28 +9,33 @@ pub struct SampleKeys {
     customer: Vec<Vec<DataType>>,
     item: Vec<Vec<DataType>>,
     order: Vec<Vec<DataType>>,
+    order_line: Vec<Vec<DataType>>,
     shopping_cart: Vec<Vec<DataType>>,
     country: Vec<Vec<DataType>>,
     rng: rand::ThreadRng,
     item_write: f32,
+    ol_write: f32,
 }
 
 impl SampleKeys {
-    pub fn new(data_location: &str, item_write: f32) -> SampleKeys {
+    pub fn new(data_location: &str, item_write: f32, ol_write: f32) -> SampleKeys {
         let mut keys = SampleKeys {
             customer: vec![],
             item: vec![],
             order: vec![],
+            order_line: vec![],
             shopping_cart: vec![],
             country: vec![],
             rng: rand::thread_rng(),
             item_write: item_write,
+            ol_write: ol_write,
         };
 
         keys.get_countries(data_location);
         keys.get_customers(data_location);
         keys.get_items(data_location);
         keys.get_orders(data_location);
+        keys.get_order_lines(data_location);
 
         keys
     }
@@ -49,7 +54,7 @@ impl SampleKeys {
                 "getRelated1" => self.item_id(),
                 "getMostRecentOrderId" => self.customer_uname(),
                 "getMostRecentOrderOrder" => self.order_id(),
-                "getMostRecentOrderLines" => self.order_id(),
+                "getMostRecentOrderLines" => self.ol_o_id(),
                 "createEmptyCart" => self.bogus_key(),
                 "addItem" => self.item_id(), // XXX(malte): dual parameter query, need SCL ID range
                 "addRandomItemToCartIfNecessary" => self.shopping_cart_id(),
@@ -87,7 +92,7 @@ impl SampleKeys {
             "getRelated1" => self.item.len(),
             "getMostRecentOrderId" => self.customer.len(),
             "getMostRecentOrderOrder" => self.order.len(),
-            "getMostRecentOrderLines" => self.order.len(),
+            "getMostRecentOrderLines" => self.order_line.len(),
             "createEmptyCart" => 0,
             "addItem" => self.item.len(),
             "addRandomItemToCartIfNecessary" => self.shopping_cart.len(),
@@ -164,6 +169,26 @@ impl SampleKeys {
         }
     }
 
+    pub fn get_order_lines(&mut self, data_location: &str) {
+        let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
+        let mut reader = BufReader::new(f);
+
+        println!("Prepopulating order_line...");
+
+        let mut s = String::new();
+        while reader.read_line(&mut s).unwrap() > 0 {
+            {
+                let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
+                let ol_o_id = i32::from_str(fields[1]).unwrap(); //
+
+                self.order_line.push(vec![
+                    ol_o_id.into(),
+                ]);
+            }
+            s.clear();
+        }
+    }
+
     fn get_countries(&mut self, data_location: &str) {
         let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
         let mut reader = BufReader::new(f);
@@ -203,6 +228,12 @@ impl SampleKeys {
         let nrecords = ((self.item.len() as f32) * self.item_write) as usize;
         let slice = self.item.chunks(nrecords).next().unwrap();
         self.rng.choose(slice).unwrap()[1].clone()
+    }
+
+    fn ol_o_id(&mut self) -> DataType {
+        let nrecords = ((self.order_line.len() as f32) * self.ol_write) as usize;
+        let slice = self.item.chunks(nrecords).next().unwrap();
+        self.rng.choose(slice).unwrap()[0].clone()
     }
 
     fn order_id(&mut self) -> DataType {
