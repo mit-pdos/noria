@@ -44,7 +44,7 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     g.with_persistence_options(distributary::PersistenceParameters {
         queue_capacity: 256,
         flush_timeout: time::Duration::from_millis(1),
-        mode: distributary::DurabilityMode::DeleteOnExit,
+        mode: distributary::DurabilityMode::MemoryOnly,
     });
 
     let transfers;
