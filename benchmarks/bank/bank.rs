@@ -3,6 +3,7 @@ extern crate clap;
 extern crate distributary;
 extern crate hdrsample;
 extern crate rand;
+extern crate time as time_crate;
 
 use hdrsample::Histogram;
 
@@ -177,7 +178,7 @@ fn run_workload(
                 let mut num_requests = 0;
                 while start.elapsed() < runtime {
                     let account: DataType = t_rng.gen_range(1, naccounts).into();
-                    let read_start = time::Instant::now();
+                    let read_start = time_crate::PreciseTime::now();
                     match mode {
                         ConsistencyMode::Eventual | ConsistencyMode::Timeline => {
                             balances_get.lookup(&account, true)
@@ -195,7 +196,12 @@ fn run_workload(
                             Ok(rs)
                         }
                     }.unwrap();
-                    let latency = dur_to_ns!(read_start.elapsed());
+                    let latency = dur_to_ns!(
+                        read_start
+                            .to(time_crate::PreciseTime::now())
+                            .to_std()
+                            .unwrap()
+                    );
                     if read_interval.is_none() {
                         println!("{}", latency);
                     }
@@ -204,7 +210,9 @@ fn run_workload(
 
                     match read_interval {
                         Some(interval) => while start.elapsed() / num_requests < interval {},
-                        None => while read_start.elapsed() < time::Duration::from_millis(1) {},
+                        None => while read_start.to(time_crate::PreciseTime::now()) <
+                            time_crate::Duration::milliseconds(1)
+                        {},
                     }
                 }
             })
