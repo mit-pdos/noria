@@ -7,7 +7,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, Recipe};
+use distributary::{Blender, Recipe, ReuseConfigType};
 
 pub struct Backend {
     blacklist: Vec<String>,
@@ -16,7 +16,7 @@ pub struct Backend {
     g: Blender,
 }
 
-fn make(blacklist: &str) -> Box<Backend> {
+fn make(blacklist: &str, reuse: ReuseConfigType, sharding: bool, partial: bool) -> Box<Backend> {
     use std::io::Read;
     use std::fs::File;
 
@@ -35,8 +35,15 @@ fn make(blacklist: &str) -> Box<Backend> {
     let log = distributary::logger_pls();
     let blender_log = log.clone();
     g.log_with(blender_log);
+    if !sharding {
+        g.disable_sharding();
+    }
+    if !partial {
+        g.disable_partial();
+    }
 
-    let recipe = Recipe::blank(Some(log.clone()));
+    let mut recipe = Recipe::blank(Some(log.clone()));
+    recipe.enable_reuse(reuse);
     Box::new(Backend {
         blacklist: blacklisted_queries,
         r: Some(recipe),
@@ -162,12 +169,29 @@ fn main() {
                 .help("File with blacklisted queries to skip."),
         )
         .arg(
+            Arg::with_name("no-partial")
+                .long("no-partial")
+                .help("Disable partial materialization"),
+        )
+        .arg(
+            Arg::with_name("no-sharding")
+                .long("no-sharding")
+                .help("Disable partial materialization"),
+        )
+        .arg(
             Arg::with_name("populate_at")
                 .default_value("11")
                 .long("populate_at")
                 .help(
                     "Schema version to populate database at; must be compatible with test data.",
                 ),
+        )
+        .arg(
+            Arg::with_name("reuse")
+                .long("reuse")
+                .default_value("finkelstein")
+                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
+                .help("Query reuse algorithm to use."),
         )
         .arg(
             Arg::with_name("start_at")
@@ -204,11 +228,20 @@ fn main() {
     let dataloc = matches.value_of("populate_from").unwrap();
     let transactional = matches.is_present("transactional");
     let base_only = matches.is_present("base_only");
+    let reuse = match matches.value_of("reuse").unwrap() {
+        "finkelstein" => ReuseConfigType::Finkelstein,
+        "full" => ReuseConfigType::Full,
+        "noreuse" => ReuseConfigType::NoReuse,
+        "relaxed" => ReuseConfigType::Relaxed,
+        _ => panic!("reuse configuration not supported"),
+    };
+    let disable_sharding = matches.is_present("no-sharding");
+    let disable_partial = matches.is_present("no-partial");
     let start_at_schema = value_t_or_exit!(matches, "start_at", u64);
     let stop_at_schema = value_t_or_exit!(matches, "stop_at", u64);
     let populate_at_schema = value_t_or_exit!(matches, "populate_at", u64);
 
-    let mut backend = make(blloc);
+    let mut backend = make(blloc, reuse, !disable_sharding, !disable_partial);
 
     let mut query_files = Vec::new();
     let mut schema_files = Vec::new();
