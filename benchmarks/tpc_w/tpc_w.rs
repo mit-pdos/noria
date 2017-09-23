@@ -247,7 +247,8 @@ fn main() {
             Arg::with_name("reuse")
                 .long("reuse")
                 .default_value("finkelstein")
-                .help("Enable node reuse"),
+                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
+                .help("Query reuse algorithm"),
         )
         .arg(
             Arg::with_name("disable_partial")
