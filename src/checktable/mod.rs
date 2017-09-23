@@ -385,4 +385,8 @@ impl CheckTable {
             }
         }
     }
+
+    pub fn get_current_timestamp(&self) -> i64 {
+        self.next_timestamp - 1
+    }
 }

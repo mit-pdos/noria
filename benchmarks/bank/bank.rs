@@ -41,6 +41,11 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     // set up graph
     let mut g = Blender::new();
     let debug_channel = g.create_debug_channel();
+    g.with_persistence_options(distributary::PersistenceParameters {
+        queue_capacity: 256,
+        flush_timeout: time::Duration::from_millis(1),
+        mode: distributary::DurabilityMode::DeleteOnExit,
+    });
 
     let transfers;
     let credits;
@@ -153,7 +158,7 @@ impl ConsistencyMode {
 
 fn run_workload(
     mutator: Mutator,
-    balance_getters: Vec<distributary::Getter>,
+    balance_getters: Vec<(distributary::Getter, Box<Fn() -> i64 + Send>)>,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -162,7 +167,7 @@ fn run_workload(
 ) {
     let readers: Vec<_> = balance_getters
         .into_iter()
-        .map(|balances_get| {
+        .map(|(mut balances_get, clock)| {
             thread::spawn(move || {
                 assert_eq!(
                     mode.needs_transactions(),
@@ -176,7 +181,18 @@ fn run_workload(
                         ConsistencyMode::Eventual | ConsistencyMode::Timeline => {
                             balances_get.lookup(&account, true)
                         }
-                        ConsistencyMode::Linearizable => unimplemented!(),
+                        ConsistencyMode::Linearizable => {
+                            let ts = clock();
+                            let (mut rs, mut token) =
+                                balances_get.transactional_lookup(&account).unwrap();
+                            while token.get_timestamp() < ts {
+                                if let Ok(r) = balances_get.transactional_lookup(&account) {
+                                    rs = r.0;
+                                    token = r.1;
+                                }
+                            }
+                            Ok(rs)
+                        }
                     }.unwrap();
                     num_requests += 1;
                 }
@@ -574,7 +590,7 @@ fn main() {
 
     if let Some(mode) = mode {
         let mutator = bank.blender.get_mutator(bank.transfers);
-        let balance_getters = vec![bank.getter()];
+        let balance_getters = vec![(bank.getter(), bank.blender.get_clock())];
         run_workload(mutator, balance_getters, naccounts, start, runtime, mode, 3);
         return;
     }

@@ -211,6 +211,12 @@ impl Blender {
         })
     }
 
+    /// Get a boxed function which reports the current logical time.
+    pub fn get_clock(&self) -> Box<Fn() -> i64 + Send> {
+        let checktable = self.checktable.clone();
+        Box::new(move || checktable.lock().unwrap().get_current_timestamp())
+    }
+
     #[cfg(test)]
     pub fn graph(&self) -> &prelude::Graph {
         &self.ingredients
