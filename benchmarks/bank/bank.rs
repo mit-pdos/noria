@@ -44,7 +44,7 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     g.with_persistence_options(distributary::PersistenceParameters {
         queue_capacity: 256,
         flush_timeout: time::Duration::from_millis(1),
-        mode: distributary::DurabilityMode::MemoryOnly,
+        mode: distributary::DurabilityMode::DeleteOnExit,
     });
 
     let transfers;
@@ -122,7 +122,6 @@ impl Bank {
 fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
-    println!("Connected. Setting up {} accounts.", naccounts);
     {
         for i in 0..naccounts {
             mutator.put(vec![0.into(), i.into(), 1000.into()]).unwrap();
@@ -137,8 +136,6 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
             thread::sleep(time::Duration::new(0, 50000000));
         }
     }
-
-    println!("Done with account creation");
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -164,10 +161,13 @@ fn run_workload(
     runtime: time::Duration,
     mode: ConsistencyMode,
     nwriters: usize,
+    write_interval: Option<time::Duration>,
+    read_interval: Option<time::Duration>,
 ) {
     let readers: Vec<_> = balance_getters
         .into_iter()
         .map(|(mut balances_get, clock)| {
+            let read_interval = read_interval.clone();
             thread::spawn(move || {
                 assert_eq!(
                     mode.needs_transactions(),
@@ -177,6 +177,7 @@ fn run_workload(
                 let mut num_requests = 0;
                 while start.elapsed() < runtime {
                     let account: DataType = t_rng.gen_range(1, naccounts).into();
+                    let read_start = time::Instant::now();
                     match mode {
                         ConsistencyMode::Eventual | ConsistencyMode::Timeline => {
                             balances_get.lookup(&account, true)
@@ -194,16 +195,25 @@ fn run_workload(
                             Ok(rs)
                         }
                     }.unwrap();
+                    let latency = dur_to_ns!(read_start.elapsed());
+                    if read_interval.is_none() {
+                        println!("{}", latency);
+                    }
+
                     num_requests += 1;
+
+                    match read_interval {
+                        Some(interval) => while start.elapsed() / num_requests < interval {},
+                        None => while read_start.elapsed() < time::Duration::from_millis(1) {},
+                    }
                 }
-                (num_requests * NANOS_PER_SEC) as f32 / dur_to_ns!(runtime) as f32
             })
         })
         .collect();
 
     let writers: Vec<_> = (0..nwriters)
-        .map(|_| mutator.clone())
-        .map(|mut mutator| {
+        .map(|_| (mutator.clone(), write_interval.clone()))
+        .map(|(mut mutator, write_interval)| {
             thread::spawn(move || {
                 let mut t_rng = rand::thread_rng();
                 let mut num_requests = 0;
@@ -216,16 +226,24 @@ fn run_workload(
                         .unwrap();
 
                     num_requests += 1;
+
+                    if let Some(d) = write_interval {
+                        while start.elapsed() / num_requests < d {}
+                    }
                 }
-                (num_requests * NANOS_PER_SEC) as f32 / dur_to_ns!(runtime) as f32
+                (num_requests as u64 * NANOS_PER_SEC) as f32 / dur_to_ns!(runtime) as f32
             })
         })
         .collect();
 
-    let reads: f32 = readers.into_iter().map(|j| j.join().unwrap()).sum();
+    for j in readers {
+        j.join().unwrap()
+    }
+
     let writes: f32 = writers.into_iter().map(|j| j.join().unwrap()).sum();
-    println!("{} GET/s", reads);
-    println!("{} PUT/s", writes);
+    if write_interval.is_none() {
+        println!("{} PUT/s", writes);
+    }
 }
 
 fn client(
@@ -538,6 +556,11 @@ fn main() {
                 .takes_value(false)
                 .help("Use deterministic money transfers"),
         )
+        .arg(
+            Arg::with_name("measure_writes")
+                .long("measure_writes")
+                .takes_value(false),
+        )
         .arg(Arg::with_name("mode").long("mode").takes_value(true))
         .after_help(BENCH_USAGE)
         .get_matches();
@@ -576,7 +599,6 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
     // setup db
-    println!("Attempting to set up bank");
     let mut bank = setup(transactions);
 
     {
@@ -591,7 +613,31 @@ fn main() {
     if let Some(mode) = mode {
         let mutator = bank.blender.get_mutator(bank.transfers);
         let balance_getters = vec![(bank.getter(), bank.blender.get_clock())];
-        run_workload(mutator, balance_getters, naccounts, start, runtime, mode, 3);
+        if args.is_present("measure_writes") {
+            run_workload(
+                mutator,
+                balance_getters,
+                naccounts,
+                start,
+                runtime,
+                mode,
+                4,
+                None,
+                Some(time::Duration::from_millis(1)),
+            );
+        } else {
+            run_workload(
+                mutator,
+                balance_getters,
+                naccounts,
+                start,
+                runtime,
+                mode,
+                3,
+                Some(time::Duration::new(0, 16667)),
+                None,
+            );
+        }
         return;
     }
 
