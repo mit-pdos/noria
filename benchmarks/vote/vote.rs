@@ -64,6 +64,13 @@ fn main() {
                 ),
         )
         .arg(
+            Arg::with_name("nmixers")
+                .short("n")
+                .long("mixers")
+                .value_name("N")
+                .help("Number of MIX clients to start"),
+        )
+        .arg(
             Arg::with_name("ngetters")
                 .short("g")
                 .long("getters")
@@ -149,6 +156,13 @@ fn main() {
                 .default_value("512")
                 .help("Size of batches processed at base nodes."),
         )
+        .arg(
+            Arg::with_name("MODE")
+                .index(1)
+                .requires("nmixers")
+                .conflicts_with_all(&["migrate", "stage"])
+                .help("Mode to run clients in [read|write|mix:rw_ratio]"),
+        )
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -162,13 +176,44 @@ fn main() {
     let crossover = args.value_of("crossover")
         .map(|_| value_t_or_exit!(args, "crossover", u64))
         .map(time::Duration::from_secs);
-    let ngetters = value_t_or_exit!(args, "ngetters", usize);
-    let nputters = value_t_or_exit!(args, "nputters", usize);
+    let mut ngetters = value_t_or_exit!(args, "ngetters", usize);
+    let mut nputters = value_t_or_exit!(args, "nputters", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
 
-    assert!(ngetters > 0);
+    let mix = match args.value_of("MODE") {
+        Some("read") => Some(common::Mix::Read(1)),
+        Some("write") => Some(common::Mix::Write(1)),
+        Some(ref mode) if mode.starts_with("mix:") => {
+            // ratio is number of reads per write
+            let ratio = mode.split(':')
+                .skip(1)
+                .next()
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+            Some(common::Mix::RW(ratio, 1))
+        }
+        Some(_) => unreachable!(),
+        None => None,
+    };
+
+    if mix.is_some() {
+        assert!(args.occurrences_of("nputters") == 0);
+        assert!(args.occurrences_of("ngetters") == 0);
+        let nmixers = value_t_or_exit!(args, "nmixers", usize);
+        assert!(nmixers > 0);
+
+        // we can make the code below do what we want by playing a simple trick: use no readers,
+        // and nmixers writers, and then force those writers to also grab a Getter and use the
+        // proper mix.
+        ngetters = 0;
+        nputters = nmixers;
+    } else {
+        assert!(ngetters > 0);
+        assert!(nputters > 0);
+    }
 
     if let Some(ref migrate_after) = migrate_after {
         assert!(migrate_after < &runtime);
@@ -213,6 +258,7 @@ fn main() {
     let putters: Vec<_> = (0..nputters)
         .into_iter()
         .map(|_| {
+            let mix_getter = mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap());
             Spoon {
                 article: putters.0.clone(),
                 vote_pre: putters.1.clone(),
@@ -220,10 +266,12 @@ fn main() {
                 new_vote: new_votes.as_mut().map(|&mut (_, ref mut bus)| bus.add_rx()),
                 x: Crossover::new(crossover),
                 i: 0,
+                mix_getter,
             }
         })
         .collect();
 
+    let put_name = if mix.is_some() { "MIX" } else { "PUT" };
     let put_stats: Vec<_>;
     let get_stats: Vec<_>;
     if stage {
@@ -288,7 +336,10 @@ fn main() {
         let start = sync::Arc::new(sync::Barrier::new(n));
         let barrier = Some(sync::Arc::new(sync::Barrier::new(putters.len() + 1)));
         let mut pconfig = config.clone();
-        pconfig.mix = common::Mix::Write(1);
+        pconfig.mix = match mix {
+            Some(ref mix) => mix.clone(),
+            None => common::Mix::Write(1),
+        };
         let putters: Vec<_> = putters
             .into_iter()
             .enumerate()
@@ -300,9 +351,12 @@ fn main() {
                     // only one thread does prepopulation
                     pconfig.set_reuse(true);
                 }
+                let is_mix = mix.is_some();
                 thread::Builder::new()
-                    .name(format!("PUT{}", i))
-                    .spawn(move || {
+                    .name(format!("{}{}", put_name, i))
+                    .spawn(move || if is_mix {
+                        exercise::launch_mix_wait(p, pconfig, barrier, start)
+                    } else {
                         exercise::launch(
                             None::<exercise::NullClient>,
                             Some(p),
@@ -367,28 +421,32 @@ fn main() {
     }
 
     for (i, s) in put_stats.iter().enumerate() {
-        print_stats(format!("PUT{}", i), true, &s.pre, avg);
+        print_stats(format!("{}{}", put_name, i), true, &s.pre, avg);
     }
     for (i, s) in get_stats.iter().enumerate() {
         print_stats(format!("GET{}", i), true, &s.pre, avg);
     }
     if avg {
-        let sum = put_stats
-            .iter()
-            .fold((0f64, 0usize), |(tot, count), stats| {
-                // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.pre.sum_len();
-                (tot + sum, count + num)
-            });
-        println!("avg PUT: {:.2}", sum.0 as f64 / sum.1 as f64);
-        let sum = get_stats
-            .iter()
-            .fold((0f64, 0usize), |(tot, count), stats| {
-                // TODO: do we *really* want an average of averages?
-                let (sum, num) = stats.pre.sum_len();
-                (tot + sum, count + num)
-            });
-        println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+        if nputters != 0 {
+            let sum = put_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.pre.sum_len();
+                    (tot + sum, count + num)
+                });
+            println!("avg {}: {:.2}", put_name, sum.0 as f64 / sum.1 as f64);
+        }
+        if ngetters != 0 {
+            let sum = get_stats
+                .iter()
+                .fold((0f64, 0usize), |(tot, count), stats| {
+                    // TODO: do we *really* want an average of averages?
+                    let (sum, num) = stats.pre.sum_len();
+                    (tot + sum, count + num)
+                });
+            println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+        }
     }
 
     if migrate_after.is_some() {
@@ -589,6 +647,7 @@ struct Spoon {
     i: usize,
     x: Crossover,
     new_vote: Option<bus::BusReader<Mutator>>,
+    mix_getter: Option<distributary::Getter>,
 }
 
 impl Writer for Spoon {
@@ -709,5 +768,47 @@ impl Reader for Getter {
         } else {
             (res, Period::PostMigration)
         }
+    }
+}
+
+// same for sneaky reader Spoon
+impl Reader for Spoon {
+    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
+        let res = ids.iter()
+            .map(|&(_, article_id)| {
+                self.mix_getter
+                    .as_ref()
+                    .unwrap()
+                    .lookup_map(
+                        &article_id.into(),
+                        |rows| match rows.len() {
+                            0 => ArticleResult::NoSuchArticle,
+                            1 => {
+                                let row = &rows[0];
+                                let id: i64 = row[0].clone().into();
+                                let title: String = row[1].deep_clone().into();
+                                let votes: i64 = match row[2] {
+                                    DataType::None => 42,
+                                    ref d => d.clone().into(),
+                                };
+                                ArticleResult::Article {
+                                    id: id,
+                                    title: title,
+                                    votes: votes,
+                                }
+                            }
+                            _ => unreachable!(),
+                        },
+                        true,
+                    )
+                    .map(|r| {
+                        // r.is_none() if partial and not yet ready
+                        // but that can't happen since we use blocking
+                        r.expect("blocking read returned None")
+                    })
+            })
+            .collect();
+
+        (res, Period::PreMigration)
     }
 }

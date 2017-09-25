@@ -300,6 +300,21 @@ where
     )
 }
 
+pub fn launch_mix_wait<T>(
+    inner: T,
+    config: RuntimeConfig,
+    ready: Option<sync::Arc<sync::Barrier>>,
+    start: sync::Arc<sync::Barrier>,
+) -> BenchmarkResults
+where
+    T: Reader + Writer,
+{
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    let inner = Rc::new(RefCell::new(inner));
+    launch(Some(inner.clone()), Some(inner), config, ready, start)
+}
+
 #[allow(dead_code)]
 pub struct NullClient;
 impl Reader for NullClient {

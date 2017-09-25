@@ -88,7 +88,7 @@ impl FromStr for Distribution {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, Copy)]
 pub enum Mix {
     Write(usize),
     Read(usize),
