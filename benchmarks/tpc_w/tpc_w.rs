@@ -145,46 +145,56 @@ impl Backend {
         self
     }
 
+    fn size(&self, query_name: &str) -> usize {
+        match self.r.node_addr_for(query_name) {
+            Err(_) => panic!("no node for {}!", query_name),
+            Ok(nd) => {
+                let g = self.g.get_getter(nd).unwrap();
+                g.len()
+            }
+        }
+    }
+
     fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32, parallel: bool) -> Option<JoinHandle<()>>{
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
-                    println!("reading {}", query_name);
-                    let g = self.g.get_getter(nd).unwrap();
-                    let query_name = String::from(query_name);
+                println!("reading {}", query_name);
+                let g = self.g.get_getter(nd).unwrap();
+                let query_name = String::from(query_name);
 
-                    let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
-                    let params = keys.generate_parameter(&query_name, num);
+                let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
+                let params = keys.generate_parameter(&query_name, num);
 
-                    let read_view = move || {
-                        let mut ok = 0;
+                let read_view = move || {
+                    let mut ok = 0;
 
-                        let start = time::Instant::now();
-                        for i in 0..num {
-                            match g.lookup(&params[i], true) {
-                                Err(_) => continue,
-                                Ok(datas) => if datas.len() > 0 {
-                                    ok += 1;
-                                },
-                            }
+                    let start = time::Instant::now();
+                    for i in 0..num {
+                        match g.lookup(&params[i], true) {
+                            Err(_) => continue,
+                            Ok(datas) => if datas.len() > 0 {
+                                ok += 1;
+                            },
                         }
-                        let dur = dur_to_fsec!(start.elapsed());
-                        println!(
-                            "{}: ({:.2} GETs/sec) (ok: {})!",
-                            query_name,
-                            f64::from(num as i32) / dur,
-                            ok
-                        );
-                    };
-
-                    if parallel {
-                        Some(thread::spawn(move || {
-                            read_view();
-                        }))
-                    } else {
-                        read_view();
-                        None
                     }
+                    let dur = dur_to_fsec!(start.elapsed());
+                    println!(
+                        "{}: ({:.2} GETs/sec) (ok: {})!",
+                        query_name,
+                        f64::from(num as i32) / dur,
+                        ok
+                    );
+                };
+
+                if parallel {
+                    Some(thread::spawn(move || {
+                        read_view();
+                    }))
+                } else {
+                    read_view();
+                    None
+                }
             }
         }
     }
@@ -382,6 +392,19 @@ fn main() {
                 Some(jh) => jh.join().unwrap(),
                 None => continue,
             }
+        }
+
+        println!("Checking size of leaf views...");
+        for nq in backend.r.aliases() {
+            let populated = backend.size(nq);
+            let total = keys.key_space(nq);
+            let ratio = (populated as f32) / (total as f32);
+
+            println!("{}: {} of {} keys populated ({})",
+                nq,
+                populated,
+                total,
+                ratio);
         }
     }
 

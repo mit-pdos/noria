@@ -1,6 +1,7 @@
 use rand;
 use rand::Rng;
 use distributary::DataType;
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
@@ -78,6 +79,44 @@ impl SampleKeys {
         }
 
         params
+    }
+
+    pub fn key_space(&mut self, query_name: &str) -> usize {
+        let dedup = |mut vec: Vec<_>| -> usize {
+            let set: HashSet<_> = vec.drain(..).collect(); // dedup
+            set.len()
+        };
+
+        match query_name {
+            "getName" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
+            "getBook" => dedup(self.item.iter().map(|x| x[0].clone()).collect()),
+            "getCustomer" => dedup(self.customer.iter().map(|x| x[1].clone()).collect()),
+            "doSubjectSearch" => dedup(self.item.iter().map(|x| x[1].clone()).collect()),
+            "getNewProducts" => dedup(self.item.iter().map(|x| x[1].clone()).collect()),
+            "getUserName" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
+            "getPassword" => dedup(self.customer.iter().map(|x| x[1].clone()).collect()),
+            "getRelated1" => dedup(self.item.iter().map(|x| x[0].clone()).collect()),
+            "getMostRecentOrderId" => dedup(self.customer.iter().map(|x| x[1].clone()).collect()),
+            "getMostRecentOrderOrder" => dedup(self.order.iter().map(|x| x[0].clone()).collect()),
+            "getMostRecentOrderLines" => dedup(self.order_line.iter().map(|x| x[0].clone()).collect()),
+            "createEmptyCart" => 0,
+            "addItem" => dedup(self.item.iter().map(|x| x[0].clone()).collect()), // XXX(malte): dual parameter query, need SCL ID range
+            "addRandomItemToCartIfNecessary" => dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect()),
+            "getCart" => dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect()),
+            "createNewCustomerMaxId" => 0,
+            "getCDiscount" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
+            "getCAddrId" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
+            "getCAddr" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
+            "enterAddressId" => dedup(self.country.iter().map(|x| x[0].clone()).collect()),
+            "enterAddressMaxId" => 0,
+            "enterOrderMaxId" => 0,
+            "getStock" => dedup(self.item.iter().map(|x| x[0].clone()).collect()),
+            "verifyDBConsistencyCustId" => 0,
+            "verifyDBConsistencyItemId" => 0,
+            "verifyDBConsistencyAddrId" => 0,
+            "getBestSellers" => dedup(self.item.iter().map(|x| x[1].clone()).collect()),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn keys_size(&mut self, query_name: &str) -> usize {
@@ -172,8 +211,6 @@ impl SampleKeys {
     pub fn get_order_lines(&mut self, data_location: &str) {
         let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
         let mut reader = BufReader::new(f);
-
-        println!("Prepopulating order_line...");
 
         let mut s = String::new();
         while reader.read_line(&mut s).unwrap() > 0 {
