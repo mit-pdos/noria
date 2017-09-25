@@ -156,7 +156,7 @@ impl ConsistencyMode {
 
 fn run_workload(
     mutator: Mutator,
-    balance_getters: Vec<(distributary::Getter, Box<Fn() -> i64 + Send>)>,
+    balance_getters: Vec<(distributary::Getter, Box<Fn(&distributary::Token) -> bool + Send>)>,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -167,7 +167,7 @@ fn run_workload(
 ) {
     let readers: Vec<_> = balance_getters
         .into_iter()
-        .map(|(mut balances_get, clock)| {
+        .map(|(mut balances_get, validator)| {
             let read_interval = read_interval.clone();
             thread::spawn(move || {
                 assert_eq!(
@@ -184,10 +184,9 @@ fn run_workload(
                             balances_get.lookup(&account, true)
                         }
                         ConsistencyMode::Linearizable => {
-                            let ts = clock();
                             let (mut rs, mut token) =
                                 balances_get.transactional_lookup(&account).unwrap();
-                            while token.get_timestamp() < ts {
+                            while !validator(&token) {
                                 if let Ok(r) = balances_get.transactional_lookup(&account) {
                                     rs = r.0;
                                     token = r.1;
@@ -620,7 +619,7 @@ fn main() {
 
     if let Some(mode) = mode {
         let mutator = bank.blender.get_mutator(bank.transfers);
-        let balance_getters = vec![(bank.getter(), bank.blender.get_clock())];
+        let balance_getters = vec![(bank.getter(), bank.blender.get_validator())];
         if args.is_present("measure_writes") {
             run_workload(
                 mutator,

@@ -204,7 +204,7 @@ impl Blender {
     }
 
     /// Get a boxed function which can be used to validate tokens.
-    pub fn get_validator(&self) -> Box<Fn(&checktable::Token) -> bool> {
+    pub fn get_validator(&self) -> Box<Fn(&checktable::Token) -> bool + Send> {
         let checktable = self.checktable.clone();
         Box::new(move |t: &checktable::Token| {
             checktable.lock().unwrap().validate_token(t)
