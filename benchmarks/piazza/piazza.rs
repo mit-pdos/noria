@@ -5,7 +5,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, DataType, Recipe};
+use distributary::{Blender, DataType, Recipe, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -17,13 +17,29 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn new() -> Backend {
+    pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
         let mut g = Blender::new();
         let log = distributary::logger_pls();
         let blender_log = log.clone();
         g.log_with(blender_log);
 
-        let recipe = Recipe::blank(Some(log.clone()));
+        let mut recipe = Recipe::blank(Some(log.clone()));
+
+        if !partial {
+            g.disable_partial();
+        }
+
+        if !shard {
+            g.disable_sharding();
+        }
+
+        match reuse.as_ref() {
+            "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
+            "full" => recipe.enable_reuse(ReuseConfigType::Full),
+            "noreuse" => recipe.enable_reuse(ReuseConfigType::NoReuse),
+            "relaxed" => recipe.enable_reuse(ReuseConfigType::Relaxed),
+            _ => panic!("reuse configuration not supported"),
+        }
 
         Backend {
             recipe: Some(recipe),
@@ -149,6 +165,23 @@ fn main() {
                 .default_value("pgraph.gv")
                 .help("File to dump application's soup graph, if set"),
         )
+        .arg(
+            Arg::with_name("reuse")
+                .long("reuse")
+                .default_value("finkelstein")
+                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
+                .help("Query reuse algorithm"),
+        )
+        .arg(
+            Arg::with_name("shard")
+                .long("shard")
+                .help("Enable sharding"),
+        )
+        .arg(
+            Arg::with_name("partial")
+                .long("partial")
+                .help("Enable partial materialization"),
+        )
         .get_matches();
 
 
@@ -159,10 +192,13 @@ fn main() {
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
     let gloc = args.value_of("graph");
+    let partial = args.is_present("partial");
+    let shard = args.is_present("shard");
+    let reuse = args.value_of("reuse").unwrap();
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
-    let mut backend = Backend::new();
+    let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
 
     // Login a user
