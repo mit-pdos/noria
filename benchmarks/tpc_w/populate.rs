@@ -370,7 +370,12 @@ pub fn populate_orders(backend: &Backend, data_location: &str) -> usize {
     populate(backend, "orders", records)
 }
 
-pub fn populate_order_line(backend: &Backend, data_location: &str, write: f32, start: bool) -> usize {
+pub fn populate_order_line(
+    backend: &Backend,
+    data_location: &str,
+    write: f32,
+    start: bool,
+) -> usize {
     let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 

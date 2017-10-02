@@ -59,7 +59,14 @@ fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
     queries
 }
 
-fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query: bool, disable_partial: bool, reuse: &str) -> Backend {
+fn make(
+    recipe_location: &str,
+    transactions: bool,
+    parallel: bool,
+    single_query: bool,
+    disable_partial: bool,
+    reuse: &str,
+) -> Backend {
     use std::io::Read;
     use std::fs::File;
 
@@ -122,14 +129,12 @@ impl Backend {
 
         let new_recipe = {
             let r = self.r;
-            self.g.migrate(|mig| {
-                match r.extend(query) {
-                    Ok(mut recipe) => {
-                        recipe.activate(mig, transactions).unwrap();
-                        recipe
-                    }
-                    Err(e) => panic!(e),
+            self.g.migrate(|mig| match r.extend(query) {
+                Ok(mut recipe) => {
+                    recipe.activate(mig, transactions).unwrap();
+                    recipe
                 }
+                Err(e) => panic!(e),
             })
         };
 
@@ -150,7 +155,13 @@ impl Backend {
         }
     }
 
-    fn read(&self, keys: &mut SampleKeys, query_name: &str, read_scale: f32, parallel: bool) -> Option<JoinHandle<()>>{
+    fn read(
+        &self,
+        keys: &mut SampleKeys,
+        query_name: &str,
+        read_scale: f32,
+        parallel: bool,
+    ) -> Option<JoinHandle<()>> {
         match self.r.node_addr_for(query_name) {
             Err(_) => panic!("no node for {}!", query_name),
             Ok(nd) => {
@@ -254,32 +265,32 @@ fn main() {
             Arg::with_name("read")
                 .long("read")
                 .default_value("0.00")
-                .help("Reads % of keys for each query")
+                .help("Reads % of keys for each query"),
         )
         .arg(
             Arg::with_name("write_to")
                 .long("write_to")
                 .possible_values(&["item", "author", "order_line"])
                 .default_value("item")
-                .help("Base table to write to")
+                .help("Base table to write to"),
         )
         .arg(
             Arg::with_name("write")
                 .long("write")
                 .short("w")
                 .default_value("1.00")
-                .help("Writes % before reads and (1-%) after reads")
+                .help("Writes % before reads and (1-%) after reads"),
         )
         .arg(
             Arg::with_name("random")
                 .long("random")
                 .help("Adds queries in random order")
-                .requires("single_query_migration")
+                .requires("single_query_migration"),
         )
         .arg(
             Arg::with_name("parallel_read")
                 .long("parallel_read")
-                .help("Reads using parallel threads")
+                .help("Reads using parallel threads"),
         )
         .get_matches();
 
@@ -292,7 +303,7 @@ fn main() {
     let gloc = matches.value_of("gloc");
     let disable_partial = matches.is_present("disable_partial");
     let read_scale = value_t_or_exit!(matches, "read", f32);
-    let write_to =matches.value_of("write_to").unwrap();
+    let write_to = matches.value_of("write_to").unwrap();
     let write = value_t_or_exit!(matches, "write", f32);
     let reuse = matches.value_of("reuse").unwrap();
     let random = matches.is_present("random");
@@ -302,14 +313,21 @@ fn main() {
     }
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(&rloc, transactions, parallel_prepop, single_query, disable_partial, reuse);
+    let mut backend = make(
+        &rloc,
+        transactions,
+        parallel_prepop,
+        single_query,
+        disable_partial,
+        reuse,
+    );
 
     println!("Prepopulating from data files in {}", ploc);
     let (item_write, author_write, order_line_write) = match write_to.as_ref() {
         "item" => (write, 1.0, 1.0),
         "author" => (1.0, write, 1.0),
         "order_line" => (1.0, 1.0, write),
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     let num_addr = populate_addresses(&backend, &ploc);
@@ -369,14 +387,14 @@ fn main() {
         println!("Reading...");
         let mut keys = SampleKeys::new(&ploc, item_write, order_line_write);
         let item_queries = [
-                            "getBestSellers",
-                            "getMostRecentOrderLines",
-                            "getBook",
-                            "doSubjectSearch",
-                            "getNewProducts",
-                            "getRelated1",
-                            "getCart",
-                            "verifyDBConsistencyItemId"
+            "getBestSellers",
+            "getMostRecentOrderLines",
+            "getBook",
+            "doSubjectSearch",
+            "getNewProducts",
+            "getRelated1",
+            "getCart",
+            "verifyDBConsistencyItemId",
         ];
         let mut handles = Vec::new();
         for nq in item_queries.iter() {
@@ -396,11 +414,13 @@ fn main() {
             let total = keys.key_space(nq);
             let ratio = (populated as f32) / (total as f32);
 
-            println!("{}: {} of {} keys populated ({})",
+            println!(
+                "{}: {} of {} keys populated ({})",
                 nq,
                 populated,
                 total,
-                ratio);
+                ratio
+            );
         }
     }
 

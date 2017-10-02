@@ -79,9 +79,7 @@ fn main() {
 
     let args = App::new("vote")
         .version("0.1")
-        .about(
-            "Benchmarks user-curated news aggregator throughput for in-memory Soup",
-        )
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
         .arg(
             Arg::with_name("distribution")
                 .short("d")
