@@ -97,9 +97,7 @@ fn main() {
                 .require_equals(true)
                 .min_values(0)
                 .default_value("-")
-                .help(
-                    "produce a CDF of recorded latencies for each client at the end",
-                ),
+                .help("produce a CDF of recorded latencies for each client at the end"),
         )
         .arg(
             Arg::with_name("narticles")

@@ -62,7 +62,13 @@ impl C {
             builder.build()
         });
 
-        Ok(getter.lookup(keys, true).into_iter().map(|rs| rs.unwrap_or_default()).collect())
+        Ok(
+            getter
+                .lookup(keys, true)
+                .into_iter()
+                .map(|rs| rs.unwrap_or_default())
+                .collect(),
+        )
     }
 }
 
