@@ -136,9 +136,12 @@ fn main() {
     let matches = App::new("hotsoup")
         .version("0.1")
         .about("Soupy conference management system for your HotCRP needs.")
-        .arg(Arg::with_name("graphs").short("g").value_name("DIR").help(
-            "Directory to dump graphs for each schema version into (if set).",
-        ))
+        .arg(
+            Arg::with_name("graphs")
+                .short("g")
+                .value_name("DIR")
+                .help("Directory to dump graphs for each schema version into (if set)."),
+        )
         .arg(
             Arg::with_name("populate_from")
                 .short("p")
@@ -180,9 +183,7 @@ fn main() {
             Arg::with_name("populate_at")
                 .default_value("11")
                 .long("populate_at")
-                .help(
-                    "Schema version to populate database at; must be compatible with test data.",
-                ),
+                .help("Schema version to populate database at; must be compatible with test data."),
         )
         .arg(
             Arg::with_name("reuse")
@@ -195,17 +196,13 @@ fn main() {
             Arg::with_name("start_at")
                 .default_value("1")
                 .long("start_at")
-                .help(
-                    "Schema version to start at; versions prior to this will be skipped.",
-                ),
+                .help("Schema version to start at; versions prior to this will be skipped."),
         )
         .arg(
             Arg::with_name("stop_at")
                 .default_value("161")
                 .long("stop_at")
-                .help(
-                    "Schema version to stop at; versions after this will be skipped.",
-                ),
+                .help("Schema version to stop at; versions after this will be skipped."),
         )
         .arg(
             Arg::with_name("base_only")

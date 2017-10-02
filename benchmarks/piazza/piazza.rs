@@ -127,9 +127,7 @@ fn main() {
     use clap::{App, Arg};
     let args = App::new("piazza")
         .version("0.1")
-        .about(
-            "Benchmarks Piazza-like application with some security policies.",
-        )
+        .about("Benchmarks Piazza-like application with some security policies.")
         .arg(
             Arg::with_name("nclasses")
                 .short("c")
