@@ -164,7 +164,6 @@ impl Writer for RW {
 impl Reader for RW {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         use memcached::proto::MultiOperation;
-        use std::str;
 
         let keys: Vec<_> = ids.iter()
             .map(|&(_, ref article_id)| format!("article_{}_vc", article_id))
@@ -206,7 +205,7 @@ impl Reader for RW {
                 .collect::<Vec<_>>()
                 .join(" UNION ");
             for row in self.conn.query(qstring).unwrap() {
-                let mut rr = row.unwrap();
+                let rr = row.unwrap();
                 let id = rr.get(0).unwrap();
                 let title = rr.get(1).unwrap();
                 let vc = rr.get(2).unwrap();
