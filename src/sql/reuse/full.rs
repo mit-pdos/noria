@@ -1,6 +1,6 @@
 use sql::reuse::{ReuseConfiguration, ReuseType};
 use sql::query_graph::QueryGraph;
-use mir::MirQuery;
+use mir::query::MirQuery;
 
 use std::vec::Vec;
 use std::collections::HashMap;
@@ -16,9 +16,14 @@ impl ReuseConfiguration for Full {
         _qg: &QueryGraph,
         query_graphs: &'a HashMap<u64, (QueryGraph, MirQuery)>,
     ) -> Vec<(ReuseType, &'a QueryGraph)> {
-        query_graphs
-            .values()
-            .map(|c| (ReuseType::DirectExtension, &c.0))
+        // sort keys to make reuse deterministic
+        let mut sorted_keys: Vec<u64> = query_graphs
+                            .keys()
+                            .cloned()
+                            .collect();
+        sorted_keys.sort();
+        sorted_keys.iter()
+            .map(|k| (ReuseType::DirectExtension, &query_graphs[k].0))
             .collect()
     }
 }

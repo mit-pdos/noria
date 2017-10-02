@@ -7,7 +7,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, Recipe};
+use distributary::{Blender, Recipe, ReuseConfigType};
 
 pub struct Backend {
     blacklist: Vec<String>,
@@ -16,7 +16,7 @@ pub struct Backend {
     g: Blender,
 }
 
-fn make(blacklist: &str) -> Box<Backend> {
+fn make(blacklist: &str, reuse: ReuseConfigType, sharding: bool, partial: bool) -> Box<Backend> {
     use std::io::Read;
     use std::fs::File;
 
@@ -35,8 +35,15 @@ fn make(blacklist: &str) -> Box<Backend> {
     let log = distributary::logger_pls();
     let blender_log = log.clone();
     g.log_with(blender_log);
+    if !sharding {
+        g.disable_sharding();
+    }
+    if !partial {
+        g.disable_partial();
+    }
 
-    let recipe = Recipe::blank(Some(log.clone()));
+    let mut recipe = Recipe::blank(Some(log.clone()));
+    recipe.enable_reuse(reuse);
     Box::new(Backend {
         blacklist: blacklisted_queries,
         r: Some(recipe),
@@ -56,66 +63,64 @@ impl Backend {
         use std::fs::File;
 
         let ref blacklist = self.blacklist;
-        // migrate
-        let mut mig = self.g.start_migration();
-
-        let mut sf = File::open(schema_file).unwrap();
-        let mut s = String::new();
-
-        let mut blacklisted = 0;
-
-        // load schema
-        sf.read_to_string(&mut s).unwrap();
-        // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
-        let mut rs = s.lines()
-            .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
-            .take_while(|l| !l.contains("insert"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        // load queries and concatenate them onto the table definitions from the schema
-        s.clear();
-
-        match query_file {
-            None => (),
-            Some(qf) => {
-                let mut qf = File::open(qf).unwrap();
-                qf.read_to_string(&mut s).unwrap();
-                rs.push_str("\n");
-                rs.push_str(&s.lines()
-                    .filter(|ref l| {
-                        // make sure to skip blacklisted queries
-                        for ref q in blacklist {
-                            if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
-                                blacklisted += 1;
-                                return false;
-                            }
-                        }
-                        true
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"))
-            }
-        }
-
-        info!(self.log, "Ignored {} blacklisted queries", blacklisted);
-
-        let new_recipe = Recipe::from_str(&rs, Some(self.log.clone()))?;
+        let log = &mut self.log;
         let cur_recipe = self.r.take().unwrap();
-        let updated_recipe = match cur_recipe.replace(new_recipe) {
-            Ok(mut recipe) => {
-                match recipe.activate(&mut mig, transactions) {
-                    Ok(ar) => {
-                        info!(self.log, "{} expressions added", ar.expressions_added);
-                        info!(self.log, "{} expressions removed", ar.expressions_removed);
-                    }
-                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
-                };
-                recipe
-            }
-            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
-        };
+        let updated_recipe = self.g.migrate(|mig| {
+            let mut sf = File::open(schema_file).unwrap();
+            let mut s = String::new();
 
-        mig.commit();
+            let mut blacklisted = 0;
+
+            // load schema
+            sf.read_to_string(&mut s).unwrap();
+            // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
+            let mut rs = s.lines()
+                .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
+                .take_while(|l| !l.contains("insert"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            // load queries and concatenate them onto the table definitions from the schema
+            s.clear();
+
+            match query_file {
+                None => (),
+                Some(qf) => {
+                    let mut qf = File::open(qf).unwrap();
+                    qf.read_to_string(&mut s).unwrap();
+                    rs.push_str("\n");
+                    rs.push_str(&s.lines()
+                        .filter(|ref l| {
+                            // make sure to skip blacklisted queries
+                            for ref q in blacklist {
+                                if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
+                                    blacklisted += 1;
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                }
+            }
+
+            info!(log, "Ignored {} blacklisted queries", blacklisted);
+
+            let new_recipe = Recipe::from_str(&rs, Some(log.clone()))?;
+            match cur_recipe.replace(new_recipe) {
+                Ok(mut recipe) => {
+                    match recipe.activate(mig, transactions) {
+                        Ok(ar) => {
+                            info!(log, "{} expressions added", ar.expressions_added);
+                            info!(log, "{} expressions removed", ar.expressions_removed);
+                        }
+                        Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                    };
+                    Ok(recipe)
+                }
+                Err(e) => return Err(format!("failed to replace recipe: {}", e)),
+            }
+        })?;
         self.r = Some(updated_recipe);
         Ok(())
     }
@@ -162,12 +167,29 @@ fn main() {
                 .help("File with blacklisted queries to skip."),
         )
         .arg(
+            Arg::with_name("no-partial")
+                .long("no-partial")
+                .help("Disable partial materialization"),
+        )
+        .arg(
+            Arg::with_name("no-sharding")
+                .long("no-sharding")
+                .help("Disable partial materialization"),
+        )
+        .arg(
             Arg::with_name("populate_at")
                 .default_value("11")
                 .long("populate_at")
                 .help(
                     "Schema version to populate database at; must be compatible with test data.",
                 ),
+        )
+        .arg(
+            Arg::with_name("reuse")
+                .long("reuse")
+                .default_value("finkelstein")
+                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
+                .help("Query reuse algorithm to use."),
         )
         .arg(
             Arg::with_name("start_at")
@@ -204,11 +226,20 @@ fn main() {
     let dataloc = matches.value_of("populate_from").unwrap();
     let transactional = matches.is_present("transactional");
     let base_only = matches.is_present("base_only");
+    let reuse = match matches.value_of("reuse").unwrap() {
+        "finkelstein" => ReuseConfigType::Finkelstein,
+        "full" => ReuseConfigType::Full,
+        "noreuse" => ReuseConfigType::NoReuse,
+        "relaxed" => ReuseConfigType::Relaxed,
+        _ => panic!("reuse configuration not supported"),
+    };
+    let disable_sharding = matches.is_present("no-sharding");
+    let disable_partial = matches.is_present("no-partial");
     let start_at_schema = value_t_or_exit!(matches, "start_at", u64);
     let stop_at_schema = value_t_or_exit!(matches, "stop_at", u64);
     let populate_at_schema = value_t_or_exit!(matches, "populate_at", u64);
 
-    let mut backend = make(blloc);
+    let mut backend = make(blloc, reuse, !disable_sharding, !disable_partial);
 
     let mut query_files = Vec::new();
     let mut schema_files = Vec::new();

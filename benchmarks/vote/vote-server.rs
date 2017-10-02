@@ -31,7 +31,7 @@ fn main() {
         512,
         time::Duration::from_millis(1),
     );
-    let g = graph::make(true, false, persistence_params);
+    let g = graph::make(graph::Setup::default().with_logging(), persistence_params);
 
     // start processing
     // TODO: what about the node indices?

@@ -263,18 +263,18 @@ impl Materializations {
 
                 if self.have
                     .entry(mi)
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(columns.clone())
                 {
                     // also add a replay obligation to enable partial
                     replay_obligations
                         .entry(mi)
-                        .or_insert_with(HashSet::new)
+                        .or_default()
                         .insert(columns.clone());
 
                     self.added
                         .entry(mi)
-                        .or_insert_with(HashSet::new)
+                        .or_default()
                         .insert(columns);
                 }
             }
@@ -400,7 +400,7 @@ impl Materializations {
                 self.partial.insert(ni);
                 warn!(self.log, "using partial materialization for {}", ni.index());
                 for (mi, indices) in add {
-                    let m = replay_obligations.entry(mi).or_insert_with(HashSet::new);
+                    let m = replay_obligations.entry(mi).or_default();
                     for index in indices {
                         m.insert(index);
                     }
@@ -426,7 +426,7 @@ impl Materializations {
                         // about new partial replay paths sourced from this node.
                         self.added
                             .entry(ni)
-                            .or_insert_with(HashSet::new)
+                            .or_default()
                             .insert(index);
                     }
                 }
@@ -522,7 +522,7 @@ impl Materializations {
                 self.setup(node, &mut index_on, graph, &empty, domains);
                 mem::replace(&mut self.log, log);
                 index_on.clear();
-            } else if n.sharded_by() != Sharding::None {
+            } else if !n.sharded_by().is_none() {
                 // what do we even do here?!
                 crit!(self.log, "asked to add index to sharded node";
                            "node" => node.index(),
@@ -702,34 +702,33 @@ impl Materializations {
             plan.finalize()
         };
 
-        trace!(self.log, "all domains ready for replay");
+        if !pending.is_empty() {
+            trace!(self.log, "all domains ready for replay");
 
-        // prepare for, start, and wait for replays
-        for pending in pending {
-            // tell the first domain to start playing
-            trace!(self.log, "telling root domain to start replay";
+            // prepare for, start, and wait for replays
+            for pending in pending {
+                // tell the first domain to start playing
+                trace!(self.log, "telling root domain to start replay";
                    "domain" => pending.source_domain.index());
 
-            domains
-                .get_mut(&pending.source_domain)
-                .unwrap()
-                .send(box Packet::StartReplay {
-                    tag: pending.tag,
-                    from: pending.source,
-                })
-                .unwrap();
+                domains
+                    .get_mut(&pending.source_domain)
+                    .unwrap()
+                    .send(box Packet::StartReplay {
+                        tag: pending.tag,
+                        from: pending.source,
+                    })
+                    .unwrap();
+            }
 
             // and then wait for the last domain to receive all the records
+            let target = graph[ni].domain();
             trace!(self.log,
                "waiting for done message from target";
-               "domain" => pending.target_domain.index()
+               "domain" => target.index(),
             );
 
-            domains
-                .get_mut(&pending.target_domain)
-                .unwrap()
-                .wait_for_ack()
-                .unwrap();
+            domains.get_mut(&target).unwrap().wait_for_ack().unwrap();
         }
     }
 }

@@ -45,6 +45,19 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
+    pub fn cdf(&self) -> Option<&(Histogram<u64>, Histogram<u64>)> {
+        self.samples.as_ref()
+    }
+
+    pub fn merged_cdf(&self) -> Option<Histogram<u64>> {
+        self.samples.as_ref().map(|&(ref r, ref w)| {
+            let mut h = r.clone();
+            h.auto(true);
+            h += w;
+            h
+        })
+    }
+
     pub fn cdf_percentiles(
         &self,
     ) -> Option<
@@ -174,7 +187,7 @@ where
                     (true, w.as_mut().unwrap().vote(&batch[..bs]))
                 };
                 let t = (dur_to_ns!(t.elapsed()) / 1000) as u64;
-                if stats.record_latency(read, period, t).is_err() {
+                if stats.record_latency(read, period, t / bs as u64).is_err() {
                     let desc = if read { "GET" } else { "PUT" };
                     println!("failed to record slow {} ({}μs)", desc, t);
                 }
@@ -298,6 +311,21 @@ where
         None,
         sync::Arc::new(sync::Barrier::new(1)),
     )
+}
+
+pub fn launch_mix_wait<T>(
+    inner: T,
+    config: RuntimeConfig,
+    ready: Option<sync::Arc<sync::Barrier>>,
+    start: sync::Arc<sync::Barrier>,
+) -> BenchmarkResults
+where
+    T: Reader + Writer,
+{
+    use std::rc::Rc;
+    use std::cell::RefCell;
+    let inner = Rc::new(RefCell::new(inner));
+    launch(Some(inner.clone()), Some(inner), config, ready, start)
 }
 
 #[allow(dead_code)]

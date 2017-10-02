@@ -17,6 +17,7 @@ pub(crate) struct Plan<'a> {
     partial: bool,
 
     tags: HashMap<Vec<usize>, Vec<(Tag, domain::Index)>>,
+    paths: HashMap<Tag, Vec<NodeIndex>>,
     pending: Vec<PendingReplay>,
 }
 
@@ -48,6 +49,7 @@ impl<'a> Plan<'a> {
 
             pending: Vec::new(),
             tags: Default::default(),
+            paths: Default::default(),
         }
     }
 
@@ -112,13 +114,20 @@ impl<'a> Plan<'a> {
     /// paths about them. It also notes if any data backfills will need to be run, which is
     /// eventually reported back by `finalize`.
     pub fn add(&mut self, index_on: Vec<usize>) {
-        // TODO: what if we have two paths with the same source because of a fork-join? we'd need
-        // to buffer somewhere to avoid splitting pieces...
+        if !self.partial && !self.paths.is_empty() {
+            // non-partial views should not have one replay path per index. that would cause us to
+            // replay several times, even though one full replay should always be sufficient.
+            // we do need to keep track of the fact that there should be an index here though.
+            self.tags.entry(index_on).or_default();
+            return;
+        }
 
         // inform domains about replay paths
         let mut tags = Vec::new();
         for path in self.paths(&index_on[..]) {
             let tag = self.m.next_tag();
+            self.paths
+                .insert(tag, path.iter().map(|&(ni, _)| ni).collect());
 
             // what key are we using for partial materialization (if any)?
             let mut partial = None;
@@ -143,7 +152,7 @@ impl<'a> Plan<'a> {
                         self.m
                             .domains_on_path
                             .entry(tag.clone())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(domain);
                     }
                 }
@@ -288,7 +297,7 @@ impl<'a> Plan<'a> {
 
         self.tags
             .entry(index_on)
-            .or_insert_with(Vec::new)
+            .or_default()
             .extend(tags);
     }
 
@@ -301,33 +310,28 @@ impl<'a> Plan<'a> {
     pub fn finalize(mut self) -> Vec<PendingReplay> {
         use flow::payload::InitialState;
 
-        let tags: usize = self.tags.values().map(|ts| ts.len()).sum();
-
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
         // mutable references to taken state.
         let s = self.graph[self.node]
             .with_reader(|r| {
                 // we need to make sure there's an entry in readers for this reader!
-                match self.graph[self.node].sharded_by() {
-                    Sharding::None => {
-                        self.m
-                            .readers
-                            .lock()
-                            .unwrap()
-                            .insert(self.node, ReadHandle::Singleton(None));
+                if self.graph[self.node].sharded_by().is_none() {
+                    self.m
+                        .readers
+                        .lock()
+                        .unwrap()
+                        .insert(self.node, ReadHandle::Singleton(None));
+                } else {
+                    use arrayvec::ArrayVec;
+                    let mut shards = ArrayVec::new();
+                    for _ in 0..::SHARDS {
+                        shards.push(None);
                     }
-                    _ => {
-                        use arrayvec::ArrayVec;
-                        let mut shards = ArrayVec::new();
-                        for _ in 0..::SHARDS {
-                            shards.push(None);
-                        }
-                        self.m
-                            .readers
-                            .lock()
-                            .unwrap()
-                            .insert(self.node, ReadHandle::Sharded(shards));
-                    }
+                    self.m
+                        .readers
+                        .lock()
+                        .unwrap()
+                        .insert(self.node, ReadHandle::Sharded(shards));
                 }
 
                 if self.partial {
@@ -387,10 +391,23 @@ impl<'a> Plan<'a> {
             .unwrap();
 
         if !self.partial {
-            // TODO: I'm like 90% sure this is incorrect.
-            // If we add multiple indices to a single view, we should still only replay once.
-            // The only case where more than one replay per view is correct is when we have unions.
-            assert_eq!(self.pending.len(), tags);
+            // we know that this must be a *new* fully materialized node:
+            //
+            //  - finalize() is only called by setup()
+            //  - setup() is only called for existing nodes if they are partial
+            //  - this branch has !self.partial
+            //
+            // if we're constructing a new view, there is no reason to replay any given path more
+            // than once. we do need to be careful here though: the fact that the source and
+            // destination of a path are the same does *not* mean that the path is the same (b/c of
+            // unions), and we do not want to eliminate different paths!
+            let mut distinct_paths = HashSet::new();
+            let paths = &self.paths;
+            self.pending.retain(|p| {
+                // keep if this path is different
+                distinct_paths.insert(&paths[&p.tag])
+            });
+            assert!(!self.pending.is_empty());
         } else {
             assert!(self.pending.is_empty());
         }

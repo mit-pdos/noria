@@ -104,7 +104,11 @@ fn main() {
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // setup db
-    let mut g = graph::make(false, false, persistence_params);
+    let mut s = graph::Setup::default();
+    s.stupid = args.is_present("stupid");
+    s.partial = !args.is_present("full");
+    s.sharding = !args.is_present("unsharded");
+    let mut g = graph::make(s, persistence_params);
 
     if let Some(n) = concurrent_replays {
         g.graph.set_max_concurrent_replay(n);
@@ -114,16 +118,6 @@ fn main() {
     }
     if let Some(t) = replay_timeout {
         g.graph.set_partial_replay_batch_timeout(t);
-    }
-
-    if args.is_present("full") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_partial();
-    }
-
-    if args.is_present("unsharded") {
-        // it's okay to change this here, since it only matters for migration
-        g.graph.disable_sharding();
     }
 
     // we need a putter and a getter
@@ -151,7 +145,7 @@ fn main() {
     if !args.is_present("quiet") {
         println!("Migrating...");
     }
-    let (ratings, read_new) = g.transition(args.is_present("stupid"), false);
+    let (ratings, read_new) = g.transition();
     let mut ratings = g.graph.get_mutator(ratings);
     let read_new = g.graph.get_getter(read_new).unwrap();
 

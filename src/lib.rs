@@ -318,6 +318,7 @@
 #![feature(box_patterns)]
 #![feature(box_syntax)]
 #![feature(conservative_impl_trait)]
+#![feature(entry_or_default)]
 #![deny(missing_docs)]
 
 /// The number of domain threads to spin up for each sharded subtree of the data-flow graph.
@@ -414,6 +415,7 @@ pub use ops::filter::{Filter, Operator};
 pub use ops::topk::TopK;
 pub use recipe::{ActivationResult, Recipe};
 pub use sql::{SqlIncorporator, ToFlowParts};
+pub use sql::reuse::ReuseConfigType;
 
 /// Just give me a damn terminal logger
 pub fn logger_pls() -> slog::Logger {

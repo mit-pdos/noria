@@ -97,6 +97,13 @@ impl PartialOrd for OutputColumn {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct JoinRef {
+    pub src: String,
+    pub dst: String,
+    pub index: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct QueryGraphNode {
     pub rel_name: String,
     pub predicates: Vec<ConditionExpression>,
@@ -120,6 +127,9 @@ pub struct QueryGraph {
     /// Final set of projected columns in this query; may include literals in addition to the
     /// columns reflected in individual relations' `QueryGraphNode` structures.
     pub columns: Vec<OutputColumn>,
+    /// Establishes an order for join predicates. Each join predicate can be identified by
+    /// its (src, dst) pair, and its index in the array of predicates.
+    pub join_order: Vec<JoinRef>,
 }
 
 impl QueryGraph {
@@ -128,6 +138,7 @@ impl QueryGraph {
             relations: HashMap::new(),
             edges: HashMap::new(),
             columns: Vec::new(),
+            join_order: Vec::new(),
         }
     }
 
@@ -294,10 +305,10 @@ fn classify_conditionals(
                             right: Box::new(ces.last().unwrap().clone()),
                         });
 
-                        let e = local.entry(t.to_string()).or_insert(Vec::new());
+                        let e = local.entry(t.to_string()).or_default();
                         e.push(new_ce);
                     } else {
-                        let e = local.entry(t.to_string()).or_insert(Vec::new());
+                        let e = local.entry(t.to_string()).or_default();
                         e.extend(ces);
                     }
                 },
@@ -323,7 +334,7 @@ fn classify_conditionals(
                             right: Box::new(ces.last().unwrap().clone()),
                         });
 
-                        let e = local.entry(t.to_string()).or_insert(Vec::new());
+                        let e = local.entry(t.to_string()).or_default();
                         e.push(new_ce);
                     }
                 }
@@ -367,7 +378,7 @@ fn classify_conditionals(
                                 // and thus all columns carry table names
                                 assert!(lf.table.is_some());
                                 let e =
-                                    local.entry(lf.table.clone().unwrap()).or_insert(Vec::new());
+                                    local.entry(lf.table.clone().unwrap()).or_default();
                                 e.push(ce.clone());
                             }
                         }
@@ -677,6 +688,47 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
                     QueryGraphEdge::GroupBy(ref mut cols) => cols.push(column.clone()),
                     _ => unreachable!(),
                 }
+            }
+        }
+    }
+
+    // create initial join order
+    {
+        let mut sorted_edges: Vec<(&(String, String), &QueryGraphEdge)> =
+                    qg.edges.iter().collect();
+        // Sort the edges to ensure deterministic join order.
+        sorted_edges.sort_by(|&(a, _), &(b, _)| {
+            let src_ord = b.0.cmp(&a.0);
+            if src_ord == Ordering::Equal {
+                a.1.cmp(&b.1)
+            } else {
+                src_ord
+            }
+        });
+
+        for (&(ref src, ref dst), edge) in sorted_edges {
+            match *edge {
+                QueryGraphEdge::Join(ref jps) => qg.join_order.extend(
+                                                        jps.iter()
+                                                        .enumerate()
+                                                        .map(|(idx, _)| JoinRef {
+                                                            src: src.clone(),
+                                                            dst: dst.clone(),
+                                                            index: idx
+                                                        })
+                                                        .collect::<Vec<_>>()
+                                                    ),
+                QueryGraphEdge::LeftJoin(ref jps) => qg.join_order.extend(
+                                                        jps.iter()
+                                                        .enumerate()
+                                                        .map(|(idx, _)| JoinRef {
+                                                            src: src.clone(),
+                                                            dst: dst.clone(),
+                                                            index: idx
+                                                        })
+                                                        .collect::<Vec<_>>()
+                                                    ),
+                QueryGraphEdge::GroupBy(_) => continue
             }
         }
     }

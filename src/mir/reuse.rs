@@ -1,4 +1,6 @@
-use mir::{MirNode, MirNodeRef, MirNodeType, MirQuery};
+use mir::MirNodeRef;
+use mir::node::{MirNode, MirNodeType};
+use mir::query::MirQuery;
 use nom_sql::Column;
 use slog;
 
@@ -154,6 +156,7 @@ pub fn merge_mir_for_queries(
             })
             .cloned()
             .collect();
+        let original_children: Vec<_> = n.borrow().children().iter().cloned().collect();
         let children: Vec<_> = n.borrow()
             .children()
             .iter()
@@ -181,7 +184,7 @@ pub fn merge_mir_for_queries(
         real_n.borrow_mut().ancestors = ancestors;
         real_n.borrow_mut().children = children;
 
-        for c in &n.borrow().children {
+        for c in original_children {
             let cid = c.borrow().versioned_name();
             let in_edges = if in_edge_counts.contains_key(&cid) {
                 in_edge_counts[&cid]
@@ -210,7 +213,8 @@ pub fn merge_mir_for_queries(
 mod tests {
     use super::*;
     use nom_sql::{Column, ColumnSpecification, SqlType};
-    use mir::{MirNode, MirNodeRef, MirNodeType};
+    use mir::node::{MirNode, MirNodeType};
+    use mir::MirNodeRef;
 
     fn make_nodes() -> (MirNodeRef, MirNodeRef, MirNodeRef, MirNodeRef) {
         let cspec = |n: &str| -> (ColumnSpecification, Option<usize>) {
@@ -273,7 +277,8 @@ mod tests {
 
     #[test]
     fn merge_mir() {
-        use mir::{MirNode, MirNodeType, MirQuery};
+        use mir::node::{MirNode, MirNodeType};
+        use mir::query::MirQuery;
 
         let log = slog::Logger::root(slog::Discard, o!());
 

@@ -238,7 +238,6 @@ impl ReadHandle {
         }
     }
 
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         match *self {
             ReadHandle::Sharded(ref shards) => {

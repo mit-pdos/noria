@@ -61,6 +61,7 @@ pub mod local;
 mod handle;
 pub use self::handle::{DomainHandle, DomainInputHandle};
 
+#[derive(Debug)]
 enum DomainMode {
     Forwarding,
     Replaying {
@@ -68,6 +69,15 @@ enum DomainMode {
         buffered: VecDeque<Box<Packet>>,
         passes: usize,
     },
+}
+
+impl PartialEq for DomainMode {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (&DomainMode::Forwarding, &DomainMode::Forwarding) => true,
+            _ => false,
+        }
+    }
 }
 
 enum TriggerEndpoint {
@@ -84,22 +94,32 @@ struct ReplayPath {
     trigger: TriggerEndpoint,
 }
 
-/// A waiting node is one that is waiting for at least one incoming replay.
+type Hole = (usize, DataType);
+type Redo = (Tag, DataType);
+/// When a replay misses while being processed, it triggers a replay to backfill the hole that it
+/// missed in. We need to ensure that when this happens, we re-run the original replay to fill the
+/// hole we *originally* were trying to fill.
 ///
-/// Upon receiving a replay message, the node should attempt to re-process replays for any
-/// downstream nodes that missed in on the key that was just filled.
+/// This comes with some complexity:
 ///
-/// When one node misses in another during a replay, that miss will be registered with the target
-/// node, and a replay to the target node will be triggered for the key in question. When that
-/// replay eventually finishes, the subscription will cause the target node to notify this
-/// subscription, causing the replay to run again.
+///  - If two replays both hit the *same* hole, we should only request a backfill of it once, but
+///    need to re-run *both* replays when the hole is filled.
+///  - If one replay hits two *different* holes, we should backfill both holes, but we must ensure
+///    that we only re-run the replay once when both holes have been filled.
 ///
-/// The map is from miss_key -> Set(tag + replay_key).
-/// TODO: this can result in false positives, since we can think that we've filled a key on a node,
-/// but we did it with the wrong tag. probably doesn't matter though.
-#[derive(Debug)]
+/// To keep track of this, we use the `Waiting` structure below. One is created for every node with
+/// at least one outstanding backfill, and contains the necessary bookkeeping to ensure the two
+/// behaviors outlined above.
+///
+/// Note that in the type aliases above, we have chosen to use Vec<usize> instead of Tag to
+/// identify a hole. This is because there may be more than one Tag used to fill a given hole, and
+/// the set of columns uniquely identifies the set of tags.
+#[derive(Debug, Default)]
 struct Waiting {
-    subscribed: HashMap<Vec<DataType>, HashSet<(Tag, Vec<DataType>)>>,
+    /// For each eventual redo, how many holes are we waiting for?
+    holes: HashMap<Redo, usize>,
+    /// For each hole, which redos do we expect we'll have to do?
+    redos: HashMap<Hole, HashSet<Redo>>,
 }
 
 pub struct Domain {
@@ -210,19 +230,41 @@ impl Domain {
         miss_key: Vec<DataType>,
         needed_for: Tag,
     ) {
-        // when the replay eventually succeeds, we want to re-do the replay.
-        let mut subscribed = match self.waiting.remove(&miss_in) {
-            Some(Waiting { subscribed }) => subscribed,
-            None => HashMap::new(),
-        };
-        let already_filling = !subscribed
-            .entry(miss_key.clone())
-            .or_insert_with(HashSet::new)
-            .insert((needed_for, replay_key));
-        self.waiting.insert(miss_in, Waiting { subscribed });
+        use std::ops::AddAssign;
+        use std::collections::hash_map::Entry;
 
-        if already_filling {
-            // no need to trigger again
+        // when the replay eventually succeeds, we want to re-do the replay.
+        let mut w = self.waiting.remove(&miss_in).unwrap_or_default();
+
+        assert_eq!(miss_columns.len(), 1);
+        assert_eq!(replay_key.len(), 1);
+        assert_eq!(miss_key.len(), 1);
+
+        let mut redundant = false;
+        let redo = (needed_for, replay_key[0].clone());
+        match w.redos.entry((miss_columns[0], miss_key[0].clone())) {
+            Entry::Occupied(e) => {
+                // we have already requested backfill of this key
+                // remember to notify this Redo when backfill completes
+                if e.into_mut().insert(redo.clone()) {
+                    // this Redo should wait for this backfill to complete before redoing
+                    w.holes.entry(redo).or_default().add_assign(1);
+                }
+                redundant = true;
+            }
+            Entry::Vacant(e) => {
+                // we haven't already requested backfill of this key
+                let mut redos = HashSet::new();
+                // remember to notify this Redo when backfill completes
+                redos.insert(redo.clone());
+                e.insert(redos);
+                // this Redo should wait for this backfill to complete before redoing
+                w.holes.entry(redo).or_default().add_assign(1);
+            }
+        }
+
+        self.waiting.insert(miss_in, w);
+        if redundant {
             return;
         }
 
@@ -1046,10 +1088,7 @@ impl Domain {
                         self.finish_replay(tag, ni);
                     }
                     Packet::Ready { node, index } => {
-                        if let DomainMode::Forwarding = self.mode {
-                        } else {
-                            unreachable!();
-                        }
+                        assert_eq!(self.mode, DomainMode::Forwarding);
 
                         if !index.is_empty() {
                             let mut s = {
@@ -1461,8 +1500,8 @@ impl Domain {
                     mut context,
                     transaction_state,
                 } => {
-                    if let ReplayPieceContext::Partial { .. } = context {
-                        trace!(self.log, "replaying batch"; "#" => data.len(), "tag" => tag.id());
+                    if let ReplayPieceContext::Partial { ref for_keys, .. } = context {
+                        trace!(self.log, "replaying batch"; "#" => data.len(), "tag" => tag.id(), "keys" => ?for_keys);
                     } else {
                         debug!(self.log, "replaying batch"; "#" => data.len());
                     }
@@ -1567,7 +1606,7 @@ impl Domain {
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {
                             use std::cmp::Ordering;
-                            let mut x = a.node.cmp(&b.node);
+                            let mut x = a.replay_key.cmp(&b.replay_key);
                             if x != Ordering::Equal {
                                 return x;
                             }
@@ -1579,22 +1618,37 @@ impl Domain {
                             if x != Ordering::Equal {
                                 return x;
                             }
-                            a.replay_key.cmp(&b.replay_key)
+                            a.node.cmp(&b.node)
                         });
                         misses.dedup();
+
+                        let missed_on = if backfill_keys.is_some() {
+                            let mut prev = None;
+                            let mut missed_on = Vec::with_capacity(misses.len());
+                            for miss in &misses {
+                                let k = miss.replay_key.as_ref().unwrap();
+                                if prev.is_none() || k != prev.unwrap() {
+                                    missed_on.push(k.clone());
+                                    prev = Some(k);
+                                }
+                            }
+                            missed_on
+                        } else {
+                            Vec::new()
+                        };
 
                         if target {
                             if !misses.is_empty() {
                                 // we missed while processing
                                 // it's important that we clear out any partially-filled holes.
                                 if let Some(state) = self.state.get_mut(&segment.node) {
-                                    for miss in &misses {
-                                        state.mark_hole(&miss.replay_key.as_ref().unwrap()[..], &tag);
+                                    for miss in &missed_on {
+                                        state.mark_hole(&miss[..], &tag);
                                     }
                                 } else {
                                     n.with_reader_mut(|r| {
-                                        r.writer_mut().map(|wh| for miss in &misses {
-                                            wh.mark_hole(&miss.replay_key.as_ref().unwrap()[0]);
+                                        r.writer_mut().map(|wh| for miss in &missed_on {
+                                            wh.mark_hole(&miss[0]);
                                         });
                                     });
                                 }
@@ -1683,9 +1737,7 @@ impl Domain {
                         // if we missed during replay, we need to do another replay
                         if backfill_keys.is_some() && !misses.is_empty() {
                             let misses = misses;
-                            let mut missed_on = HashSet::with_capacity(misses.len());
                             for miss in misses {
-                                missed_on.insert(miss.replay_key.clone().unwrap());
                                 need_replay.push((
                                     miss.node,
                                     miss.replay_key.unwrap(),
@@ -1718,6 +1770,7 @@ impl Domain {
                         // we're all good -- continue propagating
                         if m.as_ref().map(|m| m.is_empty()).unwrap_or(true) {
                             if let ReplayPieceContext::Regular { last: false } = context {
+                                trace!(self.log, "dropping empty non-terminal full replay packet");
                                 // don't continue processing empty updates, *except* if this is the
                                 // last replay batch. in that case we need to send it so that the
                                 // next domain knows that we're done
@@ -1789,35 +1842,84 @@ impl Domain {
         }
 
         if let Some((tag, ni, for_keys)) = finished {
-            if let Some(Waiting { mut subscribed }) = self.waiting.remove(&ni) {
-                trace!(self.log, "partial replay finished to node with waiting backfills";
-                       "waiting" => subscribed.len(),
-                       "keys" => ?for_keys);
+            trace!(self.log, "partial replay finished";
+                   "node" => ?ni,
+                   "keys" => ?for_keys);
+            if let Some(mut waiting) = self.waiting.remove(&ni) {
+                trace!(
+                    self.log,
+                    "partial replay finished to node with waiting backfills"
+                );
+
+                let key_col = *self.replay_paths[&tag]
+                    .path
+                    .last()
+                    .unwrap()
+                    .partial_key
+                    .as_ref()
+                    .unwrap();
 
                 // we got a partial replay result that we were waiting for. it's time we let any
                 // downstream nodes that missed in us on that key know that they can (probably)
                 // continue with their replays.
-                for key in for_keys.unwrap() {
-                    match subscribed.remove(&key) {
-                        None => {
-                            // no subscriptions for this key (why are we filling it?)
-                        }
-                        Some(replay) => {
-                            for (tag, replay_key) in replay {
-                                // we've filled the hole that prevented the replay previously!
-                                self.seed_replay(tag, &replay_key[..], None);
+                for mut key in for_keys.unwrap() {
+                    assert_eq!(key.len(), 1);
+                    let hole = (key_col, key.swap_remove(0));
+                    let replay = waiting
+                        .redos
+                        .remove(&hole)
+                        .expect("got backfill for unnecessary key");
+
+                    // we may need more holes to fill before some replays should be re-attempted
+                    let replay: Vec<_> = replay
+                        .into_iter()
+                        .filter_map(|tagged_replay_key| {
+                            let left = {
+                                let left = waiting.holes.get_mut(&tagged_replay_key).unwrap();
+                                *left -= 1;
+                                *left
+                            };
+
+                            if left == 0 {
+                                trace!(self.log, "filled last hole for key, triggering replay";
+                                   "k" => ?tagged_replay_key);
+
+                                // we've filled all holes that prevented the replay previously!
+                                waiting.holes.remove(&tagged_replay_key);
+                                Some(tagged_replay_key)
+                            } else {
+                                trace!(self.log, "filled hole for key, not triggering replay";
+                                   "k" => ?tagged_replay_key,
+                                   "left" => left);
+                                None
                             }
-                        }
+                        })
+                        .collect();
+
+                    if !waiting.holes.is_empty() {
+                        // there are still holes, so there must still be pending redos
+                        assert!(!waiting.redos.is_empty());
+
+                        // restore Waiting in case seeding triggers more replays
+                        self.waiting.insert(ni, waiting);
+                    } else {
+                        // there are no more holes that are filling, so there can't be more redos
+                        assert!(waiting.redos.is_empty());
                     }
+
+                    for (tag, replay_key) in replay {
+                        self.seed_replay(tag, &[replay_key], None);
+                    }
+
+                    waiting = self.waiting.remove(&ni).unwrap_or_default();
                 }
 
-                if let Some(Waiting { subscribed: new }) = self.waiting.remove(&ni) {
-                    for (k, rs) in new {
-                        subscribed.entry(k).or_insert_with(HashSet::new).extend(rs);
-                    }
+                if !waiting.holes.is_empty() {
+                    assert!(!waiting.redos.is_empty());
+                    self.waiting.insert(ni, waiting);
+                } else {
+                    assert!(waiting.redos.is_empty());
                 }
-
-                self.waiting.insert(ni, Waiting { subscribed });
                 return;
             }
 

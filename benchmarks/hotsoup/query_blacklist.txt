@@ -122,6 +122,12 @@ ff0cae2d_71e181bd9892d0e5: select topicId, interest, count(*) from TopicInterest
 8dbbc83c_34426d08700b212: select TopicArea.topicId, TopicArea.topicName, TopicInterest.interest from TopicArea left join TopicInterest on TopicInterest.contactId=? and TopicInterest.topicId=TopicArea.topicId order by TopicArea.topicName;
 
 ######################
+# SCHEMA v41
+
+# Table alias "s" not defined in query
+8dbbc83c_dfab3072144fb8a6: select p.paperId, s.mimetype, s.paper as content, s.paperStorageId, s.compression from Paper p;
+
+######################
 # SCHEMA v46
 
 # parameter in join clause
