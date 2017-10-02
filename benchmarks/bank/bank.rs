@@ -42,16 +42,9 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     let mut g = Blender::new();
     let debug_channel = g.create_debug_channel();
 
-    let transfers;
-    let credits;
-    let debits;
-    let balances;
-    {
-        // migrate
-        let mut mig = g.start_migration();
-
+    let (transfers, _credits, _debits, balances) = g.migrate(|mig| {
         // add transfers base table
-        transfers = if transactions {
+        let transfers = if transactions {
             mig.add_transactional_base(
                 "transfers",
                 &["src_acct", "dst_acct", "amount"],
@@ -66,14 +59,14 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         };
 
         // add all debits
-        debits = mig.add_ingredient(
+        let debits = mig.add_ingredient(
             "debits",
             &["acct_id", "total"],
             Aggregation::SUM.over(transfers, 2, &[0]),
         );
 
         // add all credits
-        credits = mig.add_ingredient(
+        let credits = mig.add_ingredient(
             "credits",
             &["acct_id", "total"],
             Aggregation::SUM.over(transfers, 2, &[1]),
@@ -83,12 +76,11 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         // aggregations or arithmetic on columns.
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
-        balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
+        let balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
         mig.maintain(balances, 0);
 
-        // start processing
-        mig.commit();
-    };
+        (transfers, credits, debits, balances)
+    });
 
     Box::new(Bank {
         blender: g,
@@ -103,14 +95,15 @@ impl Bank {
         self.blender.get_getter(self.balances).unwrap()
     }
     pub fn migrate(&mut self) {
-        let mut mig = self.blender.start_migration();
-        let identity = mig.add_ingredient(
-            "identity",
-            &["acct_id", "credit", "debit"],
-            distributary::Identity::new(self.balances),
-        );
-        mig.maintain(identity, 0);
-        mig.commit();
+        let balances = self.balances;
+        self.blender.migrate(|mig| {
+            let identity = mig.add_ingredient(
+                "identity",
+                &["acct_id", "credit", "debit"],
+                distributary::Identity::new(balances),
+            );
+            mig.maintain(identity, 0);
+        });
     }
 }
 
