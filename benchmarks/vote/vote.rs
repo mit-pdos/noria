@@ -267,10 +267,12 @@ fn main() {
     // prepare putters
     let putters: Vec<_> = {
         let b = g.graph.lock().unwrap();
-        let mix_getter = mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap());
+        let mix_getters = (0..new_vote_receivers.len())
+            .map(|_| mix.as_ref().map(|_| b.get_getter(g.end).unwrap()));
         new_vote_receivers
             .into_iter()
-            .map(|new_vote| {
+            .zip(mix_getters)
+            .map(|(new_vote, mix_getter)| {
                 Spoon {
                     article: b.get_mutator(g.article),
                     vote_pre: b.get_mutator(g.vote),
