@@ -252,8 +252,8 @@ fn client(
             // check if we should report
             if measure_latency.is_none() && last_reported.elapsed() > time::Duration::from_secs(1) {
                 let ts = last_reported.elapsed();
-                let throughput = committed as f64 /
-                    (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
+                let throughput = committed as f64
+                    / (ts.as_secs() as f64 + ts.subsec_nanos() as f64 / 1_000_000_000f64);
                 let commit_rate = committed as f64 / count as f64;
                 let abort_rate = aborted as f64 / count as f64;
                 println!(

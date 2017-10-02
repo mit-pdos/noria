@@ -98,10 +98,14 @@ impl SampleKeys {
             "getRelated1" => dedup(self.item.iter().map(|x| x[0].clone()).collect()),
             "getMostRecentOrderId" => dedup(self.customer.iter().map(|x| x[1].clone()).collect()),
             "getMostRecentOrderOrder" => dedup(self.order.iter().map(|x| x[0].clone()).collect()),
-            "getMostRecentOrderLines" => dedup(self.order_line.iter().map(|x| x[0].clone()).collect()),
+            "getMostRecentOrderLines" => {
+                dedup(self.order_line.iter().map(|x| x[0].clone()).collect())
+            }
             "createEmptyCart" => 0,
             "addItem" => dedup(self.item.iter().map(|x| x[0].clone()).collect()), // XXX(malte): dual parameter query, need SCL ID range
-            "addRandomItemToCartIfNecessary" => dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect()),
+            "addRandomItemToCartIfNecessary" => {
+                dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect())
+            }
             "getCart" => dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect()),
             "createNewCustomerMaxId" => 0,
             "getCDiscount" => dedup(self.customer.iter().map(|x| x[0].clone()).collect()),
@@ -161,9 +165,7 @@ impl SampleKeys {
             {
                 let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
                 let o_id = i32::from_str(fields[0]).unwrap();
-                self.order.push(vec![
-                    o_id.into(),
-                ]);
+                self.order.push(vec![o_id.into()]);
             }
             s.clear();
         }
@@ -179,10 +181,7 @@ impl SampleKeys {
                 let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
                 let i_id = i32::from_str(fields[0]).unwrap();
                 let i_subject = fields[5];
-                self.item.push(vec![
-                    i_id.into(),
-                    i_subject.into(),
-                ]);
+                self.item.push(vec![i_id.into(), i_subject.into()]);
             }
             s.clear();
         }
@@ -199,10 +198,7 @@ impl SampleKeys {
                 let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
                 let c_id = i32::from_str(fields[0]).unwrap();
                 let c_uname = fields[1];
-                self.customer.push(vec![
-                    c_id.into(),
-                    c_uname.into(),
-                ]);
+                self.customer.push(vec![c_id.into(), c_uname.into()]);
             }
             s.clear();
         }
@@ -218,9 +214,7 @@ impl SampleKeys {
                 let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
                 let ol_o_id = i32::from_str(fields[1]).unwrap(); //
 
-                self.order_line.push(vec![
-                    ol_o_id.into(),
-                ]);
+                self.order_line.push(vec![ol_o_id.into()]);
             }
             s.clear();
         }
@@ -235,9 +229,7 @@ impl SampleKeys {
             {
                 let fields: Vec<&str> = s.split("\t").map(str::trim).collect();
                 let co_name = fields[1];
-                self.country.push(vec![
-                    co_name.into(),
-                ]);
+                self.country.push(vec![co_name.into()]);
             }
             s.clear();
         }
@@ -278,7 +270,7 @@ impl SampleKeys {
     }
 
     fn shopping_cart_id(&self) -> DataType {
-       0.into()
+        0.into()
     }
 
     fn country_name(&mut self) -> DataType {
