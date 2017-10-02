@@ -26,9 +26,7 @@ fn main() {
 
     let args = App::new("vote")
         .version("0.1")
-        .about(
-            "Benchmarks user-curated news aggregator throughput for in-memory Soup",
-        )
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
         .arg(
             Arg::with_name("narticles")
                 .short("a")
@@ -49,9 +47,7 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .default_value("10")
-                .help(
-                    "Read until all keys have been read, or this time has elapsed",
-                ),
+                .help("Read until all keys have been read, or this time has elapsed"),
         )
         .arg(
             Arg::with_name("stupid")

@@ -94,7 +94,11 @@ pub fn make(
 
             // add vote base table
             let vote = if s.transactions {
-                mig.add_transactional_base("vote", &["user", "id"], Base::default().with_key(vec![1]))
+                mig.add_transactional_base(
+                    "vote",
+                    &["user", "id"],
+                    Base::default().with_key(vec![1]),
+                )
             } else {
                 mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
             };
@@ -140,7 +144,7 @@ impl Graph {
 
         // migrate
         let mut g = self.graph.lock().unwrap();
-        g.migrate(|mig {
+        g.migrate(|mig| {
             // add new "ratings" base table
             let b = Base::default().with_key(vec![1]);
             let rating = if setup.transactions {

@@ -27,9 +27,7 @@ fn main() {
 
     let args = App::new("vote")
         .version("0.1")
-        .about(
-            "Benchmarks user-curated news aggregator throughput for in-memory Soup",
-        )
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
         .arg(
             Arg::with_name("avg")
                 .long("avg")
@@ -41,18 +39,14 @@ fn main() {
                 .short("c")
                 .long("cdf")
                 .takes_value(false)
-                .help(
-                    "produce a CDF of recorded latencies for each client at the end",
-                ),
+                .help("produce a CDF of recorded latencies for each client at the end"),
         )
         .arg(
             Arg::with_name("stage")
                 .short("s")
                 .long("stage")
                 .takes_value(false)
-                .help(
-                    "stage execution such that all writes are performed before all reads",
-                ),
+                .help("stage execution such that all writes are performed before all reads"),
         )
         .arg(
             Arg::with_name("distribution")
