@@ -102,7 +102,8 @@ impl SampleKeys {
                 dedup(self.order_line.iter().map(|x| x[0].clone()).collect())
             }
             "createEmptyCart" => 0,
-            "addItem" => dedup(self.item.iter().map(|x| x[0].clone()).collect()), // XXX(malte): dual parameter query, need SCL ID range
+            // XXX(malte): dual parameter query, need SCL ID range:
+            "addItem" => dedup(self.item.iter().map(|x| x[0].clone()).collect()),
             "addRandomItemToCartIfNecessary" => {
                 dedup(self.shopping_cart.iter().map(|x| x[0].clone()).collect())
             }
