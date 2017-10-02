@@ -92,7 +92,11 @@ fn main() {
             Arg::with_name("cdf")
                 .short("c")
                 .long("cdf")
-                .takes_value(false)
+                .value_name("FILE")
+                .takes_value(true)
+                .require_equals(true)
+                .min_values(0)
+                .default_value("-")
                 .help(
                     "produce a CDF of recorded latencies for each client at the end",
                 ),
@@ -158,7 +162,6 @@ fn main() {
         .get_matches();
 
     let avg = args.is_present("avg");
-    let cdf = args.is_present("cdf");
     let dist = value_t_or_exit!(args, "distribution", common::Distribution);
     let mode = args.value_of("MODE").unwrap();
     let dbn = args.value_of("BACKEND").unwrap();
@@ -192,7 +195,7 @@ fn main() {
     let runtime = if runtime == 0 { None } else { Some(runtime) };
     let runtime = runtime.map(time::Duration::from_secs);
     let mut config = common::RuntimeConfig::new(narticles, mix, runtime);
-    config.produce_cdf(cdf);
+    config.produce_cdf(args.occurrences_of("cdf") != 0);
     config.set_reuse(args.is_present("reuse"));
     config.set_verbose(!args.is_present("quiet"));
     config.use_distribution(dist);
@@ -253,20 +256,38 @@ fn main() {
             t
         ),
     };
-    print_stats(&cfg.mix, &stats, avg);
+    print_stats(&cfg.mix, args.value_of("cdf").unwrap(), &stats, avg);
 }
 
-fn print_stats(mix: &common::Mix, stats: &exercise::BenchmarkResults, avg: bool) {
+fn print_stats(mix: &common::Mix, cdf: &str, stats: &exercise::BenchmarkResults, avg: bool) {
     let stats = &stats.pre;
     if let Some((r_perc, w_perc)) = stats.cdf_percentiles() {
-        if mix.does_read() {
-            for iv in r_perc {
-                println!("percentile GET {:.2} {:.2}", iv.value(), iv.percentile());
+        if cdf == "-" {
+            if mix.does_read() {
+                for iv in r_perc {
+                    println!("percentile GET {:.2} {:.2}", iv.value(), iv.percentile());
+                }
             }
-        }
-        if mix.does_write() {
-            for iv in w_perc {
-                println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+            if mix.does_write() {
+                for iv in w_perc {
+                    println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+                }
+            }
+        } else {
+            use hdrsample::serialization::V2Serializer;
+            use std::fs::File;
+            match File::create(cdf) {
+                Ok(mut f) => {
+                    let h = stats.merged_cdf().unwrap();
+                    if let Err(e) = V2Serializer::new().serialize(&h, &mut f) {
+                        println!("failed to serialize histogram: {:?}", e);
+                    } else if let Err(e) = f.sync_all() {
+                        println!("failed to write histogram: {}", e);
+                    }
+                }
+                Err(e) => {
+                    println!("failed to create histogram file: {}", e);
+                }
             }
         }
     }
