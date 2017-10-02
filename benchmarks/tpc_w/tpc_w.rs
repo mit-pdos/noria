@@ -75,11 +75,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
     }
 
 
-    let recipe;
-    {
-        // migrate
-        let mut mig = g.start_migration();
-
+    let recipe = g.migrate(|mig| {
         let mut f = File::open(recipe_location).unwrap();
         let mut s = String::new();
 
@@ -91,7 +87,7 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
                 .collect::<Vec<_>>()
                 .join("\n");
         }
-        recipe = match Recipe::from_str(&s, Some(recipe_log.clone())) {
+        match Recipe::from_str(&s, Some(recipe_log.clone())) {
             Ok(mut recipe) => {
                 match reuse.as_ref() {
                     "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
@@ -100,14 +96,12 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
                     "relaxed" => recipe.enable_reuse(ReuseConfigType::Relaxed),
                     _ => panic!("reuse configuration not supported"),
                 }
-                recipe.activate(&mut mig, transactions).unwrap();
+                recipe.activate(mig, transactions).unwrap();
                 recipe
             }
             Err(e) => panic!(e),
-        };
-
-        mig.commit();
-    }
+        }
+    });
 
     // println!("{}", g);
 
@@ -123,25 +117,26 @@ fn make(recipe_location: &str, transactions: bool, parallel: bool, single_query:
 
 impl Backend {
     fn extend(mut self, query: &str, transactions: bool) -> Backend {
-        {
-            let query_name = query.split(":").next().unwrap();
-            let start = time::Instant::now();
-            let mut mig = self.g.start_migration();
-            let new_recipe = match self.r.extend(query) {
-                Ok(mut recipe) => {
-                    recipe.activate(&mut mig, transactions).unwrap();
-                    recipe
+        let query_name = query.split(":").next().unwrap();
+        let start = time::Instant::now();
+
+        let new_recipe = {
+            let r = self.r;
+            self.g.migrate(|mig| {
+                match r.extend(query) {
+                    Ok(mut recipe) => {
+                        recipe.activate(mig, transactions).unwrap();
+                        recipe
+                    }
+                    Err(e) => panic!(e),
                 }
-                Err(e) => panic!(e),
-            };
+            })
+        };
 
-            mig.commit();
-            let dur = dur_to_fsec!(start.elapsed());
-            println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
+        let dur = dur_to_fsec!(start.elapsed());
+        println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
 
-            self.r = new_recipe;
-        }
-
+        self.r = new_recipe;
         self
     }
 
