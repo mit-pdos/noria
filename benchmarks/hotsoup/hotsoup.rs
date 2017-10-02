@@ -63,66 +63,64 @@ impl Backend {
         use std::fs::File;
 
         let ref blacklist = self.blacklist;
-        // migrate
-        let mut mig = self.g.start_migration();
-
-        let mut sf = File::open(schema_file).unwrap();
-        let mut s = String::new();
-
-        let mut blacklisted = 0;
-
-        // load schema
-        sf.read_to_string(&mut s).unwrap();
-        // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
-        let mut rs = s.lines()
-            .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
-            .take_while(|l| !l.contains("insert"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        // load queries and concatenate them onto the table definitions from the schema
-        s.clear();
-
-        match query_file {
-            None => (),
-            Some(qf) => {
-                let mut qf = File::open(qf).unwrap();
-                qf.read_to_string(&mut s).unwrap();
-                rs.push_str("\n");
-                rs.push_str(&s.lines()
-                    .filter(|ref l| {
-                        // make sure to skip blacklisted queries
-                        for ref q in blacklist {
-                            if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
-                                blacklisted += 1;
-                                return false;
-                            }
-                        }
-                        true
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"))
-            }
-        }
-
-        info!(self.log, "Ignored {} blacklisted queries", blacklisted);
-
-        let new_recipe = Recipe::from_str(&rs, Some(self.log.clone()))?;
+        let log = &mut self.log;
         let cur_recipe = self.r.take().unwrap();
-        let updated_recipe = match cur_recipe.replace(new_recipe) {
-            Ok(mut recipe) => {
-                match recipe.activate(&mut mig, transactions) {
-                    Ok(ar) => {
-                        info!(self.log, "{} expressions added", ar.expressions_added);
-                        info!(self.log, "{} expressions removed", ar.expressions_removed);
-                    }
-                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
-                };
-                recipe
-            }
-            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
-        };
+        let updated_recipe = self.g.migrate(|mig| {
+            let mut sf = File::open(schema_file).unwrap();
+            let mut s = String::new();
 
-        mig.commit();
+            let mut blacklisted = 0;
+
+            // load schema
+            sf.read_to_string(&mut s).unwrap();
+            // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
+            let mut rs = s.lines()
+                .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
+                .take_while(|l| !l.contains("insert"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            // load queries and concatenate them onto the table definitions from the schema
+            s.clear();
+
+            match query_file {
+                None => (),
+                Some(qf) => {
+                    let mut qf = File::open(qf).unwrap();
+                    qf.read_to_string(&mut s).unwrap();
+                    rs.push_str("\n");
+                    rs.push_str(&s.lines()
+                        .filter(|ref l| {
+                            // make sure to skip blacklisted queries
+                            for ref q in blacklist {
+                                if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
+                                    blacklisted += 1;
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                }
+            }
+
+            info!(log, "Ignored {} blacklisted queries", blacklisted);
+
+            let new_recipe = Recipe::from_str(&rs, Some(log.clone()))?;
+            match cur_recipe.replace(new_recipe) {
+                Ok(mut recipe) => {
+                    match recipe.activate(mig, transactions) {
+                        Ok(ar) => {
+                            info!(log, "{} expressions added", ar.expressions_added);
+                            info!(log, "{} expressions removed", ar.expressions_removed);
+                        }
+                        Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                    };
+                    Ok(recipe)
+                }
+                Err(e) => return Err(format!("failed to replace recipe: {}", e)),
+            }
+        })?;
         self.r = Some(updated_recipe);
         Ok(())
     }
