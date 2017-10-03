@@ -203,7 +203,8 @@ fn main() {
 
     // Login a user
     println!("Login in users...");
-    backend.login(make_user(0));
+    backend.login(make_user(0)).is_ok();
+    // backend.login(make_user(1)).is_ok();
 
     println!("Done with benchmark.");
 
