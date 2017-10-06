@@ -248,7 +248,7 @@ fn main() {
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
-    s.sharding = !args.is_present("unsharded");<<<<<<< HEAD
+    s.sharding = !args.is_present("unsharded");
     let blender = Arc::new(Mutex::new(distributary::Blender::new()));
     let g = graph::make(blender, s, persistence_params);
 
