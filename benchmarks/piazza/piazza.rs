@@ -28,30 +28,25 @@ impl Piazza {
         let mut g = Blender::new();
         g.log_with(distributary::logger_pls());
 
-        let (user, post, class, taking);
-
-        {
-            let mut mig = g.start_migration();
-
+        let (user, post, class, taking) = g.migrate(|mig| {
             // add a user account base table
-            user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
+            let user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
 
             // add a post base table
-            post = mig.add_ingredient(
+            let post = mig.add_ingredient(
                 "post",
                 &["pid", "cid", "author", "content"],
                 Base::default().with_key(vec![1]),
             );
 
             // add a class base table
-            class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
+            let class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
 
             // associations between users and classes
-            taking = mig.add_ingredient("taking", &["cid", "uid"], Base::default());
+            let taking = mig.add_ingredient("taking", &["cid", "uid"], Base::default());
 
-            // commit migration
-            mig.commit();
-        }
+            (user, post, class, taking)
+        });
 
         Piazza {
             soup: g,
@@ -65,31 +60,28 @@ impl Piazza {
     pub fn log_user(&mut self, uid: DataType) {
         use distributary::Operator;
 
-        let visible_posts;
+        let post = self.post;
+        let taking = self.taking;
+        self.soup.migrate(|mig| {
+            // classes user is taking
+            let class_filter = Filter::new(taking, &[None, Some((Operator::Equal, uid.into()))]);
 
-        let mut mig = self.soup.start_migration();
+            let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
+            // add visible posts to user
+            // only posts from classes the user is taking should be visible
+            use distributary::JoinSource::*;
+            let j = Join::new(
+                post,
+                user_classes,
+                JoinType::Inner,
+                vec![L(0), B(1, 0), L(2), L(3)],
+            );
+            let visible_posts =
+                mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
 
-        // classes user is taking
-        let class_filter = Filter::new(self.taking, &[None, Some((Operator::Equal, uid.into()))]);
-
-        let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
-        // add visible posts to user
-        // only posts from classes the user is taking should be visible
-        use distributary::JoinSource::*;
-        let j = Join::new(
-            self.post,
-            user_classes,
-            JoinType::Inner,
-            vec![L(0), B(1, 0), L(2), L(3)],
-        );
-        visible_posts =
-            mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
-
-        // maintain visible_posts
-        mig.maintain(visible_posts, 0);
-
-        // commit migration
-        mig.commit();
+            // maintain visible_posts
+            mig.maintain(visible_posts, 0);
+        });
     }
 }
 

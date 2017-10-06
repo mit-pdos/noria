@@ -49,6 +49,12 @@ fn main() {
                 .help("stage execution such that all writes are performed before all reads"),
         )
         .arg(
+            Arg::with_name("unsharded")
+                .long("unsharded")
+                .takes_value(false)
+                .help("disable sharding"),
+        )
+        .arg(
             Arg::with_name("distribution")
                 .short("d")
                 .takes_value(true)
@@ -242,6 +248,7 @@ fn main() {
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
+    s.sharding = !args.is_present("unsharded");<<<<<<< HEAD
     let blender = Arc::new(Mutex::new(distributary::Blender::new()));
     let g = graph::make(blender, s, persistence_params);
 

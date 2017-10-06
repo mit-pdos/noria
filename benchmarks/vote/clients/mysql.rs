@@ -142,7 +142,7 @@ impl<'a> Reader for RW<'a> {
         let mut qresult = self.r_prep.execute(&ids[..]).unwrap();
         while qresult.more_results_exists() {
             for row in qresult.by_ref() {
-                let mut rr = row.unwrap();
+                let rr = row.unwrap();
                 res.push(ArticleResult::Article {
                     id: rr.get(0).unwrap(),
                     title: rr.get(1).unwrap(),
