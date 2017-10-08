@@ -168,7 +168,7 @@ fn main() {
         .arg(
             Arg::with_name("reuse")
                 .long("reuse")
-                .default_value("finkelstein")
+                .default_value("full")
                 .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
                 .help("Query reuse algorithm"),
         )
