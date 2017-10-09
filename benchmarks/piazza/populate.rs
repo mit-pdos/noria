@@ -4,7 +4,7 @@ use rand;
 use rand::Rng;
 use super::Backend;
 
-const NANOS_PER_SEC: u64 = 1_000_000_000;
+pub const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {
     ($d:expr) => {{
         let d = $d;
@@ -41,8 +41,6 @@ impl Populate {
         let mut mutator = backend
             .g
             .get_mutator(backend.recipe().node_addr_for(name).unwrap());
-
-        let i = records.len();
 
         let start = time::Instant::now();
 
@@ -134,6 +132,7 @@ impl Populate {
         self.rng.gen_range(0, self.nclasses).into()
     }
 
+    #[allow(dead_code)]
     /// Generate random pid within bounds
     fn pid(&mut self) -> DataType {
         self.rng.gen_range(0, self.nposts).into()

@@ -12,9 +12,10 @@ use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
 
+#[macro_use]
 mod populate;
 
-use populate::Populate;
+use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
     recipe: Option<Recipe>,
@@ -167,7 +168,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("policies")
-                .short("p")
+                .long("policies")
                 .required(true)
                 .default_value("Benchmarks/piazza/policies.json")
                 .help("Security policies file for Piazza application"),
@@ -200,6 +201,24 @@ fn main() {
                 .long("populate")
                 .help("Populate app with randomly generated data"),
         )
+        .arg(
+            Arg::with_name("nusers")
+                .short("u")
+                .default_value("1000")
+                .help("Number of users"),
+        )
+        .arg(
+            Arg::with_name("nclasses")
+                .short("c")
+                .default_value("100")
+                .help("Number of classes"),
+        )
+        .arg(
+            Arg::with_name("nposts")
+                .short("p")
+                .default_value("100000")
+                .help("Number of posts"),
+        )
         .get_matches();
 
 
@@ -214,6 +233,9 @@ fn main() {
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
     let populate = args.is_present("populate");
+    let nusers = value_t_or_exit!(args, "nusers", i32);
+    let nclasses = value_t_or_exit!(args, "nclasses", i32);
+    let nposts = value_t_or_exit!(args, "nposts", i32);
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
@@ -222,7 +244,7 @@ fn main() {
 
     if populate {
         println!("Populating tables...");
-        let mut p = Populate::new(10000, 10000, 10000);
+        let mut p = Populate::new(nposts, nusers, nclasses);
         p.populate_tables(&backend);
     }
 
@@ -231,8 +253,16 @@ fn main() {
 
     // Login a user
     println!("Login in users...");
-    backend.login(make_user(0)).is_ok();
-    // backend.login(make_user(1)).is_ok();
+    for i in 0..nusers {
+        let start = time::Instant::now();
+        backend.login(make_user(i)).is_ok();
+        let dur = dur_to_fsec!(start.elapsed());
+        println!(
+            "Migration {} took {:.2}s!",
+            i,
+            dur,
+        );
+    }
 
 
     println!("Done with benchmark.");
