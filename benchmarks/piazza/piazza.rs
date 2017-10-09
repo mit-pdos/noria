@@ -10,6 +10,7 @@ use distributary::{Blender, DataType, Recipe, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::{thread, time};
 
 mod populate;
 
@@ -194,6 +195,11 @@ fn main() {
                 .long("partial")
                 .help("Enable partial materialization"),
         )
+        .arg(
+            Arg::with_name("populate")
+                .long("populate")
+                .help("Populate app with randomly generated data"),
+        )
         .get_matches();
 
 
@@ -207,20 +213,27 @@ fn main() {
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
+    let populate = args.is_present("populate");
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
 
-    println!("Populating tables...");
-    let mut p = Populate::new(10, 10, 10);
-    p.populate_tables(&backend);
+    if populate {
+        println!("Populating tables...");
+        let mut p = Populate::new(10000, 10000, 10000);
+        p.populate_tables(&backend);
+    }
+
+    println!("Finished writing! Sleeping for 2 seconds...");
+    thread::sleep(time::Duration::from_millis(2000));
 
     // Login a user
     println!("Login in users...");
     backend.login(make_user(0)).is_ok();
     // backend.login(make_user(1)).is_ok();
+
 
     println!("Done with benchmark.");
 
