@@ -1,4 +1,5 @@
 extern crate distributary;
+extern crate rand;
 
 #[macro_use]
 extern crate clap;
@@ -9,6 +10,10 @@ use distributary::{Blender, DataType, Recipe, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+
+mod populate;
+
+use populate::Populate;
 
 pub struct Backend {
     recipe: Option<Recipe>,
@@ -45,6 +50,13 @@ impl Backend {
             recipe: Some(recipe),
             log: log,
             g: g,
+        }
+    }
+
+    pub fn recipe(&self) -> Recipe {
+        match self.recipe {
+            Some(ref r) => r.clone(),
+            None => panic!("recipe doesn't exist"),
         }
     }
 
@@ -200,6 +212,10 @@ fn main() {
     println!("Initiliazing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
+
+    println!("Populating tables...");
+    let mut p = Populate::new(10, 10, 10);
+    p.populate_tables(&backend);
 
     // Login a user
     println!("Login in users...");
