@@ -156,21 +156,21 @@ fn main() {
             Arg::with_name("schema")
                 .short("s")
                 .required(true)
-                .default_value("Benchmarks/piazza/schema.sql")
+                .default_value("benchmarks/piazza/schema.sql")
                 .help("Schema file for Piazza application"),
         )
         .arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("Benchmarks/piazza/queries.sql")
+                .default_value("benchmarks/piazza/queries.sql")
                 .help("Query file for Piazza application"),
         )
         .arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("Benchmarks/piazza/policies.json")
+                .default_value("benchmarks/piazza/policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
