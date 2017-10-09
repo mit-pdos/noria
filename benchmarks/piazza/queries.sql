@@ -1,8 +1,8 @@
-posts: select * from Post where classId=?;
-public_posts: select * from Post WHERE Post.private=0 and classId=?;
-private_posts: select * from Post WHERE Post.private=1 and classId=?;
-tas: select * from Role WHERE role = 1 and classId=?;
-ta_posts: select * from Post WHERE Post.authorId in (select userId from Role WHERE Role.role=1) and classId=?;
-enrolled_in: select classId from Role where userId=?;
-enrolled_students: select userId from Role where classId=?;
+posts: select * from Post where p_cid=?;
+public_posts: select * from Post WHERE Post.p_private=0 and p_cid=?;
+private_posts: select * from Post WHERE Post.p_private=1 and p_cid=?;
+tas: select * from Role WHERE r_role = 1 and r_cid=?;
+ta_posts: select * from Post WHERE Post.p_author in (select r_uid from Role WHERE Role.r_role=1) and p_cid=?;
+enrolled_in: select r_cid from Role where r_uid=?;
+enrolled_students: select r_uid from Role where r_cid=?;
 -- vote_count: select postId, COUNT(userId) AS votes FROM Vote GROUP BY postId;

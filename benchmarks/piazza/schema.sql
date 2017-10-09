@@ -3,15 +3,15 @@
 --
 
 CREATE TABLE `Post` (
-  `postId` int(11) NOT NULL auto_increment,
-  `classId` int(11) NOT NULL,
-  `authorId` int(11) NOT NULL,
-  `content` text NOT NULL default '',
-  `private` tinyint(1) NOT NULL default '0',
-  PRIMARY KEY  (`postId`),
-  UNIQUE KEY `postId` (`postId`),
-  KEY `classId` (`classId`),
-  KEY `authorId` (`authorId`)
+  `p_id` int(11) NOT NULL auto_increment,
+  `p_cid` int(11) NOT NULL,
+  `p_author` int(11) NOT NULL,
+  `p_content` text NOT NULL default '',
+  `p_private` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`p_id`),
+  UNIQUE KEY `p_id` (`p_id`),
+  KEY `p_cid` (`p_cid`),
+  KEY `p_author` (`p_author`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
@@ -19,9 +19,9 @@ CREATE TABLE `Post` (
 --
 
 CREATE TABLE `User` (
-  `userId` int(11) NOT NULL auto_increment,
-  PRIMARY KEY  (`userId`),
-  UNIQUE KEY `userId` (`userId`),
+  `u_id` int(11) NOT NULL auto_increment,
+  PRIMARY KEY  (`u_id`),
+  UNIQUE KEY `u_id` (`u_id`),
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
@@ -29,9 +29,9 @@ CREATE TABLE `User` (
 --
 
 CREATE TABLE `Class` (
-  `classId` int(11) NOT NULL auto_increment,
-  PRIMARY KEY  (`classId`),
-  UNIQUE KEY `classId` (`classId`),
+  `c_id` int(11) NOT NULL auto_increment,
+  PRIMARY KEY  (`c_id`),
+  UNIQUE KEY `c_id` (`c_id`),
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
@@ -39,10 +39,10 @@ CREATE TABLE `Class` (
 --
 
 CREATE TABLE `Role` (
-  `userId` int(11) NOT NULL,
-  `classId` int(11) NOT NULL,
-  `role` tinyint(1) NOT NULL default '0',
-  PRIMARY KEY  (`userId`),
-  UNIQUE KEY `userId` (`userId`),
-  KEY `classId` (`classId`),
+  `r_uid` int(11) NOT NULL,
+  `r_cid` int(11) NOT NULL,
+  `r_role` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`r_uid`),
+  UNIQUE KEY `r_uid` (`r_uid`),
+  KEY `r_cid` (`r_cid`),
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
