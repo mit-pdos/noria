@@ -26,6 +26,17 @@ pub fn inform(
 ) {
     let source = blender.source;
     for (domain, nodes) in nodes {
+        let old_nodes: HashSet<_> = nodes
+            .iter()
+            .filter(|&&(_, new)| !new)
+            .map(|&(ni, _)| ni)
+            .collect();
+
+        if old_nodes.len() == nodes.len() {
+            // some domains haven't changed at all
+            continue;
+        }
+
         let log = log.new(o!("domain" => domain.index()));
         let ctx = blender.domains.get_mut(&domain).unwrap();
 
@@ -37,16 +48,6 @@ pub fn inform(
         let _ = ctx.wait_for_ack();
         trace!(log, "domain ready for migration");
 
-        let old_nodes: HashSet<_> = nodes
-            .iter()
-            .filter(|&&(_, new)| !new)
-            .map(|&(ni, _)| ni)
-            .collect();
-
-        if old_nodes.len() == nodes.len() {
-            // some domains haven't changed at all
-            continue;
-        }
 
         for (ni, new) in nodes {
             if !new {
