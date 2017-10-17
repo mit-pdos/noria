@@ -144,7 +144,7 @@ impl Graph {
                 let upgrade = mig.add_ingredient(
                     "upvote",
                     &["id", "one"],
-                    Project::new(vote, &[1], Some(vec![1.into()])),
+                    Project::new(vote, &[1], Some(vec![1.into()]), None),
                 );
 
                 // take a union of votes and ratings
