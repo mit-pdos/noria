@@ -205,19 +205,25 @@ fn main() {
             Arg::with_name("nusers")
                 .short("u")
                 .default_value("1000")
-                .help("Number of users"),
+                .help("Number of users in the db"),
         )
+        .arg(
+            Arg::with_name("nlogged")
+                .short("l")
+                .default_value("1000")
+                .help("Number of logged users. Must be less or equal than the number of users in the db")
+            )
         .arg(
             Arg::with_name("nclasses")
                 .short("c")
                 .default_value("100")
-                .help("Number of classes"),
+                .help("Number of classes in the db"),
         )
         .arg(
             Arg::with_name("nposts")
                 .short("p")
                 .default_value("100000")
-                .help("Number of posts"),
+                .help("Number of posts in the db"),
         )
         .get_matches();
 
@@ -234,6 +240,7 @@ fn main() {
     let reuse = args.value_of("reuse").unwrap();
     let populate = args.is_present("populate");
     let nusers = value_t_or_exit!(args, "nusers", i32);
+    let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
 
@@ -244,7 +251,7 @@ fn main() {
 
     // Login a user
     println!("Login in users...");
-    for i in 0..nusers {
+    for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
