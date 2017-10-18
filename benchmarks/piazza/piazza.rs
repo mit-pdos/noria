@@ -242,15 +242,6 @@ fn main() {
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
 
-    if populate {
-        println!("Populating tables...");
-        let mut p = Populate::new(nposts, nusers, nclasses);
-        p.populate_tables(&backend);
-    }
-
-    println!("Finished writing! Sleeping for 2 seconds...");
-    thread::sleep(time::Duration::from_millis(2000));
-
     // Login a user
     println!("Login in users...");
     for i in 0..nusers {
@@ -263,6 +254,15 @@ fn main() {
             dur,
         );
     }
+
+    let mut p = Populate::new(nposts, nusers, nclasses);
+    if populate {
+        println!("Populating tables...");
+        p.populate_tables(&backend);
+    }
+
+    println!("Finished writing! Sleeping for 2 seconds...");
+    thread::sleep(time::Duration::from_millis(2000));
 
 
     println!("Done with benchmark.");

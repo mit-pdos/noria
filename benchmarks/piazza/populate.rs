@@ -66,7 +66,7 @@ impl Populate {
         let mut records = Vec::new();
         for i in 0..self.nclasses {
             // add some students
-            for i in 0..50 {
+            for _ in 0..50 {
                 let uid = self.uid();
                 let cid = i.into();
                 let role = 0.into(); // student
@@ -74,7 +74,7 @@ impl Populate {
             }
 
             // add some tas
-            for i in 0..4 {
+            for _ in 0..4 {
                 let uid = self.uid();
                 let cid = i.into();
                 let role = 0.into(); // ta
