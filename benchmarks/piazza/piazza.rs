@@ -265,6 +265,8 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
+    assert!(nlogged <= nusers, "nusers must be greater than nlogged");
+
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
