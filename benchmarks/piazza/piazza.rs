@@ -239,6 +239,12 @@ fn main() {
                 .default_value("100000")
                 .help("Number of posts in the db"),
         )
+        .arg(
+            Arg::with_name("private")
+                .long("private")
+                .default_value("0.1")
+                .help("Percentage of private posts"),
+        )
         .get_matches();
 
 
@@ -257,6 +263,7 @@ fn main() {
     let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
+    let private = value_t_or_exit!(args, "private", f32);
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
@@ -276,7 +283,7 @@ fn main() {
         );
     }
 
-    let mut p = Populate::new(nposts, nusers, nclasses);
+    let mut p = Populate::new(nposts, nusers, nclasses, private);
     if populate {
         println!("Populating tables...");
         p.populate_tables(&backend);

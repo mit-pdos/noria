@@ -16,16 +16,19 @@ pub struct Populate {
     nposts: i32,
     nusers: i32,
     nclasses: i32,
+    private: f32,
     rng: rand::ThreadRng,
 }
 
 
 impl Populate {
-    pub fn new(nposts: i32, nusers: i32, nclasses: i32) -> Populate {
+    pub fn new(nposts: i32, nusers: i32, nclasses: i32, private: f32) -> Populate {
+
         Populate {
             nposts: nposts,
             nusers: nusers,
             nclasses: nclasses,
+            private: private,
             rng: rand::thread_rng(),
         }
     }
@@ -139,7 +142,9 @@ impl Populate {
     }
 
     fn private(&mut self) -> DataType {
-        (self.rng.gen_weighted_bool(10) as i32).into()
+        // posts have a 1 in (1 / private) of being private.
+        let private = (1.0 / self.private) as u32;
+        (self.rng.gen_weighted_bool(private) as i32).into()
     }
 
 }
