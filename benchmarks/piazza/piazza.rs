@@ -63,19 +63,33 @@ impl Backend {
     }
 
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-        let mut mig = self.g.add_universe(user_context);
-        let mut recipe = self.recipe.take().unwrap();
-        recipe.next();
-        match recipe.create_universe(&mut mig) {
-            Ok(ar) => {
-                info!(self.log, "{} expressions added", ar.expressions_added);
-                info!(self.log, "{} expressions removed", ar.expressions_removed);
-            }
-            Err(e) => panic!("failed to activate recipe: {}", e),
-        };
-        mig.commit();
-        self.recipe = Some(recipe);
+        {
+            let mut mig = self.g.add_universe(user_context.clone());
+            let mut recipe = self.recipe.take().unwrap();
+            recipe.next();
+            match recipe.create_universe(&mut mig) {
+                Ok(ar) => {
+                    info!(self.log, "{} expressions added", ar.expressions_added);
+                    info!(self.log, "{} expressions removed", ar.expressions_removed);
+                }
+                Err(e) => panic!("failed to activate recipe: {}", e),
+            };
+            mig.commit();
+            self.recipe = Some(recipe);
+        }
+
+        self.write_to_user_context(user_context);
         Ok(())
+    }
+
+    fn write_to_user_context(&self, uc: HashMap<String, DataType>) {
+        let name = &format!("UserContext_{}", uc.get("id").unwrap());
+        let r: Vec<DataType> = uc.values().cloned().collect();
+        let mut mutator = self
+            .g
+            .get_mutator(self.recipe().node_addr_for(name).unwrap());
+
+        mutator.put(r).unwrap();
     }
 
     fn migrate(
