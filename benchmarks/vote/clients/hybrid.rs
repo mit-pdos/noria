@@ -205,7 +205,7 @@ impl Reader for RW {
                 .collect::<Vec<_>>()
                 .join(" UNION ");
             for row in self.conn.query(qstring).unwrap() {
-                let rr = row.unwrap();
+                let mut rr = row.unwrap();
                 let id = rr.get(0).unwrap();
                 let title = rr.get(1).unwrap();
                 let vc = rr.get(2).unwrap();

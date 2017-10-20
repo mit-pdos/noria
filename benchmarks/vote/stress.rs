@@ -11,6 +11,7 @@ mod common;
 
 use std::thread;
 use std::time;
+use std::sync::{Arc, Mutex};
 
 fn randomness(range: usize, n: usize) -> Vec<i64> {
     use rand::Rng;
@@ -104,21 +105,25 @@ fn main() {
     s.stupid = args.is_present("stupid");
     s.partial = !args.is_present("full");
     s.sharding = !args.is_present("unsharded");
-    let mut g = graph::make(s, persistence_params);
+    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
+    let mut g = graph::make(blender, s, persistence_params);
 
-    if let Some(n) = concurrent_replays {
-        g.graph.set_max_concurrent_replay(n);
-    }
-    if let Some(n) = replay_size {
-        g.graph.set_partial_replay_batch_size(n);
-    }
-    if let Some(t) = replay_timeout {
-        g.graph.set_partial_replay_batch_timeout(t);
-    }
+    let (mut articles, mut votes) = {
+        let mut b = g.graph.lock().unwrap();
 
-    // we need a putter and a getter
-    let mut articles = g.graph.get_mutator(g.article);
-    let mut votes = g.graph.get_mutator(g.vote);
+        if let Some(n) = concurrent_replays {
+            b.set_max_concurrent_replay(n);
+        }
+        if let Some(n) = replay_size {
+            b.set_partial_replay_batch_size(n);
+        }
+        if let Some(t) = replay_timeout {
+            b.set_partial_replay_batch_timeout(t);
+        }
+
+        // we need putters
+        (b.get_mutator(g.article), b.get_mutator(g.vote))
+    };
 
     // prepopulate
     if !args.is_present("quiet") {
@@ -142,8 +147,10 @@ fn main() {
         println!("Migrating...");
     }
     let (ratings, read_new) = g.transition();
-    let mut ratings = g.graph.get_mutator(ratings);
-    let read_new = g.graph.get_getter(read_new).unwrap();
+    let (mut ratings, read_new) = {
+        let b = g.graph.lock().unwrap();
+        (b.get_mutator(ratings), b.get_getter(read_new).unwrap())
+    };
 
     // prepopulate new ratings
     if !args.is_present("quiet") {

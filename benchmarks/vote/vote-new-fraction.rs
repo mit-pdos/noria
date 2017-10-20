@@ -15,7 +15,7 @@ const WRITE_RATE: u64 = 200_000;
 
 use zipf::ZipfDistribution;
 
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
 use std::time;
 
@@ -112,9 +112,9 @@ fn main() {
                 .help("Make the migration stupid"),
         )
         .arg(
-            Arg::with_name("unsharded")
-                .long("unsharded")
-                .help("Run without sharding"),
+            Arg::with_name("sharded")
+                .long("sharded")
+                .help("Enable sharding of the graph."),
         )
         .arg(
             Arg::with_name("max_concurrent")
@@ -174,23 +174,30 @@ fn main() {
     let mut s = graph::Setup::default();
     s.stupid = args.is_present("stupid");
     s.partial = !args.is_present("full");
-    s.sharding = !args.is_present("unsharded");
-    let mut g = graph::make(s, persistence_params);
+    s.sharding = args.is_present("sharded");
+    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
+    let mut g = graph::make(blender, s, persistence_params);
 
-    if let Some(n) = concurrent_replays {
-        g.graph.set_max_concurrent_replay(n);
-    }
-    if let Some(n) = replay_size {
-        g.graph.set_partial_replay_batch_size(n);
-    }
-    if let Some(t) = replay_timeout {
-        g.graph.set_partial_replay_batch_timeout(t);
-    }
+    let (mut articles, mut votes, read_old) = {
+        let mut b = g.graph.lock().unwrap();
 
-    // we need a putter and a getter
-    let mut articles = g.graph.get_mutator(g.article);
-    let mut votes = g.graph.get_mutator(g.vote);
-    let read_old = g.graph.get_getter(g.end).unwrap();
+        if let Some(n) = concurrent_replays {
+            b.set_max_concurrent_replay(n);
+        }
+        if let Some(n) = replay_size {
+            b.set_partial_replay_batch_size(n);
+        }
+        if let Some(t) = replay_timeout {
+            b.set_partial_replay_batch_timeout(t);
+        }
+
+        // we need a putter and a getter
+        (
+            b.get_mutator(g.article),
+            b.get_mutator(g.vote),
+            b.get_getter(g.end).unwrap(),
+        )
+    };
 
     // prepopulate
     println!("Prepopulating with {} articles", narticles);
@@ -273,8 +280,10 @@ fn main() {
 
     // all right, migration time
     let (ratings, read_new) = g.transition();
-    let mut ratings = g.graph.get_mutator(ratings);
-    let read_new = g.graph.get_getter(read_new).unwrap();
+    let (mut ratings, read_new) = {
+        let b = g.graph.lock().unwrap();
+        (b.get_mutator(ratings), b.get_getter(read_new).unwrap())
+    };
 
     println!("Starting new writer");
 

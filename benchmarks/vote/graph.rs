@@ -1,13 +1,15 @@
 use distributary::{Aggregation, Base, Blender, Join, JoinType, NodeIndex, PersistenceParameters};
 use distributary;
 
+use std::sync::{Arc, Mutex};
+
 pub struct Graph {
     setup: Setup,
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub vc: NodeIndex,
     pub end: NodeIndex,
-    pub graph: Blender,
+    pub graph: Arc<Mutex<Blender>>,
 }
 
 pub struct Setup {
@@ -62,59 +64,69 @@ impl Setup {
     }
 }
 
-pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
-    // set up graph
-    let mut g = Blender::new();
-    if s.log {
-        g.log_with(distributary::logger_pls());
-    }
-    if !s.partial {
-        g.disable_partial();
-    }
-    if !s.sharding {
-        g.disable_sharding();
-    }
+pub fn make(
+    blender: Arc<Mutex<Blender>>,
+    s: Setup,
+    persistence_params: PersistenceParameters,
+) -> Graph {
+    let (article, vote, vc, end) = {
+        // set up graph
+        let mut g = blender.lock().unwrap();
+        if s.log {
+            g.log_with(distributary::logger_pls());
+        }
+        if !s.partial {
+            g.disable_partial();
+        }
+        if !s.sharding {
+            g.disable_sharding();
+        }
 
-    g.with_persistence_options(persistence_params);
+        g.with_persistence_options(persistence_params);
 
-    let (article, vote, vc, end) = g.migrate(|mig| {
-        // add article base node
-        let article = if s.transactions {
-            mig.add_transactional_base("article", &["id", "title"], Base::default())
-        } else {
-            mig.add_ingredient("article", &["id", "title"], Base::default())
-        };
+        g.migrate(|mig| {
+            // add article base node
+            let article = if s.transactions {
+                mig.add_transactional_base("article", &["id", "title"], Base::default())
+            } else {
+                mig.add_ingredient("article", &["id", "title"], Base::default())
+            };
 
-        // add vote base table
-        let vote = if s.transactions {
-            mig.add_transactional_base("vote", &["user", "id"], Base::default().with_key(vec![1]))
-        } else {
-            mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
-        };
+            // add vote base table
+            let vote = if s.transactions {
+                mig.add_transactional_base(
+                    "vote",
+                    &["user", "id"],
+                    Base::default().with_key(vec![1]),
+                )
+            } else {
+                mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
+            };
 
-        // add vote count
-        let vc = mig.add_ingredient(
-            "votecount",
-            &["id", "votes"],
-            Aggregation::COUNT.over(vote, 0, &[1]),
-        );
+            // add vote count
+            let vc = mig.add_ingredient(
+                "votecount",
+                &["id", "votes"],
+                Aggregation::COUNT.over(vote, 0, &[1]),
+            );
 
-        // add final join using first field from article and first from vc
-        use distributary::JoinSource::*;
-        let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
-        let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
+            // add final join using first field from article and first from vc
+            use distributary::JoinSource::*;
+            let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
+            let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
 
-        mig.maintain(end, 0);
-        (article, vote, vc, end)
-    });
+            mig.maintain(end, 0);
+            (article, vote, vc, end)
+        })
+    };
 
     Graph {
         vote: vote.into(),
         article: article.into(),
         vc: vc.into(),
         end: end.into(),
+        graph: blender,
         setup: s,
-        graph: g,
     }
 }
 
@@ -130,7 +142,9 @@ impl Graph {
         let article = self.article;
         let setup = &self.setup;
 
-        self.graph.migrate(|mig| {
+        // migrate
+        let mut g = self.graph.lock().unwrap();
+        g.migrate(|mig| {
             // add new "ratings" base table
             let b = Base::default().with_key(vec![1]);
             let rating = if setup.transactions {

@@ -5,7 +5,6 @@ extern crate rand;
 
 extern crate distributary;
 
-extern crate bus;
 extern crate hdrsample;
 extern crate zipf;
 
@@ -17,9 +16,10 @@ mod common;
 
 use common::{ArticleResult, Distribution, Period, Reader, RuntimeConfig, Writer};
 use distributary::{DataType, DurabilityMode, Mutator, PersistenceParameters};
+use std::sync::mpsc;
 
 use std::thread;
-use std::sync;
+use std::sync::{self, Arc, Mutex};
 use std::time;
 
 fn main() {
@@ -101,6 +101,12 @@ fn main() {
                 .value_name("N")
                 .default_value("60")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("sharded")
+                .long("sharded")
+                .takes_value(false)
+                .help("Enable sharding of the graph."),
         )
         .arg(
             Arg::with_name("stupid")
@@ -240,37 +246,52 @@ fn main() {
     let mut s = graph::Setup::default();
     s.log = !args.is_present("quiet");
     s.transactions = args.is_present("transactions");
+    s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
-    let g = graph::make(s, persistence_params);
+    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
+    let g = graph::make(blender, s, persistence_params);
 
     // prepare getters
-    let getters: Vec<_> = (0..ngetters)
-        .into_iter()
-        .map(|_| {
-            Getter::new(g.graph.get_getter(g.end).unwrap(), crossover)
-        })
-        .collect();
+    let getters: Vec<_> = {
+        let b = g.graph.lock().unwrap();
+        (0..ngetters)
+            .into_iter()
+            .map(|_| Getter::new(b.get_getter(g.end).unwrap(), crossover))
+            .collect()
+    };
 
-    let mut new_votes = migrate_after.map(|t| (t, bus::Bus::new(nputters)));
-    let putters = (g.graph.get_mutator(g.article), g.graph.get_mutator(g.vote));
+    let mut new_vote_senders = Vec::new();
+    let mut new_vote_receivers = Vec::new();
+    for _ in 0..nputters {
+        let (tx, rx) = mpsc::channel();
+        new_vote_receivers.push(rx);
+        new_vote_senders.push(tx);
+    }
+
+    let new_votes = migrate_after.map(|t| (t, new_vote_senders));
 
     // prepare putters
-    let putters: Vec<_> = (0..nputters)
-        .into_iter()
-        .map(|_| {
-            let mix_getter = mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap());
-            Spoon {
-                article: putters.0.clone(),
-                vote_pre: putters.1.clone(),
-                vote_post: None,
-                new_vote: new_votes.as_mut().map(|&mut (_, ref mut bus)| bus.add_rx()),
-                x: Crossover::new(crossover),
-                i: 0,
-                mix_getter,
-            }
-        })
-        .collect();
+    let putters: Vec<_> = {
+        let b = g.graph.lock().unwrap();
+        let mix_getters = (0..new_vote_receivers.len())
+            .map(|_| mix.as_ref().map(|_| b.get_getter(g.end).unwrap()));
+        new_vote_receivers
+            .into_iter()
+            .zip(mix_getters)
+            .map(|(new_vote, mix_getter)| {
+                Spoon {
+                    article: b.get_mutator(g.article),
+                    vote_pre: b.get_mutator(g.vote),
+                    vote_post: None,
+                    new_vote: new_votes.as_ref().and(Some(new_vote)),
+                    x: Crossover::new(crossover),
+                    i: 0,
+                    mix_getter,
+                }
+            })
+            .collect()
+    };
 
     let put_name = if mix.is_some() { "MIX" } else { "PUT" };
     let put_stats: Vec<_>;
@@ -647,7 +668,7 @@ struct Spoon {
     vote_post: Option<Mutator>,
     i: usize,
     x: Crossover,
-    new_vote: Option<bus::BusReader<Mutator>>,
+    new_vote: Option<mpsc::Receiver<Mutator>>,
     mix_getter: Option<distributary::Getter>,
 }
 
@@ -707,7 +728,7 @@ impl Writer for Spoon {
 
 struct Migrator {
     graph: graph::Graph,
-    bus: bus::Bus<Mutator>,
+    bus: Vec<mpsc::Sender<Mutator>>,
     getters: Vec<Getter>,
     barrier: sync::Arc<sync::Barrier>,
 }
@@ -718,10 +739,12 @@ impl Migrator {
         println!("Starting migration");
         let mig_start = time::Instant::now();
         let (rating, newend) = self.graph.transition();
-        let mutator = self.graph.graph.get_mutator(rating);
-        self.bus.broadcast(mutator);
+        let b = self.graph.graph.lock().unwrap();
+        for sender in self.bus {
+            sender.send(b.get_mutator(rating)).unwrap();
+        }
         for mut getter in self.getters {
-            unsafe { getter.replace(self.graph.graph.get_getter(newend).unwrap()) };
+            unsafe { getter.replace(b.get_getter(newend).unwrap()) };
         }
         let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
         println!("Migration completed in {:.4}s", mig_duration);
