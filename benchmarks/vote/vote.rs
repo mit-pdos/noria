@@ -249,7 +249,12 @@ fn main() {
         DurabilityMode::MemoryOnly
     };
 
-    let persistence_params = PersistenceParameters::new(mode, queue_length, flush_timeout);
+    let persistence_params = PersistenceParameters::new(
+        mode,
+        queue_length,
+        flush_timeout,
+        Some(String::from("vote")),
+    );
 
     // setup db
     let mut s = graph::Setup::default();
