@@ -702,20 +702,18 @@ impl Writer for Spoon {
         }
 
         if self.x.use_post() {
-            for &(user_id, article_id) in ids {
-                self.vote_post
-                    .as_mut()
-                    .unwrap()
-                    .put(vec![user_id.into(), article_id.into(), 5.into()])
-                    .unwrap();
-            }
+            let data: Vec<Vec<DataType>> = ids.iter()
+                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into(), 5.into()])
+                .collect();
+
+            self.vote_post.as_mut().unwrap().multi_put(data).unwrap();
             Period::PostMigration
         } else {
-            for &(user_id, article_id) in ids {
-                self.vote_pre
-                    .put(vec![user_id.into(), article_id.into()])
-                    .unwrap();
-            }
+            let data: Vec<Vec<DataType>> = ids.iter()
+                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into()])
+                .collect();
+            self.vote_pre.multi_put(data).unwrap();
+
             if !self.x.has_swapped() {
                 Period::PreMigration
             } else {
