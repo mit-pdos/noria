@@ -309,10 +309,12 @@ fn process_latencies(
     //     for DebugEvent { instant, event } in debug_channel.iter() {
     //         match event {
     //             DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
-    //                 if let Some((transaction_start, write_start, write_end)) = times[tag as usize] {
+    //                 if let Some((transaction_start, write_start, write_end))
+    //                     = times[tag as usize] {
     //                     read_latencies.push(dur_to_ns!(write_start - transaction_start));
     //                     write_latencies.push(dur_to_ns!(write_end - write_start));
-    //                     settle_latencies.push(dur_to_ns!(cmp::max(instant, write_end) - write_end));
+    //                     settle_latencies.push(
+    //                           dur_to_ns!(cmp::max(instant, write_end) - write_end));
     //                 }
     //                 break;
     //             }

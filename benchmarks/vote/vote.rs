@@ -703,14 +703,18 @@ impl Writer for Spoon {
 
         if self.x.use_post() {
             let data: Vec<Vec<DataType>> = ids.iter()
-                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into(), 5.into()])
+                .map(|&(user_id, article_id)| {
+                    vec![user_id.into(), article_id.into(), 5.into()]
+                })
                 .collect();
 
             self.vote_post.as_mut().unwrap().multi_put(data).unwrap();
             Period::PostMigration
         } else {
             let data: Vec<Vec<DataType>> = ids.iter()
-                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into()])
+                .map(|&(user_id, article_id)| {
+                    vec![user_id.into(), article_id.into()]
+                })
                 .collect();
             self.vote_pre.multi_put(data).unwrap();
 
