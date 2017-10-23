@@ -689,7 +689,7 @@ impl Writer for Spoon {
         if self.new_vote.is_some() {
             self.i += 1;
             // don't try too eagerly
-            if self.i & 65536 == 0 {
+            if self.i % 65536 == 0 {
                 // we may have been given a new putter
                 if let Ok(nv) = self.new_vote.as_mut().unwrap().try_recv() {
                     // yay!
