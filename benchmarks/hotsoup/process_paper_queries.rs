@@ -103,20 +103,26 @@ fn main() {
         .arg(
             Arg::with_name("source")
                 .index(1)
-                .help("Location of the HotCRP paper queries (in MySQL query log form).")
+                .help(
+                    "Location of the HotCRP paper queries (in MySQL query log form).",
+                )
                 .required(true),
         )
         .arg(
             Arg::with_name("start_at")
                 .default_value("10")
                 .long("start_at")
-                .help("Schema version to start at; versions prior to this will be skipped."),
+                .help(
+                    "Schema version to start at; versions prior to this will be skipped.",
+                ),
         )
         .arg(
             Arg::with_name("stop_at")
                 .default_value("163")
                 .long("stop_at")
-                .help("Schema version to stop at; versions after this will be skipped."),
+                .help(
+                    "Schema version to stop at; versions after this will be skipped.",
+                ),
         )
         .get_matches();
 

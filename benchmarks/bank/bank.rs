@@ -1,17 +1,15 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
-extern crate hdrsample;
+extern crate mio;
 extern crate rand;
 
-use hdrsample::Histogram;
-
-use std::cmp;
-use std::sync::mpsc;
 use std::thread;
 use std::time;
 
 use std::collections::HashMap;
+
+use mio::net::TcpListener;
 
 use distributary::{Aggregation, Base, Blender, DataType, Join, JoinType, Mutator, Token};
 
@@ -34,7 +32,7 @@ pub struct Bank {
     blender: Blender,
     transfers: distributary::NodeIndex,
     balances: distributary::NodeIndex,
-    debug_channel: Option<mpsc::Receiver<distributary::DebugEvent>>,
+    debug_channel: Option<TcpListener>,
 }
 
 pub fn setup(transactions: bool) -> Box<Bank> {
@@ -42,16 +40,9 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     let mut g = Blender::new();
     let debug_channel = g.create_debug_channel();
 
-    let transfers;
-    let credits;
-    let debits;
-    let balances;
-    {
-        // migrate
-        let mut mig = g.start_migration();
-
+    let (transfers, _credits, _debits, balances) = g.migrate(|mig| {
         // add transfers base table
-        transfers = if transactions {
+        let transfers = if transactions {
             mig.add_transactional_base(
                 "transfers",
                 &["src_acct", "dst_acct", "amount"],
@@ -66,14 +57,14 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         };
 
         // add all debits
-        debits = mig.add_ingredient(
+        let debits = mig.add_ingredient(
             "debits",
             &["acct_id", "total"],
             Aggregation::SUM.over(transfers, 2, &[0]),
         );
 
         // add all credits
-        credits = mig.add_ingredient(
+        let credits = mig.add_ingredient(
             "credits",
             &["acct_id", "total"],
             Aggregation::SUM.over(transfers, 2, &[1]),
@@ -83,12 +74,11 @@ pub fn setup(transactions: bool) -> Box<Bank> {
         // aggregations or arithmetic on columns.
         use distributary::JoinSource::*;
         let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
-        balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
+        let balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
         mig.maintain(balances, 0);
 
-        // start processing
-        mig.commit();
-    };
+        (transfers, credits, debits, balances)
+    });
 
     Box::new(Bank {
         blender: g,
@@ -103,14 +93,15 @@ impl Bank {
         self.blender.get_getter(self.balances).unwrap()
     }
     pub fn migrate(&mut self) {
-        let mut mig = self.blender.start_migration();
-        let identity = mig.add_ingredient(
-            "identity",
-            &["acct_id", "credit", "debit"],
-            distributary::Identity::new(self.balances),
-        );
-        mig.maintain(identity, 0);
-        mig.commit();
+        let balances = self.balances;
+        self.blender.migrate(|mig| {
+            let identity = mig.add_ingredient(
+                "identity",
+                &["acct_id", "credit", "debit"],
+                distributary::Identity::new(balances),
+            );
+            mig.maintain(identity, 0);
+        });
     }
 }
 
@@ -145,7 +136,7 @@ fn client(
     runtime: time::Duration,
     _verbose: bool,
     audit: bool,
-    measure_latency: Option<mpsc::Receiver<distributary::DebugEvent>>,
+    measure_latency: Option<TcpListener>,
     coarse: bool,
     transactions: bool,
     is_transfer_deterministic: bool,
@@ -304,63 +295,61 @@ fn client(
 /// Given a Vec of (transaction_start, write_start) and the global debug channel, compute and output
 /// latency statistics.
 fn process_latencies(
-    times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
-    debug_channel: mpsc::Receiver<distributary::DebugEvent>,
+    _times: Vec<Option<(time::Instant, time::Instant, time::Instant)>>,
+    _debug_channel: TcpListener,
 ) {
-    use distributary::{DebugEvent, DebugEventType, PacketEvent};
+    unimplemented!();
 
-    let mut read_latencies: Vec<u64> = Vec::new();
-    let mut write_latencies = Vec::new();
-    let mut settle_latencies = Vec::new();
+    // use distributary::{DebugEvent, DebugEventType, PacketEvent};
 
-    for _ in 0..(times.iter().filter(|t| t.is_some()).count()) {
-        for DebugEvent { instant, event } in debug_channel.iter() {
-            // if verbose {
-            //     let dt = dur_to_ns!(instant.duration_since(last_instant)) as f64;
-            //     println!("{:.3} μs: {:?}", dt * 0.001, event);
-            //     last_instant = instant;
-            // }
-            match event {
-                DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
-                    if let Some((transaction_start, write_start, write_end)) = times[tag as usize] {
-                        read_latencies.push(dur_to_ns!(write_start - transaction_start));
-                        write_latencies.push(dur_to_ns!(write_end - write_start));
-                        settle_latencies.push(dur_to_ns!(cmp::max(instant, write_end) - write_end));
-                    }
-                    break;
-                }
-                DebugEventType::PacketEvent(PacketEvent::Merged(_), _) => unimplemented!(),
-                _ => {}
-            }
-        }
-    }
+    // let mut read_latencies: Vec<u64> = Vec::new();
+    // let mut write_latencies = Vec::new();
+    // let mut settle_latencies = Vec::new();
+    // for _ in 0..(times.iter().filter(|t| t.is_some()).count()) {
+    //     for DebugEvent { instant, event } in debug_channel.iter() {
+    //         match event {
+    //             DebugEventType::PacketEvent(PacketEvent::ReachedReader, tag) => {
+    //                 if let Some((transaction_start, write_start, write_end))
+    //                     = times[tag as usize] {
+    //                     read_latencies.push(dur_to_ns!(write_start - transaction_start));
+    //                     write_latencies.push(dur_to_ns!(write_end - write_start));
+    //                     settle_latencies.push(
+    //                           dur_to_ns!(cmp::max(instant, write_end) - write_end));
+    //                 }
+    //                 break;
+    //             }
+    //             DebugEventType::PacketEvent(PacketEvent::Merged(_), _) => unimplemented!(),
+    //             _ => {}
+    //         }
+    //     }
+    // }
 
 
-    // Print average latencies.
-    let rl: u64 = read_latencies.iter().sum();
-    let wl: u64 = write_latencies.iter().sum();
-    let sl: u64 = settle_latencies.iter().sum();
+    // // Print average latencies.
+    // let rl: u64 = read_latencies.iter().sum();
+    // let wl: u64 = write_latencies.iter().sum();
+    // let sl: u64 = settle_latencies.iter().sum();
 
-    let n = write_latencies.len() as f64;
-    println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
-    println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
-    println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
-    println!(
-        "write + settle latency: {:.3} μs",
-        (wl + sl) as f64 / n * 0.001
-    );
+    // let n = write_latencies.len() as f64;
+    // println!("read latency: {:.3} μs", rl as f64 / n * 0.001);
+    // println!("write latency: {:.3} μs", wl as f64 / n * 0.001);
+    // println!("settle latency: {:.3} μs", sl as f64 / n * 0.001);
+    // println!(
+    //     "write + settle latency: {:.3} μs",
+    //     (wl + sl) as f64 / n * 0.001
+    // );
 
-    let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
-    for i in 0..write_latencies.len() {
-        let sample_nanos = write_latencies[i] + settle_latencies[i];
-        let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
-        latencies_hist.record(sample_micros).unwrap();
-    }
+    // let mut latencies_hist = Histogram::<u64>::new_with_bounds(10, 10000000, 4).unwrap();
+    // for i in 0..write_latencies.len() {
+    //     let sample_nanos = write_latencies[i] + settle_latencies[i];
+    //     let sample_micros = (sample_nanos as f64 * 0.001).round() as u64;
+    //     latencies_hist.record(sample_micros).unwrap();
+    // }
 
-    for iv in latencies_hist.iter_recorded() {
-        // XXX: Print CDF in the format expected by the print_latency_cdf script.
-        println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
-    }
+    // for iv in latencies_hist.iter_recorded() {
+    //     // XXX: Print CDF in the format expected by the print_latency_cdf script.
+    //     println!("percentile PUT {:.2} {:.2}", iv.value(), iv.percentile());
+    // }
 }
 
 fn main() {

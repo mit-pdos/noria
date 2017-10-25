@@ -45,10 +45,12 @@ impl BenchmarkResult {
         s / self.throughputs.len() as f64
     }
 
+    #[allow(dead_code)]
     pub fn cdf(&self) -> Option<&(Histogram<u64>, Histogram<u64>)> {
         self.samples.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn merged_cdf(&self) -> Option<Histogram<u64>> {
         self.samples.as_ref().map(|&(ref r, ref w)| {
             let mut h = r.clone();
@@ -313,6 +315,7 @@ where
     )
 }
 
+#[allow(dead_code)]
 pub fn launch_mix_wait<T>(
     inner: T,
     config: RuntimeConfig,

@@ -164,7 +164,6 @@ impl Writer for RW {
 impl Reader for RW {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
         use memcached::proto::MultiOperation;
-        use std::str;
 
         let keys: Vec<_> = ids.iter()
             .map(|&(_, ref article_id)| format!("article_{}_vc", article_id))

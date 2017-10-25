@@ -1,69 +1,72 @@
 use distributary::srv;
-use distributary::DataType;
+use distributary::{DataType, Mutator, MutatorBuilder, RemoteGetter, RemoteGetterBuilder};
 
 use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
 
 use std::io;
 use std::io::prelude::*;
-use std::net::TcpStream;
+use std::net::{IpAddr, SocketAddr, TcpStream};
 use net2::TcpBuilder;
 use bufstream::BufStream;
 use bincode;
+use vec_map::VecMap;
 
 const ARTICLE_NODE: usize = 1;
 const VOTE_NODE: usize = 2;
 const END_NODE: usize = 4;
 
-pub struct C(BufStream<TcpStream>);
+pub struct C(
+    BufStream<TcpStream>,
+    VecMap<Mutator>,
+    VecMap<RemoteGetter>,
+    IpAddr,
+);
+
 impl C {
-    pub fn mput(&mut self, view: usize, mut data: Vec<Vec<DataType>>) {
-        let &mut C(ref mut bs) = self;
-        let n = data.len();
-        let mut method = srv::Method::Insert {
-            view,
-            args: Vec::new(),
-        };
-        for r in &mut data {
-            if let srv::Method::Insert { ref mut args, .. } = method {
-                use std::mem;
-                mem::swap(args, r);
-            }
-            bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
-        }
-        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
-        bs.flush().unwrap();
-        for _ in 0..n {
-            let _: i64 = bincode::deserialize_from(bs, bincode::Infinite).unwrap();
-        }
+    pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
+        let stream = &mut self.0;
+        let listen_addr = self.3.clone();
+        let mutator = self.1.entry(view).or_insert_with(|| {
+            bincode::serialize_into(
+                stream,
+                &srv::Method::GetMutatorBuilder { view },
+                bincode::Infinite,
+            ).unwrap();
+            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
+            stream.flush().unwrap();
+            let builder: MutatorBuilder =
+                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
+            builder.build(SocketAddr::new(listen_addr, 0))
+        });
+
+        mutator.multi_put(data).unwrap();
     }
 
     pub fn query(
         &mut self,
         view: usize,
-        mut keys: Vec<DataType>,
+        keys: Vec<DataType>,
     ) -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
-        let &mut C(ref mut bs) = self;
-        let n = keys.len();
-        let mut method = srv::Method::Query {
-            view,
-            key: DataType::None,
-        };
-        for q_key in &mut keys {
-            if let srv::Method::Query { ref mut key, .. } = method {
-                use std::mem;
-                mem::swap(key, q_key);
-            }
-            bincode::serialize_into(bs, &method, bincode::Infinite).unwrap();
-        }
-        bincode::serialize_into(bs, &srv::Method::Flush, bincode::Infinite).unwrap();
-        bs.flush()?;
+        let stream = &mut self.0;
+        let getter = self.2.entry(view).or_insert_with(|| {
+            bincode::serialize_into(
+                stream,
+                &srv::Method::GetGetterBuilder { view },
+                bincode::Infinite,
+            ).unwrap();
+            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
+            stream.flush().unwrap();
+            let builder: RemoteGetterBuilder =
+                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
+            println!("Got RemoteGetterBuilder: {:?}", builder);
+            builder.build()
+        });
+
         Ok(
-            (0..n)
-                .map(|_| {
-                    let result: Result<Vec<Vec<DataType>>, ()> =
-                        bincode::deserialize_from(bs, bincode::Infinite).unwrap();
-                    result.unwrap_or_default()
-                })
+            getter
+                .lookup(keys, true)
+                .into_iter()
+                .map(|rs| rs.unwrap_or_default())
                 .collect(),
         )
     }
@@ -77,7 +80,8 @@ pub fn make(addr: &str, config: &RuntimeConfig) -> C {
     let stream = stream.connect(addr).unwrap();
     stream.set_nodelay(true).unwrap();
     let stream = BufStream::new(stream);
-    C(stream)
+    let sa: SocketAddr = config.bind_to.as_ref().unwrap().parse().unwrap();
+    C(stream, VecMap::new(), VecMap::new(), sa.ip())
 }
 
 impl Writer for C {

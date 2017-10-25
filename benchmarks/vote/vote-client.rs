@@ -29,6 +29,7 @@ extern crate net2;
 extern crate memcached;
 
 extern crate hdrsample;
+extern crate vec_map;
 extern crate zipf;
 
 mod clients;
@@ -119,6 +120,7 @@ fn main() {
             Arg::with_name("bind")
                 .short("B")
                 .takes_value(true)
+                .default_value("127.0.0.1:0")
                 .help("bind to the given local address when possible"),
         )
         .arg(
