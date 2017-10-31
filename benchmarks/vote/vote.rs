@@ -19,7 +19,7 @@ use distributary::{DataType, DurabilityMode, Mutator, PersistenceParameters};
 use std::sync::mpsc;
 
 use std::thread;
-use std::sync::{self, Arc, Mutex};
+use std::sync;
 use std::time;
 
 fn main() {
@@ -244,20 +244,20 @@ fn main() {
 
     // setup db
     let mut s = graph::Setup::default();
-    s.log = !args.is_present("quiet");
+    // s.log = !args.is_present("quiet");
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
-    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
-    let g = graph::make(blender, s, persistence_params);
+    let g = graph::make(s, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = {
-        let b = g.graph.lock().unwrap();
         (0..ngetters)
             .into_iter()
-            .map(|_| Getter::new(b.get_getter(g.end).unwrap(), crossover))
+            .map(|_| {
+                Getter::new(g.graph.get_getter(g.end).unwrap(), crossover)
+            })
             .collect()
     };
 
@@ -273,16 +273,15 @@ fn main() {
 
     // prepare putters
     let putters: Vec<_> = {
-        let b = g.graph.lock().unwrap();
         let mix_getters = (0..new_vote_receivers.len())
-            .map(|_| mix.as_ref().map(|_| b.get_getter(g.end).unwrap()));
+            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap()));
         new_vote_receivers
             .into_iter()
             .zip(mix_getters)
             .map(|(new_vote, mix_getter)| {
                 Spoon {
-                    article: b.get_mutator(g.article),
-                    vote_pre: b.get_mutator(g.vote),
+                    article: g.graph.get_mutator(g.article).unwrap(),
+                    vote_pre: g.graph.get_mutator(g.vote).unwrap(),
                     vote_post: None,
                     new_vote: new_votes.as_ref().and(Some(new_vote)),
                     x: Crossover::new(crossover),
@@ -575,7 +574,7 @@ impl Crossover {
     }
 }
 
-type G = distributary::Getter;
+type G = distributary::RemoteGetter;
 
 // A more dangerous AtomicPtr that also derefs into the inner type
 use std::sync::atomic::AtomicPtr;
@@ -669,7 +668,7 @@ struct Spoon {
     i: usize,
     x: Crossover,
     new_vote: Option<mpsc::Receiver<Mutator>>,
-    mix_getter: Option<distributary::Getter>,
+    mix_getter: Option<distributary::RemoteGetter>,
 }
 
 impl Writer for Spoon {
@@ -741,12 +740,13 @@ impl Migrator {
         println!("Starting migration");
         let mig_start = time::Instant::now();
         let (rating, newend) = self.graph.transition();
-        let b = self.graph.graph.lock().unwrap();
         for sender in self.bus {
-            sender.send(b.get_mutator(rating)).unwrap();
+            sender
+                .send(self.graph.graph.get_mutator(rating).unwrap())
+                .unwrap();
         }
         for mut getter in self.getters {
-            unsafe { getter.replace(b.get_getter(newend).unwrap()) };
+            unsafe { getter.replace(self.graph.graph.get_getter(newend).unwrap()) };
         }
         let mig_duration = dur_to_ns!(mig_start.elapsed()) as f64 / 1_000_000_000.0;
         println!("Migration completed in {:.4}s", mig_duration);
@@ -759,32 +759,24 @@ impl Reader for Getter {
         let res = ids.iter()
             .map(|&(_, article_id)| {
                 (self.call())
-                    .lookup_map(
-                        &article_id.into(),
-                        |rows| match rows.len() {
-                            0 => ArticleResult::NoSuchArticle,
-                            1 => {
-                                let row = &rows[0];
-                                let id: i64 = row[0].clone().into();
-                                let title: String = row[1].deep_clone().into();
-                                let votes: i64 = match row[2] {
-                                    DataType::None => 42,
-                                    ref d => d.clone().into(),
-                                };
-                                ArticleResult::Article {
-                                    id: id,
-                                    title: title,
-                                    votes: votes,
-                                }
+                    .lookup(&article_id.into(), true)
+                    .map(|rows| match rows.len() {
+                        0 => ArticleResult::NoSuchArticle,
+                        1 => {
+                            let row = &rows[0];
+                            let id: i64 = row[0].clone().into();
+                            let title: String = row[1].deep_clone().into();
+                            let votes: i64 = match row[2] {
+                                DataType::None => 42,
+                                ref d => d.clone().into(),
+                            };
+                            ArticleResult::Article {
+                                id: id,
+                                title: title,
+                                votes: votes,
                             }
-                            _ => unreachable!(),
-                        },
-                        true,
-                    )
-                    .map(|r| {
-                        // r.is_none() if partial and not yet ready
-                        // but that can't happen since we use blocking
-                        r.expect("blocking read returned None")
+                        }
+                        _ => unreachable!(),
                     })
             })
             .collect();
@@ -803,34 +795,26 @@ impl Reader for Spoon {
         let res = ids.iter()
             .map(|&(_, article_id)| {
                 self.mix_getter
-                    .as_ref()
+                    .as_mut()
                     .unwrap()
-                    .lookup_map(
-                        &article_id.into(),
-                        |rows| match rows.len() {
-                            0 => ArticleResult::NoSuchArticle,
-                            1 => {
-                                let row = &rows[0];
-                                let id: i64 = row[0].clone().into();
-                                let title: String = row[1].deep_clone().into();
-                                let votes: i64 = match row[2] {
-                                    DataType::None => 42,
-                                    ref d => d.clone().into(),
-                                };
-                                ArticleResult::Article {
-                                    id: id,
-                                    title: title,
-                                    votes: votes,
-                                }
+                    .lookup(&article_id.into(), true)
+                    .map(|rows| match rows.len() {
+                        0 => ArticleResult::NoSuchArticle,
+                        1 => {
+                            let row = &rows[0];
+                            let id: i64 = row[0].clone().into();
+                            let title: String = row[1].deep_clone().into();
+                            let votes: i64 = match row[2] {
+                                DataType::None => 42,
+                                ref d => d.clone().into(),
+                            };
+                            ArticleResult::Article {
+                                id: id,
+                                title: title,
+                                votes: votes,
                             }
-                            _ => unreachable!(),
-                        },
-                        true,
-                    )
-                    .map(|r| {
-                        // r.is_none() if partial and not yet ready
-                        // but that can't happen since we use blocking
-                        r.expect("blocking read returned None")
+                        }
+                        _ => unreachable!(),
                     })
             })
             .collect();

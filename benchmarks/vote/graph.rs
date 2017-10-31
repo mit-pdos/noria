@@ -1,7 +1,4 @@
-use distributary::{Aggregation, Base, Blender, Join, JoinType, NodeIndex, PersistenceParameters};
-use distributary;
-
-use std::sync::{Arc, Mutex};
+use distributary::{Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
 
 pub struct Graph {
     setup: Setup,
@@ -9,11 +6,10 @@ pub struct Graph {
     pub article: NodeIndex,
     pub vc: NodeIndex,
     pub end: NodeIndex,
-    pub graph: Arc<Mutex<Blender>>,
+    pub graph: Blender,
 }
 
 pub struct Setup {
-    pub log: bool,
     pub transactions: bool,
     pub stupid: bool,
     pub partial: bool,
@@ -23,7 +19,6 @@ pub struct Setup {
 impl Default for Setup {
     fn default() -> Self {
         Setup {
-            log: false,
             transactions: false,
             stupid: false,
             partial: true,
@@ -33,12 +28,6 @@ impl Default for Setup {
 }
 
 impl Setup {
-    #[allow(dead_code)]
-    pub fn with_logging(mut self) -> Self {
-        self.log = true;
-        self
-    }
-
     #[allow(dead_code)]
     pub fn with_transactions(mut self) -> Self {
         self.transactions = true;
@@ -64,68 +53,41 @@ impl Setup {
     }
 }
 
-pub fn make(
-    blender: Arc<Mutex<Blender>>,
-    s: Setup,
-    persistence_params: PersistenceParameters,
-) -> Graph {
-    let (article, vote, vc, end) = {
-        // set up graph
-        let mut g = blender.lock().unwrap();
-        if s.log {
-            g.log_with(distributary::logger_pls());
-        }
-        if !s.partial {
-            g.disable_partial();
-        }
-        if !s.sharding {
-            g.disable_sharding();
-        }
+pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
+    let mut g = ControllerBuilder::default();
+    if !s.partial {
+        g.disable_partial();
+    }
+    if !s.sharding {
+        g.disable_sharding();
+    }
+    g.set_persistence(persistence_params);
+    let graph = g.build();
 
-        g.with_persistence_options(persistence_params);
+    let recipe = "# base tables
+               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
 
-        g.migrate(|mig| {
-            // add article base node
-            let article = if s.transactions {
-                mig.add_transactional_base("article", &["id", "title"], Base::default())
-            } else {
-                mig.add_ingredient("article", &["id", "title"], Base::default())
-            };
+               # read queries
+               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
+                            FROM Vote GROUP BY Vote.id;
+               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article, VoteCount \
+                            WHERE Article.id = VoteCount.id AND Article.id = ?;";
 
-            // add vote base table
-            let vote = if s.transactions {
-                mig.add_transactional_base(
-                    "vote",
-                    &["user", "id"],
-                    Base::default().with_key(vec![1]),
-                )
-            } else {
-                mig.add_ingredient("vote", &["user", "id"], Base::default().with_key(vec![1]))
-            };
+    graph.install_recipe(recipe.to_owned());
+    let inputs = graph.inputs();
+    let outputs = graph.outputs();
 
-            // add vote count
-            let vc = mig.add_ingredient(
-                "votecount",
-                &["id", "votes"],
-                Aggregation::COUNT.over(vote, 0, &[1]),
-            );
-
-            // add final join using first field from article and first from vc
-            use distributary::JoinSource::*;
-            let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
-            let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
-
-            mig.maintain(end, 0);
-            (article, vote, vc, end)
-        })
-    };
+    println!("inputs {:?}", inputs);
+    println!("outputs {:?}", outputs);
 
     Graph {
-        vote: vote.into(),
-        article: article.into(),
-        vc: vc.into(),
-        end: end.into(),
-        graph: blender,
+        vote: inputs["Vote"],
+        article: inputs["Article"],
+        vc: outputs["VoteCount"],
+        end: outputs["ArticleWithVoteCount"],
+        graph,
         setup: s,
     }
 }
@@ -133,76 +95,94 @@ pub fn make(
 impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
-        use distributary::{Aggregation, Base, Join, JoinType, Project, Union};
-        use std::collections::HashMap;
+        // TODO(fintelia): Figure out why the SQL parser rejects UNION query.
+        // TODO(fintelia): Port non-stupid migration to SQL expression.
+        let stupid_recipe = "# base tables
+               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
+               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
 
-        // get all the ids since migration will borrow self
-        let vc = self.vc;
-        let vote = self.vote;
-        let article = self.article;
-        let setup = &self.setup;
+               # read queries
+               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
+                            FROM Vote GROUP BY Vote.id;
+               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article, VoteCount \
+                            WHERE Article.id = VoteCount.id AND Article.id = ?;
 
-        // migrate
-        let mut g = self.graph.lock().unwrap();
-        g.migrate(|mig| {
-            // add new "ratings" base table
-            let b = Base::default().with_key(vec![1]);
-            let rating = if setup.transactions {
-                mig.add_transactional_base("rating", &["user", "id", "stars"], b)
-            } else {
-                mig.add_ingredient("rating", &["user", "id", "stars"], b)
-            };
+               U: SELECT id, 1 FROM Vote UNION SELECT id, stars from Rating;
+               Total: SELECT id, SUM(stars) as score FROM U GROUP BY id;
+               ArticleWithScore: SELECT Article.id, title, Total.score AS score \
+                            FROM Article, Total \
+                            WHERE Article.id = Total.id AND Article.id = ?;";
 
-            let total = if setup.stupid {
-                // project on 1 to votes
-                let upgrade = mig.add_ingredient(
-                    "upvote",
-                    &["id", "one"],
-                    Project::new(vote, &[1], Some(vec![1.into()]), None),
-                );
+        if self.setup.stupid {
+            self.graph.install_recipe(stupid_recipe.to_owned());
+        } else {
+            unimplemented!();
+        }
 
-                // take a union of votes and ratings
-                let mut emits = HashMap::new();
-                emits.insert(rating, vec![1, 2]);
-                emits.insert(upgrade, vec![0, 1]);
-                let u = Union::new(emits);
-                let both = mig.add_ingredient("both", &["id", "value"], u);
+        let inputs = self.graph.inputs();
+        let outputs = self.graph.outputs();
+        (inputs["Ratings"], outputs["ArticleWithScore"])
+        // self.graph.migrate(|mig| {
+        //     // add new "ratings" base table
+        //     let b = Base::default().with_key(vec![1]);
+        //     let rating = if setup.transactions {
+        //         mig.add_transactional_base("rating", &["user", "id", "stars"], b)
+        //     } else {
+        //         mig.add_ingredient("rating", &["user", "id", "stars"], b)
+        //     };
 
-                // add sum of combined ratings
-                mig.add_ingredient(
-                    "total",
-                    &["id", "total"],
-                    Aggregation::SUM.over(both, 1, &[0]),
-                )
-            } else {
-                // add sum of ratings
-                let rs = mig.add_ingredient(
-                    "rsum",
-                    &["id", "total"],
-                    Aggregation::SUM.over(rating, 2, &[1]),
-                );
+        //     let total = if setup.stupid {
+        //         // project on 1 to votes
+        //         let upgrade = mig.add_ingredient(
+        //             "upvote",
+        //             &["id", "one"],
+        //             Project::new(vote, &[1], Some(vec![1.into()]), None),
+        //         );
 
-                // take a union of vote count and rsum
-                let mut emits = HashMap::new();
-                emits.insert(rs, vec![0, 1]);
-                emits.insert(vc, vec![0, 1]);
-                let u = Union::new(emits);
-                let both = mig.add_ingredient("both", &["id", "value"], u);
+        //         // take a union of votes and ratings
+        //         let mut emits = HashMap::new();
+        //         emits.insert(rating, vec![1, 2]);
+        //         emits.insert(upgrade, vec![0, 1]);
+        //         let u = Union::new(emits);
+        //         let both = mig.add_ingredient("both", &["id", "value"], u);
 
-                // sum them by article id
-                mig.add_ingredient(
-                    "total",
-                    &["id", "total"],
-                    Aggregation::SUM.over(both, 1, &[0]),
-                )
-            };
+        //         // add sum of combined ratings
+        //         mig.add_ingredient(
+        //             "total",
+        //             &["id", "total"],
+        //             Aggregation::SUM.over(both, 1, &[0]),
+        //         )
+        //     } else {
+        //         // add sum of ratings
+        //         let rs = mig.add_ingredient(
+        //             "rsum",
+        //             &["id", "total"],
+        //             Aggregation::SUM.over(rating, 2, &[1]),
+        //         );
 
-            // finally, produce end result
-            use distributary::JoinSource::*;
-            let j = Join::new(article, total, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
-            let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
-            mig.maintain(newend, 0);
-            (rating, newend)
-        })
+        //         // take a union of vote count and rsum
+        //         let mut emits = HashMap::new();
+        //         emits.insert(rs, vec![0, 1]);
+        //         emits.insert(vc, vec![0, 1]);
+        //         let u = Union::new(emits);
+        //         let both = mig.add_ingredient("both", &["id", "value"], u);
+
+        //         // sum them by article id
+        //         mig.add_ingredient(
+        //             "total",
+        //             &["id", "total"],
+        //             Aggregation::SUM.over(both, 1, &[0]),
+        //         )
+        //     };
+
+        //     // finally, produce end result
+        //     use distributary::JoinSource::*;
+        //     let j = Join::new(article, total, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
+        //     let newend = mig.add_ingredient("awr", &["id", "title", "score"], j);
+        //     mig.maintain(newend, 0);
+        //     (rating, newend)
+        // })
     }
 }
