@@ -169,6 +169,14 @@ fn main() {
                 .conflicts_with_all(&["migrate", "stage"])
                 .help("Mode to run clients in [read|write|mix:rw_ratio]"),
         )
+        .arg(
+            Arg::with_name("workers")
+                .short("w")
+                .long("workers")
+                .takes_value(true)
+                .default_value("0")
+                .help("Number of workers to use")
+        )
         .get_matches();
 
     let avg = args.is_present("avg");
@@ -187,6 +195,7 @@ fn main() {
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
+    let nworkers = value_t_or_exit!(args, "workers", usize);
 
     let mix = match args.value_of("MODE") {
         Some("read") => Some(common::Mix::Read(1)),
@@ -249,6 +258,7 @@ fn main() {
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
+    s.nworkers = nworkers;
     let g = graph::make(s, persistence_params);
 
     // prepare getters
