@@ -102,54 +102,60 @@ impl Backend {
         use std::io::Read;
 
         // Start migration
-        let mut mig = self.g.start_migration();
-
-        // Read schema file
-        let mut sf = File::open(schema_file).unwrap();
-        let mut s = String::new();
-        sf.read_to_string(&mut s).unwrap();
-
-        let mut rs = s.clone();
-        s.clear();
-
-        match query_file {
-            None => (),
-            Some(qf) => {
-                let mut qf = File::open(qf).unwrap();
-                qf.read_to_string(&mut s).unwrap();
-                rs.push_str("\n");
-                rs.push_str(&s);
-            }
-        }
-
-        let mut p = String::new();
-        let pstr: Option<&str> = match policy_file {
-            None => None,
-            Some(pf) => {
-                let mut pf = File::open(pf).unwrap();
-                pf.read_to_string(&mut p).unwrap();
-                Some(&p)
-            }
-        };
-
-        let new_recipe = Recipe::from_str_with_policy(&rs, pstr, Some(self.log.clone()))?;
+        let newlog = self.log.clone();
         let cur_recipe = self.recipe.take().unwrap();
-        let updated_recipe = match cur_recipe.replace(new_recipe) {
-            Ok(mut recipe) => {
-                match recipe.activate(&mut mig, false) {
-                    Ok(ar) => {
-                        info!(self.log, "{} expressions added", ar.expressions_added);
-                        info!(self.log, "{} expressions removed", ar.expressions_removed);
-                    }
-                    Err(e) => return Err(format!("failed to activate recipe: {}", e)),
-                };
-                recipe
+        let updated_recipe = self.g.migrate(|mut mig| {
+            // Read schema file
+            let mut sf = File::open(schema_file).unwrap();
+            let mut s = String::new();
+            sf.read_to_string(&mut s).unwrap();
+
+            let mut rs = s.clone();
+            s.clear();
+
+            match query_file {
+                None => (),
+                Some(qf) => {
+                    let mut qf = File::open(qf).unwrap();
+                    qf.read_to_string(&mut s).unwrap();
+                    rs.push_str("\n");
+                    rs.push_str(&s);
+                }
             }
-            Err(e) => return Err(format!("failed to replace recipe: {}", e)),
+
+            let mut p = String::new();
+            let pstr: Option<&str> = match policy_file {
+                None => None,
+                Some(pf) => {
+                    let mut pf = File::open(pf).unwrap();
+                    pf.read_to_string(&mut p).unwrap();
+                    Some(&p)
+                }
+            };
+
+            let new_recipe = Recipe::from_str_with_policy(&rs, pstr, Some(newlog.clone()))?;
+            let updated_recipe = match cur_recipe.replace(new_recipe) {
+                Ok(mut recipe) => {
+                    match recipe.activate(&mut mig, false) {
+                        Ok(ar) => {
+                            info!(newlog, "{} expressions added", ar.expressions_added);
+                            info!(newlog, "{} expressions removed", ar.expressions_removed);
+                        }
+                        Err(e) => return Err(format!("failed to activate recipe: {}", e)),
+                    };
+                    recipe
+                }
+                Err(e) => return Err(format!("failed to replace recipe: {}", e)),
+            };
+
+            Ok(updated_recipe)
+        });
+
+        self.recipe = match updated_recipe {
+            Ok(r) => Some(r),
+            Err(e) => return Err(e),
         };
 
-        mig.commit();
-        self.recipe = Some(updated_recipe);
         Ok(())
     }
 }
