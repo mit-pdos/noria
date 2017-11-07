@@ -175,7 +175,7 @@ fn main() {
                 .long("workers")
                 .takes_value(true)
                 .default_value("0")
-                .help("Number of workers to use")
+                .help("Number of workers to use"),
         )
         .get_matches();
 
@@ -385,16 +385,18 @@ fn main() {
                 let is_mix = mix.is_some();
                 thread::Builder::new()
                     .name(format!("{}{}", put_name, i))
-                    .spawn(move || if is_mix {
-                        exercise::launch_mix_wait(p, pconfig, barrier, start)
-                    } else {
-                        exercise::launch(
-                            None::<exercise::NullClient>,
-                            Some(p),
-                            pconfig,
-                            barrier,
-                            start,
-                        )
+                    .spawn(move || {
+                        if is_mix {
+                            exercise::launch_mix_wait(p, pconfig, barrier, start)
+                        } else {
+                            exercise::launch(
+                                None::<exercise::NullClient>,
+                                Some(p),
+                                pconfig,
+                                barrier,
+                                start,
+                            )
+                        }
                     })
                     .unwrap()
             })
