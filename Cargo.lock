@@ -1,14 +1,3 @@
-[root]
-name = "mir"
-version = "0.1.0"
-dependencies = [
- "core 0.1.0",
- "dataflow 0.1.0",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=b01998fc34a5d473387987110724a395298fc6c0)",
- "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 2.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [[package]]
 name = "advapi32-sys"
 version = "0.1.2"
@@ -886,6 +875,17 @@ dependencies = [
  "net2 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "mir"
+version = "0.1.0"
+dependencies = [
+ "core 0.1.0",
+ "dataflow 0.1.0",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=b01998fc34a5d473387987110724a395298fc6c0)",
+ "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 2.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
