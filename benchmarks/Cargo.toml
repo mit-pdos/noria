@@ -15,7 +15,6 @@ default = ["b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-gulaschkanone = { path = "../daemon" }
 nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "13744adf972e42741b5e7146db46e8ed7353a15d"}
 regex = "0.2.2"
 slog = "2.0.6"
