@@ -310,7 +310,7 @@ dependencies = [
  "channel 0.1.0",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -364,7 +364,7 @@ dependencies = [
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -421,7 +421,7 @@ dependencies = [
  "mio 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
  "mysql 11.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
  "num 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -889,7 +889,7 @@ version = "0.1.0"
 dependencies = [
  "core 0.1.0",
  "dataflow 0.1.0",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1005,6 +1005,16 @@ dependencies = [
 name = "nom_sql"
 version = "0.0.1"
 source = "git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be#af113901265d5d9add36ac8f7ff1abee75a220be"
+dependencies = [
+ "nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nom_sql"
+version = "0.0.1"
+source = "git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2#fe7cdaa360c86bd4202e4065bc125ba5642439d2"
 dependencies = [
  "nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2007,6 +2017,7 @@ dependencies = [
 "checksum nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a5b8c256fd9471521bcb84c3cdba98921497f1a331cbc15b8030fc63b82050ce"
 "checksum nom 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "06989cbd367e06f787a451f3bc67d8c3e0eaa10b461cc01152ffab24261a31b1"
 "checksum nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=af113901265d5d9add36ac8f7ff1abee75a220be)" = "<none>"
+"checksum nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)" = "<none>"
 "checksum num 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "a311b77ebdc5dd4cf6449d81e4135d9f0e3b153839ac90e648a8ef538f923525"
 "checksum num-bigint 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "8fd0f8dbb4c0960998958a796281d88c16fbe68d87b1baa6f31e2979e81fd0bd"
 "checksum num-complex 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "503e668405c5492d67cf662a81e05be40efe2e6bcf10f7794a07bd9865e704e6"
