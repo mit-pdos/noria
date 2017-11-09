@@ -110,6 +110,7 @@ impl Backend {
         let mut rs = s.clone();
         s.clear();
 
+        // Read query file
         match query_file {
             None => (),
             Some(qf) => {
@@ -120,13 +121,18 @@ impl Backend {
             }
         }
 
-        let mut p = String::new();
-        let pstr: Option<&str> = match policy_file {
-            None => None,
+        // Read policy file
+        match policy_file {
+            None => (),
             Some(pf) => {
+                let mut p = String::new();
                 let mut pf = File::open(pf).unwrap();
                 pf.read_to_string(&mut p).unwrap();
-                Some(&p)
+
+                // Install policies
+                self.g.install_recipe_with_policies(rs, p);
+
+                return Ok(())
             }
         };
 
