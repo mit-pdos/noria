@@ -55,40 +55,22 @@ impl Backend {
         }
     }
 
-    pub fn recipe(&self) -> Recipe {
-        match self.recipe {
-            Some(ref r) => r.clone(),
-            None => panic!("recipe doesn't exist"),
-        }
+    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
+
+        self.g.create_universe(user_context.clone());
+
+        self.write_to_user_context(user_context);
+        Ok(())
     }
-
-    // fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-    //     {
-    //         let mut mig = self.g.add_universe(user_context.clone());
-    //         let mut recipe = self.recipe.take().unwrap();
-    //         recipe.next();
-    //         match recipe.create_universe(&mut mig) {
-    //             Ok(ar) => {
-    //                 info!(self.log, "{} expressions added", ar.expressions_added);
-    //                 info!(self.log, "{} expressions removed", ar.expressions_removed);
-    //             }
-    //             Err(e) => panic!("failed to activate recipe: {}", e),
-    //         };
-    //         mig.commit();
-    //         self.recipe = Some(recipe);
-    //     }
-
-    //     self.write_to_user_context(user_context);
-    //     Ok(())
-    // }
 
     fn write_to_user_context(&self, uc: HashMap<String, DataType>) {
         let name = &format!("UserContext_{}", uc.get("id").unwrap());
         let r: Vec<DataType> = uc.values().cloned().collect();
+        let ins = self.g.inputs();
         let mut mutator = self
             .g
-            .get_mutator(self.recipe().node_addr_for(name).unwrap())
-        .unwrap();
+            .get_mutator(ins[name])
+            .unwrap();
 
         mutator.put(r).unwrap();
     }
@@ -274,7 +256,7 @@ fn main() {
     println!("Login in users...");
     for i in 0..nlogged {
         let start = time::Instant::now();
-        // backend.login(make_user(i)).is_ok();
+        backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
         println!(
             "Migration {} took {:.2}s!",

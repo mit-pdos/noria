@@ -41,9 +41,10 @@ impl Populate {
     }
 
     fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+        let ins = backend.g.inputs();
         let mut mutator = backend
             .g
-            .get_mutator(backend.recipe().node_addr_for(name).unwrap())
+            .get_mutator(ins[name])
             .unwrap();
 
         let start = time::Instant::now();
