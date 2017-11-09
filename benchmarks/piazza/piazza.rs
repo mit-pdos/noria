@@ -6,7 +6,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, DataType, Recipe, ReuseConfigType};
+use distributary::{Blender, DataType, Recipe, ReuseConfigType, ControllerBuilder};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -19,26 +19,27 @@ use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
     recipe: Option<Recipe>,
-    log: slog::Logger,
     g: Blender,
 }
 
 impl Backend {
     pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
-        let mut g = Blender::new();
+        let mut cb = ControllerBuilder::default();
         let log = distributary::logger_pls();
         let blender_log = log.clone();
-        g.log_with(blender_log);
 
         let mut recipe = Recipe::blank(Some(log.clone()));
 
         if !partial {
-            g.disable_partial();
+            cb.disable_partial();
         }
 
         if !shard {
-            g.disable_sharding();
+            cb.disable_sharding();
         }
+
+        let mut g = cb.build();
+        g.log_with(blender_log);
 
         match reuse.as_ref() {
             "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
@@ -50,7 +51,6 @@ impl Backend {
 
         Backend {
             recipe: Some(recipe),
-            log: log,
             g: g,
         }
     }
@@ -62,32 +62,33 @@ impl Backend {
         }
     }
 
-    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-        {
-            let mut mig = self.g.add_universe(user_context.clone());
-            let mut recipe = self.recipe.take().unwrap();
-            recipe.next();
-            match recipe.create_universe(&mut mig) {
-                Ok(ar) => {
-                    info!(self.log, "{} expressions added", ar.expressions_added);
-                    info!(self.log, "{} expressions removed", ar.expressions_removed);
-                }
-                Err(e) => panic!("failed to activate recipe: {}", e),
-            };
-            mig.commit();
-            self.recipe = Some(recipe);
-        }
+    // fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
+    //     {
+    //         let mut mig = self.g.add_universe(user_context.clone());
+    //         let mut recipe = self.recipe.take().unwrap();
+    //         recipe.next();
+    //         match recipe.create_universe(&mut mig) {
+    //             Ok(ar) => {
+    //                 info!(self.log, "{} expressions added", ar.expressions_added);
+    //                 info!(self.log, "{} expressions removed", ar.expressions_removed);
+    //             }
+    //             Err(e) => panic!("failed to activate recipe: {}", e),
+    //         };
+    //         mig.commit();
+    //         self.recipe = Some(recipe);
+    //     }
 
-        self.write_to_user_context(user_context);
-        Ok(())
-    }
+    //     self.write_to_user_context(user_context);
+    //     Ok(())
+    // }
 
     fn write_to_user_context(&self, uc: HashMap<String, DataType>) {
         let name = &format!("UserContext_{}", uc.get("id").unwrap());
         let r: Vec<DataType> = uc.values().cloned().collect();
         let mut mutator = self
             .g
-            .get_mutator(self.recipe().node_addr_for(name).unwrap());
+            .get_mutator(self.recipe().node_addr_for(name).unwrap())
+        .unwrap();
 
         mutator.put(r).unwrap();
     }
@@ -101,60 +102,36 @@ impl Backend {
         use std::fs::File;
         use std::io::Read;
 
-        // Start migration
-        let newlog = self.log.clone();
-        let cur_recipe = self.recipe.take().unwrap();
-        let updated_recipe = self.g.migrate(|mut mig| {
-            // Read schema file
-            let mut sf = File::open(schema_file).unwrap();
-            let mut s = String::new();
-            sf.read_to_string(&mut s).unwrap();
+        // Read schema file
+        let mut sf = File::open(schema_file).unwrap();
+        let mut s = String::new();
+        sf.read_to_string(&mut s).unwrap();
 
-            let mut rs = s.clone();
-            s.clear();
+        let mut rs = s.clone();
+        s.clear();
 
-            match query_file {
-                None => (),
-                Some(qf) => {
-                    let mut qf = File::open(qf).unwrap();
-                    qf.read_to_string(&mut s).unwrap();
-                    rs.push_str("\n");
-                    rs.push_str(&s);
-                }
+        match query_file {
+            None => (),
+            Some(qf) => {
+                let mut qf = File::open(qf).unwrap();
+                qf.read_to_string(&mut s).unwrap();
+                rs.push_str("\n");
+                rs.push_str(&s);
             }
+        }
 
-            let mut p = String::new();
-            let pstr: Option<&str> = match policy_file {
-                None => None,
-                Some(pf) => {
-                    let mut pf = File::open(pf).unwrap();
-                    pf.read_to_string(&mut p).unwrap();
-                    Some(&p)
-                }
-            };
-
-            let new_recipe = Recipe::from_str_with_policy(&rs, pstr, Some(newlog.clone()))?;
-            let updated_recipe = match cur_recipe.replace(new_recipe) {
-                Ok(mut recipe) => {
-                    match recipe.activate(&mut mig, false) {
-                        Ok(ar) => {
-                            info!(newlog, "{} expressions added", ar.expressions_added);
-                            info!(newlog, "{} expressions removed", ar.expressions_removed);
-                        }
-                        Err(e) => return Err(format!("failed to activate recipe: {}", e)),
-                    };
-                    recipe
-                }
-                Err(e) => return Err(format!("failed to replace recipe: {}", e)),
-            };
-
-            Ok(updated_recipe)
-        });
-
-        self.recipe = match updated_recipe {
-            Ok(r) => Some(r),
-            Err(e) => return Err(e),
+        let mut p = String::new();
+        let pstr: Option<&str> = match policy_file {
+            None => None,
+            Some(pf) => {
+                let mut pf = File::open(pf).unwrap();
+                pf.read_to_string(&mut p).unwrap();
+                Some(&p)
+            }
         };
+
+        // Install recipe
+        self.g.install_recipe(rs);
 
         Ok(())
     }
@@ -291,7 +268,7 @@ fn main() {
     println!("Login in users...");
     for i in 0..nlogged {
         let start = time::Instant::now();
-        backend.login(make_user(i)).is_ok();
+        // backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
         println!(
             "Migration {} took {:.2}s!",
@@ -306,6 +283,6 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{:x}", backend.g).is_ok());
+        // assert!(write!(gf, "{:?}", backend.g).is_ok());
     }
 }

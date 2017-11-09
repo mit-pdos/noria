@@ -90,10 +90,12 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
         .map(|(qn, q)| {
             (qn, unclosed_quote.replace_all(&q, "=?").to_string())
         })
-        .map(|(qn, q)| if !q.ends_with(";") {
-            (qn, format!("{};", q))
-        } else {
-            (qn, q.to_string())
+        .map(|(qn, q)| {
+            if !q.ends_with(";") {
+                (qn, format!("{};", q))
+            } else {
+                (qn, q.to_string())
+            }
         })
         .collect()
 }
