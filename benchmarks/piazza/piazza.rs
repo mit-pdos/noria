@@ -6,7 +6,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{Blender, DataType, Recipe, ReuseConfigType, ControllerBuilder};
+use distributary::{Blender, DataType, ReuseConfigType, ControllerBuilder};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -18,7 +18,6 @@ mod populate;
 use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
-    recipe: Option<Recipe>,
     g: Blender,
 }
 
@@ -27,8 +26,6 @@ impl Backend {
         let mut cb = ControllerBuilder::default();
         let log = distributary::logger_pls();
         let blender_log = log.clone();
-
-        let mut recipe = Recipe::blank(Some(log.clone()));
 
         if !partial {
             cb.disable_partial();
@@ -42,15 +39,14 @@ impl Backend {
         g.log_with(blender_log);
 
         match reuse.as_ref() {
-            "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
-            "full" => recipe.enable_reuse(ReuseConfigType::Full),
-            "noreuse" => recipe.enable_reuse(ReuseConfigType::NoReuse),
-            "relaxed" => recipe.enable_reuse(ReuseConfigType::Relaxed),
+            "finkelstein" => g.enable_reuse(ReuseConfigType::Finkelstein),
+            "full" => g.enable_reuse(ReuseConfigType::Full),
+            "noreuse" => g.enable_reuse(ReuseConfigType::NoReuse),
+            "relaxed" => g.enable_reuse(ReuseConfigType::Relaxed),
             _ => panic!("reuse configuration not supported"),
         }
 
         Backend {
-            recipe: Some(recipe),
             g: g,
         }
     }
@@ -111,7 +107,7 @@ impl Backend {
                 let mut pf = File::open(pf).unwrap();
                 pf.read_to_string(&mut p).unwrap();
 
-                // Install policies
+                // Install recipe with policies
                 self.g.install_recipe_with_policies(rs, p);
 
                 return Ok(())
