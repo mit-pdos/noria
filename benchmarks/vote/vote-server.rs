@@ -67,8 +67,12 @@ fn main() {
 
     println!("Attempting to start soup on {}", addr);
 
-    let persistence_params =
-        distributary::PersistenceParameters::new(durability, 512, time::Duration::from_millis(1));
+    let persistence_params = distributary::PersistenceParameters::new(
+        durability,
+        512,
+        time::Duration::from_millis(1),
+        Some(String::from("vote")),
+    );
 
     let sock_addr: SocketAddr = addr.parse()
         .expect("ADDR must be a valid HOST:PORT combination");
