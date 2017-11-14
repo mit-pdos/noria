@@ -161,6 +161,12 @@ fn main() {
                 .help("File to dump application's soup graph, if set"),
         )
         .arg(
+            Arg::with_name("info")
+                .short("i")
+                .takes_value(true)
+                .help("Directory to dump runtime process info (doesn't work on OSX)"),
+        )
+        .arg(
             Arg::with_name("reuse")
                 .long("reuse")
                 .default_value("full")
@@ -222,6 +228,7 @@ fn main() {
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
     let gloc = args.value_of("graph");
+    let iloc = args.value_of("info");
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
@@ -259,6 +266,12 @@ fn main() {
             i,
             dur,
         );
+
+        if iloc.is_some() && i % 50 == 0 {
+            use std::fs;
+            let fname = format!("{}-{}", iloc.unwrap(), i);
+            fs::copy("/proc/self/status", fname).unwrap();
+        }
     }
 
 
