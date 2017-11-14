@@ -86,3 +86,7 @@ path = "vote/vote-new-fraction.rs"
 [[bin]]
 name = "vote-stress"
 path = "vote/stress.rs"
+
+[[bin]]
+name = "securecrp"
+path = "securecrp/main.rs"
