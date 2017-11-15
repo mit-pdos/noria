@@ -23,7 +23,6 @@ pub struct Populate {
 
 impl Populate {
     pub fn new(nposts: i32, nusers: i32, nclasses: i32, private: f32) -> Populate {
-
         Populate {
             nposts: nposts,
             nusers: nusers,
@@ -144,9 +143,8 @@ impl Populate {
     }
 
     fn private(&mut self) -> DataType {
-        // posts have a 1 in (1 / private) of being private.
-        let private = (1.0 / self.private) as u32;
-        (self.rng.gen_weighted_bool(private) as i32).into()
+        let m: f32 = self.rng.gen_range(0.0, 1.0);
+        ((m < self.private) as i32).into()
     }
 
 }

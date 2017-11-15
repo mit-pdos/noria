@@ -119,6 +119,13 @@ impl Backend {
 
         Ok(())
     }
+
+    fn size(&self) -> usize {
+        let outs = self.g.outputs();
+        outs.into_iter().fold(0, |acc, (_, ni)| {
+            acc + self.g.get_getter(ni).unwrap().len()
+        })
+    }
 }
 
 fn make_user(id: i32) -> HashMap<String, DataType> {
@@ -244,13 +251,15 @@ fn main() {
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
-    backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
+    backend.migrate(sloc, None, None).unwrap();
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     if populate {
         println!("Populating tables...");
         p.populate_tables(&backend);
     }
+
+    backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
 
     println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
@@ -273,6 +282,10 @@ fn main() {
             fs::copy("/proc/self/status", fname).unwrap();
         }
     }
+
+    let nreaders = backend.g.outputs().len();
+    let nkeys = backend.size();
+    println!("{} keys in {} leaf views (avg: {})", nkeys, nreaders, nkeys as f32 / nreaders as f32);
 
 
     println!("Done with benchmark.");
