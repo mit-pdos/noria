@@ -1,7 +1,8 @@
 [
-	{
-		"table": "Paper",
-		"predicate": "WHERE Paper.paperId < 5",
-		"description": "test policy"
-	}
+  {
+    "name": "test",
+    "description": "test policy",
+    "table": "Paper",
+    "predicate": "WHERE Paper.paperId < 5"
+  }
 ]
