@@ -1,8 +1,8 @@
 [
   {
-    "name": "test",
-    "description": "test policy",
+    "name": "own-papers",
+    "description": "Users can see their own papers.",
     "table": "Paper",
-    "predicate": "WHERE Paper.paperId < 5"
+    "predicate": "WHERE Paper.paperId IN (SELECT paperId FROM Paper JOIN ContactInfo ON (ContactInfo.contactId = Paper.leadContactId));"
   }
 ]
