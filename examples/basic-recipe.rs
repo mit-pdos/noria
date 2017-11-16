@@ -24,7 +24,7 @@ fn main() {
         distributary::DurabilityMode::Permanent,
         512,
         Duration::from_millis(1),
-        Some(Duration::from_secs(5)),
+        Some(Duration::from_secs(10)),
         Some(String::from("example")),
     );
 

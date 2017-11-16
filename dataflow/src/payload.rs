@@ -243,11 +243,11 @@ pub enum Packet {
     Spin,
 
     /// Signal that a base node's domain should start replaying logs.
-    StartRecovery,
+    StartRecovery { link: Link, snapshot_id: u64 },
 
     /// Initiate the snapshotting process. Domains should send ACKs
     /// to the controller containing the given ID.
-    TakeSnapshot { id: u64 },
+    TakeSnapshot { link: Link, snapshot_id: u64 },
 
     // Transaction time messages
     //
@@ -294,6 +294,8 @@ impl Packet {
             Packet::Message { ref link, .. } => link,
             Packet::Transaction { ref link, .. } => link,
             Packet::ReplayPiece { ref link, .. } => link,
+            Packet::TakeSnapshot { ref link, .. } => link,
+            Packet::StartRecovery { ref link, .. } => link,
             _ => unreachable!(),
         }
     }
@@ -303,6 +305,8 @@ impl Packet {
             Packet::Message { ref mut link, .. } => link,
             Packet::Transaction { ref mut link, .. } => link,
             Packet::ReplayPiece { ref mut link, .. } => link,
+            Packet::TakeSnapshot { ref mut link, .. } => link,
+            Packet::StartRecovery { ref mut link, .. } => link,
             _ => unreachable!(),
         }
     }
@@ -344,6 +348,14 @@ impl Packet {
         match *self {
             Packet::ReplayPiece { tag, .. } => Some(tag),
             _ => None,
+        }
+    }
+
+    pub fn snapshot_id(&self) -> u64 {
+        match *self {
+            Packet::TakeSnapshot { snapshot_id, .. } => snapshot_id,
+            Packet::StartRecovery { snapshot_id, .. } => snapshot_id,
+            _ => unreachable!(),
         }
     }
 

@@ -10,6 +10,7 @@ use worker;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
+use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
@@ -403,6 +404,28 @@ impl ControllerInner {
         socket
     }
 
+    // Tries to read the snapshot_id from {log_prefix}-snapshot_id, returning
+    // a default value if the file doesn't exist.
+    fn retrieve_snapshot_id(log_prefix: &str) -> u64 {
+        let filename = format!("{}-snapshot_id", log_prefix);
+        let mut file = match File::open(&filename) {
+            Ok(f) => f,
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
+                // Start at 0 if we haven't taken any snapshots before:
+                return 0;
+            }
+            Err(e) => panic!("Could not open snapshot_id file {}: {}", filename, e),
+        };
+
+        let mut buffer = String::new();
+        file.read_to_string(&mut buffer)
+            .expect("Failed reading snapshot_id");
+        buffer
+            .parse::<u64>()
+            .expect("persisted snapshot_id is not a valid number")
+    }
+
+
     /// Starts a loop that initiates a snapshot every `timeout`.
     fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
         let builder = thread::Builder::new().name("snapshots".to_owned());
@@ -430,6 +453,20 @@ impl ControllerInner {
                 });
             })
             .unwrap();
+    }
+
+    // Writes the ID of the last completed snapshot to disk,
+    // making it available for future recovery situations.
+    fn persist_snapshot_id(&mut self, snapshot_id: u64) {
+        let filename = format!("{}-snapshot_id", self.persistence.log_prefix);
+        let mut file = File::create(&filename).expect(&format!(
+            "Could not open snapshot ID file for writing {}",
+            filename,
+        ));
+
+        file.write_all(format!("{}", snapshot_id).as_bytes())
+            .expect("Failed writing snapshot_id");
+        self.snapshot_id = snapshot_id;
     }
 
     fn handle_register(
@@ -530,8 +567,9 @@ impl ControllerInner {
             ndomains: 0,
             checktable,
             checktable_addr,
+
             sharding: builder.sharding,
-            snapshot_id: 0,
+            snapshot_id: Self::retrieve_snapshot_id(&builder.persistence.log_prefix),
             sharding_enabled: builder.sharding_enabled,
             materializations: builder.materializations,
             domain_config: builder.domain_config,
@@ -560,24 +598,33 @@ impl ControllerInner {
         }
     }
 
-    /// Initializes a single snapshot by sending TakeSnapshot to all domains.
+    /// Initializes and persists a single snapshot by sending TakeSnapshot to all domains.
     pub fn initialize_snapshot(&mut self) {
         // All snapshots have completed at this point, so increment and start another:
-        self.snapshot_id += 1;
-        let id = self.snapshot_id;
-        info!(self.log, "Initializing snapshot with ID {}", id);
-        for (_name, index) in self.inputs(()).iter() {
-            let domain_index = &self.ingredients[*index].domain();
+        let snapshot_id = self.snapshot_id + 1;
+        info!(self.log, "Initializing snapshot with ID {}", snapshot_id);
+
+        let nodes: Vec<_> = self.inputs(())
+            .iter()
+            .map(|(_name, index)| {
+                let node = &self.ingredients[*index];
+                (*node.local_addr(), node.domain())
+            })
+            .collect();
+
+        for &(local_addr, domain_index) in nodes.iter() {
             let domain = self.domains.get_mut(&domain_index).unwrap();
-            let packet = payload::Packet::TakeSnapshot { id };
+            let link = Link::new(local_addr, local_addr);
+            let packet = payload::Packet::TakeSnapshot { link, snapshot_id };
             domain.send(box packet).unwrap();
         }
 
-        for (_name, index) in self.inputs(()).iter() {
-            let domain_index = &self.ingredients[*index].domain();
+        for &(_local_addr, domain_index) in nodes.iter() {
             let domain = self.domains.get_mut(&domain_index).unwrap();
-            domain.wait_for_ack();
+            domain.wait_for_ack().unwrap();
         }
+
+        self.persist_snapshot_id(snapshot_id);
     }
 
     /// Use a debug channel. This function may only be called once because the receiving end it
@@ -649,7 +696,12 @@ impl ControllerInner {
         for (_name, index) in self.inputs().iter() {
             let node = &self.ingredients[*index];
             let domain = self.domains.get_mut(&node.domain()).unwrap();
-            domain.send(box payload::Packet::StartRecovery).unwrap();
+            let packet = payload::Packet::StartRecovery {
+                link: Link::new(*node.local_addr(), *node.local_addr()),
+                snapshot_id: self.snapshot_id,
+            };
+
+            domain.send(box packet).unwrap();
             domain.wait_for_ack().unwrap();
         }
     }

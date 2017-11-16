@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use std::time;
 use std::collections::hash_map::Entry;
 use std::io::{BufRead, BufReader, BufWriter, ErrorKind};
-use std::rc::Rc;
 use std::fs::File;
 
 use std::net::SocketAddr;
@@ -812,10 +811,10 @@ impl Domain {
                 self.handle_replay(m, sends);
             }
             Packet::StartRecovery { .. } => {
-                self.handle_recovery(sends);
+                self.handle_recovery(m, sends);
             }
-            Packet::TakeSnapshot { id } => {
-                self.snapshot(id);
+            Packet::TakeSnapshot { .. } => {
+                self.snapshot(m, sends);
             }
             consumed => {
                 match consumed {
@@ -1569,12 +1568,62 @@ impl Domain {
         }
     }
 
-    fn handle_recovery(&mut self, sends: &mut EnqueuedSends) {
+    fn recover_snapshots(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        // Forward recovery packet on to other domains first:
+        for (_local_addr, node) in self.nodes.iter() {
+            let mut node = node.borrow_mut();
+            if node.is_egress() {
+                node.process(
+                    &mut Some(packet.clone()),
+                    None,
+                    &mut self.state,
+                    &self.nodes,
+                    self.shard,
+                    false,
+                    sends,
+                );
+            }
+        }
+
+        // Then recover all the snapshots for this domain:
+        for (local_addr, _node) in self.nodes.iter() {
+            if let Some(state) = self.state.get_mut(&local_addr) {
+                let filename = format!(
+                    "{}-snapshot-#{}-{}_{}-{}.bin",
+                    &self.persistence_parameters.log_prefix,
+                    self.snapshot_id,
+                    self.index.index(),
+                    self.shard.unwrap_or(0),
+                    local_addr.id(),
+                );
+
+                debug!(self.log, "Recovering snapshot {}", filename);
+                let file = File::open(&filename)
+                    .expect(&format!("Failed reading snapshot file: {}", filename));
+                let mut reader = BufReader::new(file);
+                *state = bincode::deserialize_from(&mut reader, bincode::Infinite)
+                    .expect("bincode deserialization of snapshot failed");
+                debug!(self.log, "State size after recovery {}", state.len());
+            }
+        }
+    }
+
+    fn handle_recovery(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        let snapshot_id = packet.snapshot_id();
+        self.snapshot_id = snapshot_id;
+        if self.snapshot_id > 0 {
+            self.recover_snapshots(packet, sends);
+        }
+
         let node_info: Vec<_> = self.nodes
             .iter()
-            .map(|(index, node)| {
+            .filter_map(|(index, node)| {
                 let n = node.borrow();
-                (index, n.global_addr(), n.is_transactional())
+                if n.is_internal() && n.get_base().is_some() {
+                    Some((index, n.global_addr(), n.is_transactional()))
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -1604,13 +1653,15 @@ impl Domain {
                 .filter_map(|line| {
                     let line = line
                         .expect(&format!("Failed to read line from log file: {:?}", path));
-                    let entries: Result<Vec<Records>, _> = serde_json::from_str(&line);
-                    entries.ok()
+                    let entry: Result<(u64, Vec<Records>), _> = serde_json::from_str(&line);
+                    entry.ok()
                 })
+                // Filter out log entries that should've been discarded previously:
+                .filter(|&(log_id, ref _records)| log_id >= snapshot_id)
                 // Parsing each individual line gives us an iterator over Vec<Records>.
                 // We're interested in chunking each record, so let's flat_map twice:
                 // Iter<Vec<Records>> -> Iter<Records> -> Iter<Record>
-                .flat_map(|r| r)
+                .flat_map(|(_, r)| r)
                 .flat_map(|r| r)
                 // Merge individual records into batches of RECOVERY_BATCH_SIZE:
                 .chunks(RECOVERY_BATCH_SIZE)
@@ -1646,24 +1697,20 @@ impl Domain {
     }
 
     /// Persists a snapshot of each materialized nodes, and sends a single ACK when complete.
-    fn snapshot(&mut self, id: u64) {
-        let indices: Vec<_> = self.nodes
-            .iter()
-            .map(|(index, _node)| index)
-            .collect();
-
-        for local_index in indices {
-            if let Some(state) = self.state.get(&local_index) {
+    fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        let snapshot_id = packet.snapshot_id();
+        for (local_addr, _node) in self.nodes.iter() {
+            if let Some(state) = self.state.get(&local_addr) {
                 let filename = format!(
                     "{}-snapshot-#{}-{}_{}-{}.bin",
                     &self.persistence_parameters.log_prefix,
-                    id,
+                    snapshot_id,
                     self.index.index(),
                     self.shard.unwrap_or(0),
-                    local_index.id(),
+                    local_addr.id(),
                 );
 
-                info!(self.log, "Persisting snapshot {}", filename);
+                debug!(self.log, "Persisting snapshot {}", filename);
                 let file = File::create(&filename)
                     .expect(&format!("Failed creating snapshot file: {}", filename));
                 let mut writer = BufWriter::new(file);
@@ -1672,7 +1719,22 @@ impl Domain {
             }
         }
 
-        self.snapshot_id = id;
+        for (_local_addr, node) in self.nodes.iter() {
+            let mut node = node.borrow_mut();
+            if node.is_egress() {
+                node.process(
+                    &mut Some(packet.clone()),
+                    None,
+                    &mut self.state,
+                    &self.nodes,
+                    self.shard,
+                    false,
+                    sends,
+                );
+            }
+        }
+
+        self.snapshot_id = snapshot_id;
         self.control_reply_tx
             .send(ControlReplyPacket::ack())
             .unwrap();
@@ -2365,7 +2427,8 @@ impl Domain {
                 if self.group_commit_queues.should_append(&packet, &self.nodes) {
                     debug_assert!(packet.is_regular());
                     packet.trace(PacketEvent::ExitInputChannel);
-                    let merged_packet = self.group_commit_queues.append(packet, &self.nodes);
+                    let merged_packet =
+                        self.group_commit_queues.append(packet, &self.nodes, self.snapshot_id);
                     if let Some(packet) = merged_packet {
                         self.handle(packet, sends);
                     }
@@ -2380,7 +2443,7 @@ impl Domain {
                 ProcessResult::KeepPolling
             }
             PollEvent::Timeout => {
-                if let Some(m) = self.group_commit_queues.flush_if_necessary(&self.nodes) {
+                if let Some(m) = self.group_commit_queues.flush_if_necessary(&self.nodes, self.snapshot_id) {
                     self.handle(m, sends);
                     while let Some(p) = self.inject.take() {
                         self.handle(p, sends);
