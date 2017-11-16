@@ -15,25 +15,36 @@ case "$OSTYPE" in
   linux*)   cmd="/usr/bin/time" ;;
 esac
 
-for i in {0..10}
-do
-    nuser=$(( $i * 50 ))
+nuser=5000
+reuse="full"
+name=$nuser-$reuse
+mkdir $1/$name
+mkdir $1/$name/info
 
-    reuse="full"
-    $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/results-$nuser-$reuse.out 2> $1/results-$nuser-$reuse.log
+$cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
+    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
-    reuse="noreuse"
-    $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/results-$nuser-$reuse.out 2> $1/results-$nuser-$reuse.log
+reuse="noreuse"
+name=$nuser-$reuse
+mkdir $1/$name
+mkdir $1/$name/info
 
-    # all posts are private workload
-    reuse="full"
-    $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/results-$nuser-$reuse-private.out 2> $1/results-$nuser-$reuse-private.log
+$cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
+    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
-    reuse="noreuse"
-    $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/results-$nuser-$reuse-private.out 2> $1/results-$nuser-$reuse-private.log
+# all posts are private workload
+reuse="full"
+name=$nuser-$reuse-private
+mkdir $1/$name
+mkdir $1/$name/info
 
-done
+$cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
+    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+
+reuse="noreuse"
+name=$nuser-$reuse-private
+mkdir $1/$name
+mkdir $1/$name/info
+
+$cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
+    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
