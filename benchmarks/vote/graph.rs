@@ -111,7 +111,7 @@ impl Graph {
                             FROM Article, VoteCount \
                             WHERE Article.id = VoteCount.id AND Article.id = ?;
 
-               U: SELECT id, 1 FROM Vote UNION SELECT id, stars FROM Rating;
+               U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
                Total: SELECT id, SUM(stars) AS score FROM U GROUP BY id;
                ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article, Total \
