@@ -286,7 +286,7 @@ fn main() {
 
     let nreaders = backend.g.outputs().len();
     let nkeys = backend.size();
-    println!("{} keys in {} leaf views (avg: {})", nkeys, nreaders, nkeys as f32 / nreaders as f32);
+    println!("{} rows in {} leaf views (avg: {})", nkeys, nreaders, nkeys as f32 / nreaders as f32);
 
 
     println!("Done with benchmark.");
