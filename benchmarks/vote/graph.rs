@@ -125,7 +125,7 @@ impl Graph {
 
         let inputs = self.graph.inputs();
         let outputs = self.graph.outputs();
-        (inputs["Ratings"], outputs["ArticleWithScore"])
+        (inputs["Rating"], outputs["ArticleWithScore"])
         // self.graph.migrate(|mig| {
         //     // add new "ratings" base table
         //     let b = Base::default().with_key(vec![1]);
