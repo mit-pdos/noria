@@ -36,6 +36,9 @@ pub struct Parameters {
     pub queue_capacity: usize,
     /// Amount of time to wait before flushing despite not reaching `queue_capacity`.
     pub flush_timeout: time::Duration,
+    /// Amount of time to wait before a new snapshot is initiated.
+    /// Set to None to disable snapshotting altogether.
+    pub snapshot_timeout: Option<time::Duration>,
     /// Whether the output files should be deleted when the GroupCommitQueue is dropped.
     pub mode: DurabilityMode,
     /// Filename prefix for persistent log entries.
@@ -47,6 +50,7 @@ impl Default for Parameters {
         Self {
             queue_capacity: 256,
             flush_timeout: time::Duration::from_millis(1),
+            snapshot_timeout: None,
             mode: DurabilityMode::MemoryOnly,
             log_prefix: String::from("soup"),
         }
@@ -71,11 +75,13 @@ impl Parameters {
         mode: DurabilityMode,
         queue_capacity: usize,
         flush_timeout: time::Duration,
+        snapshot_timeout: Option<time::Duration>,
         log_prefix: Option<String>,
     ) -> Self {
         Self {
             queue_capacity,
             flush_timeout,
+            snapshot_timeout,
             mode,
             log_prefix: log_prefix.unwrap_or(String::from("soup")),
         }

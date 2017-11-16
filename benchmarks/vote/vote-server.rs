@@ -71,6 +71,7 @@ fn main() {
         durability,
         512,
         time::Duration::from_millis(1),
+        None,
         Some(String::from("vote")),
     );
 

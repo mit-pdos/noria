@@ -81,6 +81,7 @@ fn it_works_basic() {
         DurabilityMode::DeleteOnExit,
         128,
         Duration::from_millis(1),
+        None,
         Some(get_log_name("it_works_basic")),
     );
     g.with_persistence_options(pparams);
@@ -406,6 +407,7 @@ fn it_recovers_persisted_logs() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);
@@ -513,6 +515,7 @@ fn it_recovers_persisted_logs_w_multiple_nodes() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);
@@ -571,6 +574,7 @@ fn it_recovers_persisted_logs_w_transactions() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);

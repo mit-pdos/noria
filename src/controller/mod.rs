@@ -112,7 +112,7 @@ impl Default for ControllerBuilder {
             sharding: None,
             domain_config: DomainConfig {
                 concurrent_replays: 512,
-                replay_batch_timeout: time::Duration::from_millis(1),
+                replay_batch_timeout: Duration::from_millis(1),
                 replay_batch_size: 32,
             },
             persistence: Default::default(),
@@ -149,7 +149,7 @@ impl ControllerBuilder {
     }
 
     /// Set the longest time a partial replay response can be delayed.
-    pub fn set_partial_replay_batch_timeout(&mut self, t: time::Duration) {
+    pub fn set_partial_replay_batch_timeout(&mut self, t: Duration) {
         self.domain_config.replay_batch_timeout = t;
     }
 
@@ -200,7 +200,8 @@ impl ControllerBuilder {
         let (tx, rx) = mpsc::channel();
 
         let addr = ControllerInner::listen_external(tx.clone(), external_addr);
-        ControllerInner::listen_internal(tx, internal_addr);
+        ControllerInner::listen_internal(tx.clone(), internal_addr);
+        ControllerInner::initialize_snapshots(tx, self.persistence.snapshot_timeout);
 
         let (worker_ready_tx, worker_ready_rx) = mpsc::channel();
 
@@ -235,6 +236,8 @@ pub struct ControllerInner {
     checktable: checktable::CheckTableClient,
     checktable_addr: SocketAddr,
     sharding: Option<usize>,
+
+    snapshot_id: u64,
 
     domain_config: DomainConfig,
 
@@ -333,6 +336,9 @@ impl ControllerInner {
                             _ => "NOT FOUND".to_owned(),
                         })
                         .unwrap();
+                },
+                ControlEvent::InitializeSnapshot => {
+                    self.initialize_snapshot();
                 }
             }
         }
@@ -395,6 +401,17 @@ impl ControllerInner {
         let builder = thread::Builder::new().name("srv-ext".to_owned());
         builder.spawn(move || drop(listen)).unwrap();
         socket
+    }
+
+    /// Starts a loop that initiates a snapshot every `timeout`.
+    fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
+        let builder = thread::Builder::new().name("snapshots".to_owned());
+        builder.spawn(move || {
+            loop {
+                thread::sleep(timeout);
+                event_tx.send(ControlEvent::InitializeSnapshot);
+            }
+        });
     }
 
     /// Listen for messages from workers.
@@ -513,8 +530,9 @@ impl ControllerInner {
             ndomains: 0,
             checktable,
             checktable_addr,
-
             sharding: builder.sharding,
+            snapshot_id: 0,
+            sharding_enabled: builder.sharding_enabled,
             materializations: builder.materializations,
             domain_config: builder.domain_config,
             persistence: builder.persistence,
@@ -539,6 +557,26 @@ impl ControllerInner {
             local_pool,
 
             last_checked_workers: Instant::now(),
+        }
+    }
+
+    /// Initializes a single snapshot by sending TakeSnapshot to all domains.
+    pub fn initialize_snapshot(&mut self) {
+        // All snapshots have completed at this point, so increment and start another:
+        self.snapshot_id += 1;
+        let id = self.snapshot_id;
+        info!(self.log, "Initializing snapshot with ID {}", id);
+        for (_name, index) in self.inputs(()).iter() {
+            let domain_index = &self.ingredients[*index].domain();
+            let domain = self.domains.get_mut(&domain_index).unwrap();
+            let packet = payload::Packet::TakeSnapshot { id };
+            domain.send(box packet).unwrap();
+        }
+
+        for (_name, index) in self.inputs(()).iter() {
+            let domain_index = &self.ingredients[*index].domain();
+            let domain = self.domains.get_mut(&domain_index).unwrap();
+            domain.wait_for_ack();
         }
     }
 

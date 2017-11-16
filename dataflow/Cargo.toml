@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["The Distributary Developers"]
 
 [dependencies]
+bincode = "0.9.0"
 buf_redux = "0.6.1"
 evmap = "2.0.1"
 fnv = "1.0.5"

@@ -249,6 +249,7 @@ fn main() {
         mode,
         queue_length,
         flush_timeout,
+        None,
         Some(String::from("vote")),
     );
 

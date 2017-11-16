@@ -245,6 +245,10 @@ pub enum Packet {
     /// Signal that a base node's domain should start replaying logs.
     StartRecovery,
 
+    /// Initiate the snapshotting process. Domains should send ACKs
+    /// to the controller containing the given ID.
+    TakeSnapshot { id: u64 },
+
     // Transaction time messages
     //
     /// Instruct domain to flush pending transactions and notify upon completion. `prev_ts` is the
