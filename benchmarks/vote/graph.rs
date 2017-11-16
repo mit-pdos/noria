@@ -98,7 +98,6 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
 impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
-        // TODO(fintelia): Figure out why the SQL parser rejects UNION query.
         // TODO(fintelia): Port non-stupid migration to SQL expression.
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
