@@ -35,8 +35,9 @@ impl Backend {
             cb.disable_sharding();
         }
 
-        let mut g = cb.build();
-        g.log_with(blender_log);
+        cb.log_with(blender_log);
+
+        let g = cb.build();
 
         match reuse.as_ref() {
             "finkelstein" => g.enable_reuse(ReuseConfigType::Finkelstein),
