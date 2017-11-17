@@ -98,7 +98,6 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
 impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
-        // TODO(fintelia): Figure out why the SQL parser rejects UNION query.
         // TODO(fintelia): Port non-stupid migration to SQL expression.
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
@@ -112,8 +111,8 @@ impl Graph {
                             FROM Article, VoteCount \
                             WHERE Article.id = VoteCount.id AND Article.id = ?;
 
-               U: SELECT id, 1 FROM Vote UNION SELECT id, stars from Rating;
-               Total: SELECT id, SUM(stars) as score FROM U GROUP BY id;
+               U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
+               Total: SELECT id, SUM(stars) AS score FROM U GROUP BY id;
                ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article, Total \
                             WHERE Article.id = Total.id AND Article.id = ?;";
@@ -126,7 +125,7 @@ impl Graph {
 
         let inputs = self.graph.inputs();
         let outputs = self.graph.outputs();
-        (inputs["Ratings"], outputs["ArticleWithScore"])
+        (inputs["Rating"], outputs["ArticleWithScore"])
         // self.graph.migrate(|mig| {
         //     // add new "ratings" base table
         //     let b = Base::default().with_key(vec![1]);
