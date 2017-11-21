@@ -85,6 +85,7 @@ enum ControlEvent {
     WorkerCoordination(CoordinationMessage),
     ExternalGet(String, String, Sender<String>),
     ExternalPost(String, String, Sender<String>),
+    InitializeSnapshot,
 }
 
 /// Used to construct a controller.
@@ -202,7 +203,9 @@ impl ControllerBuilder {
 
         let addr = ControllerInner::listen_external(tx.clone(), external_addr);
         ControllerInner::listen_internal(tx.clone(), internal_addr);
-        ControllerInner::initialize_snapshots(tx, self.persistence.snapshot_timeout);
+        if let Some(timeout) = self.persistence.snapshot_timeout {
+            ControllerInner::initialize_snapshots(tx, timeout);
+        }
 
         let (worker_ready_tx, worker_ready_rx) = mpsc::channel();
 
@@ -337,7 +340,7 @@ impl ControllerInner {
                             _ => "NOT FOUND".to_owned(),
                         })
                         .unwrap();
-                },
+                }
                 ControlEvent::InitializeSnapshot => {
                     self.initialize_snapshot();
                 }
@@ -426,7 +429,7 @@ impl ControllerInner {
     }
 
 
-    /// Starts a loop that initiates a snapshot every `timeout`.
+    /// Starts a loop that attempts to initiate a snapshot every `timeout`.
     fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
         let builder = thread::Builder::new().name("snapshots".to_owned());
         builder.spawn(move || {
@@ -604,7 +607,7 @@ impl ControllerInner {
         let snapshot_id = self.snapshot_id + 1;
         info!(self.log, "Initializing snapshot with ID {}", snapshot_id);
 
-        let nodes: Vec<_> = self.inputs(())
+        let nodes: Vec<_> = self.inputs()
             .iter()
             .map(|(_name, index)| {
                 let node = &self.ingredients[*index];

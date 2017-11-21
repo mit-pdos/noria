@@ -243,11 +243,17 @@ pub enum Packet {
     Spin,
 
     /// Signal that a base node's domain should start replaying logs.
-    StartRecovery { link: Link, snapshot_id: u64 },
+    StartRecovery {
+        link: Link,
+        snapshot_id: u64,
+    },
 
     /// Initiate the snapshotting process. Domains should send ACKs
     /// to the controller containing the given ID.
-    TakeSnapshot { link: Link, snapshot_id: u64 },
+    TakeSnapshot {
+        link: Link,
+        snapshot_id: u64,
+    },
 
     // Transaction time messages
     //

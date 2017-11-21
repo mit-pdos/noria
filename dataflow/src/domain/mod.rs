@@ -1674,6 +1674,7 @@ impl Domain {
                         let (ts, prevs) = checktable::with_checktable(|ct| {
                             ct.recover(global_addr).unwrap()
                         });
+
                         Packet::Transaction {
                             link,
                             data,
@@ -2428,7 +2429,8 @@ impl Domain {
                     debug_assert!(packet.is_regular());
                     packet.trace(PacketEvent::ExitInputChannel);
                     let merged_packet =
-                        self.group_commit_queues.append(packet, &self.nodes, self.snapshot_id);
+                        self.group_commit_queues
+                            .append(packet, &self.nodes, self.snapshot_id);
                     if let Some(packet) = merged_packet {
                         self.handle(packet, sends);
                     }
@@ -2443,7 +2445,9 @@ impl Domain {
                 ProcessResult::KeepPolling
             }
             PollEvent::Timeout => {
-                if let Some(m) = self.group_commit_queues.flush_if_necessary(&self.nodes, self.snapshot_id) {
+                if let Some(m) = self.group_commit_queues
+                    .flush_if_necessary(&self.nodes, self.snapshot_id)
+                {
                     self.handle(m, sends);
                     while let Some(p) = self.inject.take() {
                         self.handle(p, sends);
