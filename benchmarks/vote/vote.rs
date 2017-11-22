@@ -174,7 +174,7 @@ fn main() {
                 .short("w")
                 .long("workers")
                 .takes_value(true)
-                .default_value("0")
+                .default_value("2")
                 .help("Number of workers to use"),
         )
         .get_matches();
@@ -257,13 +257,12 @@ fn main() {
     );
 
     // setup db
-    let mut s = graph::Setup::default();
+    let mut s = graph::Setup::new(true, nworkers);
     // s.log = !args.is_present("quiet");
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
-    s.nworkers = nworkers;
     let g = graph::make(s, persistence_params);
 
     // prepare getters
