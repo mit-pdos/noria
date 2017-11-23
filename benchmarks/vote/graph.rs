@@ -138,9 +138,10 @@ impl Graph {
 
                RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
                U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
-               ArticleWithScore: SELECT Article.id, title, U.score AS score \
+               ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
                             FROM Article, U \
-                            WHERE Article.id = U.id AND Article.id = ?;";
+                            WHERE Article.id = U.id AND Article.id = ? \
+                            GROUP BY Article.id;";
 
 
         if self.setup.stupid {
