@@ -174,7 +174,7 @@ fn main() {
                 .short("w")
                 .long("workers")
                 .takes_value(true)
-                .default_value("0")
+                .default_value("2")
                 .help("Number of workers to use"),
         )
         .get_matches();
@@ -198,8 +198,8 @@ fn main() {
     let nworkers = value_t_or_exit!(args, "workers", usize);
 
     let mix = match args.value_of("MODE") {
-        Some("read") => Some(common::Mix::Read(1)),
-        Some("write") => Some(common::Mix::Write(1)),
+        Some("read") => Some(common::Mix::Read(128)),
+        Some("write") => Some(common::Mix::Write(128)),
         Some(ref mode) if mode.starts_with("mix:") => {
             // ratio is number of reads per write
             let ratio = mode.split(':')
@@ -208,7 +208,7 @@ fn main() {
                 .unwrap()
                 .parse::<usize>()
                 .unwrap();
-            Some(common::Mix::RW(ratio, 1))
+            Some(common::Mix::RW(ratio * 16, 16))
         }
         Some(_) => unreachable!(),
         None => None,
@@ -234,7 +234,7 @@ fn main() {
         assert!(migrate_after < &runtime);
     }
 
-    let mut config = RuntimeConfig::new(narticles, common::Mix::Read(1), Some(runtime));
+    let mut config = RuntimeConfig::new(narticles, common::Mix::Read(128), Some(runtime));
     config.set_verbose(!args.is_present("quiet"));
     config.produce_cdf(cdf);
     config.use_distribution(dist);
@@ -257,13 +257,12 @@ fn main() {
     );
 
     // setup db
-    let mut s = graph::Setup::default();
+    let mut s = graph::Setup::new(true, nworkers);
     // s.log = !args.is_present("quiet");
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
-    s.nworkers = nworkers;
     let g = graph::make(s, persistence_params);
 
     // prepare getters
@@ -314,7 +313,7 @@ fn main() {
         let start = sync::Arc::new(sync::Barrier::new(putters.len()));
         let prepop = Some(sync::Arc::new(sync::Barrier::new(putters.len() + 1)));
         let mut pconfig = config.clone();
-        pconfig.mix = common::Mix::Write(1);
+        pconfig.mix = common::Mix::Write(128);
         // put first
         let putters: Vec<_> = putters
             .into_iter()
@@ -374,7 +373,7 @@ fn main() {
         let mut pconfig = config.clone();
         pconfig.mix = match mix {
             Some(ref mix) => mix.clone(),
-            None => common::Mix::Write(1),
+            None => common::Mix::Write(128),
         };
         let putters: Vec<_> = putters
             .into_iter()
@@ -773,28 +772,31 @@ impl Migrator {
 
 impl Reader for Getter {
     fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let res = ids.iter()
-            .map(|&(_, article_id)| {
-                (self.call())
-                    .lookup(&article_id.into(), true)
-                    .map(|rows| match rows.len() {
-                        0 => ArticleResult::NoSuchArticle,
-                        1 => {
-                            let row = &rows[0];
-                            let id: i64 = row[0].clone().into();
-                            let title: String = row[1].deep_clone().into();
-                            let votes: i64 = match row[2] {
-                                DataType::None => 42,
-                                ref d => d.clone().into(),
-                            };
-                            ArticleResult::Article {
-                                id: id,
-                                title: title,
-                                votes: votes,
-                            }
+        let arg = ids.iter()
+            .map(|&(_, article_id)| article_id.into())
+            .collect();
+        let res = (self.call())
+            .multi_lookup(arg, true)
+            .into_iter()
+            .map(|res| {
+                res.map(|rows| match rows.len() {
+                    0 => ArticleResult::NoSuchArticle,
+                    1 => {
+                        let mut row = rows.into_iter().next().unwrap().into_iter();
+                        let id: i64 = row.next().unwrap().into();
+                        let title: String = row.next().unwrap().into();
+                        let votes: i64 = match row.next().unwrap() {
+                            DataType::None => 42,
+                            d => d.into(),
+                        };
+                        ArticleResult::Article {
+                            id: id,
+                            title: title,
+                            votes: votes,
                         }
-                        _ => unreachable!(),
-                    })
+                    }
+                    _ => unreachable!(),
+                })
             })
             .collect();
 

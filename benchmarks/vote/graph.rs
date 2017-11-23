@@ -14,17 +14,19 @@ pub struct Setup {
     pub stupid: bool,
     pub partial: bool,
     pub sharding: bool,
+    pub local: bool,
     pub nworkers: usize,
 }
 
-impl Default for Setup {
-    fn default() -> Self {
+impl Setup {
+    pub fn new(local: bool, nworkers: usize) -> Self {
         Setup {
             transactions: false,
             stupid: false,
             partial: true,
             sharding: true,
-            nworkers: 0,
+            local,
+            nworkers,
         }
     }
 }
@@ -64,7 +66,11 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
         g.disable_sharding();
     }
     g.set_persistence(persistence_params);
-    g.set_nworkers(s.nworkers);
+    if s.local {
+        g.set_local_workers(s.nworkers);
+    } else {
+        g.set_nworkers(s.nworkers);
+    }
     let graph = g.build();
 
     let recipe = "# base tables
