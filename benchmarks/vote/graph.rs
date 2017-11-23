@@ -1,4 +1,4 @@
-use distributary::{Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
+use distributary::{self, Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
 
 pub struct Graph {
     setup: Setup,
@@ -71,6 +71,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     } else {
         g.set_nworkers(s.nworkers);
     }
+    g.log_with(distributary::logger_pls());
     let graph = g.build();
 
     let recipe = "# base tables
