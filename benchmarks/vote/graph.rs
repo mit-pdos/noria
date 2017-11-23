@@ -124,10 +124,29 @@ impl Graph {
                             FROM Article, Total \
                             WHERE Article.id = Total.id AND Article.id = ?;";
 
+        let smart_recipe = "# base tables
+               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
+               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+
+               # read queries
+               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
+                            FROM Vote GROUP BY Vote.id;
+               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article, VoteCount \
+                            WHERE Article.id = VoteCount.id AND Article.id = ?;
+
+               RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
+               U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
+               ArticleWithScore: SELECT Article.id, title, U.score AS score \
+                            FROM Article, U \
+                            WHERE Article.id = U.id AND Article.id = ?;";
+
+
         if self.setup.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned());
         } else {
-            unimplemented!();
+            self.graph.install_recipe(smart_recipe.to_owned());
         }
 
         let inputs = self.graph.inputs();
