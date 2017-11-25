@@ -1,4 +1,4 @@
-use distributary::{Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
+use distributary::{self, Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
 
 pub struct Graph {
     setup: Setup,
@@ -14,17 +14,19 @@ pub struct Setup {
     pub stupid: bool,
     pub partial: bool,
     pub sharding: bool,
+    pub local: bool,
     pub nworkers: usize,
 }
 
-impl Default for Setup {
-    fn default() -> Self {
+impl Setup {
+    pub fn new(local: bool, nworkers: usize) -> Self {
         Setup {
             transactions: false,
             stupid: false,
             partial: true,
             sharding: true,
-            nworkers: 0,
+            local,
+            nworkers,
         }
     }
 }
@@ -64,7 +66,12 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
         g.disable_sharding();
     }
     g.set_persistence(persistence_params);
-    g.set_nworkers(s.nworkers);
+    if s.local {
+        g.set_local_workers(s.nworkers);
+    } else {
+        g.set_nworkers(s.nworkers);
+    }
+    g.log_with(distributary::logger_pls());
     let graph = g.build();
 
     let recipe = "# base tables
@@ -117,10 +124,30 @@ impl Graph {
                             FROM Article, Total \
                             WHERE Article.id = Total.id AND Article.id = ?;";
 
+        let smart_recipe = "# base tables
+               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
+               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+
+               # read queries
+               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
+                            FROM Vote GROUP BY Vote.id;
+               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article, VoteCount \
+                            WHERE Article.id = VoteCount.id AND Article.id = ?;
+
+               RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
+               U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
+               ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
+                            FROM Article, U \
+                            WHERE Article.id = U.id AND Article.id = ? \
+                            GROUP BY Article.id;";
+
+
         if self.setup.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned());
         } else {
-            unimplemented!();
+            self.graph.install_recipe(smart_recipe.to_owned());
         }
 
         let inputs = self.graph.inputs();
