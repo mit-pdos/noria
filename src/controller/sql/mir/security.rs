@@ -12,7 +12,7 @@ pub trait SecurityBoundary {
         &self,
         universe: DataType,
         node_for_rel: &mut HashMap<&str, MirNodeRef>,
-        prev_node: Option<MirNodeRef>,
+        prev_node: MirNodeRef,
     ) -> Vec<MirNodeRef>;
 
     fn make_security_nodes(
@@ -200,14 +200,14 @@ impl SecurityBoundary for SqlToMirConverter {
         &self,
         universe: DataType,
         node_for_rel: &mut HashMap<&str, MirNodeRef>,
-        prev_node: Option<MirNodeRef>,
+        prev_node: MirNodeRef,
     ) -> Vec<MirNodeRef> {
         let mut security_nodes: Vec<MirNodeRef> = Vec::new();
         if universe == "global".into() {
             return security_nodes;
         }
 
-        let mut prev_node = prev_node.unwrap().clone();
+        let mut parent = prev_node.clone();
 
         for (rel, _) in &node_for_rel.clone() {
             let nodes =
@@ -226,7 +226,7 @@ impl SecurityBoundary for SqlToMirConverter {
             if !security_nodes.is_empty() {
                 let last_pol = security_nodes.last().unwrap();
                 node_for_rel.insert(*rel, last_pol.clone());
-                prev_node = last_pol.clone();
+                parent = last_pol.clone();
             }
         }
 
