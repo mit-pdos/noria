@@ -1,8 +1,14 @@
 [
   {
-    "name": "own-papers",
-    "description": "Users can see their own papers.",
+    "name": "lead-author-papers",
+    "description": "Users can papers that they are the lead contact for.",
     "table": "Paper",
-    "predicate": "WHERE Paper.paperId IN (SELECT paperId FROM Paper JOIN ContactInfo ON (ContactInfo.contactId = Paper.leadContactId));"
+    "predicate": "WHERE Paper.leadContactId = UserContext.id;"
+  },
+  {
+    "name": "unconflicted-papers",
+    "description": "Users can only see papers they are not conflicted with.",
+    "table": "Paper",
+    "predicate": "WHERE Paper.paperId NOT IN (SELECT PaperConflict.paperId FROM PaperConflict WHERE PaperConflict.contactId = UserContext.id);"
   }
 ]
