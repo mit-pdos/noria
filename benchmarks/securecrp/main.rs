@@ -17,6 +17,7 @@ pub struct Backend {
 impl Backend {
     pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
+        cb.set_local_workers(2);
         let log = distributary::logger_pls();
         let blender_log = log.clone();
 
