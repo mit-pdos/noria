@@ -226,7 +226,7 @@ impl MirNode {
             // otherwise, just look up in the column set
             _ => match self.columns
                 .iter()
-                .position(|cc| cc.name == c.name && cc.table == c.table)
+                .position(|cc| cc.name == c.name)
             {
                 None => {
                     panic!("tried to look up non-existent column {:?}", c.name);
@@ -429,7 +429,11 @@ impl MirNodeType {
             MirNodeType::Project { ref mut emit, .. } => {
                 emit.push(c);
             }
-            MirNodeType::Union { .. } => unimplemented!(),
+            MirNodeType::Union { ref mut emit } => {
+                for e in emit.iter_mut() {
+                    e.push(c.clone());
+                }
+            }
             MirNodeType::TopK {
                 ref mut group_by, ..
             } => {

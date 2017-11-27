@@ -519,13 +519,13 @@ impl ControllerInner {
             listen_addr: builder.listen_addr,
             heartbeat_every: builder.heartbeat_every,
             healthcheck_every: builder.healthcheck_every,
-            log: builder.log,
+            log: builder.log.clone(),
 
             domains: Default::default(),
             channel_coordinator: cc,
             debug_channel: None,
 
-            recipe: Recipe::blank(None),
+            recipe: Recipe::blank(Some(builder.log.clone())),
 
             deps: HashMap::default(),
             remap: HashMap::default(),

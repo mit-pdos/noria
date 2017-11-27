@@ -6,32 +6,43 @@ use controller::sql::query_graph::QueryGraphEdge;
 use std::collections::{HashMap, HashSet};
 use dataflow::prelude::DataType;
 use controller::sql::query_signature::Signature;
+use nom_sql::SelectStatement;
+use controller::sql::query_graph::QueryGraph;
 
 pub trait SecurityBoundary {
     fn make_security_boundary(
-        &self,
+        &mut self,
         universe: DataType,
         node_for_rel: &mut HashMap<&str, MirNodeRef>,
         prev_node: MirNodeRef,
+        st: &SelectStatement,
+        qg: &QueryGraph,
+        mut node_count: usize,
     ) -> Vec<MirNodeRef>;
 
     fn make_security_nodes(
-        &self,
+        &mut self,
         rel: &str,
         base_node: &MirNodeRef,
         universe_id: DataType,
         node_for_rel: HashMap<&str, MirNodeRef>,
+        st: &SelectStatement,
+        qg: &QueryGraph,
+        node_count: &mut usize,
     ) -> Vec<MirNodeRef>;
 }
 
 impl SecurityBoundary for SqlToMirConverter {
     // TODO(larat): this is basically make_selection_nodes
     fn make_security_nodes(
-        &self,
+        &mut self,
         rel: &str,
         prev_node: &MirNodeRef,
         universe_id: DataType,
         node_for_rel: HashMap<&str, MirNodeRef>,
+        st: &SelectStatement,
+        main_qg: &QueryGraph,
+        node_count: &mut usize,
     ) -> Vec<MirNodeRef> {
         use std::cmp::Ordering;
         let policies = match self.policies.get(&(universe_id.clone(), String::from(rel))) {
@@ -50,7 +61,7 @@ impl SecurityBoundary for SqlToMirConverter {
             rel
         );
 
-        let output_cols = prev_node.borrow().columns().iter().cloned().collect();
+        // let output_cols = prev_node.borrow().columns().iter().cloned().collect();
         let mut security_nodes = Vec::new();
         let mut last_policy_nodes = Vec::new();
 
@@ -183,12 +194,21 @@ impl SecurityBoundary for SqlToMirConverter {
             assert!(policy_nodes.len() > 0, "no nodes where created for policy");
 
             security_nodes.extend(policy_nodes.clone());
-            last_policy_nodes.push(policy_nodes.last().unwrap().clone())
+            let mut last = policy_nodes.last().unwrap().clone();
+
+
+            let (func_nodes, predicate_nodes, predicates_above_group_by_nodes) =
+                self.make_linear_query(st, main_qg, &mut last, &mut node_count, &format!("_u{}", universe_id));
+
+            security_nodes.extend(func_nodes);
+            security_nodes.extend(predicate_nodes);
+            security_nodes.extend(predicates_above_group_by_nodes);
+            last_policy_nodes.push(last)
         }
 
         if last_policy_nodes.len() > 1 {
             let final_node =
-                self.make_union_from_same_base(&format!("sp_union_u{}", universe_id), last_policy_nodes, output_cols);
+                self.make_union_node(&format!("sp_union_u{}", universe_id), last_policy_nodes);
 
             security_nodes.push(final_node);
         }
@@ -197,10 +217,13 @@ impl SecurityBoundary for SqlToMirConverter {
     }
 
     fn make_security_boundary(
-        &self,
+        &mut self,
         universe: DataType,
         node_for_rel: &mut HashMap<&str, MirNodeRef>,
         prev_node: MirNodeRef,
+        st: &SelectStatement,
+        qg: &QueryGraph,
+        mut node_count: usize,
     ) -> Vec<MirNodeRef> {
         let mut security_nodes: Vec<MirNodeRef> = Vec::new();
         if universe == "global".into() {
@@ -211,7 +234,7 @@ impl SecurityBoundary for SqlToMirConverter {
 
         for (rel, _) in &node_for_rel.clone() {
             let nodes =
-                self.make_security_nodes(*rel, &prev_node, universe.clone(), node_for_rel.clone());
+                self.make_security_nodes(*rel, &prev_node, universe.clone(), node_for_rel.clone(), st, qg, &mut node_count);
             debug!(
                 self.log,
                 "Created {} security nodes for table {}",
