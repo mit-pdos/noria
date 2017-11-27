@@ -1111,8 +1111,8 @@ impl SqlToMirConverter {
 
                         let func = fn_col.function.as_ref().unwrap();
                         let new_func = match *func.deref() {
-                            Sum(ref col, b) => FunctionExpression::Count(Column::from(format!("{}.sum({})", col.clone().table.unwrap(), col.name).as_ref()), b),
-                            Count(ref col, b) => FunctionExpression::Count(Column::from(format!("{}.count({})", col.clone().table.unwrap(), col.name).as_ref()), b),
+                            Sum(ref col, b) => FunctionExpression::Sum(Column::from(format!("{}.sum({})", col.clone().table.unwrap(), col.name).as_ref()), b),
+                            Count(ref col, b) => FunctionExpression::Sum(Column::from(format!("{}.count({})", col.clone().table.unwrap(), col.name).as_ref()), b),
                             Max(ref col) => FunctionExpression::Max(Column::from(format!("{}.max({})", col.clone().table.unwrap(), col.name).as_ref())),
                             Min(ref col) => FunctionExpression::Min(Column::from(format!("{}.min({})", col.clone().table.unwrap(), col.name).as_ref())),
                             _ => unimplemented!(),
