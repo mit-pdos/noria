@@ -27,6 +27,7 @@ impl ManyUniverses for SqlIncorporator {
         // First, we need to create a UserContext base node.
         let uid = mig.universe();
         let context = mig.context();
+        self.groups.entry(String::from("private")).or_insert(Vec::new()).push(uid.clone());
 
         info!(self.log, "Starting user universe {}", uid);
 

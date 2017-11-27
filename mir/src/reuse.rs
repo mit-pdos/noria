@@ -110,6 +110,13 @@ pub fn merge_mir_for_queries(
 
             let mut found = false;
             for old_child in old.borrow().children() {
+                let can_reuse_ancestors = new_child.borrow()
+                                            .ancestors()
+                                            .iter()
+                                            .all(|a| reuse.contains_key(&a.borrow().versioned_name()));
+                if !can_reuse_ancestors{
+                    continue;
+                }
                 if old_child.borrow().can_reuse_as(&*new_child.borrow()) {
                     trace!(
                         log,

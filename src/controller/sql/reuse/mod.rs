@@ -62,12 +62,15 @@ impl ReuseConfig {
     }
 
     // Return which universes are available for reuse opportunities
-    pub fn reuse_universes(&self, universe: UniverseId) -> Vec<UniverseId> {
-        if universe == "global".into() {
-            vec![universe.clone()]
+    pub fn reuse_universes(&self, universe: UniverseId, groups: &HashMap<String, Vec<UniverseId>>) -> Vec<UniverseId> {
+        let mut universes;
+        if let Some(private) = groups.get("private").unwrap().first() {
+            universes = vec!["global".into(), universe.clone(), private.clone()];
         } else {
-            vec!["global".into(), universe.clone()]
+            universes = vec!["global".into(), universe.clone()];
         }
+        universes.dedup();
+        universes
     }
 
     pub fn new(reuse_type: ReuseConfigType) -> ReuseConfig {

@@ -50,6 +50,7 @@ pub struct SqlIncorporator {
     view_schemas: HashMap<String, Vec<String>>,
     transactional: bool,
     reuse_type: ReuseConfigType,
+    groups: HashMap<String, Vec<UniverseId>>,
 }
 
 impl Default for SqlIncorporator {
@@ -65,6 +66,7 @@ impl Default for SqlIncorporator {
             view_schemas: HashMap::default(),
             transactional: false,
             reuse_type: ReuseConfigType::Finkelstein,
+            groups: HashMap::default(),
         }
     }
 }
@@ -299,7 +301,7 @@ impl SqlIncorporator {
             );
 
             let mut mir_queries = Vec::new();
-            for uid in reuse_config.reuse_universes(universe) {
+            for uid in reuse_config.reuse_universes(universe, &self.groups) {
                 let mqs: Vec<_> = reuse_candidates
                     .iter()
                     .map(|c| {
