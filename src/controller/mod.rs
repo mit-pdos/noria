@@ -313,7 +313,7 @@ impl ControllerInner {
 
                     self.check_worker_liveness();
 
-                    if !workers_arrived && self.workers.len() == nworkers {
+                    if !workers_arrived && nworkers > 0 && self.workers.len() == nworkers {
                         workers_arrived = true;
                         worker_ready_tx.send(()).unwrap();
                     }
