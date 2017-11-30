@@ -62,8 +62,8 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     if !s.partial {
         g.disable_partial();
     }
-    if !s.sharding {
-        g.disable_sharding();
+    if s.sharding {
+        g.enable_sharding(2);
     }
     g.set_persistence(persistence_params);
     if s.local {
