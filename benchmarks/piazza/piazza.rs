@@ -252,8 +252,8 @@ fn main() {
         p.populate_tables(&backend);
     }
 
-    backend.migrate(sloc, Some(qloc)).unwrap();
     backend.set_security_config(ploc);
+    backend.migrate(sloc, Some(qloc)).unwrap();
 
     println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
