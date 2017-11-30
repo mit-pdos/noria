@@ -4,7 +4,6 @@ pub struct Graph {
     setup: Setup,
     pub vote: NodeIndex,
     pub article: NodeIndex,
-    pub vc: NodeIndex,
     pub end: NodeIndex,
     pub graph: Blender,
 }
@@ -89,11 +88,11 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
                CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;";
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
 
     graph.install_recipe(recipe.to_owned());
     let inputs = graph.inputs();
@@ -107,7 +106,6 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     Graph {
         vote: inputs["Vote"],
         article: inputs["Article"],
-        vc: outputs["VoteCount"],
         end: outputs["ArticleWithVoteCount"],
         graph,
         setup: s,
@@ -124,11 +122,11 @@ impl Graph {
                CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
 
                U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
                Total: SELECT id, SUM(stars) AS score FROM U GROUP BY id;
@@ -142,11 +140,11 @@ impl Graph {
                CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
 
                RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
                U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
