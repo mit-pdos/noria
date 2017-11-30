@@ -16,6 +16,7 @@ pub struct Setup {
     pub sharding: bool,
     pub local: bool,
     pub nworkers: usize,
+    pub logging: bool,
 }
 
 impl Setup {
@@ -25,6 +26,7 @@ impl Setup {
             stupid: false,
             partial: true,
             sharding: true,
+            logging: false,
             local,
             nworkers,
         }
@@ -32,6 +34,12 @@ impl Setup {
 }
 
 impl Setup {
+    #[allow(dead_code)]
+    pub fn enable_logging(mut self) -> Self {
+        self.logging = true;
+        self
+    }
+
     #[allow(dead_code)]
     pub fn with_transactions(mut self) -> Self {
         self.transactions = true;
@@ -71,7 +79,9 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     } else {
         g.set_nworkers(s.nworkers);
     }
-    g.log_with(distributary::logger_pls());
+    if s.logging {
+        g.log_with(distributary::logger_pls());
+    }
     let graph = g.build();
 
     let recipe = "# base tables
@@ -89,8 +99,10 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     let inputs = graph.inputs();
     let outputs = graph.outputs();
 
-    println!("inputs {:?}", inputs);
-    println!("outputs {:?}", outputs);
+    if s.logging {
+        println!("inputs {:?}", inputs);
+        println!("outputs {:?}", outputs);
+    }
 
     Graph {
         vote: inputs["Vote"],

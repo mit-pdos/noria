@@ -137,10 +137,12 @@ where
         let mut i = 0;
         let randomness: Vec<i64> = {
             let n = 1_000_000 * config.runtime.as_ref().unwrap().as_secs();
-            println!(
-                "Generating ~{}M random numbers; this'll take a few seconds...",
-                n / 1_000_000
-            );
+            if config.verbose {
+                println!(
+                    "Generating ~{}M random numbers; this'll take a few seconds...",
+                    n / 1_000_000
+                );
+            }
             match config.distribution {
                 Distribution::Uniform => {
                     let mut u = rand::thread_rng();
@@ -253,7 +255,9 @@ where
 pub fn prep_writer<W: Writer>(writer: &mut W, config: &RuntimeConfig) {
     // prepopulate
     if !config.should_reuse() {
-        println!("Prepopulating with {} articles", config.narticles);
+        if config.verbose {
+            println!("Prepopulating with {} articles", config.narticles);
+        }
         let pop_batch_size = 100;
         assert_eq!(config.narticles % pop_batch_size, 0);
         for i in 0..config.narticles / pop_batch_size {
@@ -262,7 +266,9 @@ pub fn prep_writer<W: Writer>(writer: &mut W, config: &RuntimeConfig) {
                 (reali..reali + pop_batch_size).map(|i| (i as i64, format!("Article #{}", i))),
             );
         }
-        println!("Done with prepopulation");
+        if config.verbose {
+            println!("Done with prepopulation");
+        }
     }
 
     // let system settle
