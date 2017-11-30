@@ -178,9 +178,10 @@ impl DomainBuilder {
             .as_ref()
             .map(|addr| TcpSender::connect(addr, None).unwrap());
 
-        let coordination_tx =
-            coordination_addr.and_then(|ref addr| TcpSender::connect(&addr, None).ok());
         let control_reply_tx = TcpSender::connect(&self.control_addr, None).unwrap();
+        let coordination_tx = coordination_addr.and_then(|ref addr| {
+            Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
+        });
 
         let transaction_state = transactions::DomainState::new(self.index, self.ts);
         let group_commit_queues = persistence::GroupCommitQueueSet::new(

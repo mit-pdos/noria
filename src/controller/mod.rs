@@ -12,7 +12,7 @@ use worker;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
@@ -204,14 +204,11 @@ impl ControllerBuilder {
         let internal_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.internal_port);
         let external_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.external_port);
         let addr = ControllerInner::listen_external(tx.clone(), external_addr);
-        ControllerInner::listen_internal(tx.clone(), internal_addr);
+        self.internal_addr = Some(ControllerInner::listen_internal(tx.clone(), internal_addr));
         if let Some(timeout) = self.persistence.snapshot_timeout {
             ControllerInner::initialize_snapshots(tx, timeout);
         }
 
-        // TODO(ekmartin): We set the address here to avoid controller connections when
-        // .build_inner() is called directly, e.g. in tests:
-        self.internal_addr = Some(internal_addr);
         let (worker_ready_tx, worker_ready_rx) = mpsc::channel();
 
         let builder = thread::Builder::new().name("ctrl-inner".to_owned());
@@ -338,6 +335,9 @@ impl ControllerInner {
                             "recover" => json::to_string(&self.recover()).unwrap(),
                             "graphviz" => json::to_string(&self.graphviz()).unwrap(),
                             "get_statistics" => json::to_string(&self.get_statistics()).unwrap(),
+                            "initialize_snapshot" => {
+                                json::to_string(&self.initialize_snapshot()).unwrap()
+                            }
                             "mutator_builder" => json::to_string(
                                 &self.mutator_builder(json::from_str(&body).unwrap()),
                             ).unwrap(),
@@ -451,11 +451,12 @@ impl ControllerInner {
     }
 
     /// Listen for messages from workers.
-    fn listen_internal(event_tx: Sender<ControlEvent>, addr: SocketAddr) {
+    fn listen_internal(event_tx: Sender<ControlEvent>, addr: SocketAddr) -> SocketAddr {
         let builder = thread::Builder::new().name("srv-int".to_owned());
+        let mut pl: PollingLoop<CoordinationMessage> = PollingLoop::new(addr);
+        let addr = pl.get_listener_addr().unwrap();
         builder
             .spawn(move || {
-                let mut pl: PollingLoop<CoordinationMessage> = PollingLoop::new(addr);
                 pl.run_polling_loop(|e| {
                     if let PollEvent::Process(msg) = e {
                         if !event_tx.send(ControlEvent::WorkerCoordination(msg)).is_ok() {
@@ -466,12 +467,20 @@ impl ControllerInner {
                 });
             })
             .unwrap();
+
+        addr
     }
 
     // Writes the ID of the last completed snapshot to disk,
     // making it available for future recovery situations.
     fn persist_snapshot_id(&mut self, snapshot_id: u64) {
         let filename = format!("{}-snapshot_id", self.persistence.log_prefix);
+        info!(
+            self.log,
+            "Persisting snapshot ID {} to {}",
+            snapshot_id,
+            filename
+        );
         let mut file = File::create(&filename).expect(&format!(
             "Could not open snapshot ID file for writing {}",
             filename,
@@ -526,10 +535,11 @@ impl ControllerInner {
             domain,
             snapshot_id
         );
+
         self.snapshot_ids.insert(domain, snapshot_id);
         // Persist the snapshot_id if all shards have snapshotted:
         let min_id = *self.snapshot_ids.values().min().unwrap();
-        if min_id == snapshot_id {
+        if min_id == snapshot_id && min_id != self.snapshot_id {
             self.persist_snapshot_id(snapshot_id);
         }
 
@@ -1697,6 +1707,11 @@ impl Blender {
     /// StartRecovery packet to each base node domain.
     pub fn recover(&mut self) {
         self.rpc("recover", &()).unwrap()
+    }
+
+    /// Initiaties a single snapshot.
+    pub fn initialize_snapshot(&mut self) {
+        self.rpc("initialize_snapshot", &()).unwrap()
     }
 
     /// Get statistics about the time spent processing different parts of the graph.
