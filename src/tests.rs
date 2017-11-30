@@ -623,8 +623,8 @@ fn it_recovers_persisted_logs_w_transactions() {
 }
 
 #[test]
-fn it_recovers_w_snapshots() {
-    let log_name = LogName::new("it_recovers_w_snapshots");
+fn it_recovers_w_snapshots_and_logs() {
+    let log_name = LogName::new("it_recovers_w_snapshots_and_logs");
     let setup = || {
         let pparams = PersistenceParameters::new(
             DurabilityMode::Permanent,
@@ -636,11 +636,11 @@ fn it_recovers_w_snapshots() {
 
         let mut builder = ControllerBuilder::default();
         builder.set_persistence(pparams);
-        let mut g = builder.build();
+        let g = builder.build();
 
         let sql = "
             CREATE TABLE Cat \
-                (cat_id int, breed_id int, cat_name varchar(255), PRIMARY KEY(breed_id));
+                (cat_id int, breed_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
             CREATE TABLE Breed (breed_id int, breed_name varchar(255), PRIMARY KEY(breed_id));
 
             BreedQuery: SELECT breed_id, breed_name FROM Breed WHERE breed_id = ?;
@@ -651,13 +651,12 @@ fn it_recovers_w_snapshots() {
                       GROUP BY breed_name;
         ";
 
-
         g.install_recipe(sql.to_owned());
         g
     };
 
     let cats = vec!["Bob", "Tom", "Smokey"];
-    let breeds = vec!["Furry", "Burgery"];
+    let breeds = vec!["Bengal", "Tabby"];
     let counts = vec![2, 1];
 
     {
@@ -716,6 +715,78 @@ fn it_recovers_w_snapshots() {
         assert_eq!(count_result.len(), 1);
         assert_eq!(count_result[0][0], counts[i].into());
         assert_eq!(count_result[0][1], breed.into());
+    }
+}
+
+// TODO(ekmartin): Reading right after recovering a snapshot only works if at least a few writes
+// are processed during the recovery, which doesn't happen in this test.
+#[ignore]
+#[test]
+fn it_recovers_w_only_snapshots() {
+    let log_name = LogName::new("it_recovers_w_only_snapshots");
+    let setup = || {
+        let pparams = PersistenceParameters::new(
+            DurabilityMode::Permanent,
+            128,
+            Duration::from_millis(1),
+            None,
+            Some(log_name.name.clone()),
+        );
+
+        let mut builder = ControllerBuilder::default();
+        use logger_pls;
+        builder.log_with(logger_pls());
+        builder.set_persistence(pparams);
+        let g = builder.build();
+
+        let sql = "
+            CREATE TABLE Cat (cat_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
+            CatQuery: SELECT cat_id, cat_name FROM Cat where cat_id = ?;
+        ";
+
+        g.install_recipe(sql.to_owned());
+        g
+    };
+
+    let cats = vec!["Bob", "Tom", "Smokey"];
+
+    {
+        let mut g = setup();
+        let inputs = g.inputs();
+
+        let mut cat_mutator = g.get_mutator(inputs["Cat"]).unwrap();
+        for (i, &name) in cats.iter().enumerate() {
+            cat_mutator
+                .put(vec![(i as i32).into(), name.into()])
+                .unwrap();
+        }
+
+        // Let writes propagate:
+        sleep();
+
+        // Trigger a snapshot:
+        g.initialize_snapshot();
+        sleep();
+    }
+
+    // Delete logs to ensure that we're only reading from the snapshot:
+    for log_path in glob::glob(&format!("./{}-*.json", log_name.name)).unwrap() {
+        fs::remove_file(log_path.unwrap()).unwrap();
+    }
+
+    let mut g = setup();
+    // Recover and let the writes propagate:
+    g.recover();
+    sleep();
+
+    let outputs = g.outputs();
+    let mut cat_getter = g.get_getter(outputs["CatQuery"]).unwrap();
+    for (i, &name) in cats.iter().enumerate() {
+        let id: DataType = (i as i32).into();
+        let cat_result = cat_getter.lookup(&id, true).unwrap();
+        assert_eq!(cat_result.len(), 1);
+        assert_eq!(cat_result[0][0], id);
+        assert_eq!(cat_result[0][1], name.into());
     }
 }
 

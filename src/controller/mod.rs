@@ -442,12 +442,14 @@ impl ControllerInner {
     /// Starts a loop that attempts to initiate a snapshot every `timeout`.
     fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
         let builder = thread::Builder::new().name("snapshots".to_owned());
-        builder.spawn(move || {
-            loop {
-                thread::sleep(timeout);
-                event_tx.send(ControlEvent::InitializeSnapshot);
-            }
-        });
+        builder
+            .spawn(move || {
+                loop {
+                    thread::sleep(timeout);
+                    event_tx.send(ControlEvent::InitializeSnapshot).unwrap();
+                }
+            })
+            .unwrap();
     }
 
     /// Listen for messages from workers.
