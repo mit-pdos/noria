@@ -3,6 +3,7 @@ use channel::tcp::TcpSender;
 use channel;
 use dataflow::prelude::*;
 use dataflow::{checktable, node, payload, DomainConfig, PersistenceParameters, Readers};
+use dataflow::coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::ops::base::Base;
 use dataflow::statistics::GraphStats;
 use souplet::Souplet;
@@ -43,7 +44,6 @@ mod mir_to_flow;
 mod mutator;
 
 use self::domain_handle::DomainHandle;
-use coordination::{CoordinationMessage, CoordinationPayload};
 
 pub use self::mutator::{Mutator, MutatorBuilder, MutatorError};
 pub use self::getter::{Getter, ReadQuery, ReadReply, RemoteGetter, RemoteGetterBuilder};
@@ -95,6 +95,7 @@ pub struct ControllerBuilder {
     persistence: PersistenceParameters,
     materializations: migrate::materialization::Materializations,
     listen_addr: IpAddr,
+    internal_addr: Option<SocketAddr>,
     heartbeat_every: Duration,
     healthcheck_every: Duration,
     nworkers: usize,
@@ -122,9 +123,10 @@ impl Default for ControllerBuilder {
             listen_addr: "127.0.0.1".parse().unwrap(),
             heartbeat_every: Duration::from_secs(1),
             healthcheck_every: Duration::from_secs(10),
+            internal_addr: None,
             internal_port: if cfg!(test) { 0 } else { 8000 },
-            checktable_port: if cfg!(test) { 0 } else { 8500 },
             external_port: if cfg!(test) { 0 } else { 9000 },
+            checktable_port: if cfg!(test) { 0 } else { 8500 },
             nworkers: 0,
             #[cfg(test)]
             local_workers: 2,
@@ -193,20 +195,23 @@ impl ControllerBuilder {
     }
 
     /// Build a controller, and return a Blender to provide access to it.
-    pub fn build(self) -> Blender {
-        // TODO(fintelia): Don't hard code addresses in this function.
-        let internal_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.internal_port);
-        let external_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.external_port);
+    pub fn build(mut self) -> Blender {
         let nworkers = self.nworkers;
 
         let (tx, rx) = mpsc::channel();
 
+        // TODO(fintelia): Don't hard code addresses in this function.
+        let internal_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.internal_port);
+        let external_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), self.external_port);
         let addr = ControllerInner::listen_external(tx.clone(), external_addr);
         ControllerInner::listen_internal(tx.clone(), internal_addr);
         if let Some(timeout) = self.persistence.snapshot_timeout {
             ControllerInner::initialize_snapshots(tx, timeout);
         }
 
+        // TODO(ekmartin): We set the address here to avoid controller connections when
+        // .build_inner() is called directly, e.g. in tests:
+        self.internal_addr = Some(internal_addr);
         let (worker_ready_tx, worker_ready_rx) = mpsc::channel();
 
         let builder = thread::Builder::new().name("ctrl-inner".to_owned());
@@ -242,6 +247,7 @@ pub struct ControllerInner {
     sharding: Option<usize>,
 
     snapshot_id: u64,
+    snapshot_ids: HashMap<(DomainIndex, usize), u64>,
 
     domain_config: DomainConfig,
 
@@ -257,6 +263,7 @@ pub struct ControllerInner {
     debug_channel: Option<SocketAddr>,
 
     listen_addr: IpAddr,
+    internal_addr: Option<SocketAddr>,
     read_listen_addr: SocketAddr,
     readers: Readers,
 
@@ -297,6 +304,9 @@ impl ControllerInner {
                         } => self.handle_register(&msg, addr, read_listen_addr.clone()),
                         CoordinationPayload::Heartbeat => self.handle_heartbeat(&msg),
                         CoordinationPayload::DomainBooted(ref _domain, ref _addr) => Ok(()),
+                        CoordinationPayload::SnapshotCompleted(domain, snapshot_id) => {
+                            self.handle_snapshot_completed(domain, snapshot_id)
+                        }
                         _ => unimplemented!(),
                     };
                     match process {
@@ -505,6 +515,26 @@ impl ControllerInner {
         }
     }
 
+    fn handle_snapshot_completed(
+        &mut self,
+        domain: (DomainIndex, usize),
+        snapshot_id: u64,
+    ) -> Result<(), io::Error> {
+        info!(
+            self.log,
+            "Setting shard {:?}'s snapshot ID to {}",
+            domain,
+            snapshot_id
+        );
+        self.snapshot_ids.insert(domain, snapshot_id);
+        // Persist the snapshot_id if all shards have snapshotted:
+        let min_id = *self.snapshot_ids.values().min().unwrap();
+        if min_id == snapshot_id {
+            self.persist_snapshot_id(snapshot_id);
+        }
+
+        Ok(())
+    }
 
     fn handle_heartbeat(&mut self, msg: &CoordinationMessage) -> Result<(), io::Error> {
         match self.workers.get_mut(&msg.source) {
@@ -572,12 +602,12 @@ impl ControllerInner {
             checktable_addr,
 
             sharding: builder.sharding,
-            snapshot_id: Self::retrieve_snapshot_id(&builder.persistence.log_prefix),
             sharding_enabled: builder.sharding_enabled,
             materializations: builder.materializations,
             domain_config: builder.domain_config,
             persistence: builder.persistence,
             listen_addr: builder.listen_addr,
+            internal_addr: builder.internal_addr,
             heartbeat_every: builder.heartbeat_every,
             healthcheck_every: builder.healthcheck_every,
             recipe: Recipe::blank(Some(builder.log.clone())),
@@ -598,11 +628,18 @@ impl ControllerInner {
             local_pool,
 
             last_checked_workers: Instant::now(),
+            snapshot_id: Self::retrieve_snapshot_id(&builder.persistence.log_prefix),
         }
     }
 
     /// Initializes and persists a single snapshot by sending TakeSnapshot to all domains.
     pub fn initialize_snapshot(&mut self) {
+        let min_id = self.snapshot_ids.values().min();
+        if min_id.is_none() || *min_id.unwrap() < self.snapshot_id {
+            info!(self.log, "Skipping snapshot, still waiting for ACKs");
+            return;
+        }
+
         // All snapshots have completed at this point, so increment and start another:
         let snapshot_id = self.snapshot_id + 1;
         info!(self.log, "Initializing snapshot with ID {}", snapshot_id);
@@ -621,13 +658,6 @@ impl ControllerInner {
             let packet = payload::Packet::TakeSnapshot { link, snapshot_id };
             domain.send(box packet).unwrap();
         }
-
-        for &(_local_addr, domain_index) in nodes.iter() {
-            let domain = self.domains.get_mut(&domain_index).unwrap();
-            domain.wait_for_ack().unwrap();
-        }
-
-        self.persist_snapshot_id(snapshot_id);
     }
 
     /// Use a debug channel. This function may only be called once because the receiving end it
@@ -1468,9 +1498,22 @@ impl<'a> Migration<'a> {
             }
 
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let sharded_by = mainline.ingredients[nodes[0].0].sharded_by();
+            let num_shards = if sharded_by.is_none() {
+                1
+            } else {
+                dataflow::SHARDS
+            };
+
+            for shard in 0..num_shards {
+                mainline
+                    .snapshot_ids
+                    .insert((domain, shard), mainline.snapshot_id);
+            }
+
             let d = DomainHandle::new(
                 domain,
-                mainline.ingredients[nodes[0].0].sharded_by(),
+                sharded_by,
                 &log,
                 &mut mainline.ingredients,
                 &mainline.readers,
@@ -1478,6 +1521,7 @@ impl<'a> Migration<'a> {
                 nodes,
                 &mainline.persistence,
                 &mainline.listen_addr,
+                &mainline.internal_addr,
                 &mainline.channel_coordinator,
                 &mut mainline.local_pool,
                 &mainline.debug_channel,

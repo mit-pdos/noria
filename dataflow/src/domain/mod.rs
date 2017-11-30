@@ -14,6 +14,7 @@ use channel::TcpSender;
 use channel::poll::{PollEvent, ProcessResult};
 use prelude::*;
 use payload::{ControlReplyPacket, ReplayPieceContext, ReplayTransactionState, TransactionState};
+use coordination::{CoordinationMessage, CoordinationPayload};
 use statistics;
 use transactions;
 use persistence;
@@ -159,6 +160,7 @@ impl DomainBuilder {
         readers: Readers,
         channel_coordinator: Arc<ChannelCoordinator>,
         addr: SocketAddr,
+        coordination_addr: &Option<SocketAddr>,
     ) -> Domain {
         // initially, all nodes are not ready
         let not_ready = self.nodes
@@ -175,6 +177,9 @@ impl DomainBuilder {
         let debug_tx = self.debug_addr
             .as_ref()
             .map(|addr| TcpSender::connect(addr, None).unwrap());
+
+        let coordination_tx =
+            coordination_addr.and_then(|ref addr| TcpSender::connect(&addr, None).ok());
         let control_reply_tx = TcpSender::connect(&self.control_addr, None).unwrap();
 
         let transaction_state = transactions::DomainState::new(self.index, self.ts);
@@ -209,6 +214,7 @@ impl DomainBuilder {
             inject: None,
             _debug_tx: debug_tx,
             control_reply_tx,
+            coordination_tx,
             channel_coordinator,
 
             buffered_replay_requests: Default::default(),
@@ -263,6 +269,7 @@ pub struct Domain {
     inject: Option<Box<Packet>>,
     _debug_tx: Option<TcpSender<debug::DebugEvent>>,
     control_reply_tx: TcpSender<ControlReplyPacket>,
+    coordination_tx: Option<TcpSender<CoordinationMessage>>,
     channel_coordinator: Arc<ChannelCoordinator>,
 
     buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>)>,
@@ -1700,6 +1707,7 @@ impl Domain {
     /// Persists a snapshot of each materialized nodes, and sends a single ACK when complete.
     fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
         let snapshot_id = packet.snapshot_id();
+        let shard = self.shard.unwrap_or(0);
         for (local_addr, _node) in self.nodes.iter() {
             if let Some(state) = self.state.get(&local_addr) {
                 let filename = format!(
@@ -1707,7 +1715,7 @@ impl Domain {
                     &self.persistence_parameters.log_prefix,
                     snapshot_id,
                     self.index.index(),
-                    self.shard.unwrap_or(0),
+                    shard,
                     local_addr.id(),
                 );
 
@@ -1736,9 +1744,15 @@ impl Domain {
         }
 
         self.snapshot_id = snapshot_id;
-        self.control_reply_tx
-            .send(ControlReplyPacket::ack())
-            .unwrap();
+        if let Some(ref mut tx) = self.coordination_tx {
+            let payload = CoordinationPayload::SnapshotCompleted((self.index, shard), snapshot_id);
+            tx.send(CoordinationMessage {
+                payload,
+                // TODO(ekmartin): we're not really a worker, so should probably
+                // either rewrite CoordinationMessage or send these from the replica.
+                source: "127.0.0.1:0".parse().unwrap(),
+            }).unwrap();
+        }
     }
 
     fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {

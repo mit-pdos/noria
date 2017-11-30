@@ -32,6 +32,7 @@ extern crate vec_map;
 
 pub mod backlog;
 pub mod checktable;
+pub mod coordination;
 pub mod debug;
 pub mod node;
 pub mod ops;
