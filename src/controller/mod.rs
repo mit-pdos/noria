@@ -601,8 +601,10 @@ impl ControllerInner {
             checktable,
             checktable_addr,
 
+            snapshot_id: Self::retrieve_snapshot_id(&builder.persistence.log_prefix),
+            snapshot_ids: Default::default(),
+
             sharding: builder.sharding,
-            sharding_enabled: builder.sharding_enabled,
             materializations: builder.materializations,
             domain_config: builder.domain_config,
             persistence: builder.persistence,
@@ -628,7 +630,6 @@ impl ControllerInner {
             local_pool,
 
             last_checked_workers: Instant::now(),
-            snapshot_id: Self::retrieve_snapshot_id(&builder.persistence.log_prefix),
         }
     }
 
@@ -1499,13 +1500,7 @@ impl<'a> Migration<'a> {
 
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
             let sharded_by = mainline.ingredients[nodes[0].0].sharded_by();
-            let num_shards = if sharded_by.is_none() {
-                1
-            } else {
-                dataflow::SHARDS
-            };
-
-            for shard in 0..num_shards {
+            for shard in 0..sharded_by.shards() {
                 mainline
                     .snapshot_ids
                     .insert((domain, shard), mainline.snapshot_id);
