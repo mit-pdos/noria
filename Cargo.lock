@@ -328,7 +328,7 @@ dependencies = [
  "buf_redux 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
  "core 0.1.0",
- "evmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "1.0.2"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -1900,7 +1900,7 @@ dependencies = [
 "checksum encoding-index-tradchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fd0e20d5688ce3cab59eb3ef3a2083a5c77bf496cb798dc6fcdb75f323890c18"
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
-"checksum evmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9b8eff3e6fd8462bfb687adf8216fb4016ce9d8788bf6c04defdc58ab4b1156d"
+"checksum evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc0636f6ddc376cb6ace9f1ba65a7e1a0dde4b2554056175fc12b94b7e1397eb"
 "checksum fixedbitset 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "85cb8fec437468d86dc7c83ca7cfc933341d561873275f22dd5eedefa63a6478"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
