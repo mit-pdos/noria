@@ -127,12 +127,14 @@ impl Graph {
                             JOIN (SELECT Vote.id, COUNT(user) AS votes \
                                   FROM Vote GROUP BY Vote.id) AS VoteCount \
                             ON (Article.id = VoteCount.id) WHERE Article.id = ?;
-
                U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
-               Total: SELECT id, SUM(stars) AS score FROM U GROUP BY id;
                ArticleWithScore: SELECT Article.id, title, Total.score AS score \
-                            FROM Article, Total \
-                            WHERE Article.id = Total.id AND Article.id = ?;";
+                            FROM Article \
+                            JOIN (SELECT id, SUM(stars) AS score \
+                                  FROM U \
+                                  GROUP BY id) AS Total
+                            ON (Article.id = Total.id) \
+                            WHERE Article.id = ?;";
 
         let smart_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
