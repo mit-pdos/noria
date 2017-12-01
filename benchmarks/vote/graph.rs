@@ -85,7 +85,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
 
     let recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
 
                # read queries
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
@@ -118,8 +118,8 @@ impl Graph {
         // TODO(fintelia): Port non-stupid migration to SQL expression.
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
-               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
 
                # read queries
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
@@ -136,8 +136,8 @@ impl Graph {
 
         let smart_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
-               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
 
                # read queries
                ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
