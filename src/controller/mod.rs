@@ -477,12 +477,13 @@ impl ControllerInner {
     // making it available for future recovery situations.
     fn persist_snapshot_id(&mut self, snapshot_id: u64) {
         let filename = format!("{}-snapshot_id", self.persistence.log_prefix);
-        info!(
+        debug!(
             self.log,
             "Persisting snapshot ID {} to {}",
             snapshot_id,
             filename
         );
+
         let mut file = File::create(&filename).expect(&format!(
             "Could not open snapshot ID file for writing {}",
             filename,
@@ -531,7 +532,7 @@ impl ControllerInner {
         domain: (DomainIndex, usize),
         snapshot_id: u64,
     ) -> Result<(), io::Error> {
-        info!(
+        debug!(
             self.log,
             "Setting shard {:?}'s snapshot ID to {}",
             domain,
@@ -649,13 +650,13 @@ impl ControllerInner {
     pub fn initialize_snapshot(&mut self) {
         let min_id = self.snapshot_ids.values().min();
         if min_id.is_none() || *min_id.unwrap() < self.snapshot_id {
-            info!(self.log, "Skipping snapshot, still waiting for ACKs");
+            debug!(self.log, "Skipping snapshot, still waiting for ACKs");
             return;
         }
 
         // All snapshots have completed at this point, so increment and start another:
         let snapshot_id = self.snapshot_id + 1;
-        info!(self.log, "Initializing snapshot with ID {}", snapshot_id);
+        debug!(self.log, "Initializing snapshot with ID {}", snapshot_id);
 
         let nodes: Vec<_> = self.inputs()
             .iter()

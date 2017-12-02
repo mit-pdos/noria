@@ -151,6 +151,12 @@ fn main() {
                 .help("Do not delete the base node logs on exit."),
         )
         .arg(
+            Arg::with_name("snapshot-timeout")
+                .long("snapshot-timeout")
+                .value_name("N")
+                .help("Initialize a snapshot every x seconds")
+        )
+        .arg(
             Arg::with_name("write-batch-size")
                 .long("write-batch-size")
                 .takes_value(true)
@@ -184,6 +190,9 @@ fn main() {
         .map(time::Duration::from_secs);
     let crossover = args.value_of("crossover")
         .map(|_| value_t_or_exit!(args, "crossover", u64))
+        .map(time::Duration::from_secs);
+    let snapshot_timeout = args.value_of("snapshot-timeout")
+        .map(|_| value_t_or_exit!(args, "snapshot-timeout", u64))
         .map(time::Duration::from_secs);
     let mut ngetters = value_t_or_exit!(args, "ngetters", usize);
     let mut nputters = value_t_or_exit!(args, "nputters", usize);
@@ -249,7 +258,7 @@ fn main() {
         mode,
         queue_length,
         flush_timeout,
-        None,
+        snapshot_timeout,
         Some(String::from("vote")),
     );
 
