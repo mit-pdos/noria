@@ -1,8 +1,10 @@
+use bincode;
 use buf_redux::BufWriter;
 use buf_redux::strategy::WhenFull;
 
 use serde_json;
 
+use std::mem;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -10,7 +12,9 @@ use std::path::PathBuf;
 use std::time;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::mpsc;
 
+use coordination::{CoordinationMessage, CoordinationPayload};
 use debug::DebugEventType;
 use domain;
 use prelude::*;
@@ -470,6 +474,64 @@ impl Drop for GroupCommitQueueSet {
         if let DurabilityMode::DeleteOnExit = self.params.mode {
             for &(ref filename, _) in self.files.values() {
                 fs::remove_file(filename).unwrap();
+            }
+        }
+    }
+}
+
+/// Request a snapshot to be written for each of the given nodes.
+pub struct PersistSnapshot {
+    snapshot_id: u64,
+    node_states: HashMap<String, State>,
+}
+
+impl PersistSnapshot {
+    pub fn new(snapshot_id: u64, node_states: HashMap<String, State>) -> Self {
+        Self {
+            snapshot_id,
+            node_states,
+        }
+    }
+}
+
+/// Receives cloned states from a domain and persists snapshot files.
+pub struct SnapshotPersister {
+    id: (domain::Index, usize),
+    coordination_tx: Option<TcpSender<CoordinationMessage>>,
+    receiver: mpsc::Receiver<PersistSnapshot>,
+}
+
+impl SnapshotPersister {
+    pub fn new(
+        id: (domain::Index, usize),
+        coordination_tx: Option<TcpSender<CoordinationMessage>>,
+        receiver: mpsc::Receiver<PersistSnapshot>,
+    ) -> Self {
+        Self {
+            id,
+            coordination_tx,
+            receiver,
+        }
+    }
+
+    pub fn start(mut self) {
+        for event in self.receiver {
+            for (filename, state) in event.node_states.iter() {
+                let file = File::create(&filename)
+                    .expect(&format!("Failed creating snapshot file: {}", filename));
+                let mut writer = BufWriter::new(file);
+                bincode::serialize_into(&mut writer, &state, bincode::Infinite)
+                    .expect("bincode serialization of snapshot failed");
+            }
+
+            if let Some(ref mut tx) = self.coordination_tx {
+                let payload = CoordinationPayload::SnapshotCompleted(self.id, event.snapshot_id);
+                tx.send(CoordinationMessage {
+                    payload,
+                    // TODO(ekmartin): we're not really a worker, so should probably
+                    // either rewrite CoordinationMessage or send these from the replica.
+                    source: "127.0.0.1:0".parse().unwrap(),
+                }).unwrap();
             }
         }
     }

@@ -1,10 +1,11 @@
 use bincode;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 use std::time;
 use std::collections::hash_map::Entry;
-use std::io::{BufRead, BufReader, BufWriter, ErrorKind};
+use std::io::{BufRead, BufReader, ErrorKind};
 use std::fs::File;
 
 use std::net::SocketAddr;
@@ -14,7 +15,6 @@ use channel::TcpSender;
 use channel::poll::{PollEvent, ProcessResult};
 use prelude::*;
 use payload::{ControlReplyPacket, ReplayPieceContext, ReplayTransactionState, TransactionState};
-use coordination::{CoordinationMessage, CoordinationPayload};
 use statistics;
 use transactions;
 use persistence;
@@ -179,16 +179,40 @@ impl DomainBuilder {
             .map(|addr| TcpSender::connect(addr, None).unwrap());
 
         let control_reply_tx = TcpSender::connect(&self.control_addr, None).unwrap();
-        let coordination_tx = coordination_addr.and_then(|ref addr| {
-            Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
-        });
-
         let transaction_state = transactions::DomainState::new(self.index, self.ts);
         let group_commit_queues = persistence::GroupCommitQueueSet::new(
             self.index,
             shard.unwrap_or(0),
             &self.persistence_parameters,
         );
+
+        let snapshot_persister = match self.persistence_parameters.snapshot_timeout {
+            Some(_) => {
+                let coordination_tx = coordination_addr.and_then(|ref addr| {
+                    Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
+                });
+
+                let (tx, rx) = mpsc::channel();
+                let persister = persistence::SnapshotPersister::new(
+                    (self.index, shard.unwrap_or(0)),
+                    coordination_tx,
+                    rx,
+                );
+
+                thread::Builder::new()
+                    .name(format!(
+                        "snapshot{}.{}",
+                        self.index.index(),
+                        shard.unwrap_or(0)
+                    ))
+                    .spawn(move || persister.start())
+                    .unwrap();
+
+                Some(tx)
+            }
+            None => None,
+        };
+
 
         Domain {
             index: self.index,
@@ -210,12 +234,12 @@ impl DomainBuilder {
             ingress_inject: Default::default(),
 
             snapshot_id: 0,
+            snapshot_persister,
 
             readers,
             inject: None,
             _debug_tx: debug_tx,
             control_reply_tx,
-            coordination_tx,
             channel_coordinator,
 
             buffered_replay_requests: Default::default(),
@@ -253,6 +277,7 @@ pub struct Domain {
     ingress_inject: local::Map<(usize, Vec<DataType>)>,
 
     snapshot_id: u64,
+    snapshot_persister: Option<mpsc::Sender<persistence::PersistSnapshot>>,
 
     transaction_state: transactions::DomainState,
     persistence_parameters: persistence::Parameters,
@@ -270,7 +295,6 @@ pub struct Domain {
     inject: Option<Box<Packet>>,
     _debug_tx: Option<TcpSender<debug::DebugEvent>>,
     control_reply_tx: TcpSender<ControlReplyPacket>,
-    coordination_tx: Option<TcpSender<CoordinationMessage>>,
     channel_coordinator: Arc<ChannelCoordinator>,
 
     buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>)>,
@@ -1337,15 +1361,16 @@ impl Domain {
         }
 
         let n = self.nodes[&source].borrow();
+        let data: &Vec<DataType> = &*row;
         if n.is_internal() {
             if let Some(b) = n.get_base() {
-                let mut row = ((*row).clone(), true).into();
+                let mut row = (data.clone(), true).into();
                 b.fix(&mut row);
                 return row;
             }
         }
 
-        return ((*row).clone(), true).into();
+        return (data.clone(), true).into();
     }
 
     fn seed_all(&mut self, tag: Tag, keys: HashSet<Vec<DataType>>, sends: &mut EnqueuedSends) {
@@ -1709,25 +1734,25 @@ impl Domain {
     fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
         let snapshot_id = packet.snapshot_id();
         let shard = self.shard.unwrap_or(0);
-        for (local_addr, _node) in self.nodes.iter() {
-            if let Some(state) = self.state.get(&local_addr) {
-                let filename = format!(
-                    "{}-snapshot-#{}-{}_{}-{}.bin",
-                    &self.persistence_parameters.log_prefix,
-                    snapshot_id,
-                    self.index.index(),
-                    shard,
-                    local_addr.id(),
-                );
+        let node_states = self.nodes
+            .iter()
+            .filter_map(|(local_addr, _node)| {
+                if let Some(state) = self.state.get(&local_addr) {
+                    let filename = format!(
+                        "{}-snapshot-#{}-{}_{}-{}.bin",
+                        &self.persistence_parameters.log_prefix,
+                        snapshot_id,
+                        self.index.index(),
+                        shard,
+                        local_addr.id(),
+                    );
 
-                debug!(self.log, "Persisting snapshot {}", filename);
-                let file = File::create(&filename)
-                    .expect(&format!("Failed creating snapshot file: {}", filename));
-                let mut writer = BufWriter::new(file);
-                bincode::serialize_into(&mut writer, &state, bincode::Infinite)
-                    .expect("bincode serialization of snapshot failed");
-            }
-        }
+                    Some((filename, state.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
 
         for (_local_addr, node) in self.nodes.iter() {
             let mut node = node.borrow_mut();
@@ -1745,14 +1770,13 @@ impl Domain {
         }
 
         self.snapshot_id = snapshot_id;
-        if let Some(ref mut tx) = self.coordination_tx {
-            let payload = CoordinationPayload::SnapshotCompleted((self.index, shard), snapshot_id);
-            tx.send(CoordinationMessage {
-                payload,
-                // TODO(ekmartin): we're not really a worker, so should probably
-                // either rewrite CoordinationMessage or send these from the replica.
-                source: "127.0.0.1:0".parse().unwrap(),
-            }).unwrap();
+        match self.snapshot_persister {
+            Some(ref persister) => persister
+                .send(persistence::PersistSnapshot::new(snapshot_id, node_states))
+                .unwrap(),
+            // We should always have a snapshot persister if
+            // we're in the snapshotting business:
+            None => unreachable!(),
         }
     }
 

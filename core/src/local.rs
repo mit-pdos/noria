@@ -252,7 +252,7 @@ use std::collections::hash_map;
 use fnv::FnvHashMap;
 use std::hash::Hash;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Row<T>(Rc<T>);
 
 unsafe impl<T> Send for Row<T> {}
@@ -274,7 +274,7 @@ pub enum KeyType<'a, T: 'a> {
     Sex((T, T, T, T, T, T)),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 enum KeyedState<T: Eq + Hash> {
     Single(FnvHashMap<T, Vec<Row<Vec<T>>>>),
     Double(FnvHashMap<(T, T), Vec<Row<Vec<T>>>>),
@@ -380,14 +380,14 @@ pub enum LookupResult<'a, T: 'a> {
     Missing,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct SingleState<T: Hash + Eq + Clone + 'static> {
     key: Vec<usize>,
     state: KeyedState<T>,
     partial: Option<Vec<Tag>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct State<T: Hash + Eq + Clone + 'static> {
     state: Vec<SingleState<T>>,
     by_tag: HashMap<Tag, usize>,

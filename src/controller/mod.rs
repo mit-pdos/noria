@@ -1514,6 +1514,8 @@ impl<'a> Migration<'a> {
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
             let sharded_by = mainline.ingredients[nodes[0].0].sharded_by();
             for shard in 0..sharded_by.shards() {
+                // TODO(ekmartin): Only insert if the shard
+                // has at least one materialized node:
                 mainline
                     .snapshot_ids
                     .insert((domain, shard), mainline.snapshot_id);
