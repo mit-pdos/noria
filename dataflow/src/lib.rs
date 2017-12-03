@@ -32,7 +32,6 @@ extern crate vec_map;
 
 pub mod backlog;
 pub mod checktable;
-pub mod coordination;
 pub mod debug;
 pub mod node;
 pub mod ops;
@@ -57,7 +56,7 @@ pub type PersistenceParameters = persistence::Parameters;
 pub type DomainConfig = domain::Config;
 
 pub use persistence::DurabilityMode;
-pub use domain::{Domain, DomainBuilder, Index};
+pub use domain::{Domain, DomainBuilder, Index, PersistSnapshotRequest};
 pub use payload::{LocalBypass, Packet};
 pub use checktable::connect_thread_checktable;
 

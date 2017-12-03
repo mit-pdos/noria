@@ -3,9 +3,9 @@ use channel::tcp::TcpSender;
 use channel;
 use dataflow::prelude::*;
 use dataflow::{checktable, node, payload, DomainConfig, PersistenceParameters, Readers};
-use dataflow::coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::ops::base::Base;
 use dataflow::statistics::GraphStats;
+use snapshots::SnapshotPersister;
 use souplet::Souplet;
 use worker;
 
@@ -44,6 +44,7 @@ mod mir_to_flow;
 mod mutator;
 
 use self::domain_handle::DomainHandle;
+use coordination::{CoordinationMessage, CoordinationPayload};
 
 pub use self::mutator::{Mutator, MutatorBuilder, MutatorError};
 pub use self::getter::{Getter, ReadQuery, ReadReply, RemoteGetter, RemoteGetterBuilder};
@@ -260,7 +261,6 @@ pub struct ControllerInner {
     debug_channel: Option<SocketAddr>,
 
     listen_addr: IpAddr,
-    internal_addr: Option<SocketAddr>,
     read_listen_addr: SocketAddr,
     readers: Readers,
 
@@ -595,12 +595,19 @@ impl ControllerInner {
         let cc = Arc::new(ChannelCoordinator::new());
         assert!((builder.nworkers == 0) ^ (builder.local_workers == 0));
         let local_pool = if builder.nworkers == 0 {
+            let snapshot_persister = if builder.persistence.snapshot_timeout.is_some() {
+                Some(SnapshotPersister::new(builder.internal_addr))
+            } else {
+                None
+            };
+
             Some(
                 worker::WorkerPool::new(
                     builder.local_workers,
                     &builder.log,
                     checktable_addr,
                     cc.clone(),
+                    snapshot_persister,
                 ).unwrap(),
             )
         } else {
@@ -622,7 +629,6 @@ impl ControllerInner {
             domain_config: builder.domain_config,
             persistence: builder.persistence,
             listen_addr: builder.listen_addr,
-            internal_addr: builder.internal_addr,
             heartbeat_every: builder.heartbeat_every,
             healthcheck_every: builder.healthcheck_every,
             recipe: Recipe::blank(Some(builder.log.clone())),
@@ -1531,7 +1537,6 @@ impl<'a> Migration<'a> {
                 nodes,
                 &mainline.persistence,
                 &mainline.listen_addr,
-                &mainline.internal_addr,
                 &mainline.channel_coordinator,
                 &mut mainline.local_pool,
                 &mainline.debug_channel,

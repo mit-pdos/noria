@@ -9,11 +9,11 @@ use slog::Logger;
 use channel::{tcp, TcpReceiver, TcpSender};
 use channel::poll::{KeepPolling, PollEvent, PollingLoop, StopPolling};
 use dataflow::{self, DomainBuilder, DomainConfig, PersistenceParameters, Readers};
-use dataflow::coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::payload::ControlReplyPacket;
 use dataflow::prelude::*;
 use dataflow::statistics::{DomainStats, NodeStats};
 
+use coordination::{CoordinationMessage, CoordinationPayload};
 use controller::{WorkerEndpoint, WorkerIdentifier};
 use worker;
 
@@ -128,7 +128,6 @@ impl DomainHandle {
         nodes: Vec<(NodeIndex, bool)>,
         persistence_params: &PersistenceParameters,
         listen_addr: &IpAddr,
-        controller_addr: &Option<SocketAddr>,
         channel_coordinator: &Arc<ChannelCoordinator>,
         local_pool: &mut Option<worker::WorkerPool>,
         debug_addr: &Option<SocketAddr>,
@@ -200,13 +199,8 @@ impl DomainHandle {
                 None => {
                     let listener = ::std::net::TcpListener::bind("127.0.0.1:0").unwrap();
                     let addr = listener.local_addr().unwrap();
-                    let d = domain.build(
-                        logger,
-                        readers.clone(),
-                        channel_coordinator.clone(),
-                        addr,
-                        controller_addr,
-                    );
+                    let d =
+                        domain.build(logger, readers.clone(), channel_coordinator.clone(), addr);
 
                     let listener = ::mio::net::TcpListener::from_listener(listener, &addr).unwrap();
                     local_pool

@@ -19,6 +19,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::thread;
 use std::sync::mpsc;
 use std::env;
+use std::u64;
 use std::fs;
 use std::collections::HashMap;
 
@@ -630,7 +631,9 @@ fn it_recovers_w_snapshots_and_logs() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
-            None,
+            // We want to trigger snapshots manually, but we still need
+            // a snapshot persister - so set a large timeout:
+            Some(Duration::from_secs(u64::MAX)),
             Some(log_name.name.clone()),
         );
 

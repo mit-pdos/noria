@@ -1,8 +1,8 @@
 use bincode;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::time;
 use std::collections::hash_map::Entry;
 use std::io::{BufRead, BufReader, ErrorKind};
@@ -87,6 +87,27 @@ impl PartialEq for DomainMode {
     }
 }
 
+/// Request a snapshot to be written for each of the given nodes.
+pub struct PersistSnapshotRequest {
+    pub domain_id: (Index, usize),
+    pub snapshot_id: u64,
+    pub node_states: HashMap<String, State>,
+}
+
+impl PersistSnapshotRequest {
+    pub fn new(
+        domain_id: (Index, usize),
+        snapshot_id: u64,
+        node_states: HashMap<String, State>,
+    ) -> Self {
+        Self {
+            domain_id,
+            snapshot_id,
+            node_states,
+        }
+    }
+}
+
 enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
@@ -160,7 +181,6 @@ impl DomainBuilder {
         readers: Readers,
         channel_coordinator: Arc<ChannelCoordinator>,
         addr: SocketAddr,
-        coordination_addr: &Option<SocketAddr>,
     ) -> Domain {
         // initially, all nodes are not ready
         let not_ready = self.nodes
@@ -177,42 +197,14 @@ impl DomainBuilder {
         let debug_tx = self.debug_addr
             .as_ref()
             .map(|addr| TcpSender::connect(addr, None).unwrap());
-
         let control_reply_tx = TcpSender::connect(&self.control_addr, None).unwrap();
+
         let transaction_state = transactions::DomainState::new(self.index, self.ts);
         let group_commit_queues = persistence::GroupCommitQueueSet::new(
             self.index,
             shard.unwrap_or(0),
             &self.persistence_parameters,
         );
-
-        let snapshot_persister = match self.persistence_parameters.snapshot_timeout {
-            Some(_) => {
-                let coordination_tx = coordination_addr.and_then(|ref addr| {
-                    Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
-                });
-
-                let (tx, rx) = mpsc::channel();
-                let persister = persistence::SnapshotPersister::new(
-                    (self.index, shard.unwrap_or(0)),
-                    coordination_tx,
-                    rx,
-                );
-
-                thread::Builder::new()
-                    .name(format!(
-                        "snapshot{}.{}",
-                        self.index.index(),
-                        shard.unwrap_or(0)
-                    ))
-                    .spawn(move || persister.start())
-                    .unwrap();
-
-                Some(tx)
-            }
-            None => None,
-        };
-
 
         Domain {
             index: self.index,
@@ -234,7 +226,7 @@ impl DomainBuilder {
             ingress_inject: Default::default(),
 
             snapshot_id: 0,
-            snapshot_persister,
+            snapshot_sender: None,
 
             readers,
             inject: None,
@@ -277,7 +269,7 @@ pub struct Domain {
     ingress_inject: local::Map<(usize, Vec<DataType>)>,
 
     snapshot_id: u64,
-    snapshot_persister: Option<mpsc::Sender<persistence::PersistSnapshot>>,
+    snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
 
     transaction_state: transactions::DomainState,
     persistence_parameters: persistence::Parameters,
@@ -1770,14 +1762,18 @@ impl Domain {
         }
 
         self.snapshot_id = snapshot_id;
-        match self.snapshot_persister {
-            Some(ref persister) => persister
-                .send(persistence::PersistSnapshot::new(snapshot_id, node_states))
-                .unwrap(),
-            // We should always have a snapshot persister if
-            // we're in the snapshotting business:
-            None => unreachable!(),
-        }
+
+        // We should always have a snapshot persister if
+        // we're in the snapshotting business:
+        self.snapshot_sender
+            .as_ref()
+            .unwrap()
+            .send(PersistSnapshotRequest::new(
+                (self.index, shard),
+                snapshot_id,
+                node_states,
+            ))
+            .unwrap();
     }
 
     fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
@@ -2425,8 +2421,13 @@ impl Domain {
         (self.index, self.shard.unwrap_or(0))
     }
 
-    pub fn booted(&mut self, addr: SocketAddr) {
+    pub fn booted(
+        &mut self,
+        addr: SocketAddr,
+        snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
+    ) {
         info!(self.log, "booted domain"; "nodes" => self.nodes.len());
+        self.snapshot_sender = snapshot_sender;
         self.control_reply_tx
             .send(ControlReplyPacket::Booted(self.shard.unwrap_or(0), addr))
             .unwrap();

@@ -9,11 +9,12 @@ use channel::{self, TcpSender};
 use channel::poll::{PollEvent, PollingLoop, ProcessResult, RpcPollEvent, RpcPollingLoop};
 use dataflow::{DomainBuilder, Readers};
 use dataflow::checktable::TokenGenerator;
-use dataflow::coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::backlog::SingleReadHandle;
 use dataflow::prelude::*;
 
+use coordination::{CoordinationMessage, CoordinationPayload};
 use controller::{LocalOrNot, ReadQuery, ReadReply};
+use snapshots::SnapshotPersister;
 
 use worker;
 
@@ -149,8 +150,17 @@ impl Souplet {
         let mut checktable_addr: SocketAddr = controller.parse().unwrap();
         checktable_addr.set_port(8500);
 
+        let controller_addr: SocketAddr = controller.parse().unwrap();
+        // TODO(ekmartin): only create a persister if we're actually taking snapshots:
+        let snapshot_persister = SnapshotPersister::new(Some(controller_addr));
         let cc = Arc::new(ChannelCoordinator::new());
-        let pool = worker::WorkerPool::new(workers, &log, checktable_addr, cc.clone()).unwrap();
+        let pool = worker::WorkerPool::new(
+            workers,
+            &log,
+            checktable_addr,
+            cc.clone(),
+            Some(snapshot_persister),
+        ).unwrap();
 
         Souplet {
             log: log,
@@ -159,7 +169,7 @@ impl Souplet {
 
             listen_addr: String::from(listen_addr),
             listen_port: port,
-            controller_addr: controller.parse().unwrap(),
+            controller_addr,
 
             read_listen_addr,
 
@@ -257,7 +267,6 @@ impl Souplet {
             self.readers.clone(),
             self.channel_coordinator.clone(),
             addr,
-            &Some(self.controller_addr),
         );
 
         let listener = ::mio::net::TcpListener::from_listener(listener, &addr).unwrap();
