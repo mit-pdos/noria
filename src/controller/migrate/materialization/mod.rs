@@ -404,8 +404,7 @@ impl Materializations {
         assert!(replay_obligations.is_empty());
     }
 
-    /// Retrieves the materialization status of a given node, or None
-    /// if the node isn't materialized.
+    /// Retrieves the materialization status of a given node.
     pub fn get_status(&self, index: &NodeIndex, node: &Node) -> MaterializationStatus {
         let is_materialized = self.have.contains_key(index)
             || node.with_reader(|r| r.is_materialized()).unwrap_or(false);

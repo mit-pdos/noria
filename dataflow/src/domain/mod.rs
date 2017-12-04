@@ -1726,6 +1726,35 @@ impl Domain {
     fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
         let snapshot_id = packet.snapshot_id();
         let shard = self.shard.unwrap_or(0);
+
+        // TODO(ekmartin):
+        // Snapshot packets are forwarded through the graph, which means we might receive
+        // the same packet twice from two different ancestors. At the moment we're simply
+        // snapshotting when we receive the first one, but that's probably not correct.
+        // Consider the following scenario, where A is an update processed by both parents:
+        //                       ...
+        //   ...                  | A
+        //    |                   | Snapshot
+        // Parent 1            Parent 2
+        //    | A                 |
+        //    | Snaphot           |
+        //    ------ Domain -------
+        //
+        // This would result in us snapshotting after Parent 1 has processed A, but before
+        // Parent 2 has had time to do so. The correct thing to do would then be to wait for
+        // the snapshot packet from Parent 2 to arrive before we snapshot, while simulatenously
+        // blocking writes from the other parents. That would probably not be very efficient
+        // though, so we might have to look for a better solution.
+        if self.snapshot_id >= snapshot_id {
+            debug!(
+                self.log,
+                "Ignoring old snapshot request for #{}",
+                snapshot_id
+            );
+
+            return;
+        }
+
         let node_states = self.nodes
             .iter()
             .filter_map(|(local_addr, _node)| {
@@ -1746,6 +1775,7 @@ impl Domain {
             })
             .collect::<HashMap<_, _>>();
 
+        // Forward the snapshot packet throughout the graph:
         for (_local_addr, node) in self.nodes.iter() {
             let mut node = node.borrow_mut();
             if node.is_egress() {
@@ -1762,18 +1792,21 @@ impl Domain {
         }
 
         self.snapshot_id = snapshot_id;
-
-        // We should always have a snapshot persister if
-        // we're in the snapshotting business:
-        self.snapshot_sender
-            .as_ref()
-            .unwrap()
-            .send(PersistSnapshotRequest::new(
-                (self.index, shard),
-                snapshot_id,
-                node_states,
-            ))
-            .unwrap();
+        // Only send an ACK if we actually snapshotted something:
+        if !node_states.is_empty() {
+            debug!(self.log, "Sending snapshot ACK for #{}", snapshot_id);
+            // We should always have a snapshot persister if
+            // we're in the snapshotting business:
+            self.snapshot_sender
+                .as_ref()
+                .unwrap()
+                .send(PersistSnapshotRequest::new(
+                    self.id(),
+                    snapshot_id,
+                    node_states,
+                ))
+                .unwrap();
+        }
     }
 
     fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
