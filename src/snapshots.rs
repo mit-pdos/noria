@@ -1,4 +1,5 @@
 use bincode;
+use serde::Serialize;
 
 use std::sync::mpsc;
 use std::fs::File;
@@ -26,18 +27,26 @@ impl SnapshotPersister {
         }
     }
 
+    fn serialize<T: Serialize>(filename: String, state: T) {
+        let file =
+            File::create(&filename).expect(&format!("Failed creating snapshot file: {}", filename));
+        let mut writer = BufWriter::new(file);
+        bincode::serialize_into(&mut writer, &state, bincode::Infinite)
+            .expect("bincode serialization of snapshot failed");
+    }
+
     pub fn start(self) {
         let mut coordination_tx = self.controller_addr.and_then(|ref addr| {
             Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
         });
 
         for event in self.receiver {
-            for (filename, state) in event.node_states.iter() {
-                let file = File::create(&filename)
-                    .expect(&format!("Failed creating snapshot file: {}", filename));
-                let mut writer = BufWriter::new(file);
-                bincode::serialize_into(&mut writer, &state, bincode::Infinite)
-                    .expect("bincode serialization of snapshot failed");
+            for (filename, state) in event.reader_states {
+                Self::serialize(filename, state);
+            }
+
+            for (filename, state) in event.node_states {
+                Self::serialize(filename, state);
             }
 
             if let Some(ref mut tx) = coordination_tx {

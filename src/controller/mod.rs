@@ -1605,8 +1605,9 @@ impl<'a> Migration<'a> {
         // at least one materialized node:
         for (domain_index, nodes) in domain_new_nodes {
             let domain = &mainline.domains[&domain_index];
-            let is_materialized = nodes.iter().any(|ni| {
-                let status = mainline.materializations.get_status(ni);
+            let is_materialized = nodes.iter().any(|&ni| {
+                let node = &mainline.ingredients[ni];
+                let status = mainline.materializations.get_status(&ni, &node);
                 status != MaterializationStatus::Not
             });
 

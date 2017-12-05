@@ -92,20 +92,7 @@ pub struct PersistSnapshotRequest {
     pub domain_id: (Index, usize),
     pub snapshot_id: u64,
     pub node_states: HashMap<String, State>,
-}
-
-impl PersistSnapshotRequest {
-    pub fn new(
-        domain_id: (Index, usize),
-        snapshot_id: u64,
-        node_states: HashMap<String, State>,
-    ) -> Self {
-        Self {
-            domain_id,
-            snapshot_id,
-            node_states,
-        }
-    }
+    pub reader_states: HashMap<String, HashMap<DataType, Datas>>,
 }
 
 enum TriggerEndpoint {
@@ -225,6 +212,7 @@ impl DomainBuilder {
 
             ingress_inject: Default::default(),
 
+            has_recovered: false,
             snapshot_id: 0,
             snapshot_sender: None,
 
@@ -268,6 +256,7 @@ pub struct Domain {
 
     ingress_inject: local::Map<(usize, Vec<DataType>)>,
 
+    has_recovered: bool,
     snapshot_id: u64,
     snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
 
@@ -1611,17 +1600,15 @@ impl Domain {
         }
 
         // Then recover all the snapshots for this domain:
-        for (local_addr, _node) in self.nodes.iter() {
-            if let Some(state) = self.state.get_mut(&local_addr) {
-                let filename = format!(
-                    "{}-snapshot-#{}-{}_{}-{}.bin",
-                    &self.persistence_parameters.log_prefix,
-                    self.snapshot_id,
-                    self.index.index(),
-                    self.shard.unwrap_or(0),
-                    local_addr.id(),
-                );
+        for (local_addr, node) in self.nodes.iter() {
+            let mut n = node.borrow_mut();
+            let filename = self.persistence_parameters.snapshot_filename(
+                self.snapshot_id,
+                &local_addr,
+                self.id(),
+            );
 
+            if let Some(state) = self.state.get_mut(&local_addr) {
                 debug!(self.log, "Recovering snapshot {}", filename);
                 let file = File::open(&filename)
                     .expect(&format!("Failed reading snapshot file: {}", filename));
@@ -1629,14 +1616,34 @@ impl Domain {
                 *state = bincode::deserialize_from(&mut reader, bincode::Infinite)
                     .expect("bincode deserialization of snapshot failed");
                 debug!(self.log, "State size after recovery {}", state.len());
+            } else if n.with_reader(|ref r| r.is_materialized()).unwrap_or(false) {
+                let file = File::open(&filename)
+                    .expect(&format!("Failed reading snapshot file: {}", filename));
+                let mut buf_reader = BufReader::new(file);
+                let state: HashMap<DataType, Datas> =
+                    bincode::deserialize_from(&mut buf_reader, bincode::Infinite)
+                        .expect("bincode deserialization of reader snapshot failed");
+
+                n.with_reader_mut(|r| {
+                    let writer = r.writer_mut().unwrap();
+                    writer.extend(state);
+                    writer.swap();
+                });
             }
         }
     }
 
     fn handle_recovery(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        if self.has_recovered {
+            // This might happen if we have two parents that
+            // both forward us a recovery packet.
+            debug!(self.log, "Ignoring duplicate recovery packet");
+            return;
+        }
+
         let snapshot_id = packet.snapshot_id();
-        self.snapshot_id = snapshot_id;
-        if self.snapshot_id > 0 {
+        if snapshot_id > 0 {
+            self.snapshot_id = snapshot_id;
             self.recover_snapshots(packet, sends);
         }
 
@@ -1653,11 +1660,7 @@ impl Domain {
             .collect();
 
         for (local_addr, global_addr, is_transactional) in node_info {
-            let path = self.persistence_parameters.log_path(
-                &local_addr,
-                self.index,
-                self.shard.unwrap_or(0),
-            );
+            let path = self.persistence_parameters.log_path(&local_addr, self.id());
 
             let file = match File::open(&path) {
                 Ok(f) => f,
@@ -1717,6 +1720,7 @@ impl Domain {
                 .for_each(|packet| self.handle(box packet, sends));
         }
 
+        self.has_recovered = true;
         self.control_reply_tx
             .send(ControlReplyPacket::ack())
             .unwrap();
@@ -1724,27 +1728,25 @@ impl Domain {
 
     /// Persists a snapshot of each materialized nodes, and sends a single ACK when complete.
     fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
-        let snapshot_id = packet.snapshot_id();
-        let shard = self.shard.unwrap_or(0);
-
         // TODO(ekmartin):
         // Snapshot packets are forwarded through the graph, which means we might receive
         // the same packet twice from two different ancestors. At the moment we're simply
         // snapshotting when we receive the first one, but that's probably not correct.
-        // Consider the following scenario, where A is an update processed by both parents:
+        // Consider the following scenario, where A is an update processed by both parents, and
+        // both Parent 1, Parent 2 and Domain have at least one materialized node:
         //                       ...
-        //   ...                  | A
-        //    |                   | Snapshot
+        //   ...                  | Snapshot
+        //    |                   | A
         // Parent 1            Parent 2
+        //    | Snapshot          |
         //    | A                 |
-        //    | Snaphot           |
         //    ------ Domain -------
         //
         // This would result in us snapshotting after Parent 1 has processed A, but before
         // Parent 2 has had time to do so. The correct thing to do would then be to wait for
         // the snapshot packet from Parent 2 to arrive before we snapshot, while simulatenously
-        // blocking writes from the other parents. That would probably not be very efficient
-        // though, so we might have to look for a better solution.
+        // blocking updates from the other parents.
+        let snapshot_id = packet.snapshot_id();
         if self.snapshot_id >= snapshot_id {
             debug!(
                 self.log,
@@ -1755,17 +1757,35 @@ impl Domain {
             return;
         }
 
+        self.snapshot_id = snapshot_id;
+        let shard = self.shard.unwrap_or(0);
+        let reader_states = self.nodes
+            .iter()
+            .filter_map(|(local_addr, node)| {
+                let n = node.borrow();
+                let readers = self.readers.lock().unwrap();
+                if let Some(&(ref reader, _)) = readers.get(&(n.global_addr(), shard)) {
+                    let filename = self.persistence_parameters.snapshot_filename(
+                        self.snapshot_id,
+                        &local_addr,
+                        self.id(),
+                    );
+
+                    Some((filename, reader.collect_state()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
         let node_states = self.nodes
             .iter()
             .filter_map(|(local_addr, _node)| {
                 if let Some(state) = self.state.get(&local_addr) {
-                    let filename = format!(
-                        "{}-snapshot-#{}-{}_{}-{}.bin",
-                        &self.persistence_parameters.log_prefix,
-                        snapshot_id,
-                        self.index.index(),
-                        shard,
-                        local_addr.id(),
+                    let filename = self.persistence_parameters.snapshot_filename(
+                        self.snapshot_id,
+                        &local_addr,
+                        self.id(),
                     );
 
                     Some((filename, state.clone()))
@@ -1791,20 +1811,20 @@ impl Domain {
             }
         }
 
-        self.snapshot_id = snapshot_id;
         // Only send an ACK if we actually snapshotted something:
-        if !node_states.is_empty() {
+        if !node_states.is_empty() || !reader_states.is_empty() {
             debug!(self.log, "Sending snapshot ACK for #{}", snapshot_id);
             // We should always have a snapshot persister if
             // we're in the snapshotting business:
             self.snapshot_sender
                 .as_ref()
                 .unwrap()
-                .send(PersistSnapshotRequest::new(
-                    self.id(),
+                .send(PersistSnapshotRequest {
+                    domain_id: self.id(),
                     snapshot_id,
                     node_states,
-                ))
+                    reader_states,
+                })
                 .unwrap();
         }
     }

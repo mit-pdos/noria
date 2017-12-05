@@ -90,19 +90,36 @@ impl Parameters {
     /// The path that would be used for the given domain/shard pair's logs.
     pub fn log_path(
         &self,
-        node: &LocalNodeIndex,
-        domain_index: domain::Index,
-        domain_shard: usize,
+        local_addr: &LocalNodeIndex,
+        domain_id: (domain::Index, usize),
     ) -> PathBuf {
+        let (domain_index, shard) = domain_id;
         let filename = format!(
             "{}-log-{}_{}-{}.json",
             self.log_prefix,
             domain_index.index(),
-            domain_shard,
-            node.id()
+            shard,
+            local_addr.id()
         );
 
         PathBuf::from(&filename)
+    }
+
+    pub fn snapshot_filename(
+        &self,
+        snapshot_id: u64,
+        local_addr: &LocalNodeIndex,
+        domain_id: (domain::Index, usize),
+    ) -> String {
+        let (domain_index, shard) = domain_id;
+        format!(
+            "{}-snapshot-#{}-{}_{}-{}.bin",
+            self.log_prefix,
+            snapshot_id,
+            domain_index.index(),
+            shard,
+            local_addr.id(),
+        )
     }
 }
 
@@ -144,7 +161,7 @@ impl GroupCommitQueueSet {
 
     fn get_or_create_file(&self, node: &LocalNodeIndex) -> (PathBuf, BufWriter<File, WhenFull>) {
         let path = self.params
-            .log_path(node, self.domain_index, self.domain_shard);
+            .log_path(node, (self.domain_index, self.domain_shard));
         let file = OpenOptions::new()
             .append(true)
             .create(true)

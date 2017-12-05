@@ -721,18 +721,15 @@ fn it_recovers_w_snapshots_and_logs() {
     }
 }
 
-// TODO(ekmartin): Reading right after recovering a snapshot only works if at least a few writes
-// are processed during the recovery, which doesn't happen in this test.
-#[ignore]
 #[test]
 fn it_recovers_w_only_snapshots() {
     let log_name = LogName::new("it_recovers_w_only_snapshots");
     let setup = || {
         let pparams = PersistenceParameters::new(
-            DurabilityMode::Permanent,
+            DurabilityMode::MemoryOnly,
             128,
             Duration::from_millis(1),
-            None,
+            Some(Duration::from_secs(u64::MAX)),
             Some(log_name.name.clone()),
         );
 
@@ -770,11 +767,6 @@ fn it_recovers_w_only_snapshots() {
         // Trigger a snapshot:
         g.initialize_snapshot();
         sleep();
-    }
-
-    // Delete logs to ensure that we're only reading from the snapshot:
-    for log_path in glob::glob(&format!("./{}-*.json", log_name.name)).unwrap() {
-        fs::remove_file(log_path.unwrap()).unwrap();
     }
 
     let mut g = setup();
