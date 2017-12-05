@@ -1,3 +1,5 @@
+use time;
+
 use distributary::{self, Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
 
 pub struct Graph {
@@ -16,6 +18,9 @@ pub struct Setup {
     pub local: bool,
     pub nworkers: usize,
     pub logging: bool,
+    pub concurrent_replays: usize,
+    pub replay_batch_timeout: time::Duration,
+    pub replay_batch_size: usize,
 }
 
 impl Setup {
@@ -28,6 +33,9 @@ impl Setup {
             logging: false,
             local,
             nworkers,
+            concurrent_replays: 512,
+            replay_batch_timeout: time::Duration::from_millis(1),
+            replay_batch_size: 32,
         }
     }
 }
@@ -36,6 +44,24 @@ impl Setup {
     #[allow(dead_code)]
     pub fn enable_logging(mut self) -> Self {
         self.logging = true;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_max_concurrent_replay(mut self, n: usize) -> Self {
+        self.concurrent_replays = n;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_partial_replay_batch_timeout(mut self, t: time::Duration) -> Self {
+        self.replay_batch_timeout = t;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_partial_replay_batch_size(mut self, n: usize) -> Self {
+        self.replay_batch_size = n;
         self
     }
 
