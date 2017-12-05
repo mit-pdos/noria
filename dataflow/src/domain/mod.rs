@@ -20,6 +20,7 @@ use transactions;
 use persistence;
 use debug;
 use checktable;
+use serde;
 use serde_json;
 use itertools::Itertools;
 use slog::Logger;
@@ -1599,6 +1600,17 @@ impl Domain {
             }
         }
 
+        fn deserialize<T>(filename: String) -> T
+        where
+            for<'de> T: serde::Deserialize<'de>,
+        {
+            let file = File::open(&filename)
+                .expect(&format!("Failed reading snapshot file: {}", filename));
+            let mut reader = BufReader::new(file);
+            bincode::deserialize_from(&mut reader, bincode::Infinite)
+                .expect("bincode deserialization of snapshot failed")
+        };
+
         // Then recover all the snapshots for this domain:
         for (local_addr, node) in self.nodes.iter() {
             let mut n = node.borrow_mut();
@@ -1609,21 +1621,10 @@ impl Domain {
             );
 
             if let Some(state) = self.state.get_mut(&local_addr) {
-                debug!(self.log, "Recovering snapshot {}", filename);
-                let file = File::open(&filename)
-                    .expect(&format!("Failed reading snapshot file: {}", filename));
-                let mut reader = BufReader::new(file);
-                *state = bincode::deserialize_from(&mut reader, bincode::Infinite)
-                    .expect("bincode deserialization of snapshot failed");
+                *state = deserialize(filename);
                 debug!(self.log, "State size after recovery {}", state.len());
             } else if n.with_reader(|ref r| r.is_materialized()).unwrap_or(false) {
-                let file = File::open(&filename)
-                    .expect(&format!("Failed reading snapshot file: {}", filename));
-                let mut buf_reader = BufReader::new(file);
-                let state: HashMap<DataType, Datas> =
-                    bincode::deserialize_from(&mut buf_reader, bincode::Infinite)
-                        .expect("bincode deserialization of reader snapshot failed");
-
+                let state: HashMap<DataType, Datas> = deserialize(filename);
                 n.with_reader_mut(|r| {
                     let writer = r.writer_mut().unwrap();
                     writer.extend(state);
