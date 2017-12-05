@@ -7,7 +7,7 @@
                 {
                     "table": "Post",
                     "predicate": "WHERE Post.p_private = 1;",
-                    "description": "users are allowed to see private posts from classes they TA"
+                    "description": "tas are allowed to see private posts from classes they ta"
                 }
             ]
         }
