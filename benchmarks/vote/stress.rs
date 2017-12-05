@@ -11,7 +11,6 @@ mod common;
 
 use std::thread;
 use std::time;
-use std::sync::{Arc, Mutex};
 
 fn randomness(range: usize, n: usize) -> Vec<i64> {
     use rand::Rng;
