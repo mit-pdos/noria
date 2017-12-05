@@ -264,7 +264,7 @@ fn main() {
     s.stupid = args.is_present("stupid");
     s.sharding = !args.is_present("unsharded");
     s.nworkers = nworkers;
-    let g = graph::make(s, persistence_params);
+    let mut g = graph::make(s, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = {
@@ -288,11 +288,11 @@ fn main() {
 
     // prepare putters
     let putters: Vec<_> = {
-        let mix_getters = (0..new_vote_receivers.len())
-            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap()));
+        let mix_getters: Vec<_> = (0..new_vote_receivers.len())
+            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap())).collect();
         new_vote_receivers
             .into_iter()
-            .zip(mix_getters)
+            .zip(mix_getters.into_iter())
             .map(|(new_vote, mix_getter)| {
                 Spoon {
                     article: g.graph.get_mutator(g.article).unwrap(),

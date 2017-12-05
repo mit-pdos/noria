@@ -1,4 +1,5 @@
-use distributary::{Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
+use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
+                   PersistenceParameters};
 
 pub struct Graph {
     setup: Setup,
@@ -6,7 +7,7 @@ pub struct Graph {
     pub article: NodeIndex,
     pub vc: NodeIndex,
     pub end: NodeIndex,
-    pub graph: Blender,
+    pub graph: ControllerHandle<LocalAuthority>,
 }
 
 pub struct Setup {
@@ -64,8 +65,8 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
         g.disable_sharding();
     }
     g.set_persistence(persistence_params);
-    g.set_nworkers(s.nworkers);
-    let graph = g.build();
+    // g.set_nworkers(s.nworkers);
+    let mut graph = g.build_local();
 
     let recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
