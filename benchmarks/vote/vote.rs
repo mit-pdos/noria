@@ -196,6 +196,7 @@ fn main() {
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
     let nworkers = value_t_or_exit!(args, "workers", usize);
+    let verbose = !args.is_present("quiet");
 
     let mix = match args.value_of("MODE") {
         Some("read") => Some(common::Mix::Read(128)),
@@ -235,7 +236,7 @@ fn main() {
     }
 
     let mut config = RuntimeConfig::new(narticles, common::Mix::Read(128), Some(runtime));
-    config.set_verbose(!args.is_present("quiet"));
+    config.set_verbose(verbose);
     config.produce_cdf(cdf);
     config.use_distribution(dist);
 
@@ -258,7 +259,7 @@ fn main() {
 
     // setup db
     let mut s = graph::Setup::new(true, nworkers);
-    // s.log = !args.is_present("quiet");
+    s.logging = verbose;
     s.transactions = args.is_present("transactions");
     s.sharding = args.is_present("sharded");
     s.stupid = args.is_present("stupid");
