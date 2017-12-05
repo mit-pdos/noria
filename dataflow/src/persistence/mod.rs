@@ -113,7 +113,7 @@ impl Parameters {
     ) -> String {
         let (domain_index, shard) = domain_id;
         format!(
-            "{}-snapshot-#{}-{}_{}-{}.bin",
+            "{}-snapshot-{}-{}_{}-{}.bin",
             self.log_prefix,
             snapshot_id,
             domain_index.index(),

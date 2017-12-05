@@ -646,8 +646,8 @@ fn it_recovers_w_snapshots_and_logs() {
                 (cat_id int, breed_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
             CREATE TABLE Breed (breed_id int, breed_name varchar(255), PRIMARY KEY(breed_id));
 
-            BreedQuery: SELECT breed_id, breed_name FROM Breed WHERE breed_id = ?;
-            Count: SELECT COUNT(cat_id), breed_name \
+            QUERY BreedQuery: SELECT breed_id, breed_name FROM Breed WHERE breed_id = ?;
+            QUERY Count: SELECT COUNT(cat_id), breed_name \
                       FROM Cat \
                       JOIN Breed ON Cat.breed_id = Breed.breed_id \
                       WHERE breed_name = ? \
@@ -734,14 +734,12 @@ fn it_recovers_w_only_snapshots() {
         );
 
         let mut builder = ControllerBuilder::default();
-        use logger_pls;
-        builder.log_with(logger_pls());
         builder.set_persistence(pparams);
         let g = builder.build();
 
         let sql = "
             CREATE TABLE Cat (cat_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
-            CatQuery: SELECT cat_id, cat_name FROM Cat where cat_id = ?;
+            QUERY CatQuery: SELECT cat_id, cat_name FROM Cat where cat_id = ?;
         ";
 
         g.install_recipe(sql.to_owned());
