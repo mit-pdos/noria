@@ -30,8 +30,8 @@ impl Backend {
             cb.disable_partial();
         }
 
-        if !shard {
-            cb.disable_sharding();
+        if shard {
+            cb.enable_sharding(2);
         }
 
         cb.log_with(blender_log);
@@ -144,14 +144,14 @@ fn main() {
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("benchmarks/piazza/queries.sql")
+                .default_value("benchmarks/piazza/post-queries.sql")
                 .help("Query file for Piazza application"),
         )
         .arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/policies.json")
+                .default_value("benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
