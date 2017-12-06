@@ -6,7 +6,7 @@
             "policies": [
                 {
                     "table": "Post",
-                    "predicate": "WHERE Post.p_private = 1;",
+                    "predicate": "WHERE Post.p_private = 1 and GroupContext.id = p_cid",
                     "description": "tas are allowed to see private posts from classes they ta"
                 }
             ]
