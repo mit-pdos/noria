@@ -65,7 +65,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
         g.disable_sharding();
     }
     g.set_persistence(persistence_params);
-    // g.set_nworkers(s.nworkers);
+    g.set_nworkers(s.nworkers);
     let mut graph = g.build_local();
 
     let recipe = "# base tables

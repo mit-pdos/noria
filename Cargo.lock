@@ -384,6 +384,7 @@ dependencies = [
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
  "num 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
+ "rand 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
