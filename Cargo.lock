@@ -335,7 +335,6 @@ dependencies = [
  "core 0.1.0",
  "evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",

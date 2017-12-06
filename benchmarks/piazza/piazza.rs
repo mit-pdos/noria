@@ -151,7 +151,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/basic-policies.json")
+                .default_value("benchmarks/piazza/ta-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
@@ -246,14 +246,14 @@ fn main() {
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
 
+    backend.set_security_config(ploc);
+    backend.migrate(sloc, Some(qloc)).unwrap();
+
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     if populate {
         println!("Populating tables...");
         p.populate_tables(&backend);
     }
-
-    backend.set_security_config(ploc);
-    backend.migrate(sloc, Some(qloc)).unwrap();
 
     println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
