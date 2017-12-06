@@ -1,3 +1,5 @@
+use time;
+
 use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
                    PersistenceParameters};
 
@@ -5,7 +7,6 @@ pub struct Graph {
     setup: Setup,
     pub vote: NodeIndex,
     pub article: NodeIndex,
-    pub vc: NodeIndex,
     pub end: NodeIndex,
     pub graph: ControllerHandle<LocalAuthority>,
 }
@@ -17,6 +18,10 @@ pub struct Setup {
     pub sharding: bool,
     pub local: bool,
     pub nworkers: usize,
+    pub logging: bool,
+    pub concurrent_replays: usize,
+    pub replay_batch_timeout: time::Duration,
+    pub replay_batch_size: usize,
 }
 
 impl Setup {
@@ -26,13 +31,41 @@ impl Setup {
             stupid: false,
             partial: true,
             sharding: true,
+            logging: false,
             local,
             nworkers,
+            concurrent_replays: 512,
+            replay_batch_timeout: time::Duration::from_millis(1),
+            replay_batch_size: 32,
         }
     }
 }
 
 impl Setup {
+    #[allow(dead_code)]
+    pub fn enable_logging(mut self) -> Self {
+        self.logging = true;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_max_concurrent_replay(mut self, n: usize) -> Self {
+        self.concurrent_replays = n;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_partial_replay_batch_timeout(mut self, t: time::Duration) -> Self {
+        self.replay_batch_timeout = t;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_partial_replay_batch_size(mut self, n: usize) -> Self {
+        self.replay_batch_size = n;
+        self
+    }
+
     #[allow(dead_code)]
     pub fn with_transactions(mut self) -> Self {
         self.transactions = true;
@@ -63,8 +96,8 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     if !s.partial {
         g.disable_partial();
     }
-    if !s.sharding {
-        g.disable_sharding();
+    if s.sharding {
+        g.enable_sharding(2);
     }
     g.set_persistence(persistence_params);
     if s.local {
@@ -72,31 +105,34 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     } else {
         g.set_nworkers(s.nworkers);
     }
-    g.log_with(distributary::logger_pls());
-    let mut graph = g.build();
+    if s.logging {
+        g.log_with(distributary::logger_pls());
+    }
+    let mut graph = g.build_local();
 
     let recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
-               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;";
+               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
 
     graph.install_recipe(recipe.to_owned());
     let inputs = graph.inputs();
     let outputs = graph.outputs();
 
-    println!("inputs {:?}", inputs);
-    println!("outputs {:?}", outputs);
+    if s.logging {
+        println!("inputs {:?}", inputs);
+        println!("outputs {:?}", outputs);
+    }
 
     Graph {
         vote: inputs["Vote"],
         article: inputs["Article"],
-        vc: outputs["VoteCount"],
         end: outputs["ArticleWithVoteCount"],
         graph,
         setup: s,
@@ -109,37 +145,39 @@ impl Graph {
         // TODO(fintelia): Port non-stupid migration to SQL expression.
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
-               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
-               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;
-
+               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
                U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
-               Total: SELECT id, SUM(stars) AS score FROM U GROUP BY id;
-               ArticleWithScore: SELECT Article.id, title, Total.score AS score \
-                            FROM Article, Total \
-                            WHERE Article.id = Total.id AND Article.id = ?;";
+               QUERY ArticleWithScore: SELECT Article.id, title, Total.score AS score \
+                            FROM Article \
+                            JOIN (SELECT id, SUM(stars) AS score \
+                                  FROM U \
+                                  GROUP BY id) AS Total
+                            ON (Article.id = Total.id) \
+                            WHERE Article.id = ?;";
 
         let smart_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (user int, id int, PRIMARY KEY(id));
-               CREATE TABLE Rating (user int, id int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
 
                # read queries
-               VoteCount: SELECT Vote.id, COUNT(user) AS votes \
-                            FROM Vote GROUP BY Vote.id;
-               ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.id = VoteCount.id AND Article.id = ?;
+               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                            FROM Article \
+                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
 
                RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
                U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
-               ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
+               QUERY ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
                             FROM Article, U \
                             WHERE Article.id = U.id AND Article.id = ? \
                             GROUP BY Article.id;";

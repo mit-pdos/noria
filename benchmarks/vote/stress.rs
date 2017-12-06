@@ -101,28 +101,25 @@ fn main() {
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // setup db
-    let mut s = graph::Setup::default();
+    let mut s = graph::Setup::new(true, 2);
     s.stupid = args.is_present("stupid");
     s.partial = !args.is_present("full");
     s.sharding = !args.is_present("unsharded");
-    let blender = Arc::new(Mutex::new(distributary::Blender::new()));
-    let mut g = graph::make(blender, s, persistence_params);
+    if let Some(n) = concurrent_replays {
+        s = s.set_max_concurrent_replay(n);
+    }
+    if let Some(n) = replay_size {
+        s = s.set_partial_replay_batch_size(n);
+    }
+    if let Some(t) = replay_timeout {
+        s = s.set_partial_replay_batch_timeout(t);
+    }
+
+    let mut g = graph::make(s, persistence_params);
 
     let (mut articles, mut votes) = {
-        let mut b = g.graph.lock().unwrap();
-
-        if let Some(n) = concurrent_replays {
-            b.set_max_concurrent_replay(n);
-        }
-        if let Some(n) = replay_size {
-            b.set_partial_replay_batch_size(n);
-        }
-        if let Some(t) = replay_timeout {
-            b.set_partial_replay_batch_timeout(t);
-        }
-
         // we need putters
-        (b.get_mutator(g.article), b.get_mutator(g.vote))
+        (g.graph.get_mutator(g.article).unwrap(), g.graph.get_mutator(g.vote).unwrap())
     };
 
     // prepopulate
@@ -147,9 +144,8 @@ fn main() {
         println!("Migrating...");
     }
     let (ratings, read_new) = g.transition();
-    let (mut ratings, read_new) = {
-        let b = g.graph.lock().unwrap();
-        (b.get_mutator(ratings), b.get_getter(read_new).unwrap())
+    let (mut ratings, mut read_new) = {
+        (g.graph.get_mutator(ratings), g.graph.get_getter(read_new).unwrap())
     };
 
     // prepopulate new ratings
@@ -159,7 +155,9 @@ fn main() {
     let random = randomness(narticles, nvotes);
     for i in 0..nvotes {
         ratings
-            .put(vec![0.into(), random[i].into(), 5.into()])
+            .as_mut()
+            .unwrap()
+            .multi_put(vec![vec![0.into(), random[i].into(), 5.into()]])
             .unwrap();
     }
 
