@@ -81,7 +81,7 @@ impl Populate {
             for _ in 0..4 {
                 let uid = self.uid();
                 let cid = i.into();
-                let role = 0.into(); // ta
+                let role = 1.into(); // ta
                 records.push(vec![uid, cid, role]);
             }
         }
