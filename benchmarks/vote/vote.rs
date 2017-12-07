@@ -465,22 +465,24 @@ fn main() {
         if nputters != 0 {
             let sum = put_stats
                 .iter()
-                .fold((0f64, 0usize), |(tot, count), stats| {
+                .fold((0f64, 0usize, 0f64), |(tot, count, totavg), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.pre.sum_len();
-                    (tot + sum, count + num)
+                    (tot + sum, count + num, totavg + (sum / num as f64))
                 });
-            println!("avg {}: {:.2}", put_name, sum.0 as f64 / sum.1 as f64);
+            println!("\navg {}: {:.2}", put_name, sum.0 as f64 / sum.1 as f64);
+            println!("cumavg {}: {:.2}", put_name, sum.2 as f64);
         }
         if ngetters != 0 {
             let sum = get_stats
                 .iter()
-                .fold((0f64, 0usize), |(tot, count), stats| {
+                .fold((0f64, 0usize, 0f64), |(tot, count, totavg), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.pre.sum_len();
-                    (tot + sum, count + num)
+                    (tot + sum, count + num, totavg + (sum / num as f64))
                 });
-            println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+            println!("\navg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+            println!("cumavg GET: {:.2}", sum.2 as f64);
         }
     }
 
