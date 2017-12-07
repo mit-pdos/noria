@@ -97,10 +97,11 @@ fn main() {
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
-            Arg::with_name("sharded")
-                .long("sharded")
-                .takes_value(false)
-                .help("Enable sharding of the graph."),
+            Arg::with_name("shards")
+                .long("shards")
+                .takes_value(true)
+                .default_value("2")
+                .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(
             Arg::with_name("stupid")
@@ -255,7 +256,10 @@ fn main() {
     let mut s = graph::Setup::new(true, nworkers);
     s.logging = verbose;
     s.transactions = args.is_present("transactions");
-    s.sharding = args.is_present("sharded");
+    s.sharding = match value_t_or_exit!(args, "shards", usize) {
+        0 => None,
+        x => Some(x),
+    };
     s.stupid = args.is_present("stupid");
     let g = graph::make(s, persistence_params);
 

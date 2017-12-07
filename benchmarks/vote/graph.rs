@@ -14,7 +14,7 @@ pub struct Setup {
     pub transactions: bool,
     pub stupid: bool,
     pub partial: bool,
-    pub sharding: bool,
+    pub sharding: Option<usize>,
     pub local: bool,
     pub nworkers: usize,
     pub logging: bool,
@@ -29,7 +29,7 @@ impl Setup {
             transactions: false,
             stupid: false,
             partial: true,
-            sharding: true,
+            sharding: None,
             logging: false,
             local,
             nworkers,
@@ -78,6 +78,12 @@ impl Setup {
     }
 
     #[allow(dead_code)]
+    pub fn with_sharding(mut self, s: usize) -> Self {
+        self.sharding = Some(s);
+        self
+    }
+
+    #[allow(dead_code)]
     pub fn without_partial(mut self) -> Self {
         self.partial = false;
         self
@@ -85,7 +91,7 @@ impl Setup {
 
     #[allow(dead_code)]
     pub fn without_sharding(mut self) -> Self {
-        self.sharding = false;
+        self.sharding = None;
         self
     }
 }
@@ -95,8 +101,8 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     if !s.partial {
         g.disable_partial();
     }
-    if s.sharding {
-        g.enable_sharding(2);
+    if let Some(shards) = s.sharding {
+        g.enable_sharding(shards);
     }
     g.set_persistence(persistence_params);
     if s.local {
