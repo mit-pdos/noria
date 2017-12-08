@@ -123,8 +123,8 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
                # read queries
                QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
                             FROM Article \
-                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
                             ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
 
     graph.install_recipe(recipe.to_owned());
@@ -157,15 +157,15 @@ impl Graph {
                # read queries
                QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
                             FROM Article \
-                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
                             ON (Article.id = VoteCount.id) WHERE Article.id = ?;
                U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
                QUERY ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article \
-                            JOIN (SELECT id, SUM(stars) AS score \
-                                  FROM U \
-                                  GROUP BY id) AS Total
+                            LEFT JOIN (SELECT id, SUM(stars) AS score \
+                                       FROM U \
+                                       GROUP BY id) AS Total
                             ON (Article.id = Total.id) \
                             WHERE Article.id = ?;";
 
@@ -177,8 +177,8 @@ impl Graph {
                # read queries
                QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
                             FROM Article \
-                            JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                  FROM Vote GROUP BY Vote.id) AS VoteCount \
+                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
                             ON (Article.id = VoteCount.id) WHERE Article.id = ?;
 
                RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
