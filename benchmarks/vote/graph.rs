@@ -1,13 +1,14 @@
 use time;
 
-use distributary::{self, Blender, ControllerBuilder, NodeIndex, PersistenceParameters};
+use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
+                   PersistenceParameters};
 
 pub struct Graph {
     setup: Setup,
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub end: NodeIndex,
-    pub graph: Blender,
+    pub graph: ControllerHandle<LocalAuthority>,
 }
 
 pub struct Setup {
@@ -113,7 +114,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     if s.logging {
         g.log_with(distributary::logger_pls());
     }
-    let graph = g.build();
+    let mut graph = g.build_local();
 
     let recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
