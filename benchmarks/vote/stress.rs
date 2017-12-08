@@ -54,9 +54,11 @@ fn main() {
                 .help("Make the migration stupid"),
         )
         .arg(
-            Arg::with_name("unsharded")
-                .long("unsharded")
-                .help("Run without sharding"),
+            Arg::with_name("shards")
+                .long("shards")
+                .takes_value(true)
+                .default_value("2")
+                .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(Arg::with_name("quiet").long("quiet").short("q"))
         .arg(
@@ -103,7 +105,10 @@ fn main() {
     let mut s = graph::Setup::new(true, 2);
     s.stupid = args.is_present("stupid");
     s.partial = !args.is_present("full");
-    s.sharding = !args.is_present("unsharded");
+    s.sharding = match value_t_or_exit!(args, "shards", usize) {
+        0 => None,
+        x => Some(x),
+    };
     if let Some(n) = concurrent_replays {
         s = s.set_max_concurrent_replay(n);
     }
