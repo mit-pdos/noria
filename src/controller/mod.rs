@@ -184,6 +184,16 @@ impl ControllerBuilder {
         self.local_workers = workers;
     }
 
+    /// Set the port the internal listener uses.
+    pub fn set_internal_port(&mut self, port: u16) {
+        self.internal_port = port;
+    }
+
+    /// Set the port the external listener uses.
+    pub fn set_external_port(&mut self, port: u16) {
+        self.external_port = port;
+    }
+
     #[cfg(test)]
     pub fn build_inner(self) -> ControllerInner {
         ControllerInner::from_builder(self)
@@ -745,7 +755,7 @@ impl ControllerInner {
     /// Initiaties log recovery by sending a
     /// StartRecovery packet to each base node domain.
     pub fn recover(&mut self) {
-        info!(self.log, "Recovering from log");
+        info!(self.log, "Initiating recovery");
         for (_name, index) in self.inputs().iter() {
             let node = &self.ingredients[*index];
             let domain = self.domains.get_mut(&node.domain()).unwrap();
