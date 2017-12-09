@@ -59,46 +59,6 @@ pub fn setup(transactions: bool) -> Box<Bank> {
 
     g.install_recipe(recipe.to_owned());
 
-    /*let (transfers, _credits, _debits, balances) = g.migrate(|mig| {
-        // add transfers base table
-        let transfers = if transactions {
-            mig.add_transactional_base(
-                "transfers",
-                &["src_acct", "dst_acct", "amount"],
-                Base::default(),
-            )
-        } else {
-            mig.add_ingredient(
-                "transfers",
-                &["src_acct", "dst_acct", "amount"],
-                Base::default(),
-            )
-        };
-
-        // add all debits
-        let debits = mig.add_ingredient(
-            "debits",
-            &["acct_id", "total"],
-            Aggregation::SUM.over(transfers, 2, &[0]),
-        );
-
-        // add all credits
-        let credits = mig.add_ingredient(
-            "credits",
-            &["acct_id", "total"],
-            Aggregation::SUM.over(transfers, 2, &[1]),
-        );
-
-        // add join of credits and debits; this is a hack as we don't currently have multi-parent
-        // aggregations or arithmetic on columns.
-        use distributary::JoinSource::*;
-        let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
-        let balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        mig.maintain(balances, 0);
-
-        (transfers, credits, debits, balances)
-    });*/
-
     let inputs = g.inputs();
     let outputs = g.outputs();
 
