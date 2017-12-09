@@ -148,7 +148,6 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
 impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
-        // TODO(fintelia): Port non-stupid migration to SQL expression.
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
                CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
@@ -169,6 +168,8 @@ impl Graph {
                             ON (Article.id = Total.id) \
                             WHERE Article.id = ?;";
 
+        // TODO(malte): ends up with partial-above-full due to compound group by key in post-join
+        // aggregation.
         let smart_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
                CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
