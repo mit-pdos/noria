@@ -10,6 +10,7 @@ pub struct Graph {
     pub graph: Blender,
 }
 
+#[derive(Clone)]
 pub struct Setup {
     pub transactions: bool,
     pub stupid: bool,
@@ -18,6 +19,7 @@ pub struct Setup {
     pub local: bool,
     pub nworkers: usize,
     pub logging: bool,
+    pub randomize_ports: bool,
     pub concurrent_replays: usize,
     pub replay_batch_timeout: time::Duration,
     pub replay_batch_size: usize,
@@ -31,6 +33,7 @@ impl Setup {
             partial: true,
             sharding: None,
             logging: false,
+            randomize_ports: false,
             local,
             nworkers,
             concurrent_replays: 512,
@@ -94,6 +97,12 @@ impl Setup {
         self.sharding = None;
         self
     }
+
+    #[allow(dead_code)]
+    pub fn with_random_ports(mut self) -> Self {
+        self.randomize_ports = true;
+        self
+    }
 }
 
 pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
@@ -112,6 +121,10 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     }
     if s.logging {
         g.log_with(distributary::logger_pls());
+    }
+    if s.randomize_ports {
+        g.set_internal_port(0);
+        g.set_external_port(0);
     }
     let graph = g.build();
 

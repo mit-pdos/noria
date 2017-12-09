@@ -23,6 +23,7 @@ slog-term = "2.0.1"
 vec_map = { version = "0.8.0" }
 
 # for benchmarks
+glob = "0.2.11"
 # cli
 clap = "2.25.0"
 # distributions
@@ -86,3 +87,7 @@ path = "vote/vote-new-fraction.rs"
 [[bin]]
 name = "vote-stress"
 path = "vote/stress.rs"
+
+[[bin]]
+name = "vote-recovery"
+path = "vote/recovery.rs"

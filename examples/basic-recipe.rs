@@ -40,7 +40,6 @@ fn main() {
 
     blender.recover();
     thread::sleep(Duration::from_millis(1000));
-    println!("{}", blender.graphviz());
 
     // Get mutators and getter.
     let inputs = blender.inputs();
