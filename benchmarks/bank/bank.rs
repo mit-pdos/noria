@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use mio::net::TcpListener;
 
-use distributary::{Aggregation, Base, Blender, DataType, Join, JoinType, Mutator, Token};
+use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, Token};
 
 use rand::Rng;
 
@@ -29,71 +29,55 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
-    blender: Blender,
+    blender: ControllerHandle<LocalAuthority>,
     transfers: distributary::NodeIndex,
     balances: distributary::NodeIndex,
     debug_channel: Option<TcpListener>,
 }
 
 pub fn setup(transactions: bool) -> Box<Bank> {
+    let log = distributary::logger_pls();
+
     // set up graph
-    let mut g = Blender::new();
-    let debug_channel = g.create_debug_channel();
+    let mut b = ControllerBuilder::default();
+    b.log_with(log);
+    b.set_local_workers(2);
 
-    let (transfers, _credits, _debits, balances) = g.migrate(|mig| {
-        // add transfers base table
-        let transfers = if transactions {
-            mig.add_transactional_base(
-                "transfers",
-                &["src_acct", "dst_acct", "amount"],
-                Base::default(),
-            )
-        } else {
-            mig.add_ingredient(
-                "transfers",
-                &["src_acct", "dst_acct", "amount"],
-                Base::default(),
-            )
-        };
+    //let debug_channel = g.create_debug_channel();
 
-        // add all debits
-        let debits = mig.add_ingredient(
-            "debits",
-            &["acct_id", "total"],
-            Aggregation::SUM.over(transfers, 2, &[0]),
-        );
+    let mut g = b.build_local();
 
-        // add all credits
-        let credits = mig.add_ingredient(
-            "credits",
-            &["acct_id", "total"],
-            Aggregation::SUM.over(transfers, 2, &[1]),
-        );
+    let recipe = "CREATE TABLE transfers (src_acct int, dst_acct int, amount int, PRIMARY KEY(src_acct));
 
-        // add join of credits and debits; this is a hack as we don't currently have multi-parent
-        // aggregations or arithmetic on columns.
-        use distributary::JoinSource::*;
-        let j2 = Join::new(credits, debits, JoinType::Inner, vec![B(0, 0), L(1), R(1)]);
-        let balances = mig.add_ingredient("balances", &["acct_id", "credit", "debit"], j2);
-        mig.maintain(balances, 0);
+                  debits: SELECT src_acct AS acct_id, SUM(amount) AS total \
+                          FROM transfers GROUP BY src_acct;
+                  credits: SELECT dst_acct AS acct_id, SUM(amount) AS total \
+                           FROM transfers GROUP BY dst_acct;
 
-        (transfers, credits, debits, balances)
-    });
+                  QUERY balances: SELECT debits.acct_id, credits.total AS credit, debits.total AS debit \
+                                  FROM credits JOIN debits ON (credits.acct_id = debits.acct_id);";
+
+    g.install_recipe(recipe.to_owned());
+
+    let inputs = g.inputs();
+    let outputs = g.outputs();
 
     Box::new(Bank {
         blender: g,
-        transfers: transfers,
-        balances: balances,
-        debug_channel: Some(debug_channel),
+        transfers: inputs["transfers"],
+        balances: outputs["balances"],
+        debug_channel: None, // Some(debug_channel),
     })
 }
 
 impl Bank {
-    fn getter(&mut self) -> distributary::Getter {
+    fn getter(&mut self) -> distributary::RemoteGetter {
         self.blender.get_getter(self.balances).unwrap()
     }
     pub fn migrate(&mut self) {
-        let balances = self.balances;
+        // XXX(malte): re-implement this
+        unimplemented!();
+        /*let balances = self.balances;
         self.blender.migrate(|mig| {
             let identity = mig.add_ingredient(
                 "identity",
@@ -101,11 +85,11 @@ impl Bank {
                 distributary::Identity::new(balances),
             );
             mig.maintain(identity, 0);
-        });
+        });*/
     }
 }
 
-fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
+fn populate(naccounts: i64, mut mutator: distributary::Mutator, transactions: bool) {
     // prepopulate non-transactionally (this is okay because we add no accounts while running the
     // benchmark)
     println!("Connected. Setting up {} accounts.", naccounts);
@@ -129,8 +113,8 @@ fn populate(naccounts: i64, mut mutator: Mutator, transactions: bool) {
 
 fn client(
     _i: usize,
-    mut mutator: Mutator,
-    mut balances_get: distributary::Getter,
+    mut mutator: distributary::Mutator,
+    mut balances_get: distributary::RemoteGetter,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -165,7 +149,8 @@ fn client(
             })
         };
 
-        let mut get = |id: &DataType| if balances_get.supports_transactions() {
+        //let mut get = |id: &DataType| if balances_get.supports_transactions() {
+        let mut get = |id: &DataType| if transactions {
             balances_get.transactional_lookup(id).map(&f)
         } else {
             balances_get
@@ -460,7 +445,8 @@ fn main() {
     let mut bank = setup(transactions);
 
     {
-        let mutator = bank.blender.get_mutator(bank.transfers);
+        let transfer_nid = bank.transfers;
+        let mutator = bank.blender.get_mutator(transfer_nid).unwrap();
         populate(naccounts, mutator, transactions);
     }
 
@@ -473,7 +459,8 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let mutator = bank.blender.get_mutator(bank.transfers);
+                let transfers_nid = bank.transfers;
+                let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
                 let balances_get = bank.getter();
 
                 thread::Builder::new()
@@ -501,7 +488,8 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-            let mutator = bank.blender.get_mutator(bank.transfers);
+            let transfers_nid = bank.transfers;
+            let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
             let balances_get = bank.getter();
             let debug_channel = bank.debug_channel.take();
             assert!(debug_channel.is_some());
