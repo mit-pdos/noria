@@ -65,6 +65,13 @@ fn main() {
                 .help("Number of MIX clients to start"),
         )
         .arg(
+            Arg::with_name("readthreads")
+                .long("read-threads")
+                .value_name("N")
+                .default_value("1")
+                .help("Number of read threads to start"),
+        )
+        .arg(
             Arg::with_name("ngetters")
                 .short("g")
                 .long("getters")
@@ -187,6 +194,7 @@ fn main() {
         .map(time::Duration::from_secs);
     let mut ngetters = value_t_or_exit!(args, "ngetters", usize);
     let mut nputters = value_t_or_exit!(args, "nputters", usize);
+    let read_threads = value_t_or_exit!(args, "readthreads", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
@@ -254,6 +262,7 @@ fn main() {
 
     // setup db
     let mut s = graph::Setup::new(true, nworkers);
+    s.nreaders = read_threads;
     s.logging = verbose;
     s.transactions = args.is_present("transactions");
     s.sharding = match value_t_or_exit!(args, "shards", usize) {
