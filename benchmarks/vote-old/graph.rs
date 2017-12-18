@@ -189,7 +189,6 @@ impl Graph {
                             WHERE Article.id = U.id AND Article.id = ? \
                             GROUP BY Article.id;";
 
-
         if self.setup.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned());
         } else {

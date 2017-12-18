@@ -21,6 +21,7 @@ slog = "2.0.6"
 #slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "2.0.1"
 vec_map = { version = "0.8.0" }
+rayon = "0.9"
 
 # for benchmarks
 # cli
@@ -29,7 +30,7 @@ clap = "2.25.0"
 rand = "0.3.15"
 zipf = "0.2.0"
 # sampling
-hdrsample = "4.0.0"
+hdrsample = "6.0.0"
 # mssql
 futures-state-stream = { version = "0.1", optional = true }
 tiberius = { git = "https://github.com/ms705/tiberius/", optional = true }
@@ -53,7 +54,7 @@ path = "bank/bank.rs"
 
 [[bin]]
 name = "vote"
-path = "vote/vote.rs"
+path = "vote/main.rs"
 
 [[bin]]
 name = "vote-server"
