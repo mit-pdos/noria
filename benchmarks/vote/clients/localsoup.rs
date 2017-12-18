@@ -20,7 +20,7 @@ impl VoteClient for Client {
         use distributary::{DataType, DurabilityMode, PersistenceParameters};
 
         let nworkers = value_t_or_exit!(args, "workers", usize);
-        let verbose = !args.is_present("quiet");
+        let verbose = args.is_present("verbose");
 
         let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
         let flush_timeout = time::Duration::from_millis(10);

@@ -118,6 +118,7 @@ where
                     let done = time::Instant::now();
 
                     let remote_t = done.duration_since(sent);
+                    assert_eq!(remote_t.as_secs(), 0);
                     RMT.with(|h| {
                         h.borrow_mut()
                             .record(remote_t.subsec_nanos() as u64 / 1_000)
@@ -126,6 +127,7 @@ where
 
                     for (started, _) in batch {
                         let sjrn_t = done.duration_since(started);
+                        assert_eq!(sjrn_t.as_secs(), 0);
                         SJRN.with(|h| {
                             h.borrow_mut()
                                 .record(sjrn_t.subsec_nanos() as u64 / 1_000)
@@ -158,20 +160,14 @@ where
     drop(c);
 
     // all done!
-    for iv in sjrn_t.lock().unwrap().iter_quantiles(1) {
-        println!(
-            "percentile SJRN {:.2} {:.2}",
-            iv.value_iterated_to(),
-            iv.percentile()
-        );
-    }
-    for iv in rmt_t.lock().unwrap().iter_quantiles(1) {
-        println!(
-            "percentile RMT {:.2} {:.2}",
-            iv.value_iterated_to(),
-            iv.percentile()
-        );
-    }
+    let sjrn_t = sjrn_t.lock().unwrap();
+    println!("sojourn 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
+    println!("sojourn 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
+    println!("sojourn 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
+    let rmt_t = rmt_t.lock().unwrap();
+    println!("remote 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
+    println!("remote 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
+    println!("remote 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
 }
 
 fn main() {
@@ -206,8 +202,8 @@ fn main() {
         )
         .arg(
             Arg::with_name("ops")
-                .long("target-ops")
-                .default_value("1000")
+                .long("target")
+                .default_value("20000")
                 .help("Target operations per second"),
         )
         .subcommand(
@@ -246,6 +242,17 @@ fn main() {
                         .takes_value(true)
                         .default_value("512")
                         .help("Size of batches processed at base nodes."),
+                )
+                .arg(
+                    Arg::with_name("stupid")
+                        .long("stupid")
+                        .help("Make the migration stupid")
+                        .requires("migrate"),
+                )
+                .arg(
+                    Arg::with_name("verbose")
+                        .short("v")
+                        .help("Include logging output"),
                 ),
         )
         .get_matches();
