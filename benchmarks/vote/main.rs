@@ -106,6 +106,7 @@ where
 
     // TODO: warmup
 
+    let every = value_t_or_exit!(global_args, "ratio", u32);
     let mut queued_w = Vec::new();
     let mut queued_r = Vec::new();
     loop {
@@ -124,7 +125,7 @@ where
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
                 let q = (now, rng.gen_range(0, articles));
-                if rng.gen_weighted_bool(2) {
+                if rng.gen_weighted_bool(every) {
                     queued_w.push(q);
                 } else {
                     queued_r.push(q);
@@ -210,26 +211,42 @@ where
     drop(c);
 
     // all done!
+    println!("op\tpct\tsojourn\tremote");
 
-    let sjrn_t = sjrn_w_t.lock().unwrap();
-    println!("sojourn w 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
-    println!("sojourn w 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
-    println!("sojourn w 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
-    let rmt_t = rmt_w_t.lock().unwrap();
-    println!("remote w 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
-    println!("remote w 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
-    println!("remote w 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
-
-    println!("");
-
-    let sjrn_t = sjrn_r_t.lock().unwrap();
-    println!("sojourn r 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
-    println!("sojourn r 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
-    println!("sojourn r 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
-    let rmt_t = rmt_r_t.lock().unwrap();
-    println!("remote r 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
-    println!("remote r 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
-    println!("remote r 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
+    let sjrn_w_t = sjrn_w_t.lock().unwrap();
+    let rmt_w_t = rmt_w_t.lock().unwrap();
+    let sjrn_r_t = sjrn_r_t.lock().unwrap();
+    let rmt_r_t = rmt_r_t.lock().unwrap();
+    println!(
+        "write\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.5),
+        rmt_w_t.value_at_quantile(0.5)
+    );
+    println!(
+        "read\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.5),
+        rmt_r_t.value_at_quantile(0.5)
+    );
+    println!(
+        "write\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.95),
+        rmt_w_t.value_at_quantile(0.95)
+    );
+    println!(
+        "read\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.95),
+        rmt_r_t.value_at_quantile(0.95)
+    );
+    println!(
+        "write\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.99),
+        rmt_w_t.value_at_quantile(0.99)
+    );
+    println!(
+        "read\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.99),
+        rmt_r_t.value_at_quantile(0.99)
+    );
 }
 
 fn main() {
@@ -267,6 +284,13 @@ fn main() {
                 .long("target")
                 .default_value("20000")
                 .help("Target operations per second"),
+        )
+        .arg(
+            Arg::with_name("ratio")
+                .long("write-every")
+                .default_value("2")
+                .value_name("N")
+                .help("1-in-N chance of a write"),
         )
         .subcommand(
             SubCommand::with_name("localsoup")
