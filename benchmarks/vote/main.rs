@@ -14,8 +14,10 @@ use std::cell::RefCell;
 
 thread_local! {
     static THREAD_ID: RefCell<usize> = RefCell::new(1);
-    static SJRN: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
-    static RMT: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
 }
 
 const MAX_BATCH_SIZE: usize = 512;
@@ -26,7 +28,8 @@ pub trait VoteClient {
 
     fn new(&clap::ArgMatches, articles: usize) -> Self::Constructor;
     fn from(&mut Self::Constructor) -> Self;
-    fn handle(&mut self, requests: &[(time::Instant, usize)]);
+    fn handle_reads(&mut self, requests: &[(time::Instant, usize)]);
+    fn handle_writes(&mut self, requests: &[(time::Instant, usize)]);
 }
 
 mod clients;
@@ -45,14 +48,26 @@ where
         .collect();
     let clients = Arc::new(clients);
 
-    let sjrn_t = Arc::new(Mutex::new(
+    let sjrn_w_t = Arc::new(Mutex::new(
         Histogram::<u64>::new_with_bounds(10, 10_000_000, 4).unwrap(),
     ));
-    let rmt_t = Arc::new(Mutex::new(
+    let sjrn_r_t = Arc::new(Mutex::new(
+        Histogram::<u64>::new_with_bounds(10, 10_000_000, 4).unwrap(),
+    ));
+    let rmt_w_t = Arc::new(Mutex::new(
+        Histogram::<u64>::new_with_bounds(10, 10_000_000, 4).unwrap(),
+    ));
+    let rmt_r_t = Arc::new(Mutex::new(
         Histogram::<u64>::new_with_bounds(10, 10_000_000, 4).unwrap(),
     ));
     let finished = Arc::new(Barrier::new(nthreads + 1));
-    let ts = (sjrn_t.clone(), rmt_t.clone(), finished.clone());
+    let ts = (
+        sjrn_w_t.clone(),
+        sjrn_r_t.clone(),
+        rmt_w_t.clone(),
+        rmt_r_t.clone(),
+        finished.clone(),
+    );
 
     let pool = rayon::Configuration::new()
         .thread_name(|i| format!("client-{}", i))
@@ -63,11 +78,19 @@ where
             })
         })
         .exit_handler(move |_| {
-            SJRN.with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
+            SJRN_W
+                .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
-            RMT.with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
+            SJRN_R
+                .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
-            ts.2.wait();
+            RMT_W
+                .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            RMT_R
+                .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            ts.4.wait();
         })
         .build()
         .unwrap();
@@ -83,7 +106,8 @@ where
 
     // TODO: warmup
 
-    let mut queued = Vec::new();
+    let mut queued_w = Vec::new();
+    let mut queued_r = Vec::new();
     loop {
         use rand::distributions::IndependentSample;
 
@@ -99,53 +123,79 @@ where
             if now >= next {
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
-                queued.push((now, rng.gen_range(0, articles)));
+                let q = (now, rng.gen_range(0, articles));
+                if rng.gen_weighted_bool(2) {
+                    queued_w.push(q);
+                } else {
+                    queued_r.push(q);
+                }
             }
 
-            if queued.len() >= MAX_BATCH_SIZE
-                || (!queued.is_empty() && now.duration_since(queued[0].0) > max_batch_time)
-            {
-                let batch = queued.split_off(0);
+            let enqueue = |batch: Vec<_>, write| {
                 let clients = clients.clone();
-                pool.spawn(move || {
+                move || {
                     let tid = THREAD_ID.with(|tid| *tid.borrow());
 
                     // TODO: avoid the overhead of taking an uncontended lock
                     let mut client = clients[tid].try_lock().unwrap();
 
                     let sent = time::Instant::now();
-                    client.handle(&batch[..]);
+                    if write {
+                        client.handle_writes(&batch[..]);
+                    } else {
+                        client.handle_reads(&batch[..]);
+                    }
                     let done = time::Instant::now();
 
                     let remote_t = done.duration_since(sent);
                     assert_eq!(remote_t.as_secs(), 0);
-                    RMT.with(|h| {
+
+                    let rmt = if write { &RMT_W } else { &RMT_R };
+                    rmt.with(|h| {
                         h.borrow_mut()
                             .record(remote_t.subsec_nanos() as u64 / 1_000)
                             .unwrap()
                     });
 
+                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
                     for (started, _) in batch {
                         let sjrn_t = done.duration_since(started);
                         assert_eq!(sjrn_t.as_secs(), 0);
-                        SJRN.with(|h| {
+                        sjrn.with(|h| {
                             h.borrow_mut()
                                 .record(sjrn_t.subsec_nanos() as u64 / 1_000)
                                 .unwrap()
                         });
                     }
-                });
+                }
+            };
+
+            if queued_w.len() >= MAX_BATCH_SIZE
+                || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
+            {
+                pool.spawn(enqueue(queued_w.split_off(0), true));
+            }
+
+            if queued_r.len() >= MAX_BATCH_SIZE
+                || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
+            {
+                pool.spawn(enqueue(queued_r.split_off(0), false));
             }
 
             if now >= next {
                 break;
             } else {
                 let mut left = next - now;
-                if !queued.is_empty() {
-                    let qnext = queued[0].0 + max_batch_time;
-                    if next > qnext {
-                        // we know we didn't just flush, so qnext *must* be in the future
-                        left = qnext - now;
+                if !queued_w.is_empty() {
+                    let qleft = (queued_w[0].0 + max_batch_time) - now;
+                    if left > qleft {
+                        left = qleft;
+                    }
+                }
+                if !queued_r.is_empty() {
+                    let qleft = (queued_r[0].0 + max_batch_time) - now;
+                    if left > qleft {
+                        left = qleft;
                     }
                 }
 
@@ -160,14 +210,26 @@ where
     drop(c);
 
     // all done!
-    let sjrn_t = sjrn_t.lock().unwrap();
-    println!("sojourn 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
-    println!("sojourn 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
-    println!("sojourn 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
-    let rmt_t = rmt_t.lock().unwrap();
-    println!("remote 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
-    println!("remote 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
-    println!("remote 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
+
+    let sjrn_t = sjrn_w_t.lock().unwrap();
+    println!("sojourn w 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
+    println!("sojourn w 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
+    println!("sojourn w 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
+    let rmt_t = rmt_w_t.lock().unwrap();
+    println!("remote w 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
+    println!("remote w 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
+    println!("remote w 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
+
+    println!("");
+
+    let sjrn_t = sjrn_r_t.lock().unwrap();
+    println!("sojourn r 50 {:.2} µs", sjrn_t.value_at_quantile(0.5));
+    println!("sojourn r 95 {:.2} µs", sjrn_t.value_at_quantile(0.95));
+    println!("sojourn r 99 {:.2} µs", sjrn_t.value_at_quantile(0.99));
+    let rmt_t = rmt_r_t.lock().unwrap();
+    println!("remote r 50 {:.2} µs", rmt_t.value_at_quantile(0.5));
+    println!("remote r 95 {:.2} µs", rmt_t.value_at_quantile(0.95));
+    println!("remote r 99 {:.2} µs", rmt_t.value_at_quantile(0.99));
 }
 
 fn main() {

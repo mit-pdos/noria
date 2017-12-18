@@ -1,4 +1,4 @@
-use distributary;
+use distributary::{self, DataType};
 use clap;
 use std::time;
 use std::thread;
@@ -17,7 +17,7 @@ impl VoteClient for Client {
     type Constructor = graph::Graph;
 
     fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
-        use distributary::{DataType, DurabilityMode, PersistenceParameters};
+        use distributary::{DurabilityMode, PersistenceParameters};
 
         let nworkers = value_t_or_exit!(args, "workers", usize);
         let verbose = args.is_present("verbose");
@@ -84,9 +84,15 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle(&mut self, ids: &[(time::Instant, usize)]) {
-        // TODO: sometimes do writes
+    fn handle_writes(&mut self, ids: &[(time::Instant, usize)]) {
+        let data: Vec<Vec<DataType>> = ids.iter()
+            .map(|&(_, article_id)| vec![0.into(), article_id.into()])
+            .collect();
 
+        self.w.multi_put(data).unwrap();
+    }
+
+    fn handle_reads(&mut self, ids: &[(time::Instant, usize)]) {
         let arg = ids.iter()
             .map(|&(_, article_id)| article_id.into())
             .collect();
@@ -94,7 +100,7 @@ impl VoteClient for Client {
         let rows = self.r
             .multi_lookup(arg, true)
             .into_iter()
-            .map(|rows| {
+            .map(|_rows| {
                 // TODO
                 //assert_eq!(rows.map(|rows| rows.len()), Ok(1));
             })
