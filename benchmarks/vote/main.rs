@@ -288,7 +288,7 @@ fn main() {
         .arg(
             Arg::with_name("ratio")
                 .long("write-every")
-                .default_value("2")
+                .default_value("19")
                 .value_name("N")
                 .help("1-in-N chance of a write"),
         )
