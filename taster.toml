@@ -1,13 +1,13 @@
 version = 2
 
 [uniform]
-command = "/usr/bin/cargo"
+command = "cargo"
 args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--articles=100000", "--runtime=30", "--target=1000000", "localsoup"]
 regexs = ["^(write\t50)\t([0-9.]+)", "^(read\t50)\t([0-9.]+)", "^(write\t95)\t([0-9.]+)", "^(read\t95)\t([0-9.]+)"]
 lower_better = true
 
 [uniform-unsharded]
-command = "/usr/bin/cargo"
+command = "cargo"
 args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--articles=100000", "--runtime=30", "--target=1000000", "localsoup", "--shards=1"]
 regexs = ["^(write\t50)\t([0-9.]+)", "^(read\t50)\t([0-9.]+)", "^(write\t95)\t([0-9.]+)", "^(read\t95)\t([0-9.]+)"]
 lower_better = true
