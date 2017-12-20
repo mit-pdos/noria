@@ -9,7 +9,7 @@ use hdrsample::Histogram;
 use rand::Rng;
 use std::time;
 use std::thread;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
 
 thread_local! {
@@ -106,101 +106,107 @@ where
 
     // TODO: warmup
 
-    let every = value_t_or_exit!(global_args, "ratio", u32);
-    let mut queued_w = Vec::new();
-    let mut queued_r = Vec::new();
-    loop {
-        use rand::distributions::IndependentSample;
+    {
+        let enqueue = |batch: Vec<_>, write| {
+            let clients = clients.clone();
+            move || {
+                let tid = THREAD_ID.with(|tid| *tid.borrow());
 
-        let next =
-            time::Instant::now() + time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
-        if next > end {
-            break;
-        }
+                // TODO: avoid the overhead of taking an uncontended lock
+                let mut client = clients[tid].try_lock().unwrap();
 
-        loop {
-            let now = time::Instant::now();
-
-            if now >= next {
-                // only queue a new request if we're told to. if this is not the case, we've
-                // just been woken up so we can realize we need to send a batch
-                let q = (now, rng.gen_range(0, articles));
-                if rng.gen_weighted_bool(every) {
-                    queued_w.push(q);
+                let sent = time::Instant::now();
+                if write {
+                    client.handle_writes(&batch[..]);
                 } else {
-                    queued_r.push(q);
+                    client.handle_reads(&batch[..]);
                 }
-            }
+                let done = time::Instant::now();
 
-            let enqueue = |batch: Vec<_>, write| {
-                let clients = clients.clone();
-                move || {
-                    let tid = THREAD_ID.with(|tid| *tid.borrow());
+                let remote_t = done.duration_since(sent);
+                assert_eq!(remote_t.as_secs(), 0);
 
-                    // TODO: avoid the overhead of taking an uncontended lock
-                    let mut client = clients[tid].try_lock().unwrap();
+                let rmt = if write { &RMT_W } else { &RMT_R };
+                rmt.with(|h| {
+                    h.borrow_mut()
+                        .record(remote_t.subsec_nanos() as u64 / 1_000)
+                        .unwrap()
+                });
 
-                    let sent = time::Instant::now();
-                    if write {
-                        client.handle_writes(&batch[..]);
-                    } else {
-                        client.handle_reads(&batch[..]);
-                    }
-                    let done = time::Instant::now();
-
-                    let remote_t = done.duration_since(sent);
-                    assert_eq!(remote_t.as_secs(), 0);
-
-                    let rmt = if write { &RMT_W } else { &RMT_R };
-                    rmt.with(|h| {
+                let sjrn = if write { &SJRN_W } else { &SJRN_R };
+                for (started, _) in batch {
+                    let sjrn_t = done.duration_since(started);
+                    assert_eq!(sjrn_t.as_secs(), 0);
+                    sjrn.with(|h| {
                         h.borrow_mut()
-                            .record(remote_t.subsec_nanos() as u64 / 1_000)
+                            .record(sjrn_t.subsec_nanos() as u64 / 1_000)
                             .unwrap()
                     });
-
-                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                    for (started, _) in batch {
-                        let sjrn_t = done.duration_since(started);
-                        assert_eq!(sjrn_t.as_secs(), 0);
-                        sjrn.with(|h| {
-                            h.borrow_mut()
-                                .record(sjrn_t.subsec_nanos() as u64 / 1_000)
-                                .unwrap()
-                        });
-                    }
                 }
-            };
-
-            if queued_w.len() >= MAX_BATCH_SIZE
-                || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
-            {
-                pool.spawn(enqueue(queued_w.split_off(0), true));
             }
+        };
 
-            if queued_r.len() >= MAX_BATCH_SIZE
-                || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
-            {
-                pool.spawn(enqueue(queued_r.split_off(0), false));
-            }
+        let every = value_t_or_exit!(global_args, "ratio", u32);
+        let mut queued_w = Vec::new();
+        let mut queued_r = Vec::new();
+        loop {
+            use rand::distributions::IndependentSample;
 
-            if now >= next {
+            let next = time::Instant::now()
+                + time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
+            if next > end {
                 break;
-            } else {
-                let mut left = next - now;
-                if !queued_w.is_empty() {
-                    let qleft = (queued_w[0].0 + max_batch_time) - now;
-                    if left > qleft {
-                        left = qleft;
-                    }
-                }
-                if !queued_r.is_empty() {
-                    let qleft = (queued_r[0].0 + max_batch_time) - now;
-                    if left > qleft {
-                        left = qleft;
+            }
+
+            loop {
+                let now = time::Instant::now();
+
+                if now >= next {
+                    // only queue a new request if we're told to. if this is not the case, we've
+                    // just been woken up so we can realize we need to send a batch
+                    let q = (now, rng.gen_range(0, articles));
+                    if rng.gen_weighted_bool(every) {
+                        queued_w.push(q);
+                    } else {
+                        queued_r.push(q);
                     }
                 }
 
-                thread::sleep(left);
+                if queued_w.len() >= MAX_BATCH_SIZE
+                    || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
+                {
+                    pool.spawn(enqueue(queued_w.split_off(0), true));
+                }
+
+                if queued_r.len() >= MAX_BATCH_SIZE
+                    || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
+                {
+                    pool.spawn(enqueue(queued_r.split_off(0), false));
+                }
+
+                if now >= next {
+                    break;
+                } else {
+                    let mut left = next - now;
+                    if !queued_w.is_empty() {
+                        let qleft = (queued_w[0].0 + max_batch_time) - now;
+                        if left > qleft {
+                            left = qleft;
+                        }
+                    }
+                    if !queued_r.is_empty() {
+                        let qleft = (queued_r[0].0 + max_batch_time) - now;
+                        if left > qleft {
+                            left = qleft;
+                        }
+                    }
+
+                    if left.as_secs() == 0 && left.subsec_nanos() < 1_000 {
+                        atomic::spin_loop_hint();
+                    } else {
+                        thread::sleep(left);
+                    }
+                }
             }
         }
     }
