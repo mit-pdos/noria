@@ -124,24 +124,15 @@ where
                 let done = time::Instant::now();
 
                 let remote_t = done.duration_since(sent);
-                assert_eq!(remote_t.as_secs(), 0);
-
                 let rmt = if write { &RMT_W } else { &RMT_R };
-                rmt.with(|h| {
-                    h.borrow_mut()
-                        .record(remote_t.subsec_nanos() as u64 / 1_000)
-                        .unwrap()
-                });
+                let ns = remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
+                rmt.with(|h| h.borrow_mut().record(ns).unwrap());
 
                 let sjrn = if write { &SJRN_W } else { &SJRN_R };
                 for (started, _) in batch {
                     let sjrn_t = done.duration_since(started);
-                    assert_eq!(sjrn_t.as_secs(), 0);
-                    sjrn.with(|h| {
-                        h.borrow_mut()
-                            .record(sjrn_t.subsec_nanos() as u64 / 1_000)
-                            .unwrap()
-                    });
+                    let ns = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
+                    sjrn.with(|h| h.borrow_mut().record(ns).unwrap());
                 }
             }
         };
