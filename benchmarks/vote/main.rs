@@ -14,10 +14,10 @@ use std::cell::RefCell;
 
 thread_local! {
     static THREAD_ID: RefCell<usize> = RefCell::new(1);
-    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
-    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
-    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
-    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1_000_000, 4).unwrap());
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 10_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 10_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 10_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 10_000_000, 4).unwrap());
 }
 
 const MAX_BATCH_SIZE: usize = 512;
