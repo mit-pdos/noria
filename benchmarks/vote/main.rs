@@ -20,7 +20,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 10_000_000, 4).unwrap());
 }
 
-const MAX_BATCH_SIZE: usize = 512;
+const MAX_BATCH_SIZE: usize = 128;
 const MAX_BATCH_TIME_US: u32 = 10;
 
 pub trait VoteClient {
@@ -138,8 +138,8 @@ where
         };
 
         let every = value_t_or_exit!(global_args, "ratio", u32);
-        let mut queued_w = Vec::new();
-        let mut queued_r = Vec::new();
+        let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
+        let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
         loop {
             use rand::distributions::IndependentSample;
 
@@ -192,10 +192,13 @@ where
                         }
                     }
 
-                    if left.as_secs() == 0 && left.subsec_nanos() < 1_000 {
-                        atomic::spin_loop_hint();
-                    } else {
+                    if left > time::Duration::new(0, 1_000_000) {
                         thread::sleep(left);
+                    } else {
+                        let end = time::Instant::now() + left;
+                        while end > time::Instant::now() {
+                            atomic::spin_loop_hint();
+                        }
                     }
                 }
             }
@@ -243,6 +246,16 @@ where
         "read\t99\t{:.2}\t{:.2}\t(all µs)",
         sjrn_r_t.value_at_quantile(0.99),
         rmt_r_t.value_at_quantile(0.99)
+    );
+    println!(
+        "write\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.max(),
+        rmt_w_t.max()
+    );
+    println!(
+        "read\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.max(),
+        rmt_r_t.max()
     );
 }
 
