@@ -98,6 +98,7 @@ where
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let end = time::Instant::now() + runtime;
 
+    let mut ops = 0;
     let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(
@@ -106,6 +107,10 @@ where
 
     // TODO: warmup
 
+    let every = value_t_or_exit!(global_args, "ratio", u32);
+    let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
+    let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
+    let start = time::Instant::now();
     {
         let enqueue = |batch: Vec<_>, write| {
             let clients = clients.clone();
@@ -137,9 +142,6 @@ where
             }
         };
 
-        let every = value_t_or_exit!(global_args, "ratio", u32);
-        let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
-        let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
         loop {
             use rand::distributions::IndependentSample;
 
@@ -166,12 +168,14 @@ where
                 if queued_w.len() >= MAX_BATCH_SIZE
                     || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
                 {
+                    ops += queued_w.len();
                     pool.spawn(enqueue(queued_w.split_off(0), true));
                 }
 
                 if queued_r.len() >= MAX_BATCH_SIZE
                     || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
                 {
+                    ops += queued_r.len();
                     pool.spawn(enqueue(queued_r.split_off(0), false));
                 }
 
@@ -211,7 +215,12 @@ where
     drop(c);
 
     // all done!
-    println!("op\tpct\tsojourn\tremote");
+    let took = start.elapsed();
+    println!(
+        "# actual ops/s: {:.2}",
+        ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
+    );
+    println!("# op\tpct\tsojourn\tremote");
 
     let sjrn_w_t = sjrn_w_t.lock().unwrap();
     let rmt_w_t = rmt_w_t.lock().unwrap();
