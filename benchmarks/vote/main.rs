@@ -8,7 +8,6 @@ extern crate rayon;
 use hdrsample::Histogram;
 use rand::Rng;
 use std::time;
-use std::thread;
 use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
 
@@ -142,70 +141,43 @@ where
             }
         };
 
-        loop {
-            use rand::distributions::IndependentSample;
+        let mut next = time::Instant::now();
+        while next < end {
+            let mut now = time::Instant::now();
+            while now >= next {
+                use rand::distributions::IndependentSample;
 
-            let next = time::Instant::now()
-                + time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
-            if next > end {
-                break;
-            }
+                // schedule next delivery
+                next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
 
-            loop {
-                let now = time::Instant::now();
-
-                if now >= next {
-                    // only queue a new request if we're told to. if this is not the case, we've
-                    // just been woken up so we can realize we need to send a batch
-                    let q = (now, rng.gen_range(0, articles));
-                    if rng.gen_weighted_bool(every) {
-                        queued_w.push(q);
-                    } else {
-                        queued_r.push(q);
-                    }
-                }
-
-                if queued_w.len() >= MAX_BATCH_SIZE
-                    || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
-                {
-                    ops += queued_w.len();
-                    pool.spawn(enqueue(queued_w.split_off(0), true));
-                }
-
-                if queued_r.len() >= MAX_BATCH_SIZE
-                    || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
-                {
-                    ops += queued_r.len();
-                    pool.spawn(enqueue(queued_r.split_off(0), false));
-                }
-
-                if now >= next {
-                    break;
+                // only queue a new request if we're told to. if this is not the case, we've
+                // just been woken up so we can realize we need to send a batch
+                let q = (now, rng.gen_range(0, articles));
+                if rng.gen_weighted_bool(every) {
+                    queued_w.push(q);
                 } else {
-                    let mut left = next - now;
-                    if !queued_w.is_empty() {
-                        let qleft = (queued_w[0].0 + max_batch_time) - now;
-                        if left > qleft {
-                            left = qleft;
-                        }
-                    }
-                    if !queued_r.is_empty() {
-                        let qleft = (queued_r[0].0 + max_batch_time) - now;
-                        if left > qleft {
-                            left = qleft;
-                        }
-                    }
-
-                    if left > time::Duration::new(0, 1_000_000) {
-                        thread::sleep(left);
-                    } else {
-                        let end = time::Instant::now() + left;
-                        while end > time::Instant::now() {
-                            atomic::spin_loop_hint();
-                        }
-                    }
+                    queued_r.push(q);
                 }
+
+                now = time::Instant::now();
             }
+
+            let now = time::Instant::now();
+            if queued_w.len() >= MAX_BATCH_SIZE
+                || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
+            {
+                ops += queued_w.len();
+                pool.spawn(enqueue(queued_w.split_off(0), true));
+            }
+
+            if queued_r.len() >= MAX_BATCH_SIZE
+                || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
+            {
+                ops += queued_r.len();
+                pool.spawn(enqueue(queued_r.split_off(0), false));
+            }
+
+            atomic::spin_loop_hint();
         }
     }
 
