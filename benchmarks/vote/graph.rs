@@ -18,6 +18,7 @@ pub struct Setup {
     pub sharding: Option<usize>,
     pub local: bool,
     pub nworkers: usize,
+    pub nreaders: usize,
     pub logging: bool,
     pub concurrent_replays: usize,
     pub replay_batch_timeout: time::Duration,
@@ -34,6 +35,7 @@ impl Setup {
             logging: false,
             local,
             nworkers,
+            nreaders: 1,
             concurrent_replays: 512,
             replay_batch_timeout: time::Duration::from_millis(1),
             replay_batch_size: 32,
@@ -51,6 +53,12 @@ impl Setup {
     #[allow(dead_code)]
     pub fn set_max_concurrent_replay(mut self, n: usize) -> Self {
         self.concurrent_replays = n;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn set_read_threads(mut self, n: usize) -> Self {
+        self.nreaders = n;
         self
     }
 
@@ -111,6 +119,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     } else {
         g.set_nworkers(s.nworkers);
     }
+    g.set_local_read_threads(s.nreaders);
     if s.logging {
         g.log_with(distributary::logger_pls());
     }
