@@ -317,6 +317,7 @@ fn main() {
             Arg::with_name("histogram")
                 .long("histogram")
                 .help("Output serialized HdrHistogram to a file")
+                .takes_value(true)
                 .long_help(
                     "If the file already exists, the existing histogram is extended.\
                      There are four histograms, written out in order: \
