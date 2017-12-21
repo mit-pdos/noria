@@ -19,7 +19,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_SIZE: usize = 128;
+const MAX_BATCH_SIZE: usize = 1024;
 const MAX_BATCH_TIME_US: u32 = 10;
 
 pub trait VoteClient {
