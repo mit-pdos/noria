@@ -327,6 +327,7 @@ extern crate mir;
 extern crate nom_sql;
 extern crate petgraph;
 extern crate rand;
+extern crate rayon;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -358,7 +359,8 @@ pub use dataflow::prelude::DomainIndex;
 pub use dataflow::{DurabilityMode, PersistenceParameters};
 
 pub use controller::{Controller, ControllerBuilder, ControllerHandle, Mutator, MutatorBuilder,
-                     MutatorError, ReadQuery, ReadReply, RemoteGetter, RemoteGetterBuilder};
+                     MutatorError, ReadQuery, ReadReply, RemoteGetter, RemoteGetterBuilder,
+                     RpcError};
 pub use souplet::Souplet;
 
 /// Just give me a damn terminal logger
