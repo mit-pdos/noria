@@ -7,6 +7,7 @@ extern crate rayon;
 
 use hdrsample::Histogram;
 use rand::Rng;
+use std::fs;
 use std::time;
 use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
@@ -47,18 +48,31 @@ where
         .collect();
     let clients = Arc::new(clients);
 
-    let sjrn_w_t = Arc::new(Mutex::new(
-        Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-    ));
-    let sjrn_r_t = Arc::new(Mutex::new(
-        Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-    ));
-    let rmt_w_t = Arc::new(Mutex::new(
-        Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-    ));
-    let rmt_r_t = Arc::new(Mutex::new(
-        Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-    ));
+    let hists = if let Some(mut f) = global_args
+        .value_of("histogram")
+        .and_then(|h| fs::File::open(h).ok())
+    {
+        use hdrsample::serialization::Deserializer;
+        let mut deserializer = Deserializer::new();
+        (
+            deserializer.deserialize(&mut f).unwrap(),
+            deserializer.deserialize(&mut f).unwrap(),
+            deserializer.deserialize(&mut f).unwrap(),
+            deserializer.deserialize(&mut f).unwrap(),
+        )
+    } else {
+        (
+            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+        )
+    };
+
+    let sjrn_w_t = Arc::new(Mutex::new(hists.0));
+    let sjrn_r_t = Arc::new(Mutex::new(hists.1));
+    let rmt_w_t = Arc::new(Mutex::new(hists.2));
+    let rmt_r_t = Arc::new(Mutex::new(hists.3));
     let finished = Arc::new(Barrier::new(nthreads + 1));
     let ts = (
         sjrn_w_t.clone(),
@@ -207,9 +221,26 @@ where
     println!("# op\tpct\tsojourn\tremote");
 
     let sjrn_w_t = sjrn_w_t.lock().unwrap();
-    let rmt_w_t = rmt_w_t.lock().unwrap();
     let sjrn_r_t = sjrn_r_t.lock().unwrap();
+    let rmt_w_t = rmt_w_t.lock().unwrap();
     let rmt_r_t = rmt_r_t.lock().unwrap();
+
+    if let Some(h) = global_args.value_of("histogram") {
+        match fs::File::create(h) {
+            Ok(mut f) => {
+                use hdrsample::serialization::V2Serializer;
+                let mut s = V2Serializer::new();
+                s.serialize(&sjrn_w_t, &mut f).unwrap();
+                s.serialize(&sjrn_r_t, &mut f).unwrap();
+                s.serialize(&rmt_w_t, &mut f).unwrap();
+                s.serialize(&rmt_r_t, &mut f).unwrap();
+            }
+            Err(e) => {
+                eprintln!("failed to open histogram file for writing: {:?}", e);
+            }
+        }
+    }
+
     println!(
         "write\t50\t{:.2}\t{:.2}\t(all µs)",
         sjrn_w_t.value_at_quantile(0.5),
@@ -281,6 +312,16 @@ fn main() {
                 .value_name("N")
                 .default_value("60")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("histogram")
+                .long("histogram")
+                .help("Output serialized HdrHistogram to a file")
+                .long_help(
+                    "If the file already exists, the existing histogram is extended.\
+                     There are four histograms, written out in order: \
+                     sojourn-write, sojourn-read, remote-write, and remote-read",
+                ),
         )
         .arg(
             Arg::with_name("ops")
