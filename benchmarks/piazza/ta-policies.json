@@ -2,7 +2,7 @@
     "groups": [
         {
             "name": "ta",
-            "membership": "select r_uid as uid, r_cid as gid FROM Role WHERE r_role = 1;",
+            "membership": "select r_uid as uid, r_cid as gid FROM Role WHERE r_role = 1",
             "policies": [
                 {
                     "table": "Post",
