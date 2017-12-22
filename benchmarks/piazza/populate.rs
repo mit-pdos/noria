@@ -32,14 +32,14 @@ impl Populate {
         }
     }
 
-    pub fn populate_tables(&mut self, backend: &Backend) {
-        self.populate_roles(backend);
-        self.populate_users(backend);
-        self.populate_posts(backend);
-        self.populate_classes(backend);
+    pub fn populate_tables(&mut self, mut backend: &mut Backend) {
+        self.populate_roles(&mut backend);
+        self.populate_users(&mut backend);
+        self.populate_posts(&mut backend);
+        self.populate_classes(&mut backend);
     }
 
-    fn populate(backend: &Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+    fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
         let ins = backend.g.inputs();
         let mut mutator = backend
             .g
@@ -65,7 +65,7 @@ impl Populate {
         i
     }
 
-    fn populate_roles(&mut self, backend: &Backend) {
+    fn populate_roles(&mut self, mut backend: &mut Backend) {
         println!("Populating roles...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
@@ -86,10 +86,10 @@ impl Populate {
             }
         }
 
-        Self::populate(backend, "Role", records);
+        Self::populate(&mut backend, "Role", records);
     }
 
-    fn populate_users(&mut self, backend: &Backend) {
+    fn populate_users(&mut self, mut backend: &mut Backend) {
         println!("Populating users...");
         let mut records = Vec::new();
         for i in 0..self.nusers {
@@ -97,10 +97,10 @@ impl Populate {
             records.push(vec![uid]);
         }
 
-        Self::populate(backend, "User", records);
+        Self::populate(&mut backend, "User", records);
     }
 
-    fn populate_posts(&mut self, backend: &Backend) {
+    fn populate_posts(&mut self, mut backend: &mut Backend) {
         println!("Populating posts...");
         let mut records = Vec::new();
         for i in 0..self.nposts {
@@ -112,10 +112,10 @@ impl Populate {
             records.push(vec![pid, cid, author, content, private]);
         }
 
-        Self::populate(backend, "Post", records);
+        Self::populate(&mut backend, "Post", records);
     }
 
-    fn populate_classes(&mut self, backend: &Backend) {
+    fn populate_classes(&mut self, mut backend: &mut Backend) {
         println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
@@ -123,7 +123,7 @@ impl Populate {
             records.push(vec![cid]);
         }
 
-        Self::populate(backend, "Class", records);
+        Self::populate(&mut backend, "Class", records);
     }
 
     /// Generate random uid within bounds

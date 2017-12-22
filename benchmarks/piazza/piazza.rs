@@ -4,7 +4,7 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
-use distributary::{Blender, DataType, ReuseConfigType, ControllerBuilder};
+use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -16,7 +16,7 @@ mod populate;
 use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
-    g: Blender,
+    g: ControllerHandle<LocalAuthority>,
 }
 
 impl Backend {
@@ -36,7 +36,7 @@ impl Backend {
 
         cb.log_with(blender_log);
 
-        let g = cb.build();
+        let mut g = cb.build_local();
 
         match reuse.as_ref() {
             "finkelstein" => g.enable_reuse(ReuseConfigType::Finkelstein),
@@ -59,7 +59,7 @@ impl Backend {
         Ok(())
     }
 
-    fn write_to_user_context(&self, uc: HashMap<String, DataType>) {
+    fn write_to_user_context(&mut self, uc: HashMap<String, DataType>) {
         let name = &format!("UserContext_{}", uc.get("id").unwrap());
         let r: Vec<DataType> = uc.values().cloned().collect();
         let ins = self.g.inputs();
@@ -71,7 +71,7 @@ impl Backend {
         mutator.put(r).unwrap();
     }
 
-    fn set_security_config(&self, config_file: &str) {
+    fn set_security_config(&mut self, config_file: &str) {
         use std::io::Read;
         let mut config = String::new();
         let mut cf = File::open(config_file).unwrap();
@@ -113,7 +113,7 @@ impl Backend {
         Ok(())
     }
 
-    fn size(&self) -> usize {
+    fn size(&mut self) -> usize {
         let outs = self.g.outputs();
         outs.into_iter().fold(0, |acc, (_, ni)| {
             acc + self.g.get_getter(ni).unwrap().len()
@@ -252,7 +252,7 @@ fn main() {
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     if populate {
         println!("Populating tables...");
-        p.populate_tables(&backend);
+        p.populate_tables(&mut backend);
     }
 
     println!("Finished writing! Sleeping for 2 seconds...");

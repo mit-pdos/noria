@@ -75,9 +75,9 @@ path = "hotsoup/hotsoup.rs"
 name = "extract_hotcrp_queries"
 path = "hotsoup/extract_queries.rs"
 
-#[[bin]]
-#name = "piazza"
-#path = "piazza/piazza.rs"
+[[bin]]
+name = "piazza"
+path = "piazza/piazza.rs"
 
 [[bin]]
 name = "vote-new-fraction"
