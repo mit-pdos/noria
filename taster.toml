@@ -2,18 +2,18 @@ version = 2
 
 [uniform]
 command = "/usr/bin/time"
-args = ["-v", "cargo", "run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--putters=5"]
+args = ["-v", "cargo", "run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)", ".*Maximum (resident set size).*: ([0-9.]+)"]
 
 [staged]
 command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--stage", "--runtime=30", "--putters=5"]
+args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--stage", "--runtime=30"]
 regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
 
 [multiclient]
 command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--getters=8", "--putters=5"]
-regexs = ["(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)"]
+args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--read-threads=2", "--getters=4"]
+regexs = ["^(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)", "^(cumavg GET): ([0-9.]+)"]
 
 [tx-bank]
 command = "cargo"
@@ -22,12 +22,12 @@ regexs = ["(avg PUT): ([0-9.]+)"]
 
 [backfill]
 command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote-stress", "--", "--articles=100000", "--votes=100000", "--runtime=10"]
+args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote-stress", "--", "--articles=100000", "--votes=100000", "--runtime=10", "--stupid"]
 regexs = ["(RATE): ([0-9.]+)"]
 
 [vote-migration]
 command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30", "--putters=5", "--stupid"]
+args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30", "--stupid"]
 regexs = ["(Migration) completed in ([0-9.]+)s"]
 lower_better = true
 improvement_threshold = 0.5
@@ -35,7 +35,7 @@ regression_threshold = 0.5
 
 [post-migration]
 command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--migrate=10", "--putters=5", "--stupid"]
+args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=60", "--migrate=30", "--stupid"]
 regexs = ["avg (GET)\\+: ([0-9.]+)", "avg (PUT)\\+: ([0-9.]+)"]
 
 [slack-aliases]

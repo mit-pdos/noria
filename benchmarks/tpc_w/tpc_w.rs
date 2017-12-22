@@ -16,14 +16,17 @@ use std::{thread, time};
 use std::collections::HashMap;
 use rand::Rng;
 
+use std::collections::BTreeMap;
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{Blender, Recipe, ReuseConfigType};
+use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex};
 
 pub struct Backend {
-    r: Recipe,
-    g: Blender,
+    r: String,
+    g: ControllerHandle<LocalAuthority>,
+    inputs: BTreeMap<String, NodeIndex>,
+    outputs: BTreeMap<String, NodeIndex>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
@@ -71,18 +74,18 @@ fn make(
     use std::fs::File;
 
     // set up graph
-    let mut g = Blender::new();
+    let mut b = ControllerBuilder::default();
 
     let main_log = distributary::logger_pls();
-    let recipe_log = main_log.new(o!());
-    g.log_with(main_log);
-    g.disable_sharding();
+    b.log_with(main_log);
     if disable_partial {
-        g.disable_partial();
+        b.disable_partial();
     }
+    b.set_local_workers(2);
 
+    let mut g = b.build_local();
 
-    let recipe = g.migrate(|mig| {
+    let recipe = {
         let mut f = File::open(recipe_location).unwrap();
         let mut s = String::new();
 
@@ -94,7 +97,14 @@ fn make(
                 .collect::<Vec<_>>()
                 .join("\n");
         }
-        match Recipe::from_str(&s, Some(recipe_log.clone())) {
+
+        s
+    };
+
+    g.install_recipe(recipe.clone());
+
+    // XXX(malte): fix reuse configuration passthrough
+    /*match Recipe::from_str(&s, Some(recipe_log.clone())) {
             Ok(mut recipe) => {
                 match reuse.as_ref() {
                     "finkelstein" => recipe.enable_reuse(ReuseConfigType::Finkelstein),
@@ -107,14 +117,18 @@ fn make(
                 recipe
             }
             Err(e) => panic!(e),
-        }
-    });
+        }*/
 
     // println!("{}", g);
+
+    let inputs = g.inputs();
+    let outputs = g.outputs();
 
     Backend {
         r: recipe,
         g: g,
+        inputs: inputs,
+        outputs: outputs,
         parallel_prepop: parallel,
         prepop_counts: HashMap::new(),
         barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
@@ -125,18 +139,13 @@ fn make(
 impl Backend {
     fn extend(mut self, query: &str, transactions: bool) -> Backend {
         let query_name = query.split(":").next().unwrap();
-        let start = time::Instant::now();
 
-        let new_recipe = {
-            let r = self.r;
-            self.g.migrate(|mig| match r.extend(query) {
-                Ok(mut recipe) => {
-                    recipe.activate(mig, transactions).unwrap();
-                    recipe
-                }
-                Err(e) => panic!(e),
-            })
-        };
+        let mut new_recipe = self.r.clone();
+        new_recipe.push_str("\n");
+        new_recipe.push_str(query);
+
+        let start = time::Instant::now();
+        self.g.install_recipe(new_recipe.clone());
 
         let dur = dur_to_fsec!(start.elapsed());
         println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
@@ -145,34 +154,36 @@ impl Backend {
         self
     }
 
-    fn size(&self, query_name: &str) -> usize {
-        match self.r.node_addr_for(query_name) {
-            Err(_) => panic!("no node for {}!", query_name),
-            Ok(nd) => {
-                let g = self.g.get_getter(nd).unwrap();
+    fn size(&mut self, query_name: &str) -> usize {
+        // XXX(malte): fix -- needs len RPC
+        unimplemented!();
+        /*match self.outputs.get(query_name) {
+            None => panic!("no node for {}!", query_name),
+            Some(nd) => {
+                let g = self.g.get_getter(*nd).unwrap();
                 g.len()
             }
-        }
+        }*/
     }
 
     fn read(
-        &self,
+        &mut self,
         keys: &mut SampleKeys,
         query_name: &str,
         read_scale: f32,
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
-        match self.r.node_addr_for(query_name) {
-            Err(_) => panic!("no node for {}!", query_name),
-            Ok(nd) => {
+        match self.outputs.get(query_name) {
+            None => panic!("no node for {}!", query_name),
+            Some(nd) => {
                 println!("reading {}", query_name);
-                let g = self.g.get_getter(nd).unwrap();
+                let mut g = self.g.get_getter(*nd).unwrap();
                 let query_name = String::from(query_name);
 
                 let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
                 let params = keys.generate_parameter(&query_name, num);
 
-                let read_view = move || {
+                let mut read_view = move || {
                     let mut ok = 0;
 
                     let start = time::Instant::now();
@@ -330,27 +341,27 @@ fn main() {
         _ => unreachable!(),
     };
 
-    let num_addr = populate_addresses(&backend, &ploc);
+    let num_addr = populate_addresses(&mut backend, &ploc);
     backend.prepop_counts.insert("addresses".into(), num_addr);
-    let num_authors = populate_authors(&backend, &ploc, author_write, true);
+    let num_authors = populate_authors(&mut backend, &ploc, author_write, true);
     backend.prepop_counts.insert("authors".into(), num_authors);
-    let num_countries = populate_countries(&backend, &ploc);
+    let num_countries = populate_countries(&mut backend, &ploc);
     backend
         .prepop_counts
         .insert("countries".into(), num_countries);
-    let num_customers = populate_customers(&backend, &ploc);
+    let num_customers = populate_customers(&mut backend, &ploc);
     backend
         .prepop_counts
         .insert("customers".into(), num_customers);
-    let num_items = populate_items(&backend, &ploc, item_write, true);
+    let num_items = populate_items(&mut backend, &ploc, item_write, true);
     backend.prepop_counts.insert("items".into(), num_items);
-    let num_orders = populate_orders(&backend, &ploc);
+    let num_orders = populate_orders(&mut backend, &ploc);
     backend.prepop_counts.insert("orders".into(), num_orders);
-    let num_cc_xacts = populate_cc_xacts(&backend, &ploc);
+    let num_cc_xacts = populate_cc_xacts(&mut backend, &ploc);
     backend
         .prepop_counts
         .insert("cc_xacts".into(), num_cc_xacts);
-    let num_order_line = populate_order_line(&backend, &ploc, order_line_write, true);
+    let num_order_line = populate_order_line(&mut backend, &ploc, order_line_write, true);
     backend
         .prepop_counts
         .insert("order_line".into(), num_order_line);
@@ -378,7 +389,7 @@ fn main() {
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
             }
         }
     }
@@ -408,7 +419,7 @@ fn main() {
             }
         }
 
-        println!("Checking size of leaf views...");
+        /*println!("Checking size of leaf views...");
         for nq in backend.r.aliases() {
             let populated = backend.size(nq);
             let total = keys.key_space(nq);
@@ -421,13 +432,13 @@ fn main() {
                 total,
                 ratio
             );
-        }
+        }*/
     }
 
     match write_to.as_ref() {
-        "item" => populate_items(&backend, &ploc, write, false),
-        "author" => populate_authors(&backend, &ploc, write, false),
-        "order_line" => populate_order_line(&backend, &ploc, write, false),
+        "item" => populate_items(&mut backend, &ploc, write, false),
+        "author" => populate_authors(&mut backend, &ploc, write, false),
+        "order_line" => populate_order_line(&mut backend, &ploc, write, false),
         _ => unreachable!(),
     };
 }

@@ -49,12 +49,6 @@ fn main() {
                 .help("stage execution such that all writes are performed before all reads"),
         )
         .arg(
-            Arg::with_name("unsharded")
-                .long("unsharded")
-                .takes_value(false)
-                .help("disable sharding"),
-        )
-        .arg(
             Arg::with_name("distribution")
                 .short("d")
                 .takes_value(true)
@@ -69,6 +63,13 @@ fn main() {
                 .long("mixers")
                 .value_name("N")
                 .help("Number of MIX clients to start"),
+        )
+        .arg(
+            Arg::with_name("readthreads")
+                .long("read-threads")
+                .value_name("N")
+                .default_value("1")
+                .help("Number of read threads to start"),
         )
         .arg(
             Arg::with_name("ngetters")
@@ -103,10 +104,11 @@ fn main() {
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
-            Arg::with_name("sharded")
-                .long("sharded")
-                .takes_value(false)
-                .help("Enable sharding of the graph."),
+            Arg::with_name("shards")
+                .long("shards")
+                .takes_value(true)
+                .default_value("2")
+                .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(
             Arg::with_name("stupid")
@@ -192,6 +194,7 @@ fn main() {
         .map(time::Duration::from_secs);
     let mut ngetters = value_t_or_exit!(args, "ngetters", usize);
     let mut nputters = value_t_or_exit!(args, "nputters", usize);
+    let read_threads = value_t_or_exit!(args, "readthreads", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
@@ -259,12 +262,15 @@ fn main() {
 
     // setup db
     let mut s = graph::Setup::new(true, nworkers);
+    s.nreaders = read_threads;
     s.logging = verbose;
     s.transactions = args.is_present("transactions");
-    s.sharding = args.is_present("sharded");
+    s.sharding = match value_t_or_exit!(args, "shards", usize) {
+        0 => None,
+        x => Some(x),
+    };
     s.stupid = args.is_present("stupid");
-    s.sharding = !args.is_present("unsharded");
-    let g = graph::make(s, persistence_params);
+    let mut g = graph::make(s, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = {
@@ -288,11 +294,11 @@ fn main() {
 
     // prepare putters
     let putters: Vec<_> = {
-        let mix_getters = (0..new_vote_receivers.len())
-            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap()));
+        let mix_getters: Vec<_> = (0..new_vote_receivers.len())
+            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap())).collect();
         new_vote_receivers
             .into_iter()
-            .zip(mix_getters)
+            .zip(mix_getters.into_iter())
             .map(|(new_vote, mix_getter)| {
                 Spoon {
                     article: g.graph.get_mutator(g.article).unwrap(),
@@ -468,22 +474,24 @@ fn main() {
         if nputters != 0 {
             let sum = put_stats
                 .iter()
-                .fold((0f64, 0usize), |(tot, count), stats| {
+                .fold((0f64, 0usize, 0f64), |(tot, count, totavg), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.pre.sum_len();
-                    (tot + sum, count + num)
+                    (tot + sum, count + num, totavg + (sum / num as f64))
                 });
-            println!("avg {}: {:.2}", put_name, sum.0 as f64 / sum.1 as f64);
+            println!("\navg {}: {:.2}", put_name, sum.0 as f64 / sum.1 as f64);
+            println!("cumavg {}: {:.2}", put_name, sum.2 as f64);
         }
         if ngetters != 0 {
             let sum = get_stats
                 .iter()
-                .fold((0f64, 0usize), |(tot, count), stats| {
+                .fold((0f64, 0usize, 0f64), |(tot, count, totavg), stats| {
                     // TODO: do we *really* want an average of averages?
                     let (sum, num) = stats.pre.sum_len();
-                    (tot + sum, count + num)
+                    (tot + sum, count + num, totavg + (sum / num as f64))
                 });
-            println!("avg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+            println!("\navg GET: {:.2}", sum.0 as f64 / sum.1 as f64);
+            println!("cumavg GET: {:.2}", sum.2 as f64);
         }
     }
 
