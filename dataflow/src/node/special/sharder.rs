@@ -1,3 +1,4 @@
+
 use prelude::*;
 use payload;
 use vec_map::VecMap;
@@ -166,7 +167,10 @@ impl Sharder {
             // we need to make sure it gets to every shard so they know to ready the node
             force_all = true;
         }
-        if let Packet::Transaction { .. } = *m {
+        if let Packet::VtMessage { .. } = *m {
+            // TODO(jbehrens): This path used to apply only to transactions, and probably doesn't
+            // always apply now. `force_all` should be set only when absolutely required...
+
             // transactions (currently) need to reach all shards so they know they can progress
             force_all = true;
         }

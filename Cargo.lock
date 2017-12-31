@@ -335,7 +335,7 @@ dependencies = [
  "buf_redux 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
  "core 0.1.0",
- "evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "evmap 2.0.1 (git+http://github.com/fintelia/rust-evmap)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
@@ -476,7 +476,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "evmap"
 version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+http://github.com/fintelia/rust-evmap#4eb2baf2ed35ae5600e82af61487469ba316b1e8"
 
 [[package]]
 name = "fixedbitset"
@@ -1831,7 +1831,7 @@ dependencies = [
 "checksum encoding-index-singlebyte 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3351d5acffb224af9ca265f435b859c7c01537c0849754d3db3fdf2bfe2ae84a"
 "checksum encoding-index-tradchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fd0e20d5688ce3cab59eb3ef3a2083a5c77bf496cb798dc6fcdb75f323890c18"
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
-"checksum evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc0636f6ddc376cb6ace9f1ba65a7e1a0dde4b2554056175fc12b94b7e1397eb"
+"checksum evmap 2.0.1 (git+http://github.com/fintelia/rust-evmap)" = "<none>"
 "checksum fixedbitset 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "85cb8fec437468d86dc7c83ca7cfc933341d561873275f22dd5eedefa63a6478"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"

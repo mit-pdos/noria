@@ -1,6 +1,7 @@
 use petgraph;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use core::{Time, TimeSource};
 #[cfg(debug_assertions)]
 use backtrace::Backtrace;
 use channel;
@@ -78,19 +79,18 @@ pub enum ReplayPieceContext {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum TransactionState {
-    Committed(
-        i64,
-        petgraph::graph::NodeIndex,
-        Option<Box<HashMap<domain::Index, i64>>>,
-    ),
+    VtCommitted {
+        at: (Time, TimeSource),
+        prev: VectorTime,
+    },
     Pending(checktable::Token, SocketAddr),
     WillCommit,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReplayTransactionState {
-    pub ts: i64,
-    pub prevs: Option<Box<HashMap<domain::Index, i64>>>,
+    pub at: VectorTime,
+    pub prev: VectorTime,
 }
 
 /// Different events that can occur as a packet is being processed.
@@ -114,21 +114,13 @@ pub type EgressForBase = HashMap<petgraph::graph::NodeIndex, Vec<LocalNodeIndex>
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Packet {
-    // Data messages
-    //
-    /// Regular data-flow update.
-    Message {
-        link: Link,
-        data: Records,
-        tracer: Tracer,
-    },
-
     /// Transactional data-flow update.
-    Transaction {
+    VtMessage {
         link: Link,
         data: Records,
         state: TransactionState,
         tracer: Tracer,
+        base: NodeIndex,
     },
 
     /// Update that is part of a tagged data-flow replay path.
@@ -253,8 +245,8 @@ pub enum Packet {
     /// This allows a migration to ensure all transactions happen strictly *before* or *after* a
     /// migration in timestamp order.
     StartMigration {
-        at: i64,
-        prev_ts: i64,
+        at: VectorTime,
+        prev: VectorTime,
     },
 
     /// Notify a domain about a completion timestamp for an ongoing migration.
@@ -265,7 +257,8 @@ pub enum Packet {
     /// The update also includes the new ingress_from_base counts and egress_from_base map the
     /// domain should use going forward.
     CompleteMigration {
-        at: i64,
+        at: VectorTime,
+        prev: VectorTime,
         ingress_from_base: IngressFromBase,
         egress_for_base: EgressForBase,
     },
@@ -287,8 +280,7 @@ pub enum Packet {
 impl Packet {
     pub fn link(&self) -> &Link {
         match *self {
-            Packet::Message { ref link, .. } => link,
-            Packet::Transaction { ref link, .. } => link,
+            Packet::VtMessage { ref link, .. } => link,
             Packet::ReplayPiece { ref link, .. } => link,
             _ => unreachable!(),
         }
@@ -296,8 +288,7 @@ impl Packet {
 
     pub fn link_mut(&mut self) -> &mut Link {
         match *self {
-            Packet::Message { ref mut link, .. } => link,
-            Packet::Transaction { ref mut link, .. } => link,
+            Packet::VtMessage { ref mut link, .. } => link,
             Packet::ReplayPiece { ref mut link, .. } => link,
             _ => unreachable!(),
         }
@@ -305,8 +296,7 @@ impl Packet {
 
     pub fn is_empty(&self) -> bool {
         match *self {
-            Packet::Message { ref data, .. } => data.is_empty(),
-            Packet::Transaction { ref data, .. } => data.is_empty(),
+            Packet::VtMessage { ref data, .. } => data.is_empty(),
             Packet::ReplayPiece { ref data, .. } => data.is_empty(),
             _ => unreachable!(),
         }
@@ -317,8 +307,7 @@ impl Packet {
         F: FnOnce(&mut Records),
     {
         match *self {
-            Packet::Message { ref mut data, .. }
-            | Packet::Transaction { ref mut data, .. }
+            Packet::VtMessage { ref mut data, .. }
             | Packet::ReplayPiece { ref mut data, .. } => {
                 map(data);
             }
@@ -330,8 +319,7 @@ impl Packet {
 
     pub fn is_regular(&self) -> bool {
         match *self {
-            Packet::Message { .. } => true,
-            Packet::Transaction { .. } => true,
+            Packet::VtMessage { .. } => true,
             _ => false,
         }
     }
@@ -345,8 +333,7 @@ impl Packet {
 
     pub fn data(&self) -> &Records {
         match *self {
-            Packet::Message { ref data, .. } => data,
-            Packet::Transaction { ref data, .. } => data,
+            Packet::VtMessage { ref data, .. } => data,
             Packet::ReplayPiece { ref data, .. } => data,
             _ => unreachable!(),
         }
@@ -355,8 +342,7 @@ impl Packet {
     pub fn swap_data(&mut self, new_data: Records) -> Records {
         use std::mem;
         let inner = match *self {
-            Packet::Message { ref mut data, .. } => data,
-            Packet::Transaction { ref mut data, .. } => data,
+            Packet::VtMessage { ref mut data, .. } => data,
             Packet::ReplayPiece { ref mut data, .. } => data,
             _ => unreachable!(),
         };
@@ -366,8 +352,7 @@ impl Packet {
     pub fn take_data(&mut self) -> Records {
         use std::mem;
         let inner = match *self {
-            Packet::Message { ref mut data, .. } => data,
-            Packet::Transaction { ref mut data, .. } => data,
+            Packet::VtMessage { ref mut data, .. } => data,
             Packet::ReplayPiece { ref mut data, .. } => data,
             _ => unreachable!(),
         };
@@ -376,25 +361,18 @@ impl Packet {
 
     pub fn clone_data(&self) -> Self {
         match *self {
-            Packet::Message {
+            Packet::VtMessage {
                 ref link,
                 ref data,
                 ref tracer,
-            } => Packet::Message {
-                link: link.clone(),
-                data: data.clone(),
-                tracer: tracer.clone(),
-            },
-            Packet::Transaction {
-                ref link,
-                ref data,
                 ref state,
-                ref tracer,
-            } => Packet::Transaction {
+                ref base,
+            } => Packet::VtMessage {
                 link: link.clone(),
                 data: data.clone(),
-                state: state.clone(),
                 tracer: tracer.clone(),
+                state: state.clone(),
+                base: base.clone(),
             },
             Packet::ReplayPiece {
                 ref link,
@@ -417,11 +395,7 @@ impl Packet {
 
     pub fn trace(&self, event: PacketEvent) {
         match *self {
-            Packet::Message {
-                tracer: Some((tag, Some(ref sender))),
-                ..
-            }
-            | Packet::Transaction {
+            Packet::VtMessage {
                 tracer: Some((tag, Some(ref sender))),
                 ..
             } => {
@@ -438,7 +412,7 @@ impl Packet {
 
     pub fn tracer(&mut self) -> Option<&mut Tracer> {
         match *self {
-            Packet::Message { ref mut tracer, .. } | Packet::Transaction { ref mut tracer, .. } => {
+            Packet::VtMessage { ref mut tracer, .. } => {
                 Some(tracer)
             }
             _ => None,
@@ -467,19 +441,18 @@ impl Packet {
 impl fmt::Debug for Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Packet::Message { ref link, .. } => write!(f, "Packet::Message({:?})", link),
-            Packet::Transaction {
+            Packet::VtMessage {
                 ref link,
                 ref state,
                 ..
             } => match *state {
-                TransactionState::Committed(ts, ..) => {
-                    write!(f, "Packet::Transaction({:?}, {})", link, ts)
+                TransactionState::VtCommitted {ref at, ref prev} => {
+                    write!(f, "Packet::VtMessage({:?}, {:?})", at, prev)
                 }
                 TransactionState::Pending(..) => {
-                    write!(f, "Packet::Transaction({:?}, pending)", link)
+                    write!(f, "Packet::VtMessage({:?}, pending)", link)
                 }
-                TransactionState::WillCommit => write!(f, "Packet::Transaction({:?}, ?)", link),
+                TransactionState::WillCommit => write!(f, "Packet::VtMessage({:?}, ?)", link),
             },
             Packet::ReplayPiece {
                 ref link,

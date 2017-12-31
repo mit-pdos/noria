@@ -20,8 +20,8 @@ pub fn inform(
     log: &Logger,
     controller: &mut controller::ControllerInner,
     nodes: HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
-    ts: i64,
-    prevs: Box<HashMap<DomainIndex, i64>>,
+    ts: VectorTime,
+    prev: VectorTime,
 ) {
     let source = controller.source;
     for (domain, nodes) in nodes {
@@ -30,8 +30,8 @@ pub fn inform(
 
         trace!(log, "informing domain of migration start");
         let _ = ctx.send(box Packet::StartMigration {
-            at: ts,
-            prev_ts: prevs[&domain],
+            at: ts.clone(),
+            prev: prev.clone(),
         });
         let _ = ctx.wait_for_ack();
         trace!(log, "domain ready for migration");

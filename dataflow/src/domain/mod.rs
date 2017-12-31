@@ -17,7 +17,6 @@ use statistics;
 use transactions;
 use persistence;
 use debug;
-use checktable;
 use serde_json;
 use itertools::Itertools;
 use slog::Logger;
@@ -141,7 +140,7 @@ pub struct DomainBuilder {
     /// The domain's persistence setting.
     pub persistence_parameters: persistence::Parameters,
     /// The starting timestamp.
-    pub ts: i64,
+    pub ts: VectorTime,
     /// The socket address at which this domain receives control messages.
     pub control_addr: SocketAddr,
     /// The socket address for debug interactions with this domain.
@@ -515,8 +514,8 @@ impl Domain {
                 ..
             } if to == &me =>
             {
-                buffered.push_back(m);
-                return output_messages;
+                // Only old `Payload::Message`s could take this path, but those no-longer exist.
+                unreachable!()
             }
             DomainMode::Replaying { .. } => (),
         }
@@ -541,12 +540,7 @@ impl Domain {
 
         // ignore misses during regular forwarding
         match m.as_ref().unwrap() {
-            m @ &box Packet::Message { .. } if m.is_empty() => {
-                // no need to deal with our children if we're not sending them anything
-                return output_messages;
-            }
-            &box Packet::Message { .. } => {}
-            &box Packet::Transaction { .. } => {
+            &box Packet::VtMessage { .. } => {
                 // Any message with a timestamp (ie part of a transaction) must flow through the
                 // entire graph, even if there are no updates associated with it.
             }
@@ -641,13 +635,14 @@ impl Domain {
         assert!(!messages.is_empty());
 
         let mut egress_messages = HashMap::new();
-        let (ts, tracer) = if let Packet::Transaction {
-            state: ref ts @ TransactionState::Committed(..),
+        let (ts, tracer, base) = if let Packet::VtMessage {
+            state: ref ts @ TransactionState::VtCommitted { .. },
             ref tracer,
+            base,
             ..
         } = *messages[0]
         {
-            (ts.clone(), tracer.clone())
+            (ts.clone(), tracer.clone(), base)
         } else {
             unreachable!();
         };
@@ -663,12 +658,6 @@ impl Domain {
             }
         }
 
-        let base = if let TransactionState::Committed(_, base, _) = ts {
-            base
-        } else {
-            unreachable!()
-        };
-
         for n in self.transaction_state.egress_for(base) {
             let n = &self.nodes[n];
             let data = match egress_messages.entry(*n.borrow().local_addr()) {
@@ -678,21 +667,12 @@ impl Domain {
 
             let addr = *n.borrow().local_addr();
             // TODO: message should be from actual parent, not self.
-            let m = if n.borrow().is_transactional() {
-                box Packet::Transaction {
-                    link: Link::new(addr, addr),
-                    data: data,
-                    state: ts.clone(),
-                    tracer: tracer.clone(),
-                }
-            } else {
-                // The packet is about to hit a non-transactional output node (which could be an
-                // egress node), so it must be converted to a normal normal message.
-                box Packet::Message {
-                    link: Link::new(addr, addr),
-                    data: data,
-                    tracer: tracer.clone(),
-                }
+            let m = box Packet::VtMessage {
+                link: Link::new(addr, addr),
+                data: data,
+                state: ts.clone(),
+                tracer: tracer.clone(),
+                base: base.clone(),
             };
 
             if !self.not_ready.is_empty() && self.not_ready.contains(&addr) {
@@ -787,10 +767,7 @@ impl Domain {
         m.trace(PacketEvent::Handle);
 
         match *m {
-            Packet::Message { .. } => {
-                self.dispatch_(m, true, sends);
-            }
-            Packet::Transaction { .. }
+            Packet::VtMessage { .. }
             | Packet::StartMigration { .. }
             | Packet::CompleteMigration { .. }
             | Packet::ReplayPiece {
@@ -1607,22 +1584,13 @@ impl Domain {
                 .map(|chunk| {
                     let data: Records = chunk.collect();
                     let link = Link::new(local_addr, local_addr);
-                    if is_transactional {
-                        let (ts, prevs) = checktable::with_checktable(|ct| {
-                            ct.recover(global_addr).unwrap()
-                        });
-                        Packet::Transaction {
-                            link,
-                            data,
-                            tracer: None,
-                            state: TransactionState::Committed(ts, global_addr, prevs),
-                        }
-                    } else {
-                        Packet::Message {
-                            link,
-                            data,
-                            tracer: None,
-                        }
+                    let (at, prev) = unimplemented!(); // TODO(jbehrens)
+                    Packet::VtMessage {
+                        link,
+                        data,
+                        tracer: None,
+                        state: TransactionState::VtCommitted { at, prev },
+                        base: global_addr,
                     }
                 })
                 .for_each(|packet| self.handle(box packet, sends));
@@ -2177,101 +2145,81 @@ impl Domain {
     }
 
     fn finish_replay(&mut self, tag: Tag, node: LocalNodeIndex, sends: &mut EnqueuedSends) {
-        let finished = if let DomainMode::Replaying {
-            ref to,
-            ref mut buffered,
-            ref mut passes,
-        } = self.mode
+        // let finished = if let DomainMode::Replaying {
+        //     ref to,
+        //     ref mut buffered,
+        //     ref mut passes,
+        // } = self.mode
+        // {
+        //     if *to != node {
+        //         // we're told to continue replay for node a, but not b is being replayed
+        //         unreachable!();
+        //     }
+        //     // log that we did another pass
+        //     *passes += 1;
+
+        //     let mut handle = buffered.len();
+        //     if handle > 100 {
+        //         handle /= 2;
+        //     }
+
+        //     let mut handled = 0;
+        //     while let Some(m) = buffered.pop_front() {
+        //         // some updates were propagated to this node during the migration. we need to
+        //         // replay them before we take even newer updates. however, we don't want to
+        //         // completely block the domain data channel, so we only process a few backlogged
+        //         // updates before yielding to the main loop (which might buffer more things).
+        //         //
+        //         // However, no VtMessages are allowed here since we're still in a migration
+        //         unreachable!();
+
+        //         handled += 1;
+        //         if handled == handle {
+        //             // we want to make sure we actually drain the backlog we've accumulated
+        //             // but at the same time we don't want to completely stall the system
+        //             // therefore we only handle half the backlog at a time
+        //             break;
+        //         }
+        //     }
+
+        //     buffered.is_empty()
+        // } else {
+        //     // we're told to continue replay, but nothing is being replayed
+        //     unreachable!();
+        // };
+
+        // if finished {
+        use std::mem;
+        // node is now ready, and should start accepting "real" updates
+        if let DomainMode::Replaying { passes, .. } =
+            mem::replace(&mut self.mode, DomainMode::Forwarding)
         {
-            if *to != node {
-                // we're told to continue replay for node a, but not b is being replayed
-                unreachable!();
-            }
-            // log that we did another pass
-            *passes += 1;
-
-            let mut handle = buffered.len();
-            if handle > 100 {
-                handle /= 2;
-            }
-
-            let mut handled = 0;
-            while let Some(m) = buffered.pop_front() {
-                // some updates were propagated to this node during the migration. we need to
-                // replay them before we take even newer updates. however, we don't want to
-                // completely block the domain data channel, so we only process a few backlogged
-                // updates before yielding to the main loop (which might buffer more things).
-
-                if let m @ box Packet::Message { .. } = m {
-                    // NOTE: we cannot use self.dispatch_ here, because we specifically need to
-                    // override the buffering behavior that our self.replaying_to = Some above would
-                    // initiate.
-                    Self::dispatch(
-                        m,
-                        &self.not_ready,
-                        &mut DomainMode::Forwarding,
-                        &mut self.waiting,
-                        &mut self.state,
-                        &self.nodes,
-                        self.shard,
-                        &mut self.replay_paths,
-                        &mut self.process_times,
-                        &mut self.process_ptimes,
-                        true,
-                        sends,
-                    );
-                } else {
-                    // no transactions allowed here since we're still in a migration
-                    unreachable!();
-                }
-
-                handled += 1;
-                if handled == handle {
-                    // we want to make sure we actually drain the backlog we've accumulated
-                    // but at the same time we don't want to completely stall the system
-                    // therefore we only handle half the backlog at a time
-                    break;
-                }
-            }
-
-            buffered.is_empty()
-        } else {
-            // we're told to continue replay, but nothing is being replayed
-            unreachable!();
-        };
-
-        if finished {
-            use std::mem;
-            // node is now ready, and should start accepting "real" updates
-            if let DomainMode::Replaying { passes, .. } =
-                mem::replace(&mut self.mode, DomainMode::Forwarding)
-            {
-                debug!(self.log,
+            debug!(self.log,
                        "node is fully up-to-date";
                        "local" => node.id(),
                        "passes" => passes
                 );
-            } else {
-                unreachable!();
-            }
-
-            if self.replay_paths[&tag].notify_done {
-                // NOTE: this will only be Some for non-partial replays
-                info!(self.log, "acknowledging replay completed"; "node" => node.id());
-                self.control_reply_tx
-                    .send(ControlReplyPacket::ack())
-                    .unwrap();
-            } else {
-                unreachable!()
-            }
         } else {
-            // we're not done -- inject a request to continue handling buffered things
-            // NOTE: similarly to in handle_replay, inject can never be Some before this function
-            // because it is called directly from handle, which is always called with inject being
-            // None.
-            assert!(self.inject.is_none());
-            self.inject = Some(box Packet::Finish(tag, node));
+            unreachable!();
         }
+
+        if self.replay_paths[&tag].notify_done {
+            // NOTE: this will only be Some for non-partial replays
+            info!(self.log, "acknowledging replay completed"; "node" => node.id());
+            self.control_reply_tx
+                .send(ControlReplyPacket::ack())
+                .unwrap();
+        } else {
+            unreachable!()
+        }
+        // } else {
+        //     // we're not done -- inject a request to continue handling buffered things
+        //     // NOTE: similarly to in handle_replay, inject can never be Some before this function
+        //     // because it is called directly from handle, which is always called with inject being
+        //     // None.
+        //     assert!(self.inject.is_none());
+        //     self.inject = Some(box Packet::Finish(tag, node));
+        // }
     }
 
     pub fn id(&self) -> (Index, usize) {

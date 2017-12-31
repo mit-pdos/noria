@@ -548,12 +548,8 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        let (start_ts, end_ts, prevs) = mainline
-            .checktable
-            .perform_migration(mainline.deps.clone())
-            .unwrap();
-
-        info!(log, "migration claimed timestamp range"; "start" => start_ts, "end" => end_ts);
+        // TODO(jbehrens): Get vector times for the migration here.
+        let (start_ts, end_ts, prev): (VectorTime, VectorTime, VectorTime) = unimplemented!();
 
         let mut workers: Vec<_> = mainline
             .workers
@@ -592,7 +588,7 @@ impl<'a> Migration<'a> {
                 &mainline.debug_channel,
                 &mut placer,
                 &mut workers,
-                start_ts,
+                &start_ts,
             );
             mainline.domains.insert(domain, d);
         }
@@ -603,8 +599,8 @@ impl<'a> Migration<'a> {
             &log,
             &mut mainline,
             uninformed_domain_nodes,
-            start_ts,
-            prevs.unwrap(),
+            start_ts.clone(),
+            prev,
         );
 
         // Tell all base nodes and base ingress children about newly added columns
@@ -672,7 +668,7 @@ impl<'a> Migration<'a> {
             .add_replay_paths(mainline.materializations.domains_on_path.clone())
             .unwrap();
 
-        transactions::finalize(mainline.deps.clone(), &log, &mut mainline.domains, end_ts);
+        transactions::finalize(mainline.deps.clone(), &log, &mut mainline.domains, end_ts, start_ts);
 
         warn!(log, "migration completed"; "ms" => dur_to_ns!(start.elapsed()) / 1_000_000);
     }

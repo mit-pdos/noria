@@ -132,19 +132,12 @@ impl Mutator {
 
     fn send(&mut self, mut rs: Records) {
         self.inject_dropped_cols(&mut rs);
-        let m = if self.transactional {
-            box Packet::Transaction {
-                link: Link::new(self.addr, self.addr),
-                data: rs,
-                state: TransactionState::WillCommit,
-                tracer: self.tracer.clone(),
-            }
-        } else {
-            box Packet::Message {
-                link: Link::new(self.addr, self.addr),
-                data: rs,
-                tracer: self.tracer.clone(),
-            }
+        let m = box Packet::VtMessage {
+            link: Link::new(self.addr, self.addr),
+            data: rs,
+            state: TransactionState::WillCommit,
+            tracer: self.tracer.clone(),
+            base: unimplemented!(), // TODO(jbehrens)
         };
 
         self.domain_input_handle
@@ -156,11 +149,12 @@ impl Mutator {
         assert!(self.transactional);
 
         self.inject_dropped_cols(&mut rs);
-        let m = box Packet::Transaction {
+        let m = box Packet::VtMessage {
             link: Link::new(self.addr, self.addr),
             data: rs,
             state: TransactionState::Pending(t, self.domain_input_handle.tx_reply_addr()),
             tracer: self.tracer.clone(),
+            base: unimplemented!(), // TODO(jbehrens)
         };
 
         self.domain_input_handle

@@ -11,10 +11,10 @@ use std::time;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+use checktable::TransactionId;
 use debug::DebugEventType;
 use domain;
 use prelude::*;
-use checktable;
 
 use channel::TcpSender;
 
@@ -155,9 +155,7 @@ impl GroupCommitQueueSet {
     /// directed to otherwise.
     fn packet_destination(p: &Box<Packet>) -> Option<LocalNodeIndex> {
         match **p {
-            Packet::Message { ref link, .. } | Packet::Transaction { ref link, .. } => {
-                Some(link.dst)
-            }
+            Packet::VtMessage { ref link, .. } => Some(link.dst),
             _ => None,
         }
     }
@@ -204,8 +202,7 @@ impl GroupCommitQueueSet {
                     let data_to_flush: Vec<_> = self.pending_packets[&node]
                         .iter()
                         .map(|p| match **p {
-                            Packet::Transaction { ref data, .. }
-                            | Packet::Message { ref data, .. } => data,
+                            Packet::VtMessage { ref data, .. } => data,
                             _ => unreachable!(),
                         })
                         .collect();
@@ -268,28 +265,23 @@ impl GroupCommitQueueSet {
         I: Iterator<Item = Box<Packet>>,
     {
         let mut packets = packets.peekable();
-        let merged_link = match **packets.peek().as_mut().unwrap() {
-            box Packet::Message { ref link, .. } | box Packet::Transaction { ref link, .. } => {
-                link.clone()
-            }
+        let (merged_link, merged_base) = match **packets.peek().as_mut().unwrap() {
+            box Packet::VtMessage { ref link, base, .. } => (link.clone(), base),
             _ => unreachable!(),
         };
         let mut merged_tracer: Tracer = None;
 
         let merged_data = packets.fold(Records::default(), |mut acc, p| {
             match (p,) {
-                (box Packet::Message {
+                (box Packet::VtMessage {
                     ref link,
-                    ref mut data,
-                    ref mut tracer,
-                },)
-                | (box Packet::Transaction {
-                    ref link,
+                    ref base,
                     ref mut data,
                     ref mut tracer,
                     ..
                 },) => {
                     assert_eq!(merged_link, *link);
+                    assert_eq!(merged_base, *base);
                     acc.append(data);
 
                     match (&merged_tracer, tracer) {
@@ -316,17 +308,14 @@ impl GroupCommitQueueSet {
         });
 
         match transaction_state {
-            Some(merged_state) => Some(Box::new(Packet::Transaction {
+            Some(merged_state) => Some(Box::new(Packet::VtMessage {
                 link: merged_link,
                 data: merged_data,
                 tracer: merged_tracer,
                 state: merged_state,
+                base: merged_base,
             })),
-            None => Some(Box::new(Packet::Message {
-                link: merged_link,
-                data: merged_data,
-                tracer: merged_tracer,
-            })),
+            None => unreachable!(),
         }
     }
 
@@ -345,88 +334,92 @@ impl GroupCommitQueueSet {
                 .unwrap()
         };
 
-        let base = if let box Packet::Transaction { ref link, .. } = packets[0] {
+        let base = if let box Packet::VtMessage { ref link, .. } = packets[0] {
             nodes[&link.dst].borrow().global_addr()
         } else {
             unreachable!()
         };
 
-        let reply = {
-            let transactions = packets
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let id = checktable::TransactionId(i as u64);
-                    if let box Packet::Transaction {
-                        ref data,
-                        ref state,
-                        ..
-                    } = *p
-                    {
-                        match *state {
-                            TransactionState::Pending(ref token, _) => {
-                                (id, data.clone(), Some(token.clone()))
-                            }
-                            TransactionState::WillCommit => (id, data.clone(), None),
-                            TransactionState::Committed(..) => unreachable!(),
-                        }
-                    } else {
-                        unreachable!();
-                    }
-                })
-                .collect();
+        let (at, prev, committed_transactions): (
+            VectorTime,
+            VectorTime,
+            Vec<TransactionId>,
+        ) = {
+            // let transactions = packets
+            //     .iter()
+            //     .enumerate()
+            //     .map(|(i, p)| {
+            //         let id = checktable::TransactionId(i as u64);
+            //         if let box Packet::VtMessage {
+            //             ref data,
+            //             ref state,
+            //             ..
+            //         } = *p
+            //         {
+            //             match *state {
+            //                 TransactionState::Pending(ref token, _) => {
+            //                     (id, data.clone(), Some(token.clone()))
+            //                 }
+            //                 TransactionState::WillCommit => (id, data.clone(), None),
+            //                 TransactionState::VtCommitted {..} => unreachable!(),
+            //             }
+            //         } else {
+            //             unreachable!();
+            //         }
+            //     })
+            //     .collect();
 
-            let request = checktable::service::TimestampRequest { transactions, base };
-            match checktable::with_checktable(|ct| ct.apply_batch(request).unwrap()) {
-                None => {
-                    for packet in packets.drain(..) {
-                        if let (box Packet::Transaction {
-                            state: TransactionState::Pending(_, ref mut addr),
-                            ..
-                        },) = (packet,)
-                        {
-                            send_reply(addr.clone(), Err(()));
-                        } else {
-                            unreachable!();
-                        }
-                    }
-                    return None;
-                }
-                Some(mut reply) => {
-                    reply.committed_transactions.sort();
-                    reply
-                }
-            }
+            // let request = checktable::service::TimestampRequest { transactions, base };
+            // match checktable::with_checktable(|ct| ct.apply_batch(request).unwrap()) {
+            //     None => {
+            //         for packet in packets.drain(..) {
+            //             if let (box Packet::VtMessage {
+            //                 state: TransactionState::Pending(_, ref mut addr),
+            //                 ..
+            //             },) = (packet,)
+            //             {
+            //                 send_reply(addr.clone(), Err(()));
+            //             } else {
+            //                 unreachable!();
+            //             }
+            //         }
+            //         return None;
+            //     }
+            //     Some(mut reply) => {
+            //         reply.committed_transactions.sort();
+            //         reply
+            //     }
+            // }
+
+            unimplemented!() // TODO(jbehrens)
         };
-
-        let prevs = reply.prevs;
-        let timestamp = reply.timestamp;
-        let committed_transactions = reply.committed_transactions;
 
         // TODO: persist list of committed transacions.
 
-        let committed_packets = packets.drain(..).enumerate().filter_map(|(i, mut packet)| {
-            if let box Packet::Transaction {
-                state: TransactionState::Pending(_, ref mut addr),
-                ..
-            } = packet
-            {
-                if committed_transactions
-                    .binary_search(&checktable::TransactionId(i as u64))
-                    .is_err()
-                {
-                    send_reply(addr.clone(), Err(()));
-                    return None;
-                }
-                send_reply(addr.clone(), Ok(timestamp));
-            }
-            Some(packet)
-        });
+        // let committed_packets = packets.drain(..).enumerate().filter_map(|(i, mut packet)| {
+        //     if let box Packet::VtMessage {
+        //         state: TransactionState::Pending(_, ref mut addr),
+        //         ..
+        //     } = packet
+        //     {
+        //         if committed_transactions
+        //             .binary_search(&checktable::TransactionId(i as u64))
+        //             .is_err()
+        //         {
+        //             send_reply(addr.clone(), Err(()));
+        //             return None;
+        //         }
+        //         send_reply(addr.clone(), Ok(at));
+        //     }
+        //     Some(packet)
+        // });
 
-        Self::merge_committed_packets(
-            committed_packets,
-            Some(TransactionState::Committed(reply.timestamp, base, prevs)),
-        )
+        // Self::merge_committed_packets(
+        //     committed_packets,
+        //     Some(TransactionState::VtCommitted {at, prev}),
+        // )
+
+        // TODO(jbehrens)
     }
 
     /// Merge the contents of packets into a single packet, emptying packets in the process.
@@ -439,13 +432,7 @@ impl GroupCommitQueueSet {
             return None;
         }
 
-        match packets[0] {
-            box Packet::Message { .. } => Self::merge_committed_packets(packets.drain(..), None),
-            box Packet::Transaction { .. } => {
-                Self::merge_transactional_packets(packets, nodes, transaction_reply_txs)
-            }
-            _ => unreachable!(),
-        }
+        Self::merge_transactional_packets(packets, nodes, transaction_reply_txs)
     }
 }
 

@@ -226,7 +226,7 @@ impl RemoteGetter {
 pub struct Getter {
     pub(crate) generator: Option<checktable::TokenGenerator>,
     pub(crate) handle: backlog::ReadHandle,
-    last_ts: i64,
+    last_ts: VectorTime,
 }
 
 #[allow(unused)]
@@ -264,7 +264,7 @@ impl Getter {
         Some(Getter {
             generator: gen,
             handle: rh,
-            last_ts: i64::min_value(),
+            last_ts: VectorTime::zero(),
         })
     }
 
@@ -321,16 +321,17 @@ impl Getter {
                         true,
                     );
                     match res {
-                        Ok((_, ts)) if ts < self.last_ts => {
-                            // we must have read from a different shard that is not yet up-to-date
-                            // to our last read. this is *extremely* unlikely: you would have to
-                            // issue two reads to different shards *between* the barrier and swap
-                            // inside Reader nodes, which is only a span of a handful of
-                            // instructions. But it is *possible*.
-                        }
                         Ok((res, ts)) => {
+                            if ts < self.last_ts {
+                                // we must have read from a different shard that is not yet up-to-date
+                                // to our last read. this is *extremely* unlikely: you would have to
+                                // issue two reads to different shards *between* the barrier and swap
+                                // inside Reader nodes, which is only a span of a handful of
+                                // instructions. But it is *possible*.
+                                continue;
+                            }
                             self.last_ts = ts;
-                            let token = g.generate(ts, q.clone());
+                            let token = unimplemented!(); // TODO(jbehrens);
                             break Ok((res.unwrap_or_else(Vec::new), token));
                         }
                         Err(e) => break Err(e),

@@ -235,7 +235,10 @@ fn handle_message(m: LocalOrNot<ReadQuery>, conn: &mut Rpc) {
                                     true,
                                 )
                                 .map(|r| (r.0.unwrap_or_else(Vec::new), r.1))
-                                .map(|r| (r.0, generator.as_ref().unwrap().generate(r.1, key)))
+                                .map(|r| {
+                                    let token = unimplemented!(); // TODO(jbehrens)
+                                    (r.0, token)
+                                })
                         })
                     })
                     .collect(),

@@ -1,4 +1,4 @@
-use core::{DataType, Record};
+use core::{DataType, Record, VectorTime};
 use fnv::FnvBuildHasher;
 use evmap;
 
@@ -25,7 +25,7 @@ fn new_inner(
     trigger: Option<Arc<Fn(&DataType) + Send + Sync>>,
 ) -> (SingleReadHandle, WriteHandle) {
     let (r, w) = evmap::Options::default()
-        .with_meta(-1)
+        .with_meta(VectorTime::zero())
         .with_hasher(FnvBuildHasher::default())
         .construct();
     let w = WriteHandle {
@@ -43,7 +43,7 @@ fn new_inner(
 }
 
 pub struct WriteHandle {
-    handle: evmap::WriteHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>,
+    handle: evmap::WriteHandle<DataType, Vec<DataType>, VectorTime, FnvBuildHasher>,
     partial: bool,
     cols: usize,
     key: usize,
@@ -79,8 +79,12 @@ impl WriteHandle {
         }
     }
 
-    pub fn update_ts(&mut self, ts: i64) {
-        self.handle.set_meta(ts);
+    pub fn get_time(&self) -> &VectorTime {
+        self.handle.get_meta()
+    }
+
+    pub fn update_time(&mut self, time: VectorTime) {
+        self.handle.set_meta(time);
     }
 
     pub fn mark_filled(&mut self, key: &DataType) {
@@ -91,7 +95,7 @@ impl WriteHandle {
         self.handle.empty(key.clone());
     }
 
-    pub fn try_find_and<F, T>(&self, key: &DataType, mut then: F) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &DataType, mut then: F) -> Result<(Option<T>, VectorTime), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
@@ -114,7 +118,7 @@ impl WriteHandle {
 /// Handle to get the state of a single shard of a reader.
 #[derive(Clone)]
 pub struct SingleReadHandle {
-    handle: evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>,
+    handle: evmap::ReadHandle<DataType, Vec<DataType>, VectorTime, FnvBuildHasher>,
     trigger: Option<Arc<Fn(&DataType) + Send + Sync>>,
     key: usize,
 }
@@ -134,12 +138,12 @@ impl SingleReadHandle {
         key: &DataType,
         mut then: F,
         block: bool,
-    ) -> Result<(Option<T>, i64), ()>
+    ) -> Result<(Option<T>, VectorTime), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
-        match self.try_find_and(key, &mut then) {
-            Ok((None, ts)) if self.trigger.is_some() => {
+        match (self.trigger.is_some(), self.try_find_and(key, &mut then)) {
+            (true, Ok((None, ts))) => {
                 if let Some(ref trigger) = self.trigger {
                     use std::thread;
 
@@ -162,7 +166,7 @@ impl SingleReadHandle {
                     unreachable!()
                 }
             }
-            r => r,
+            (_, r) => r,
         }
     }
 
@@ -170,7 +174,7 @@ impl SingleReadHandle {
         &self,
         key: &DataType,
         mut then: F,
-    ) -> Result<(Option<T>, i64), ()>
+    ) -> Result<(Option<T>, VectorTime), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
@@ -204,7 +208,7 @@ impl ReadHandle {
         key: &DataType,
         then: F,
         block: bool,
-    ) -> Result<(Option<T>, i64), ()>
+    ) -> Result<(Option<T>, VectorTime), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
@@ -218,7 +222,7 @@ impl ReadHandle {
     }
 
     #[allow(dead_code)]
-    pub fn try_find_and<F, T>(&self, key: &DataType, then: F) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &DataType, then: F) -> Result<(Option<T>, VectorTime), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {

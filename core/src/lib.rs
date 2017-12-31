@@ -23,7 +23,7 @@ pub use data::{DataType, Datas, Record, Records};
 pub use addressing::{IndexPair, LocalNodeIndex};
 pub use local::{KeyType, LookupResult, Map, Row, Tag};
 pub use petgraph::graph::NodeIndex;
-pub use time::{VectorTime, VectorTimeComponent};
+pub use time::{Time, TimeSource, VectorTime};
 
 pub type State = local::State<DataType>;
 pub type StateMap = local::Map<State>;

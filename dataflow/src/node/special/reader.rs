@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use backlog;
 use channel;
 use checktable;
@@ -186,12 +188,15 @@ impl Reader {
             } else {
                 state.add(m.data().iter().cloned());
             }
-            if let Packet::Transaction {
-                state: TransactionState::Committed(ts, ..),
+            if let Packet::VtMessage {
+                state: TransactionState::VtCommitted { at, .. },
                 ..
             } = **m
             {
-                state.update_ts(ts);
+                let t = state
+                    .get_time()
+                    .supremum(Cow::Owned(VectorTime::new(at.0, at.1)));
+                state.update_time(t);
             }
 
             if swap {

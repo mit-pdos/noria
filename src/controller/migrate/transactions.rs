@@ -127,13 +127,15 @@ pub fn finalize(
     deps: HashMap<DomainIndex, (IngressFromBase, EgressForBase)>,
     log: &Logger,
     txs: &mut HashMap<DomainIndex, DomainHandle>,
-    at: i64,
+    at: VectorTime,
+    prev: VectorTime,
 ) {
     for (domain, (ingress_from_base, egress_for_base)) in deps {
         trace!(log, "notifying domain of migration completion"; "domain" => domain.index());
         let ctx = txs.get_mut(&domain).unwrap();
         let _ = ctx.send(box Packet::CompleteMigration {
-            at,
+            at: at.clone(),
+            prev: prev.clone(),
             ingress_from_base,
             egress_for_base,
         });
