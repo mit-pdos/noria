@@ -224,15 +224,19 @@ impl DomainState {
 
         let mut next = None;
         for (source, ref messages) in self.message_buffer.iter() {
-            // TODO(jbehrens): Should we still be using bases (rather than "sources" which
-            // correspond to shards of a base), and if so how can we get one?
-            let base: NodeIndex = unimplemented!();
-            if !messages.is_empty()
-                && messages[0].packets.len() == self.ingress_from_base[base.index()]
+            if !messages.is_empty() && !messages[0].packets.is_empty()
                 && self.ts >= messages[0].prev
             {
-                next = Some(source);
-                break;
+                let base = if let box Packet::VtMessage { ref base, .. } = messages[0].packets[0] {
+                    base.index()
+                } else {
+                    unreachable!()
+                };
+
+                if messages[0].packets.len() == self.ingress_from_base[base] {
+                    next = Some(source);
+                    break;
+                }
             }
         }
         if let Some(source) = next {

@@ -168,10 +168,8 @@ impl Sharder {
             force_all = true;
         }
         if let Packet::VtMessage { .. } = *m {
-            // TODO(jbehrens): This path used to apply only to transactions, and probably doesn't
-            // always apply now. `force_all` should be set only when absolutely required...
-
-            // transactions (currently) need to reach all shards so they know they can progress
+            // Messages (currently) need to reach all shards so they all advance to the new vector
+            // time.
             force_all = true;
         }
         if force_all {
