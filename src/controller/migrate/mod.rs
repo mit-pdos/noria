@@ -362,6 +362,10 @@ impl<'a> Migration<'a> {
             new.insert(reader);
         }
 
+        // If ingredients contains only one more node than is currently being added (the source
+        // node), then this is the first migration.
+        let is_first_migration = mainline.ingredients.node_count() == new.len() + 1;
+
         // Shard the graph as desired
         let mut swapped0 = if let Some(shards) = mainline.sharding {
             sharding::shard(
@@ -548,8 +552,18 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        // TODO(jbehrens): Get vector times for the migration here.
-        let (start_ts, end_ts, prev): (VectorTime, VectorTime, VectorTime) = unimplemented!();
+        let prev = VectorTime::new(mainline.time, mainline.time_source);
+        let start_ts = VectorTime::new(mainline.time.next(), mainline.time_source);
+        let end_ts = VectorTime::new(mainline.time.next().next(), mainline.time_source);
+
+        if !is_first_migration {
+            // TODO(jbehrens): Reserve a timestamp from all the current bases and update
+            // prev/start_ts/end_ts accordingly.
+            unimplemented!();
+        }
+
+        // Increment time to account for the two timestamps for this migration.
+        mainline.time = mainline.time.next().next();
 
         let mut workers: Vec<_> = mainline
             .workers
@@ -668,7 +682,13 @@ impl<'a> Migration<'a> {
             .add_replay_paths(mainline.materializations.domains_on_path.clone())
             .unwrap();
 
-        transactions::finalize(mainline.deps.clone(), &log, &mut mainline.domains, end_ts, start_ts);
+        transactions::finalize(
+            mainline.deps.clone(),
+            &log,
+            &mut mainline.domains,
+            end_ts,
+            start_ts,
+        );
 
         warn!(log, "migration completed"; "ms" => dur_to_ns!(start.elapsed()) / 1_000_000);
     }

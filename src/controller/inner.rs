@@ -49,6 +49,10 @@ pub struct ControllerInner {
     /// Current recipe
     recipe: Recipe,
 
+    /// Current time
+    pub(super) time: Time,
+    pub(super) time_source: TimeSource,
+
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
     pub(super) debug_channel: Option<SocketAddr>,
@@ -247,6 +251,9 @@ impl ControllerInner {
             healthcheck_every: state.config.healthcheck_every,
             recipe: Recipe::blank(Some(log.clone())),
             log,
+
+            time: Time::zero(),
+            time_source: 0,
 
             domains: Default::default(),
             channel_coordinator: cc,
