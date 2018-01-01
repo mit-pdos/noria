@@ -265,8 +265,8 @@ impl GroupCommitQueueSet {
         I: Iterator<Item = Box<Packet>>,
     {
         let mut packets = packets.peekable();
-        let (merged_link, merged_base) = match **packets.peek().as_mut().unwrap() {
-            box Packet::VtMessage { ref link, base, .. } => (link.clone(), base),
+        let merged_link = match **packets.peek().as_mut().unwrap() {
+            box Packet::VtMessage { ref link, .. } => link.clone(),
             _ => unreachable!(),
         };
         let mut merged_tracer: Tracer = None;
@@ -275,13 +275,11 @@ impl GroupCommitQueueSet {
             match (p,) {
                 (box Packet::VtMessage {
                     ref link,
-                    ref base,
                     ref mut data,
                     ref mut tracer,
                     ..
                 },) => {
                     assert_eq!(merged_link, *link);
-                    assert_eq!(merged_base, *base);
                     acc.append(data);
 
                     match (&merged_tracer, tracer) {
@@ -313,7 +311,6 @@ impl GroupCommitQueueSet {
                 data: merged_data,
                 tracer: merged_tracer,
                 state: merged_state,
-                base: merged_base,
             })),
             None => unreachable!(),
         }

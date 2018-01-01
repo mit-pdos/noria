@@ -636,13 +636,25 @@ impl Domain {
 
         let mut egress_messages = HashMap::new();
         let (ts, tracer, base) = if let Packet::VtMessage {
-            state: ref ts @ TransactionState::VtCommitted { .. },
+            state:
+                TransactionState::VtCommitted {
+                    ref at,
+                    ref prev,
+                    base,
+                },
             ref tracer,
-            base,
             ..
         } = *messages[0]
         {
-            (ts.clone(), tracer.clone(), base)
+            (
+                TransactionState::VtCommitted {
+                    at: at.clone(),
+                    prev: prev.clone(),
+                    base,
+                },
+                tracer.clone(),
+                base,
+            )
         } else {
             unreachable!();
         };
@@ -672,7 +684,6 @@ impl Domain {
                 data: data,
                 state: ts.clone(),
                 tracer: tracer.clone(),
-                base: base.clone(),
             };
 
             if !self.not_ready.is_empty() && self.not_ready.contains(&addr) {
@@ -1589,8 +1600,7 @@ impl Domain {
                         link,
                         data,
                         tracer: None,
-                        state: TransactionState::VtCommitted { at, prev },
-                        base: global_addr,
+                        state: TransactionState::VtCommitted { at, prev, base: global_addr },
                     }
                 })
                 .for_each(|packet| self.handle(box packet, sends));

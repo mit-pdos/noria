@@ -137,7 +137,6 @@ impl Mutator {
             data: rs,
             state: TransactionState::WillCommit,
             tracer: self.tracer.clone(),
-            base: unimplemented!(), // TODO(jbehrens)
         };
 
         self.domain_input_handle
@@ -154,7 +153,6 @@ impl Mutator {
             data: rs,
             state: TransactionState::Pending(t, self.domain_input_handle.tx_reply_addr()),
             tracer: self.tracer.clone(),
-            base: unimplemented!(), // TODO(jbehrens)
         };
 
         self.domain_input_handle

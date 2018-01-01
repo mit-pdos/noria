@@ -82,6 +82,7 @@ pub enum TransactionState {
     VtCommitted {
         at: (Time, TimeSource),
         prev: VectorTime,
+        base: NodeIndex,
     },
     Pending(checktable::Token, SocketAddr),
     WillCommit,
@@ -120,7 +121,6 @@ pub enum Packet {
         data: Records,
         state: TransactionState,
         tracer: Tracer,
-        base: NodeIndex,
     },
 
     /// Update that is part of a tagged data-flow replay path.
@@ -307,8 +307,7 @@ impl Packet {
         F: FnOnce(&mut Records),
     {
         match *self {
-            Packet::VtMessage { ref mut data, .. }
-            | Packet::ReplayPiece { ref mut data, .. } => {
+            Packet::VtMessage { ref mut data, .. } | Packet::ReplayPiece { ref mut data, .. } => {
                 map(data);
             }
             _ => {
@@ -366,13 +365,11 @@ impl Packet {
                 ref data,
                 ref tracer,
                 ref state,
-                ref base,
             } => Packet::VtMessage {
                 link: link.clone(),
                 data: data.clone(),
                 tracer: tracer.clone(),
                 state: state.clone(),
-                base: base.clone(),
             },
             Packet::ReplayPiece {
                 ref link,
@@ -412,9 +409,7 @@ impl Packet {
 
     pub fn tracer(&mut self) -> Option<&mut Tracer> {
         match *self {
-            Packet::VtMessage { ref mut tracer, .. } => {
-                Some(tracer)
-            }
+            Packet::VtMessage { ref mut tracer, .. } => Some(tracer),
             _ => None,
         }
     }
@@ -446,9 +441,11 @@ impl fmt::Debug for Packet {
                 ref state,
                 ..
             } => match *state {
-                TransactionState::VtCommitted {ref at, ref prev} => {
-                    write!(f, "Packet::VtMessage({:?}, {:?})", at, prev)
-                }
+                TransactionState::VtCommitted {
+                    ref at,
+                    ref prev,
+                    ref base,
+                } => write!(f, "Packet::VtMessage({:?}, {:?}, {:?})", at, prev, base),
                 TransactionState::Pending(..) => {
                     write!(f, "Packet::VtMessage({:?}, pending)", link)
                 }

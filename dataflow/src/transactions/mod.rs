@@ -11,6 +11,7 @@ use domain;
 struct BufferedMessage {
     at: Time,
     prev: VectorTime,
+    base: NodeIndex,
     packets: Vec<Box<Packet>>,
 }
 impl Ord for BufferedMessage {
@@ -103,8 +104,12 @@ impl DomainState {
     fn buffer_transaction(&mut self, m: Box<Packet>) {
         let (at, base, past_prev) = match *m {
             Packet::VtMessage {
-                state: TransactionState::VtCommitted { ref at, ref prev },
-                base,
+                state:
+                    TransactionState::VtCommitted {
+                        ref at,
+                        ref prev,
+                        base,
+                    },
                 ..
             } => (Some(at.clone()), Some(base), self.ts >= prev),
             Packet::StartMigration {
@@ -153,12 +158,12 @@ impl DomainState {
             self.ts[at.1] = at.0;
             self.next_transaction = Some(Bundle::Messages(vec![m]));
         } else if base.is_some() {
-            let prev = if let box Packet::VtMessage {
-                state: TransactionState::VtCommitted { ref prev, .. },
+            let (prev, base) = if let box Packet::VtMessage {
+                state: TransactionState::VtCommitted { ref prev, base, .. },
                 ..
             } = m
             {
-                prev.clone()
+                (prev.clone(), base)
             } else {
                 unreachable!()
             };
@@ -168,6 +173,7 @@ impl DomainState {
                 buf.push(BufferedMessage {
                     at: at.0,
                     prev,
+                    base,
                     packets: vec![m],
                 });
             } else {
@@ -224,19 +230,11 @@ impl DomainState {
 
         let mut next = None;
         for (source, ref messages) in self.message_buffer.iter() {
-            if !messages.is_empty() && !messages[0].packets.is_empty()
-                && self.ts >= messages[0].prev
+            if !messages.is_empty() && self.ts >= messages[0].prev
+                && messages[0].packets.len() == self.ingress_from_base[messages[0].base.index()]
             {
-                let base = if let box Packet::VtMessage { ref base, .. } = messages[0].packets[0] {
-                    base.index()
-                } else {
-                    unreachable!()
-                };
-
-                if messages[0].packets.len() == self.ingress_from_base[base] {
-                    next = Some(source);
-                    break;
-                }
+                next = Some(source);
+                break;
             }
         }
         if let Some(source) = next {
