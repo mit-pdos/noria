@@ -1,4 +1,5 @@
 use std::time;
+use std::collections::HashMap;
 use distributary::DataType;
 use rand;
 use rand::Rng;
@@ -12,12 +13,17 @@ macro_rules! dur_to_fsec {
     }}
 }
 
+const STUDENTS_PER_CLASS: usize = 50;
+const TAS_PER_CLASS: usize = STUDENTS_PER_CLASS / 10;
+
 pub struct Populate {
     nposts: i32,
     nusers: i32,
     nclasses: i32,
     private: f32,
     rng: rand::ThreadRng,
+    students: HashMap<DataType, Vec<DataType>>,
+    tas: HashMap<DataType, Vec<DataType>>,
 }
 
 
@@ -29,14 +35,44 @@ impl Populate {
             nclasses: nclasses,
             private: private,
             rng: rand::thread_rng(),
+            students: HashMap::new(),
+            tas: HashMap::new(),
         }
     }
 
     pub fn populate_tables(&mut self, mut backend: &mut Backend) {
+        self.enroll_students();
         self.populate_roles(&mut backend);
         self.populate_users(&mut backend);
         self.populate_posts(&mut backend);
         self.populate_classes(&mut backend);
+    }
+
+    fn enroll_students(&mut self) {
+        for i in 0..self.nusers {
+            let mut classes: Vec<DataType> = Vec::new();
+            while classes.len() < STUDENTS_PER_CLASS {
+                let cid = self.cid();
+                if !classes.contains(&cid) {
+                    classes.push(cid.clone());
+                }
+            }
+
+            self.students.insert(i.into(), classes);
+        }
+
+        for i in 0..self.nclasses {
+            let mut tas: Vec<DataType> = Vec::new();
+
+            while tas.len() < TAS_PER_CLASS {
+                let uid = self.uid();
+                if !tas.contains(&uid) {
+                    tas.push(uid.clone());
+                }
+            }
+
+            self.tas.insert(i.into(), tas);
+        }
     }
 
     fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
@@ -68,20 +104,22 @@ impl Populate {
     fn populate_roles(&mut self, mut backend: &mut Backend) {
         println!("Populating roles...");
         let mut records = Vec::new();
-        for i in 0..self.nclasses {
-            // add some students
-            for _ in 0..50 {
-                let uid = self.uid();
-                let cid = i.into();
-                let role = 0.into(); // student
+        // add tas
+        for (cid, tas) in self.tas.iter() {
+            for ta in tas {
+                let uid = ta.clone();
+                let cid = cid.clone();
+                let role = 1.into(); // ta
                 records.push(vec![uid, cid, role]);
             }
+        }
 
-            // add some tas
-            for _ in 0..4 {
-                let uid = self.uid();
-                let cid = i.into();
-                let role = 1.into(); // ta
+        // add students
+        for (uid, classes) in self.students.iter() {
+            for cid in classes {
+                let uid = uid.clone();
+                let cid = cid.clone();
+                let role = 0.into(); // student
                 records.push(vec![uid, cid, role]);
             }
         }
@@ -105,8 +143,8 @@ impl Populate {
         let mut records = Vec::new();
         for i in 0..self.nposts {
             let pid = i.into();
-            let cid = self.cid();
             let author = self.uid();
+            let cid = self.cid_for(&author);
             let content = "".into();
             let private = self.private();
             records.push(vec![pid, cid, author, content, private]);
@@ -134,6 +172,11 @@ impl Populate {
     /// Generate random cid within bounds
     fn cid(&mut self) -> DataType {
         self.rng.gen_range(0, self.nclasses).into()
+    }
+
+    fn cid_for(&mut self, uid: &DataType) -> DataType {
+        let classes = self.students[uid].as_slice();
+        self.rng.choose(&classes).unwrap().clone()
     }
 
     #[allow(dead_code)]
