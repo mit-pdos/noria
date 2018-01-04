@@ -22,7 +22,7 @@ mkdir $1/$name
 mkdir $1/$name/info
 
 $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+    -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
 reuse="noreuse"
 name=$nuser-$reuse
@@ -30,7 +30,7 @@ mkdir $1/$name
 mkdir $1/$name/info
 
 $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+    -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
 # all posts are private workload
 reuse="full"
@@ -39,7 +39,7 @@ mkdir $1/$name
 mkdir $1/$name/info
 
 $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+    -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
 reuse="noreuse"
 name=$nuser-$reuse-private
@@ -47,4 +47,4 @@ mkdir $1/$name
 mkdir $1/$name/info
 
 $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-    -l $nuser -u 5000 -i $1/$name/info/info -p 10000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+    -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --private 1.0 --reuse $reuse --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
