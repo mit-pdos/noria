@@ -13,8 +13,8 @@ macro_rules! dur_to_fsec {
     }}
 }
 
-const STUDENTS_PER_CLASS: usize = 50;
-const TAS_PER_CLASS: usize = STUDENTS_PER_CLASS / 10;
+const CLASSES_PER_STUDENT: usize = 5;
+const TAS_PER_CLASS: usize = 5;
 
 pub struct Populate {
     nposts: i32,
@@ -49,9 +49,10 @@ impl Populate {
     }
 
     fn enroll_students(&mut self) {
+        println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();
-            while classes.len() < STUDENTS_PER_CLASS {
+            while classes.len() < CLASSES_PER_STUDENT && (classes.len() as i32 != self.nclasses){
                 let cid = self.cid();
                 if !classes.contains(&cid) {
                     classes.push(cid.clone());
@@ -61,10 +62,11 @@ impl Populate {
             self.students.insert(i.into(), classes);
         }
 
+        println!("Enrolling TAs...");
         for i in 0..self.nclasses {
             let mut tas: Vec<DataType> = Vec::new();
 
-            while tas.len() < TAS_PER_CLASS {
+            while tas.len() < TAS_PER_CLASS && (tas.len() as i32 != self.nusers) {
                 let uid = self.uid();
                 if !tas.contains(&uid) {
                     tas.push(uid.clone());
