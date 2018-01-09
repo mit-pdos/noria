@@ -465,22 +465,27 @@ impl<'a> Migration<'a> {
             .map(|&&ni| mainline.ingredients[ni].domain())
             .collect();
 
-        let mut domain_new_nodes = sorted_new
-            .iter()
-            .filter(|&&&ni| ni != mainline.source)
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
-            .fold(HashMap::new(), |mut dns, (d, ni)| {
-                dns.entry(d).or_insert_with(Vec::new).push(ni);
+        let mut domain_nodes = mainline
+            .ingredients
+            .node_indices()
+            .filter(|&ni| ni != mainline.source)
+            .filter(|&ni| !mainline.ingredients[ni].is_dropped())
+            .map(|ni| {
+                (mainline.ingredients[ni].domain(), ni, new.contains(&ni))
+            })
+            .fold(HashMap::new(), |mut dns, (d, ni, new)| {
+                dns.entry(d).or_insert_with(Vec::new).push((ni, new));
                 dns
-            });
+        });
 
         // Assign local addresses to all new nodes, and initialize them
-        for (domain, nodes) in &mut domain_new_nodes {
+        let mut local_remap = HashMap::new();
+        let mut remap = HashMap::new();
+        for (domain, nodes) in &mut domain_nodes {
             // Number of pre-existing nodes
-            let mut nnodes = mainline.remap.get(domain).map(HashMap::len).unwrap_or(0);
+            let mut nnodes = nodes.iter().filter(|&&(_, new)| !new).count();
 
-            if nodes.is_empty() {
+            if nnodes == nodes.len() {
                 // Nothing to do here
                 continue;
             }
@@ -488,33 +493,35 @@ impl<'a> Migration<'a> {
             let log = log.new(o!("domain" => domain.index()));
 
             // Give local addresses to every (new) node
-            for &ni in nodes.iter() {
-                debug!(log,
-                       "assigning local index";
-                       "type" => format!("{:?}", mainline.ingredients[ni]),
-                       "node" => ni.index(),
-                       "local" => nnodes
-                );
+            local_remap.clear();
+            for &(ni, new) in nodes.iter() {
+                if new {
+                    debug!(log,
+                           "assigning local index";
+                           "type" => format!("{:?}", mainline.ingredients[ni]),
+                           "node" => ni.index(),
+                           "local" => nnodes
+                    );
 
-                let mut ip: IndexPair = ni.into();
-                ip.set_local(unsafe { LocalNodeIndex::make(nnodes as u32) });
-                mainline.ingredients[ni].set_finalized_addr(ip);
-                mainline
-                    .remap
-                    .entry(*domain)
-                    .or_insert_with(HashMap::new)
-                    .insert(ni, ip);
-                nnodes += 1;
+                    let mut ip: IndexPair = ni.into();
+                    ip.set_local(unsafe { LocalNodeIndex::make(nnodes as u32) });
+                    mainline.ingredients[ni].set_finalized_addr(ip);
+                    local_remap.insert(ni, ip);
+                    nnodes += 1;
+                } else {
+                    local_remap.insert(ni, *mainline.ingredients[ni].get_index());
+                }
             }
 
             // Initialize each new node
-            for &ni in nodes.iter() {
-                if mainline.ingredients[ni].is_internal() {
+            for &(ni, new) in nodes.iter() {
+                if new && mainline.ingredients[ni].is_internal() {
                     // Figure out all the remappings that have happened
                     // NOTE: this has to be *per node*, since a shared parent may be remapped
                     // differently to different children (due to sharding for example). we just
                     // allocate it once though.
-                    let mut remap = mainline.remap[domain].clone();
+                    remap.clear();
+                    remap.extend(local_remap.iter().map(|(&k, &v)| (k, v)));
 
                     // Parents in other domains have been swapped for ingress nodes.
                     // Those ingress nodes' indices are now local.
@@ -524,7 +531,7 @@ impl<'a> Migration<'a> {
                             continue;
                         }
 
-                        let old = remap.insert(src, mainline.remap[domain][&instead]);
+                        let old = remap.insert(src, local_remap[&instead]);
                         assert_eq!(old, None);
                     }
 
@@ -558,10 +565,11 @@ impl<'a> Migration<'a> {
         // etc.
         // println!("{}", mainline);
 
-        let new_deps =
-            transactions::analyze_changes(&mainline.ingredients, mainline.source, domain_new_nodes);
-
-        transactions::merge_deps(&mainline.ingredients, &mut mainline.deps, new_deps);
+        mainline.deps = transactions::analyze_graph(
+            &mainline.ingredients,
+            mainline.source,
+            domain_nodes,
+        );
 
         let mut uninformed_domain_nodes = mainline
             .ingredients
