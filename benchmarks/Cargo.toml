@@ -80,6 +80,10 @@ name = "piazza"
 path = "piazza/piazza.rs"
 
 [[bin]]
+name = "security-mysql"
+path = "piazza/mysql.rs"
+
+[[bin]]
 name = "vote-new-fraction"
 path = "vote/vote-new-fraction.rs"
 
