@@ -81,7 +81,7 @@ pub enum ReplayPieceContext {
 pub enum TransactionState {
     VtCommitted {
         at: (Time, TimeSource),
-        prev: VectorTime,
+        prev: Option<VectorTime>,
         base: NodeIndex,
     },
     Pending(checktable::Token, SocketAddr),

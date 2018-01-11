@@ -10,7 +10,7 @@ use domain;
 
 struct BufferedMessage {
     at: Time,
-    prev: VectorTime,
+    prev: Option<VectorTime>,
     base: NodeIndex,
     packets: Vec<Box<Packet>>,
 }
@@ -107,11 +107,20 @@ impl DomainState {
                 state:
                     TransactionState::VtCommitted {
                         ref at,
-                        ref prev,
+                        prev: None,
                         base,
                     },
                 ..
-            } => (Some(at.clone()), Some(base), self.ts >= prev),
+            } => (Some(at.clone()), Some(base), true),
+            Packet::VtMessage {
+                state:
+                    TransactionState::VtCommitted {
+                        ref at,
+                        prev: Some(ref p),
+                        base,
+                    },
+                ..
+            } => (Some(at.clone()), Some(base), self.ts >= p),
             Packet::StartMigration {
                 ref at, ref prev, ..
             } => (None, None, self.ts >= prev),
@@ -230,7 +239,8 @@ impl DomainState {
 
         let mut next = None;
         for (source, ref messages) in self.message_buffer.iter() {
-            if !messages.is_empty() && self.ts >= messages[0].prev
+            if !messages.is_empty()
+                && (messages[0].prev.is_none() || self.ts >= messages[0].prev.as_ref().unwrap())
                 && messages[0].packets.len() == self.ingress_from_base[messages[0].base.index()]
             {
                 next = Some(source);
