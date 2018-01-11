@@ -6,16 +6,16 @@ use serde_json;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::mem;
 use std::path::PathBuf;
 use std::time;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use checktable::TransactionId;
 use debug::DebugEventType;
 use domain;
 use prelude::*;
-
+use transactions;
 use channel::TcpSender;
 
 /// Indicates to what degree updates should be persisted.
@@ -172,7 +172,11 @@ impl GroupCommitQueueSet {
     }
 
     /// Find the first queue that has timed out waiting for more packets, and flush it to disk.
-    pub fn flush_if_necessary(&mut self, nodes: &DomainNodes) -> Option<Box<Packet>> {
+    pub fn flush_if_necessary(
+        &mut self,
+        nodes: &DomainNodes,
+        transaction_state: &mut transactions::DomainState,
+    ) -> Option<Box<Packet>> {
         let mut needs_flush = None;
         for (node, wait_start) in self.wait_start.iter() {
             if wait_start.elapsed() >= self.params.flush_timeout {
@@ -181,7 +185,7 @@ impl GroupCommitQueueSet {
             }
         }
 
-        needs_flush.and_then(|node| self.flush_internal(&node, nodes))
+        needs_flush.and_then(|node| self.flush_internal(&node, nodes, transaction_state))
     }
 
     /// Flush any pending packets for node to disk (if applicable), and return a merged packet.
@@ -189,6 +193,7 @@ impl GroupCommitQueueSet {
         &mut self,
         node: &LocalNodeIndex,
         nodes: &DomainNodes,
+        transaction_state: &mut transactions::DomainState,
     ) -> Option<Box<Packet>> {
         match self.params.mode {
             DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
@@ -220,15 +225,20 @@ impl GroupCommitQueueSet {
 
         self.wait_start.remove(node);
         Self::merge_packets(
-            &mut self.pending_packets[node],
+            mem::replace(&mut self.pending_packets[node], Vec::new()),
             nodes,
-            &mut self.transaction_reply_txs,
+            transaction_state,
         )
     }
 
     /// Add a new packet to be persisted, and if this triggered a flush return an iterator over the
     /// packets that were written.
-    pub fn append<'a>(&mut self, p: Box<Packet>, nodes: &DomainNodes) -> Option<Box<Packet>> {
+    pub fn append<'a>(
+        &mut self,
+        p: Box<Packet>,
+        nodes: &DomainNodes,
+        transaction_state: &mut transactions::DomainState,
+    ) -> Option<Box<Packet>> {
         let node = Self::packet_destination(&p).unwrap();
         if !self.pending_packets.contains_key(&node) {
             self.pending_packets
@@ -237,7 +247,7 @@ impl GroupCommitQueueSet {
 
         self.pending_packets[&node].push(p);
         if self.pending_packets[&node].len() >= self.params.queue_capacity {
-            return self.flush_internal(&node, nodes);
+            return self.flush_internal(&node, nodes, transaction_state);
         } else if !self.wait_start.contains_key(&node) {
             self.wait_start.insert(node, time::Instant::now());
         }
@@ -257,20 +267,30 @@ impl GroupCommitQueueSet {
             .min()
     }
 
-    fn merge_committed_packets<I>(
-        packets: I,
-        transaction_state: Option<TransactionState>,
-    ) -> Option<Box<Packet>>
-    where
-        I: Iterator<Item = Box<Packet>>,
-    {
-        let mut packets = packets.peekable();
+    /// Merge the contents of packets into a single packet.
+    fn merge_packets(
+        packets: Vec<Box<Packet>>,
+        nodes: &DomainNodes,
+        transaction_state: &mut transactions::DomainState,
+    ) -> Option<Box<Packet>> {
+        if packets.is_empty() {
+            return None;
+        }
+
+        let base = if let box Packet::VtMessage { ref link, .. } = packets[0] {
+            nodes[&link.dst].borrow().global_addr()
+        } else {
+            unreachable!()
+        };
+
+        let assignment = transaction_state.assign_time(base);
+
+        let mut packets = packets.into_iter().peekable();
         let merged_link = match **packets.peek().as_mut().unwrap() {
             box Packet::VtMessage { ref link, .. } => link.clone(),
             _ => unreachable!(),
         };
         let mut merged_tracer: Tracer = None;
-
         let merged_data = packets.fold(Records::default(), |mut acc, p| {
             match (p,) {
                 (box Packet::VtMessage {
@@ -305,131 +325,16 @@ impl GroupCommitQueueSet {
             acc
         });
 
-        match transaction_state {
-            Some(merged_state) => Some(Box::new(Packet::VtMessage {
-                link: merged_link,
-                data: merged_data,
-                tracer: merged_tracer,
-                state: merged_state,
-            })),
-            None => unreachable!(),
-        }
-    }
-
-    /// Merge the contents of packets into a single packet, emptying packets in the process. Panics
-    /// if every packet in packets is not a `Packet::Transaction`, or if packets is empty.
-    fn merge_transactional_packets(
-        packets: &mut Vec<Box<Packet>>,
-        nodes: &DomainNodes,
-        transaction_reply_txs: &mut HashMap<SocketAddr, TcpSender<Result<i64, ()>>>,
-    ) -> Option<Box<Packet>> {
-        let mut send_reply = |addr: SocketAddr, reply| {
-            transaction_reply_txs
-                .entry(addr.clone())
-                .or_insert_with(|| TcpSender::connect(&addr, None).unwrap())
-                .send(reply)
-                .unwrap()
-        };
-
-        let base = if let box Packet::VtMessage { ref link, .. } = packets[0] {
-            nodes[&link.dst].borrow().global_addr()
-        } else {
-            unreachable!()
-        };
-
-        let (at, prev, committed_transactions): (
-            VectorTime,
-            VectorTime,
-            Vec<TransactionId>,
-        ) = {
-            // let transactions = packets
-            //     .iter()
-            //     .enumerate()
-            //     .map(|(i, p)| {
-            //         let id = checktable::TransactionId(i as u64);
-            //         if let box Packet::VtMessage {
-            //             ref data,
-            //             ref state,
-            //             ..
-            //         } = *p
-            //         {
-            //             match *state {
-            //                 TransactionState::Pending(ref token, _) => {
-            //                     (id, data.clone(), Some(token.clone()))
-            //                 }
-            //                 TransactionState::WillCommit => (id, data.clone(), None),
-            //                 TransactionState::VtCommitted {..} => unreachable!(),
-            //             }
-            //         } else {
-            //             unreachable!();
-            //         }
-            //     })
-            //     .collect();
-
-            // let request = checktable::service::TimestampRequest { transactions, base };
-            // match checktable::with_checktable(|ct| ct.apply_batch(request).unwrap()) {
-            //     None => {
-            //         for packet in packets.drain(..) {
-            //             if let (box Packet::VtMessage {
-            //                 state: TransactionState::Pending(_, ref mut addr),
-            //                 ..
-            //             },) = (packet,)
-            //             {
-            //                 send_reply(addr.clone(), Err(()));
-            //             } else {
-            //                 unreachable!();
-            //             }
-            //         }
-            //         return None;
-            //     }
-            //     Some(mut reply) => {
-            //         reply.committed_transactions.sort();
-            //         reply
-            //     }
-            // }
-
-            unimplemented!() // TODO(jbehrens)
-        };
-
-        // TODO: persist list of committed transacions.
-
-        // let committed_packets = packets.drain(..).enumerate().filter_map(|(i, mut packet)| {
-        //     if let box Packet::VtMessage {
-        //         state: TransactionState::Pending(_, ref mut addr),
-        //         ..
-        //     } = packet
-        //     {
-        //         if committed_transactions
-        //             .binary_search(&checktable::TransactionId(i as u64))
-        //             .is_err()
-        //         {
-        //             send_reply(addr.clone(), Err(()));
-        //             return None;
-        //         }
-        //         send_reply(addr.clone(), Ok(at));
-        //     }
-        //     Some(packet)
-        // });
-
-        // Self::merge_committed_packets(
-        //     committed_packets,
-        //     Some(TransactionState::VtCommitted {at, prev}),
-        // )
-
-        // TODO(jbehrens)
-    }
-
-    /// Merge the contents of packets into a single packet, emptying packets in the process.
-    fn merge_packets(
-        packets: &mut Vec<Box<Packet>>,
-        nodes: &DomainNodes,
-        transaction_reply_txs: &mut HashMap<SocketAddr, TcpSender<Result<i64, ()>>>,
-    ) -> Option<Box<Packet>> {
-        if packets.is_empty() {
-            return None;
-        }
-
-        Self::merge_transactional_packets(packets, nodes, transaction_reply_txs)
+        Some(Box::new(Packet::VtMessage {
+            link: merged_link,
+            data: merged_data,
+            tracer: merged_tracer,
+            state: TransactionState::VtCommitted {
+                at: (assignment.time, assignment.source),
+                prev: assignment.prev,
+                base,
+            },
+        }))
     }
 }
 

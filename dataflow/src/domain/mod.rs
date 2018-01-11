@@ -2278,7 +2278,11 @@ impl Domain {
                 if self.group_commit_queues.should_append(&packet, &self.nodes) {
                     debug_assert!(packet.is_regular());
                     packet.trace(PacketEvent::ExitInputChannel);
-                    let merged_packet = self.group_commit_queues.append(packet, &self.nodes);
+                    let merged_packet = self.group_commit_queues.append(
+                        packet,
+                        &self.nodes,
+                        &mut self.transaction_state,
+                    );
                     if let Some(packet) = merged_packet {
                         self.handle(packet, sends);
                     }
@@ -2293,7 +2297,9 @@ impl Domain {
                 ProcessResult::KeepPolling
             }
             PollEvent::Timeout => {
-                if let Some(m) = self.group_commit_queues.flush_if_necessary(&self.nodes) {
+                if let Some(m) = self.group_commit_queues
+                    .flush_if_necessary(&self.nodes, &mut self.transaction_state)
+                {
                     self.handle(m, sends);
                     while let Some(p) = self.inject.take() {
                         self.handle(p, sends);

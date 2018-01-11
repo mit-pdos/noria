@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use petgraph::graph::NodeIndex;
 use vec_map::VecMap;
@@ -60,6 +61,12 @@ pub enum Event {
     None,
 }
 
+pub struct TimeAssignment {
+    pub source: TimeSource,
+    pub time: Time,
+    pub prev: Option<VectorTime>,
+}
+
 pub struct DomainState {
     domain_index: domain::Index,
 
@@ -80,6 +87,9 @@ pub struct DomainState {
     /// Reachable egress (or rather, output) nodes from a given base inside this domain.
     egress_for_base: EgressForBase,
 
+    /// Map from base node to the next time assignment it will give.
+    base_times: HashMap<NodeIndex, TimeAssignment>,
+
     /// Timestamp that the domain has seen all transactions up to.
     ts: VectorTime,
 }
@@ -93,12 +103,24 @@ impl DomainState {
             special_buffer: Vec::new(),
             ingress_from_base: Vec::new(),
             egress_for_base: Default::default(),
+            base_times: HashMap::new(),
             ts,
         }
     }
 
     pub fn egress_for(&self, base: NodeIndex) -> &[LocalNodeIndex] {
         &self.egress_for_base[&base][..]
+    }
+
+    pub fn assign_time(&mut self, base: NodeIndex) -> TimeAssignment {
+        let assignment: &mut TimeAssignment = self.base_times.get_mut(&base).unwrap();
+        let ret = TimeAssignment {
+            source: assignment.source,
+            time: assignment.time,
+            prev: assignment.prev.take(),
+        };
+        assignment.time.increment();
+        ret
     }
 
     fn buffer_transaction(&mut self, m: Box<Packet>) {

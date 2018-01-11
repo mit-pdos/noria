@@ -21,6 +21,9 @@ impl Time {
         assert!(other <= *self);
         self.0 - other.0
     }
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
 }
 
 /// A `VectorTime` represents the time at some number of base nodes.
