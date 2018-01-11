@@ -229,6 +229,7 @@ where
     if let Some(h) = global_args.value_of("histogram") {
         match fs::File::create(h) {
             Ok(mut f) => {
+                use hdrsample::serialization::Serializer;
                 use hdrsample::serialization::V2Serializer;
                 let mut s = V2Serializer::new();
                 s.serialize(&sjrn_w_t, &mut f).unwrap();
