@@ -9,6 +9,7 @@ use hdrsample::Histogram;
 use rand::Rng;
 use std::fs;
 use std::time;
+use std::thread;
 use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
 
@@ -395,8 +396,13 @@ fn main() {
         )
         .get_matches();
 
-    match args.subcommand() {
-        ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
-        (name, _) => eprintln!("unrecognized backend type '{}'", name),
-    }
+    thread::Builder::new()
+        .name("load-gen".to_string())
+        .spawn(move || match args.subcommand() {
+            ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
+            (name, _) => eprintln!("unrecognized backend type '{}'", name),
+        })
+        .unwrap()
+        .join()
+        .unwrap()
 }
