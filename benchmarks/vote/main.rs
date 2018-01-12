@@ -39,6 +39,11 @@ fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
     C: VoteClient + Send + 'static,
 {
+    // each load generator can generate ~4M reqs/s
+    let mut target = value_t_or_exit!(global_args, "ops", f64);
+    let ngen = target as usize / 4_000_000;
+    target /= ngen as f64;
+
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
     let mut c = C::new(local_args, articles);
@@ -74,7 +79,7 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
-    let finished = Arc::new(Barrier::new(nthreads + 1));
+    let finished = Arc::new(Barrier::new(nthreads + ngen));
     let ts = (
         sjrn_w_t.clone(),
         sjrn_r_t.clone(),
@@ -108,23 +113,131 @@ where
         })
         .build()
         .unwrap();
+    let pool = Arc::new(pool);
 
+    let start = time::Instant::now();
+    let generators: Vec<_> = (0..ngen)
+        .map(|geni| {
+            let pool = pool.clone();
+            let clients = clients.clone();
+            let finished = finished.clone();
+            let global_args = global_args.clone();
+
+            use std::mem;
+            // we know that we won't drop the original args until the thread has exited
+            let global_args: clap::ArgMatches<'static> = unsafe { mem::transmute(global_args) };
+
+            thread::Builder::new()
+                .name(format!("load-gen{}", geni))
+                .spawn(move || {
+                    let ops = run_generator(pool, clients, target, global_args);
+                    finished.wait();
+                    ops
+                })
+                .unwrap()
+        })
+        .collect();
+
+    drop(pool);
+    let ops: usize = generators.into_iter().map(|gen| gen.join().unwrap()).sum();
+    drop(clients);
+    drop(c);
+
+    // all done!
+    let took = start.elapsed();
+    println!(
+        "# actual ops/s: {:.2}",
+        ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
+    );
+    println!("# op\tpct\tsojourn\tremote");
+
+    let sjrn_w_t = sjrn_w_t.lock().unwrap();
+    let sjrn_r_t = sjrn_r_t.lock().unwrap();
+    let rmt_w_t = rmt_w_t.lock().unwrap();
+    let rmt_r_t = rmt_r_t.lock().unwrap();
+
+    if let Some(h) = global_args.value_of("histogram") {
+        match fs::File::create(h) {
+            Ok(mut f) => {
+                use hdrsample::serialization::Serializer;
+                use hdrsample::serialization::V2Serializer;
+                let mut s = V2Serializer::new();
+                s.serialize(&sjrn_w_t, &mut f).unwrap();
+                s.serialize(&sjrn_r_t, &mut f).unwrap();
+                s.serialize(&rmt_w_t, &mut f).unwrap();
+                s.serialize(&rmt_r_t, &mut f).unwrap();
+            }
+            Err(e) => {
+                eprintln!("failed to open histogram file for writing: {:?}", e);
+            }
+        }
+    }
+
+    println!(
+        "write\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.5),
+        rmt_w_t.value_at_quantile(0.5)
+    );
+    println!(
+        "read\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.5),
+        rmt_r_t.value_at_quantile(0.5)
+    );
+    println!(
+        "write\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.95),
+        rmt_w_t.value_at_quantile(0.95)
+    );
+    println!(
+        "read\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.95),
+        rmt_r_t.value_at_quantile(0.95)
+    );
+    println!(
+        "write\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.99),
+        rmt_w_t.value_at_quantile(0.99)
+    );
+    println!(
+        "read\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.99),
+        rmt_r_t.value_at_quantile(0.99)
+    );
+    println!(
+        "write\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.max(),
+        rmt_w_t.max()
+    );
+    println!(
+        "read\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.max(),
+        rmt_r_t.max()
+    );
+}
+
+fn run_generator<C>(
+    pool: Arc<rayon::ThreadPool>,
+    clients: Arc<Vec<Mutex<C>>>,
+    target: f64,
+    global_args: clap::ArgMatches,
+) -> usize
+where
+    C: VoteClient + Send + 'static,
+{
+    let articles = value_t_or_exit!(global_args, "articles", usize);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let end = time::Instant::now() + runtime;
 
     let mut ops = 0;
     let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
-    let interarrival = rand::distributions::exponential::Exp::new(
-        value_t_or_exit!(global_args, "ops", f64) * 1e-9,
-    );
+    let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
     // TODO: warmup
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
     let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
-    let start = time::Instant::now();
     {
         let enqueue = |batch: Vec<_>, write| {
             let clients = clients.clone();
@@ -208,81 +321,7 @@ where
         }
     }
 
-    drop(pool);
-    finished.wait();
-    drop(clients);
-    drop(c);
-
-    // all done!
-    let took = start.elapsed();
-    println!(
-        "# actual ops/s: {:.2}",
-        ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
-    );
-    println!("# op\tpct\tsojourn\tremote");
-
-    let sjrn_w_t = sjrn_w_t.lock().unwrap();
-    let sjrn_r_t = sjrn_r_t.lock().unwrap();
-    let rmt_w_t = rmt_w_t.lock().unwrap();
-    let rmt_r_t = rmt_r_t.lock().unwrap();
-
-    if let Some(h) = global_args.value_of("histogram") {
-        match fs::File::create(h) {
-            Ok(mut f) => {
-                use hdrsample::serialization::Serializer;
-                use hdrsample::serialization::V2Serializer;
-                let mut s = V2Serializer::new();
-                s.serialize(&sjrn_w_t, &mut f).unwrap();
-                s.serialize(&sjrn_r_t, &mut f).unwrap();
-                s.serialize(&rmt_w_t, &mut f).unwrap();
-                s.serialize(&rmt_r_t, &mut f).unwrap();
-            }
-            Err(e) => {
-                eprintln!("failed to open histogram file for writing: {:?}", e);
-            }
-        }
-    }
-
-    println!(
-        "write\t50\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_w_t.value_at_quantile(0.5),
-        rmt_w_t.value_at_quantile(0.5)
-    );
-    println!(
-        "read\t50\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_r_t.value_at_quantile(0.5),
-        rmt_r_t.value_at_quantile(0.5)
-    );
-    println!(
-        "write\t95\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_w_t.value_at_quantile(0.95),
-        rmt_w_t.value_at_quantile(0.95)
-    );
-    println!(
-        "read\t95\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_r_t.value_at_quantile(0.95),
-        rmt_r_t.value_at_quantile(0.95)
-    );
-    println!(
-        "write\t99\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_w_t.value_at_quantile(0.99),
-        rmt_w_t.value_at_quantile(0.99)
-    );
-    println!(
-        "read\t99\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_r_t.value_at_quantile(0.99),
-        rmt_r_t.value_at_quantile(0.99)
-    );
-    println!(
-        "write\t100\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_w_t.max(),
-        rmt_w_t.max()
-    );
-    println!(
-        "read\t100\t{:.2}\t{:.2}\t(all µs)",
-        sjrn_r_t.max(),
-        rmt_r_t.max()
-    );
+    ops
 }
 
 fn main() {
@@ -397,13 +436,8 @@ fn main() {
         )
         .get_matches();
 
-    thread::Builder::new()
-        .name("load-gen".to_string())
-        .spawn(move || match args.subcommand() {
-            ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
-            (name, _) => eprintln!("unrecognized backend type '{}'", name),
-        })
-        .unwrap()
-        .join()
-        .unwrap()
+    match args.subcommand() {
+        ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
+        (name, _) => eprintln!("unrecognized backend type '{}'", name),
+    }
 }
