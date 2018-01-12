@@ -1,9 +1,16 @@
+#![feature(type_ascription)]
 #[macro_use]
 extern crate clap;
-
+extern crate distributary;
+#[macro_use]
 extern crate mysql;
+extern crate rand;
 
 use mysql as my;
+use distributary::DataType;
+
+mod populate;
+use populate::Populate;
 
 struct Backend {
     pool: mysql::Pool,
@@ -16,8 +23,57 @@ impl Backend {
         }
     }
 
-    fn populate(&self, nusers: i32, nclasses: i32, nposts: i32) {
-        unimplemented!();
+    pub fn populate_tables(&self, pop: &mut Populate) {
+        pop.enroll_students();
+        let roles = pop.get_roles();
+        let users = pop.get_users();
+        let posts = pop.get_posts();
+        let classes = pop.get_classes();
+
+        self.populate("Role", roles);
+        self.populate("User", users);
+        self.populate("Post", posts);
+        self.populate("Class", classes);
+    }
+
+    fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
+        let params_arr: Vec<_> = records.iter().map(|ref r| {
+            match name.as_ref() {
+                "Role" => params!{
+                    "r_uid" => r[0].clone().into() : i32,
+                    "r_cid" => r[1].clone().into() : i32,
+                    "r_role" => r[2].clone().into() : i32,
+                },
+                "User" => params!{
+                    "u_id" => r[0].clone().into() : i32,
+                },
+                "Post" => params!{
+                    "p_id" => r[0].clone().into() : i32,
+                    "p_cid" => r[1].clone().into() : i32,
+                    "p_author" => r[2].clone().into() : i32,
+                    "p_content" => r[3].clone().into() : String,
+                    "p_private" => r[4].clone().into() : i32,
+                },
+                "Class" => params!{
+                    "c_id" => r[0].clone().into() : i32,
+                },
+                _ => panic!("unspecified table"),
+            }
+        }).collect();
+
+        let qstring = match name.as_ref() {
+            "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
+            "User" => "INSERT INTO User (u_id) VALUES (:u_id)",
+            "Post" => "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES (:p_id, :p_cid, :p_author, :p_content, :p_private)",
+            "Class" => "INSERT INTO Class (c_id) VALUES (:c_id)",
+            _ => panic!("unspecified table"),
+        };
+
+        for mut stmt in self.pool.prepare(qstring).into_iter() {
+            for params in params_arr.iter() {
+                stmt.execute(params).unwrap();
+            }
+        }
     }
 
     fn create_connection(&self, db: &str) {
@@ -37,7 +93,7 @@ impl Backend {
     fn create_tables(&self) {
         self.pool.prep_exec(
             "CREATE TABLE Post ( \
-              p_id int(11) NOT NULL auto_increment, \
+              p_id int(11) NOT NULL, \
               p_cid int(11) NOT NULL, \
               p_author int(11) NOT NULL, \
               p_content varchar(258) NOT NULL, \
@@ -52,7 +108,7 @@ impl Backend {
 
         self.pool.prep_exec(
             "CREATE TABLE User ( \
-              u_id int(11) NOT NULL auto_increment, \
+              u_id int(11) NOT NULL, \
               PRIMARY KEY  (u_id), \
               UNIQUE KEY u_id (u_id) \
             ) ENGINE=MEMORY;",
@@ -61,7 +117,7 @@ impl Backend {
 
         self.pool.prep_exec(
             "CREATE TABLE Class ( \
-              c_id int(11) NOT NULL auto_increment, \
+              c_id int(11) NOT NULL, \
               PRIMARY KEY  (c_id), \
               UNIQUE KEY c_id (c_id) \
             ) ENGINE=MEMORY;",
@@ -73,17 +129,14 @@ impl Backend {
               r_uid int(11) NOT NULL, \
               r_cid int(11) NOT NULL, \
               r_role tinyint(1) NOT NULL default '0', \
-              PRIMARY KEY  (r_uid), \
-              UNIQUE KEY r_uid (r_uid), \
+              KEY r_uid (r_uid), \
               KEY r_cid (r_cid) \
             ) ENGINE=MEMORY;",
             (),
         ).unwrap();
 
     }
-
 }
-
 
 fn main() {
     use clap::{App, Arg};
@@ -113,12 +166,19 @@ fn main() {
                 .default_value("100000")
                 .help("Number of posts in the db"),
         )
+        .arg(
+            Arg::with_name("private")
+                .long("private")
+                .default_value("0.1")
+                .help("Percentage of private posts"),
+        )
         .get_matches();
 
     let dbn = args.value_of("dbname").unwrap();
     let nusers = value_t_or_exit!(args, "nusers", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
+    let private = value_t_or_exit!(args, "private", f32);
 
     let backend = Backend::new(dbn);
 
@@ -126,6 +186,7 @@ fn main() {
     backend.create_connection(db);
     backend.create_tables();
 
-    backend.populate(nusers, nclasses, nposts);
+    let mut p = Populate::new(nposts, nusers, nclasses, private);
+    backend.populate_tables(&mut p);
 
 }
