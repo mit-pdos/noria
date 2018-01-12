@@ -9,8 +9,10 @@ extern crate rand;
 use mysql as my;
 use distributary::DataType;
 
+#[macro_use]
 mod populate;
-use populate::Populate;
+use populate::{Populate, NANOS_PER_SEC};
+use std::time;
 
 struct Backend {
     pool: mysql::Pool,
@@ -21,6 +23,25 @@ impl Backend {
         Backend {
             pool: my::Pool::new_manual(1, 1, addr).unwrap(),
         }
+    }
+
+    pub fn read(&self, _uid: i32) {
+        let qstring = "SELECT p_cid, COUNT(p_id) FROM Post GROUP BY p_cid";
+        self.pool.prep_exec(qstring, ()).unwrap();
+    }
+
+    pub fn secure_read(&self, uid: i32) {
+        let qstring = format!(
+            "SELECT p_cid, count(p_id) FROM Post \
+                WHERE Post.p_private = 0 OR \
+                Post.p_private = 1 AND Post.p_author = {} OR \
+                (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) \
+                GROUP BY p_cid",
+            uid,
+            uid,
+        );
+
+        self.pool.prep_exec(qstring, ()).unwrap();
     }
 
     pub fn populate_tables(&self, pop: &mut Populate) {
@@ -69,11 +90,20 @@ impl Backend {
             _ => panic!("unspecified table"),
         };
 
+        let start = time::Instant::now();
         for mut stmt in self.pool.prepare(qstring).into_iter() {
             for params in params_arr.iter() {
                 stmt.execute(params).unwrap();
             }
         }
+        let dur = dur_to_fsec!(start.elapsed());
+        println!(
+            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+            records.len(),
+            name,
+            dur,
+            records.len() as f64 / dur
+        );
     }
 
     fn create_connection(&self, db: &str) {
@@ -188,5 +218,36 @@ fn main() {
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     backend.populate_tables(&mut p);
+
+    let repeats = 1000;
+    // Do some reads without security
+    let start = time::Instant::now();
+    for _ in 0..1000 {
+        for uid in 0..nusers {
+            backend.read(uid);
+        }
+    }
+    let dur = dur_to_fsec!(start.elapsed());
+    println!(
+        "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
+        nusers * repeats,
+        dur,
+        (nusers * repeats) as f64 / dur
+    );
+
+    // Do some reads WITH security
+    let start = time::Instant::now();
+    for _ in 0..repeats {
+        for uid in 0..nusers {
+            backend.secure_read(uid);
+        }
+    }
+    let dur = dur_to_fsec!(start.elapsed());
+    println!(
+        "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
+        nusers * repeats,
+        dur,
+        (nusers * repeats) as f64 / dur
+    );
 
 }
