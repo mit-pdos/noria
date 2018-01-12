@@ -1,9 +1,7 @@
-use std::time;
 use std::collections::HashMap;
 use distributary::DataType;
 use rand;
 use rand::Rng;
-use super::Backend;
 
 pub const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {
@@ -40,15 +38,7 @@ impl Populate {
         }
     }
 
-    pub fn populate_tables(&mut self, mut backend: &mut Backend) {
-        self.enroll_students();
-        self.populate_roles(&mut backend);
-        self.populate_users(&mut backend);
-        self.populate_posts(&mut backend);
-        self.populate_classes(&mut backend);
-    }
-
-    fn enroll_students(&mut self) {
+    pub fn enroll_students(&mut self) {
         println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();
@@ -77,33 +67,8 @@ impl Populate {
         }
     }
 
-    fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let ins = backend.g.inputs();
-        let mut mutator = backend
-            .g
-            .get_mutator(ins[name])
-            .unwrap();
 
-        let start = time::Instant::now();
-
-        let i = records.len();
-        for r in records.drain(..) {
-            mutator.put(r).unwrap();
-        }
-
-        let dur = dur_to_fsec!(start.elapsed());
-        println!(
-            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
-            name,
-            dur,
-            i as f64 / dur
-        );
-
-        i
-    }
-
-    fn populate_roles(&mut self, mut backend: &mut Backend) {
+    pub fn get_roles(&mut self) -> Vec<Vec<DataType>> {
         println!("Populating roles...");
         let mut records = Vec::new();
         // add tas
@@ -126,10 +91,10 @@ impl Populate {
             }
         }
 
-        Self::populate(&mut backend, "Role", records);
+        records
     }
 
-    fn populate_users(&mut self, mut backend: &mut Backend) {
+    pub fn get_users(&mut self) -> Vec<Vec<DataType>> {
         println!("Populating users...");
         let mut records = Vec::new();
         for i in 0..self.nusers {
@@ -137,10 +102,10 @@ impl Populate {
             records.push(vec![uid]);
         }
 
-        Self::populate(&mut backend, "User", records);
+        records
     }
 
-    fn populate_posts(&mut self, mut backend: &mut Backend) {
+    pub fn get_posts(&mut self) -> Vec<Vec<DataType>> {
         println!("Populating posts...");
         let mut records = Vec::new();
         for i in 0..self.nposts {
@@ -152,10 +117,10 @@ impl Populate {
             records.push(vec![pid, cid, author, content, private]);
         }
 
-        Self::populate(&mut backend, "Post", records);
+        records
     }
 
-    fn populate_classes(&mut self, mut backend: &mut Backend) {
+    pub fn get_classes(&mut self) -> Vec<Vec<DataType>> {
         println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
@@ -163,7 +128,7 @@ impl Populate {
             records.push(vec![cid]);
         }
 
-        Self::populate(&mut backend, "Class", records);
+        records
     }
 
     /// Generate random uid within bounds

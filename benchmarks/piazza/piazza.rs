@@ -51,6 +51,46 @@ impl Backend {
         }
     }
 
+    pub fn populate_tables(&mut self, pop: &mut Populate) {
+        pop.enroll_students();
+        let roles = pop.get_roles();
+        let users = pop.get_users();
+        let posts = pop.get_posts();
+        let classes = pop.get_classes();
+
+        self.populate("Role", roles);
+        self.populate("User", users);
+        self.populate("Post", posts);
+        self.populate("Class", classes);
+    }
+
+    fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+        let ins = self.g.inputs();
+        let mut mutator = self
+            .g
+            .get_mutator(ins[name])
+            .unwrap();
+
+        let start = time::Instant::now();
+
+        let i = records.len();
+        for r in records.drain(..) {
+            mutator.put(r).unwrap();
+        }
+
+        let dur = dur_to_fsec!(start.elapsed());
+        println!(
+            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+            i,
+            name,
+            dur,
+            i as f64 / dur
+        );
+
+        i
+    }
+
+
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
 
         self.g.create_universe(user_context.clone());
@@ -252,7 +292,7 @@ fn main() {
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     if populate {
         println!("Populating tables...");
-        p.populate_tables(&mut backend);
+        backend.populate_tables(&mut p);
     }
 
     println!("Finished writing! Sleeping for 2 seconds...");
