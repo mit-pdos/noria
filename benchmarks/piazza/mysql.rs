@@ -20,49 +20,63 @@ impl Backend {
         unimplemented!();
     }
 
+    fn create_connection(&self, db: &str) {
+        let mut conn = self.pool.get_conn().unwrap();
+        if conn.query(format!("USE {}", db)).is_ok() {
+            conn.query(format!("DROP DATABASE {}", &db).as_str())
+                .unwrap();
+        }
+
+        conn.query(format!("CREATE DATABASE {}", &db).as_str())
+            .unwrap();
+        conn.query(format!("USE {}", db)).unwrap();
+
+        drop(conn);
+    }
+
     fn create_tables(&self) {
         self.pool.prep_exec(
-            "CREATE TABLE `Post` ( \
-              `p_id` int(11) NOT NULL auto_increment, \
-              `p_cid` int(11) NOT NULL, \
-              `p_author` int(11) NOT NULL, \
-              `p_content` text NOT NULL default '', \
-              `p_private` tinyint(1) NOT NULL default '0', \
-              PRIMARY KEY  (`p_id`), \
-              UNIQUE KEY `p_id` (`p_id`), \
-              KEY `p_cid` (`p_cid`), \
-              KEY `p_author` (`p_author`) \
-            ) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+            "CREATE TABLE Post ( \
+              p_id int(11) NOT NULL auto_increment, \
+              p_cid int(11) NOT NULL, \
+              p_author int(11) NOT NULL, \
+              p_content varchar(258) NOT NULL, \
+              p_private tinyint(1) NOT NULL default '0', \
+              PRIMARY KEY (p_id), \
+              UNIQUE KEY p_id (p_id), \
+              KEY p_cid (p_cid), \
+              KEY p_author (p_author) \
+            ) ENGINE=MEMORY;",
             (),
         ).unwrap();
 
         self.pool.prep_exec(
-            "CREATE TABLE `User` ( \
-              `u_id` int(11) NOT NULL auto_increment, \
-              PRIMARY KEY  (`u_id`), \
-              UNIQUE KEY `u_id` (`u_id`), \
-            ) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+            "CREATE TABLE User ( \
+              u_id int(11) NOT NULL auto_increment, \
+              PRIMARY KEY  (u_id), \
+              UNIQUE KEY u_id (u_id) \
+            ) ENGINE=MEMORY;",
             (),
         ).unwrap();
 
         self.pool.prep_exec(
-            "CREATE TABLE `Class` ( \
-              `c_id` int(11) NOT NULL auto_increment, \
-              PRIMARY KEY  (`c_id`), \
-              UNIQUE KEY `c_id` (`c_id`), \
-            ) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+            "CREATE TABLE Class ( \
+              c_id int(11) NOT NULL auto_increment, \
+              PRIMARY KEY  (c_id), \
+              UNIQUE KEY c_id (c_id) \
+            ) ENGINE=MEMORY;",
             (),
         ).unwrap();
 
         self.pool.prep_exec(
-            "CREATE TABLE `Role` ( \
-              `r_uid` int(11) NOT NULL, \
-              `r_cid` int(11) NOT NULL, \
-              `r_role` tinyint(1) NOT NULL default '0', \
-              PRIMARY KEY  (`r_uid`), \
-              UNIQUE KEY `r_uid` (`r_uid`), \
-              KEY `r_cid` (`r_cid`), \
-            ) ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+            "CREATE TABLE Role ( \
+              r_uid int(11) NOT NULL, \
+              r_cid int(11) NOT NULL, \
+              r_role tinyint(1) NOT NULL default '0', \
+              PRIMARY KEY  (r_uid), \
+              UNIQUE KEY r_uid (r_uid), \
+              KEY r_cid (r_cid) \
+            ) ENGINE=MEMORY;",
             (),
         ).unwrap();
 
@@ -108,6 +122,8 @@ fn main() {
 
     let backend = Backend::new(dbn);
 
+    let db = &dbn[dbn.rfind("/").unwrap() + 1..];
+    backend.create_connection(db);
     backend.create_tables();
 
     backend.populate(nusers, nclasses, nposts);
