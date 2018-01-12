@@ -40,8 +40,9 @@ where
     C: VoteClient + Send + 'static,
 {
     // each load generator can generate ~4M reqs/s
+    let per_generator = 4_000_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
-    let ngen = target as usize / 4_000_000;
+    let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
     target /= ngen as f64;
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
