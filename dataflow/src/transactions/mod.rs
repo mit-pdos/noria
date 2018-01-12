@@ -152,14 +152,10 @@ impl DomainState {
                     },
                 ..
             } => (Some(at.clone()), Some(base), self.ts >= p),
-            Packet::StartMigration {
-                ref at, ref prev, ..
-            } => (None, None, self.ts >= prev),
-            Packet::CompleteMigration {
-                ref at, ref prev, ..
-            } => (None, None, self.ts >= prev),
+            Packet::StartMigration { ref prev, .. } => (None, None, self.ts >= prev),
+            Packet::CompleteMigration { ref prev, .. } => (None, None, self.ts >= prev),
             Packet::ReplayPiece {
-                transaction_state: Some(ReplayTransactionState { ref at, ref prev }),
+                transaction_state: Some(ReplayTransactionState { ref prev, .. }),
                 ..
             } => (None, None, self.ts >= prev),
             _ => unreachable!(),

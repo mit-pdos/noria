@@ -147,7 +147,7 @@ impl<'a> Plan<'a> {
                     segments.push((domain, Vec::new()));
                     last_domain = Some(domain);
 
-                    if self.partial && self.graph[node].is_transactional() {
+                    if self.partial {
                         self.m
                             .domains_on_path
                             .entry(tag.clone())

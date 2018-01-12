@@ -7,8 +7,8 @@ use dataflow::statistics::GraphStats;
 use std::collections::{BTreeMap, HashMap};
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
-use std::thread::{self};
-use std::sync::{Arc, Mutex, atomic};
+use std::thread;
+use std::sync::{atomic, Arc, Mutex};
 use std::{io, time};
 
 use coordination::{CoordinationMessage, CoordinationPayload};
@@ -197,7 +197,6 @@ impl ControllerInner {
             "source",
             &["because-type-inference"],
             node::special::Source,
-            true,
         ));
 
         let checktable =
@@ -482,7 +481,6 @@ impl ControllerInner {
             addr: (*node.local_addr()).into(),
             key: key,
             key_is_primary: is_primary,
-            transactional: self.ingredients[base].is_transactional(),
             dropped: base_operator.get_dropped(),
             expected_columns: num_fields - base_operator.get_dropped().len(),
             is_local: true,

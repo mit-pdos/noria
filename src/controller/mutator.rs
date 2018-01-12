@@ -21,7 +21,6 @@ pub struct MutatorBuilder {
     pub(crate) addr: LocalNodeIndex,
     pub(crate) key_is_primary: bool,
     pub(crate) key: Vec<usize>,
-    pub(crate) transactional: bool,
     pub(crate) dropped: VecMap<DataType>,
     pub(crate) expected_columns: usize,
 
@@ -36,7 +35,6 @@ impl MutatorBuilder {
             addr: self.addr,
             key: self.key,
             key_is_primary: self.key_is_primary,
-            transactional: self.transactional,
             dropped: self.dropped,
             tracer: None,
             expected_columns: self.expected_columns,
@@ -51,7 +49,6 @@ pub struct Mutator {
     addr: LocalNodeIndex,
     key_is_primary: bool,
     key: Vec<usize>,
-    transactional: bool,
     dropped: VecMap<DataType>,
     tracer: Tracer,
     expected_columns: usize,
@@ -145,8 +142,6 @@ impl Mutator {
     }
 
     fn tx_send(&mut self, mut rs: Records, t: checktable::Token) -> Result<i64, ()> {
-        assert!(self.transactional);
-
         self.inject_dropped_cols(&mut rs);
         let m = box Packet::VtMessage {
             link: Link::new(self.addr, self.addr),

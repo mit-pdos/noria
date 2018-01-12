@@ -1425,50 +1425,8 @@ impl Domain {
                 ..
             } = self.replay_paths[&tag]
             {
-                if self.nodes[&source].borrow().is_transactional() {
-                    self.transaction_state.schedule_replay(tag, key.into());
-                    self.process_transactions(sends);
-                    return;
-                }
-
-                // maybe delay this seed request so that we can batch respond later?
-                // TODO
-                use std::collections::hash_map::Entry;
-                let key = Vec::from(key);
-                let full = match self.buffered_replay_requests.entry(tag) {
-                    Entry::Occupied(mut o) => {
-                        let l = o.get().1.len();
-                        if l == self.replay_batch_size - 1 {
-                            use std::mem;
-                            let mut o =
-                                mem::replace(&mut o.get_mut().1, HashSet::with_capacity(l + 1));
-                            o.insert(key);
-                            Some(o)
-                        } else {
-                            if l == 0 {
-                                o.get_mut().0 = time::Instant::now();
-                            }
-                            o.into_mut().1.insert(key);
-                            self.has_buffered_replay_requests = true;
-                            None
-                        }
-                    }
-                    Entry::Vacant(v) => {
-                        let mut ks = HashSet::new();
-                        ks.insert(key);
-                        if self.replay_batch_size == 1 {
-                            Some(ks)
-                        } else {
-                            v.insert((time::Instant::now(), ks));
-                            self.has_buffered_replay_requests = true;
-                            None
-                        }
-                    }
-                };
-
-                if let Some(all) = full {
-                    self.seed_all(tag, all, sends);
-                }
+                self.transaction_state.schedule_replay(tag, key.into());
+                self.process_transactions(sends);
                 return;
             }
         }
@@ -1560,13 +1518,10 @@ impl Domain {
     fn handle_recovery(&mut self, sends: &mut EnqueuedSends) {
         let node_info: Vec<_> = self.nodes
             .iter()
-            .map(|(index, node)| {
-                let n = node.borrow();
-                (index, n.global_addr(), n.is_transactional())
-            })
+            .map(|(index, node)| (index, node.borrow().global_addr()))
             .collect();
 
-        for (local_addr, global_addr, is_transactional) in node_info {
+        for (local_addr, global_addr) in node_info {
             let path = self.persistence_parameters.log_path(
                 &local_addr,
                 self.index,
@@ -1666,7 +1621,7 @@ impl Domain {
             } = m
             {
                 let mut n = self.nodes[&path.last().unwrap().node].borrow_mut();
-                if n.is_egress() && n.is_transactional() {
+                if n.is_egress() {
                     // We need to propagate this replay even though it contains no data, so that
                     // downstream domains don't wait for its timestamp.  There is no need to set
                     // link src/dst since the egress node will not use them.
@@ -1744,23 +1699,6 @@ impl Domain {
                         } else {
                             None
                         };
-
-                        if !n.is_transactional() {
-                            if let Some(box Packet::ReplayPiece {
-                                ref mut transaction_state,
-                                ..
-                            }) = m
-                            {
-                                // Transactional replays that cross into non-transactional subgraphs
-                                // should stop being transactional. This is necessary to ensure that
-                                // they don't end up being buffered, and thus re-ordered relative to
-                                // subsequent writes to the same key.
-                                transaction_state.take();
-                                is_transactional = false;
-                            } else {
-                                unreachable!();
-                            }
-                        }
 
                         // figure out if we're the target of a partial replay.
                         // this is the case either if the current node is waiting for a replay,
@@ -1884,7 +1822,7 @@ impl Domain {
                                 let last_ni = path.last().unwrap().node;
                                 if last_ni != segment.node {
                                     let mut n = self.nodes[&last_ni].borrow_mut();
-                                    if n.is_egress() && n.is_transactional() {
+                                    if n.is_egress() {
                                         // The partial replay was captured, but we still need to
                                         // propagate an (ignored) ReplayPiece so that downstream
                                         // domains don't end up waiting forever for the timestamp we

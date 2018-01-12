@@ -85,18 +85,11 @@ impl<'a> Migration<'a> {
         i.on_connected(&self.mainline.ingredients);
         let parents = i.ancestors();
 
-        let transactional = !parents.is_empty()
-            && parents
-                .iter()
-                .all(|&p| self.mainline.ingredients[p].is_transactional());
-
         // add to the graph
-        let ni = self.mainline.ingredients.add_node(node::Node::new(
-            name.to_string(),
-            fields,
-            i.into(),
-            transactional,
-        ));
+        let ni =
+            self.mainline
+                .ingredients
+                .add_node(node::Node::new(name.to_string(), fields, i.into()));
         info!(self.log,
               "adding new node";
               "node" => ni.index(),
@@ -135,10 +128,9 @@ impl<'a> Migration<'a> {
         let b: NodeOperator = b.into();
 
         // add to the graph
-        let ni =
-            self.mainline
-                .ingredients
-                .add_node(node::Node::new(name.to_string(), fields, b, true));
+        let ni = self.mainline
+            .ingredients
+            .add_node(node::Node::new(name.to_string(), fields, b));
         info!(self.log,
               "adding new node";
               "node" => ni.index(),
@@ -282,12 +274,9 @@ impl<'a> Migration<'a> {
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: usize) {
         self.ensure_reader_for(n, None);
-        if self.mainline.ingredients[n].is_transactional() {
-            self.ensure_token_generator(n, key);
-        }
+        self.ensure_token_generator(n, key);
 
         let ri = self.readers[&n];
-
         self.mainline.ingredients[ri].with_reader_mut(|r| r.set_key(key));
     }
 
@@ -297,12 +286,9 @@ impl<'a> Migration<'a> {
     /// `ControllerInner::get_transactional_getter`
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: usize) {
         self.ensure_reader_for(n, Some(name));
-        if self.mainline.ingredients[n].is_transactional() {
-            self.ensure_token_generator(n, key);
-        }
+        self.ensure_token_generator(n, key);
 
         let ri = self.readers[&n];
-
         self.mainline.ingredients[ri].with_reader_mut(|r| r.set_key(key));
     }
 

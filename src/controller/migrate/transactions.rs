@@ -15,7 +15,6 @@ fn count_base_ingress(
     let ingress_nodes: Vec<_> = nodes
         .into_iter()
         .filter(|&&ni| graph[ni].borrow().is_ingress())
-        .filter(|&&ni| graph[ni].borrow().is_transactional())
         .collect();
 
     graph
@@ -47,7 +46,6 @@ fn base_egress_map(
     let output_nodes: Vec<_> = nodes
         .into_iter()
         .filter(|&&ni| graph[ni].is_output())
-        //.filter(|&ni| graph[ni].is_transactional())
         .collect();
 
     graph
