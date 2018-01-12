@@ -114,13 +114,22 @@ impl DomainState {
 
     pub fn assign_time(&mut self, base: NodeIndex) -> TimeAssignment {
         let assignment: &mut TimeAssignment = self.base_times.get_mut(&base).unwrap();
-        let ret = TimeAssignment {
+        TimeAssignment {
             source: assignment.source,
-            time: assignment.time,
+            time: assignment.time.increment(),
             prev: assignment.prev.take(),
-        };
-        assignment.time.increment();
-        ret
+        }
+    }
+
+    pub fn add_base(&mut self, base: NodeIndex, ts: (Time, TimeSource)) {
+        self.base_times.insert(
+            base,
+            TimeAssignment {
+                source: ts.1,
+                time: ts.0,
+                prev: None,
+            },
+        );
     }
 
     fn buffer_transaction(&mut self, m: Box<Packet>) {
@@ -156,63 +165,64 @@ impl DomainState {
             _ => unreachable!(),
         };
 
-        if past_prev && self.next_transaction.is_none() && base.is_none() {
-            match m {
-                box Packet::StartMigration { ref at, .. }
-                | box Packet::CompleteMigration { ref at, .. }
-                | box Packet::ReplayPiece {
-                    transaction_state: Some(ReplayTransactionState { ref at, .. }),
-                    ..
-                } => {
-                    self.ts.advance_to(at);
-                }
-                _ => unreachable!(),
-            }
+        if let Some(base) = base {
+            let num_ingress = *self.ingress_from_base.get(base.index()).unwrap_or(&1);
+            assert!(num_ingress > 0);
 
-            self.next_transaction = Some(match (m,) {
-                (box Packet::StartMigration { .. },) => Bundle::MigrationStart,
-                (box Packet::CompleteMigration {
-                    ingress_from_base,
-                    egress_for_base,
+            if past_prev && self.next_transaction.is_none() && num_ingress == 1 {
+                let at = at.unwrap();
+                assert_eq!(self.ts[at.1].next(), at.0);
+                self.ts[at.1] = at.0;
+                self.next_transaction = Some(Bundle::Messages(vec![m]));
+            } else {
+                let (prev, base) = if let box Packet::VtMessage {
+                    state: TransactionState::VtCommitted { ref prev, base, .. },
                     ..
-                },) => Bundle::MigrationEnd(ingress_from_base, egress_for_base),
-                m @ (box Packet::ReplayPiece { .. },) => Bundle::Replay(m.0),
-                _ => unreachable!(),
-            });
-        } else if past_prev && self.next_transaction.is_none()
-            && *self.ingress_from_base
-                .get(base.as_ref().unwrap().index())
-                .unwrap_or(&1) == 1
-        {
-            let at = at.unwrap();
-            assert_eq!(self.ts[at.1].next(), at.0);
-            self.ts[at.1] = at.0;
-            self.next_transaction = Some(Bundle::Messages(vec![m]));
-        } else if base.is_some() {
-            let (prev, base) = if let box Packet::VtMessage {
-                state: TransactionState::VtCommitted { ref prev, base, .. },
-                ..
-            } = m
-            {
-                (prev.clone(), base)
-            } else {
-                unreachable!()
-            };
-            let at = at.unwrap();
-            let buf = self.message_buffer.entry(at.1).or_insert_with(Vec::new);
-            if buf.is_empty() || at.0 == buf[buf.len() - 1].at.next() {
-                buf.push(BufferedMessage {
-                    at: at.0,
-                    prev,
-                    base,
-                    packets: vec![m],
-                });
-            } else {
-                let i = at.0.difference(buf[0].at) as usize;
-                buf[i].packets.push(m);
+                } = m
+                {
+                    (prev.clone(), base)
+                } else {
+                    unreachable!()
+                };
+                let at = at.unwrap();
+                let buf = self.message_buffer.entry(at.1).or_insert_with(Vec::new);
+                if buf.is_empty() || at.0 == buf[buf.len() - 1].at.next() {
+                    buf.push(BufferedMessage {
+                        at: at.0,
+                        prev,
+                        base,
+                        packets: vec![m],
+                    });
+                } else {
+                    let i = at.0.difference(buf[0].at) as usize;
+                    buf[i].packets.push(m);
+                }
             }
         } else {
-            if let m @ box Packet::ReplayPiece { .. } = m {
+            if past_prev && self.next_transaction.is_none() {
+                match m {
+                    box Packet::StartMigration { ref at, .. }
+                    | box Packet::CompleteMigration { ref at, .. }
+                    | box Packet::ReplayPiece {
+                        transaction_state: Some(ReplayTransactionState { ref at, .. }),
+                        ..
+                    } => {
+                        self.ts.advance_to(at);
+                    }
+                    _ => unreachable!(),
+                }
+
+                self.next_transaction = Some(match (m,) {
+                    (box Packet::StartMigration { .. },) => Bundle::MigrationStart,
+                    (box Packet::CompleteMigration {
+                        ingress_from_base,
+                        egress_for_base,
+                        ..
+                    },) => Bundle::MigrationEnd(ingress_from_base, egress_for_base),
+                    m @ (box Packet::ReplayPiece { .. },) => Bundle::Replay(m.0),
+                    _ => unreachable!(),
+                });
+            } else if let m @ box Packet::ReplayPiece { .. } = m {
                 let (at, prev) = if let box Packet::ReplayPiece {
                     transaction_state: Some(ReplayTransactionState { ref at, ref prev }),
                     ..
@@ -228,27 +238,26 @@ impl DomainState {
                     prev,
                     special: SpecialEntry::Replay(m),
                 });
-                return;
+            } else {
+                let (at, prev, special) = match (m,) {
+                    (box Packet::StartMigration { at, prev },) => {
+                        (at, prev, SpecialEntry::MigrationStart)
+                    }
+                    (box Packet::CompleteMigration {
+                        at,
+                        prev,
+                        ingress_from_base,
+                        egress_for_base,
+                    },) => (
+                        at,
+                        prev,
+                        SpecialEntry::MigrationEnd(ingress_from_base, egress_for_base),
+                    ),
+                    _ => unreachable!(),
+                };
+                self.special_buffer
+                    .push(BufferedSpecial { at, prev, special });
             }
-
-            let (at, prev, special) = match (m,) {
-                (box Packet::StartMigration { at, prev },) => {
-                    (at, prev, SpecialEntry::MigrationStart)
-                }
-                (box Packet::CompleteMigration {
-                    at,
-                    prev,
-                    ingress_from_base,
-                    egress_for_base,
-                },) => (
-                    at,
-                    prev,
-                    SpecialEntry::MigrationEnd(ingress_from_base, egress_for_base),
-                ),
-                _ => unreachable!(),
-            };
-            self.special_buffer
-                .push(BufferedSpecial { at, prev, special });
         }
     }
 

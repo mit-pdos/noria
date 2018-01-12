@@ -140,10 +140,12 @@ pub enum Packet {
 
     // Control messages
     //
-    /// Add a new node to this domain below the given parents.
+    /// Add a new node to this domain below the given parents. The `time_sources` field is only used
+    /// for base nodes and it maps from shard of the base to the time source associated with it.
     AddNode {
         node: Node,
         parents: Vec<LocalNodeIndex>,
+        time_sources: Option<Vec<(Time, TimeSource)>>,
     },
 
     /// Add a new column to an existing `Base` node.

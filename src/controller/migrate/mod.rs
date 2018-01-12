@@ -552,18 +552,15 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        let prev = VectorTime::new(mainline.time, mainline.time_source);
-        let start_ts = VectorTime::new(mainline.time.next(), mainline.time_source);
-        let end_ts = VectorTime::new(mainline.time.next().next(), mainline.time_source);
+        let prev = VectorTime::new(mainline.time.increment(), mainline.time_source);
+        let start_ts = VectorTime::new(mainline.time.increment(), mainline.time_source);
+        let end_ts = VectorTime::new(mainline.time, mainline.time_source);
 
         if !is_first_migration {
             // TODO(jbehrens): Reserve a timestamp from all the current bases and update
             // prev/start_ts/end_ts accordingly.
             unimplemented!();
         }
-
-        // Increment time to account for the two timestamps for this migration.
-        mainline.time = mainline.time.next().next();
 
         let mut workers: Vec<_> = mainline
             .workers
@@ -586,7 +583,7 @@ impl<'a> Migration<'a> {
                 continue;
             }
 
-            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let nodes = uninformed_domain_nodes.get(&domain).unwrap();
             let d = DomainHandle::new(
                 domain,
                 mainline.ingredients[nodes[0].0].sharded_by(),
@@ -594,7 +591,7 @@ impl<'a> Migration<'a> {
                 &mut mainline.ingredients,
                 &mainline.readers,
                 &mainline.domain_config,
-                nodes,
+                Vec::new(),
                 &mainline.persistence,
                 &mainline.listen_addr,
                 &mainline.channel_coordinator,

@@ -797,10 +797,21 @@ impl Domain {
             consumed => {
                 match consumed {
                     // workaround #16223
-                    Packet::AddNode { node, parents } => {
+                    Packet::AddNode {
+                        node,
+                        parents,
+                        time_sources,
+                    } => {
                         use std::cell;
                         let addr = *node.local_addr();
                         self.not_ready.insert(addr);
+
+                        if let Some(time_sources) = time_sources {
+                            self.transaction_state.add_base(
+                                node.global_addr(),
+                                time_sources[self.shard.unwrap_or(0)],
+                            );
+                        }
 
                         for p in parents {
                             self.nodes

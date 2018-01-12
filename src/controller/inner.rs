@@ -53,6 +53,9 @@ pub struct ControllerInner {
     pub(super) time: Time,
     pub(super) time_source: TimeSource,
 
+    /// Next time source to assign.
+    pub(super) next_time_source: TimeSource,
+
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
     pub(super) debug_channel: Option<SocketAddr>,
@@ -254,6 +257,7 @@ impl ControllerInner {
 
             time: Time::zero(),
             time_source: 0,
+            next_time_source: 1,
 
             domains: Default::default(),
             channel_coordinator: cc,

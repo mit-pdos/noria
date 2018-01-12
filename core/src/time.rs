@@ -21,8 +21,10 @@ impl Time {
         assert!(other <= *self);
         self.0 - other.0
     }
-    pub fn increment(&mut self) {
+    /// Increments time and returns the old value.
+    pub fn increment(&mut self) -> Self {
         self.0 += 1;
+        Time(self.0 - 1)
     }
 }
 
@@ -70,8 +72,8 @@ impl Index<usize> for VectorTime {
 }
 impl IndexMut<usize> for VectorTime {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        if self.0.len() <= index {
-            self.0.resize(index, Time::zero());
+        if index >= self.0.len() {
+            self.0.resize(index + 1, Time::zero());
         }
         &mut self.0[index]
     }

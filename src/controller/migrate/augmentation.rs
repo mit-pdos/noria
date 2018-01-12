@@ -65,10 +65,22 @@ pub fn inform(
                 .map(|n| *n.local_addr())
                 .collect();
 
+            let time_sources = if node.is_internal() && node.get_base().is_some() {
+                let mut time_sources = Vec::new();
+                for _ in 0..ctx.shards() {
+                    time_sources.push((Time::zero().next(), controller.next_time_source));
+                    controller.next_time_source += 1;
+                }
+                Some(time_sources)
+            } else {
+                None
+            };
+
             trace!(log, "request addition of node"; "node" => ni.index());
             ctx.send(box Packet::AddNode {
                 node: node,
                 parents: old_parents,
+                time_sources,
             }).unwrap();
         }
     }

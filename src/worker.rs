@@ -188,7 +188,10 @@ impl WorkerPool {
     pub fn wait(&mut self) {
         self.notify.clear();
         for jh in self.workers.drain(..) {
-            jh.join().unwrap();
+            let r = jh.join();
+            if !thread::panicking() {
+                r.unwrap();
+            }
         }
     }
 }
