@@ -72,9 +72,15 @@ impl Populate {
         println!("Populating roles...");
         let mut records = Vec::new();
         // add tas
-        for (cid, tas) in self.tas.iter() {
-            for ta in tas {
-                let uid = ta.clone();
+        // we populate in this order so that each batch of writes
+        // as many cids as possible. this is important for the
+        // trigger node, since it creates one thread per batch
+        // if the batch has a new id. having the same cid in one
+        // batch would mean we create a new thread for each cid,
+        // instead of one thread per batch of cid.
+        for i in 0..TAS_PER_CLASS {
+            for (cid, tas) in self.tas.iter() {
+                let uid = tas[i].clone();
                 let cid = cid.clone();
                 let role = 1.into(); // ta
                 records.push(vec![uid, cid, role]);
