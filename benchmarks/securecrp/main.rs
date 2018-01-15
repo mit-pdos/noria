@@ -176,6 +176,7 @@ fn main() {
     let reuse = args.value_of("reuse").unwrap();
 
     let mut backend = Backend::new(partial, shard, reuse);
+    backend.migrate(sloc, None).unwrap();
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
 
