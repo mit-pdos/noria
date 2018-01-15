@@ -4,7 +4,7 @@ extern crate rand;
 extern crate clap;
 extern crate slog;
 
-use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
+use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -41,9 +41,7 @@ impl Backend {
             _ => panic!("reuse configuration not supported"),
         }
 
-        Backend {
-            g: g,
-        }
+        Backend { g: g }
     }
 
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
@@ -57,10 +55,7 @@ impl Backend {
         let name = &format!("UserContext_{}", uc.get("id").unwrap());
         let r: Vec<DataType> = uc.values().cloned().collect();
         let ins = self.g.inputs();
-        let mut mutator = self
-            .g
-            .get_mutator(ins[name])
-            .unwrap();
+        let mut mutator = self.g.get_mutator(ins[name]).unwrap();
 
         mutator.put(r).unwrap();
     }
@@ -75,11 +70,7 @@ impl Backend {
         self.g.set_security_config(config);
     }
 
-    fn migrate(
-        &mut self,
-        schema_file: &str,
-        query_file: Option<&str>,
-    ) -> Result<(), String> {
+    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::fs::File;
         use std::io::Read;
 
