@@ -61,6 +61,7 @@ pub enum Event {
     None,
 }
 
+#[derive(Debug)]
 pub struct TimeAssignment {
     pub source: TimeSource,
     pub time: Time,
@@ -162,14 +163,24 @@ impl DomainState {
         };
 
         if let Some(base) = base {
-            let num_ingress = *self.ingress_from_base.get(base.index()).unwrap_or(&1);
+            let num_ingress = *self.ingress_from_base.get(base.index()).unwrap();
             assert!(num_ingress > 0);
 
+            let at = at.unwrap();
             if past_prev && self.next_transaction.is_none() && num_ingress == 1 {
-                let at = at.unwrap();
-                assert_eq!(self.ts[at.1].next(), at.0);
+                assert_eq!(self.ts[at.1].next(), at.0,);
                 self.ts[at.1] = at.0;
                 self.next_transaction = Some(Bundle::Messages(vec![m]));
+            } else if past_prev && self.next_transaction.is_none()
+                && self.message_buffer
+                    .get(at.1)
+                    .map(|v| v[0].at == at.0 && v[0].packets.len() == num_ingress - 1)
+                    .unwrap_or(false)
+            {
+                let mut messages = self.message_buffer[at.1].remove(0).packets;
+                messages.push(m);
+                self.ts[at.1] = at.0;
+                self.next_transaction = Some(Bundle::Messages(messages));
             } else {
                 let (prev, base) = if let box Packet::VtMessage {
                     state: TransactionState::VtCommitted { ref prev, base, .. },
@@ -180,7 +191,6 @@ impl DomainState {
                 } else {
                     unreachable!()
                 };
-                let at = at.unwrap();
                 let buf = self.message_buffer.entry(at.1).or_insert_with(Vec::new);
                 if buf.is_empty() || at.0 == buf[buf.len() - 1].at.next() {
                     buf.push(BufferedMessage {
@@ -191,6 +201,7 @@ impl DomainState {
                     });
                 } else {
                     let i = at.0.difference(buf[0].at) as usize;
+                    assert_eq!(buf[i].at, at.0);
                     buf[i].packets.push(m);
                 }
             }
