@@ -4,6 +4,8 @@ extern crate rand;
 extern crate clap;
 extern crate slog;
 
+mod test_populate;
+
 use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
@@ -180,7 +182,16 @@ fn main() {
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
 
+    if args.is_present("populate") {
+        test_populate::create_users(&mut backend);
+        test_populate::create_papers(&mut backend);
+    }
+
     backend.login(make_user("malte")).is_ok();
+
+    if args.is_present("populate") {
+        test_populate::dump_papers(&mut backend, "malte");
+    }
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
