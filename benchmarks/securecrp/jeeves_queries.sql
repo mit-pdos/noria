@@ -1,4 +1,4 @@
-PaperList: SELECT Paper.*, title AS latest_version_title
+QUERY PaperList: SELECT Paper.*, Paper.title AS latest_version_title
            FROM Paper
            JOIN (SELECT *
                  FROM PaperVersion
