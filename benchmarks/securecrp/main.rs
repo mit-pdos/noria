@@ -4,14 +4,14 @@ extern crate rand;
 extern crate clap;
 extern crate slog;
 
-use distributary::{Blender, DataType, ReuseConfigType, ControllerBuilder};
+use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
 
 pub struct Backend {
-    g: Blender,
+    g: ControllerHandle<LocalAuthority>,
 }
 
 impl Backend {
@@ -25,12 +25,13 @@ impl Backend {
             cb.disable_partial();
         }
 
-        if !shard {
-            cb.disable_sharding();
+        if shard {
+            cb.enable_sharding(2);
         }
 
-        let mut g = cb.build();
-        g.log_with(blender_log);
+        cb.log_with(blender_log);
+
+        let mut g = cb.build_local();
 
         match reuse.as_ref() {
             "finkelstein" => g.enable_reuse(ReuseConfigType::Finkelstein),
@@ -52,7 +53,7 @@ impl Backend {
         Ok(())
     }
 
-    fn write_to_user_context(&self, uc: HashMap<String, DataType>) {
+    fn write_to_user_context(&mut self, uc: HashMap<String, DataType>) {
         let name = &format!("UserContext_{}", uc.get("id").unwrap());
         let r: Vec<DataType> = uc.values().cloned().collect();
         let ins = self.g.inputs();
@@ -64,11 +65,20 @@ impl Backend {
         mutator.put(r).unwrap();
     }
 
+    fn set_security_config(&mut self, config_file: &str) {
+        use std::io::Read;
+        let mut config = String::new();
+        let mut cf = File::open(config_file).unwrap();
+        cf.read_to_string(&mut config).unwrap();
+
+        // Install recipe with policies
+        self.g.set_security_config(config);
+    }
+
     fn migrate(
         &mut self,
         schema_file: &str,
         query_file: Option<&str>,
-        policy_file: Option<&str>,
     ) -> Result<(), String> {
         use std::fs::File;
         use std::io::Read;
@@ -92,23 +102,8 @@ impl Backend {
             }
         }
 
-        // Read policy file
-        match policy_file {
-            None => (),
-            Some(pf) => {
-                let mut p = String::new();
-                let mut pf = File::open(pf).unwrap();
-                pf.read_to_string(&mut p).unwrap();
-
-                // Install recipe with policies
-                self.g.install_recipe_with_policies(rs, p);
-
-                return Ok(())
-            }
-        };
-
         // Install recipe
-        self.g.install_recipe(rs);
+        self.g.install_recipe(rs).unwrap();
 
         Ok(())
     }
@@ -190,7 +185,8 @@ fn main() {
     let reuse = args.value_of("reuse").unwrap();
 
     let mut backend = Backend::new(partial, shard, reuse);
-    backend.migrate(sloc, Some(qloc), Some(ploc)).unwrap();
+    backend.set_security_config(ploc);
+    backend.migrate(sloc, Some(qloc)).unwrap();
 
     backend.login(make_user(1)).is_ok();
 
