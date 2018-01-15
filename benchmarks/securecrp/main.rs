@@ -100,9 +100,9 @@ impl Backend {
     }
 }
 
-fn make_user(id: i32) -> HashMap<String, DataType> {
+fn make_user(name: &str) -> HashMap<String, DataType> {
     let mut user = HashMap::new();
-    user.insert(String::from("id"), id.into());
+    user.insert(String::from("id"), name.into());
 
     user
 }
@@ -180,7 +180,7 @@ fn main() {
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
 
-    backend.login(make_user(1)).is_ok();
+    backend.login(make_user("malte")).is_ok();
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
