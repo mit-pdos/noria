@@ -355,7 +355,7 @@ dependencies = [
  "hyper 0.11.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "mio-pool 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio-pool 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
  "mysql 12.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=fe7cdaa360c86bd4202e4065bc125ba5642439d2)",
@@ -783,9 +783,10 @@ dependencies = [
 
 [[package]]
 name = "mio-pool"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
+ "libc 0.2.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1875,7 +1876,7 @@ dependencies = [
 "checksum miniz-sys 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "609ce024854aeb19a0ef7567d348aaa5a746b32fb72e336df7fcc16869d7e2b4"
 "checksum mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a637d1ca14eacae06296a008fa7ad955347e34efcb5891cfd8ba05491a37907e"
 "checksum mio 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)" = "75f72a93f046f1517e3cfddc0a096eb756a2ba727d36edc8227dee769a50a9b0"
-"checksum mio-pool 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "50fa4cb7f17eb069d89f19d36977ede2dbebb3b80739a20f3ba738d279241bf7"
+"checksum mio-pool 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "feb5cc2c8f00533a1525cf63d29fd01a4b7d1128ada83b7c21d6177772af1cb2"
 "checksum miow 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3e690c5df6b2f60acd45d56378981e827ff8295562fc8d34f573deb267a59cd1"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum mysql 11.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "76747b7301788cd7e70c90faa322935e55831d5d5293f3f52b69f3cecdfc0b81"
