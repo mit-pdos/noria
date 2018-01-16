@@ -303,7 +303,7 @@ impl DomainHandle {
         self.txs[i].0.send(p)
     }
 
-    fn wait_for_next_reply(&mut self) -> ControlReplyPacket {
+    pub fn wait_for_next_reply(&mut self) -> ControlReplyPacket {
         let mut reply = None;
         self.cr_poll.run_polling_loop(|event| match event {
             PollEvent::Process(packet) => {

@@ -23,6 +23,7 @@
 use channel;
 use dataflow::{checktable, node, payload};
 use dataflow::ops::base::Base;
+use dataflow::payload::ControlReplyPacket;
 use dataflow::prelude::*;
 
 use std::collections::{HashMap, HashSet};
@@ -351,6 +352,11 @@ impl<'a> Migration<'a> {
         // If ingredients contains only one more node than is currently being added (the source
         // node), then this is the first migration.
         let is_first_migration = mainline.ingredients.node_count() == new.len() + 1;
+        let existing_bases: Vec<_> = mainline
+            .ingredients
+            .neighbors_directed(mainline.source, petgraph::EdgeDirection::Outgoing)
+            .filter(|n| !new.contains(n))
+            .collect();
 
         // Shard the graph as desired
         let mut swapped0 = if let Some(shards) = mainline.sharding {
@@ -538,14 +544,29 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        let prev = VectorTime::new(mainline.time.increment(), mainline.time_source);
-        let start_ts = VectorTime::new(mainline.time.increment(), mainline.time_source);
-        let end_ts = VectorTime::new(mainline.time, mainline.time_source);
+        let mut prev = VectorTime::new(mainline.time.increment(), mainline.time_source);
+        let mut start_ts = VectorTime::new(mainline.time.increment(), mainline.time_source);
+        let mut end_ts = VectorTime::new(mainline.time, mainline.time_source);
 
         if !is_first_migration {
-            // TODO(jbehrens): Reserve a timestamp from all the current bases and update
-            // prev/start_ts/end_ts accordingly.
-            unimplemented!();
+            for base in existing_bases {
+                let node = &mut mainline.ingredients[base];
+                assert!(node.get_base().is_some());
+
+                let domain = mainline.domains.get_mut(&node.domain()).unwrap();
+                for s in 0..domain.shards() {
+                    domain.send_to_shard(s, Box::new(Packet::GetTimestamp { base }));
+                    match domain.wait_for_next_reply() {
+                        ControlReplyPacket::TimestampAssigned { time, source, prev: p } => {
+                            if let Some(p) = p {
+                                prev.advance_to(&p);
+                            }
+                            end_ts[source] = time;
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+            }
         }
 
         let mut workers: Vec<_> = mainline

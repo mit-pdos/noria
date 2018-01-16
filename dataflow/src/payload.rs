@@ -268,6 +268,12 @@ pub enum Packet {
     /// Request that a domain send usage statistics on the control reply channel.
     GetStatistics,
 
+    /// Request that a domain give out a timestamp from source, and send it back on the control
+    /// reply channel.
+    GetTimestamp {
+        base: NodeIndex,
+    },
+
     /// The packet was captured awaiting the receipt of other replays.
     Captured,
 
@@ -490,6 +496,11 @@ pub enum ControlReplyPacket {
         HashMap<petgraph::graph::NodeIndex, statistics::NodeStats>,
     ),
     Booted(usize, SocketAddr),
+    TimestampAssigned {
+        time: Time,
+        source: TimeSource,
+        prev: Option<VectorTime>,
+    },
 }
 
 impl ControlReplyPacket {

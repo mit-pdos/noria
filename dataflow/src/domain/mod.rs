@@ -1269,6 +1269,17 @@ impl Domain {
                             .send(ControlReplyPacket::Statistics(domain_stats, node_stats))
                             .unwrap();
                     }
+                    Packet::GetTimestamp { base } => {
+                        let timestamp = self.transaction_state.assign_time(base);
+
+                        self.control_reply_tx
+                            .send(ControlReplyPacket::TimestampAssigned {
+                                time: timestamp.time,
+                                source: timestamp.source,
+                                prev: timestamp.prev,
+                            })
+                            .unwrap();
+                    }
                     Packet::Captured => {
                         unreachable!("captured packets should never be sent around")
                     }
