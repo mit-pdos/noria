@@ -195,40 +195,37 @@ impl GroupCommitQueueSet {
         nodes: &DomainNodes,
         transaction_state: &mut transactions::DomainState,
     ) -> Option<Box<Packet>> {
-        match self.params.mode {
-            DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
-                if !self.files.contains_key(node) {
-                    let file = self.get_or_create_file(node);
-                    self.files.insert(node.clone(), file);
-                }
-
-                let mut file = &mut self.files[node].1;
-                {
-                    let data_to_flush: Vec<_> = self.pending_packets[&node]
-                        .iter()
-                        .map(|p| match **p {
-                            Packet::VtMessage { ref data, .. } => data,
-                            _ => unreachable!(),
-                        })
-                        .collect();
-                    serde_json::to_writer(&mut file, &data_to_flush).unwrap();
-                    // Separate log flushes with a newline so that the
-                    // file can be easily parsed later on:
-                    writeln!(&mut file, "").unwrap();
-                }
-
-                file.flush().unwrap();
-                file.get_mut().sync_data().unwrap();
-            }
-            DurabilityMode::MemoryOnly => {}
-        }
-
         self.wait_start.remove(node);
-        Self::merge_packets(
+        let packet = Self::merge_packets(
             mem::replace(&mut self.pending_packets[node], Vec::new()),
             nodes,
             transaction_state,
-        )
+        );
+
+        if let Some(ref packet) = packet {
+            match self.params.mode {
+                DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
+                    if !self.files.contains_key(node) {
+                        let file = self.get_or_create_file(node);
+                        self.files.insert(node.clone(), file);
+                    }
+
+                    let mut file = &mut self.files[node].1;
+                    {
+                        serde_json::to_writer(&mut file, &packet).unwrap();
+                        // Separate log flushes with a newline so that the
+                        // file can be easily parsed later on:
+                        writeln!(&mut file, "").unwrap();
+                    }
+
+                    file.flush().unwrap();
+                    file.get_mut().sync_data().unwrap();
+                }
+                DurabilityMode::MemoryOnly => {}
+            }
+        }
+
+        packet
     }
 
     /// Add a new packet to be persisted, and if this triggered a flush return an iterator over the

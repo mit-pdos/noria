@@ -1554,33 +1554,13 @@ impl Domain {
 
             BufReader::new(file)
                 .lines()
-                .filter_map(|line| {
-                    let line = line
-                        .expect(&format!("Failed to read line from log file: {:?}", path));
-                    let entries: Result<Vec<Records>, _> = serde_json::from_str(&line);
-                    entries.ok()
+                .map(|line| {
+                    let line =
+                        line.expect(&format!("Failed to read line from log file: {:?}", path));
+                    serde_json::from_str::<Box<Packet>>(&line)
+                        .expect("Failed to parse log file entry")
                 })
-                // Parsing each individual line gives us an iterator over Vec<Records>.
-                // We're interested in chunking each record, so let's flat_map twice:
-                // Iter<Vec<Records>> -> Iter<Records> -> Iter<Record>
-                .flat_map(|r| r)
-                .flat_map(|r| r)
-                // Merge individual records into batches of RECOVERY_BATCH_SIZE:
-                .chunks(RECOVERY_BATCH_SIZE)
-                .into_iter()
-                // Then create Packet objects from the data:
-                .map(|chunk| {
-                    let data: Records = chunk.collect();
-                    let link = Link::new(local_addr, local_addr);
-                    let (at, prev) = unimplemented!(); // TODO(jbehrens)
-                    Packet::VtMessage {
-                        link,
-                        data,
-                        tracer: None,
-                        state: TransactionState::VtCommitted { at, prev, base: global_addr },
-                    }
-                })
-                .for_each(|packet| self.handle(box packet, sends));
+                .for_each(|packet| self.handle(packet, sends));
         }
 
         self.control_reply_tx
