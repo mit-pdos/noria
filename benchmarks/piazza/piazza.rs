@@ -59,6 +59,9 @@ impl Backend {
         let classes = pop.get_classes();
 
         self.populate("Role", roles);
+        println!("Waiting for groups to be constructed...");
+        thread::sleep(time::Duration::from_millis(120000));
+
         self.populate("User", users);
         self.populate("Post", posts);
         self.populate("Class", classes);
