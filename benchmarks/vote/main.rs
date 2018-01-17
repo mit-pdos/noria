@@ -403,124 +403,129 @@ where
 fn main() {
     use clap::{App, Arg, SubCommand};
 
-    let args = App::new("vote")
-        .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
-        .arg(
-            Arg::with_name("articles")
-                .short("a")
-                .long("articles")
-                .value_name("N")
-                .default_value("100000")
-                .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
-            Arg::with_name("threads")
-                .short("t")
-                .long("threads")
-                .value_name("N")
-                .default_value("4")
-                .help("Number of client load threads to run"),
-        )
-        .arg(
-            Arg::with_name("runtime")
-                .short("r")
-                .long("runtime")
-                .value_name("N")
-                .default_value("15")
-                .help("Benchmark runtime in seconds"),
-        )
-        .arg(
-            Arg::with_name("histogram")
-                .long("histogram")
-                .help("Output serialized HdrHistogram to a file")
-                .takes_value(true)
-                .long_help(
-                    "If the file already exists, the existing histogram is extended.\
-                     There are four histograms, written out in order: \
-                     sojourn-write, sojourn-read, remote-write, and remote-read",
-                ),
-        )
-        .arg(
-            Arg::with_name("ops")
-                .long("target")
-                .default_value("1000000")
-                .help("Target operations per second"),
-        )
-        .arg(
-            Arg::with_name("ratio")
-                .long("write-every")
-                .default_value("19")
-                .value_name("N")
-                .help("1-in-N chance of a write"),
-        )
-        .subcommand(
-            SubCommand::with_name("netsoup").arg(
-                Arg::with_name("zookeeper")
-                    .short("z")
-                    .long("zookeeper")
+    let args =
+        App::new("vote")
+            .version("0.1")
+            .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
+            .arg(
+                Arg::with_name("articles")
+                    .short("a")
+                    .long("articles")
+                    .value_name("N")
+                    .default_value("100000")
+                    .help("Number of articles to prepopulate the database with"),
+            )
+            .arg(
+                Arg::with_name("threads")
+                    .short("t")
+                    .long("threads")
+                    .value_name("N")
+                    .default_value("4")
+                    .help("Number of client load threads to run"),
+            )
+            .arg(
+                Arg::with_name("runtime")
+                    .short("r")
+                    .long("runtime")
+                    .value_name("N")
+                    .default_value("15")
+                    .help("Benchmark runtime in seconds"),
+            )
+            .arg(
+                Arg::with_name("histogram")
+                    .long("histogram")
+                    .help("Output serialized HdrHistogram to a file")
                     .takes_value(true)
-                    .required(true)
-                    .help("Address of Zookeeper instance"),
-            ),
-        )
-        .subcommand(
-            SubCommand::with_name("localsoup")
-                .arg(
-                    Arg::with_name("workers")
-                        .short("w")
-                        .long("workers")
-                        .takes_value(true)
-                        .default_value("1")
-                        .help("Number of workers to use"),
-                )
-                .arg(
-                    Arg::with_name("readthreads")
-                        .long("read-threads")
-                        .value_name("N")
-                        .default_value("2")
-                        .help("Number of read threads to start"),
-                )
-                .arg(
-                    Arg::with_name("shards")
-                        .long("shards")
-                        .takes_value(true)
-                        .default_value("2")
-                        .help("Shard the graph this many ways (0 = disable sharding)."),
-                )
-                .arg(
-                    Arg::with_name("durability")
-                        .long("durability")
-                        .takes_value(false)
-                        .help("Enable durability for Base nodes"),
-                )
-                .arg(
-                    Arg::with_name("retain-logs-on-exit")
-                        .long("retain-logs-on-exit")
-                        .takes_value(false)
-                        .requires("durability")
-                        .help("Do not delete the base node logs on exit."),
-                )
-                .arg(
-                    Arg::with_name("write-batch-size")
-                        .long("write-batch-size")
-                        .takes_value(true)
-                        .default_value("512")
-                        .help("Size of batches processed at base nodes."),
-                )
-                .arg(
-                    Arg::with_name("stupid")
-                        .long("stupid")
-                        .help("Make the migration stupid")
-                        .requires("migrate"),
-                )
-                .arg(
-                    Arg::with_name("verbose")
-                        .short("v")
-                        .help("Include logging output"),
-                ),
-        )
-        .get_matches();
+                    .long_help(
+                        "If the file already exists, the existing histogram is extended.\
+                         There are four histograms, written out in order: \
+                         sojourn-write, sojourn-read, remote-write, and remote-read",
+                    ),
+            )
+            .arg(
+                Arg::with_name("ops")
+                    .long("target")
+                    .default_value("1000000")
+                    .help("Target operations per second"),
+            )
+            .arg(
+                Arg::with_name("ratio")
+                    .long("write-every")
+                    .default_value("19")
+                    .value_name("N")
+                    .help("1-in-N chance of a write"),
+            )
+            .subcommand(
+                SubCommand::with_name("netsoup")
+                    .arg(
+                        Arg::with_name("zookeeper")
+                            .short("z")
+                            .long("zookeeper")
+                            .takes_value(true)
+                            .required(true)
+                            .help("Address of Zookeeper instance"),
+                    )
+                    .arg(Arg::with_name("first").long("first").help(
+                        "Indicates that this is the first client, which should populate the db",
+                    )),
+            )
+            .subcommand(
+                SubCommand::with_name("localsoup")
+                    .arg(
+                        Arg::with_name("workers")
+                            .short("w")
+                            .long("workers")
+                            .takes_value(true)
+                            .default_value("1")
+                            .help("Number of workers to use"),
+                    )
+                    .arg(
+                        Arg::with_name("readthreads")
+                            .long("read-threads")
+                            .value_name("N")
+                            .default_value("2")
+                            .help("Number of read threads to start"),
+                    )
+                    .arg(
+                        Arg::with_name("shards")
+                            .long("shards")
+                            .takes_value(true)
+                            .default_value("2")
+                            .help("Shard the graph this many ways (0 = disable sharding)."),
+                    )
+                    .arg(
+                        Arg::with_name("durability")
+                            .long("durability")
+                            .takes_value(false)
+                            .help("Enable durability for Base nodes"),
+                    )
+                    .arg(
+                        Arg::with_name("retain-logs-on-exit")
+                            .long("retain-logs-on-exit")
+                            .takes_value(false)
+                            .requires("durability")
+                            .help("Do not delete the base node logs on exit."),
+                    )
+                    .arg(
+                        Arg::with_name("write-batch-size")
+                            .long("write-batch-size")
+                            .takes_value(true)
+                            .default_value("512")
+                            .help("Size of batches processed at base nodes."),
+                    )
+                    .arg(
+                        Arg::with_name("stupid")
+                            .long("stupid")
+                            .help("Make the migration stupid")
+                            .requires("migrate"),
+                    )
+                    .arg(
+                        Arg::with_name("verbose")
+                            .short("v")
+                            .help("Include logging output"),
+                    ),
+            )
+            .get_matches();
 
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),

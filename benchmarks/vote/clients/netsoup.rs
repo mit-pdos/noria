@@ -23,27 +23,42 @@ fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
     c.get_getter(view).unwrap()
 }
 
+const RECIPE: &str = "# base tables
+CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+
+# read queries
+QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+            FROM Article \
+            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                       FROM Vote GROUP BY Vote.id) AS VoteCount \
+            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
+
 impl VoteClient for Client {
     type Constructor = String;
 
     fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
-        // for prepop, we need a mutator
-        let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeper").unwrap()));
-        let mut m = make_mutator(&mut ch, "Articles");
+        if args.is_present("first") {
+            // for prepop, we need a mutator
+            let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeper").unwrap()));
 
-        let pop_batch_size = 100;
-        assert_eq!(articles % pop_batch_size, 0);
-        for i in 0..articles / pop_batch_size {
-            let reali = pop_batch_size * i;
-            let data: Vec<Vec<DataType>> = (reali..reali + pop_batch_size)
-                .map(|i| (i as i64, format!("Article #{}", i)))
-                .map(|(id, title)| vec![id.into(), title.into()])
-                .collect();
-            m.multi_put(data).unwrap();
+            ch.install_recipe(RECIPE.to_owned()).unwrap();
+            let mut m = make_mutator(&mut ch, "Article");
+
+            let pop_batch_size = 100;
+            assert_eq!(articles % pop_batch_size, 0);
+            for i in 0..articles / pop_batch_size {
+                let reali = pop_batch_size * i;
+                let data: Vec<Vec<DataType>> = (reali..reali + pop_batch_size)
+                    .map(|i| (i as i64, format!("Article #{}", i)))
+                    .map(|(id, title)| vec![id.into(), title.into()])
+                    .collect();
+                m.multi_put(data).unwrap();
+            }
+
+            // allow writes to propagate
+            thread::sleep(time::Duration::from_secs(1));
         }
-
-        // allow writes to propagate
-        thread::sleep(time::Duration::from_secs(1));
 
         args.value_of("zookeper").unwrap().to_string()
     }
@@ -53,7 +68,7 @@ impl VoteClient for Client {
 
         Client {
             r: make_getter(&mut ch, "ArticleWithVoteCount"),
-            w: make_mutator(&mut ch, "Votes"),
+            w: make_mutator(&mut ch, "Vote"),
         }
     }
 
