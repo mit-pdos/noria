@@ -75,7 +75,7 @@ where
     let mut bind_server = hwloc::Bitmap::new();
     if let Ok(nodes) = topo.objects_with_type(&hwloc::ObjectType::NUMANode) {
         for node in nodes {
-            if let Some(cpus) = node.cpuset() {
+            if let Some(cpus) = node.allowed_cpuset() {
                 if bind_generator.weight() as usize >= ngen + nthreads {
                     for cpu in cpus {
                         bind_server.set(cpu);
