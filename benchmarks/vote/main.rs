@@ -43,7 +43,7 @@ fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
         unsafe { libc::CPU_SET(cpu as usize, &mut cpuset) };
     }
     let errno = unsafe {
-        libc::pthread_setaffinity_np(0, mem::size_of::<libc::cpu_set_t>(), &cpuset as *const _)
+        libc::pthread_setaffinity_np(libc::pthread_self(), mem::size_of::<libc::cpu_set_t>(), &cpuset as *const _)
     };
     if errno != 0 {
         Err(io::Error::from_raw_os_error(errno))
