@@ -10,7 +10,8 @@ mod graph;
 
 pub(crate) struct Client {
     r: distributary::RemoteGetter,
-    #[allow(dead_code)] w: distributary::Mutator,
+    #[allow(dead_code)]
+    w: distributary::Mutator,
 }
 
 impl VoteClient for Client {
