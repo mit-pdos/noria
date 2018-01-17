@@ -136,7 +136,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
                                        FROM Vote GROUP BY Vote.id) AS VoteCount \
                             ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
 
-    graph.install_recipe(recipe.to_owned());
+    graph.install_recipe(recipe.to_owned()).unwrap();
     let inputs = graph.inputs();
     let outputs = graph.outputs();
 
@@ -199,9 +199,9 @@ impl Graph {
                             GROUP BY Article.id;";
 
         if self.setup.stupid {
-            self.graph.install_recipe(stupid_recipe.to_owned());
+            self.graph.install_recipe(stupid_recipe.to_owned()).unwrap();
         } else {
-            self.graph.install_recipe(smart_recipe.to_owned());
+            self.graph.install_recipe(smart_recipe.to_owned()).unwrap();
         }
 
         let inputs = self.graph.inputs();
