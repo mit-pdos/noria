@@ -27,8 +27,8 @@ fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
 impl VoteClient for Client {
     type Constructor = String;
 
-    fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
-        if args.is_present("first") {
+    fn new(prime: bool, args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
+        if prime {
             // for prepop, we need a mutator
             let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeeper").unwrap()));
 

@@ -14,13 +14,13 @@ pub(crate) struct Client {
 impl VoteClient for Client {
     type Constructor = Opts;
 
-    fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
+    fn new(prime: bool, args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
         let addr = args.value_of("address").unwrap();
         let addr = format!("mysql://{}", addr);
         let db = args.value_of("database").unwrap();
         let opts = Opts::from_url(&addr).unwrap();
 
-        if args.is_present("prime") {
+        if prime {
             let mut opts = OptsBuilder::from_opts(opts.clone());
             opts.db_name(None::<&str>);
             opts.init(vec![

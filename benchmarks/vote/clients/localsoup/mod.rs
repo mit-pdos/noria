@@ -16,8 +16,10 @@ pub(crate) struct Client {
 impl VoteClient for Client {
     type Constructor = graph::Graph;
 
-    fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
+    fn new(prime: bool, args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
         use distributary::{DurabilityMode, PersistenceParameters};
+
+        assert!(prime);
 
         let nworkers = value_t_or_exit!(args, "workers", usize);
         let read_threads = value_t_or_exit!(args, "readthreads", usize);
