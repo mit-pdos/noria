@@ -416,7 +416,7 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("60")
+                .default_value("15")
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
@@ -433,7 +433,7 @@ fn main() {
         .arg(
             Arg::with_name("ops")
                 .long("target")
-                .default_value("20000")
+                .default_value("1000000")
                 .help("Target operations per second"),
         )
         .arg(
@@ -450,14 +450,14 @@ fn main() {
                         .short("w")
                         .long("workers")
                         .takes_value(true)
-                        .default_value("2")
+                        .default_value("1")
                         .help("Number of workers to use"),
                 )
                 .arg(
                     Arg::with_name("readthreads")
                         .long("read-threads")
                         .value_name("N")
-                        .default_value("1")
+                        .default_value("2")
                         .help("Number of read threads to start"),
                 )
                 .arg(
