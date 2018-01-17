@@ -40,7 +40,7 @@ impl VoteClient for Client {
     fn new(args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
         if args.is_present("first") {
             // for prepop, we need a mutator
-            let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeper").unwrap()));
+            let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeeper").unwrap()));
 
             ch.install_recipe(RECIPE.to_owned()).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
@@ -60,7 +60,7 @@ impl VoteClient for Client {
             thread::sleep(time::Duration::from_secs(1));
         }
 
-        args.value_of("zookeper").unwrap().to_string()
+        args.value_of("zookeeper").unwrap().to_string()
     }
 
     fn from(control: &mut Self::Constructor) -> Self {

@@ -463,6 +463,7 @@ fn main() {
                             .long("zookeeper")
                             .takes_value(true)
                             .required(true)
+                            .default_value("127.0.0.1:2181")
                             .help("Address of Zookeeper instance"),
                     )
                     .arg(Arg::with_name("first").long("first").help(
