@@ -455,6 +455,16 @@ fn main() {
                 .help("1-in-N chance of a write"),
         )
         .subcommand(
+            SubCommand::with_name("netsoup").arg(
+                Arg::with_name("zookeeper")
+                    .short("z")
+                    .long("zookeeper")
+                    .takes_value(true)
+                    .required(true)
+                    .help("Address of Zookeeper instance"),
+            ),
+        )
+        .subcommand(
             SubCommand::with_name("localsoup")
                 .arg(
                     Arg::with_name("workers")
@@ -514,6 +524,7 @@ fn main() {
 
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
+        ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }
