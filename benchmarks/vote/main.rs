@@ -408,7 +408,7 @@ fn main() {
                 .short("t")
                 .long("threads")
                 .value_name("N")
-                .default_value("1")
+                .default_value("4")
                 .help("Number of client load threads to run"),
         )
         .arg(
