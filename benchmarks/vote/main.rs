@@ -4,6 +4,7 @@ extern crate distributary;
 extern crate hdrsample;
 extern crate hwloc;
 extern crate libc;
+extern crate mysql;
 extern crate rand;
 extern crate rayon;
 
@@ -471,6 +472,22 @@ fn main() {
                     )),
             )
             .subcommand(
+                SubCommand::with_name("mysql")
+                    .arg(
+                        Arg::with_name("address")
+                            .long("address")
+                            .takes_value(true)
+                            .required(true)
+                            .default_value("127.0.0.1:3306")
+                            .help("Address of MySQL server"),
+                    )
+                    .arg(
+                        Arg::with_name("prime")
+                            .long("prime")
+                            .help("Indicates that the client should set up the database"),
+                    ),
+            )
+            .subcommand(
                 SubCommand::with_name("localsoup")
                     .arg(
                         Arg::with_name("workers")
@@ -531,6 +548,7 @@ fn main() {
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
         ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
+        ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }
