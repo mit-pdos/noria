@@ -91,6 +91,8 @@ dependencies = [
  "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-state-stream 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hdrsample 6.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hwloc 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "mysql 11.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -445,6 +447,16 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "errno"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.35 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "evmap"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -552,6 +564,20 @@ dependencies = [
 name = "httparse"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "hwloc"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "errno 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.35 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "hyper"
@@ -1834,6 +1860,7 @@ dependencies = [
 "checksum encoding-index-singlebyte 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3351d5acffb224af9ca265f435b859c7c01537c0849754d3db3fdf2bfe2ae84a"
 "checksum encoding-index-tradchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fd0e20d5688ce3cab59eb3ef3a2083a5c77bf496cb798dc6fcdb75f323890c18"
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
+"checksum errno 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b2c858c42ac0b88532f48fca88b0ed947cad4f1f64d904bcd6c9f138f7b95d70"
 "checksum evmap 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc0636f6ddc376cb6ace9f1ba65a7e1a0dde4b2554056175fc12b94b7e1397eb"
 "checksum fixedbitset 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "85cb8fec437468d86dc7c83ca7cfc933341d561873275f22dd5eedefa63a6478"
 "checksum flate2 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "e6234dd4468ae5d1e2dbb06fe2b058696fdc50a339c68a393aefbf00bc81e423"
@@ -1850,6 +1877,7 @@ dependencies = [
 "checksum hdrsample 6.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1b41070431103357511e2f8aed7f5d7947f07360bc7a4f51dc07d68a9b35281d"
 "checksum hostname 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "58fab6e177434b0bb4cd344a4dabaa5bd6d7a8d792b1885aebcae7af1091d1cb"
 "checksum httparse 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "af2f2dd97457e8fb1ae7c5a420db346af389926e36f43768b96f101546b04a07"
+"checksum hwloc 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2934f84993b8b4bcae9b6a4e5f0aca638462dda9c7b4f26a570241494f21e0f4"
 "checksum hyper 0.11.12 (registry+https://github.com/rust-lang/crates.io-index)" = "856a5eb897fbc26890ddf8760ad4bbfc6bd777233522d9c48379ca9563d40517"
 "checksum idna 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "014b298351066f1512874135335d62a789ffe78a9974f94b43ed5621951eaf7d"
 "checksum iovec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b6e8b9c2247fcf6c6a1151f1156932be5606c9fd6f55a2d7f9fc1cb29386b2f7"

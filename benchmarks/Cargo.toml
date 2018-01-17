@@ -22,6 +22,8 @@ slog = "2.0.6"
 slog-term = "2.0.1"
 vec_map = { version = "0.8.0" }
 rayon = "0.9"
+libc = "0.2"
+hwloc = "0.5"
 
 # for benchmarks
 # cli
