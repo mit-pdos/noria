@@ -4,6 +4,7 @@ use std::time;
 use std::thread;
 
 use VoteClient;
+use clients::localsoup::graph::RECIPE;
 
 pub(crate) struct Client {
     r: distributary::RemoteGetter,
@@ -22,17 +23,6 @@ fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
     let view = c.outputs()[view];
     c.get_getter(view).unwrap()
 }
-
-const RECIPE: &str = "# base tables
-CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
-
-# read queries
-QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-            FROM Article \
-            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                       FROM Vote GROUP BY Vote.id) AS VoteCount \
-            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
 
 impl VoteClient for Client {
     type Constructor = String;

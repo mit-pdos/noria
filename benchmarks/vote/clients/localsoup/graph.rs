@@ -3,6 +3,17 @@ use time;
 use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
                    PersistenceParameters};
 
+pub(crate) const RECIPE: &str = "# base tables
+CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+
+# read queries
+QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+            FROM Article \
+            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
+                       FROM Vote GROUP BY Vote.id) AS VoteCount \
+            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
+
 pub struct Graph {
     setup: Setup,
     pub vote: NodeIndex,
@@ -125,18 +136,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     }
     let mut graph = g.build_local();
 
-    let recipe = "# base tables
-               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
-
-               # read queries
-               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article \
-                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
-                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
-
-    graph.install_recipe(recipe.to_owned()).unwrap();
+    graph.install_recipe(RECIPE.to_owned()).unwrap();
     let inputs = graph.inputs();
     let outputs = graph.outputs();
 

@@ -5,8 +5,7 @@ use std::thread;
 
 use VoteClient;
 
-#[path = "../../vote-old/graph.rs"]
-mod graph;
+pub(crate) mod graph;
 
 pub(crate) struct Client {
     r: distributary::RemoteGetter,
