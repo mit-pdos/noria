@@ -34,6 +34,10 @@ pub trait VoteClient {
     fn from(&mut Self::Constructor) -> Self;
     fn handle_reads(&mut self, requests: &[(time::Instant, usize)]);
     fn handle_writes(&mut self, requests: &[(time::Instant, usize)]);
+
+    fn spawns_threads() -> bool {
+        false
+    }
 }
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
@@ -67,22 +71,25 @@ where
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
 
-    // we want any threads spawned by the VoteClient (e.g., distributary itself)
-    // to be on their own NUMA node if there are many. or rather, we want to ensure that our
-    // pool clients/load generators do not interfere with the server.
-    let topo = hwloc::Topology::new();
     let mut bind_generator = hwloc::Bitmap::new();
     let mut bind_server = hwloc::Bitmap::new();
-    if let Ok(nodes) = topo.objects_with_type(&hwloc::ObjectType::NUMANode) {
-        for node in nodes {
-            if let Some(cpus) = node.allowed_cpuset() {
-                if bind_generator.weight() as usize >= ngen + nthreads {
-                    for cpu in cpus {
-                        bind_server.set(cpu);
-                    }
-                } else {
-                    for cpu in cpus {
-                        bind_generator.set(cpu);
+
+    if C::spawns_threads() {
+        // we want any threads spawned by the VoteClient (e.g., distributary itself)
+        // to be on their own NUMA node if there are many. or rather, we want to ensure that our
+        // pool clients/load generators do not interfere with the server.
+        let topo = hwloc::Topology::new();
+        if let Ok(nodes) = topo.objects_with_type(&hwloc::ObjectType::NUMANode) {
+            for node in nodes {
+                if let Some(cpus) = node.allowed_cpuset() {
+                    if bind_generator.weight() as usize >= ngen + nthreads {
+                        for cpu in cpus {
+                            bind_server.set(cpu);
+                        }
+                    } else {
+                        for cpu in cpus {
+                            bind_generator.set(cpu);
+                        }
                     }
                 }
             }

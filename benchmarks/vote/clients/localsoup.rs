@@ -110,4 +110,8 @@ impl VoteClient for Client {
             .count();
         assert_eq!(rows, ids.len());
     }
+
+    fn spawns_threads() -> bool {
+        true
+    }
 }
