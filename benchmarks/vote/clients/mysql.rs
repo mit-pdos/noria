@@ -130,7 +130,7 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle_writes(&mut self, ids: &[(time::Instant, usize)]) {
+    fn handle_writes(&mut self, ids: &[(time::Instant, i32)]) {
         let missing = self.write_size - (ids.len() % self.write_size);
         let ids = ids.iter()
             .map(|&(_, ref a)| a as &_)
@@ -146,7 +146,7 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle_reads(&mut self, ids: &[(time::Instant, usize)]) {
+    fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
         let missing = self.read_size - (ids.len() % self.read_size);
         let ids = ids.iter()
             .map(|&(_, ref a)| a as &_)

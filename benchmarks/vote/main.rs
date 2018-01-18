@@ -296,7 +296,7 @@ fn run_generator<C>(
 where
     C: VoteClient + Send + 'static,
 {
-    let articles = value_t_or_exit!(global_args, "articles", usize);
+    let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let end = time::Instant::now() + runtime;
 

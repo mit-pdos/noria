@@ -88,17 +88,17 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle_writes(&mut self, ids: &[(time::Instant, usize)]) {
+    fn handle_writes(&mut self, ids: &[(time::Instant, i32)]) {
         let data: Vec<Vec<DataType>> = ids.iter()
-            .map(|&(_, article_id)| vec![0.into(), article_id.into()])
+            .map(|&(_, article_id)| vec![0.into(), (article_id as usize).into()])
             .collect();
 
         self.w.multi_put(data).unwrap();
     }
 
-    fn handle_reads(&mut self, ids: &[(time::Instant, usize)]) {
+    fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
         let arg = ids.iter()
-            .map(|&(_, article_id)| article_id.into())
+            .map(|&(_, article_id)| (article_id as usize).into())
             .collect();
 
         let rows = self.r
