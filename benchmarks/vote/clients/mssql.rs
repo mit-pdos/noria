@@ -179,11 +179,10 @@ impl VoteClient for Client {
     fn from(cnf: &mut Self::Constructor) -> Self {
         let conn = Conn::new(&cnf.addr, &cnf.db);
 
-        let vals = (0..cnf.write_size)
-            .map(|i| format!("(0, @P{})", i + 1))
+        let vote_qstring = (0..cnf.write_size)
+            .map(|i| format!("INSERT INTO vs (u, id) VALUES (0, @P{});", i + 1))
             .collect::<Vec<_>>()
-            .join(", ");
-        let vote_qstring = format!("INSERT IGNORE INTO vt (u, id) VALUES {}", vals);
+            .join(" ");
         let w = conn.conn.as_ref().unwrap().prepare(vote_qstring);
 
         let vals = (0..cnf.read_size)
