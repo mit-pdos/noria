@@ -31,7 +31,7 @@ thread_local! {
 }
 
 const MAX_BATCH_SIZE: usize = 1000;
-const MAX_BATCH_TIME_US: u32 = 10;
+const MAX_BATCH_TIME_US: u32 = 100;
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
     use std::mem;
