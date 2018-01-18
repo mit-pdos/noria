@@ -4,6 +4,7 @@ extern crate distributary;
 extern crate hdrsample;
 extern crate hwloc;
 extern crate libc;
+extern crate memcached;
 extern crate mysql;
 extern crate rand;
 extern crate rayon;
@@ -467,6 +468,16 @@ fn main() {
             ),
         )
         .subcommand(
+            SubCommand::with_name("memcached").arg(
+                Arg::with_name("address")
+                    .long("address")
+                    .takes_value(true)
+                    .required(true)
+                    .default_value("127.0.0.1:11211")
+                    .help("Address of memcached"),
+            ),
+        )
+        .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
                     Arg::with_name("address")
@@ -546,6 +557,7 @@ fn main() {
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
         ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
+        ("memcached", Some(largs)) => run::<clients::memcached::Client>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }

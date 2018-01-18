@@ -24,3 +24,4 @@ pub(crate) trait VoteClient {
 pub(crate) mod localsoup;
 pub(crate) mod netsoup;
 pub(crate) mod mysql;
+pub(crate) mod memcached;
