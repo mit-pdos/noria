@@ -3,7 +3,7 @@ use clap;
 use std::time;
 use std::thread;
 
-use VoteClient;
+use clients::{Parameters, VoteClient};
 use clients::localsoup::graph::RECIPE;
 
 pub(crate) struct Client {
@@ -27,8 +27,8 @@ fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
 impl VoteClient for Client {
     type Constructor = String;
 
-    fn new(prime: bool, args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
-        if prime {
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
+        if params.prime {
             // for prepop, we need a mutator
             let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeeper").unwrap()));
 
@@ -36,8 +36,8 @@ impl VoteClient for Client {
             let mut m = make_mutator(&mut ch, "Article");
 
             let pop_batch_size = 100;
-            assert_eq!(articles % pop_batch_size, 0);
-            for i in 0..articles / pop_batch_size {
+            assert_eq!(params.articles % pop_batch_size, 0);
+            for i in 0..params.articles / pop_batch_size {
                 let reali = pop_batch_size * i;
                 let data: Vec<Vec<DataType>> = (reali..reali + pop_batch_size)
                     .map(|i| (i as i64, format!("Article #{}", i)))

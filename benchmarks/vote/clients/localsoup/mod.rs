@@ -3,7 +3,7 @@ use clap;
 use std::time;
 use std::thread;
 
-use VoteClient;
+use clients::{Parameters, VoteClient};
 
 pub(crate) mod graph;
 
@@ -16,10 +16,10 @@ pub(crate) struct Client {
 impl VoteClient for Client {
     type Constructor = graph::Graph;
 
-    fn new(prime: bool, args: &clap::ArgMatches, articles: usize) -> Self::Constructor {
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
         use distributary::{DurabilityMode, PersistenceParameters};
 
-        assert!(prime);
+        assert!(params.prime);
 
         let nworkers = value_t_or_exit!(args, "workers", usize);
         let read_threads = value_t_or_exit!(args, "readthreads", usize);
@@ -58,12 +58,12 @@ impl VoteClient for Client {
 
         // prepopulate
         if verbose {
-            println!("Prepopulating with {} articles", articles);
+            println!("Prepopulating with {} articles", params.articles);
         }
         let mut a = g.graph.get_mutator(g.article).unwrap();
         let pop_batch_size = 100;
-        assert_eq!(articles % pop_batch_size, 0);
-        for i in 0..articles / pop_batch_size {
+        assert_eq!(params.articles % pop_batch_size, 0);
+        for i in 0..params.articles / pop_batch_size {
             let reali = pop_batch_size * i;
             let data: Vec<Vec<DataType>> = (reali..reali + pop_batch_size)
                 .map(|i| (i as i64, format!("Article #{}", i)))

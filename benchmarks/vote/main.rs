@@ -25,21 +25,8 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_SIZE: usize = 1024;
+const MAX_BATCH_SIZE: usize = 1000;
 const MAX_BATCH_TIME_US: u32 = 10;
-
-pub trait VoteClient {
-    type Constructor;
-
-    fn new(bool, &clap::ArgMatches, articles: usize) -> Self::Constructor;
-    fn from(&mut Self::Constructor) -> Self;
-    fn handle_reads(&mut self, requests: &[(time::Instant, usize)]);
-    fn handle_writes(&mut self, requests: &[(time::Instant, usize)]);
-
-    fn spawns_threads() -> bool {
-        false
-    }
-}
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
     use std::mem;
@@ -62,6 +49,7 @@ fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
 }
 
 mod clients;
+use clients::{Parameters, VoteClient};
 
 fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
@@ -118,7 +106,14 @@ where
         set_thread_affinity(bind_server).unwrap();
     }
 
-    let mut c = C::new(!global_args.is_present("no-prime"), local_args, articles);
+    let params = Parameters {
+        prime: !global_args.is_present("no-prime"),
+        articles: articles,
+        max_batch_size: MAX_BATCH_SIZE,
+        ratio: value_t_or_exit!(global_args, "ratio", u32),
+    };
+
+    let mut c = C::new(&params, local_args);
     let clients: Vec<Mutex<C>> = (0..nthreads)
         .map(|_| VoteClient::from(&mut c))
         .map(Mutex::new)
