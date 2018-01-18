@@ -48,17 +48,23 @@ impl VoteClient for Client {
             ).unwrap();
 
             // prepop
-            let mut sql = String::new();
-            sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
-            for i in 0..articles {
-                if i != 0 {
-                    sql.push_str(", ");
+            let mut aid = 0;
+            let batch = 100;
+            assert_eq!(articles % batch, 0);
+            for _ in 0..articles / batch {
+                let mut sql = String::new();
+                sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
+                for i in 0..batch {
+                    if i != 0 {
+                        sql.push_str(", ");
+                    }
+                    sql.push_str("(");
+                    sql.push_str(&format!("{}, 'Article #{}'", aid, aid));
+                    sql.push_str(", 0)");
+                    aid += 1;
                 }
-                sql.push_str("(");
-                sql.push_str(&format!("{}, \"Article #{}\"", i, i));
-                sql.push_str(", 0)");
+                conn.query(sql).unwrap();
             }
-            conn.query(sql).unwrap();
         }
 
         // now we connect for real

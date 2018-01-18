@@ -472,14 +472,23 @@ fn main() {
             ),
         )
         .subcommand(
-            SubCommand::with_name("mysql").arg(
-                Arg::with_name("address")
-                    .long("address")
-                    .takes_value(true)
-                    .required(true)
-                    .default_value("127.0.0.1:3306")
-                    .help("Address of MySQL server"),
-            ),
+            SubCommand::with_name("mysql")
+                .arg(
+                    Arg::with_name("address")
+                        .long("address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:3306")
+                        .help("Address of MySQL server"),
+                )
+                .arg(
+                    Arg::with_name("database")
+                        .long("database")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("soup")
+                        .help("MySQL database to use"),
+                ),
         )
         .subcommand(
             SubCommand::with_name("localsoup")
