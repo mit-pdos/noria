@@ -136,11 +136,12 @@ impl VoteClient for Client {
 
             // prepop
             let mut aid = 0;
-            assert_eq!(params.articles % params.max_batch_size, 0);
-            for _ in 0..params.articles / params.max_batch_size {
+            let bs = 50;
+            assert_eq!(params.articles % bs, 0);
+            for _ in 0..params.articles / bs {
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO art (id, title) VALUES ");
-                for i in 0..params.max_batch_size {
+                for i in 0..bs {
                     if i != 0 {
                         sql.push_str(", ");
                     }
@@ -150,7 +151,7 @@ impl VoteClient for Client {
 
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO vt (u, id) VALUES ");
-                for i in 0..params.max_batch_size {
+                for i in 0..bs {
                     if i != 0 {
                         sql.push_str(", ");
                     }
@@ -158,7 +159,7 @@ impl VoteClient for Client {
                 }
                 conn = core.run(conn.simple_exec(sql).collect()).unwrap().1;
 
-                aid += params.max_batch_size;
+                aid += bs;
             }
         } else {
             core.run(fut.and_then(fixconn)).unwrap();
