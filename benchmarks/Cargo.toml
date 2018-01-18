@@ -59,14 +59,6 @@ name = "vote"
 path = "vote/main.rs"
 
 [[bin]]
-name = "vote-server"
-path = "vote/vote-server.rs"
-
-[[bin]]
-name = "vote-client"
-path = "vote/vote-client.rs"
-
-[[bin]]
 name = "tpc_w"
 path = "tpc_w/tpc_w.rs"
 
@@ -81,11 +73,3 @@ path = "hotsoup/extract_queries.rs"
 #[[bin]]
 #name = "piazza"
 #path = "piazza/piazza.rs"
-
-[[bin]]
-name = "vote-new-fraction"
-path = "vote/vote-new-fraction.rs"
-
-[[bin]]
-name = "vote-stress"
-path = "vote/stress.rs"
