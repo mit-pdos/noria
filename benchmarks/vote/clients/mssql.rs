@@ -170,7 +170,7 @@ impl VoteClient for Client {
 
         Conf {
             write_size: 2,
-            read_size: 32,
+            read_size: 16,
             addr: addr.to_string(),
             db: db.to_string(),
         }
