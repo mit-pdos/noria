@@ -17,6 +17,8 @@ pub(crate) struct Client {
     write_size: usize,
     read_size: usize,
 }
+// safe (?) because every Handle associated with Core is also sent
+unsafe impl Send for Client {}
 
 struct Conn {
     conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,

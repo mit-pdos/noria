@@ -482,6 +482,27 @@ fn main() {
             ),
         )
         .subcommand(
+            SubCommand::with_name("mssql")
+                .arg(
+                    Arg::with_name("address")
+                        .long("address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value(
+                            "server=tcp:127.0.0.1,1433;username=SA;TrustServerCertificate=true;",
+                        )
+                        .help("Address of MsSQL server"),
+                )
+                .arg(
+                    Arg::with_name("database")
+                        .long("database")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("soup")
+                        .help("MsSQL database to use"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
                     Arg::with_name("address")
@@ -562,6 +583,7 @@ fn main() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
         ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
         ("memcached", Some(largs)) => run::<clients::memcached::Client>(&args, largs),
+        ("mssql", Some(largs)) => run::<clients::mssql::Client>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
