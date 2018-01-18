@@ -84,8 +84,8 @@ impl VoteClient for Client {
         ]);
 
         Conf {
-            write_size: params.max_batch_size,
-            read_size: params.max_batch_size,
+            write_size: 16,
+            read_size: 32,
             opts: opts.into(),
         }
     }
