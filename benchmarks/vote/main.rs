@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
+extern crate futures;
+extern crate futures_state_stream;
 extern crate hdrsample;
 extern crate hwloc;
 extern crate libc;
@@ -8,6 +10,8 @@ extern crate memcached;
 extern crate mysql;
 extern crate rand;
 extern crate rayon;
+extern crate tiberius;
+extern crate tokio_core;
 
 use hdrsample::Histogram;
 use rand::Rng;
