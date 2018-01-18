@@ -84,7 +84,7 @@ impl VoteClient for Client {
         ]);
 
         Conf {
-            write_size: 16,
+            write_size: 2,
             read_size: 32,
             opts: opts.into(),
         }
