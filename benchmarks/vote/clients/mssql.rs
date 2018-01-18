@@ -180,9 +180,16 @@ impl VoteClient for Client {
         let conn = Conn::new(&cnf.addr, &cnf.db);
 
         let vote_qstring = (0..cnf.write_size)
-            .map(|i| format!("INSERT INTO vs (u, id) VALUES (0, @P{});", i + 1))
+            .map(|i| format!("begin try\n\
+                             INSERT INTO vt (u, id) VALUES (0, @P{})\n\
+                             end try\n\
+                             begin catch\n\
+                             end catch", i + 1))
             .collect::<Vec<_>>()
-            .join(" ");
+            .join("; ");
+        let vote_qstring = format!("begin transaction\n\
+                                   {}\n\
+                                   commit", vote_qstring);
         let w = conn.conn.as_ref().unwrap().prepare(vote_qstring);
 
         let vals = (0..cnf.read_size)
