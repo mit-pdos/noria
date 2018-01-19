@@ -198,7 +198,7 @@ fn main() {
         eprintln!("==> {}", backend.uniq_name());
 
         eprintln!(" -> starting server");
-        let s = match server::start(&server, listen_addr, server_has_pl, &backend).unwrap() {
+        let mut s = match server::start(&server, listen_addr, server_has_pl, &backend).unwrap() {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("failed to start {:?}: {:?}", backend, e);
@@ -217,11 +217,15 @@ fn main() {
             articles,
         };
 
-        for &target in &[1000] {
+        for &target in &[1000, 2000] {
             eprintln!(" -> {}", params.name(target, ""));
             run_clients(&clients, target, params);
 
-            // TODO: netsoup server has to be *restarted* here
+            s = s.post_run(&backend).unwrap();
+
+            // in case server was restarted
+            backend.wait(listen_addr);
+
             // TODO: also gather memory usage and stuff?
         }
 

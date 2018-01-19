@@ -3,6 +3,7 @@ use super::Backend;
 use ssh2;
 use std::error::Error;
 use std::borrow::Cow;
+use std::{thread, time};
 
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
@@ -55,6 +56,9 @@ impl<'a> ServerHandle<'a> {
 #[must_use]
 pub(crate) struct Server<'a> {
     server: &'a Ssh,
+    listen_addr: &'a str,
+    has_pl: bool,
+
     handle: ServerHandle<'a>,
 }
 
@@ -62,15 +66,38 @@ impl<'a> Server<'a> {
     pub(crate) fn end(self, backend: &Backend) -> Result<(), Box<Error>> {
         self.handle.end(self.server, backend)
     }
+
+    pub(crate) fn post_run(self, backend: &Backend) -> Result<Self, Box<Error>> {
+        match *backend {
+            Backend::Netsoup { .. } | Backend::Memcached => {
+                let s = self.server;
+                let a = self.listen_addr;
+                let p = self.has_pl;
+
+                // these backends need to be cleared after every run
+                eprintln!(" -> restarting server");
+                self.end(backend)?;
+
+                // give it some time to shut down
+                thread::sleep(time::Duration::from_secs(1));
+
+                // start a new one!
+                let s = start(s, a, p, backend)??;
+                eprintln!(" .. server restart completed");
+                Ok(s)
+            }
+            _ => Ok(self),
+        }
+    }
 }
 
 pub(crate) fn start<'a>(
     server: &'a Ssh,
-    listen_addr: &str,
+    listen_addr: &'a str,
     has_pl: bool,
     b: &Backend,
 ) -> Result<Result<Server<'a>, String>, Box<Error>> {
-    match *b {
+    let sh = match *b {
         Backend::Netsoup {
             workers,
             readers,
@@ -149,20 +176,21 @@ pub(crate) fn start<'a>(
             let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
             let w = server.exec(&cmd[..]).unwrap();
 
-            Ok(Ok(Server {
-                server,
-                handle: ServerHandle::Netsoup(c, w),
-            }))
+            ServerHandle::Netsoup(c, w)
         }
         Backend::Memcached | Backend::Mysql | Backend::Mssql => {
             match server.just_exec(&["sudo", "systemctl", "start", b.systemd_name().unwrap()]) {
-                Ok(Ok(_)) => Ok(Ok(Server {
-                    server,
-                    handle: ServerHandle::HandledBySystemd,
-                })),
-                Ok(Err(e)) => Ok(Err(e)),
-                Err(e) => Err(e),
+                Ok(Ok(_)) => ServerHandle::HandledBySystemd,
+                Ok(Err(e)) => return Ok(Err(e)),
+                Err(e) => return Err(e),
             }
         }
-    }
+    };
+
+    Ok(Ok(Server {
+        server,
+        listen_addr,
+        has_pl,
+        handle: sh,
+    }))
 }
