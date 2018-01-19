@@ -2,7 +2,8 @@ use whoami;
 use std::net::TcpStream;
 use std::error::Error;
 use std::io::prelude::*;
-use ssh2::Session;
+use ssh2::{Channel, Session};
+use shellwords;
 
 pub(crate) struct Ssh(TcpStream, Session);
 
@@ -66,17 +67,19 @@ impl Ssh {
     pub(crate) fn in_distributary(
         &self,
         has_pl: bool,
-        cmd: &[u8],
+        cmd: &[&str],
     ) -> Result<Result<(), String>, Box<Error>> {
-        let mut c = self.channel_session()?;
-        c.shell()?;
-        c.write_all(b"cd distributary\n")?;
-
+        let mut args = vec!["cd", "distributary", "&&"];
         if has_pl {
-            c.write_all(b"pls ")?;
+            args.push("pls");
         }
-        c.write_all(cmd)?;
-        c.send_eof()?;
+        args.extend(cmd);
+
+        self.just_exec(&cmd[..])
+    }
+
+    pub(crate) fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Box<Error>> {
+        let mut c = self.exec(cmd)?;
 
         let mut stderr = String::new();
         c.stderr().read_to_string(&mut stderr)?;
@@ -88,10 +91,10 @@ impl Ssh {
         Ok(Ok(()))
     }
 
-    pub(crate) fn just_exec(&self, cmd: &str) -> Result<bool, Box<Error>> {
+    pub(crate) fn exec<'a>(&'a self, cmd: &[&str]) -> Result<Channel<'a>, Box<Error>> {
         let mut c = self.channel_session()?;
-        c.exec(cmd)?;
-        c.wait_eof()?;
-        Ok(c.exit_status()? == 0)
+        let cmd: Vec<_> = cmd.iter().map(|arg| shellwords::escape(arg)).collect();
+        c.exec(&cmd.join(" "))?;
+        Ok(c)
     }
 }

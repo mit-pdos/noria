@@ -1,11 +1,11 @@
 use super::ssh::Ssh;
 use super::Backend;
 use ssh2;
-use std::io::prelude::*;
 use std::error::Error;
 
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
+    HandledBySystemd,
 }
 
 impl<'a> ServerHandle<'a> {
@@ -27,15 +27,25 @@ impl<'a> ServerHandle<'a> {
                     unimplemented!();
                 }
 
-                let w_killed = server.just_exec("pkill -f target/release/souplet")?;
-                let c_killed = server.just_exec("pkill -f target/release/controller")?;
-                if !w_killed || !c_killed {
+                let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
+                let c_killed = server.just_exec(&["pkill", "-f", "target/release/controller"])?;
+                if !w_killed.is_ok() || !c_killed.is_ok() {
                     unimplemented!();
                 }
 
                 c.wait_eof()?;
                 w.wait_eof()?;
             }
+            ServerHandle::HandledBySystemd => match server.just_exec(&[
+                "sudo",
+                "systemctl",
+                "stop",
+                backend.systemd_name().unwrap(),
+            ]) {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => Err(e)?,
+                Err(e) => Err(e)?,
+            },
         }
         Ok(())
     }
@@ -55,6 +65,7 @@ impl<'a> Server<'a> {
 
 pub(crate) fn start<'a>(
     server: &'a Ssh,
+    listen_addr: &str,
     has_pl: bool,
     b: &Backend,
 ) -> Result<Result<Server<'a>, String>, Box<Error>> {
@@ -67,7 +78,14 @@ pub(crate) fn start<'a>(
             // first, build controller if it hasn't been built already
             match server.in_distributary(
                 has_pl,
-                b"cargo b --release --manifest-path benchmarks/Cargo.toml --bin controller",
+                &[
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--manifest-path benchmarks/Cargo.toml",
+                    "--bin",
+                    "controller",
+                ],
             ) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
@@ -77,7 +95,14 @@ pub(crate) fn start<'a>(
             // then, build worker if it hasn't been built already
             match server.in_distributary(
                 has_pl,
-                b"cargo b --release --manifest-path benchmarks/Cargo.toml --bin souplet",
+                &[
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--manifest-path benchmarks/Cargo.toml",
+                    "--bin",
+                    "souplet",
+                ],
             ) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
@@ -85,7 +110,7 @@ pub(crate) fn start<'a>(
             }
 
             // now that server components have been built, start zookeeper
-            match server.in_distributary(false, b"sudo systemctl start zookeeper") {
+            match server.just_exec(&["sudo", "systemctl", "start", "zookeeper"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
@@ -93,27 +118,38 @@ pub(crate) fn start<'a>(
 
             // then start the controller
             // TODO: shards
-            let mut c = server.channel_session().unwrap();
-            c.write_all(b"cd distributary\n").unwrap();
-            c.write_all(b"target/release/controller --remote-workers=1 --address=0.0.0.0")
-                .unwrap();
-            c.send_eof().unwrap();
+            let mut cmd = vec!["cd", "distributary", "&&"];
+            cmd.extend(vec![
+                "target/release/controller",
+                "--remote-workers=1",
+                "--address",
+                listen_addr,
+            ]);
+            let c = server.exec(&cmd[..]).unwrap();
 
             // and the remote worker
             // TODO: workers + readers
-            let mut w = server.channel_session().unwrap();
-            w.write_all(b"cd distributary\n").unwrap();
+            let mut cmd = vec!["cd", "distributary", "&&"];
             if has_pl {
-                w.write_all(b"perflock ").unwrap();
+                cmd.push("perflock");
             }
-            w.write_all(b"target/release/souplet --zookeeper=0.0.0.0")
-                .unwrap();
-            w.send_eof().unwrap();
+            cmd.extend(vec!["target/release/souplet", "--zookeeper=0.0.0.0"]);
+            let w = server.exec(&cmd[..]).unwrap();
 
             Ok(Ok(Server {
                 server,
                 handle: ServerHandle::Netsoup(c, w),
             }))
+        }
+        Backend::Memcached | Backend::Mysql | Backend::Mssql => {
+            match server.just_exec(&["sudo", "systemctl", "start", b.systemd_name().unwrap()]) {
+                Ok(Ok(_)) => Ok(Ok(Server {
+                    server,
+                    handle: ServerHandle::HandledBySystemd,
+                })),
+                Ok(Err(e)) => Ok(Err(e)),
+                Err(e) => Err(e),
+            }
         }
     }
 }

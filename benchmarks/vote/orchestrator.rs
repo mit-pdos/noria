@@ -1,4 +1,6 @@
+#[macro_use]
 extern crate clap;
+extern crate shellwords;
 extern crate ssh2;
 extern crate whoami;
 
@@ -10,6 +12,7 @@ mod server;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::error::Error;
+use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Backend {
@@ -18,14 +21,58 @@ enum Backend {
         readers: usize,
         shards: usize,
     },
+    Mssql,
+    Mysql,
+    Memcached,
 }
 
 impl Backend {
     fn multiclient_name(&self) -> &'static str {
         match *self {
             Backend::Netsoup { .. } => "netsoup",
+            Backend::Mssql { .. } => "mssql",
+            Backend::Mysql { .. } => "mysql",
+            Backend::Memcached { .. } => "memcached",
         }
     }
+
+    fn systemd_name(&self) -> Option<&'static str> {
+        match *self {
+            Backend::Memcached => Some("memcached"),
+            Backend::Mysql => Some("mysqld"),
+            Backend::Mssql => Some("mssql-server"),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ClientParameters<'a> {
+    listen_addr: &'a str,
+    backend: &'a Backend,
+    runtime: usize,
+    articles: usize,
+    // TODO: target ops
+    // TODO: ratio
+    // TODO: distribution
+}
+
+impl<'a> ClientParameters<'a> {
+    fn add_params(&'a self, cmd: &mut Vec<Cow<'a, str>>) {
+        cmd.push(self.backend.multiclient_name().into());
+        cmd.push(self.listen_addr.into());
+        cmd.push("-r".into());
+        cmd.push(format!("{}", self.runtime).into());
+        cmd.push("-a".into());
+        cmd.push(format!("{}", self.articles).into());
+        // TODO: pass other useful flags to vote
+    }
+}
+
+struct HostDesc<'a> {
+    name: &'a str,
+    has_perflock: bool,
+    threads: usize,
 }
 
 fn main() {
@@ -37,6 +84,7 @@ fn main() {
         .arg(
             Arg::with_name("addr")
                 .long("address")
+                // 172.16.0.29
                 .default_value("127.0.0.1")
                 .required(true)
                 .help("Listening address for server"),
@@ -48,14 +96,6 @@ fn main() {
                 .value_name("N")
                 .default_value("100000")
                 .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
-            Arg::with_name("threads")
-                .short("t")
-                .long("threads")
-                .value_name("N")
-                .default_value("4")
-                .help("Number of client load threads to run"),
         )
         .arg(
             Arg::with_name("runtime")
@@ -73,12 +113,15 @@ fn main() {
         )
         .arg(
             Arg::with_name("client")
-                .help("Sets a host to use as a client")
+                .help("Sets a host to use as a client ([user@]host[:port],threads)")
                 .required(true)
                 .multiple(true)
                 .index(2),
         )
         .get_matches();
+
+    let runtime = value_t_or_exit!(args, "runtime", usize);
+    let articles = value_t_or_exit!(args, "articles", usize);
 
     // what backends are we benchmarking?
     let mut backends = HashMap::new();
@@ -90,41 +133,64 @@ fn main() {
             shards: 1,
         },
     );
+    backends.insert("mem", Backend::Memcached);
+    backends.insert("my", Backend::Mysql);
+    backends.insert("ms", Backend::Mssql);
 
     // make sure we can connect to the server
     let server = Ssh::connect(args.value_of("server").unwrap()).unwrap();
 
     // connect to each of the clients
-    let clients: HashMap<_, _> = args.values_of("client")
+    let clients: Vec<_> = args.values_of("client")
         .unwrap()
         .map(|client| {
+            let mut parts = client.split(',');
+            let client = parts.next().unwrap();
+            let threads: usize = parts
+                .next()
+                .ok_or(format!("no thread count given for host {}", client))
+                .and_then(|t| {
+                    t.parse().map_err(|e| {
+                        format!("invalid thread count given for host {}: {}", client, e)
+                    })
+                })?;
             Ssh::connect(client).map(|ssh| {
-                let has_pl = ssh.just_exec("perflock").unwrap();
-                (client, (ssh, has_pl))
+                let has_perflock = ssh.just_exec(&["perflock"]).unwrap().is_ok();
+                (
+                    ssh,
+                    HostDesc {
+                        has_perflock,
+                        threads,
+                        name: client,
+                    },
+                )
             })
         })
         .collect::<Result<_, _>>()
         .unwrap();
 
-    let server_has_pl = server.just_exec("perflock").unwrap();
+    let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
     eprintln!("server has perflock? {:?}", server_has_pl);
 
     // build `vote` on each client (in parallel)
     let build_chans: Vec<_> = clients
         .iter()
-        .map(|(host, &(ref ssh, has_pl))| {
-            let mut c = ssh.channel_session().unwrap();
-            c.shell().unwrap();
-            c.write_all(b"cd distributary\n").unwrap();
-
-            if has_pl {
-                c.write_all(b"pls ").unwrap();
+        .map(|&(ref ssh, ref host)| {
+            let mut cmd = vec!["cd", "distributary", "&&"];
+            if host.has_perflock {
+                cmd.push("pls");
             }
-            c.write_all(b"cargo b --release --manifest-path benchmarks/Cargo.toml --bin vote")
-                .unwrap();
-            c.send_eof().unwrap();
+            cmd.extend(vec![
+                "cargo",
+                "b",
+                "--release",
+                "--manifest-path",
+                "benchmarks/Cargo.toml",
+                "--bin",
+                "vote",
+            ]);
 
-            (host, c)
+            (host, ssh.exec(&cmd[..]).unwrap())
         })
         .collect();
     for (host, mut chan) in build_chans {
@@ -133,9 +199,9 @@ fn main() {
         chan.wait_eof().unwrap();
 
         match chan.exit_status().unwrap() {
-            0 => eprintln!("{} finished building vote", host),
+            0 => eprintln!("{} finished building vote", host.name),
             _ => {
-                eprintln!("{} failed to build vote:", host);
+                eprintln!("{} failed to build vote:", host.name);
                 eprintln!("{}", stderr);
                 return;
             }
@@ -144,7 +210,7 @@ fn main() {
 
     let listen_addr = args.value_of("addr").unwrap();
     for (name, backend) in backends {
-        let s = match server::start(&server, server_has_pl, &backend).unwrap() {
+        let s = match server::start(&server, listen_addr, server_has_pl, &backend).unwrap() {
             Ok(s) => s,
             Err(e) => {
                 println!("failed to start {:?}: {:?}", backend, e);
@@ -152,7 +218,13 @@ fn main() {
             }
         };
 
-        let results = run_clients(&clients, &backend);
+        let params = ClientParameters {
+            backend: &backend,
+            listen_addr,
+            runtime,
+            articles,
+        };
+        let results = run_clients(&clients, params);
 
         // TODO: actually log the results somewhere
         // maybe we create a file and give to run_clients to avoid storing in memory?
@@ -161,22 +233,57 @@ fn main() {
     }
 }
 
-fn run_clients(clients: &HashMap<&str, (Ssh, bool)>, benchmark: &Backend) -> () {
+fn run_clients(clients: &Vec<(Ssh, HostDesc)>, params: ClientParameters) -> () {
+    // first, we need to prime from some host -- doesn't really matter which
+    {
+        let &(ref ssh, ref host) = clients.first().unwrap();
+
+        let mut prime_params = params.clone();
+        prime_params.runtime = 0;
+        let mut cmd = Vec::<Cow<str>>::new();
+        if host.has_perflock {
+            cmd.push("perflock".into());
+        }
+        cmd.push("multiclient.sh".into());
+        prime_params.add_params(&mut cmd);
+        cmd.push("--threads".into());
+        cmd.push(format!("{}", host.threads).into());
+        let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
+
+        match ssh.just_exec(&cmd[..]) {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
+                eprintln!("{} failed to populate:", host.name);
+                eprintln!("{}", e);
+                eprintln!("");
+                return;
+            }
+            Err(e) => {
+                eprintln!("{} failed to populate:", host.name);
+                eprintln!("{:?}", e);
+                eprintln!("");
+                return;
+            }
+        }
+    }
+
     // start all the benchmark clients
     let workers: Vec<_> = clients
         .iter()
-        .map(|(host, &(ref ssh, has_pl))| {
+        .map(|&(ref ssh, ref host)| {
             // closure just to enable use of ?
             let c = || -> Result<_, Box<Error>> {
-                let mut c = ssh.channel_session()?;
-                if has_pl {
-                    c.write_all(b"perflock ")?;
+                let mut cmd = Vec::<Cow<str>>::new();
+                if host.has_perflock {
+                    cmd.push("perflock".into());
                 }
-                c.write_all(b"multiclient.sh ")?;
-                c.write_all(benchmark.multiclient_name().as_bytes())?;
-                // TODO: pass listen address to multiclient.sh
-                // TODO: pass other useful flags to vote
-                c.send_eof()?;
+                cmd.push("multiclient.sh".into());
+                params.add_params(&mut cmd);
+                cmd.push("--no-prime".into());
+                cmd.push("--threads".into());
+                cmd.push(format!("{}", host.threads).into());
+                let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
+                let c = ssh.exec(&cmd[..])?;
                 Ok(c)
             };
 
@@ -193,13 +300,13 @@ fn run_clients(clients: &HashMap<&str, (Ssh, bool)>, benchmark: &Backend) -> () 
                 chan.wait_eof().unwrap();
 
                 if chan.exit_status().unwrap() != 0 {
-                    eprintln!("{} failed to run benchmark client:", host);
+                    eprintln!("{} failed to run benchmark client:", host.name);
                     eprintln!("{}", stderr);
                     eprintln!("");
                 }
             }
             Err(e) => {
-                eprintln!("{} failed to run benchmark client:", host);
+                eprintln!("{} failed to run benchmark client:", host.name);
                 eprintln!("{:?}", e);
                 eprintln!("");
             }

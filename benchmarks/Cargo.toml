@@ -26,6 +26,7 @@ libc = "0.2"
 hwloc = "0.5"
 ssh2 = "0.3"
 whoami = "0.2"
+shellwords = "0.1"
 
 # for benchmarks
 # cli
