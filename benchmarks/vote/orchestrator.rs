@@ -103,13 +103,11 @@ fn main() {
 
     // what backends are we benchmarking?
     let backends = vec![
-        /*
         Backend::Netsoup {
             workers: 1,
             readers: 1,
             shards: 1,
         },
-        */
         Backend::Mysql,
         Backend::Mssql,
         Backend::Memcached,
@@ -217,14 +215,15 @@ fn main() {
             articles,
         };
 
-        for &target in &[1000, 2000] {
+        let targets = [1000, 2000];
+        for (i, &target) in targets.iter().enumerate() {
+            if i != 0 {
+                s = s.between_targets(&backend).unwrap();
+                backend.wait(listen_addr); // in case server was restarted
+            }
+
             eprintln!(" -> {}", params.name(target, ""));
             run_clients(&clients, target, params);
-
-            s = s.post_run(&backend).unwrap();
-
-            // in case server was restarted
-            backend.wait(listen_addr);
 
             // TODO: also gather memory usage and stuff?
         }

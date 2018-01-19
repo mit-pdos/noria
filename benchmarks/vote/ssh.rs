@@ -75,7 +75,7 @@ impl Ssh {
         }
         args.extend(cmd);
 
-        self.just_exec(&cmd[..])
+        self.just_exec(&args[..])
     }
 
     pub(crate) fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Box<Error>> {
@@ -105,8 +105,8 @@ impl Ssh {
         let cmd = cmd.join(" ");
         eprintln!("    :> {}", cmd);
 
-        // ensure we're using a regular shell
-        let cmd = format!("sh -c {}", shellwords::escape(&cmd));
+        // ensure we're using a Bourne shell (that's what shellwords supports too)
+        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
         c.exec(&cmd)?;
         Ok(c)
     }
