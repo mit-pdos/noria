@@ -24,6 +24,8 @@ vec_map = { version = "0.8.0" }
 rayon = "0.9"
 libc = "0.2"
 hwloc = "0.5"
+ssh2 = "0.3"
+whoami = "0.2"
 
 # for benchmarks
 # cli
@@ -57,6 +59,10 @@ path = "bank/bank.rs"
 [[bin]]
 name = "vote"
 path = "vote/main.rs"
+
+[[bin]]
+name = "vote-orchestrator"
+path = "vote/orchestrator.rs"
 
 [[bin]]
 name = "tpc_w"
