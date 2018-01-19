@@ -93,8 +93,21 @@ impl Ssh {
 
     pub(crate) fn exec<'a>(&'a self, cmd: &[&str]) -> Result<Channel<'a>, Box<Error>> {
         let mut c = self.channel_session()?;
-        let cmd: Vec<_> = cmd.iter().map(|arg| shellwords::escape(arg)).collect();
-        c.exec(&cmd.join(" "))?;
+        let cmd: Vec<_> = cmd.iter()
+            .map(|&arg| {
+                if arg == "&&" {
+                    arg.to_string()
+                } else {
+                    shellwords::escape(arg)
+                }
+            })
+            .collect();
+        let cmd = cmd.join(" ");
+        eprintln!("    :> {}", cmd);
+
+        // ensure we're using a regular shell
+        let cmd = format!("sh -c {}", shellwords::escape(&cmd));
+        c.exec(&cmd)?;
         Ok(c)
     }
 }

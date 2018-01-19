@@ -9,42 +9,12 @@ use ssh::Ssh;
 
 mod server;
 
-use std::collections::HashMap;
+mod backends;
+use backends::Backend;
+
 use std::io::prelude::*;
 use std::error::Error;
 use std::borrow::Cow;
-
-#[derive(Debug, PartialEq, Eq)]
-enum Backend {
-    Netsoup {
-        workers: usize,
-        readers: usize,
-        shards: usize,
-    },
-    Mssql,
-    Mysql,
-    Memcached,
-}
-
-impl Backend {
-    fn multiclient_name(&self) -> &'static str {
-        match *self {
-            Backend::Netsoup { .. } => "netsoup",
-            Backend::Mssql { .. } => "mssql",
-            Backend::Mysql { .. } => "mysql",
-            Backend::Memcached { .. } => "memcached",
-        }
-    }
-
-    fn systemd_name(&self) -> Option<&'static str> {
-        match *self {
-            Backend::Memcached => Some("memcached"),
-            Backend::Mysql => Some("mysqld"),
-            Backend::Mssql => Some("mssql-server"),
-            _ => None,
-        }
-    }
-}
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -64,6 +34,16 @@ impl<'a> ClientParameters<'a> {
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
+    }
+
+    fn name(&self, target: usize, ext: &str) -> String {
+        format!(
+            "{}.{}a.{}t.{}",
+            self.backend.uniq_name(),
+            self.articles,
+            target,
+            ext
+        )
     }
 }
 
@@ -122,23 +102,28 @@ fn main() {
     let articles = value_t_or_exit!(args, "articles", usize);
 
     // what backends are we benchmarking?
-    let mut backends = HashMap::new();
-    backends.insert(
-        "ns",
+    let backends = vec![
+        /*
         Backend::Netsoup {
             workers: 1,
             readers: 1,
             shards: 1,
         },
-    );
-    backends.insert("mem", Backend::Memcached);
-    backends.insert("my", Backend::Mysql);
-    backends.insert("ms", Backend::Mssql);
+        */
+        Backend::Mysql,
+        Backend::Mssql,
+        Backend::Memcached,
+    ];
 
     // make sure we can connect to the server
+    eprintln!("==> connecting to server");
     let server = Ssh::connect(args.value_of("server").unwrap()).unwrap();
 
+    let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
+    eprintln!(" -> perflock? {:?}", server_has_pl);
+
     // connect to each of the clients
+    eprintln!("==> connecting to clients");
     let clients: Vec<_> = args.values_of("client")
         .unwrap()
         .map(|client| {
@@ -152,8 +137,11 @@ fn main() {
                         format!("invalid thread count given for host {}: {}", client, e)
                     })
                 })?;
+
+            eprintln!(" -> {}", client);
             Ssh::connect(client).map(|ssh| {
                 let has_perflock = ssh.just_exec(&["perflock"]).unwrap().is_ok();
+                eprintln!(" .. connected; perflock? {:?}", has_perflock);
                 (
                     ssh,
                     HostDesc {
@@ -167,13 +155,12 @@ fn main() {
         .collect::<Result<_, _>>()
         .unwrap();
 
-    let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
-    eprintln!("server has perflock? {:?}", server_has_pl);
-
     // build `vote` on each client (in parallel)
+    eprintln!("==> building vote benchmark on clients");
     let build_chans: Vec<_> = clients
         .iter()
         .map(|&(ref ssh, ref host)| {
+            eprintln!(" -> starting on {}", host.name);
             let mut cmd = vec!["cd", "distributary", "&&"];
             if host.has_perflock {
                 cmd.push("pls");
@@ -197,7 +184,7 @@ fn main() {
         chan.wait_eof().unwrap();
 
         match chan.exit_status().unwrap() {
-            0 => eprintln!("{} finished building vote", host.name),
+            0 => eprintln!(" .. {} finished", host.name),
             _ => {
                 eprintln!("{} failed to build vote:", host.name);
                 eprintln!("{}", stderr);
@@ -207,14 +194,21 @@ fn main() {
     }
 
     let listen_addr = args.value_of("addr").unwrap();
-    for (name, backend) in backends {
+    for backend in backends {
+        eprintln!("==> {}", backend.uniq_name());
+
+        eprintln!(" -> starting server");
         let s = match server::start(&server, listen_addr, server_has_pl, &backend).unwrap() {
             Ok(s) => s,
             Err(e) => {
-                println!("failed to start {:?}: {:?}", backend, e);
+                eprintln!("failed to start {:?}: {:?}", backend, e);
                 continue;
             }
         };
+
+        // give the server a little time to get its stuff together
+        backend.wait(listen_addr);
+        eprintln!(" .. server started ");
 
         let params = ClientParameters {
             backend: &backend,
@@ -224,13 +218,16 @@ fn main() {
         };
 
         for &target in &[1000] {
-            let results = run_clients(&clients, target, params);
+            eprintln!(" -> {}", params.name(target, ""));
+            run_clients(&clients, target, params);
 
-            // TODO: actually log the results somewhere
-            // maybe we create a file and give to run_clients to avoid storing in memory?
+            // TODO: netsoup server has to be *restarted* here
+            // TODO: also gather memory usage and stuff?
         }
 
+        eprintln!(" -> stopping server");
         s.end(&backend).unwrap();
+        eprintln!(" .. server stopped ");
     }
 }
 
@@ -238,6 +235,7 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
     // first, we need to prime from some host -- doesn't really matter which
     {
         let &(ref ssh, ref host) = clients.first().unwrap();
+        eprintln!(" .. prepopulating on {}", host.name);
 
         let mut prime_params = params.clone();
         prime_params.runtime = 0;
@@ -266,6 +264,8 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
                 return;
             }
         }
+
+        eprintln!(" .. finished prepopulation");
     }
 
     let total_threads: usize = clients.iter().map(|&(_, ref host)| host.threads).sum();
@@ -274,7 +274,7 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
     // start all the benchmark clients
     let workers: Vec<_> = clients
         .iter()
-        .map(|&(ref ssh, ref host)| {
+        .filter_map(|&(ref ssh, ref host)| {
             // closure just to enable use of ?
             let c = || -> Result<_, Box<Error>> {
                 let mut cmd = Vec::<Cow<str>>::new();
@@ -301,31 +301,42 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
                 Ok(c)
             };
 
-            (host, c())
+            eprintln!(" .. starting benchmarker on {}", host.name);
+            match c() {
+                Ok(c) => Some((host, c)),
+                Err(e) => {
+                    eprintln!("{} failed to run benchmark client:", host.name);
+                    eprintln!("{:?}", e);
+                    eprintln!("");
+                    None
+                }
+            }
         })
         .collect();
 
     // let's see how we did
-    for (host, chan) in workers {
-        match chan {
-            Ok(mut chan) => {
-                let mut stderr = String::new();
-                chan.stderr().read_to_string(&mut stderr).unwrap();
-                chan.wait_eof().unwrap();
+    use std::fs::File;
+    let fname = params.name(target, "log");
+    let mut outf = File::create(fname);
 
-                if chan.exit_status().unwrap() != 0 {
-                    eprintln!("{} failed to run benchmark client:", host.name);
-                    eprintln!("{}", stderr);
-                    eprintln!("");
-                }
-            }
-            Err(e) => {
-                eprintln!("{} failed to run benchmark client:", host.name);
-                eprintln!("{:?}", e);
-                eprintln!("");
-            }
+    eprintln!(" .. waiting for benchmark to complete");
+    for (host, mut chan) in workers {
+        if let Ok(ref mut f) = outf {
+            use std::io;
+
+            // TODO: should we get histogram files here instead and merge them?
+            io::copy(&mut chan, f).unwrap();
+        }
+
+        let mut stderr = String::new();
+        chan.stderr().read_to_string(&mut stderr).unwrap();
+        chan.wait_eof().unwrap();
+        chan.wait_close().unwrap();
+
+        if chan.exit_status().unwrap() != 0 {
+            eprintln!("{} failed to run benchmark client:", host.name);
+            eprintln!("{}", stderr);
+            eprintln!("");
         }
     }
-
-    // TODO: gather stats or something? stdout maybe?
 }
