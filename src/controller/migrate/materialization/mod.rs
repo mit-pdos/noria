@@ -25,7 +25,6 @@ macro_rules! dur_to_ns {
     }}
 }
 
-
 type Indices = HashSet<Vec<usize>>;
 
 pub struct Materializations {
@@ -406,8 +405,9 @@ impl Materializations {
 
     /// Retrieves the materialization status of a given node.
     pub fn get_status(&self, index: &NodeIndex, node: &Node) -> MaterializationStatus {
-        let is_materialized = self.have.contains_key(index)
-            || node.with_reader(|r| r.is_materialized()).unwrap_or(false);
+        let is_materialized = self.have.contains_key(index) || node.with_reader(|r| {
+            r.is_materialized()
+        }).unwrap_or(false);
 
         if !is_materialized {
             MaterializationStatus::Not
@@ -581,7 +581,7 @@ impl Materializations {
             if self.partial.contains(&ni) {
                 debug!(self.log, "new partially-materialized node: {:?}", n);
             } else {
-                debug!(self.log, "new fullly-materalized node: {:?}", n);
+                debug!(self.log, "new fully-materalized node: {:?}", n);
             }
         } else {
             debug!(self.log, "new stateless node: {:?}", n);

@@ -242,9 +242,12 @@ impl<T: 'static> IntoIterator for Map<T> {
     type Item = (LocalNodeIndex, T);
     type IntoIter = Box<Iterator<Item = Self::Item>>;
     fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.things.into_iter().enumerate().filter_map(|(i, v)| {
-            v.map(|v| (unsafe { LocalNodeIndex::make(i as u32) }, v))
-        }))
+        Box::new(
+            self.things
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, v)| v.map(|v| (unsafe { LocalNodeIndex::make(i as u32) }, v))),
+        )
     }
 }
 
@@ -448,8 +451,10 @@ impl<T: Hash + Eq + Clone + 'static> State<T> {
             }
 
             let (new, old) = self.state.split_last_mut().unwrap();
-            let mut insert = move |rs: &Vec<Row<Vec<T>>>| for r in rs {
-                State::insert_into(new, Row(r.0.clone()));
+            let mut insert = move |rs: &Vec<Row<Vec<T>>>| {
+                for r in rs {
+                    State::insert_into(new, Row(r.0.clone()));
+                }
             };
             match old[0].state {
                 KeyedState::Single(ref map) => for rs in map.values() {

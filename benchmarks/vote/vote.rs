@@ -65,6 +65,13 @@ fn main() {
                 .help("Number of MIX clients to start"),
         )
         .arg(
+            Arg::with_name("readthreads")
+                .long("read-threads")
+                .value_name("N")
+                .default_value("1")
+                .help("Number of read threads to start"),
+        )
+        .arg(
             Arg::with_name("ngetters")
                 .short("g")
                 .long("getters")
@@ -154,7 +161,7 @@ fn main() {
             Arg::with_name("snapshot-timeout")
                 .long("snapshot-timeout")
                 .value_name("N")
-                .help("Initialize a snapshot every x seconds")
+                .help("Initialize a snapshot every x seconds"),
         )
         .arg(
             Arg::with_name("write-batch-size")
@@ -196,6 +203,7 @@ fn main() {
         .map(time::Duration::from_secs);
     let mut ngetters = value_t_or_exit!(args, "ngetters", usize);
     let mut nputters = value_t_or_exit!(args, "nputters", usize);
+    let read_threads = value_t_or_exit!(args, "readthreads", usize);
     let narticles = value_t_or_exit!(args, "narticles", isize);
     let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
     let flush_timeout = time::Duration::from_millis(10);
@@ -264,6 +272,7 @@ fn main() {
 
     // setup db
     let mut s = graph::Setup::new(true, nworkers);
+    s.nreaders = read_threads;
     s.logging = verbose;
     s.transactions = args.is_present("transactions");
     s.sharding = match value_t_or_exit!(args, "shards", usize) {
@@ -271,15 +280,13 @@ fn main() {
         x => Some(x),
     };
     s.stupid = args.is_present("stupid");
-    let g = graph::make(s, persistence_params);
+    let mut g = graph::make(s, persistence_params);
 
     // prepare getters
     let getters: Vec<_> = {
         (0..ngetters)
             .into_iter()
-            .map(|_| {
-                Getter::new(g.graph.get_getter(g.end).unwrap(), crossover)
-            })
+            .map(|_| Getter::new(g.graph.get_getter(g.end).unwrap(), crossover))
             .collect()
     };
 
@@ -295,21 +302,20 @@ fn main() {
 
     // prepare putters
     let putters: Vec<_> = {
-        let mix_getters = (0..new_vote_receivers.len())
-            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap()));
+        let mix_getters: Vec<_> = (0..new_vote_receivers.len())
+            .map(|_| mix.as_ref().map(|_| g.graph.get_getter(g.end).unwrap()))
+            .collect();
         new_vote_receivers
             .into_iter()
-            .zip(mix_getters)
-            .map(|(new_vote, mix_getter)| {
-                Spoon {
-                    article: g.graph.get_mutator(g.article).unwrap(),
-                    vote_pre: g.graph.get_mutator(g.vote).unwrap(),
-                    vote_post: None,
-                    new_vote: new_votes.as_ref().and(Some(new_vote)),
-                    x: Crossover::new(crossover),
-                    i: 0,
-                    mix_getter,
-                }
+            .zip(mix_getters.into_iter())
+            .map(|(new_vote, mix_getter)| Spoon {
+                article: g.graph.get_mutator(g.article).unwrap(),
+                vote_pre: g.graph.get_mutator(g.vote).unwrap(),
+                vote_post: None,
+                new_vote: new_votes.as_ref().and(Some(new_vote)),
+                x: Crossover::new(crossover),
+                i: 0,
+                mix_getter,
             })
             .collect()
     };
@@ -728,18 +734,14 @@ impl Writer for Spoon {
 
         if self.x.use_post() {
             let data: Vec<Vec<DataType>> = ids.iter()
-                .map(|&(user_id, article_id)| {
-                    vec![user_id.into(), article_id.into(), 5.into()]
-                })
+                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into(), 5.into()])
                 .collect();
 
             self.vote_post.as_mut().unwrap().multi_put(data).unwrap();
             Period::PostMigration
         } else {
             let data: Vec<Vec<DataType>> = ids.iter()
-                .map(|&(user_id, article_id)| {
-                    vec![user_id.into(), article_id.into()]
-                })
+                .map(|&(user_id, article_id)| vec![user_id.into(), article_id.into()])
                 .collect();
             self.vote_pre.multi_put(data).unwrap();
 

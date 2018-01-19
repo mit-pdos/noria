@@ -32,8 +32,7 @@ fn wait_for_writes(mut getter: distributary::RemoteGetter, narticles: usize, nvo
     loop {
         let keys = (0..narticles as i64).map(|i| i.into()).collect();
         let rows = getter.multi_lookup(keys, true);
-        let sum: i64 = rows
-            .into_iter()
+        let sum: i64 = rows.into_iter()
             .map(|result| {
                 let row = result.unwrap();
                 if row.is_empty() {
@@ -191,10 +190,7 @@ fn main() {
         Some(String::from("vote-recovery")),
     );
 
-    // We need to bind our listeners to a random port to prevent conflicts.
-    // If we in the future manage to correctly take down the listeners when
-    // the graph is dropped, this could be removed.
-    let mut s = graph::Setup::new(true, 2).with_random_ports();
+    let mut s = graph::Setup::new(true, 2);
     s.logging = verbose;
     s.sharding = match value_t_or_exit!(args, "shards", usize) {
         0 => None,

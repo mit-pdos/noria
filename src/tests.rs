@@ -531,7 +531,6 @@ fn it_recovers_persisted_logs_w_multiple_nodes() {
             QUERY CID: SELECT id FROM C WHERE id = ?;
         ";
 
-
         let recipe = g.migrate(|mig| {
             let mut recipe = Recipe::from_str(&sql, None).unwrap();
             recipe.activate(mig, false).unwrap();
@@ -639,7 +638,7 @@ fn it_recovers_w_snapshots_and_logs() {
 
         let mut builder = ControllerBuilder::default();
         builder.set_persistence(pparams);
-        let g = builder.build();
+        let mut g = builder.build_local();
 
         let sql = "
             CREATE TABLE Cat \
@@ -654,7 +653,7 @@ fn it_recovers_w_snapshots_and_logs() {
                       GROUP BY breed_name;
         ";
 
-        g.install_recipe(sql.to_owned());
+        g.install_recipe(sql.to_owned()).unwrap();
         g
     };
 
@@ -735,14 +734,14 @@ fn it_recovers_w_only_snapshots() {
 
         let mut builder = ControllerBuilder::default();
         builder.set_persistence(pparams);
-        let g = builder.build();
+        let mut g = builder.build_local();
 
         let sql = "
             CREATE TABLE Cat (cat_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
             QUERY CatQuery: SELECT cat_id, cat_name FROM Cat where cat_id = ?;
         ";
 
-        g.install_recipe(sql.to_owned());
+        g.install_recipe(sql.to_owned()).unwrap();
         g
     };
 
@@ -1016,9 +1015,8 @@ fn votes() {
     // check that article 1 appears in the join view with a vote count of one
     let res = endq.lookup(&a1, true).unwrap();
     assert!(
-        res.iter().any(|r| {
-            r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()
-        }),
+        res.iter()
+            .any(|r| r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()),
         "no entry for [1,2,1|2] in {:?}",
         res
     );
@@ -1171,9 +1169,8 @@ fn transactional_vote() {
     let res = endq.transactional_lookup(&a1).unwrap().0;
     assert_eq!(res.len(), 1);
     assert!(
-        res.iter().any(|r| {
-            r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()
-        }),
+        res.iter()
+            .any(|r| r[0] == a1.clone() && r[1] == 2.into() && r[2] == 1.into()),
         "no entry for [1,2,1|2] in {:?}",
         res
     );
@@ -1564,9 +1561,7 @@ fn replay_during_replay() {
 fn full_aggregation_with_bogokey() {
     // set up graph
     let mut g = ControllerBuilder::default().build_inner();
-    let base = g.migrate(|mig| {
-        mig.add_ingredient("base", &["x"], Base::new(vec![1.into()]))
-    });
+    let base = g.migrate(|mig| mig.add_ingredient("base", &["x"], Base::new(vec![1.into()])));
 
     // add an aggregation over the base with a bogo key.
     // in other words, the aggregation is across all rows.

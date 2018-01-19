@@ -7,7 +7,7 @@ use dataflow::{self, checktable, LocalBypass, Readers};
 use std::net::SocketAddr;
 
 /// A request to read a specific key.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ReadQuery {
     /// Read normally
     Normal {
@@ -59,7 +59,7 @@ impl<T> LocalOrNot<T> {
 }
 
 /// The contents of a specific key
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ReadReply {
     /// Read normally
     Normal(Vec<Result<Datas, ()>>),
@@ -81,9 +81,7 @@ impl RemoteGetterBuilder {
             node: self.node,
             shards: self.shards
                 .iter()
-                .map(|&(ref addr, is_local)| {
-                    RpcClient::connect(addr, is_local).unwrap()
-                })
+                .map(|&(ref addr, is_local)| RpcClient::connect(addr, is_local).unwrap())
                 .collect(),
         }
     }
@@ -125,6 +123,7 @@ impl RemoteGetter {
             shard_queries
                 .into_iter()
                 .enumerate()
+                .filter(|&(_, ref keys)| !keys.is_empty())
                 .flat_map(|(shardi, keys)| {
                     let shard = &mut self.shards[shardi];
                     let is_local = shard.is_local();

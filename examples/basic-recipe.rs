@@ -34,8 +34,8 @@ fn main() {
     builder.set_local_workers(2);
     builder.set_persistence(persistence_params);
 
-    let mut blender = builder.build();
-    blender.install_recipe(sql.to_owned());
+    let mut blender = builder.build_local();
+    blender.install_recipe(sql.to_owned()).unwrap();
     println!("{}", blender.graphviz());
 
     blender.recover();

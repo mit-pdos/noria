@@ -20,7 +20,6 @@ pub struct RpcClient<Q, R> {
     is_local: bool,
 }
 
-
 impl<Q: Serialize, R> RpcClient<Q, R>
 where
     for<'de> R: Deserialize<'de>,
@@ -151,6 +150,10 @@ where
         }
 
         Ok(())
+    }
+
+    pub fn get_ref(&self) -> &mio::net::TcpStream {
+        self.stream.get_ref().get_ref()
     }
 }
 

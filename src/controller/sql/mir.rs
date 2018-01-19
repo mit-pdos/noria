@@ -853,17 +853,17 @@ impl SqlToMirConverter {
                     } else {
                         c.table.clone()
                     },
-                    alias: Some(a.clone()),
+                    alias: None,
                     function: c.function.clone(),
                 },
                 None => {
-                    let mut c = c.clone();
                     // if this is the leaf node of a query, it represents a view, so we rewrite the
                     // table name here.
                     if is_leaf {
-                        c.table = Some(String::from(name))
+                        sanitize_leaf_column(c.clone(), name)
+                    } else {
+                        c.clone()
                     }
-                    c
                 }
             })
             .chain(names.into_iter().map(|n| {
@@ -1091,8 +1091,7 @@ impl SqlToMirConverter {
                             None => {
                                 panic!(
                                     "Inconsistency: base node \"{}\" does not exist at v{}",
-                                    *rel,
-                                    v
+                                    *rel, v
                                 );
                             }
                             Some(bmn) => MirNode::reuse(bmn.clone(), self.schema_version),
@@ -1285,7 +1284,6 @@ impl SqlToMirConverter {
                             // combine
                             let gb_and_param_cols: Vec<_> =
                                 gb_cols.into_iter().chain(param_cols.into_iter()).collect();
-
 
                             let parent_node = match prev_node {
                                 // If no explicit parent node is specified, we extract
@@ -1519,8 +1517,7 @@ impl SqlToMirConverter {
 
             debug!(
                 self.log,
-                "Added final MIR node for query named \"{}\"",
-                name
+                "Added final MIR node for query named \"{}\"", name
             );
         }
 
