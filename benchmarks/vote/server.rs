@@ -2,6 +2,7 @@ use super::ssh::Ssh;
 use super::Backend;
 use ssh2;
 use std::error::Error;
+use std::borrow::Cow;
 
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
@@ -129,11 +130,23 @@ pub(crate) fn start<'a>(
 
             // and the remote worker
             // TODO: workers + readers
-            let mut cmd = vec!["cd", "distributary", "&&"];
+            let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
+                .into_iter()
+                .map(|&s| s.into())
+                .collect();
             if has_pl {
-                cmd.push("perflock");
+                cmd.push("perflock".into());
             }
-            cmd.extend(vec!["target/release/souplet", "--zookeeper=0.0.0.0"]);
+            cmd.extend(vec![
+                "target/release/souplet".into(),
+                "--zookeeper".into(),
+                listen_addr.into(),
+                "-w".into(),
+                format!("{}", workers).into(),
+                "-r".into(),
+                format!("{}", readers).into(),
+            ]);
+            let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
             let w = server.exec(&cmd[..]).unwrap();
 
             Ok(Ok(Server {

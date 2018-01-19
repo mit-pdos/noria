@@ -52,7 +52,6 @@ struct ClientParameters<'a> {
     backend: &'a Backend,
     runtime: usize,
     articles: usize,
-    // TODO: target ops
     // TODO: ratio
     // TODO: distribution
 }
@@ -65,7 +64,6 @@ impl<'a> ClientParameters<'a> {
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
-        // TODO: pass other useful flags to vote
     }
 }
 
@@ -224,16 +222,19 @@ fn main() {
             runtime,
             articles,
         };
-        let results = run_clients(&clients, params);
 
-        // TODO: actually log the results somewhere
-        // maybe we create a file and give to run_clients to avoid storing in memory?
+        for &target in &[1000] {
+            let results = run_clients(&clients, target, params);
+
+            // TODO: actually log the results somewhere
+            // maybe we create a file and give to run_clients to avoid storing in memory?
+        }
 
         s.end(&backend).unwrap();
     }
 }
 
-fn run_clients(clients: &Vec<(Ssh, HostDesc)>, params: ClientParameters) -> () {
+fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientParameters) -> () {
     // first, we need to prime from some host -- doesn't really matter which
     {
         let &(ref ssh, ref host) = clients.first().unwrap();
@@ -267,6 +268,9 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, params: ClientParameters) -> () {
         }
     }
 
+    let total_threads: usize = clients.iter().map(|&(_, ref host)| host.threads).sum();
+    let ops_per_thread = target as f64 / total_threads as f64;
+
     // start all the benchmark clients
     let workers: Vec<_> = clients
         .iter()
@@ -282,6 +286,16 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, params: ClientParameters) -> () {
                 cmd.push("--no-prime".into());
                 cmd.push("--threads".into());
                 cmd.push(format!("{}", host.threads).into());
+
+                // so, target ops...
+                // target ops is actually not entirely straightforward to determine. here, we'll
+                // assume that each client thread is able to process requests at roughly the same
+                // rate, so we divide the target ops among machines based on the number of threads
+                // they have. this may or may not be the right thing.
+                cmd.push("--target".into());
+                let target = (ops_per_thread * host.threads as f64).ceil() as usize;
+                cmd.push(format!("{}", target).into());
+
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 let c = ssh.exec(&cmd[..])?;
                 Ok(c)
