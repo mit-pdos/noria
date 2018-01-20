@@ -339,10 +339,27 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    let nreaders = backend.g.outputs().len();
-    let nkeys = backend.size();
-    println!("{} rows in {} leaf views (avg: {})", nkeys, nreaders, nkeys as f32 / nreaders as f32);
 
+    let outs = backend.g.outputs();
+    let mut dur = time::Duration::from_millis(0);
+    for uid in 0..nlogged {
+        let leaf = outs[&format!("post_count_u{}", uid)];
+        let mut getter = backend.g.get_getter(leaf).unwrap();
+        let start = time::Instant::now();
+        for author in 0..nusers {
+            getter.lookup(&author.into(), true).unwrap();
+        }
+        dur += start.elapsed();
+    }
+
+    let dur = dur_to_fsec!(dur);
+
+    println!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            nlogged * nusers,
+            dur,
+            (nlogged * nusers) as f64 / dur,
+        );
 
     println!("Done with benchmark.");
 
