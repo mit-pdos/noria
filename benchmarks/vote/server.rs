@@ -161,6 +161,25 @@ impl<'a> Server<'a> {
                 w.write_all(b"disk:\n")?;
                 io::copy(&mut c, w)?;
                 c.wait_eof()?;
+
+                let mut c = self.server.exec(&[
+                    "/opt/mssql-tools/bin/sqlcmd",
+                    "-U",
+                    "SA",
+                    "-i",
+                    "distributary/mssql_stat.sql",
+                    // assume password is set in SQLCMDPASSWORD
+                    "-S",
+                    "127.0.0.1",
+                    "-I",
+                    "-d",
+                    "soup",
+                    "-h",
+                    "-1",
+                ])?;
+                w.write_all(b"tables:\n")?;
+                io::copy(&mut c, w)?;
+                c.wait_eof()?;
             }
         }
         Ok(())
