@@ -45,7 +45,7 @@ do
     do
         setup=${setups[$i-1]}
         setup_name=${setup_names[$i-1]}
-        name=$nuser-$setup_name
+        name=$nlogged-$setup_name
         mkdir $1/$name
         mkdir $1/$name/info
 
