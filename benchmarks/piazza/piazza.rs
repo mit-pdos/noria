@@ -19,6 +19,13 @@ pub struct Backend {
     g: ControllerHandle<LocalAuthority>,
 }
 
+#[derive(PartialEq)]
+enum PopulateType {
+    Before,
+    After,
+    NoPopulate,
+}
+
 impl Backend {
     pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
@@ -51,26 +58,7 @@ impl Backend {
         }
     }
 
-    pub fn populate_tables(&mut self, pop: &mut Populate) {
-        pop.enroll_students();
-        let roles = pop.get_roles();
-        let users = pop.get_users();
-        let posts = pop.get_posts();
-        let classes = pop.get_classes();
-
-        self.populate("Role", roles);
-        println!("Waiting for groups to be constructed...");
-        thread::sleep(time::Duration::from_millis(120000));
-
-        self.populate("Post", posts);
-        println!("Waiting for posts to propagate...");
-        thread::sleep(time::Duration::from_millis(150000));
-
-        self.populate("User", users);
-        self.populate("Class", classes);
-    }
-
-    fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
         let ins = self.g.inputs();
         let mut mutator = self
             .g
@@ -232,6 +220,8 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
+                .default_value("nopopulate")
+                .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         )
         .arg(
@@ -278,7 +268,7 @@ fn main() {
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
-    let populate = args.is_present("populate");
+    let populate = args.value_of("populate").unwrap_or("nopopulate");;
     let nusers = value_t_or_exit!(args, "nusers", i32);
     let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
@@ -295,10 +285,32 @@ fn main() {
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
 
+    let populate = match populate.as_ref() {
+        "before" => PopulateType::Before,
+        "after" => PopulateType::After,
+        _ => PopulateType::NoPopulate,
+    };
+
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    if populate {
-        println!("Populating tables...");
-        backend.populate_tables(&mut p);
+
+    p.enroll_students();
+    let roles = p.get_roles();
+    let users = p.get_users();
+    let posts = p.get_posts();
+    let classes = p.get_classes();
+
+    backend.populate("Role", roles);
+    println!("Waiting for groups to be constructed...");
+    thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
+
+    backend.populate("User", users);
+    backend.populate("Class", classes);
+
+
+    if populate == PopulateType::Before {
+        backend.populate("Post", posts.clone());
+        println!("Waiting for posts to propagate...");
+        thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
     }
 
     println!("Finished writing! Sleeping for 2 seconds...");
@@ -321,6 +333,10 @@ fn main() {
             let fname = format!("{}-{}", iloc.unwrap(), i);
             fs::copy("/proc/self/status", fname).unwrap();
         }
+    }
+
+    if populate == PopulateType::After {
+        backend.populate("Post", posts);
     }
 
     let nreaders = backend.g.outputs().len();
