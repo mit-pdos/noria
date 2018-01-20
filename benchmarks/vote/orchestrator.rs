@@ -278,6 +278,13 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
     let workers: Vec<_> = clients
         .iter()
         .filter_map(|&(ref ssh, ref host)| {
+            // so, target ops...
+            // target ops is actually not entirely straightforward to determine. here, we'll
+            // assume that each client thread is able to process requests at roughly the same
+            // rate, so we divide the target ops among machines based on the number of threads
+            // they have. this may or may not be the right thing.
+            let target = (ops_per_thread * host.threads as f64).ceil() as usize;
+
             // closure just to enable use of ?
             let c = || -> Result<_, Box<Error>> {
                 let mut cmd = Vec::<Cow<str>>::new();
@@ -296,7 +303,6 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
                 // rate, so we divide the target ops among machines based on the number of threads
                 // they have. this may or may not be the right thing.
                 cmd.push("--target".into());
-                let target = (ops_per_thread * host.threads as f64).ceil() as usize;
                 cmd.push(format!("{}", target).into());
 
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
@@ -304,7 +310,10 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
                 Ok(c)
             };
 
-            eprintln!(" .. starting benchmarker on {}", host.name);
+            eprintln!(
+                " .. starting benchmarker on {} with target {}",
+                host.name, target
+            );
             match c() {
                 Ok(c) => Some((host, c)),
                 Err(e) => {
