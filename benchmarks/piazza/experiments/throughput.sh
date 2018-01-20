@@ -35,12 +35,12 @@ declare -a setup_names=(
 )
 
 nuser=1000
-
+interval=100
 setupslength=${#setups[@]}
 
-for j in {1..10}
+for j in {0..10}
 do
-    nlogged=$((nuser / j))
+    nlogged=$((j * interval))
     for (( i=1; i<${setupslength}+1; i++ ));
     do
         setup=${setups[$i-1]}
