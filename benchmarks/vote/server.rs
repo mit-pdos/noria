@@ -6,14 +6,14 @@ use std::borrow::Cow;
 use std::{thread, time};
 
 pub(crate) enum ServerHandle<'a> {
-    Netsoup(ssh2::Channel<'a>),
+    Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
     HandledBySystemd,
 }
 
 impl<'a> ServerHandle<'a> {
     fn end(self, server: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
         match self {
-            ServerHandle::Netsoup(mut c) => {
+            ServerHandle::Netsoup(mut c, mut w) => {
                 // assert_eq!(backend, &Backend::Netsoup);
 
                 // we need to terminate the controller and the worker.
@@ -24,18 +24,19 @@ impl<'a> ServerHandle<'a> {
                 //  - https://www.libssh2.org/mail/libssh2-devel-archive-2009-09/0079.shtml
                 //
                 // so, instead we have to hack around it by finding the pid and killing it
-                if c.eof() {
+                if c.eof() | w.eof() {
                     // one of them terminated prematurely!
                     unimplemented!();
                 }
 
                 let c_killed = server.just_exec(&["pkill", "-f", "target/release/controller"])?;
-                //let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
-                if !c_killed.is_ok() {
+                let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
+                if !c_killed.is_ok() || !w_killed.is_ok() {
                     unimplemented!();
                 }
 
                 c.wait_eof()?;
+                w.wait_eof()?;
 
                 // also stop zookeeper
                 match server.just_exec(&["sudo", "systemctl", "stop", "zookeeper"]) {
@@ -119,13 +120,11 @@ pub(crate) fn start<'a>(
             }
 
             // then, build worker if it hasn't been built already
-            /*
             match server.in_distributary(has_pl, &["cargo", "b", "--release", "--bin", "souplet"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
             }
-            */
 
             // now that server components have been built, start zookeeper
             match server.just_exec(&["sudo", "systemctl", "start", "zookeeper"]) {
@@ -160,7 +159,6 @@ pub(crate) fn start<'a>(
                 server.exec(&cmd[..]).unwrap()
             };
 
-            /*
             // and the remote worker
             let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
                 .into_iter()
@@ -180,9 +178,8 @@ pub(crate) fn start<'a>(
             ]);
             let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
             let w = server.exec(&cmd[..]).unwrap();
-            */
 
-            ServerHandle::Netsoup(c)
+            ServerHandle::Netsoup(c, w)
         }
         Backend::Memcached | Backend::Mysql | Backend::Mssql => {
             match server.just_exec(&["sudo", "systemctl", "start", b.systemd_name().unwrap()]) {
