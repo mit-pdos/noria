@@ -62,8 +62,11 @@ impl Backend {
         println!("Waiting for groups to be constructed...");
         thread::sleep(time::Duration::from_millis(120000));
 
-        self.populate("User", users);
         self.populate("Post", posts);
+        println!("Waiting for posts to propagate...");
+        thread::sleep(time::Duration::from_millis(150000));
+
+        self.populate("User", users);
         self.populate("Class", classes);
     }
 
@@ -194,7 +197,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/ta-policies.json")
+                .default_value("benchmarks/piazza/complex-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(

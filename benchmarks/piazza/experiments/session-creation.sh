@@ -47,14 +47,7 @@ do
     mkdir $1/$name/info
 
     $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate $setup --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
+        -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --private 0.2 $setup --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
-    # all posts are private workload
-    name=$nuser-$setup_name-private
-    mkdir $1/$name
-    mkdir $1/$name/info
-
-    $cmd -v cargo run --manifest-path benchmarks/Cargo.toml --bin=piazza --release -- \
-        -l $nuser -u $nuser -i $1/$name/info/info -p 100000 -c 1000 --populate --private 1.0 $setup --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 done
 
