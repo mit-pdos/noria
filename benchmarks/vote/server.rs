@@ -146,15 +146,19 @@ pub(crate) fn start<'a>(
             }
 
             // then start the controller
-            // TODO: shards
-            let mut cmd = vec!["cd", "distributary", "&&"];
-            cmd.extend(vec![
-                "target/release/controller",
-                "--local-workers=1",
-                "--address",
-                listen_addr,
-            ]);
-            let c = server.exec(&cmd[..]).unwrap();
+            let shards = format!("{}", shards.unwrap_or(0));
+            let c = {
+                let mut cmd = vec!["cd", "distributary", "&&"];
+                cmd.extend(vec![
+                    "target/release/controller",
+                    "--remote-workers=1",
+                    "--shards",
+                    &shards,
+                    "--address",
+                    listen_addr,
+                ]);
+                server.exec(&cmd[..]).unwrap()
+            };
 
             /*
             // and the remote worker

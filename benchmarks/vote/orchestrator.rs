@@ -106,7 +106,7 @@ fn main() {
         Backend::Netsoup {
             workers: 1,
             readers: 1,
-            shards: 1,
+            shards: None,
         },
         Backend::Mysql,
         Backend::Mssql,
