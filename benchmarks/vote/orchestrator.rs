@@ -223,9 +223,7 @@ fn main() {
             }
 
             eprintln!(" -> {}", params.name(target, ""));
-            run_clients(&clients, target, params);
-
-            // TODO: also gather memory usage and stuff?
+            run_clients(&clients, &mut s, target, params);
         }
 
         eprintln!(" -> stopping server");
@@ -234,7 +232,12 @@ fn main() {
     }
 }
 
-fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientParameters) -> () {
+fn run_clients(
+    clients: &Vec<(Ssh, HostDesc)>,
+    server: &mut server::Server,
+    target: usize,
+    params: ClientParameters,
+) -> () {
     // first, we need to prime from some host -- doesn't really matter which
     {
         let &(ref ssh, ref host) = clients.first().unwrap();
@@ -329,7 +332,10 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
     // let's see how we did
     use std::fs::File;
     let fname = params.name(target, "log");
-    let mut outf = File::create(fname);
+    let mut outf = File::create(&fname);
+    if let Err(ref e) = outf {
+        eprintln!(" !! failed to open output file {}: {}", fname, e);
+    }
 
     eprintln!(" .. waiting for benchmark to complete");
     for (host, mut chan) in workers {
@@ -349,6 +355,15 @@ fn run_clients(clients: &Vec<(Ssh, HostDesc)>, target: usize, params: ClientPara
             eprintln!("{} failed to run benchmark client:", host.name);
             eprintln!("{}", stderr);
             eprintln!("");
+        }
+    }
+
+    if let Ok(mut f) = outf {
+        // also gather memory usage and stuff
+        if f.write_all(b"# server stats:").is_ok() {
+            if let Err(e) = server.write_stats(params.backend, &mut f) {
+                eprintln!(" !! failed to gather server stats: {}", e);
+            }
         }
     }
 }

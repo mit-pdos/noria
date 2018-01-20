@@ -94,12 +94,9 @@ impl Ssh {
     pub(crate) fn exec<'a>(&'a self, cmd: &[&str]) -> Result<Channel<'a>, Box<Error>> {
         let mut c = self.channel_session()?;
         let cmd: Vec<_> = cmd.iter()
-            .map(|&arg| {
-                if arg == "&&" {
-                    arg.to_string()
-                } else {
-                    shellwords::escape(arg)
-                }
+            .map(|&arg| match arg {
+                "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                _ => shellwords::escape(arg),
             })
             .collect();
         let cmd = cmd.join(" ");

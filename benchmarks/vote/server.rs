@@ -4,6 +4,8 @@ use ssh2;
 use std::error::Error;
 use std::borrow::Cow;
 use std::{thread, time};
+use std::io;
+use std::io::prelude::*;
 
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
@@ -93,8 +95,75 @@ impl<'a> Server<'a> {
                 eprintln!(" .. server restart completed");
                 Ok(s)
             }
-            _ => Ok(self),
+            Backend::Mysql | Backend::Mssql => Ok(self),
         }
+    }
+
+    fn get_pid(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
+        let mut c = self.server.exec(&["pgrep", pgrep])?;
+        let mut stdout = String::new();
+        c.read_to_string(&mut stdout)?;
+        c.wait_eof()?;
+
+        Ok(stdout.lines().next().and_then(|line| line.parse().ok()))
+    }
+
+    fn get_mem(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
+        let pid = self.get_pid(pgrep)?.ok_or("couldn't find server pid")?;
+        let f = format!("/proc/{}/status", pid);
+        let mut c = self.server.exec(&["grep", "VmRss", &f])?;
+
+        let mut stdout = String::new();
+        c.read_to_string(&mut stdout)?;
+        c.wait_eof()?;
+
+        Ok(stdout
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().skip(1).next())
+            .and_then(|col| col.parse().ok()))
+    }
+
+    pub(crate) fn write_stats(
+        &mut self,
+        backend: &Backend,
+        w: &mut io::Write,
+    ) -> Result<(), Box<Error>> {
+        match *backend {
+            Backend::Memcached => {
+                let mem = self.get_mem("memcached")?
+                    .ok_or("couldn't find memcached memory usage")?;
+                w.write_all(format!("memory: {}", mem).as_bytes())?;
+            }
+            Backend::Netsoup { .. } => {
+                let mem = self.get_mem("souplet")?
+                    .ok_or("couldn't find souplet memory usage")?;
+                w.write_all(format!("memory: {}", mem).as_bytes())?;
+            }
+            Backend::Mysql => {
+                let mut c = self.server.exec(&[
+                    "mysql",
+                    "-N",
+                    "-t",
+                    "-u",
+                    "soup",
+                    "soup",
+                    "<",
+                    "distributary/mysql_stat.sql",
+                ])?;
+
+                w.write_all(b"tables:\n")?;
+                io::copy(&mut c, w)?;
+                c.wait_eof()?;
+            }
+            Backend::Mssql => {
+                let mut c = self.server.exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
+                w.write_all(b"disk:\n")?;
+                io::copy(&mut c, w)?;
+                c.wait_eof()?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -160,6 +229,7 @@ pub(crate) fn start<'a>(
             };
 
             // and the remote worker
+            // TODO: should we worry about the running directory being on an SSD here?
             let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
                 .into_iter()
                 .map(|&s| s.into())
