@@ -420,14 +420,15 @@ impl<A: Authority + 'static> Controller<A> {
     }
 
     /// Starts a loop that attempts to initiate a snapshot every `timeout`.
-    /// TODO(ekmartin): There's probably a better way of doing this. We should also clean it up
-    /// when the controller is dropped, which isn't really possible at the moment.
+    /// TODO(ekmartin): There's probably a better way of doing this.
     fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
         let builder = thread::Builder::new().name("snapshots".to_owned());
         builder
             .spawn(move || loop {
                 thread::sleep(timeout);
-                event_tx.send(ControlEvent::InitializeSnapshot).unwrap();
+                if event_tx.send(ControlEvent::InitializeSnapshot).is_err() {
+                    return
+                }
             })
             .unwrap();
     }
