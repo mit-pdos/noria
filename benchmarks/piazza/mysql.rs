@@ -32,11 +32,13 @@ impl Backend {
 
     pub fn secure_read(&self, uid: i32) {
         let qstring = format!(
-            "SELECT p_cid, count(p_id) FROM Post \
-                WHERE Post.p_private = 0 OR \
+            "SELECT p_author, count(p_id) FROM Post \
+                WHERE \
                 Post.p_private = 1 AND Post.p_author = {} OR \
-                (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) \
-                GROUP BY p_cid",
+                (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
+                (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+                GROUP BY p_author",
+            uid,
             uid,
             uid,
         );
@@ -185,6 +187,12 @@ fn main() {
                 .help("Number of users in the db"),
         )
         .arg(
+            Arg::with_name("nlogged")
+                .short("l")
+                .default_value("1000")
+                .help("Number of logged users"),
+        )
+        .arg(
             Arg::with_name("nclasses")
                 .short("c")
                 .default_value("100")
@@ -206,6 +214,7 @@ fn main() {
 
     let dbn = args.value_of("dbname").unwrap();
     let nusers = value_t_or_exit!(args, "nusers", i32);
+    let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
@@ -219,35 +228,35 @@ fn main() {
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     backend.populate_tables(&mut p);
 
-    let repeats = 1000;
     // Do some reads without security
     let start = time::Instant::now();
-    for _ in 0..1000 {
-        for uid in 0..nusers {
+    for uid in 0..nlogged {
+        for _ in 0..nusers {
             backend.read(uid);
         }
     }
+
     let dur = dur_to_fsec!(start.elapsed());
     println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * repeats,
+        nusers * nlogged,
         dur,
-        (nusers * repeats) as f64 / dur
+        (nusers * nlogged) as f64 / dur
     );
 
     // Do some reads WITH security
     let start = time::Instant::now();
-    for _ in 0..repeats {
-        for uid in 0..nusers {
+    for uid in 0..nlogged {
+        for _ in 0..nusers {
             backend.secure_read(uid);
         }
     }
     let dur = dur_to_fsec!(start.elapsed());
     println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * repeats,
+        nusers * nlogged,
         dur,
-        (nusers * repeats) as f64 / dur
+        (nusers * nlogged) as f64 / dur
     );
 
 }
