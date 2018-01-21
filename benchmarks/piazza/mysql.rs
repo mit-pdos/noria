@@ -134,7 +134,7 @@ impl Backend {
               UNIQUE KEY p_id (p_id), \
               KEY p_cid (p_cid), \
               KEY p_author (p_author) \
-            ) ENGINE=MEMORY;",
+            );",
             (),
         ).unwrap();
 
@@ -143,7 +143,7 @@ impl Backend {
               u_id int(11) NOT NULL, \
               PRIMARY KEY  (u_id), \
               UNIQUE KEY u_id (u_id) \
-            ) ENGINE=MEMORY;",
+            );",
             (),
         ).unwrap();
 
@@ -152,7 +152,7 @@ impl Backend {
               c_id int(11) NOT NULL, \
               PRIMARY KEY  (c_id), \
               UNIQUE KEY c_id (c_id) \
-            ) ENGINE=MEMORY;",
+            );",
             (),
         ).unwrap();
 
@@ -163,7 +163,7 @@ impl Backend {
               r_role tinyint(1) NOT NULL default '0', \
               KEY r_uid (r_uid), \
               KEY r_cid (r_cid) \
-            ) ENGINE=MEMORY;",
+            );",
             (),
         ).unwrap();
 
