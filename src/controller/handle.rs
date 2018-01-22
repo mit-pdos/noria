@@ -1,4 +1,4 @@
-use consensus::{Authority};
+use consensus::Authority;
 use dataflow::prelude::*;
 use dataflow::statistics::GraphStats;
 
@@ -109,6 +109,11 @@ impl<A: Authority> ControllerHandle<A> {
     /// Get statistics about the time spent processing different parts of the graph.
     pub fn get_statistics(&mut self) -> GraphStats {
         self.rpc("get_statistics", &())
+    }
+
+    /// Extend the existing recipe on the controller by adding a new query.
+    pub fn extend_recipe(&mut self, recipe_addition: String) -> Result<(), RpcError> {
+        self.rpc("extend_recipe", &recipe_addition)
     }
 
     /// Install a new recipe on the controller.
