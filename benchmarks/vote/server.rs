@@ -111,7 +111,7 @@ impl<'a> Server<'a> {
     fn get_mem(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
         let pid = self.get_pid(pgrep)?.ok_or("couldn't find server pid")?;
         let f = format!("/proc/{}/status", pid);
-        let mut c = self.server.exec(&["grep", "VmRss", &f])?;
+        let mut c = self.server.exec(&["grep", "VmRSS", &f])?;
 
         let mut stdout = String::new();
         c.read_to_string(&mut stdout)?;
@@ -258,8 +258,6 @@ pub(crate) fn start<'a>(
             }
             cmd.extend(vec![
                 "target/release/souplet".into(),
-                "--zookeeper".into(),
-                listen_addr.into(),
                 "-w".into(),
                 format!("{}", workers).into(),
                 "-r".into(),

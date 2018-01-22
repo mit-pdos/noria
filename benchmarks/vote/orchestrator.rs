@@ -80,7 +80,7 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("15")
+                .default_value("20")
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
@@ -104,9 +104,24 @@ fn main() {
     // what backends are we benchmarking?
     let backends = vec![
         Backend::Netsoup {
-            workers: 1,
-            readers: 1,
+            workers: 2,
+            readers: 8,
             shards: None,
+        },
+        Backend::Netsoup {
+            workers: 2,
+            readers: 8,
+            shards: Some(2),
+        },
+        Backend::Netsoup {
+            workers: 2,
+            readers: 16,
+            shards: None,
+        },
+        Backend::Netsoup {
+            workers: 2,
+            readers: 16,
+            shards: Some(2),
         },
         Backend::Mysql,
         Backend::Mssql,
@@ -215,7 +230,7 @@ fn main() {
             articles,
         };
 
-        let targets = [1000, 2000];
+        let targets = [5000, 10000, 100000, 1000000, 2000000, 4000000];
         for (i, &target) in targets.iter().enumerate() {
             if i != 0 {
                 s = s.between_targets(&backend).unwrap();
@@ -224,6 +239,8 @@ fn main() {
 
             eprintln!(" -> {}", params.name(target, ""));
             run_clients(&clients, &mut s, target, params);
+
+            // TODO: if backend clearly couldn't handle the load, don't run higher targets
         }
 
         eprintln!(" -> stopping server");
