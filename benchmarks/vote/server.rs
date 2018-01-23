@@ -258,6 +258,8 @@ pub(crate) fn start<'a>(
             }
             cmd.extend(vec![
                 "target/release/souplet".into(),
+                "--listen".into(),
+                listen_addr.into(),
                 "-w".into(),
                 format!("{}", workers).into(),
                 "-r".into(),
