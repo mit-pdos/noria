@@ -44,7 +44,7 @@ impl Backend {
 
     pub(crate) fn port(&self) -> u16 {
         match *self {
-            Backend::Netsoup { .. } => 9000,
+            Backend::Netsoup { .. } => unreachable!(),
             Backend::Memcached => 11211,
             Backend::Mysql => 3306,
             Backend::Mssql => 1433,

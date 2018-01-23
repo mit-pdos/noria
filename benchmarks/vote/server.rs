@@ -116,6 +116,12 @@ impl<'a> Server<'a> {
     }
 
     pub(crate) fn wait(&mut self, client: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
+        if let Backend::Netsoup { .. } = *backend {
+            // netsoup *worker* doesn't have a well-defined port :/
+            thread::sleep(time::Duration::from_secs(5));
+            return Ok(());
+        }
+
         let start = time::Instant::now();
         client.set_timeout(2000);
         while start.elapsed() < time::Duration::from_secs(2) {
