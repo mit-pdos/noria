@@ -37,6 +37,22 @@ impl<'a> ServerHandle<'a> {
                     unimplemented!();
                 }
 
+                /*
+                let mut cstdout = String::new();
+                let mut cstderr = String::new();
+                c.stderr().read_to_string(&mut cstderr)?;
+                c.read_to_string(&mut cstdout)?;
+                println!("{}", cstdout);
+                println!("{}", cstderr);
+
+                let mut wstdout = String::new();
+                let mut wstderr = String::new();
+                w.stderr().read_to_string(&mut wstderr)?;
+                w.read_to_string(&mut wstdout)?;
+                println!("{}", wstdout);
+                println!("{}", wstderr);
+                */
+
                 c.wait_eof()?;
                 w.wait_eof()?;
 
