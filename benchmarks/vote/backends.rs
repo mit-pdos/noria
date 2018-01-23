@@ -1,6 +1,3 @@
-use std::net::TcpStream;
-use std::time;
-
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Backend {
     Netsoup {
@@ -45,22 +42,12 @@ impl Backend {
         }
     }
 
-    fn port(&self) -> u16 {
+    pub(crate) fn port(&self) -> u16 {
         match *self {
             Backend::Netsoup { .. } => 9000,
             Backend::Memcached => 11211,
             Backend::Mysql => 3306,
             Backend::Mssql => 1433,
-        }
-    }
-
-    pub(crate) fn wait(&self, addr: &str) {
-        // *technically* we should connect from one of the clients...
-        let start = time::Instant::now();
-        while TcpStream::connect((addr, self.port())).is_err() {
-            if start.elapsed() > time::Duration::from_secs(5) {
-                break;
-            }
         }
     }
 }

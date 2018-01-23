@@ -99,6 +99,30 @@ impl<'a> Server<'a> {
         }
     }
 
+    pub(crate) fn wait(&mut self, client: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
+        let start = time::Instant::now();
+        client.set_timeout(2000);
+        while start.elapsed() < time::Duration::from_secs(2) {
+            let e: Result<(), ssh2::Error> = do catch {
+                let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
+                c.send_eof()?;
+                c.wait_eof()?;
+                Ok(())
+            };
+
+            if let Err(e) = e {
+                if e.code() == -21 {
+                    // "connect failed"
+                    continue;
+                }
+                Err(e)?;
+            } else {
+                return Ok(());
+            }
+        }
+        Err("server never started".into())
+    }
+
     fn get_pid(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
         let mut c = self.server.exec(&["pgrep", pgrep])?;
         let mut stdout = String::new();

@@ -222,7 +222,10 @@ fn main() {
         };
 
         // give the server a little time to get its stuff together
-        backend.wait(listen_addr);
+        if let Err(e) = s.wait(&clients[0].0, &backend) {
+            eprintln!("failed to start {:?}: {:?}", backend, e);
+            continue;
+        }
         eprintln!(" .. server started ");
 
         let params = ClientParameters {
@@ -236,7 +239,12 @@ fn main() {
         for (i, &target) in targets.iter().enumerate() {
             if i != 0 {
                 s = s.between_targets(&backend).unwrap();
-                backend.wait(listen_addr); // in case server was restarted
+
+                // wait in case server was restarted
+                if let Err(e) = s.wait(&clients[0].0, &backend) {
+                    eprintln!("failed to restart {:?}: {:?}", backend, e);
+                    continue;
+                }
             }
 
             eprintln!(" -> {}", params.name(target, ""));
@@ -259,7 +267,8 @@ fn run_clients(
 ) -> () {
     // first, we need to prime from some host -- doesn't really matter which
     {
-        let &(ref ssh, ref host) = clients.first().unwrap();
+        let (ref ssh, ref host) = clients[0];
+        ssh.set_timeout(0);
         eprintln!(" .. prepopulating on {}", host.name);
 
         let mut prime_params = params.clone();
