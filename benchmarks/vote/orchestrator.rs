@@ -377,7 +377,7 @@ fn run_clients(
 
     if let Ok(mut f) = outf {
         // also gather memory usage and stuff
-        if f.write_all(b"# server stats:").is_ok() {
+        if f.write_all(b"# server stats:\n").is_ok() {
             if let Err(e) = server.write_stats(params.backend, &mut f) {
                 eprintln!(" !! failed to gather server stats: {}", e);
             }
