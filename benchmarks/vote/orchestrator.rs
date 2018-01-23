@@ -1,3 +1,5 @@
+#![feature(catch_expr)]
+
 #[macro_use]
 extern crate clap;
 extern crate shellwords;
@@ -305,8 +307,12 @@ fn run_clients(
             // they have. this may or may not be the right thing.
             let target = (ops_per_thread * host.threads as f64).ceil() as usize;
 
-            // closure just to enable use of ?
-            let c = || -> Result<_, Box<Error>> {
+            eprintln!(
+                " .. starting benchmarker on {} with target {}",
+                host.name, target
+            );
+
+            let c: Result<_, Box<Error>> = do catch {
                 let mut cmd = Vec::<Cow<str>>::new();
                 if host.has_perflock {
                     cmd.push("perflock".into());
@@ -330,11 +336,7 @@ fn run_clients(
                 Ok(c)
             };
 
-            eprintln!(
-                " .. starting benchmarker on {} with target {}",
-                host.name, target
-            );
-            match c() {
+            match c {
                 Ok(c) => Some((host, c)),
                 Err(e) => {
                     eprintln!("{} failed to run benchmark client:", host.name);
