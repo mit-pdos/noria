@@ -10,6 +10,7 @@ for (arg in args) {
 	con <- file(arg, open = "r")
 	actual = 0
 	in_results = TRUE
+	n <- 0
 	ts <- data.frame()
 	this_t <- data.frame()
 	while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
@@ -17,11 +18,12 @@ for (arg in args) {
 			if (startsWith(line, "# actual ops")) {
 				if (nrow(this_t) > 0) {
 					if (nrow(ts) > 0) {
-						ts <- ts + this_t
+						ts <- mean(rep(ts, n), this_t)
 					} else {
 						ts <- this_t
 					}
 					this_t <- data.frame()
+					n = n + 1
 				}
 				actual = actual + as.numeric(sub("# actual ops/s: ", "", line))
 				in_results = TRUE
@@ -37,7 +39,7 @@ for (arg in args) {
 
 	if (nrow(this_t) > 0) {
 		if (nrow(ts) > 0) {
-			ts <- ts + this_t
+			ts <- mean(rep(ts, n), this_t)
 		} else {
 			ts <- this_t
 		}
