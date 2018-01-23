@@ -124,7 +124,7 @@ impl<'a> Server<'a> {
 
         let start = time::Instant::now();
         client.set_timeout(2000);
-        while start.elapsed() < time::Duration::from_secs(2) {
+        while start.elapsed() < time::Duration::from_secs(5) {
             let e: Result<(), ssh2::Error> = do catch {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
