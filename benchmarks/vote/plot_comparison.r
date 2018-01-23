@@ -8,19 +8,42 @@ for (arg in args) {
 	target = as.numeric(sub("t$", "", a[[3]]))
 
 	con <- file(arg, open = "r")
-	actual = target
+	actual = 0
+	in_results = TRUE
+	ts <- data.frame()
+	this_t <- data.frame()
 	while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
 		if (startsWith(line, "# ")) {
 			if (startsWith(line, "# actual ops")) {
-				actual <- as.numeric(sub("# actual ops/s: ", "", line))
+				if (nrow(this_t) > 0) {
+					if (nrow(ts) > 0) {
+						ts <- ts + this_t
+					} else {
+						ts <- this_t
+					}
+					this_t <- data.frame()
+				}
+				actual = actual + as.numeric(sub("# actual ops/s: ", "", line))
+				in_results = TRUE
 			} else if (startsWith(line, "# server stats")) {
-				break
+				in_results = FALSE
 			}
-		} else {
+		} else if (in_results) {
 			v <- read.table(text = line)
-			t <- rbind(t, data.frame(server=server, op=v[,1], pct=as.factor(v[,2]), sjrn=as.numeric(v[,3]), rmt=as.numeric(v[,4]), articles=articles, target=target, actual=actual))
+			this <- data.frame(server=server, op=v[,1], pct=as.factor(v[,2]), sjrn=as.numeric(v[,3]), rmt=as.numeric(v[,4]), articles=articles, target=target, actual=actual)
+			this_t <- rbind(this_t, this)
 		}
 	} 
+
+	if (nrow(this_t) > 0) {
+		if (nrow(ts) > 0) {
+			ts <- ts + this_t
+		} else {
+			ts <- this_t
+		}
+	}
+
+	t <- rbind(t, ts)
 	close(con)
 }
 t
