@@ -54,6 +54,10 @@ impl ZookeeperAuthority {
 }
 
 impl Authority for ZookeeperAuthority {
+    fn disconnect(&self) {
+        self.zk.close().unwrap();
+    }
+
     fn become_leader(&self, payload_data: Vec<u8>) -> Result<Epoch, Box<Error + Send + Sync>> {
         loop {
             match self.zk

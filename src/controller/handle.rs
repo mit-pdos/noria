@@ -137,5 +137,7 @@ impl<A: Authority> Drop for ControllerHandle<A> {
             let _ = sender.send(ControlEvent::Shutdown);
             let _ = join_handle.join();
         }
+
+        self.authority.disconnect();
     }
 }

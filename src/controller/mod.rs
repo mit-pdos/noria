@@ -549,6 +549,20 @@ mod tests {
         c.install_recipe(r_txt.to_owned());
     }
 
+    #[test]
+    #[allow_fail]
+    fn it_allows_authority_reuse() {
+        let r_txt = "CREATE TABLE a (x int, y int, z int);\n
+                     CREATE TABLE b (r int, s int);\n";
+
+        let address = "127.0.0.1:2181/it_allows_authority_reuse";
+        for _ in 0..2 {
+            let authority = ZookeeperAuthority::new(address);
+            let mut c = ControllerBuilder::default().build(authority);
+            c.install_recipe(r_txt.to_owned()).unwrap();
+        }
+    }
+
     // Controller without any domains gets dropped once it leaves the scope.
     #[test]
     #[ignore]
