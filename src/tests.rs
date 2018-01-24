@@ -1,6 +1,7 @@
 extern crate glob;
 
 use core::DataType;
+use consensus::ZookeeperAuthority;
 use dataflow::checktable::Token;
 use dataflow::node::StreamUpdate;
 use dataflow::ops::base::Base;
@@ -638,7 +639,9 @@ fn it_recovers_w_snapshots_and_logs() {
 
         let mut builder = ControllerBuilder::default();
         builder.set_persistence(pparams);
-        let mut g = builder.build_local();
+        let address = format!("127.0.0.1:2181/{}", log_name.name);
+        let authority = ZookeeperAuthority::new(&address);
+        let mut g = builder.build(authority);
 
         let sql = "
             CREATE TABLE Cat \
@@ -734,7 +737,9 @@ fn it_recovers_w_only_snapshots() {
 
         let mut builder = ControllerBuilder::default();
         builder.set_persistence(pparams);
-        let mut g = builder.build_local();
+        let address = format!("127.0.0.1:2181/{}", log_name.name);
+        let authority = ZookeeperAuthority::new(&address);
+        let mut g = builder.build(authority);
 
         let sql = "
             CREATE TABLE Cat (cat_id int, cat_name varchar(255), PRIMARY KEY(cat_id));

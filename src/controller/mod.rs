@@ -7,7 +7,7 @@ use dataflow::{DomainConfig, PersistenceParameters};
 use controller::domain_handle::DomainHandle;
 use controller::inner::ControllerInner;
 use controller::recipe::Recipe;
-use coordination::CoordinationMessage;
+use coordination::{CoordinationMessage, CoordinationPayload};
 
 use std::error::Error;
 use std::io::ErrorKind;
@@ -94,7 +94,7 @@ struct ControllerDescriptor {
     nonce: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct ControllerConfig {
     sharding: Option<usize>,
     partial_enabled: bool,
@@ -132,10 +132,11 @@ impl Default for ControllerConfig {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct ControllerState {
     config: ControllerConfig,
     epoch: Epoch,
+    snapshot_id: u64,
     recipe: (), // TODO: store all relevant state here.
 }
 
@@ -202,6 +203,7 @@ impl<A: Authority + 'static> Controller<A> {
         let campaign = Self::campaign(event_tx.clone(), authority.clone(), descriptor, config);
 
         let builder = thread::Builder::new().name("srv-main".to_owned());
+        let controller_authority = authority.clone();
         let join_handle = builder
             .spawn(move || {
                 let controller = Self {
@@ -215,7 +217,7 @@ impl<A: Authority + 'static> Controller<A> {
                     listen_addr,
                     phantom: PhantomData,
                 };
-                controller.main_loop(event_rx)
+                controller.main_loop(controller_authority, event_rx)
             })
             .unwrap();
 
@@ -226,10 +228,32 @@ impl<A: Authority + 'static> Controller<A> {
         }
     }
 
-    fn main_loop(mut self, receiver: Receiver<ControlEvent>) {
+    fn main_loop(mut self, authority: Arc<A>, receiver: Receiver<ControlEvent>) {
         for event in receiver {
             match event {
                 ControlEvent::ControllerMessage(msg) => if let Some(ref mut inner) = self.inner {
+                    match msg.payload {
+                        CoordinationPayload::SnapshotCompleted(domain, snapshot_id) => {
+                            if let Some(id) = inner.handle_snapshot_completed(domain, snapshot_id) {
+                                debug!(self.log, "Persisting snapshot ID {}", snapshot_id);
+                                authority
+                                    .read_modify_write(
+                                        "/state",
+                                        |state: Option<ControllerState>| match state {
+                                            None => Err(()),
+                                            Some(mut state) => {
+                                                state.snapshot_id = id;
+                                                Ok(state)
+                                            }
+                                        },
+                                    )
+                                    .unwrap()
+                                    .unwrap();
+                            }
+                        }
+                        _ => (),
+                    };
+
                     inner.coordination_message(msg)
                 },
                 ControlEvent::ExternalRequest(method, path, body, reply_tx) => {
@@ -427,7 +451,7 @@ impl<A: Authority + 'static> Controller<A> {
             .spawn(move || loop {
                 thread::sleep(timeout);
                 if event_tx.send(ControlEvent::InitializeSnapshot).is_err() {
-                    return
+                    return;
                 }
             })
             .unwrap();
@@ -451,6 +475,7 @@ impl<A: Authority + 'static> Controller<A> {
                             None => Ok(ControllerState {
                                 config: config.clone(),
                                 epoch: current_epoch,
+                                snapshot_id: 0,
                                 recipe: (),
                             }),
                             Some(ref state) if state.epoch > current_epoch => Err(()),

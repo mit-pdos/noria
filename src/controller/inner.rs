@@ -10,8 +10,6 @@ use std::time::{Duration, Instant};
 use std::thread;
 use std::sync::{atomic, Arc, Mutex};
 use std::{io, time};
-use std::io::{Read, Write};
-use std::fs::File;
 
 use coordination::{CoordinationMessage, CoordinationPayload};
 use controller::{ControllerConfig, ControllerState, DomainHandle, Migration, Recipe,
@@ -99,9 +97,7 @@ impl ControllerInner {
             } => self.handle_register(&msg, addr, read_listen_addr.clone()),
             CoordinationPayload::Heartbeat => self.handle_heartbeat(&msg),
             CoordinationPayload::DomainBooted(..) => Ok(()),
-            CoordinationPayload::SnapshotCompleted(domain, snapshot_id) => {
-                self.handle_snapshot_completed(domain, snapshot_id)
-            }
+            CoordinationPayload::SnapshotCompleted(..) => Ok(()),
             _ => unimplemented!(),
         };
         match process {
@@ -140,6 +136,27 @@ impl ControllerInner {
             }
             _ => return Err(StatusCode::NotFound),
         })
+    }
+
+    pub fn handle_snapshot_completed(
+        &mut self,
+        domain: (DomainIndex, usize),
+        snapshot_id: u64,
+    ) -> Option<u64> {
+        debug!(
+            self.log,
+            "Setting shard {:?}'s snapshot ID to {}", domain, snapshot_id
+        );
+
+        self.snapshot_ids.insert(domain, snapshot_id);
+        // Persist the snapshot_id if all shards have snapshotted:
+        let min_id = *self.snapshot_ids.values().min().unwrap();
+        if min_id == snapshot_id && min_id != self.snapshot_id {
+            self.snapshot_id = snapshot_id;
+            Some(snapshot_id)
+        } else {
+            None
+        }
     }
 
     fn handle_register(
@@ -183,26 +200,6 @@ impl ControllerInner {
             Some(ref mut ws) => {
                 ws.last_heartbeat = Instant::now();
             }
-        }
-
-        Ok(())
-    }
-
-    fn handle_snapshot_completed(
-        &mut self,
-        domain: (DomainIndex, usize),
-        snapshot_id: u64,
-    ) -> Result<(), io::Error> {
-        debug!(
-            self.log,
-            "Setting shard {:?}'s snapshot ID to {}", domain, snapshot_id
-        );
-
-        self.snapshot_ids.insert(domain, snapshot_id);
-        // Persist the snapshot_id if all shards have snapshotted:
-        let min_id = *self.snapshot_ids.values().min().unwrap();
-        if min_id == snapshot_id && min_id != self.snapshot_id {
-            self.persist_snapshot_id(snapshot_id);
         }
 
         Ok(())
@@ -281,7 +278,7 @@ impl ControllerInner {
             checktable_addr,
             listen_addr,
 
-            snapshot_id: Self::retrieve_snapshot_id(&persistence.log_prefix),
+            snapshot_id: state.snapshot_id,
             snapshot_ids: Default::default(),
 
             materializations,
@@ -310,46 +307,6 @@ impl ControllerInner {
 
             last_checked_workers: Instant::now(),
         }
-    }
-
-    // Tries to read the snapshot_id from {log_prefix}-snapshot_id, returning
-    // a default value if the file doesn't exist.
-    fn retrieve_snapshot_id(log_prefix: &str) -> u64 {
-        let filename = format!("{}-snapshot_id", log_prefix);
-        let mut file = match File::open(&filename) {
-            Ok(f) => f,
-            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
-                // Start at 0 if we haven't taken any snapshots before:
-                return 0;
-            }
-            Err(e) => panic!("Could not open snapshot_id file {}: {}", filename, e),
-        };
-
-        let mut buffer = String::new();
-        file.read_to_string(&mut buffer)
-            .expect("Failed reading snapshot_id");
-        buffer
-            .parse::<u64>()
-            .expect("persisted snapshot_id is not a valid number")
-    }
-
-    // Writes the ID of the last completed snapshot to disk,
-    // making it available for future recovery situations.
-    fn persist_snapshot_id(&mut self, snapshot_id: u64) {
-        let filename = format!("{}-snapshot_id", self.persistence.log_prefix);
-        debug!(
-            self.log,
-            "Persisting snapshot ID {} to {}", snapshot_id, filename
-        );
-
-        let mut file = File::create(&filename).expect(&format!(
-            "Could not open snapshot ID file for writing {}",
-            filename,
-        ));
-
-        file.write_all(format!("{}", snapshot_id).as_bytes())
-            .expect("Failed writing snapshot_id");
-        self.snapshot_id = snapshot_id;
     }
 
     /// Use a debug channel. This function may only be called once because the receiving end it

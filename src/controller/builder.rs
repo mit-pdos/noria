@@ -91,6 +91,7 @@ impl ControllerBuilder {
         let initial_state = ControllerState {
             config: self.config,
             recipe: (),
+            snapshot_id: 0,
             epoch: LocalAuthority::get_epoch(),
         };
         ControllerInner::new(
