@@ -1,6 +1,6 @@
 extern crate distributary;
 
-use distributary::ControllerBuilder;
+use distributary::{ControllerBuilder, PersistenceParameters, ZookeeperAuthority};
 
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -20,7 +20,7 @@ fn main() {
                             FROM Article, VoteCount \
                             WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
-    let persistence_params = distributary::PersistenceParameters::new(
+    let persistence_params = PersistenceParameters::new(
         distributary::DurabilityMode::Permanent,
         512,
         Duration::from_millis(1),
@@ -34,7 +34,8 @@ fn main() {
     builder.set_local_workers(2);
     builder.set_persistence(persistence_params);
 
-    let mut blender = builder.build_local();
+    let authority = ZookeeperAuthority::new("127.0.0.1:2181/basic-recipe");
+    let mut blender = builder.build(authority);
     blender.install_recipe(sql.to_owned()).unwrap();
     println!("{}", blender.graphviz());
 
