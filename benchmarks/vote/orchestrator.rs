@@ -107,16 +107,6 @@ fn main() {
     let backends = vec![
         Backend::Netsoup {
             workers: 2,
-            readers: 8,
-            shards: None,
-        },
-        Backend::Netsoup {
-            workers: 2,
-            readers: 8,
-            shards: Some(2),
-        },
-        Backend::Netsoup {
-            workers: 2,
             readers: 16,
             shards: None,
         },
@@ -235,7 +225,10 @@ fn main() {
             articles,
         };
 
-        let targets = [5000, 10000, 100000, 1000000, 2000000, 4000000];
+        let targets = [
+            5000, 10000, 50000, 100000, 500000, 1000000, 2000000, 3000000, 4000000
+        ];
+        // TODO: run more iterations
         for (i, &target) in targets.iter().enumerate() {
             if i != 0 {
                 s = s.between_targets(&backend).unwrap();
