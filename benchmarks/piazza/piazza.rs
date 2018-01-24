@@ -89,20 +89,7 @@ impl Backend {
 
         self.g.create_universe(user_context.clone());
 
-        self.write_to_user_context(user_context);
         Ok(())
-    }
-
-    fn write_to_user_context(&mut self, uc: HashMap<String, DataType>) {
-        let name = &format!("UserContext_{}", uc.get("id").unwrap());
-        let r: Vec<DataType> = uc.values().cloned().collect();
-        let ins = self.g.inputs();
-        let mut mutator = self
-            .g
-            .get_mutator(ins[name])
-            .unwrap();
-
-        mutator.put(r).unwrap();
     }
 
     fn set_security_config(&mut self, config_file: &str) {
