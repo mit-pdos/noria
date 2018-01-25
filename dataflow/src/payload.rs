@@ -433,6 +433,13 @@ impl Packet {
                 context: context.clone(),
                 transaction_state: transaction_state.clone(),
             },
+            Packet::TakeSnapshot {
+                snapshot_id,
+                ref link,
+            } => Packet::TakeSnapshot {
+                snapshot_id,
+                link: link.clone(),
+            },
             _ => unreachable!(),
         }
     }

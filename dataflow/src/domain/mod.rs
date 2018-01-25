@@ -1745,6 +1745,7 @@ impl Domain {
         // the snapshot packet from Parent 2 to arrive before we snapshot, while simulatenously
         // blocking updates from the other parents.
         let snapshot_id = packet.snapshot_id();
+        debug!(self.log, "Received snapshot request #{}", snapshot_id);
         if self.snapshot_id >= snapshot_id {
             debug!(
                 self.log,
@@ -1795,7 +1796,7 @@ impl Domain {
         // Forward the snapshot packet throughout the graph:
         for (_local_addr, node) in self.nodes.iter() {
             let mut node = node.borrow_mut();
-            if node.is_egress() {
+            if node.is_egress() || node.is_sharder() {
                 node.process(
                     &mut Some(packet.clone()),
                     None,
@@ -1823,6 +1824,11 @@ impl Domain {
                     reader_states,
                 })
                 .unwrap();
+        } else {
+            debug!(
+                self.log,
+                "No materialized nodes - skipping snapshot ACK for #{}", snapshot_id
+            );
         }
     }
 
