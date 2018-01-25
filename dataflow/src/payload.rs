@@ -244,7 +244,6 @@ pub enum Packet {
 
     /// Signal that a base node's domain should start replaying logs.
     StartRecovery {
-        link: Link,
         snapshot_id: u64,
     },
 
@@ -301,7 +300,6 @@ impl Packet {
             Packet::Transaction { ref link, .. } => link,
             Packet::ReplayPiece { ref link, .. } => link,
             Packet::TakeSnapshot { ref link, .. } => link,
-            Packet::StartRecovery { ref link, .. } => link,
             _ => unreachable!(),
         }
     }
@@ -312,7 +310,6 @@ impl Packet {
             Packet::Transaction { ref mut link, .. } => link,
             Packet::ReplayPiece { ref mut link, .. } => link,
             Packet::TakeSnapshot { ref mut link, .. } => link,
-            Packet::StartRecovery { ref mut link, .. } => link,
             _ => unreachable!(),
         }
     }

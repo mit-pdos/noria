@@ -213,7 +213,6 @@ impl DomainBuilder {
 
             ingress_inject: Default::default(),
 
-            has_recovered: false,
             snapshot_id: 0,
             snapshot_sender: None,
 
@@ -257,7 +256,6 @@ pub struct Domain {
 
     ingress_inject: local::Map<(usize, Vec<DataType>)>,
 
-    has_recovered: bool,
     snapshot_id: u64,
     snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
 
@@ -1581,23 +1579,7 @@ impl Domain {
         }
     }
 
-    fn recover_snapshots(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
-        // Forward recovery packet on to other domains first:
-        for (_local_addr, node) in self.nodes.iter() {
-            let mut node = node.borrow_mut();
-            if node.is_egress() {
-                node.process(
-                    &mut Some(packet.clone()),
-                    None,
-                    &mut self.state,
-                    &self.nodes,
-                    self.shard,
-                    false,
-                    sends,
-                );
-            }
-        }
-
+    fn recover_snapshots(&mut self) {
         fn deserialize<T>(filename: String) -> T
         where
             for<'de> T: serde::Deserialize<'de>,
@@ -1620,9 +1602,10 @@ impl Domain {
 
             if let Some(state) = self.state.get_mut(&local_addr) {
                 *state = deserialize(filename);
-                debug!(self.log, "State size after recovery {}", state.len());
+                debug!(self.log, "State size after recovery for node {}: {}", local_addr, state.len());
             } else if n.with_reader(|ref r| r.is_materialized()).unwrap_or(false) {
                 let state: HashMap<DataType, Datas> = deserialize(filename);
+                debug!(self.log, "Recovering reader {} with state size {}", local_addr, state.len());
                 n.with_reader_mut(|r| {
                     let writer = r.writer_mut().unwrap();
                     writer.extend(state);
@@ -1632,20 +1615,8 @@ impl Domain {
         }
     }
 
-    fn handle_recovery(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
-        if self.has_recovered {
-            // This might happen if we have two parents that
-            // both forward us a recovery packet.
-            debug!(self.log, "Ignoring duplicate recovery packet");
-            return;
-        }
-
-        let snapshot_id = packet.snapshot_id();
-        if snapshot_id > 0 {
-            self.snapshot_id = snapshot_id;
-            self.recover_snapshots(packet, sends);
-        }
-
+    fn recover_logs(&mut self, sends: &mut EnqueuedSends) {
+        let snapshot_id = self.snapshot_id;
         let node_info: Vec<_> = self.nodes
             .iter()
             .filter_map(|(index, node)| {
@@ -1660,7 +1631,6 @@ impl Domain {
 
         for (local_addr, global_addr, is_transactional) in node_info {
             let path = self.persistence_parameters.log_path(&local_addr, self.id());
-
             let file = match File::open(&path) {
                 Ok(f) => f,
                 Err(ref e) if e.kind() == ErrorKind::NotFound => {
@@ -1717,8 +1687,17 @@ impl Domain {
                 })
                 .for_each(|packet| self.handle(box packet, sends));
         }
+    }
 
-        self.has_recovered = true;
+    fn handle_recovery(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        let snapshot_id = packet.snapshot_id();
+        if snapshot_id > 0 {
+            self.snapshot_id = snapshot_id;
+            self.recover_snapshots();
+        } else {
+            self.recover_logs(sends);
+        }
+
         self.control_reply_tx
             .send(ControlReplyPacket::ack())
             .unwrap();

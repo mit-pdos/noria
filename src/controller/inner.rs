@@ -4,7 +4,7 @@ use dataflow::payload::{EgressForBase, IngressFromBase};
 use dataflow::prelude::*;
 use dataflow::statistics::GraphStats;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use std::thread;
@@ -414,17 +414,40 @@ impl ControllerInner {
         r
     }
 
-    /// Initiaties recovery by sending a StartRecovery packet to each base node domain.
+    /// Recovers persisted snapshots for each domain, followed by log recovery at each base node.
     pub fn recover(&mut self) {
         info!(self.log, "Initiating recovery");
+        if self.snapshot_id > 0 {
+            // Sends StartRecovery packets in parallel to each domain that contains at least one
+            // materialized node, and waits for ACKs before proceeding.
+            info!(self.log, "Recovering from snapshot ID {}", self.snapshot_id);
+            let domains = self.snapshot_ids
+                .keys()
+                .map(|&(domain_index, _shard)| domain_index)
+                .collect::<HashSet<_>>();
+
+            for domain_index in domains.iter() {
+                let domain = self.domains.get_mut(&domain_index).unwrap();
+                let packet = payload::Packet::StartRecovery {
+                    snapshot_id: self.snapshot_id,
+                };
+
+                domain.send(box packet).unwrap();
+            }
+
+            for domain_index in domains {
+                let domain = self.domains.get_mut(&domain_index).unwrap();
+                domain.wait_for_ack().unwrap();
+            }
+        }
+
+        // Finally, initiate log recovery by
+        // sending sequential StartRecovery packets with a snapshot_id of 0:
+        info!(self.log, "Recovering from logs");
         for (_name, index) in self.inputs().iter() {
             let node = &self.ingredients[*index];
             let domain = self.domains.get_mut(&node.domain()).unwrap();
-            let packet = payload::Packet::StartRecovery {
-                link: Link::new(*node.local_addr(), *node.local_addr()),
-                snapshot_id: self.snapshot_id,
-            };
-
+            let packet = payload::Packet::StartRecovery { snapshot_id: 0 };
             domain.send(box packet).unwrap();
             domain.wait_for_ack().unwrap();
         }
