@@ -3,7 +3,6 @@ library(dplyr)
 args <- commandArgs(trailingOnly = TRUE)
 t <- data.frame()
 for (arg in args) {
-	print(arg)
 	a <- strsplit(sub(".log", "", basename(arg)), "\\.")
 	a <- a[[1]]
 	server = a[[1]]
@@ -41,7 +40,7 @@ for (arg in args) {
 	t <- rbind(t, ts)
 	close(con)
 }
-t
+#t
 t = t[t$pct != 100,]
 t$server <- as.factor(t$server)
 t$actual <- t$actual/1000000.0
