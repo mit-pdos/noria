@@ -47,6 +47,7 @@ t$server <- as.factor(t$server)
 t$actual <- t$actual/1000000.0
 t$target <- t$target/1000000.0
 #t$sjrn <- pmin(t$sjrn, 500) # otherwise ggplot tries to plot all the way to 100k
+mx_rmt = max(t$rmt)
 
 library(ggplot2)
 
@@ -58,7 +59,7 @@ p <- p + xlab("offered load (Mops/s)") + ylab("batch processing time (µs)")
 ggsave('plot-batch.png',plot=p,width=10,height=4)
 
 p <- ggplot(data=t, aes(x=actual, y=sjrn, color=server, linetype=op, shape=server))
-#p <- p + coord_trans(x = "identity", y = "identity", limy=c(0, 150))
+p <- p + coord_trans(x = "identity", y = "identity", limy=c(0, 2*mx_rmt))
 p <- p + facet_wrap(~ pct)
 p <- p + geom_point(size = 0.7, alpha = 0.8) + geom_line()
 p <- p + xlab("offered load (Mops/s)") + ylab("sojourn time (µs)")
