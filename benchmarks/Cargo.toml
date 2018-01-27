@@ -15,7 +15,7 @@ default = ["b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "fe7cdaa360c86bd4202e4065bc125ba5642439d2" }
+nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "6c08e9c28caf40cc3014fd5eecee8d07fbf2023e" }
 regex = "0.2.2"
 slog = "2.0.6"
 #slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
@@ -24,6 +24,9 @@ vec_map = { version = "0.8.0" }
 rayon = "0.9"
 libc = "0.2"
 hwloc = "0.5"
+ssh2 = "0.3"
+whoami = "0.2"
+shellwords = "0.1"
 
 # for benchmarks
 # cli
@@ -57,6 +60,10 @@ path = "bank/bank.rs"
 [[bin]]
 name = "vote"
 path = "vote/main.rs"
+
+[[bin]]
+name = "vote-orchestrator"
+path = "vote/orchestrator.rs"
 
 [[bin]]
 name = "tpc_w"
