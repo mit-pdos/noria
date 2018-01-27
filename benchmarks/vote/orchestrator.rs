@@ -226,7 +226,8 @@ fn main() {
         };
 
         let targets = [
-            5000, 10000, 50000, 100000, 500000, 1000000, 2000000, 3000000, 4000000
+            5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 2_000_000, 3_000_000, 4_000_000,
+            8_000_000, 12_000_000,
         ];
         // TODO: run more iterations
         for (i, &target) in targets.iter().enumerate() {
@@ -241,9 +242,10 @@ fn main() {
             }
 
             eprintln!(" -> {}", params.name(target, ""));
-            run_clients(&clients, &mut s, target, params);
-
-            // TODO: if backend clearly couldn't handle the load, don't run higher targets
+            if !run_clients(&clients, &mut s, target, params) {
+                // backend clearly couldn't handle the load, so don't run higher targets
+                break;
+            }
         }
 
         eprintln!(" -> stopping server");
@@ -252,12 +254,13 @@ fn main() {
     }
 }
 
+// returns true if backend handled load fine
 fn run_clients(
     clients: &Vec<(Ssh, HostDesc)>,
     server: &mut server::Server,
     target: usize,
     params: ClientParameters,
-) -> () {
+) -> bool {
     // first, we need to prime from some host -- doesn't really matter which
     {
         let (ref ssh, ref host) = clients[0];
@@ -282,13 +285,13 @@ fn run_clients(
                 eprintln!("{} failed to populate:", host.name);
                 eprintln!("{}", e);
                 eprintln!("");
-                return;
+                return false;
             }
             Err(e) => {
                 eprintln!("{} failed to populate:", host.name);
                 eprintln!("{:?}", e);
                 eprintln!("");
-                return;
+                return false;
             }
         }
 
@@ -351,6 +354,7 @@ fn run_clients(
         .collect();
 
     // let's see how we did
+    let mut overloaded = None;
     use std::fs::File;
     let fname = params.name(target, "log");
     let mut outf = File::create(&fname);
@@ -361,10 +365,36 @@ fn run_clients(
     eprintln!(" .. waiting for benchmark to complete");
     for (host, mut chan) in workers {
         if let Ok(ref mut f) = outf {
-            use std::io;
-
             // TODO: should we get histogram files here instead and merge them?
-            io::copy(&mut chan, f).unwrap();
+
+            let mut stdout = String::new();
+            chan.read_to_string(&mut stdout).unwrap();
+            f.write_all(stdout.as_bytes()).unwrap();
+
+            let mut is_overloaded = false;
+            for line in stdout.lines() {
+                if !line.starts_with('#') {
+                    let mut fields = line.split_whitespace().skip(1);
+                    let pct: u32 = fields.next().unwrap().parse().unwrap();
+                    let sjrn: u32 = fields.next().unwrap().parse().unwrap();
+
+                    if pct == 50 && sjrn > 100_000 {
+                        is_overloaded = true;
+                    }
+                }
+            }
+
+            if is_overloaded {
+                eprintln!(" !! client {} was overloaded", host.name);
+            }
+
+            let was_overloaded = overloaded.unwrap_or(false);
+            if overloaded.is_some() && is_overloaded != was_overloaded {
+                // one client was overloaded, while another wasn't....
+                eprintln!(" !! unequal overload detected");
+            }
+
+            overloaded = Some(is_overloaded || was_overloaded);
         }
 
         let mut stderr = String::new();
@@ -387,4 +417,6 @@ fn run_clients(
             }
         }
     }
+
+    !overloaded.unwrap_or(false)
 }
