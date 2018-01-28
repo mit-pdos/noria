@@ -8,6 +8,7 @@ CREATE TABLE `Post` (
   `p_author` int(11) NOT NULL,
   `p_content` text NOT NULL default '',
   `p_private` tinyint(1) NOT NULL default '0',
+  `p_anonymous` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`p_id`),
   UNIQUE KEY `p_id` (`p_id`),
   KEY `p_cid` (`p_cid`),

@@ -334,8 +334,10 @@ fn main() {
         let mut getter = backend.g.get_getter(leaf).unwrap();
         let start = time::Instant::now();
         for author in 0..nusers {
-            getter.lookup(&author.into(), true).unwrap();
+            let results = getter.lookup(&author.into(), true).unwrap();
         }
+        let author = "anonymous".into();
+        let results = getter.lookup(&author, true).unwrap();
         dur += start.elapsed();
     }
 
