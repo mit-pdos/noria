@@ -80,7 +80,13 @@ impl<A: Authority> ControllerHandle<A> {
     /// Obtain a `RemoteGetterBuilder` that can be sent to a client and then used to query a given
     /// (already maintained) reader node.
     pub fn get_getter_builder(&mut self, node: NodeIndex) -> Option<RemoteGetterBuilder> {
-        self.rpc("getter_builder", &node)
+        let rgb: Option<RemoteGetterBuilder> = self.rpc("getter_builder", &node);
+        rgb.map(|mut rgb| {
+            for &mut (_, ref mut is_local) in &mut rgb.shards {
+                *is_local &= self.local.is_some();
+            }
+            rgb
+        })
     }
 
     /// Obtain a `RemoteGetter`.
@@ -97,7 +103,7 @@ impl<A: Authority> ControllerHandle<A> {
     /// Obtain a Mutator
     pub fn get_mutator(&mut self, base: NodeIndex) -> Result<Mutator, Box<Error>> {
         self.get_mutator_builder(base)
-            .map(|m| m.build("127.0.0.1:0".parse().unwrap()))
+            .map(|m| m.build("0.0.0.0:0".parse().unwrap()))
     }
 
     /// Initiaties log recovery by sending a
@@ -114,6 +120,11 @@ impl<A: Authority> ControllerHandle<A> {
     /// Get statistics about the time spent processing different parts of the graph.
     pub fn get_statistics(&mut self) -> GraphStats {
         self.rpc("get_statistics", &())
+    }
+
+    /// Extend the existing recipe on the controller by adding a new query.
+    pub fn extend_recipe(&mut self, recipe_addition: String) -> Result<(), RpcError> {
+        self.rpc("extend_recipe", &recipe_addition)
     }
 
     /// Install a new recipe on the controller.

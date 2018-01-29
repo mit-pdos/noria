@@ -15,25 +15,30 @@ default = ["b_netsoup", "b_memcached", "b_mysql", "b_mssql", "b_hybrid"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "fe7cdaa360c86bd4202e4065bc125ba5642439d2" }
+nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "6c08e9c28caf40cc3014fd5eecee8d07fbf2023e" }
 regex = "0.2.2"
 slog = "2.0.6"
 #slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "2.0.1"
 vec_map = { version = "0.8.0" }
+rayon = "0.9"
+libc = "0.2"
+hwloc = "0.5"
+ssh2 = "0.3"
+whoami = "0.2"
+shellwords = "0.1"
 
 # for benchmarks
-glob = "0.2.11"
 # cli
 clap = "2.25.0"
 # distributions
 rand = "0.3.15"
 zipf = "0.2.0"
 # sampling
-hdrsample = "4.0.0"
+hdrsample = "6.0.0"
 # mssql
 futures-state-stream = { version = "0.1", optional = true }
-tiberius = { git = "https://github.com/ms705/tiberius/", optional = true }
+tiberius = { git = "https://github.com/steffengy/tiberius.git", optional = true }
 # mysql
 mysql = { version = "11.2.0", optional = true }
 # memcached
@@ -54,15 +59,11 @@ path = "bank/bank.rs"
 
 [[bin]]
 name = "vote"
-path = "vote/vote.rs"
+path = "vote/main.rs"
 
 [[bin]]
-name = "vote-server"
-path = "vote/vote-server.rs"
-
-[[bin]]
-name = "vote-client"
-path = "vote/vote-client.rs"
+name = "vote-orchestrator"
+path = "vote/orchestrator.rs"
 
 [[bin]]
 name = "tpc_w"
@@ -79,15 +80,3 @@ path = "hotsoup/extract_queries.rs"
 #[[bin]]
 #name = "piazza"
 #path = "piazza/piazza.rs"
-
-[[bin]]
-name = "vote-new-fraction"
-path = "vote/vote-new-fraction.rs"
-
-[[bin]]
-name = "vote-stress"
-path = "vote/stress.rs"
-
-[[bin]]
-name = "vote-recovery"
-path = "vote/recovery.rs"
