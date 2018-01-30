@@ -309,7 +309,7 @@ fn main() {
         let leaf = outs[&format!("post_count")];
         let mut getter = backend.g.get_getter(leaf).unwrap();
         for author in 0..nusers/4 {
-            getter.lookup(&author.into(), true).unwrap();
+            getter.lookup(&author.into(), false).unwrap();
         }
     }
 
@@ -324,6 +324,16 @@ fn main() {
             i,
             dur,
         );
+
+        // if partial, read 25% of the keys
+        if partial {
+            let outs = backend.g.outputs();
+            let leaf = outs[&format!("post_count_u{}", i)];
+            let mut getter = backend.g.get_getter(leaf).unwrap();
+            for author in 0..nusers/4 {
+                getter.lookup(&author.into(), false).unwrap();
+            }
+        }
 
         if iloc.is_some() && i % 50 == 0 {
             use std::fs;
