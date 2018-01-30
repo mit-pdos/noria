@@ -303,6 +303,16 @@ fn main() {
     println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
 
+    // if partial, read 25% of the keys
+    if partial {
+        let outs = backend.g.outputs();
+        let leaf = outs[&format!("post_count")];
+        let mut getter = backend.g.get_getter(leaf).unwrap();
+        for author in 0..nusers/4 {
+            getter.lookup(&author.into(), true).unwrap();
+        }
+    }
+
     // Login a user
     println!("Login in users...");
     for i in 0..nlogged {
@@ -327,28 +337,28 @@ fn main() {
     }
 
 
-    let outs = backend.g.outputs();
-    let mut dur = time::Duration::from_millis(0);
-    for uid in 0..nlogged {
-        let leaf = outs[&format!("post_count_u{}", uid)];
-        let mut getter = backend.g.get_getter(leaf).unwrap();
-        let start = time::Instant::now();
-        for author in 0..nusers {
-            let results = getter.lookup(&author.into(), true).unwrap();
+    if !partial {
+        let outs = backend.g.outputs();
+        let mut dur = time::Duration::from_millis(0);
+        for uid in 0..nlogged {
+            let leaf = outs[&format!("post_count_u{}", uid)];
+            let mut getter = backend.g.get_getter(leaf).unwrap();
+            let start = time::Instant::now();
+            for author in 0..nusers {
+                getter.lookup(&author.into(), true).unwrap();
+            }
+            dur += start.elapsed();
         }
-        let author = "anonymous".into();
-        let results = getter.lookup(&author, true).unwrap();
-        dur += start.elapsed();
+
+        let dur = dur_to_fsec!(dur);
+
+        println!(
+                "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+                nlogged * nusers,
+                dur,
+                (nlogged * nusers) as f64 / dur,
+            );
     }
-
-    let dur = dur_to_fsec!(dur);
-
-    println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            nlogged * nusers,
-            dur,
-            (nlogged * nusers) as f64 / dur,
-        );
 
     println!("Done with benchmark.");
 
