@@ -140,6 +140,7 @@ impl ControllerInner {
             (Post, "/recover") => json::to_string(&self.recover()).unwrap(),
             (Post, "/graphviz") => json::to_string(&self.graphviz()).unwrap(),
             (Post, "/get_statistics") => json::to_string(&self.get_statistics()).unwrap(),
+            (Post, "/get_snapshot_id") => json::to_string(&self.snapshot_id).unwrap(),
             (Post, "/initialize_snapshot") => json::to_string(&self.initialize_snapshot()).unwrap(),
             (Post, "/mutator_builder") => {
                 json::to_string(&self.mutator_builder(json::from_slice(&body).unwrap())).unwrap()

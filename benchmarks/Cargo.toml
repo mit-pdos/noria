@@ -29,6 +29,7 @@ whoami = "0.2"
 shellwords = "0.1"
 
 # for benchmarks
+glob = "0.2.11"
 # cli
 clap = "2.25.0"
 # distributions
@@ -60,6 +61,10 @@ path = "bank/bank.rs"
 [[bin]]
 name = "vote"
 path = "vote/main.rs"
+
+[[bin]]
+name = "vote-recovery"
+path = "vote/recovery.rs"
 
 [[bin]]
 name = "vote-orchestrator"

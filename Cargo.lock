@@ -111,6 +111,7 @@ dependencies = [
  "distributary 0.1.0",
  "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-state-stream 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "hdrsample 6.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hwloc 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",

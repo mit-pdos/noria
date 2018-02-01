@@ -122,6 +122,11 @@ impl<A: Authority> ControllerHandle<A> {
         self.rpc("get_statistics", &())
     }
 
+    /// Get the latest persisted snapshot_id used by the controller.
+    pub fn get_snapshot_id(&mut self) -> u64 {
+        self.rpc("get_snapshot_id", &())
+    }
+
     /// Extend the existing recipe on the controller by adding a new query.
     pub fn extend_recipe(&mut self, recipe_addition: String) -> Result<(), RpcError> {
         self.rpc("extend_recipe", &recipe_addition)

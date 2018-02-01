@@ -703,6 +703,7 @@ fn it_recovers_w_snapshots_and_logs() {
     }
 
     let mut g = setup();
+    assert_eq!(g.get_snapshot_id(), 1);
     // Recover and let the writes propagate:
     g.recover();
     sleep();
