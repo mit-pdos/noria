@@ -7,21 +7,33 @@ use std::io::BufWriter;
 use std::net::SocketAddr;
 
 use channel::tcp::TcpSender;
+use controller::ControlEvent;
 use coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::PersistSnapshotRequest;
 
 /// Receives cloned states from a domain and persists snapshot files.
 pub struct SnapshotPersister {
-    controller_addr: Option<SocketAddr>,
+    coordination_method: SnapshotCoordination,
     receiver: mpsc::Receiver<PersistSnapshotRequest>,
     sender: mpsc::Sender<PersistSnapshotRequest>,
 }
 
+/// Snapshots confirmations can be sent in both local and remote settings.
+/// In the former the ACKs are sent directly to the controller's main_loop,
+/// whereas we make use of the coordination layer for the latter.
+pub enum SnapshotCoordination {
+    Local(mpsc::Sender<ControlEvent>),
+    Remote {
+        local_addr: SocketAddr,
+        controller_addr: SocketAddr,
+    },
+}
+
 impl SnapshotPersister {
-    pub fn new(controller_addr: Option<SocketAddr>) -> Self {
+    pub fn new(coordination_method: SnapshotCoordination) -> Self {
         let (sender, receiver) = mpsc::channel();
         Self {
-            controller_addr,
+            coordination_method,
             sender,
             receiver,
         }
@@ -36,9 +48,18 @@ impl SnapshotPersister {
     }
 
     pub fn start(self) {
-        let mut coordination_tx = self.controller_addr.and_then(|ref addr| {
-            Some(TcpSender::connect(&addr, None).expect("Could not connect to Controller"))
-        });
+        let (local, mut remote) = match self.coordination_method {
+            SnapshotCoordination::Local(sender) => (Some(sender), None),
+            SnapshotCoordination::Remote {
+                local_addr,
+                controller_addr,
+            } => {
+                let connection: TcpSender<CoordinationMessage> =
+                    TcpSender::connect(&controller_addr, None)
+                        .expect("Could not connect to Controller");
+                (None, Some((local_addr, connection)))
+            }
+        };
 
         for event in self.receiver {
             for (filename, state) in event.reader_states {
@@ -49,19 +70,23 @@ impl SnapshotPersister {
                 Self::serialize(filename, state);
             }
 
-            if let Some(ref mut tx) = coordination_tx {
-                let payload =
-                    CoordinationPayload::SnapshotCompleted(event.domain_id, event.snapshot_id);
-                tx.send(CoordinationMessage {
-                    payload,
-                    // TODO(ekmartin): SnapshotPersisters may run on both separate Souplet
-                    // instances, or below a local worker pool. We're (ab)using
-                    // CoordinationMessages to notify the controller about our snapshot ACKs, but
-                    // the local/remote compromise means we won't always have a source addr. If
-                    // we're going to keep sending snapshot ACKs over the coordination plane we
-                    // should probably solve this somehow.
-                    source: "127.0.0.1:0".parse().unwrap(),
-                }).unwrap();
+            if let Some(ref local_s) = local {
+                local_s
+                    .send(ControlEvent::SnapshotCompleted(
+                        event.domain_id,
+                        event.snapshot_id,
+                    ))
+                    .unwrap();
+            } else if let Some((source, ref mut remote_s)) = remote {
+                remote_s
+                    .send(CoordinationMessage {
+                        source,
+                        payload: CoordinationPayload::SnapshotCompleted(
+                            event.domain_id,
+                            event.snapshot_id,
+                        ),
+                    })
+                    .unwrap();
             }
         }
     }

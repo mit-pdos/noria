@@ -10,15 +10,15 @@ use std::fmt::{self, Display};
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use std::thread;
-use std::sync::{atomic, Arc, Mutex};
+use std::sync::{atomic, mpsc, Arc, Mutex};
 use std::{io, time};
 
 use coordination::{CoordinationMessage, CoordinationPayload};
-use controller::{ControllerConfig, ControllerState, DomainHandle, Migration, Recipe,
+use controller::{ControlEvent, ControllerConfig, ControllerState, DomainHandle, Migration, Recipe,
                  RemoteGetterBuilder, WorkerIdentifier, WorkerStatus};
 use controller::migrate::materialization::Materializations;
 use controller::mutator::MutatorBuilder;
-use snapshots::SnapshotPersister;
+use snapshots::{SnapshotCoordination, SnapshotPersister};
 use souplet::readers;
 use worker;
 
@@ -172,6 +172,7 @@ impl ControllerInner {
         // Persist the snapshot_id if all shards have snapshotted:
         let min_id = *self.snapshot_ids.values().min().unwrap();
         if min_id == snapshot_id && min_id != self.snapshot_id {
+            debug!(self.log, "Persisting snapshot ID {}", snapshot_id);
             self.snapshot_id = snapshot_id;
             Some(snapshot_id)
         } else {
@@ -228,10 +229,10 @@ impl ControllerInner {
     /// Construct `ControllerInner` with a specified listening interface
     pub(super) fn new(
         listen_addr: IpAddr,
-        internal_addr: Option<SocketAddr>,
         checktable_addr: SocketAddr,
         log: slog::Logger,
         state: ControllerState,
+        local_sender: mpsc::Sender<ControlEvent>,
     ) -> Self {
         let mut g = petgraph::Graph::new();
         let source = g.add_node(node::Node::new(
@@ -272,7 +273,8 @@ impl ControllerInner {
         assert!((state.config.nworkers == 0) ^ (state.config.local_workers == 0));
         let local_pool = if state.config.nworkers == 0 {
             let snapshot_persister = if persistence.snapshot_timeout.is_some() {
-                Some(SnapshotPersister::new(internal_addr))
+                let coordination = SnapshotCoordination::Local(local_sender);
+                Some(SnapshotPersister::new(coordination))
             } else {
                 None
             };

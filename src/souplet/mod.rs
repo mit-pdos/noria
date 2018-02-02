@@ -16,7 +16,7 @@ use dataflow::{DomainBuilder, Readers};
 
 use controller::ControllerDescriptor;
 use coordination::{CoordinationMessage, CoordinationPayload};
-use snapshots::SnapshotPersister;
+use snapshots::{SnapshotCoordination, SnapshotPersister};
 use worker;
 
 pub mod readers;
@@ -120,7 +120,12 @@ impl<A: Authority> Souplet<A> {
 
                     match self.sender.as_mut().unwrap().send(msg) {
                         Ok(_) => {
-                            let snapshot_persister = SnapshotPersister::new(Some(descriptor.internal_addr));
+                            let coordination = SnapshotCoordination::Remote {
+                                local_addr,
+                                controller_addr: descriptor.internal_addr,
+                            };
+
+                            let snapshot_persister = SnapshotPersister::new(coordination);
                             self.handle(descriptor.checktable_addr, snapshot_persister);
                             break;
                         }

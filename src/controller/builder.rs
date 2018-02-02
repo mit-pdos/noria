@@ -84,9 +84,11 @@ impl ControllerBuilder {
     #[cfg(test)]
     pub fn build_inner(self) -> ::controller::ControllerInner {
         use std::net::SocketAddr;
+        use std::sync::mpsc::channel;
         use dataflow::checktable::service::CheckTableServer;
         use controller::{ControllerInner, ControllerState};
 
+        let (tx, _) = channel();
         let checktable_addr = CheckTableServer::start(SocketAddr::new(self.listen_addr, 0));
         let initial_state = ControllerState {
             config: self.config,
@@ -96,10 +98,10 @@ impl ControllerBuilder {
         };
         ControllerInner::new(
             self.listen_addr,
-            None,
             checktable_addr,
             self.log,
             initial_state,
+            tx,
         )
     }
 

@@ -3,6 +3,7 @@ use channel::tcp::TcpSender;
 use consensus::{Authority, Epoch};
 use dataflow::checktable::service::CheckTableServer;
 use dataflow::{DomainConfig, PersistenceParameters};
+use dataflow::prelude::*;
 
 use controller::domain_handle::DomainHandle;
 use controller::inner::ControllerInner;
@@ -133,14 +134,14 @@ impl Default for ControllerConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct ControllerState {
+pub struct ControllerState {
     config: ControllerConfig,
     epoch: Epoch,
     snapshot_id: u64,
     recipe: (), // TODO: store all relevant state here.
 }
 
-enum ControlEvent {
+pub enum ControlEvent {
     ControllerMessage(CoordinationMessage),
     ExternalRequest(
         Method,
@@ -148,6 +149,7 @@ enum ControlEvent {
         Vec<u8>,
         futures::sync::oneshot::Sender<Result<String, StatusCode>>,
     ),
+    SnapshotCompleted((DomainIndex, usize), u64),
     WonLeaderElection(ControllerState),
     LostLeadership(Epoch),
     Shutdown,
@@ -204,6 +206,7 @@ impl<A: Authority + 'static> Controller<A> {
 
         let builder = thread::Builder::new().name("srv-main".to_owned());
         let controller_authority = authority.clone();
+        let sender = event_tx.clone();
         let join_handle = builder
             .spawn(move || {
                 let controller = Self {
@@ -217,7 +220,7 @@ impl<A: Authority + 'static> Controller<A> {
                     listen_addr,
                     phantom: PhantomData,
                 };
-                controller.main_loop(controller_authority, event_rx)
+                controller.main_loop(controller_authority, sender, event_rx)
             })
             .unwrap();
 
@@ -228,34 +231,26 @@ impl<A: Authority + 'static> Controller<A> {
         }
     }
 
-    fn main_loop(mut self, authority: Arc<A>, receiver: Receiver<ControlEvent>) {
+    fn main_loop(
+        mut self,
+        authority: Arc<A>,
+        sender: Sender<ControlEvent>,
+        receiver: Receiver<ControlEvent>,
+    ) {
         for event in receiver {
             match event {
                 ControlEvent::ControllerMessage(msg) => if let Some(ref mut inner) = self.inner {
-                    match msg.payload {
-                        CoordinationPayload::SnapshotCompleted(domain, snapshot_id) => {
-                            if let Some(id) = inner.handle_snapshot_completed(domain, snapshot_id) {
-                                debug!(self.log, "Persisting snapshot ID {}", snapshot_id);
-                                authority
-                                    .read_modify_write(
-                                        "/state",
-                                        |state: Option<ControllerState>| match state {
-                                            None => Err(()),
-                                            Some(mut state) => {
-                                                state.snapshot_id = id;
-                                                Ok(state)
-                                            }
-                                        },
-                                    )
-                                    .unwrap()
-                                    .unwrap();
-                            }
-                        }
-                        _ => (),
-                    };
+                    if let CoordinationPayload::SnapshotCompleted(domain, snapshot_id) = msg.payload {
+                        Self::handle_snapshot_completed(inner, authority.clone(), domain, snapshot_id);
+                    }
 
                     inner.coordination_message(msg)
                 },
+                ControlEvent::SnapshotCompleted(domain, snapshot_id) => {
+                    if let Some(ref mut inner) = self.inner {
+                        Self::handle_snapshot_completed(inner, authority.clone(), domain, snapshot_id);
+                    }
+                }
                 ControlEvent::ExternalRequest(method, path, body, reply_tx) => {
                     if let Some(ref mut inner) = self.inner {
                         reply_tx
@@ -269,10 +264,10 @@ impl<A: Authority + 'static> Controller<A> {
                     self.current_epoch = Some(state.epoch);
                     self.inner = Some(ControllerInner::new(
                         self.listen_addr,
-                        Some(self.internal.addr),
                         self.checktable,
                         self.log.clone(),
                         state,
+                        sender.clone(),
                     ));
                 }
                 ControlEvent::LostLeadership(new_epoch) => {
@@ -288,6 +283,28 @@ impl<A: Authority + 'static> Controller<A> {
         }
         self.external.stop();
         self.internal.stop();
+    }
+
+    // Persists snapshot IDs to controller's authority when all
+    // domain shards have completed a snapshot.
+    fn handle_snapshot_completed(
+        inner: &mut ControllerInner,
+        authority: Arc<A>,
+        domain: (DomainIndex, usize),
+        snapshot_id: u64,
+    ) {
+        if let Some(id) = inner.handle_snapshot_completed(domain, snapshot_id) {
+            authority
+                .read_modify_write("/state", |state: Option<ControllerState>| match state {
+                    None => Err(()),
+                    Some(mut state) => {
+                        state.snapshot_id = id;
+                        Ok(state)
+                    }
+                })
+                .unwrap()
+                .unwrap();
+        }
     }
 
     fn listen_external(
