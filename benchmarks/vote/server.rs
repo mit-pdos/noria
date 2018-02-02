@@ -270,10 +270,10 @@ pub(crate) fn start<'a>(
             // wait for zookeeper to be running
             let start = time::Instant::now();
             while server
-                .just_exec(&["nc", "-z", "localhost", "2181"])?
+                .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
                 .is_err()
             {
-                if start.elapsed() > time::Duration::from_secs(2) {
+                if start.elapsed() > time::Duration::from_secs(5) {
                     Err("zookeeper wouldn't start")?;
                 }
             }
