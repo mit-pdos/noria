@@ -429,7 +429,7 @@ fn main() {
                     })
                 })?;
 
-            eprintln!(" -> {}", client);
+            eprintln!(" -> {} with {} cores", client, threads);
             Ssh::connect(client).map(|ssh| {
                 let has_perflock = ssh.just_exec(&["perflock"]).unwrap().is_ok();
                 eprintln!(" .. connected; perflock? {:?}", has_perflock);
