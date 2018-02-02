@@ -195,7 +195,7 @@ impl<'a> Server<'a> {
                     "soup",
                     "soup",
                     "<",
-                    "distributary/mysql_stat.sql",
+                    "distributary/benchmarks/vote/mysql_stat.sql",
                 ])?;
 
                 w.write_all(b"tables:\n")?;
@@ -213,7 +213,7 @@ impl<'a> Server<'a> {
                     "-U",
                     "SA",
                     "-i",
-                    "distributary/mssql_stat.sql",
+                    "distributary/benchmarks/vote/mssql_stat.sql",
                     // assume password is set in SQLCMDPASSWORD
                     "-S",
                     "127.0.0.1",
