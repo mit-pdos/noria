@@ -129,6 +129,7 @@ dependencies = [
  "slog-term 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiberius 0.2.3 (git+https://github.com/steffengy/tiberius.git)",
+ "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "whoami 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1817,6 +1818,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "timeout-readwrite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "nix 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "timer_heap"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2317,6 +2326,7 @@ dependencies = [
 "checksum tiberius 0.2.3 (git+https://github.com/steffengy/tiberius.git)" = "<none>"
 "checksum time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)" = "a15375f1df02096fb3317256ce2cee6a1f42fc84ea5ad5fc8c421cfe40c73098"
 "checksum timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5bb9b8201d620a812b747fd1e8c523db6d7961ec3aa0915772256fee504bce7"
+"checksum timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "20b6a7dabffd4febd7b0b95f3c1ba00fb58dd523db07837e93c5c90e34636629"
 "checksum timer_heap 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9adbb50fcd40e56b0514e83b98f954c8aebdc03517ffbd2aaa4bc512234828b0"
 "checksum tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "52b4e32d8edbf29501aabb3570f027c6ceb00ccef6538f4bddba0200503e74e8"
 "checksum tokio-io 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "514aae203178929dbf03318ad7c683126672d4d96eccb77b29603d33c9e25743"

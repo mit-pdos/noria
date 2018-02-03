@@ -8,6 +8,7 @@ extern crate rusoto_sts;
 extern crate scopeguard;
 extern crate shellwords;
 extern crate ssh2;
+extern crate timeout_readwrite;
 extern crate whoami;
 
 mod ssh;
@@ -313,7 +314,7 @@ fn main() {
                                     // server
                                     server = Some(format!(
                                         "ec2-user@{}",
-                                        instance.public_ip_address.as_ref().unwrap()
+                                        instance.public_dns_name.as_ref().unwrap()
                                     ));
                                     listen_addr =
                                         Some(instance.private_ip_address.clone().unwrap());
@@ -321,7 +322,7 @@ fn main() {
                                     // client
                                     clients.push(format!(
                                         "ec2-user@{},{}",
-                                        instance.public_ip_address.as_ref().unwrap(),
+                                        instance.public_dns_name.as_ref().unwrap(),
                                         cores
                                     ));
                                 }
@@ -361,7 +362,7 @@ fn main() {
         return;
     }
     let server = server.unwrap();
-    let server = &server;
+    let server_host = &server;
     let listen_addr = listen_addr.unwrap();
     let listen_addr = &listen_addr;
     if clients.is_empty() {
@@ -388,7 +389,7 @@ fn main() {
 
     // make sure we can connect to the server
     eprintln!("==> connecting to server");
-    let server = Ssh::connect(server).unwrap();
+    let server = Ssh::connect(server_host).unwrap();
 
     let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
     eprintln!(" -> perflock? {:?}", server_has_pl);
@@ -536,6 +537,33 @@ fn main() {
         eprintln!(" -> stopping server");
         s.end(&backend).unwrap();
         eprintln!(" .. server stopped ");
+    }
+
+    if ec2_cleanup.is_some() {
+        use std::{io, time};
+        eprintln!("==> about to terminate ec2 instances -- press enter to interrupt");
+        match timeout_readwrite::TimeoutReader::new(
+            io::stdin(),
+            Some(time::Duration::from_secs(2 * 60)),
+        ).read(&mut [0u8])
+        {
+            Ok(_) => {
+                // user pressed enter to interrupt
+                // show all the host addresses, and let them do their thing
+                // then wait for an enter to actually terminate
+                eprintln!(" -> delaying shutdown, here are the hosts:");
+                eprintln!("server: {}", server_host);
+                for &(_, ref desc) in &clients {
+                    eprintln!("client: {}", desc.name);
+                }
+                eprintln!(" -> press enter to terminate all instances");
+                io::stdin().read(&mut [0u8]).is_ok();
+            }
+            Err(_) => {
+                // doesn't really matter what the error was
+                // we should shutdown immediately (which we do by not waiting...)
+            }
+        }
     }
 
     drop(ec2_cleanup);
