@@ -343,10 +343,10 @@ fn main() {
                 c.instance_ids = ec2_instances.clone();
                 while let Err(e) = ec2.terminate_instances(&c) {
                     let x = format!("{}", e);
-                    if !x.contains("broken pipe") {
+                    if !x.contains("broken pipe") && !x.contains("stream disconnected") {
                         // we're going to get a bunch of "broken pipe" things first
                         // because we've been running for so long.
-                        eprintln!("failed to terminate requests: {}; retrying", e);
+                        eprintln!("failed to terminate instances: {}; retrying", e);
                     }
                 }
             }));
