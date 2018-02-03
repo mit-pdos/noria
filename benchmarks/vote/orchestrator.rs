@@ -2,6 +2,7 @@
 
 #[macro_use]
 extern crate clap;
+extern crate ctrlc;
 extern crate rusoto_core;
 extern crate rusoto_ec2;
 extern crate rusoto_sts;
@@ -485,6 +486,17 @@ fn main() {
         }
     }
 
+    // if the user wants us to terminate, finish whatever we're currently doing first
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    if let Err(e) = ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }) {
+        eprintln!("==> failed to set ^C handler: {}", e);
+    }
+
     for backend in backends {
         eprintln!("==> {}", backend.uniq_name());
 
@@ -532,11 +544,25 @@ fn main() {
                 // backend clearly couldn't handle the load, so don't run higher targets
                 break;
             }
+
+            if !running.load(Ordering::SeqCst) {
+                // user pressed ^C
+                break;
+            }
         }
 
         eprintln!(" -> stopping server");
         s.end(&backend).unwrap();
         eprintln!(" .. server stopped ");
+
+        if !running.load(Ordering::SeqCst) {
+            // user pressed ^C
+            break;
+        }
+    }
+
+    if !running.load(Ordering::SeqCst) {
+        eprintln!("==> terminating early due to ^C");
     }
 
     if ec2_cleanup.is_some() {
