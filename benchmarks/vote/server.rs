@@ -123,9 +123,9 @@ impl<'a> Server<'a> {
         }
 
         let start = time::Instant::now();
-        client.set_timeout(2000);
+        client.set_timeout(5000);
         // sql server can be *really* slow to start
-        while start.elapsed() < time::Duration::from_secs(60) {
+        while start.elapsed() < time::Duration::from_secs(30) {
             let e: Result<(), ssh2::Error> = do catch {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
