@@ -124,7 +124,8 @@ impl<'a> Server<'a> {
 
         let start = time::Instant::now();
         client.set_timeout(2000);
-        while start.elapsed() < time::Duration::from_secs(5) {
+        // sql server can be *really* slow to start
+        while start.elapsed() < time::Duration::from_secs(60) {
             let e: Result<(), ssh2::Error> = do catch {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
@@ -273,7 +274,7 @@ pub(crate) fn start<'a>(
                 .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
                 .is_err()
             {
-                if start.elapsed() > time::Duration::from_secs(5) {
+                if start.elapsed() > time::Duration::from_secs(10) {
                     Err("zookeeper wouldn't start")?;
                 }
             }
