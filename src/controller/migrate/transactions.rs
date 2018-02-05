@@ -132,7 +132,7 @@ pub fn merge_deps(
     }
 }
 
-pub fn finalize(
+pub(crate) fn finalize(
     deps: HashMap<DomainIndex, (IngressFromBase, EgressForBase)>,
     log: &Logger,
     txs: &mut HashMap<DomainIndex, DomainHandle>,

@@ -22,7 +22,6 @@ pub struct Graph {
     pub graph: ControllerHandle<LocalAuthority>,
 }
 
-#[derive(Clone)]
 pub struct Setup {
     pub transactions: bool,
     pub stupid: bool,

@@ -109,7 +109,7 @@ impl DomainInputHandle {
     }
 }
 
-pub struct DomainHandle {
+pub(crate) struct DomainHandle {
     _idx: DomainIndex,
 
     cr_poll: PollingLoop<ControlReplyPacket>,

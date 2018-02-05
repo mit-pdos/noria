@@ -27,7 +27,7 @@ macro_rules! dur_to_ns {
 
 type Indices = HashSet<Vec<usize>>;
 
-pub struct Materializations {
+pub(crate) struct Materializations {
     log: Logger,
 
     have: HashMap<NodeIndex, Indices>,

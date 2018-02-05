@@ -461,6 +461,7 @@ impl SqlIncorporator {
             .collect::<Vec<_>>();
 
         // TODO(malte): get rid of duplication and figure out where to track this state
+        debug!(self.log, "registering query \"{}\"", query_name);
         self.view_schemas.insert(String::from(query_name), fields);
 
         // We made a new query, so store the query graph and the corresponding leaf MIR node.
@@ -526,9 +527,8 @@ impl SqlIncorporator {
             "Reused {} nodes for {}", num_reused_nodes, query_name
         );
 
-        // We made a new query, so store the query graph and the corresponding leaf MIR node
-        self.query_graphs
-            .insert(qg.signature().hash, (qg, post_reuse_opt_mir));
+        // register local state
+        self.register_query(query_name, Some(qg), &post_reuse_opt_mir);
 
         qfp
     }

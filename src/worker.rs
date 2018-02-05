@@ -86,7 +86,7 @@ impl SharedWorkerState {
     }
 }
 
-pub struct WorkerPool {
+pub(crate) struct WorkerPool {
     workers: Vec<thread::JoinHandle<()>>,
     poll: Arc<Poll>,
     notify: Vec<mpsc::Sender<NewReplicaInternal>>,

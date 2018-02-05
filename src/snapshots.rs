@@ -12,7 +12,7 @@ use coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::PersistSnapshotRequest;
 
 /// Receives cloned states from a domain and persists snapshot files.
-pub struct SnapshotPersister {
+pub(crate) struct SnapshotPersister {
     coordination_method: SnapshotCoordination,
     receiver: mpsc::Receiver<PersistSnapshotRequest>,
     sender: mpsc::Sender<PersistSnapshotRequest>,
@@ -21,7 +21,7 @@ pub struct SnapshotPersister {
 /// Snapshots confirmations can be sent in both local and remote settings.
 /// In the former the ACKs are sent directly to the controller's main_loop,
 /// whereas we make use of the coordination layer for the latter.
-pub enum SnapshotCoordination {
+pub(crate) enum SnapshotCoordination {
     Local(mpsc::Sender<ControlEvent>),
     Remote {
         local_addr: SocketAddr,

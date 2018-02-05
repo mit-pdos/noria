@@ -248,7 +248,7 @@ pub fn add(
     swaps
 }
 
-pub fn connect(
+pub(crate) fn connect(
     log: &Logger,
     graph: &mut Graph,
     domains: &mut HashMap<DomainIndex, DomainHandle>,

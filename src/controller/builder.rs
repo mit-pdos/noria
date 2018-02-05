@@ -88,6 +88,7 @@ impl ControllerBuilder {
         use dataflow::checktable::service::CheckTableServer;
         use controller::{ControllerInner, ControllerState};
 
+        // Fake main_loop channel for use in SnapshotPersister:
         let (tx, _) = channel();
         let checktable_addr = CheckTableServer::start(SocketAddr::new(self.listen_addr, 0));
         let initial_state = ControllerState {

@@ -31,7 +31,7 @@ const DEFAULT_SETTLE_TIME_MS: u64 = 200;
 fn get_log_name(prefix: &str) -> String {
     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     format!(
-        "{}-{}-{}",
+        "{}.{}.{}",
         prefix,
         current_time.as_secs(),
         current_time.subsec_nanos()
