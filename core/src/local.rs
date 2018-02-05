@@ -255,6 +255,7 @@ use std::collections::hash_map;
 use fnv::FnvHashMap;
 use std::hash::Hash;
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Row<T>(Rc<T>);
 
 unsafe impl<T> Send for Row<T> {}
@@ -276,6 +277,7 @@ pub enum KeyType<'a, T: 'a> {
     Sex((T, T, T, T, T, T)),
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 enum KeyedState<T: Eq + Hash> {
     Single(FnvHashMap<T, Vec<Row<Vec<T>>>>),
     Double(FnvHashMap<(T, T), Vec<Row<Vec<T>>>>),
@@ -381,12 +383,14 @@ pub enum LookupResult<'a, T: 'a> {
     Missing,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct SingleState<T: Hash + Eq + Clone + 'static> {
     key: Vec<usize>,
     state: KeyedState<T>,
     partial: Option<Vec<Tag>>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct State<T: Hash + Eq + Clone + 'static> {
     state: Vec<SingleState<T>>,
     by_tag: HashMap<Tag, usize>,
@@ -447,8 +451,10 @@ impl<T: Hash + Eq + Clone + 'static> State<T> {
             }
 
             let (new, old) = self.state.split_last_mut().unwrap();
-            let mut insert = move |rs: &Vec<Row<Vec<T>>>| for r in rs {
-                State::insert_into(new, Row(r.0.clone()));
+            let mut insert = move |rs: &Vec<Row<Vec<T>>>| {
+                for r in rs {
+                    State::insert_into(new, Row(r.0.clone()));
+                }
             };
             match old[0].state {
                 KeyedState::Single(ref map) => for rs in map.values() {

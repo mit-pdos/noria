@@ -1,6 +1,8 @@
+use bincode;
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::time;
 use std::collections::hash_map::Entry;
 use std::io::{BufRead, BufReader, ErrorKind};
@@ -18,6 +20,7 @@ use transactions;
 use persistence;
 use debug;
 use checktable;
+use serde;
 use serde_json;
 use itertools::Itertools;
 use slog::Logger;
@@ -83,6 +86,14 @@ impl PartialEq for DomainMode {
             _ => false,
         }
     }
+}
+
+/// Request a snapshot to be written for each of the given nodes.
+pub struct PersistSnapshotRequest {
+    pub domain_id: (Index, usize),
+    pub snapshot_id: u64,
+    pub node_states: HashMap<String, State>,
+    pub reader_states: HashMap<String, HashMap<DataType, Datas>>,
 }
 
 enum TriggerEndpoint {
@@ -202,6 +213,9 @@ impl DomainBuilder {
 
             ingress_inject: Default::default(),
 
+            snapshot_id: 0,
+            snapshot_sender: None,
+
             readers,
             inject: None,
             _debug_tx: debug_tx,
@@ -241,6 +255,9 @@ pub struct Domain {
     not_ready: HashSet<LocalNodeIndex>,
 
     ingress_inject: local::Map<(usize, Vec<DataType>)>,
+
+    snapshot_id: u64,
+    snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
 
     transaction_state: transactions::DomainState,
     persistence_parameters: persistence::Parameters,
@@ -804,7 +821,10 @@ impl Domain {
                 self.handle_replay(m, sends);
             }
             Packet::StartRecovery { .. } => {
-                self.handle_recovery(sends);
+                self.handle_recovery(m, sends);
+            }
+            Packet::TakeSnapshot { .. } => {
+                self.snapshot(m, sends);
             }
             consumed => {
                 match consumed {
@@ -1319,15 +1339,16 @@ impl Domain {
         }
 
         let n = self.nodes[&source].borrow();
+        let data: &Vec<DataType> = &*row;
         if n.is_internal() {
             if let Some(b) = n.get_base() {
-                let mut row = ((*row).clone(), true).into();
+                let mut row = (data.clone(), true).into();
                 b.fix(&mut row);
                 return row;
             }
         }
 
-        return ((*row).clone(), true).into();
+        return (data.clone(), true).into();
     }
 
     fn seed_all(&mut self, tag: Tag, keys: HashSet<Vec<DataType>>, sends: &mut EnqueuedSends) {
@@ -1558,7 +1579,44 @@ impl Domain {
         }
     }
 
-    fn handle_recovery(&mut self, sends: &mut EnqueuedSends) {
+    fn recover_snapshots(&mut self) {
+        fn deserialize<T>(filename: String) -> T
+        where
+            for<'de> T: serde::Deserialize<'de>,
+        {
+            let file = File::open(&filename)
+                .expect(&format!("Failed reading snapshot file: {}", filename));
+            let mut reader = BufReader::new(file);
+            bincode::deserialize_from(&mut reader, bincode::Infinite)
+                .expect("bincode deserialization of snapshot failed")
+        };
+
+        // Then recover all the snapshots for this domain:
+        for (local_addr, node) in self.nodes.iter() {
+            let mut n = node.borrow_mut();
+            let filename = self.persistence_parameters.snapshot_filename(
+                self.snapshot_id,
+                &local_addr,
+                self.id(),
+            );
+
+            if let Some(state) = self.state.get_mut(&local_addr) {
+                *state = deserialize(filename);
+                debug!(self.log, "State size after recovery for node {}: {}", local_addr, state.len());
+            } else if n.with_reader(|ref r| r.is_materialized()).unwrap_or(false) {
+                let state: HashMap<DataType, Datas> = deserialize(filename);
+                debug!(self.log, "Recovering reader {} with state size {}", local_addr, state.len());
+                n.with_reader_mut(|r| {
+                    let writer = r.writer_mut().unwrap();
+                    writer.extend(state);
+                    writer.swap();
+                });
+            }
+        }
+    }
+
+    fn recover_logs(&mut self, sends: &mut EnqueuedSends) {
+        let snapshot_id = self.snapshot_id;
         let node_info: Vec<_> = self.nodes
             .iter()
             .filter_map(|(index, node)| {
@@ -1593,13 +1651,15 @@ impl Domain {
                 .filter_map(|line| {
                     let line = line
                         .expect(&format!("Failed to read line from log file: {:?}", path));
-                    let entries: Result<Vec<Records>, _> = serde_json::from_str(&line);
-                    entries.ok()
+                    let entry: Result<(u64, Vec<Records>), _> = serde_json::from_str(&line);
+                    entry.ok()
                 })
+                // Filter out log entries that should've been discarded previously:
+                .filter(|&(log_id, ref _records)| log_id >= snapshot_id)
                 // Parsing each individual line gives us an iterator over Vec<Records>.
                 // We're interested in chunking each record, so let's flat_map twice:
                 // Iter<Vec<Records>> -> Iter<Records> -> Iter<Record>
-                .flat_map(|r| r)
+                .flat_map(|(_, r)| r)
                 .flat_map(|r| r)
                 // Merge individual records into batches of RECOVERY_BATCH_SIZE:
                 .chunks(RECOVERY_BATCH_SIZE)
@@ -1612,6 +1672,7 @@ impl Domain {
                         let (ts, prevs) = checktable::with_checktable(|ct| {
                             ct.recover(global_addr).unwrap()
                         });
+
                         Packet::Transaction {
                             link,
                             data,
@@ -1628,10 +1689,128 @@ impl Domain {
                 })
                 .for_each(|packet| self.handle(box packet, sends));
         }
+    }
+
+    fn handle_recovery(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        let snapshot_id = packet.snapshot_id();
+        if snapshot_id > 0 {
+            self.snapshot_id = snapshot_id;
+            self.recover_snapshots();
+        } else {
+            self.recover_logs(sends);
+        }
 
         self.control_reply_tx
             .send(ControlReplyPacket::ack())
             .unwrap();
+    }
+
+    /// Persists a snapshot of each materialized nodes, and sends a single ACK when complete.
+    fn snapshot(&mut self, packet: Box<Packet>, sends: &mut EnqueuedSends) {
+        // TODO(ekmartin):
+        // Snapshot packets are forwarded through the graph, which means we might receive
+        // the same packet twice from two different ancestors. At the moment we're simply
+        // snapshotting when we receive the first one, but that's probably not correct.
+        // Consider the following scenario, where A is an update processed by both parents, and
+        // both Parent 1, Parent 2 and Domain have at least one materialized node:
+        //                       ...
+        //   ...                  | Snapshot
+        //    |                   | A
+        // Parent 1            Parent 2
+        //    | Snapshot          |
+        //    | A                 |
+        //    ------ Domain -------
+        //
+        // This would result in us snapshotting after Parent 1 has processed A, but before
+        // Parent 2 has had time to do so. The correct thing to do would then be to wait for
+        // the snapshot packet from Parent 2 to arrive before we snapshot, while simulatenously
+        // blocking updates from the other parents.
+        let snapshot_id = packet.snapshot_id();
+        debug!(self.log, "Received snapshot request #{}", snapshot_id);
+        if self.snapshot_id >= snapshot_id {
+            debug!(
+                self.log,
+                "Ignoring old snapshot request for #{}", snapshot_id
+            );
+
+            return;
+        }
+
+        self.snapshot_id = snapshot_id;
+        let shard = self.shard.unwrap_or(0);
+        let reader_states = self.nodes
+            .iter()
+            .filter_map(|(local_addr, node)| {
+                let n = node.borrow();
+                let readers = self.readers.lock().unwrap();
+                if let Some(&(ref reader, _)) = readers.get(&(n.global_addr(), shard)) {
+                    let filename = self.persistence_parameters.snapshot_filename(
+                        self.snapshot_id,
+                        &local_addr,
+                        self.id(),
+                    );
+
+                    Some((filename, reader.collect_state()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
+        let node_states = self.nodes
+            .iter()
+            .filter_map(|(local_addr, _node)| {
+                if let Some(state) = self.state.get(&local_addr) {
+                    let filename = self.persistence_parameters.snapshot_filename(
+                        self.snapshot_id,
+                        &local_addr,
+                        self.id(),
+                    );
+
+                    Some((filename, state.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
+        // Forward the snapshot packet throughout the graph:
+        for (_local_addr, node) in self.nodes.iter() {
+            let mut node = node.borrow_mut();
+            if node.is_egress() || node.is_sharder() {
+                node.process(
+                    &mut Some(packet.clone()),
+                    None,
+                    &mut self.state,
+                    &self.nodes,
+                    self.shard,
+                    false,
+                    sends,
+                );
+            }
+        }
+
+        // Only send an ACK if we actually snapshotted something:
+        if !node_states.is_empty() || !reader_states.is_empty() {
+            debug!(self.log, "Sending snapshot ACK for #{}", snapshot_id);
+            // We should always have a snapshot persister if
+            // we're in the snapshotting business:
+            self.snapshot_sender
+                .as_ref()
+                .unwrap()
+                .send(PersistSnapshotRequest {
+                    domain_id: self.id(),
+                    snapshot_id,
+                    node_states,
+                    reader_states,
+                })
+                .unwrap();
+        } else {
+            debug!(
+                self.log,
+                "No materialized nodes - skipping snapshot ACK for #{}", snapshot_id
+            );
+        }
     }
 
     fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
@@ -2279,8 +2458,13 @@ impl Domain {
         (self.index, self.shard.unwrap_or(0))
     }
 
-    pub fn booted(&mut self, addr: SocketAddr) {
+    pub fn booted(
+        &mut self,
+        addr: SocketAddr,
+        snapshot_sender: Option<Sender<PersistSnapshotRequest>>,
+    ) {
         info!(self.log, "booted domain"; "nodes" => self.nodes.len());
+        self.snapshot_sender = snapshot_sender;
         self.control_reply_tx
             .send(ControlReplyPacket::Booted(self.shard.unwrap_or(0), addr))
             .unwrap();
@@ -2321,7 +2505,9 @@ impl Domain {
                 if self.group_commit_queues.should_append(&packet, &self.nodes) {
                     debug_assert!(packet.is_regular());
                     packet.trace(PacketEvent::ExitInputChannel);
-                    let merged_packet = self.group_commit_queues.append(packet, &self.nodes);
+                    let merged_packet =
+                        self.group_commit_queues
+                            .append(packet, &self.nodes, self.snapshot_id);
                     if let Some(packet) = merged_packet {
                         self.handle(packet, sends);
                     }
@@ -2336,7 +2522,9 @@ impl Domain {
                 ProcessResult::KeepPolling
             }
             PollEvent::Timeout => {
-                if let Some(m) = self.group_commit_queues.flush_if_necessary(&self.nodes) {
+                if let Some(m) = self.group_commit_queues
+                    .flush_if_necessary(&self.nodes, self.snapshot_id)
+                {
                     self.handle(m, sends);
                     while let Some(p) = self.inject.take() {
                         self.handle(p, sends);

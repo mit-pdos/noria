@@ -315,6 +315,7 @@
 #![plugin(tarpc_plugins)]
 #![deny(unused_extern_crates)]
 
+extern crate bincode;
 extern crate channel;
 extern crate consensus;
 extern crate core;
@@ -341,8 +342,9 @@ extern crate timer_heap;
 extern crate tokio_core;
 extern crate vec_map;
 
-mod controller;
 mod coordination;
+mod controller;
+mod snapshots;
 mod souplet;
 mod worker;
 

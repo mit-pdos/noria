@@ -38,6 +38,8 @@ impl LocalAuthority {
     }
 }
 impl Authority for LocalAuthority {
+    fn disconnect(&self) {}
+
     fn become_leader(&self, payload_data: Vec<u8>) -> Result<Epoch, Box<Error + Send + Sync>> {
         {
             let mut inner = self.inner.lock().unwrap();

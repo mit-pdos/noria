@@ -17,6 +17,7 @@ use dataflow::{DomainBuilder, Readers};
 
 use controller::{ControllerDescriptor, ControllerState};
 use coordination::{CoordinationMessage, CoordinationPayload};
+use snapshots::{SnapshotCoordination, SnapshotPersister};
 use worker;
 
 pub mod readers;
@@ -134,7 +135,13 @@ impl<A: Authority> Souplet<A> {
 
                     match self.sender.as_mut().unwrap().send(msg) {
                         Ok(_) => {
-                            self.handle(descriptor.checktable_addr);
+                            let coordination = SnapshotCoordination::Remote {
+                                local_addr,
+                                controller_addr: descriptor.internal_addr,
+                            };
+
+                            let snapshot_persister = SnapshotPersister::new(coordination);
+                            self.handle(descriptor.checktable_addr, snapshot_persister);
                             break;
                         }
                         Err(e) => error!(self.log, "failed to register with controller: {:?}", e),
@@ -150,7 +157,7 @@ impl<A: Authority> Souplet<A> {
 
     /// Main worker loop: waits for instructions from controller, and occasionally heartbeats to
     /// tell the controller that we're still here
-    fn handle(&mut self, checktable_addr: SocketAddr) {
+    fn handle(&mut self, checktable_addr: SocketAddr, snapshot_persister: SnapshotPersister) {
         // now that we're connected to a leader, we can start the pool
         self.pool = Some(
             worker::WorkerPool::new(
@@ -158,6 +165,7 @@ impl<A: Authority> Souplet<A> {
                 &self.log,
                 checktable_addr,
                 self.channel_coordinator.clone(),
+                Some(snapshot_persister),
             ).unwrap(),
         );
 

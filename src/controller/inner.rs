@@ -4,21 +4,22 @@ use dataflow::payload::{EgressForBase, IngressFromBase};
 use dataflow::prelude::*;
 use dataflow::statistics::GraphStats;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use std::thread;
-use std::sync::{atomic, Arc, Mutex};
+use std::sync::{atomic, mpsc, Arc, Mutex};
 use std::{io, time};
 
 use coordination::{CoordinationMessage, CoordinationPayload};
-use controller::{ControllerState, DomainHandle, Migration, Recipe, RemoteGetterBuilder,
-                 WorkerIdentifier, WorkerStatus};
+use controller::{ControlEvent, ControllerConfig, ControllerState, DomainHandle, Migration, Recipe,
+                 RemoteGetterBuilder, WorkerIdentifier, WorkerStatus};
 use controller::migrate::materialization::Materializations;
 use controller::mutator::MutatorBuilder;
 use controller::recipe::ActivationResult;
+use snapshots::{SnapshotCoordination, SnapshotPersister};
 use souplet::readers;
 use worker;
 
@@ -42,6 +43,9 @@ pub struct ControllerInner {
     pub(super) checktable: checktable::CheckTableClient,
     checktable_addr: SocketAddr,
     pub(super) sharding: Option<usize>,
+
+    pub(super) snapshot_id: u64,
+    pub(super) snapshot_ids: HashMap<(DomainIndex, usize), u64>,
 
     pub(super) domain_config: DomainConfig,
 
@@ -111,6 +115,7 @@ impl ControllerInner {
             } => self.handle_register(&msg, addr, read_listen_addr.clone()),
             CoordinationPayload::Heartbeat => self.handle_heartbeat(&msg),
             CoordinationPayload::DomainBooted(..) => Ok(()),
+            CoordinationPayload::SnapshotCompleted(..) => Ok(()),
             _ => unimplemented!(),
         };
         match process {
@@ -137,6 +142,8 @@ impl ControllerInner {
             (Post, "/recover") => json::to_string(&self.recover()).unwrap(),
             (Post, "/graphviz") => json::to_string(&self.graphviz()).unwrap(),
             (Post, "/get_statistics") => json::to_string(&self.get_statistics()).unwrap(),
+            (Post, "/get_snapshot_id") => json::to_string(&self.snapshot_id).unwrap(),
+            (Post, "/initialize_snapshot") => json::to_string(&self.initialize_snapshot()).unwrap(),
             (Post, "/mutator_builder") => {
                 json::to_string(&self.mutator_builder(json::from_slice(&body).unwrap())).unwrap()
             }
@@ -151,6 +158,28 @@ impl ControllerInner {
             }
             _ => return Err(StatusCode::NotFound),
         })
+    }
+
+    pub fn handle_snapshot_completed(
+        &mut self,
+        domain: (DomainIndex, usize),
+        snapshot_id: u64,
+    ) -> Option<u64> {
+        debug!(
+            self.log,
+            "Setting shard {:?}'s snapshot ID to {}", domain, snapshot_id
+        );
+
+        self.snapshot_ids.insert(domain, snapshot_id);
+        // Persist the snapshot_id if all shards have snapshotted:
+        let min_id = *self.snapshot_ids.values().min().unwrap();
+        if min_id == snapshot_id && min_id != self.snapshot_id {
+            debug!(self.log, "Persisting snapshot ID {}", snapshot_id);
+            self.snapshot_id = snapshot_id;
+            Some(snapshot_id)
+        } else {
+            None
+        }
     }
 
     fn handle_register(
@@ -205,6 +234,7 @@ impl ControllerInner {
         checktable_addr: SocketAddr,
         log: slog::Logger,
         state: ControllerState,
+        local_sender: mpsc::Sender<ControlEvent>,
     ) -> Self {
         let mut g = petgraph::Graph::new();
         let source = g.add_node(node::Node::new(
@@ -218,8 +248,12 @@ impl ControllerInner {
             checktable::CheckTableClient::connect(checktable_addr, client::Options::default())
                 .unwrap();
 
+        let ControllerConfig {
+            nreaders,
+            persistence,
+            ..
+        } = state.config;
         let readers: Readers = Arc::default();
-        let nreaders = state.config.nreaders;
         let listener = TcpListener::bind(&SocketAddr::new(listen_addr, 0)).unwrap();
         let read_listen_addr = listener.local_addr().unwrap();
         let thread_builder = thread::Builder::new().name("read-dispatcher".to_owned());
@@ -240,12 +274,20 @@ impl ControllerInner {
         let cc = Arc::new(ChannelCoordinator::new());
         assert!((state.config.nworkers == 0) ^ (state.config.local_workers == 0));
         let local_pool = if state.config.nworkers == 0 {
+            let snapshot_persister = if persistence.snapshot_timeout.is_some() {
+                let coordination = SnapshotCoordination::Local(local_sender);
+                Some(SnapshotPersister::new(coordination))
+            } else {
+                None
+            };
+
             Some(
                 worker::WorkerPool::new(
                     state.config.local_workers,
                     &log,
                     checktable_addr,
                     cc.clone(),
+                    snapshot_persister,
                 ).unwrap(),
             )
         } else {
@@ -260,10 +302,13 @@ impl ControllerInner {
             checktable_addr,
             listen_addr,
 
+            snapshot_id: state.snapshot_id,
+            snapshot_ids: Default::default(),
+
             materializations,
+            persistence,
             sharding: state.config.sharding,
             domain_config: state.config.domain_config,
-            persistence: state.config.persistence,
             heartbeat_every: state.config.heartbeat_every,
             healthcheck_every: state.config.healthcheck_every,
             recipe: Recipe::blank(Some(log.clone())),
@@ -350,18 +395,72 @@ impl ControllerInner {
         r
     }
 
-    /// Initiaties log recovery by sending a
-    /// StartRecovery packet to each base node domain.
+    /// Recovers persisted snapshots for each domain, followed by log recovery at each base node.
     pub fn recover(&mut self) {
-        info!(self.log, "Recovering from log");
+        info!(self.log, "Initiating recovery");
+        if self.snapshot_id > 0 {
+            // Sends StartRecovery packets in parallel to each domain that contains at least one
+            // materialized node, and waits for ACKs before proceeding.
+            info!(self.log, "Recovering from snapshot ID {}", self.snapshot_id);
+            let domains = self.snapshot_ids
+                .keys()
+                .map(|&(domain_index, _shard)| domain_index)
+                .collect::<HashSet<_>>();
+
+            for domain_index in domains.iter() {
+                let domain = self.domains.get_mut(&domain_index).unwrap();
+                let packet = payload::Packet::StartRecovery {
+                    snapshot_id: self.snapshot_id,
+                };
+
+                domain.send(box packet).unwrap();
+            }
+
+            for domain_index in domains {
+                let domain = self.domains.get_mut(&domain_index).unwrap();
+                domain.wait_for_ack().unwrap();
+            }
+        }
+
+        // Finally, initiate log recovery by
+        // sending sequential StartRecovery packets with a snapshot_id of 0:
+        info!(self.log, "Recovering from logs");
         for (_name, index) in self.inputs().iter() {
             let node = &self.ingredients[*index];
             let domain = self.domains.get_mut(&node.domain()).unwrap();
-            domain.send(box payload::Packet::StartRecovery).unwrap();
+            let packet = payload::Packet::StartRecovery { snapshot_id: 0 };
+            domain.send(box packet).unwrap();
             domain.wait_for_ack().unwrap();
         }
     }
 
+    /// Initializes and persists a single snapshot by sending TakeSnapshot to all domains.
+    pub fn initialize_snapshot(&mut self) {
+        let min_id = self.snapshot_ids.values().min();
+        if min_id.is_none() || *min_id.unwrap() < self.snapshot_id {
+            debug!(self.log, "Skipping snapshot, still waiting for ACKs");
+            return;
+        }
+
+        // All snapshots have completed at this point, so increment and start another:
+        let snapshot_id = self.snapshot_id + 1;
+        debug!(self.log, "Initializing snapshot with ID {}", snapshot_id);
+
+        let nodes: Vec<_> = self.inputs()
+            .iter()
+            .map(|(_name, index)| {
+                let node = &self.ingredients[*index];
+                (*node.local_addr(), node.domain())
+            })
+            .collect();
+
+        for &(local_addr, domain_index) in nodes.iter() {
+            let domain = self.domains.get_mut(&domain_index).unwrap();
+            let link = Link::new(local_addr, local_addr);
+            let packet = payload::Packet::TakeSnapshot { link, snapshot_id };
+            domain.send(box packet).unwrap();
+        }
+    }
     /// Get a boxed function which can be used to validate tokens.
     #[allow(unused)]
     pub fn get_validator(&self) -> Box<Fn(&checktable::Token) -> bool> {

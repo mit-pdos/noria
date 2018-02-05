@@ -8,6 +8,7 @@
 
 #[allow(unused_extern_crates)]
 extern crate backtrace;
+extern crate bincode;
 extern crate buf_redux;
 extern crate channel;
 extern crate core;
@@ -55,7 +56,7 @@ pub type PersistenceParameters = persistence::Parameters;
 pub type DomainConfig = domain::Config;
 
 pub use persistence::DurabilityMode;
-pub use domain::{Domain, DomainBuilder, Index};
+pub use domain::{Domain, DomainBuilder, Index, PersistSnapshotRequest};
 pub use payload::{LocalBypass, Packet};
 pub use checktable::connect_thread_checktable;
 

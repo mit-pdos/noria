@@ -84,16 +84,26 @@ impl ControllerBuilder {
     #[cfg(test)]
     pub fn build_inner(self) -> ::controller::ControllerInner {
         use std::net::SocketAddr;
+        use std::sync::mpsc::channel;
         use dataflow::checktable::service::CheckTableServer;
         use controller::{ControllerInner, ControllerState};
 
+        // Fake main_loop channel for use in SnapshotPersister:
+        let (tx, _) = channel();
         let checktable_addr = CheckTableServer::start(SocketAddr::new(self.listen_addr, 0));
         let initial_state = ControllerState {
             config: self.config,
             recipe: (),
+            snapshot_id: 0,
             epoch: LocalAuthority::get_epoch(),
         };
-        ControllerInner::new(self.listen_addr, checktable_addr, self.log, initial_state)
+        ControllerInner::new(
+            self.listen_addr,
+            checktable_addr,
+            self.log,
+            initial_state,
+            tx,
+        )
     }
 
     /// Set the logger that the derived controller should use. By default, it uses `slog::Discard`.

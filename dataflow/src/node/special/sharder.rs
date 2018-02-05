@@ -148,28 +148,30 @@ impl Sharder {
             // fall-through for regular replays, because they aren't really special in any way.
         }
 
-        for record in m.take_data() {
-            let shard = self.to_shard(&record);
-            let p = self.sharded
-                .entry(shard)
-                .or_insert_with(|| box m.clone_data());
-            p.map_data(|rs| rs.push(record));
-        }
+        match *m {
+            Packet::TakeSnapshot { .. } => (),
+            _ => for record in m.take_data() {
+                let shard = self.to_shard(&record);
+                let p = self.sharded
+                    .entry(shard)
+                    .or_insert_with(|| box m.clone_data());
+                p.map_data(|rs| rs.push(record));
+            },
+        };
 
-        let mut force_all = false;
-        if let Packet::ReplayPiece {
-            context: payload::ReplayPieceContext::Regular { last: true },
-            ..
-        } = *m
-        {
+        let force_all = match *m {
             // this is the last replay piece for a full replay
             // we need to make sure it gets to every shard so they know to ready the node
-            force_all = true;
-        }
-        if let Packet::Transaction { .. } = *m {
+            Packet::ReplayPiece {
+                context: payload::ReplayPieceContext::Regular { last: true },
+                ..
+            } |
             // transactions (currently) need to reach all shards so they know they can progress
-            force_all = true;
-        }
+            Packet::Transaction { .. } |
+            Packet::TakeSnapshot { .. } => true,
+            _ => false,
+        };
+
         if force_all {
             for shard in 0..self.txs.len() {
                 self.sharded

@@ -1,4 +1,7 @@
 *-log-*.json
+*-snapshot-*.bin
+*-snapshot_id
+
 *.png
 *.log
 plotting/*.png

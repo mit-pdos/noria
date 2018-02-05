@@ -575,6 +575,12 @@ fn main() {
                     Arg::with_name("verbose")
                         .short("v")
                         .help("Include logging output"),
+                )
+                .arg(
+                    Arg::with_name("snapshot-timeout")
+                        .long("snapshot-timeout")
+                        .value_name("N")
+                        .help("Initialize a snapshot every x seconds"),
                 ),
         )
         .get_matches();

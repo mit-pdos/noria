@@ -1,6 +1,7 @@
 extern crate glob;
 
 use core::DataType;
+use consensus::ZookeeperAuthority;
 use dataflow::checktable::Token;
 use dataflow::node::StreamUpdate;
 use dataflow::ops::base::Base;
@@ -19,6 +20,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::thread;
 use std::sync::mpsc;
 use std::env;
+use std::u64;
 use std::fs;
 use std::collections::HashMap;
 
@@ -48,11 +50,11 @@ impl LogName {
     }
 }
 
-// Removes the log files matching the glob ./{log_name}-*.json.
+// Removes the log files matching the glob ./{log_name}-*.
 // Used to clean up after recovery tests, where a persistent log is created.
 impl Drop for LogName {
     fn drop(&mut self) {
-        for log_path in glob::glob(&format!("./{}-*.json", self.name)).unwrap() {
+        for log_path in glob::glob(&format!("./{}-*", self.name)).unwrap() {
             fs::remove_file(log_path.unwrap()).unwrap();
         }
     }
@@ -81,6 +83,7 @@ fn it_works_basic() {
         DurabilityMode::DeleteOnExit,
         128,
         Duration::from_millis(1),
+        None,
         Some(get_log_name("it_works_basic")),
     );
     g.with_persistence_options(pparams);
@@ -406,6 +409,7 @@ fn it_recovers_persisted_logs() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);
@@ -513,6 +517,7 @@ fn it_recovers_persisted_logs_w_multiple_nodes() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);
@@ -570,6 +575,7 @@ fn it_recovers_persisted_logs_w_transactions() {
             DurabilityMode::Permanent,
             128,
             Duration::from_millis(1),
+            None,
             Some(log_name.name.clone()),
         );
         g.with_persistence_options(pparams);
@@ -614,6 +620,173 @@ fn it_recovers_persisted_logs_w_transactions() {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0][0], i.into());
         assert_eq!(result[0][1], b.into());
+    }
+}
+
+#[test]
+#[allow_fail]
+fn it_recovers_w_snapshots_and_logs() {
+    let log_name = LogName::new("it_recovers_w_snapshots_and_logs");
+    let setup = || {
+        let pparams = PersistenceParameters::new(
+            DurabilityMode::Permanent,
+            128,
+            Duration::from_millis(1),
+            // We want to trigger snapshots manually, but we still need
+            // a snapshot persister - so set a large timeout:
+            Some(Duration::from_secs(u64::MAX)),
+            Some(log_name.name.clone()),
+        );
+
+        let mut builder = ControllerBuilder::default();
+        builder.set_persistence(pparams);
+        let address = format!("127.0.0.1:2181/{}", log_name.name);
+        let authority = ZookeeperAuthority::new(&address);
+        let mut g = builder.build(authority);
+
+        let sql = "
+            CREATE TABLE Cat \
+                (cat_id int, breed_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
+            CREATE TABLE Breed (breed_id int, breed_name varchar(255), PRIMARY KEY(breed_id));
+
+            QUERY BreedQuery: SELECT breed_id, breed_name FROM Breed WHERE breed_id = ?;
+            QUERY Count: SELECT COUNT(cat_id), breed_name \
+                      FROM Cat \
+                      JOIN Breed ON Cat.breed_id = Breed.breed_id \
+                      WHERE breed_name = ? \
+                      GROUP BY breed_name;
+        ";
+
+        g.install_recipe(sql.to_owned()).unwrap();
+        g
+    };
+
+    let cats = vec!["Bob", "Tom", "Smokey"];
+    let breeds = vec!["Bengal", "Tabby"];
+    let counts = vec![2, 1];
+
+    {
+        let mut g = setup();
+        let inputs = g.inputs();
+        let mut breed_mutator = g.get_mutator(inputs["Breed"]).unwrap();
+        for (i, &breed) in breeds.iter().enumerate() {
+            breed_mutator
+                .put(vec![(i as i32).into(), breed.into()])
+                .unwrap();
+        }
+
+        let mut cat_mutator = g.get_mutator(inputs["Cat"]).unwrap();
+        for (i, &name) in cats.iter().enumerate() {
+            let breed_id = (i % breeds.len()) as i32;
+            cat_mutator
+                .put(vec![(i as i32).into(), breed_id.into(), name.into()])
+                .unwrap();
+        }
+
+        // Let writes propagate:
+        sleep();
+
+        // Trigger a snapshot:
+        g.initialize_snapshot();
+
+        // Add a couple of writes that'll have to be recovered after the snapshot:
+        let breed_id: DataType = (breeds.len() as i32).into();
+        let cat_id: DataType = (cats.len() as i32).into();
+        breed_mutator
+            .put(vec![breed_id.clone(), "Rare".into()])
+            .unwrap();
+        cat_mutator
+            .put(vec![cat_id, breed_id, "Extra".into()])
+            .unwrap();
+
+        sleep();
+    }
+
+    let mut g = setup();
+    assert_eq!(g.get_snapshot_id(), 1);
+    // Recover and let the writes propagate:
+    g.recover();
+    sleep();
+
+    let outputs = g.outputs();
+    let mut breed_getter = g.get_getter(outputs["BreedQuery"]).unwrap();
+    let mut count_getter = g.get_getter(outputs["Count"]).unwrap();
+    for (i, &breed) in breeds.iter().enumerate() {
+        let id: DataType = (i as i32).into();
+        let breed_result = breed_getter.lookup(&id, true).unwrap();
+        assert_eq!(breed_result.len(), 1);
+        assert_eq!(breed_result[0][0], id);
+        assert_eq!(breed_result[0][1], breed.into());
+
+        let count_result = count_getter.lookup(&breed.into(), true).unwrap();
+        assert_eq!(count_result.len(), 1);
+        assert_eq!(count_result[0][0], counts[i].into());
+        assert_eq!(count_result[0][1], breed.into());
+    }
+}
+
+#[test]
+#[allow_fail]
+fn it_recovers_w_only_snapshots() {
+    let log_name = LogName::new("it_recovers_w_only_snapshots");
+    let setup = || {
+        let pparams = PersistenceParameters::new(
+            DurabilityMode::MemoryOnly,
+            128,
+            Duration::from_millis(1),
+            Some(Duration::from_secs(u64::MAX)),
+            Some(log_name.name.clone()),
+        );
+
+        let mut builder = ControllerBuilder::default();
+        builder.set_persistence(pparams);
+        let address = format!("127.0.0.1:2181/{}", log_name.name);
+        let authority = ZookeeperAuthority::new(&address);
+        let mut g = builder.build(authority);
+
+        let sql = "
+            CREATE TABLE Cat (cat_id int, cat_name varchar(255), PRIMARY KEY(cat_id));
+            QUERY CatQuery: SELECT cat_id, cat_name FROM Cat where cat_id = ?;
+        ";
+
+        g.install_recipe(sql.to_owned()).unwrap();
+        g
+    };
+
+    let cats = vec!["Bob", "Tom", "Smokey"];
+
+    {
+        let mut g = setup();
+        let inputs = g.inputs();
+
+        let mut cat_mutator = g.get_mutator(inputs["Cat"]).unwrap();
+        for (i, &name) in cats.iter().enumerate() {
+            cat_mutator
+                .put(vec![(i as i32).into(), name.into()])
+                .unwrap();
+        }
+
+        // Let writes propagate:
+        sleep();
+
+        // Trigger a snapshot:
+        g.initialize_snapshot();
+        sleep();
+    }
+
+    let mut g = setup();
+    // Recover and let the writes propagate:
+    g.recover();
+    sleep();
+
+    let outputs = g.outputs();
+    let mut cat_getter = g.get_getter(outputs["CatQuery"]).unwrap();
+    for (i, &name) in cats.iter().enumerate() {
+        let id: DataType = (i as i32).into();
+        let cat_result = cat_getter.lookup(&id, true).unwrap();
+        assert_eq!(cat_result.len(), 1);
+        assert_eq!(cat_result[0][0], id);
+        assert_eq!(cat_result[0][1], name.into());
     }
 }
 

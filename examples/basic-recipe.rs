@@ -1,6 +1,6 @@
 extern crate distributary;
 
-use distributary::ControllerBuilder;
+use distributary::{ControllerBuilder, PersistenceParameters, ZookeeperAuthority};
 
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -20,10 +20,11 @@ fn main() {
                             FROM Article, VoteCount \
                             WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
-    let persistence_params = distributary::PersistenceParameters::new(
+    let persistence_params = PersistenceParameters::new(
         distributary::DurabilityMode::Permanent,
         512,
         Duration::from_millis(1),
+        Some(Duration::from_secs(10)),
         Some(String::from("example")),
     );
 
@@ -33,7 +34,8 @@ fn main() {
     builder.set_local_workers(2);
     builder.set_persistence(persistence_params);
 
-    let mut blender = builder.build_local();
+    let authority = ZookeeperAuthority::new("127.0.0.1:2181/basic-recipe");
+    let mut blender = builder.build(authority);
     blender.install_recipe(sql.to_owned()).unwrap();
     println!("{}", blender.graphviz());
 
@@ -59,17 +61,20 @@ fn main() {
             .unwrap();
     }
 
-    // Then create a new vote:
-    println!("Casting vote...");
-    let uid = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-    vote.put(vec![aid.into(), uid.into()]).unwrap();
+    loop {
+        // Then create a new vote:
+        println!("Casting vote...");
+        let uid = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        vote.put(vec![aid.into(), uid.into()]).unwrap();
 
-    println!("Finished writing! Let's wait for things to propagate...");
-    thread::sleep(Duration::from_millis(1000));
+        println!("Finished writing! Let's wait for things to propagate...");
+        thread::sleep(Duration::from_millis(1000));
 
-    println!("Reading...");
-    println!("{:#?}", awvc.lookup(&1.into(), true))
+        println!("Reading...");
+        println!("{:#?}", awvc.lookup(&1.into(), true));
+        thread::sleep(Duration::from_millis(1000));
+    }
 }

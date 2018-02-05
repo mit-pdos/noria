@@ -113,9 +113,19 @@ impl<A: Authority> ControllerHandle<A> {
         self.rpc("recover", &())
     }
 
+    /// Initiaties a single snapshot.
+    pub fn initialize_snapshot(&mut self) {
+        self.rpc("initialize_snapshot", &())
+    }
+
     /// Get statistics about the time spent processing different parts of the graph.
     pub fn get_statistics(&mut self) -> GraphStats {
         self.rpc("get_statistics", &())
+    }
+
+    /// Get the latest persisted snapshot_id used by the controller.
+    pub fn get_snapshot_id(&mut self) -> u64 {
+        self.rpc("get_snapshot_id", &())
     }
 
     /// Extend the existing recipe on the controller by adding a new query.
@@ -144,5 +154,7 @@ impl<A: Authority> Drop for ControllerHandle<A> {
             let _ = sender.send(ControlEvent::Shutdown);
             let _ = join_handle.join();
         }
+
+        self.authority.disconnect();
     }
 }

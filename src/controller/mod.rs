@@ -3,11 +3,12 @@ use channel::tcp::TcpSender;
 use consensus::{Authority, Epoch, STATE_KEY};
 use dataflow::checktable::service::CheckTableServer;
 use dataflow::{DomainConfig, PersistenceParameters};
+use dataflow::prelude::*;
 
 use controller::domain_handle::DomainHandle;
 use controller::inner::ControllerInner;
 use controller::recipe::Recipe;
-use coordination::CoordinationMessage;
+use coordination::{CoordinationMessage, CoordinationPayload};
 
 use std::error::Error;
 use std::io::ErrorKind;
@@ -136,10 +137,11 @@ impl Default for ControllerConfig {
 pub(crate) struct ControllerState {
     pub config: ControllerConfig,
     pub epoch: Epoch,
+    pub snapshot_id: u64,
     pub recipe: (), // TODO: store all relevant state here.
 }
 
-enum ControlEvent {
+pub(crate) enum ControlEvent {
     ControllerMessage(CoordinationMessage),
     ExternalRequest(
         Method,
@@ -147,9 +149,11 @@ enum ControlEvent {
         Vec<u8>,
         futures::sync::oneshot::Sender<Result<String, StatusCode>>,
     ),
+    SnapshotCompleted((DomainIndex, usize), u64),
     WonLeaderElection(ControllerState),
     LostLeadership(Epoch),
     Shutdown,
+    InitializeSnapshot,
     Error(Box<Error + Send + Sync>),
 }
 
@@ -188,6 +192,10 @@ impl<A: Authority + 'static> Controller<A> {
             authority.clone(),
         );
 
+        if let Some(timeout) = config.persistence.snapshot_timeout {
+            Self::initialize_snapshots(event_tx.clone(), timeout);
+        }
+
         let descriptor = ControllerDescriptor {
             external_addr: external.addr,
             internal_addr: internal.addr,
@@ -197,6 +205,8 @@ impl<A: Authority + 'static> Controller<A> {
         let campaign = Self::campaign(event_tx.clone(), authority.clone(), descriptor, config);
 
         let builder = thread::Builder::new().name("srv-main".to_owned());
+        let controller_authority = authority.clone();
+        let sender = event_tx.clone();
         let join_handle = builder
             .spawn(move || {
                 let controller = Self {
@@ -210,7 +220,7 @@ impl<A: Authority + 'static> Controller<A> {
                     listen_addr,
                     phantom: PhantomData,
                 };
-                controller.main_loop(event_rx)
+                controller.main_loop(controller_authority, sender, event_rx)
             })
             .unwrap();
 
@@ -221,12 +231,26 @@ impl<A: Authority + 'static> Controller<A> {
         }
     }
 
-    fn main_loop(mut self, receiver: Receiver<ControlEvent>) {
+    fn main_loop(
+        mut self,
+        authority: Arc<A>,
+        sender: Sender<ControlEvent>,
+        receiver: Receiver<ControlEvent>,
+    ) {
         for event in receiver {
             match event {
                 ControlEvent::ControllerMessage(msg) => if let Some(ref mut inner) = self.inner {
+                    if let CoordinationPayload::SnapshotCompleted(domain, snapshot_id) = msg.payload {
+                        Self::handle_snapshot_completed(inner, authority.clone(), domain, snapshot_id);
+                    }
+
                     inner.coordination_message(msg)
                 },
+                ControlEvent::SnapshotCompleted(domain, snapshot_id) => {
+                    if let Some(ref mut inner) = self.inner {
+                        Self::handle_snapshot_completed(inner, authority.clone(), domain, snapshot_id);
+                    }
+                }
                 ControlEvent::ExternalRequest(method, path, body, reply_tx) => {
                     if let Some(ref mut inner) = self.inner {
                         reply_tx
@@ -243,18 +267,44 @@ impl<A: Authority + 'static> Controller<A> {
                         self.checktable,
                         self.log.clone(),
                         state,
+                        sender.clone(),
                     ));
                 }
                 ControlEvent::LostLeadership(new_epoch) => {
                     self.current_epoch = Some(new_epoch);
                     self.inner = None;
                 }
+                ControlEvent::InitializeSnapshot => if let Some(ref mut inner) = self.inner {
+                    inner.initialize_snapshot()
+                },
                 ControlEvent::Shutdown => break,
                 ControlEvent::Error(e) => panic!("{}", e),
             }
         }
         self.external.stop();
         self.internal.stop();
+    }
+
+    // Persists snapshot IDs to controller's authority when all
+    // domain shards have completed a snapshot.
+    fn handle_snapshot_completed(
+        inner: &mut ControllerInner,
+        authority: Arc<A>,
+        domain: (DomainIndex, usize),
+        snapshot_id: u64,
+    ) {
+        if let Some(id) = inner.handle_snapshot_completed(domain, snapshot_id) {
+            authority
+                .read_modify_write("/state", |state: Option<ControllerState>| match state {
+                    None => Err(()),
+                    Some(mut state) => {
+                        state.snapshot_id = id;
+                        Ok(state)
+                    }
+                })
+                .unwrap()
+                .unwrap();
+        }
     }
 
     fn listen_external(
@@ -410,6 +460,20 @@ impl<A: Authority + 'static> Controller<A> {
         }
     }
 
+    /// Starts a loop that attempts to initiate a snapshot every `timeout`.
+    /// TODO(ekmartin): There's probably a better way of doing this.
+    fn initialize_snapshots(event_tx: Sender<ControlEvent>, timeout: Duration) {
+        let builder = thread::Builder::new().name("snapshots".to_owned());
+        builder
+            .spawn(move || loop {
+                thread::sleep(timeout);
+                if event_tx.send(ControlEvent::InitializeSnapshot).is_err() {
+                    return;
+                }
+            })
+            .unwrap();
+    }
+
     fn campaign(
         event_tx: Sender<ControlEvent>,
         authority: Arc<A>,
@@ -428,6 +492,7 @@ impl<A: Authority + 'static> Controller<A> {
                             None => Ok(ControllerState {
                                 config: config.clone(),
                                 epoch: current_epoch,
+                                snapshot_id: 0,
                                 recipe: (),
                             }),
                             Some(ref state) if state.epoch > current_epoch => Err(()),
@@ -502,6 +567,20 @@ mod tests {
         let authority = ZookeeperAuthority::new("127.0.0.1:2181/it_works_blender_with_migration");
         let mut c = ControllerBuilder::default().build(authority);
         assert!(c.install_recipe(r_txt.to_owned()).is_ok());
+    }
+
+    #[test]
+    #[allow_fail]
+    fn it_allows_authority_reuse() {
+        let r_txt = "CREATE TABLE a (x int, y int, z int);\n
+                     CREATE TABLE b (r int, s int);\n";
+
+        let address = "127.0.0.1:2181/it_allows_authority_reuse";
+        for _ in 0..2 {
+            let authority = ZookeeperAuthority::new(address);
+            let mut c = ControllerBuilder::default().build(authority);
+            c.install_recipe(r_txt.to_owned()).unwrap();
+        }
     }
 
     // Controller without any domains gets dropped once it leaves the scope.

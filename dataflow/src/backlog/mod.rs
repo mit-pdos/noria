@@ -1,8 +1,9 @@
-use core::{DataType, Record};
+use core::{DataType, Datas, Record};
 use fnv::FnvBuildHasher;
 use evmap;
 
 use std::sync::Arc;
+use std::collections::HashMap;
 
 /// Allocate a new end-user facing result table.
 pub fn new(cols: usize, key: usize) -> (SingleReadHandle, WriteHandle) {
@@ -75,6 +76,15 @@ impl WriteHandle {
                     self.handle.remove(key, r);
                 }
                 Record::DeleteRequest(..) => unreachable!(),
+            }
+        }
+    }
+
+    /// Extends the WriteHandle with the given state map.
+    pub fn extend(&mut self, state: HashMap<DataType, Datas>) {
+        for (key, rs) in state {
+            for r in rs {
+                self.handle.insert(key.clone(), r);
             }
         }
     }
@@ -164,6 +174,12 @@ impl SingleReadHandle {
             }
             r => r,
         }
+    }
+
+    /// Retrieves a HashMap that maps each key to their records.
+    pub fn collect_state(&self) -> HashMap<DataType, Datas> {
+        self.handle
+            .map_into(|key, value| (key.clone(), value.to_vec()))
     }
 
     pub(crate) fn try_find_and<F, T>(

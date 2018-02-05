@@ -36,6 +36,9 @@ pub struct Parameters {
     pub queue_capacity: usize,
     /// Amount of time to wait before flushing despite not reaching `queue_capacity`.
     pub flush_timeout: time::Duration,
+    /// Amount of time to wait before a new snapshot is initiated.
+    /// Set to None to disable snapshotting altogether.
+    pub snapshot_timeout: Option<time::Duration>,
     /// Whether the output files should be deleted when the GroupCommitQueue is dropped.
     pub mode: DurabilityMode,
     /// Filename prefix for persistent log entries.
@@ -47,6 +50,7 @@ impl Default for Parameters {
         Self {
             queue_capacity: 256,
             flush_timeout: time::Duration::from_millis(1),
+            snapshot_timeout: None,
             mode: DurabilityMode::MemoryOnly,
             log_prefix: String::from("soup"),
         }
@@ -71,6 +75,7 @@ impl Parameters {
         mode: DurabilityMode,
         queue_capacity: usize,
         flush_timeout: time::Duration,
+        snapshot_timeout: Option<time::Duration>,
         log_prefix: Option<String>,
     ) -> Self {
         let log_prefix = log_prefix.unwrap_or(String::from("soup"));
@@ -79,6 +84,7 @@ impl Parameters {
         Self {
             queue_capacity,
             flush_timeout,
+            snapshot_timeout,
             mode,
             log_prefix,
         }
@@ -92,6 +98,23 @@ impl Parameters {
             "{}-log-{}-{}.json",
             self.log_prefix, table_name, domain_shard,
         ))
+    }
+
+    pub fn snapshot_filename(
+        &self,
+        snapshot_id: u64,
+        local_addr: &LocalNodeIndex,
+        domain_id: (domain::Index, usize),
+    ) -> String {
+        let (domain_index, shard) = domain_id;
+        format!(
+            "{}-snapshot-{}-{}_{}-{}.bin",
+            self.log_prefix,
+            snapshot_id,
+            domain_index.index(),
+            shard,
+            local_addr.id(),
+        )
     }
 }
 
@@ -173,7 +196,11 @@ impl GroupCommitQueueSet {
     }
 
     /// Find the first queue that has timed out waiting for more packets, and flush it to disk.
-    pub fn flush_if_necessary(&mut self, nodes: &DomainNodes) -> Option<Box<Packet>> {
+    pub fn flush_if_necessary(
+        &mut self,
+        nodes: &DomainNodes,
+        snapshot_id: u64,
+    ) -> Option<Box<Packet>> {
         let mut needs_flush = None;
         for (node, wait_start) in self.wait_start.iter() {
             if wait_start.elapsed() >= self.params.flush_timeout {
@@ -182,7 +209,7 @@ impl GroupCommitQueueSet {
             }
         }
 
-        needs_flush.and_then(|node| self.flush_internal(&node, nodes))
+        needs_flush.and_then(|node| self.flush_internal(&node, nodes, snapshot_id))
     }
 
     /// Flush any pending packets for node to disk (if applicable), and return a merged packet.
@@ -190,6 +217,7 @@ impl GroupCommitQueueSet {
         &mut self,
         node: &LocalNodeIndex,
         nodes: &DomainNodes,
+        snapshot_id: u64,
     ) -> Option<Box<Packet>> {
         match self.params.mode {
             DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
@@ -208,7 +236,7 @@ impl GroupCommitQueueSet {
                             _ => unreachable!(),
                         })
                         .collect();
-                    serde_json::to_writer(&mut file, &data_to_flush).unwrap();
+                    serde_json::to_writer(&mut file, &(snapshot_id, data_to_flush)).unwrap();
                     // Separate log flushes with a newline so that the
                     // file can be easily parsed later on:
                     writeln!(&mut file, "").unwrap();
@@ -230,7 +258,12 @@ impl GroupCommitQueueSet {
 
     /// Add a new packet to be persisted, and if this triggered a flush return an iterator over the
     /// packets that were written.
-    pub fn append<'a>(&mut self, p: Box<Packet>, nodes: &DomainNodes) -> Option<Box<Packet>> {
+    pub fn append<'a>(
+        &mut self,
+        p: Box<Packet>,
+        nodes: &DomainNodes,
+        snapshot_id: u64,
+    ) -> Option<Box<Packet>> {
         let node = Self::packet_destination(&p).unwrap();
         if !self.pending_packets.contains_key(&node) {
             self.pending_packets
@@ -239,7 +272,7 @@ impl GroupCommitQueueSet {
 
         self.pending_packets[&node].push(p);
         if self.pending_packets[&node].len() >= self.params.queue_capacity {
-            return self.flush_internal(&node, nodes);
+            return self.flush_internal(&node, nodes, snapshot_id);
         } else if !self.wait_start.contains_key(&node) {
             self.wait_start.insert(node, time::Instant::now());
         }

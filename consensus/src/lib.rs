@@ -26,6 +26,9 @@ pub const STATE_KEY: &'static str = "/state";
 pub struct Epoch(i64);
 
 pub trait Authority: Send + Sync {
+    /// TODO(ekmartin): This is a hack to be able to forcefully disconnect the ZK connection.
+    fn disconnect(&self);
+
     /// Attempt to become leader, blocking until this is possible. Returns leader epoch upon
     /// sucess. The payload_data must be unique among all possible leaders to avoid confusion about
     /// which was elected.

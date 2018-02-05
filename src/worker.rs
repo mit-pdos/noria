@@ -18,7 +18,8 @@ use timer_heap::{TimerHeap, TimerType};
 use channel::{self, TcpReceiver, TcpSender};
 use channel::poll::{PollEvent, ProcessResult};
 use channel::tcp::{SendError, TryRecvError};
-use dataflow::{self, Domain, Packet};
+use dataflow::{self, Domain, Packet, PersistSnapshotRequest};
+use snapshots::SnapshotPersister;
 
 pub struct NewReplica {
     pub inner: Replica,
@@ -85,12 +86,13 @@ impl SharedWorkerState {
     }
 }
 
-pub struct WorkerPool {
+pub(crate) struct WorkerPool {
     workers: Vec<thread::JoinHandle<()>>,
     poll: Arc<Poll>,
     notify: Vec<mpsc::Sender<NewReplicaInternal>>,
     wstate: SharedWorkerState,
     log: Logger,
+    snapshot_sender: Option<mpsc::Sender<PersistSnapshotRequest>>,
 }
 
 impl WorkerPool {
@@ -99,8 +101,20 @@ impl WorkerPool {
         log: &Logger,
         checktable_addr: A,
         channel_coordinator: Arc<ChannelCoordinator>,
+        snapshot_persister: Option<SnapshotPersister>,
     ) -> io::Result<Self> {
         let checktable_addr = checktable_addr.to_socket_addrs().unwrap().next().unwrap();
+        let snapshot_sender = if let Some(persister) = snapshot_persister {
+            let sender = persister.sender();
+            thread::Builder::new()
+                .name(format!("snapshot-{}", n))
+                .spawn(move || persister.start())
+                .unwrap();
+
+            Some(sender)
+        } else {
+            None
+        };
 
         let poll = Arc::new(Poll::new()?);
         let (notify_tx, notify_rx): (_, Vec<_>) = (0..n).map(|_| mpsc::channel()).unzip();
@@ -127,6 +141,7 @@ impl WorkerPool {
         Ok(WorkerPool {
             workers,
             poll,
+            snapshot_sender,
             notify: notify_tx,
             wstate: SharedWorkerState::new(truth),
             log: log.new(o!()),
@@ -182,7 +197,7 @@ impl WorkerPool {
             )
             .unwrap();
         r.listener = Some(listener);
-        r.replica.booted(addr);
+        r.replica.booted(addr, self.snapshot_sender.clone());
     }
 
     pub fn wait(&mut self) {

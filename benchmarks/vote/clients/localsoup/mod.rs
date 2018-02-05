@@ -25,6 +25,9 @@ impl VoteClient for Client {
         let read_threads = value_t_or_exit!(args, "readthreads", usize);
         let verbose = args.is_present("verbose");
 
+        let snapshot_timeout = args.value_of("snapshot-timeout")
+            .map(|_| value_t_or_exit!(args, "snapshot-timeout", u64))
+            .map(time::Duration::from_secs);
         let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
         let flush_timeout = time::Duration::from_millis(10);
         let mode = if args.is_present("durability") {
@@ -41,6 +44,7 @@ impl VoteClient for Client {
             mode,
             queue_length,
             flush_timeout,
+            snapshot_timeout,
             Some(String::from("vote")),
         );
 

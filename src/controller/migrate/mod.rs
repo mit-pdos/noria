@@ -433,10 +433,11 @@ impl<'a> Migration<'a> {
         sorted_new.sort();
 
         // Find all nodes for domains that have changed
-        let changed_domains: HashSet<DomainIndex> = sorted_new
+        let new_domains: HashSet<DomainIndex> = sorted_new
             .iter()
             .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
             .map(|&&ni| mainline.ingredients[ni].domain())
+            .filter(|di| !mainline.domains.contains_key(di))
             .collect();
 
         let mut domain_new_nodes = sorted_new
@@ -532,8 +533,11 @@ impl<'a> Migration<'a> {
         // etc.
         // println!("{}", mainline);
 
-        let new_deps =
-            transactions::analyze_changes(&mainline.ingredients, mainline.source, domain_new_nodes);
+        let new_deps = transactions::analyze_changes(
+            &mainline.ingredients,
+            mainline.source,
+            domain_new_nodes.clone(),
+        );
 
         transactions::merge_deps(&mainline.ingredients, &mut mainline.deps, new_deps);
 
@@ -570,12 +574,7 @@ impl<'a> Migration<'a> {
 
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
-        for domain in changed_domains {
-            if mainline.domains.contains_key(&domain) {
-                // this is not a new domain
-                continue;
-            }
-
+        for domain in new_domains {
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
             let d = DomainHandle::new(
                 domain,
@@ -661,6 +660,25 @@ impl<'a> Migration<'a> {
         mainline
             .materializations
             .commit(&mainline.ingredients, &new, &mut mainline.domains);
+
+        // Track the snapshot IDs of any new domains we added, as long as they include
+        // at least one materialized node:
+        for (domain_index, nodes) in domain_new_nodes {
+            let domain = &mainline.domains[&domain_index];
+            let is_materialized = nodes.iter().any(|&ni| {
+                let node = &mainline.ingredients[ni];
+                let status = mainline.materializations.get_status(&ni, &node);
+                status != MaterializationStatus::Not
+            });
+
+            if is_materialized {
+                for shard in 0..domain.shards() {
+                    mainline
+                        .snapshot_ids
+                        .insert((domain_index, shard), mainline.snapshot_id);
+                }
+            }
+        }
 
         info!(log, "finalizing migration");
 
