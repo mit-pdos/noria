@@ -413,6 +413,9 @@ fn main() {
             .just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])
             .unwrap()
             .is_ok();
+        // XXX: mysql max connections!!!
+        eprintln!("need to adjust mysql max connections");
+        return;
     }
 
     // connect to each of the clients
