@@ -52,6 +52,13 @@ bufstream = { version = "0.1.3", optional = true }
 # futures
 futures = { version ="0.1.14", optional = true }
 tokio-core = { version = "0.1.8", optional = true }
+# ec2
+rusoto_core = "0.31.0"
+rusoto_ec2 = "0.31.0"
+rusoto_sts = "0.31.0"
+scopeguard = "0.3.3"
+timeout-readwrite = "0.1"
+ctrlc = "3.1"
 
 [[bin]]
 name = "bank"

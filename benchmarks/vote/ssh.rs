@@ -39,7 +39,19 @@ impl Ssh {
             port = p.parse().unwrap();
         }
 
-        let tcp = TcpStream::connect((server, port))?;
+        // try connecting a couple of times
+        let mut iter = 0;
+        let tcp = loop {
+            match TcpStream::connect((server, port)) {
+                Ok(s) => break Ok(s),
+                Err(_) if iter < 3 => {
+                    iter += 1;
+                }
+                Err(e) => {
+                    break Err(e);
+                }
+            }
+        }?;
         let mut sess = Session::new().unwrap();
         sess.handshake(&tcp)?;
 

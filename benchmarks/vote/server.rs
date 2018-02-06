@@ -123,8 +123,9 @@ impl<'a> Server<'a> {
         }
 
         let start = time::Instant::now();
-        client.set_timeout(2000);
-        while start.elapsed() < time::Duration::from_secs(5) {
+        client.set_timeout(5000);
+        // sql server can be *really* slow to start
+        while start.elapsed() < time::Duration::from_secs(30) {
             let e: Result<(), ssh2::Error> = do catch {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
@@ -195,7 +196,7 @@ impl<'a> Server<'a> {
                     "soup",
                     "soup",
                     "<",
-                    "distributary/mysql_stat.sql",
+                    "distributary/benchmarks/vote/mysql_stat.sql",
                 ])?;
 
                 w.write_all(b"tables:\n")?;
@@ -213,7 +214,7 @@ impl<'a> Server<'a> {
                     "-U",
                     "SA",
                     "-i",
-                    "distributary/mssql_stat.sql",
+                    "distributary/benchmarks/vote/mssql_stat.sql",
                     // assume password is set in SQLCMDPASSWORD
                     "-S",
                     "127.0.0.1",
@@ -270,10 +271,10 @@ pub(crate) fn start<'a>(
             // wait for zookeeper to be running
             let start = time::Instant::now();
             while server
-                .just_exec(&["nc", "-z", "localhost", "2181"])?
+                .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
                 .is_err()
             {
-                if start.elapsed() > time::Duration::from_secs(2) {
+                if start.elapsed() > time::Duration::from_secs(10) {
                     Err("zookeeper wouldn't start")?;
                 }
             }
