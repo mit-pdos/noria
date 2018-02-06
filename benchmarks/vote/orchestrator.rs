@@ -581,7 +581,7 @@ fn main() {
         eprintln!("==> about to terminate ec2 instances -- press enter to interrupt");
         match timeout_readwrite::TimeoutReader::new(
             io::stdin(),
-            Some(time::Duration::from_secs(2 * 60)),
+            Some(time::Duration::from_secs(1 * 60)),
         ).read(&mut [0u8])
         {
             Ok(_) => {
