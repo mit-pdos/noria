@@ -663,6 +663,8 @@ fn run_clients(
                 if host.has_perflock {
                     cmd.push("perflock".into());
                 }
+                cmd.push("env".into());
+                cmd.push("RUST_BACKTRACE=1".into());
                 cmd.push("multiclient.sh".into());
                 params.add_params(&mut cmd);
                 cmd.push("--no-prime".into());
