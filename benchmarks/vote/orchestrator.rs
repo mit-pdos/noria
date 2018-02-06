@@ -304,13 +304,24 @@ fn main() {
             }
 
             // collect the various hosts to connect to
-            loop {
+            'retry: loop {
                 let mut c = rusoto_ec2::DescribeInstancesRequest::default();
                 c.instance_ids = Some(ec2_instances.clone());
                 match ec2.describe_instances(&c) {
                     Ok(instances) => {
                         for res in instances.reservations.unwrap() {
                             for instance in res.instances.unwrap() {
+                                if instance
+                                    .public_dns_name
+                                    .as_ref()
+                                    .map(|n| n.is_empty())
+                                    .unwrap_or(true)
+                                {
+                                    // no dns name yet -- retry
+                                    clients.clear();
+                                    continue 'retry;
+                                }
+
                                 if instance.instance_id.as_ref().unwrap() == &ec2_instances[0] {
                                     // server
                                     server = Some(format!(
