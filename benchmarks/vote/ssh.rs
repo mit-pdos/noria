@@ -45,6 +45,7 @@ impl Ssh {
             match TcpStream::connect((server, port)) {
                 Ok(s) => break Ok(s),
                 Err(_) if iter < 3 => {
+                    ::std::thread::sleep(::std::time::Duration::from_secs(1));
                     iter += 1;
                 }
                 Err(e) => {
