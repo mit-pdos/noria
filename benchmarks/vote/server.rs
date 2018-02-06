@@ -281,6 +281,7 @@ pub(crate) fn start<'a>(
                 .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
                 .is_err()
             {
+                thread::sleep(time::Duration::from_secs(1));
                 if start.elapsed() > time::Duration::from_secs(10) {
                     Err("zookeeper wouldn't start")?;
                 }

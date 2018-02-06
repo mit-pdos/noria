@@ -44,7 +44,7 @@ impl Ssh {
         let tcp = loop {
             match TcpStream::connect((server, port)) {
                 Ok(s) => break Ok(s),
-                Err(_) if iter < 3 => {
+                Err(_) if iter < 10 => {
                     ::std::thread::sleep(::std::time::Duration::from_secs(1));
                     iter += 1;
                 }
