@@ -51,11 +51,12 @@ impl VoteClient for Client {
 
             // prepop
             let mut aid = 0;
-            assert_eq!(params.articles % params.max_batch_size, 0);
-            for _ in 0..params.articles / params.max_batch_size {
+            let bs = 1000;
+            assert_eq!(params.articles % bs, 0);
+            for _ in 0..params.articles / bs {
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
-                for i in 0..params.max_batch_size {
+                for i in 0..bs {
                     if i != 0 {
                         sql.push_str(", ");
                     }

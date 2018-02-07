@@ -22,10 +22,11 @@ impl VoteClient for Client {
                     .unwrap();
 
             let mut aid = 0;
-            assert_eq!(params.articles % params.max_batch_size, 0);
-            for _ in 0..params.articles / params.max_batch_size {
+            let bs = 1000;
+            assert_eq!(params.articles % bs, 0);
+            for _ in 0..params.articles / bs {
                 use std::collections::BTreeMap;
-                let articles: Vec<_> = (0..params.max_batch_size)
+                let articles: Vec<_> = (0..bs)
                     .map(|i| {
                         let article_id = aid + i;
                         (
@@ -43,7 +44,7 @@ impl VoteClient for Client {
                 }
                 c.set_multi(m).unwrap();
 
-                aid += params.max_batch_size;
+                aid += bs;
             }
         }
 

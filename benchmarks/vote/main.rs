@@ -30,8 +30,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_SIZE: usize = 1000;
-const MAX_BATCH_TIME_US: u32 = 1000;
+const MAX_BATCH_TIME_US: u32 = 200;
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
     use std::mem;
@@ -114,7 +113,6 @@ where
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
         articles: articles,
-        max_batch_size: MAX_BATCH_SIZE,
         ratio: value_t_or_exit!(global_args, "ratio", u32),
     };
 
@@ -313,8 +311,8 @@ where
     // TODO: warmup
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
-    let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
-    let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
+    let mut queued_w = Vec::new();
+    let mut queued_r = Vec::new();
     {
         let enqueue = |batch: Vec<_>, write| {
             let clients = clients.clone();
@@ -380,16 +378,12 @@ where
             }
 
             let now = time::Instant::now();
-            if queued_w.len() >= MAX_BATCH_SIZE
-                || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
-            {
+            if !queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time {
                 ops += queued_w.len();
                 pool.spawn(enqueue(queued_w.split_off(0), true));
             }
 
-            if queued_r.len() >= MAX_BATCH_SIZE
-                || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
-            {
+            if !queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time {
                 ops += queued_r.len();
                 pool.spawn(enqueue(queued_r.split_off(0), false));
             }
