@@ -30,7 +30,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_TIME_US: u32 = 200;
+const MAX_BATCH_TIME_US: u32 = 100;
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
     use std::mem;
