@@ -4,6 +4,7 @@ use std::time;
 pub(crate) struct Parameters {
     pub(crate) prime: bool,
     pub(crate) max_batch_size: usize,
+    #[allow(unused)]
     pub(crate) ratio: u32,
     pub(crate) articles: usize,
 }
