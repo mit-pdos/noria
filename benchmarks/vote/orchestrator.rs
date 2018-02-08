@@ -171,11 +171,11 @@ fn main() {
             let cores = args.value_of("ctype")
                 .and_then(ec2_instance_type_cores)
                 .map(|cores| {
-                    // two cores for load generators to be on the safe side
+                    // one core for load generators to be on the safe side
                     match cores {
                         1 => 1,
                         2 => 1,
-                        n => n - 2,
+                        n => n - 1,
                     }
                 });
 
