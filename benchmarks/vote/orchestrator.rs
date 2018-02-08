@@ -606,7 +606,7 @@ fn main() {
     drop(ec2_cleanup);
 }
 
-// returns true if backend handled load fine
+// returns true if next target is feasible
 fn run_clients(
     clients: &Vec<(Ssh, HostDesc)>,
     server: &mut server::Server,
@@ -709,6 +709,7 @@ fn run_clients(
 
     // let's see how we did
     let mut overloaded = None;
+    let mut any_not_overloaded = false;
     use std::fs::File;
     let fname = params.name(target, "log");
     let mut outf = File::create(&fname);
@@ -740,6 +741,8 @@ fn run_clients(
 
             if is_overloaded {
                 eprintln!(" !! client {} was overloaded", host.name);
+            } else {
+                any_not_overloaded = true;
             }
 
             let was_overloaded = overloaded.unwrap_or(false);
@@ -772,7 +775,7 @@ fn run_clients(
         }
     }
 
-    !overloaded.unwrap_or(false)
+    any_not_overloaded
 }
 
 fn ec2_instance_type_cores(it: &str) -> Option<u16> {
