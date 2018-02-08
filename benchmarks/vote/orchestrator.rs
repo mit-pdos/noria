@@ -277,7 +277,10 @@ fn main() {
                         break;
                     }
                     Err(e) => {
-                        eprintln!("failed to describe spot instances: {}", e);
+                        let e = format!("failed to describe spot instances: {}", e);
+                        if !e.contains("does not exist") {
+                            eprintln!("{}", e);
+                        }
                     }
                 }
             }
