@@ -76,6 +76,7 @@ impl VoteClient for Client {
             "SET max_heap_table_size = 4294967296;",
             "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
         ]);
+        opts.stmt_cache_size(10000);
 
         Conf { opts: opts.into() }
     }
