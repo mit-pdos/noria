@@ -113,7 +113,9 @@ impl Ssh {
             })
             .collect();
         let cmd = cmd.join(" ");
-        eprintln!("    :> {}", cmd);
+        if cmd != "perflock" {
+            eprintln!("    :> {}", cmd);
+        }
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
         let cmd = format!("bash -c {}", shellwords::escape(&cmd));

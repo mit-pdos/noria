@@ -407,7 +407,6 @@ fn main() {
     let server = Ssh::connect(server_host).unwrap();
 
     let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
-    eprintln!(" -> perflock? {:?}", server_has_pl);
 
     if let ("ec2", Some(args)) = args.subcommand() {
         let scores = args.value_of("stype")
@@ -448,7 +447,6 @@ fn main() {
             eprintln!(" -> {} with {} cores", client, threads);
             Ssh::connect(client).map(|ssh| {
                 let has_perflock = ssh.just_exec(&["perflock"]).unwrap().is_ok();
-                eprintln!(" .. connected; perflock? {:?}", has_perflock);
                 (
                     ssh,
                     HostDesc {
