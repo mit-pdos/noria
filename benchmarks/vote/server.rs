@@ -33,25 +33,26 @@ impl<'a> ServerHandle<'a> {
 
                 let c_killed = server.just_exec(&["pkill", "-f", "target/release/controller"])?;
                 let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
-                if !c_killed.is_ok() || !w_killed.is_ok() {
-                    unimplemented!();
+
+                if !c_killed.is_ok() {
+                    let mut cstdout = String::new();
+                    let mut cstderr = String::new();
+                    c.stderr().read_to_string(&mut cstderr)?;
+                    c.read_to_string(&mut cstdout)?;
+                    println!("controller died");
+                    println!("{}", cstdout);
+                    println!("{}", cstderr);
                 }
 
-                /*
-                let mut cstdout = String::new();
-                let mut cstderr = String::new();
-                c.stderr().read_to_string(&mut cstderr)?;
-                c.read_to_string(&mut cstdout)?;
-                println!("{}", cstdout);
-                println!("{}", cstderr);
-
-                let mut wstdout = String::new();
-                let mut wstderr = String::new();
-                w.stderr().read_to_string(&mut wstderr)?;
-                w.read_to_string(&mut wstdout)?;
-                println!("{}", wstdout);
-                println!("{}", wstderr);
-                */
+                if !w_killed.is_ok() {
+                    let mut wstdout = String::new();
+                    let mut wstderr = String::new();
+                    w.stderr().read_to_string(&mut wstderr)?;
+                    w.read_to_string(&mut wstdout)?;
+                    println!("souplet died");
+                    println!("{}", wstdout);
+                    println!("{}", wstderr);
+                }
 
                 c.wait_eof()?;
                 w.wait_eof()?;
