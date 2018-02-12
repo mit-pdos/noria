@@ -45,13 +45,14 @@ t = t[t$pct != 100,]
 t$server <- as.factor(t$server)
 t$actual <- t$actual/1000000.0
 t$target <- t$target/1000000.0
-mx_rmt = max(t$rmt)
+mx_rmt = max(t[t$pct == 95,]$rmt)
 t$sjrn <- pmin(t$sjrn, 10*mx_rmt) # otherwise ggplot tries to plot all the way to 100k
 
 library(ggplot2)
 pb <- ggplot(data=t, aes(x=actual, y=rmt, color=server, linetype=op, shape=server))
 pb <- pb + facet_wrap(~ pct)
 pb <- pb + geom_point(size = 0.7, alpha = 0.8) + geom_line()
+pb <- pb + coord_trans(x = "identity", y = "identity", limy=c(0, mx_rmt))
 pb <- pb + xlab("offered load (Mops/s)") + ylab("batch processing time (µs)") + ggtitle("Batch processing time")
 ggsave('plot-batch.png',plot=pb,width=10,height=4)
 
