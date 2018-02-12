@@ -32,7 +32,7 @@ struct ClientParameters<'a> {
     backend: &'a Backend,
     runtime: usize,
     articles: usize,
-    // TODO: ratio
+    read_percentage: usize,
     // TODO: distribution
 }
 
@@ -44,13 +44,38 @@ impl<'a> ClientParameters<'a> {
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
+        cmd.push("--write-every".into());
+        let write_every = match self.read_percentage {
+            0 => 1,
+            100 => {
+                // very rare
+                1_000_000_000_000
+            }
+            n => {
+                // 95 (%) == 1 in 20
+                // we want a whole number x such that 1-1/x ~= n/100
+                // so x - 1 = nx/100
+                // so x - nx/100 = 1
+                // so (1 - n/100) x = 1
+                // so x = 1 / (1 - n/100)
+                // so 1 / (100 - n)/100
+                // so 100 / (100 - n)
+                let div = 100usize.checked_sub(n).expect("percentage >= 100");
+                if 100 % div != 0 {
+                    panic!("{}% cannot be expressed as 1 in n", n);
+                }
+                100 / div
+            }
+        };
+        cmd.push(format!("{}", write_every).into());
     }
 
     fn name(&self, target: usize, ext: &str) -> String {
         format!(
-            "{}.{}a.{}t.{}",
+            "{}.{}a.{}t.{}r.{}",
             self.backend.uniq_name(),
             self.articles,
+            self.read_percentage,
             target,
             ext
         )
@@ -86,6 +111,13 @@ fn main() {
                 .default_value("20")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("read_percentage")
+                .short("p")
+                .default_value("95")
+                .takes_value(true)
+                .help("The percentage of operations that are reads"),
         )
         .subcommand(
             SubCommand::with_name("ec2")
@@ -143,6 +175,7 @@ fn main() {
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
+    let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
 
     let mut server = None;
     let mut clients = Vec::new();
@@ -532,6 +565,7 @@ fn main() {
             backend: &backend,
             listen_addr,
             runtime,
+            read_percentage,
             articles,
         };
 

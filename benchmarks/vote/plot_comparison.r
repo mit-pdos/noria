@@ -8,6 +8,7 @@ for (arg in args) {
 	server = a[[1]]
 	articles = as.numeric(sub("a$", "", a[[2]]))
 	target = as.numeric(sub("t$", "", a[[3]]))
+	#read_perc = as.numeric(sub("r$", "", a[[4]]))
 
 	con <- file(arg, open = "r")
 	actual = 0
@@ -35,6 +36,7 @@ for (arg in args) {
 	ts$articles = articles
 	ts$target = target
 	ts$actual = actual
+	#ts$readp = read_perc
 	ts <- data.frame(ts)
 
 	t <- rbind(t, ts)
