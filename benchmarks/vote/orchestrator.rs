@@ -389,12 +389,12 @@ fn main() {
     let backends = vec![
         Backend::Netsoup {
             workers: 2,
-            readers: 14,
+            readers: 32,
             shards: None,
         },
         Backend::Netsoup {
             workers: 2,
-            readers: 14,
+            readers: 32,
             shards: Some(2),
         },
         Backend::Mysql,
