@@ -194,8 +194,73 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
-        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
+        // this is going to seem a little stupid, but bear with me
+        // mssql has a bug where its performance drops off a cliff
+        // for queries with many parameters. so, if we have many
+        // parameter, we need to issue them in sub-batches.
+        //
+        // to figure out the size of the sub-batches, we find all
+        // the factors of the batch size, and pick the greatest one
+        // that's less than the performance cliff (~224 params).
+        //
+        // if we can't factor the batch size, or if the common factor
+        // is small, we issue batches of size threshold and then pay
+        // the extra cost of doing another query that isn't prepared
+        // (i.e., it will have a different # of parameters).
+        let nids = ids.len();
+        let threshold = 200;
+        if nids > threshold {
+            let sbs = 'find: loop {
+                let mut f = 2;
+                let mut end = ::std::cmp::min(threshold, (nids as f64).sqrt().floor() as usize);
+                let step = if nids % 2 == 1 {
+                    // odd numbers can't have even factors
+                    if nids % 2 == 1 {
+                        f = 3;
+                    }
+                    2
+                } else {
+                    1
+                };
 
+                while f < end {
+                    if nids % f == 0 {
+                        let other_f = nids / f;
+                        if other_f < threshold {
+                            break 'find nids / f;
+                        }
+                    }
+                    f += step;
+                }
+                break 1;
+            };
+
+            // if the chosen batch size is small, then we have to do extra RTTs
+            // that's bad. we have to weigh that against the cost of an extra
+            // prepare. let's say that 1 RTT = 1 prepare, so:
+            let min_batches = (nids + threshold - 1) / threshold;
+            let sbs_batches = nids / sbs;
+
+            let mut i = 0;
+            if sbs_batches > min_batches + 1 {
+                // batch size doesn't divide nicely, so just issue
+                // large batches + one overflow batch.
+                while i < nids {
+                    let end = ::std::cmp::min(i + threshold, nids);
+                    self.handle_reads(&ids[i..end]);
+                    i += end;
+                }
+            } else {
+                // read in batches of size sbs
+                while i < nids {
+                    self.handle_reads(&ids[i..(i + sbs)]);
+                    i += sbs;
+                }
+            }
+            return;
+        }
+
+        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
         let vals = (0..ids.len())
             .map(|i| format!("@P{}", i + 1))
             .collect::<Vec<_>>()
