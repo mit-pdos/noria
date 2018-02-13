@@ -211,12 +211,16 @@ impl VoteClient for Client {
         let threshold = 200;
         if nids > threshold {
             let sbs = 'find: loop {
-                let mut f = 2;
+                // there's no reason to try factors that would produce overly large batches
+                let mut f = ::std::cmp::max(nids / threshold, 2);
+                // also no reason to go past sqrt, since we've already the inverses of those.
+                // well, that's only kind of true. could be a good batch size there, but it would
+                // likely be much smaller than threshold, so we'd end up not using it anyway.
                 let mut end = ::std::cmp::min(threshold, (nids as f64).sqrt().floor() as usize);
                 let step = if nids % 2 == 1 {
                     // odd numbers can't have even factors
-                    if nids % 2 == 1 {
-                        f = 3;
+                    if nids % 2 == 1 && f % 2 == 0 {
+                        f += 1;
                     }
                     2
                 } else {
