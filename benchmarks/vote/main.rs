@@ -12,6 +12,7 @@ extern crate rand;
 extern crate rayon;
 extern crate tiberius;
 extern crate tokio_core;
+extern crate zipf;
 
 use hdrsample::Histogram;
 use rand::Rng;
@@ -113,7 +114,12 @@ where
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
         articles: articles,
-        ratio: value_t_or_exit!(global_args, "ratio", u32),
+    };
+
+    let skewed = match global_args.value_of("distribution") {
+        Some("skewed") => true,
+        Some("uniform") => false,
+        _ => unreachable!(),
     };
 
     let mut c = C::new(&params, local_args);
@@ -205,7 +211,13 @@ where
             thread::Builder::new()
                 .name(format!("load-gen{}", geni))
                 .spawn(move || {
-                    let ops = run_generator(pool, clients, target, global_args);
+                    let rng = rand::thread_rng();
+                    let ops = if skewed {
+                        let rng = zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap();
+                        run_generator(pool, clients, rng, target, global_args)
+                    } else {
+                        run_generator(pool, clients, rng, target, global_args)
+                    };
                     finished.wait();
                     ops
                 })
@@ -290,14 +302,16 @@ where
     );
 }
 
-fn run_generator<C>(
+fn run_generator<C, R>(
     pool: Arc<rayon::ThreadPool>,
     clients: Arc<Vec<Mutex<C>>>,
+    mut id_rng: R,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
 where
     C: VoteClient + Send + 'static,
+    R: rand::Rng,
 {
     let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
@@ -372,7 +386,7 @@ where
 
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
-                let id = rng.gen_range(0, articles);
+                let id = id_rng.gen_range(0, articles);
                 if rng.gen_weighted_bool(every) {
                     queued_w_keys.push(id);
                     queued_w.push(now);
@@ -439,6 +453,13 @@ fn main() {
                 .value_name("N")
                 .default_value("15")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .possible_values(&["uniform", "skewed"])
+                .default_value("uniform")
+                .help("Key distribution"),
         )
         .arg(
             Arg::with_name("histogram")

@@ -2,8 +2,6 @@ use clap;
 
 pub(crate) struct Parameters {
     pub(crate) prime: bool,
-    #[allow(unused)]
-    pub(crate) ratio: u32,
     pub(crate) articles: usize,
 }
 
