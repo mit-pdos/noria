@@ -75,8 +75,8 @@ impl<'a> ClientParameters<'a> {
             "{}.{}a.{}t.{}r.{}",
             self.backend.uniq_name(),
             self.articles,
-            self.read_percentage,
             target,
+            self.read_percentage,
             ext
         )
     }
