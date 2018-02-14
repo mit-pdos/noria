@@ -4,7 +4,6 @@ use tiberius;
 use tokio_core::reactor;
 
 use clap;
-use std::time;
 
 use clients::{Parameters, VoteClient};
 
@@ -173,8 +172,8 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle_writes(&mut self, ids: &[(time::Instant, i32)]) {
-        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
+    fn handle_writes(&mut self, ids: &[i32]) {
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
 
         let vote_qstring = (0..ids.len())
             .map(|i| format!("(0, @P{})", i + 1))
@@ -193,7 +192,7 @@ impl VoteClient for Client {
         self.conn.conn = Some(conn);
     }
 
-    fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
+    fn handle_reads(&mut self, ids: &[i32]) {
         // this is going to seem a little stupid, but bear with me
         // mssql has a bug where its performance drops off a cliff
         // for queries with many parameters. so, if we have many
@@ -264,7 +263,7 @@ impl VoteClient for Client {
             return;
         }
 
-        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
         let vals = (0..ids.len())
             .map(|i| format!("@P{}", i + 1))
             .collect::<Vec<_>>()

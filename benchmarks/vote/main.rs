@@ -312,9 +312,11 @@ where
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let mut queued_w = Vec::new();
+    let mut queued_w_keys = Vec::new();
     let mut queued_r = Vec::new();
+    let mut queued_r_keys = Vec::new();
     {
-        let enqueue = |batch: Vec<_>, write| {
+        let enqueue = |queued: Vec<_>, keys: Vec<_>, write| {
             let clients = clients.clone();
             move || {
                 let tid = THREAD_ID.with(|tid| *tid.borrow());
@@ -324,9 +326,9 @@ where
 
                 let sent = time::Instant::now();
                 if write {
-                    client.handle_writes(&batch[..]);
+                    client.handle_writes(&keys[..]);
                 } else {
-                    client.handle_reads(&batch[..]);
+                    client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();
 
@@ -342,7 +344,7 @@ where
                 });
 
                 let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                for (started, _) in batch {
+                for started in queued {
                     let sjrn_t = done.duration_since(started);
                     let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
                     sjrn.with(|h| {
@@ -367,25 +369,35 @@ where
 
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
-                let q = (now, rng.gen_range(0, articles));
+                let id = rng.gen_range(0, articles);
                 if rng.gen_weighted_bool(every) {
-                    queued_w.push(q);
+                    queued_w_keys.push(id);
+                    queued_w.push(now);
                 } else {
-                    queued_r.push(q);
+                    queued_r_keys.push(id);
+                    queued_r.push(now);
                 }
 
                 now = time::Instant::now();
             }
 
             let now = time::Instant::now();
-            if !queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time {
+            if !queued_w.is_empty() && now.duration_since(queued_w[0]) > max_batch_time {
                 ops += queued_w.len();
-                pool.spawn(enqueue(queued_w.split_off(0), true));
+                pool.spawn(enqueue(
+                    queued_w.split_off(0),
+                    queued_w_keys.split_off(0),
+                    true,
+                ));
             }
 
-            if !queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time {
+            if !queued_r.is_empty() && now.duration_since(queued_r[0]) > max_batch_time {
                 ops += queued_r.len();
-                pool.spawn(enqueue(queued_r.split_off(0), false));
+                pool.spawn(enqueue(
+                    queued_r.split_off(0),
+                    queued_r_keys.split_off(0),
+                    false,
+                ));
             }
 
             atomic::spin_loop_hint();

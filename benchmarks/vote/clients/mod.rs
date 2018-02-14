@@ -1,5 +1,4 @@
 use clap;
-use std::time;
 
 pub(crate) struct Parameters {
     pub(crate) prime: bool,
@@ -13,8 +12,8 @@ pub(crate) trait VoteClient {
 
     fn new(&Parameters, &clap::ArgMatches) -> Self::Constructor;
     fn from(&mut Self::Constructor) -> Self;
-    fn handle_reads(&mut self, requests: &[(time::Instant, i32)]);
-    fn handle_writes(&mut self, requests: &[(time::Instant, i32)]);
+    fn handle_reads(&mut self, requests: &[i32]);
+    fn handle_writes(&mut self, requests: &[i32]);
 
     fn spawns_threads() -> bool {
         false

@@ -1,7 +1,6 @@
 use mysql::{self, Opts, OptsBuilder};
 
 use clap;
-use std::time;
 
 use clients::{Parameters, VoteClient};
 
@@ -87,8 +86,8 @@ impl VoteClient for Client {
         }
     }
 
-    fn handle_writes(&mut self, ids: &[(time::Instant, i32)]) {
-        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
+    fn handle_writes(&mut self, ids: &[i32]) {
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
 
         let vals = (0..ids.len())
             .map(|_| "(0, ?)")
@@ -103,8 +102,8 @@ impl VoteClient for Client {
         self.conn.prep_exec(vote_qstring, &ids).unwrap();
     }
 
-    fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
-        let ids = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
+    fn handle_reads(&mut self, ids: &[i32]) {
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
         let vals = (0..ids.len()).map(|_| "?").collect::<Vec<_>>().join(",");
 
         // NOTE: this is sort of unfair with skewed ids, since every row is only returned once
