@@ -316,7 +316,7 @@ where
     let mut queued_r = Vec::new();
     let mut queued_r_keys = Vec::new();
     {
-        let enqueue = |queued: Vec<_>, keys: Vec<_>, write| {
+        let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
             let clients = clients.clone();
             move || {
                 let tid = THREAD_ID.with(|tid| *tid.borrow());
@@ -328,6 +328,9 @@ where
                 if write {
                     client.handle_writes(&keys[..]);
                 } else {
+                    // deduplicate requested keys, because not doing so would be silly
+                    keys.sort_unstable();
+                    keys.dedup();
                     client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();

@@ -268,7 +268,6 @@ impl VoteClient for Client {
             .map(|i| format!("@P{}", i + 1))
             .collect::<Vec<_>>()
             .join(",");
-        // NOTE: this is sort of unfair with skewed ids, since every row is only returned once
         let qstring = format!(
             "SELECT id, title, votes FROM awvc WITH (NOEXPAND) WHERE id IN ({})",
             vals

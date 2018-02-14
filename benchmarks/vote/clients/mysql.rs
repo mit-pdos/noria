@@ -105,8 +105,6 @@ impl VoteClient for Client {
     fn handle_reads(&mut self, ids: &[i32]) {
         let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
         let vals = (0..ids.len()).map(|_| "?").collect::<Vec<_>>().join(",");
-
-        // NOTE: this is sort of unfair with skewed ids, since every row is only returned once
         let qstring = format!("SELECT id, title, votes FROM art WHERE id IN ({})", vals);
 
         let mut rows = 0;
