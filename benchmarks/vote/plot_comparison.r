@@ -51,18 +51,18 @@ mx_rmt = max(t[t$pct == 95,]$rmt)
 t$sjrn <- pmin(t$sjrn, 10*mx_rmt) # otherwise ggplot tries to plot all the way to 100k
 
 library(ggplot2)
-pb <- ggplot(data=t, aes(x=actual, y=rmt, color=server, linetype=op, shape=server))
+pb <- ggplot(data=t, aes(x=target, y=rmt, color=server, linetype=op, shape=server))
 pb <- pb + facet_wrap(~ pct)
 pb <- pb + geom_point(size = 0.7, alpha = 0.8) + geom_line()
 pb <- pb + coord_trans(x = "identity", y = "identity", limy=c(0, mx_rmt))
-pb <- pb + xlab("offered load (Mops/s)") + ylab("batch processing time (µs)") + ggtitle("Batch processing time")
+pb <- pb + xlab("target load (Mops/s)") + ylab("batch processing time (µs)") + ggtitle("Batch processing time")
 ggsave('plot-batch.png',plot=pb,width=10,height=4)
 
-ps <- ggplot(data=t, aes(x=actual, y=sjrn, color=server, linetype=op, shape=server))
+ps <- ggplot(data=t, aes(x=target, y=sjrn, color=server, linetype=op, shape=server))
 ps <- ps + coord_trans(x = "identity", y = "identity", limy=c(0, 1.2*mx_rmt))
 ps <- ps + facet_wrap(~ pct)
 ps <- ps + geom_point(size = 0.7, alpha = 0.8) + geom_line()
-ps <- ps + xlab("offered load (Mops/s)") + ylab("sojourn time (µs)") + ggtitle("Sojourn time")
+ps <- ps + xlab("target load (Mops/s)") + ylab("sojourn time (µs)") + ggtitle("Sojourn time")
 ggsave('plot-sjrn.png',plot=ps,width=10,height=4)
 
 library(plotly)
