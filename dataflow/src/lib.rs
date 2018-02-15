@@ -57,7 +57,6 @@ pub type Readers = Arc<
 pub type PersistenceParameters = persistence::Parameters;
 pub type DomainConfig = domain::Config;
 
-pub use persistence::DurabilityMode;
 pub use domain::{Domain, DomainBuilder, Index};
 pub use payload::{LocalBypass, Packet};
 pub use checktable::connect_thread_checktable;

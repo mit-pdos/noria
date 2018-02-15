@@ -1,6 +1,6 @@
 extern crate glob;
 
-use core::DataType;
+use core::{DataType, DurabilityMode};
 use dataflow::checktable::Token;
 use dataflow::ops::base::Base;
 use dataflow::ops::grouped::aggregate::Aggregation;
@@ -9,8 +9,8 @@ use dataflow::ops::join::{Join, JoinSource, JoinType};
 use dataflow::ops::join::JoinSource::*;
 use dataflow::ops::project::Project;
 use dataflow::ops::union::Union;
-use dataflow::{DurabilityMode, PersistenceParameters};
 use consensus::LocalAuthority;
+use dataflow::PersistenceParameters;
 use controller::ControllerBuilder;
 use controller::recipe::Recipe;
 use controller::sql::SqlIncorporator;
