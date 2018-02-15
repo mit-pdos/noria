@@ -628,6 +628,13 @@ fn main() {
                         .help("Enable durability for Base nodes"),
                 )
                 .arg(
+                    Arg::with_name("persist-bases")
+                        .long("persist-bases")
+                        .takes_value(false)
+                        .requires("durability")
+                        .help("Use SQlite for base nodes"),
+                )
+                .arg(
                     Arg::with_name("retain-logs-on-exit")
                         .long("retain-logs-on-exit")
                         .takes_value(false)

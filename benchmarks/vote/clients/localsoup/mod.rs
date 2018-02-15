@@ -37,6 +37,7 @@ impl VoteClient for Client {
         };
         persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
         persistence.log_prefix = "vote".to_string();
+        persistence.persist_base_nodes = args.is_present("persist-bases");
 
         // setup db
         let mut s = graph::Setup::default();
