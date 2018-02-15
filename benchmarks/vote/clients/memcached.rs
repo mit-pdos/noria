@@ -2,7 +2,6 @@ use memcached;
 use memcached::proto::{MultiOperation, ProtoType};
 
 use clap;
-use std::time;
 
 use clients::{Parameters, VoteClient};
 
@@ -22,10 +21,11 @@ impl VoteClient for Client {
                     .unwrap();
 
             let mut aid = 0;
-            assert_eq!(params.articles % params.max_batch_size, 0);
-            for _ in 0..params.articles / params.max_batch_size {
+            let bs = 1000;
+            assert_eq!(params.articles % bs, 0);
+            for _ in 0..params.articles / bs {
                 use std::collections::BTreeMap;
-                let articles: Vec<_> = (0..params.max_batch_size)
+                let articles: Vec<_> = (0..bs)
                     .map(|i| {
                         let article_id = aid + i;
                         (
@@ -43,7 +43,7 @@ impl VoteClient for Client {
                 }
                 c.set_multi(m).unwrap();
 
-                aid += params.max_batch_size;
+                aid += bs;
             }
         }
 
@@ -56,19 +56,19 @@ impl VoteClient for Client {
             .unwrap()
     }
 
-    fn handle_writes(&mut self, ids: &[(time::Instant, i32)]) {
+    fn handle_writes(&mut self, ids: &[i32]) {
         use std::collections::HashMap;
-        let keys: Vec<_> = ids.iter()
-            .map(|&(_, article_id)| format!("article_{}_vc", article_id))
+        let keys: Vec<_> = ids.into_iter()
+            .map(|article_id| format!("article_{}_vc", article_id))
             .collect();
         let ids: HashMap<_, _> = keys.iter().map(|key| (key.as_bytes(), (1, 0, 0))).collect();
         //self.set_raw(&format!("voted_{}_{}", user, id), b"1", 0, 0).unwrap();
         drop(self.0.increment_multi(ids));
     }
 
-    fn handle_reads(&mut self, ids: &[(time::Instant, i32)]) {
-        let keys: Vec<_> = ids.iter()
-            .flat_map(|&(_, ref article_id)| {
+    fn handle_reads(&mut self, ids: &[i32]) {
+        let keys: Vec<_> = ids.into_iter()
+            .flat_map(|article_id| {
                 vec![
                     format!("article_{}", article_id),
                     format!("article_{}_vc", article_id),
@@ -93,6 +93,6 @@ impl VoteClient for Client {
                 _ => {}
             }
         }
-        assert_eq!(rows, ids.len());
+        assert_eq!(rows, keys.len());
     }
 }

@@ -39,7 +39,20 @@ impl Ssh {
             port = p.parse().unwrap();
         }
 
-        let tcp = TcpStream::connect((server, port))?;
+        // try connecting a couple of times
+        let mut iter = 0;
+        let tcp = loop {
+            match TcpStream::connect((server, port)) {
+                Ok(s) => break Ok(s),
+                Err(_) if iter < 10 => {
+                    ::std::thread::sleep(::std::time::Duration::from_secs(1));
+                    iter += 1;
+                }
+                Err(e) => {
+                    break Err(e);
+                }
+            }
+        }?;
         let mut sess = Session::new().unwrap();
         sess.handshake(&tcp)?;
 
@@ -100,7 +113,9 @@ impl Ssh {
             })
             .collect();
         let cmd = cmd.join(" ");
-        eprintln!("    :> {}", cmd);
+        if cmd != "perflock" {
+            eprintln!("    :> {}", cmd);
+        }
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
         let cmd = format!("bash -c {}", shellwords::escape(&cmd));

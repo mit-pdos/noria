@@ -2,8 +2,14 @@
 
 #[macro_use]
 extern crate clap;
+extern crate ctrlc;
+extern crate rusoto_core;
+extern crate rusoto_ec2;
+extern crate rusoto_sts;
+extern crate scopeguard;
 extern crate shellwords;
 extern crate ssh2;
+extern crate timeout_readwrite;
 extern crate whoami;
 
 mod ssh;
@@ -18,13 +24,15 @@ use std::io::prelude::*;
 use std::error::Error;
 use std::borrow::Cow;
 
+const SOUP_AMI: &str = "ami-6d0f1c17";
+
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
     listen_addr: &'a str,
     backend: &'a Backend,
     runtime: usize,
     articles: usize,
-    // TODO: ratio
+    read_percentage: usize,
     // TODO: distribution
 }
 
@@ -36,14 +44,39 @@ impl<'a> ClientParameters<'a> {
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
+        cmd.push("--write-every".into());
+        let write_every = match self.read_percentage {
+            0 => 1,
+            100 => {
+                // very rare
+                2_000_000_000
+            }
+            n => {
+                // 95 (%) == 1 in 20
+                // we want a whole number x such that 1-1/x ~= n/100
+                // so x - 1 = nx/100
+                // so x - nx/100 = 1
+                // so (1 - n/100) x = 1
+                // so x = 1 / (1 - n/100)
+                // so 1 / (100 - n)/100
+                // so 100 / (100 - n)
+                let div = 100usize.checked_sub(n).expect("percentage >= 100");
+                if 100 % div != 0 {
+                    panic!("{}% cannot be expressed as 1 in n", n);
+                }
+                100 / div
+            }
+        };
+        cmd.push(format!("{}", write_every).into());
     }
 
     fn name(&self, target: usize, ext: &str) -> String {
         format!(
-            "{}.{}a.{}t.{}",
+            "{}.{}a.{}t.{}r.{}",
             self.backend.uniq_name(),
             self.articles,
             target,
+            self.read_percentage,
             ext
         )
     }
@@ -56,25 +89,18 @@ struct HostDesc<'a> {
 }
 
 fn main() {
-    use clap::{App, Arg};
+    use clap::{App, Arg, SubCommand};
 
     let args = App::new("vote-orchestrator")
         .version("0.1")
         .about("Orchestrate many runs of the vote benchmark")
-        .arg(
-            Arg::with_name("addr")
-                .long("address")
-                // 172.16.0.29
-                .default_value("127.0.0.1")
-                .required(true)
-                .help("Listening address for server"),
-        )
         .arg(
             Arg::with_name("articles")
                 .short("a")
                 .long("articles")
                 .value_name("N")
                 .default_value("100000")
+                .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
         )
         .arg(
@@ -83,36 +109,325 @@ fn main() {
                 .long("runtime")
                 .value_name("N")
                 .default_value("20")
+                .takes_value(true)
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
-            Arg::with_name("server")
-                .help("Sets a host to use as the server")
-                .required(true)
-                .index(1),
+            Arg::with_name("read_percentage")
+                .short("p")
+                .default_value("95")
+                .takes_value(true)
+                .help("The percentage of operations that are reads"),
         )
-        .arg(
-            Arg::with_name("client")
-                .help("Sets a host to use as a client ([user@]host[:port],threads)")
-                .required(true)
-                .multiple(true)
-                .index(2),
+        .subcommand(
+            SubCommand::with_name("ec2")
+                .about("run on ec2 spot blocks")
+                .arg(
+                    Arg::with_name("stype")
+                        .long("server")
+                        .default_value("c5.large")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Instance type for server"),
+                )
+                .arg(
+                    Arg::with_name("ctype")
+                        .long("client")
+                        .default_value("c5.large")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Instance type for clients"),
+                )
+                .arg(
+                    Arg::with_name("clients")
+                        .long("clients")
+                        .short("c")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Number of client machines to spawn"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("manual")
+                .about("manually specify target machines")
+                .arg(
+                    Arg::with_name("addr")
+                        .long("address")
+                        .default_value("127.0.0.1")
+                        .required(true)
+                        .help("Listening address for server"),
+                )
+                .arg(
+                    Arg::with_name("server")
+                        .help("Sets a host to use as the server")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::with_name("client")
+                        .help("Sets a host to use as a client ([user@]host[:port],threads)")
+                        .required(true)
+                        .multiple(true)
+                        .index(2),
+                ),
         )
         .get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
+    let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
+
+    let mut server = None;
+    let mut clients = Vec::new();
+    let mut listen_addr = None;
+    let mut ec2_cleanup = None; // drop guard that terminates instances
+
+    match args.subcommand() {
+        ("manual", Some(args)) => {
+            server = Some(args.value_of("server").unwrap().to_string());
+            clients = args.values_of("client")
+                .unwrap()
+                .into_iter()
+                .map(|c| c.to_string())
+                .collect();
+            listen_addr = Some(args.value_of("addr").unwrap().to_string());
+        }
+        ("ec2", Some(args)) => {
+            use rusoto_core::{EnvironmentProvider, Region};
+            use rusoto_core::default_tls_client;
+            use rusoto_ec2::{Ec2, Ec2Client};
+            use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
+
+            let nclients = value_t_or_exit!(args, "clients", i64);
+
+            // guess the core count
+            let cores = args.value_of("ctype")
+                .and_then(ec2_instance_type_cores)
+                .map(|cores| {
+                    // one core for load generators to be on the safe side
+                    match cores {
+                        1 => 1,
+                        2 => 1,
+                        n => n - 1,
+                    }
+                });
+
+            if cores.is_none() {
+                eprintln!(
+                    "unknown core count for client instance type {}",
+                    args.value_of("ctype").unwrap()
+                );
+                return;
+            }
+            let cores = cores.unwrap();
+
+            // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
+            let sts = StsClient::new(
+                default_tls_client().unwrap(),
+                EnvironmentProvider,
+                Region::UsEast1,
+            );
+            let provider = StsAssumeRoleSessionCredentialsProvider::new(
+                sts,
+                "arn:aws:sts::125163634912:role/soup".to_owned(),
+                "vote-benchmark".to_owned(),
+                None,
+                None,
+                None,
+                None,
+            );
+
+            let ec2 = Ec2Client::new(default_tls_client().unwrap(), provider, Region::UsEast1);
+            let mut all_spot_requests = Vec::new();
+
+            let mut template = rusoto_ec2::RequestSpotInstancesRequest::default();
+            template.block_duration_minutes = Some(60);
+            let mut launch = rusoto_ec2::RequestSpotLaunchSpecification::default();
+            launch.image_id = Some(SOUP_AMI.to_string());
+            launch.instance_type = Some(args.value_of("stype").unwrap().to_string());
+            launch.security_groups = Some(vec!["pdos-ssh".to_string(), "vpc-internal".to_string()]);
+            launch.key_name = Some("jfrg-old".to_string());
+            template.launch_specification = Some(launch);
+
+            // launch server
+            eprintln!("==> requesting ec2 spot instances");
+            match ec2.request_spot_instances(&template) {
+                Ok(requests) => {
+                    let requests = requests.spot_instance_requests.unwrap();
+                    let mut placement = rusoto_ec2::SpotPlacement::default();
+                    placement.availability_zone = requests[0].launched_availability_zone.clone();
+                    template.launch_specification.as_mut().unwrap().placement = Some(placement);
+                    all_spot_requests.extend(requests);
+                }
+                Err(e) => {
+                    eprintln!("failed to launch server instance: {}", e);
+                    return;
+                }
+            }
+
+            // launch clients
+            template
+                .launch_specification
+                .as_mut()
+                .unwrap()
+                .instance_type = Some(args.value_of("ctype").unwrap().to_string());
+            template.instance_count = Some(nclients);
+            match ec2.request_spot_instances(&template) {
+                Ok(requests) => {
+                    let requests = requests.spot_instance_requests.unwrap();
+                    all_spot_requests.extend(requests);
+                }
+                Err(e) => {
+                    eprintln!("failed to launch client instances: {}", e);
+                }
+            }
+
+            let mut request_ids: Vec<_> = all_spot_requests
+                .into_iter()
+                .map(|r| r.spot_instance_request_id.unwrap())
+                .collect();
+
+            // wait for them all to launch
+            let ec2_instances: Vec<_>;
+            eprintln!("==> waiting for all instances to start");
+            let mut desc = rusoto_ec2::DescribeSpotInstanceRequestsRequest::default();
+            desc.spot_instance_request_ids = Some(request_ids.clone());
+            loop {
+                match ec2.describe_spot_instance_requests(&desc) {
+                    Ok(reqs) => {
+                        let reqs = reqs.spot_instance_requests.unwrap();
+                        if reqs.iter().any(|req| req.state.as_ref().unwrap() == "open") {
+                            continue;
+                        }
+
+                        // server comes first
+                        assert_eq!(
+                            reqs[0].spot_instance_request_id.as_ref().unwrap(),
+                            &request_ids[0]
+                        );
+                        ec2_instances =
+                            reqs.into_iter().filter_map(|req| req.instance_id).collect();
+                        break;
+                    }
+                    Err(e) => {
+                        let e = format!("failed to describe spot instances: {}", e);
+                        if !e.contains("does not exist") {
+                            eprintln!("{}", e);
+                        }
+                    }
+                }
+            }
+
+            // stop all the requests so more instances aren't created
+            let mut c = rusoto_ec2::CancelSpotInstanceRequestsRequest::default();
+            c.spot_instance_request_ids = request_ids;
+            while let Err(e) = ec2.cancel_spot_instance_requests(&c) {
+                eprintln!("failed to stop requests: {}; retrying", e);
+            }
+
+            // make sure we got what we asked for
+            if ec2_instances.len() as i64 != nclients + 1 {
+                eprintln!(
+                    "only {} instances were created. exiting...",
+                    ec2_instances.len()
+                );
+                let mut c = rusoto_ec2::TerminateInstancesRequest::default();
+                c.instance_ids = ec2_instances;
+                while let Err(e) = ec2.terminate_instances(&c) {
+                    eprintln!("failed to terminate requests: {}; retrying", e);
+                }
+                return;
+            }
+
+            // collect the various hosts to connect to
+            'retry: loop {
+                let mut c = rusoto_ec2::DescribeInstancesRequest::default();
+                c.instance_ids = Some(ec2_instances.clone());
+                match ec2.describe_instances(&c) {
+                    Ok(instances) => {
+                        for res in instances.reservations.unwrap() {
+                            for instance in res.instances.unwrap() {
+                                if instance
+                                    .public_dns_name
+                                    .as_ref()
+                                    .map(|n| n.is_empty())
+                                    .unwrap_or(true)
+                                {
+                                    // no dns name yet -- retry
+                                    clients.clear();
+                                    continue 'retry;
+                                }
+
+                                if instance.instance_id.as_ref().unwrap() == &ec2_instances[0] {
+                                    // server
+                                    server = Some(format!(
+                                        "ec2-user@{}",
+                                        instance.public_dns_name.as_ref().unwrap()
+                                    ));
+                                    listen_addr =
+                                        Some(instance.private_ip_address.clone().unwrap());
+                                } else {
+                                    // client
+                                    clients.push(format!(
+                                        "ec2-user@{},{}",
+                                        instance.public_dns_name.as_ref().unwrap(),
+                                        cores
+                                    ));
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("failed to get instance info: {}", e);
+                    }
+                }
+            }
+
+            ec2_cleanup = Some(scopeguard::guard((), move |_| {
+                let mut c = rusoto_ec2::TerminateInstancesRequest::default();
+                // clone b/c https://github.com/bluss/scopeguard/issues/15
+                c.instance_ids = ec2_instances.clone();
+                while let Err(e) = ec2.terminate_instances(&c) {
+                    let x = format!("{}", e);
+                    if !x.contains("broken pipe") && !x.contains("stream disconnected") {
+                        // we're going to get a bunch of "broken pipe" things first
+                        // because we've been running for so long.
+                        eprintln!("failed to terminate instances: {}; retrying", e);
+                    }
+                }
+            }));
+        }
+        ("", None) => {
+            eprintln!("Must specify manual or ec2 run mode");
+            return;
+        }
+        _ => unreachable!(),
+    }
+
+    if server.is_none() {
+        eprintln!("no server chosen");
+        return;
+    }
+    let server = server.unwrap();
+    let server_host = &server;
+    let listen_addr = listen_addr.unwrap();
+    let listen_addr = &listen_addr;
+    if clients.is_empty() {
+        eprintln!("no clients chosen");
+        return;
+    }
 
     // what backends are we benchmarking?
     let backends = vec![
         Backend::Netsoup {
             workers: 2,
-            readers: 16,
+            readers: 32,
             shards: None,
         },
         Backend::Netsoup {
             workers: 2,
-            readers: 16,
+            readers: 32,
             shards: Some(2),
         },
         Backend::Mysql,
@@ -122,15 +437,34 @@ fn main() {
 
     // make sure we can connect to the server
     eprintln!("==> connecting to server");
-    let server = Ssh::connect(args.value_of("server").unwrap()).unwrap();
+    let server = Ssh::connect(server_host).unwrap();
 
     let server_has_pl = server.just_exec(&["perflock"]).unwrap().is_ok();
-    eprintln!(" -> perflock? {:?}", server_has_pl);
+
+    if let ("ec2", Some(args)) = args.subcommand() {
+        let scores = args.value_of("stype")
+            .and_then(ec2_instance_type_cores)
+            .expect("could not determine server core count");
+        eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
+        server
+            .just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])
+            .unwrap()
+            .is_ok();
+
+        // TODO: memcached cache size?
+        // TODO: mssql setup?
+        // TODO: mariadb params?
+        let optstr = format!("/OPTIONS=/ s/\"$/ -t {}\"/", scores);
+        server
+            .just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])
+            .unwrap()
+            .is_ok();
+    }
 
     // connect to each of the clients
     eprintln!("==> connecting to clients");
-    let clients: Vec<_> = args.values_of("client")
-        .unwrap()
+    let clients: Vec<_> = clients
+        .iter()
         .map(|client| {
             let mut parts = client.split(',');
             let client = parts.next().unwrap();
@@ -143,10 +477,9 @@ fn main() {
                     })
                 })?;
 
-            eprintln!(" -> {}", client);
+            eprintln!(" -> {} with {} cores", client, threads);
             Ssh::connect(client).map(|ssh| {
                 let has_perflock = ssh.just_exec(&["perflock"]).unwrap().is_ok();
-                eprintln!(" .. connected; perflock? {:?}", has_perflock);
                 (
                     ssh,
                     HostDesc {
@@ -198,7 +531,17 @@ fn main() {
         }
     }
 
-    let listen_addr = args.value_of("addr").unwrap();
+    // if the user wants us to terminate, finish whatever we're currently doing first
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    if let Err(e) = ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }) {
+        eprintln!("==> failed to set ^C handler: {}", e);
+    }
+
     for backend in backends {
         eprintln!("==> {}", backend.uniq_name());
 
@@ -222,12 +565,13 @@ fn main() {
             backend: &backend,
             listen_addr,
             runtime,
+            read_percentage,
             articles,
         };
 
         let targets = [
-            5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 2_000_000, 3_000_000, 4_000_000,
-            8_000_000, 12_000_000,
+            100_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000,
+            12_000_000, 14_000_000,
         ];
         // TODO: run more iterations
         for (i, &target) in targets.iter().enumerate() {
@@ -246,15 +590,58 @@ fn main() {
                 // backend clearly couldn't handle the load, so don't run higher targets
                 break;
             }
+
+            if !running.load(Ordering::SeqCst) {
+                // user pressed ^C
+                break;
+            }
         }
 
         eprintln!(" -> stopping server");
         s.end(&backend).unwrap();
         eprintln!(" .. server stopped ");
+
+        if !running.load(Ordering::SeqCst) {
+            // user pressed ^C
+            break;
+        }
     }
+
+    if !running.load(Ordering::SeqCst) {
+        eprintln!("==> terminating early due to ^C");
+    }
+
+    if ec2_cleanup.is_some() {
+        use std::{io, time};
+        eprintln!("==> about to terminate ec2 instances -- press enter to interrupt");
+        match timeout_readwrite::TimeoutReader::new(
+            io::stdin(),
+            Some(time::Duration::from_secs(1 * 60)),
+        ).read(&mut [0u8])
+        {
+            Ok(_) => {
+                // user pressed enter to interrupt
+                // show all the host addresses, and let them do their thing
+                // then wait for an enter to actually terminate
+                eprintln!(" -> delaying shutdown, here are the hosts:");
+                eprintln!("server: {}", server_host);
+                for &(_, ref desc) in &clients {
+                    eprintln!("client: {}", desc.name);
+                }
+                eprintln!(" -> press enter to terminate all instances");
+                io::stdin().read(&mut [0u8]).is_ok();
+            }
+            Err(_) => {
+                // doesn't really matter what the error was
+                // we should shutdown immediately (which we do by not waiting...)
+            }
+        }
+    }
+
+    drop(ec2_cleanup);
 }
 
-// returns true if backend handled load fine
+// returns true if next target is feasible
 fn run_clients(
     clients: &Vec<(Ssh, HostDesc)>,
     server: &mut server::Server,
@@ -273,6 +660,8 @@ fn run_clients(
         if host.has_perflock {
             cmd.push("perflock".into());
         }
+        cmd.push("env".into());
+        cmd.push("RUST_BACKTRACE=1".into());
         cmd.push("multiclient.sh".into());
         prime_params.add_params(&mut cmd);
         cmd.push("--threads".into());
@@ -355,6 +744,7 @@ fn run_clients(
 
     // let's see how we did
     let mut overloaded = None;
+    let mut any_not_overloaded = false;
     use std::fs::File;
     let fname = params.name(target, "log");
     let mut outf = File::create(&fname);
@@ -386,6 +776,8 @@ fn run_clients(
 
             if is_overloaded {
                 eprintln!(" !! client {} was overloaded", host.name);
+            } else {
+                any_not_overloaded = true;
             }
 
             let was_overloaded = overloaded.unwrap_or(false);
@@ -418,5 +810,17 @@ fn run_clients(
         }
     }
 
-    !overloaded.unwrap_or(false)
+    any_not_overloaded
+}
+
+fn ec2_instance_type_cores(it: &str) -> Option<u16> {
+    it.rsplitn(2, '.').next().and_then(|itype| match itype {
+        "nano" | "micro" | "small" => Some(1),
+        "medium" | "large" => Some(2),
+        t if t.ends_with("xlarge") => {
+            let mult = t.trim_right_matches("xlarge").parse::<u16>().unwrap_or(1);
+            Some(4 * mult)
+        }
+        _ => None,
+    })
 }

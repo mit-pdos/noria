@@ -12,6 +12,7 @@ extern crate rand;
 extern crate rayon;
 extern crate tiberius;
 extern crate tokio_core;
+extern crate zipf;
 
 use hdrsample::Histogram;
 use rand::Rng;
@@ -30,8 +31,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_SIZE: usize = 1000;
-const MAX_BATCH_TIME_US: u32 = 100;
+const MAX_BATCH_TIME_US: u32 = 1000;
 
 fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
     use std::mem;
@@ -114,8 +114,12 @@ where
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
         articles: articles,
-        max_batch_size: MAX_BATCH_SIZE,
-        ratio: value_t_or_exit!(global_args, "ratio", u32),
+    };
+
+    let skewed = match global_args.value_of("distribution") {
+        Some("skewed") => true,
+        Some("uniform") => false,
+        _ => unreachable!(),
     };
 
     let mut c = C::new(&params, local_args);
@@ -207,7 +211,13 @@ where
             thread::Builder::new()
                 .name(format!("load-gen{}", geni))
                 .spawn(move || {
-                    let ops = run_generator(pool, clients, target, global_args);
+                    let rng = rand::thread_rng();
+                    let ops = if skewed {
+                        let rng = zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap();
+                        run_generator(pool, clients, rng, target, global_args)
+                    } else {
+                        run_generator(pool, clients, rng, target, global_args)
+                    };
                     finished.wait();
                     ops
                 })
@@ -292,14 +302,16 @@ where
     );
 }
 
-fn run_generator<C>(
+fn run_generator<C, R>(
     pool: Arc<rayon::ThreadPool>,
     clients: Arc<Vec<Mutex<C>>>,
+    mut id_rng: R,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
 where
     C: VoteClient + Send + 'static,
+    R: rand::Rng,
 {
     let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
@@ -313,10 +325,12 @@ where
     // TODO: warmup
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
-    let mut queued_w = Vec::with_capacity(MAX_BATCH_SIZE);
-    let mut queued_r = Vec::with_capacity(MAX_BATCH_SIZE);
+    let mut queued_w = Vec::new();
+    let mut queued_w_keys = Vec::new();
+    let mut queued_r = Vec::new();
+    let mut queued_r_keys = Vec::new();
     {
-        let enqueue = |batch: Vec<_>, write| {
+        let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
             let clients = clients.clone();
             move || {
                 let tid = THREAD_ID.with(|tid| *tid.borrow());
@@ -326,9 +340,12 @@ where
 
                 let sent = time::Instant::now();
                 if write {
-                    client.handle_writes(&batch[..]);
+                    client.handle_writes(&keys[..]);
                 } else {
-                    client.handle_reads(&batch[..]);
+                    // deduplicate requested keys, because not doing so would be silly
+                    keys.sort_unstable();
+                    keys.dedup();
+                    client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();
 
@@ -344,7 +361,7 @@ where
                 });
 
                 let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                for (started, _) in batch {
+                for started in queued {
                     let sjrn_t = done.duration_since(started);
                     let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
                     sjrn.with(|h| {
@@ -369,29 +386,35 @@ where
 
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
-                let q = (now, rng.gen_range(0, articles));
+                let id = id_rng.gen_range(0, articles);
                 if rng.gen_weighted_bool(every) {
-                    queued_w.push(q);
+                    queued_w_keys.push(id);
+                    queued_w.push(now);
                 } else {
-                    queued_r.push(q);
+                    queued_r_keys.push(id);
+                    queued_r.push(now);
                 }
 
                 now = time::Instant::now();
             }
 
             let now = time::Instant::now();
-            if queued_w.len() >= MAX_BATCH_SIZE
-                || (!queued_w.is_empty() && now.duration_since(queued_w[0].0) > max_batch_time)
-            {
+            if !queued_w.is_empty() && now.duration_since(queued_w[0]) > max_batch_time {
                 ops += queued_w.len();
-                pool.spawn(enqueue(queued_w.split_off(0), true));
+                pool.spawn(enqueue(
+                    queued_w.split_off(0),
+                    queued_w_keys.split_off(0),
+                    true,
+                ));
             }
 
-            if queued_r.len() >= MAX_BATCH_SIZE
-                || (!queued_r.is_empty() && now.duration_since(queued_r[0].0) > max_batch_time)
-            {
+            if !queued_r.is_empty() && now.duration_since(queued_r[0]) > max_batch_time {
                 ops += queued_r.len();
-                pool.spawn(enqueue(queued_r.split_off(0), false));
+                pool.spawn(enqueue(
+                    queued_r.split_off(0),
+                    queued_r_keys.split_off(0),
+                    false,
+                ));
             }
 
             atomic::spin_loop_hint();
@@ -430,6 +453,13 @@ fn main() {
                 .value_name("N")
                 .default_value("15")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .possible_values(&["uniform", "skewed"])
+                .default_value("uniform")
+                .help("Key distribution"),
         )
         .arg(
             Arg::with_name("histogram")

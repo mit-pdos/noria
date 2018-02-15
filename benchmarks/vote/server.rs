@@ -33,25 +33,26 @@ impl<'a> ServerHandle<'a> {
 
                 let c_killed = server.just_exec(&["pkill", "-f", "target/release/controller"])?;
                 let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
-                if !c_killed.is_ok() || !w_killed.is_ok() {
-                    unimplemented!();
+
+                if !c_killed.is_ok() {
+                    let mut cstdout = String::new();
+                    let mut cstderr = String::new();
+                    c.stderr().read_to_string(&mut cstderr)?;
+                    c.read_to_string(&mut cstdout)?;
+                    println!("controller died");
+                    println!("{}", cstdout);
+                    println!("{}", cstderr);
                 }
 
-                /*
-                let mut cstdout = String::new();
-                let mut cstderr = String::new();
-                c.stderr().read_to_string(&mut cstderr)?;
-                c.read_to_string(&mut cstdout)?;
-                println!("{}", cstdout);
-                println!("{}", cstderr);
-
-                let mut wstdout = String::new();
-                let mut wstderr = String::new();
-                w.stderr().read_to_string(&mut wstderr)?;
-                w.read_to_string(&mut wstdout)?;
-                println!("{}", wstdout);
-                println!("{}", wstderr);
-                */
+                if !w_killed.is_ok() {
+                    let mut wstdout = String::new();
+                    let mut wstderr = String::new();
+                    w.stderr().read_to_string(&mut wstderr)?;
+                    w.read_to_string(&mut wstdout)?;
+                    println!("souplet died");
+                    println!("{}", wstdout);
+                    println!("{}", wstderr);
+                }
 
                 c.wait_eof()?;
                 w.wait_eof()?;
@@ -118,13 +119,14 @@ impl<'a> Server<'a> {
     pub(crate) fn wait(&mut self, client: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
         if let Backend::Netsoup { .. } = *backend {
             // netsoup *worker* doesn't have a well-defined port :/
-            thread::sleep(time::Duration::from_secs(5));
+            thread::sleep(time::Duration::from_secs(10));
             return Ok(());
         }
 
         let start = time::Instant::now();
-        client.set_timeout(2000);
-        while start.elapsed() < time::Duration::from_secs(5) {
+        client.set_timeout(10000);
+        // sql server can be *really* slow to start b/c EBS is slow
+        while start.elapsed() < time::Duration::from_secs(5 * 60) {
             let e: Result<(), ssh2::Error> = do catch {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
@@ -195,7 +197,7 @@ impl<'a> Server<'a> {
                     "soup",
                     "soup",
                     "<",
-                    "distributary/mysql_stat.sql",
+                    "distributary/benchmarks/vote/mysql_stat.sql",
                 ])?;
 
                 w.write_all(b"tables:\n")?;
@@ -213,7 +215,7 @@ impl<'a> Server<'a> {
                     "-U",
                     "SA",
                     "-i",
-                    "distributary/mssql_stat.sql",
+                    "distributary/benchmarks/vote/mssql_stat.sql",
                     // assume password is set in SQLCMDPASSWORD
                     "-S",
                     "127.0.0.1",
@@ -260,6 +262,13 @@ pub(crate) fn start<'a>(
                 Err(e) => return Err(e),
             }
 
+            // wipe zookeeper state
+            match server.just_exec(&["sudo", "rm", "-rf", "/var/zookeeper/version-2"]) {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => return Ok(Err(e)),
+                Err(e) => return Err(e),
+            }
+
             // now that server components have been built, start zookeeper
             match server.just_exec(&["sudo", "systemctl", "start", "zookeeper"]) {
                 Ok(Ok(_)) => {}
@@ -270,10 +279,11 @@ pub(crate) fn start<'a>(
             // wait for zookeeper to be running
             let start = time::Instant::now();
             while server
-                .just_exec(&["nc", "-z", "localhost", "2181"])?
+                .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
                 .is_err()
             {
-                if start.elapsed() > time::Duration::from_secs(2) {
+                thread::sleep(time::Duration::from_secs(1));
+                if start.elapsed() > time::Duration::from_secs(10) {
                     Err("zookeeper wouldn't start")?;
                 }
             }

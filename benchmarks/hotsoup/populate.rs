@@ -16,25 +16,16 @@ macro_rules! dur_to_fsec {
 
 fn do_put<'a>(mutator: &'a mut Mutator, tx: bool) -> Box<FnMut(Vec<DataType>) + 'a> {
     match tx {
-        true => Box::new(move |v| {
-            assert!(mutator.transactional_put(v, Token::empty()).is_ok())
-        }),
+        true => Box::new(move |v| assert!(mutator.transactional_put(v, Token::empty()).is_ok())),
         false => Box::new(move |v| assert!(mutator.put(v).is_ok())),
     }
 }
 
-fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
+fn populate_table(backend: &mut Backend, data: &Path, use_txn: bool) -> usize {
     use std::str::FromStr;
 
     let table_name = data.file_stem().unwrap().to_str().unwrap();
-    let mut putter = backend.g.get_mutator(
-        backend
-            .r
-            .as_ref()
-            .unwrap()
-            .node_addr_for(table_name)
-            .unwrap(),
-    );
+    let mut putter = backend.g.get_mutator(backend.inputs[table_name]).unwrap();
 
     let f = File::open(data).unwrap();
     let mut reader = BufReader::new(f);
@@ -69,7 +60,7 @@ fn populate_table(backend: &Backend, data: &Path, use_txn: bool) -> usize {
     i as usize
 }
 
-pub fn populate(backend: &Backend, data_location: &str, use_txn: bool) -> io::Result<()> {
+pub fn populate(backend: &mut Backend, data_location: &str, use_txn: bool) -> io::Result<()> {
     use std::fs;
 
     let dir = Path::new(data_location);

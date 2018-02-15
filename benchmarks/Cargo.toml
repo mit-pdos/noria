@@ -33,7 +33,7 @@ shellwords = "0.1"
 clap = "2.25.0"
 # distributions
 rand = "0.3.15"
-zipf = "0.2.0"
+zipf = "1.0.0"
 # sampling
 hdrsample = "6.0.0"
 # mssql
@@ -52,6 +52,13 @@ bufstream = { version = "0.1.3", optional = true }
 # futures
 futures = { version ="0.1.14", optional = true }
 tokio-core = { version = "0.1.8", optional = true }
+# ec2
+rusoto_core = "0.31.0"
+rusoto_ec2 = "0.31.0"
+rusoto_sts = "0.31.0"
+scopeguard = "0.3.3"
+timeout-readwrite = "0.1"
+ctrlc = "3.1"
 
 [[bin]]
 name = "bank"
