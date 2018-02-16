@@ -81,6 +81,7 @@ impl SampleKeys {
         params
     }
 
+    #[allow(dead_code)]
     pub fn key_space(&mut self, query_name: &str) -> usize {
         let dedup = |mut vec: Vec<_>| -> usize {
             let set: HashSet<_> = vec.drain(..).collect(); // dedup
@@ -187,7 +188,6 @@ impl SampleKeys {
             s.clear();
         }
     }
-
 
     fn get_customers(&mut self, data_location: &str) {
         let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();

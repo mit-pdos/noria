@@ -14,7 +14,6 @@ pub struct Backend {
     blacklist: Vec<String>,
     r: String,
     inputs: BTreeMap<String, NodeIndex>,
-    outputs: BTreeMap<String, NodeIndex>,
     log: slog::Logger,
     g: ControllerHandle<LocalAuthority>,
 }
@@ -47,26 +46,19 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
     let mut g = b.build_local();
 
     let inputs = g.inputs();
-    let outputs = g.outputs();
 
     //recipe.enable_reuse(reuse);
     Box::new(Backend {
         blacklist: blacklisted_queries,
         r: String::new(),
         inputs: inputs,
-        outputs: outputs,
         log: log,
         g: g,
     })
 }
 
 impl Backend {
-    fn migrate(
-        &mut self,
-        schema_file: &str,
-        query_file: Option<&str>,
-        transactions: bool,
-    ) -> Result<(), String> {
+    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
         use std::fs::File;
 
@@ -295,7 +287,7 @@ fn main() {
         } else {
             Some(qf.1.to_str().unwrap())
         };
-        match backend.migrate(&sf.1.to_str().unwrap(), queries, transactional) {
+        match backend.migrate(&sf.1.to_str().unwrap(), queries) {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
                 let mut gf = File::create(graph_fname).unwrap();

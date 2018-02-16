@@ -35,7 +35,7 @@ pub struct Bank {
     debug_channel: Option<TcpListener>,
 }
 
-pub fn setup(transactions: bool) -> Box<Bank> {
+pub fn setup() -> Box<Bank> {
     let log = distributary::logger_pls();
 
     // set up graph
@@ -57,7 +57,7 @@ pub fn setup(transactions: bool) -> Box<Bank> {
                   QUERY balances: SELECT debits.acct_id, credits.total AS credit, debits.total AS debit \
                                   FROM credits JOIN debits ON (credits.acct_id = debits.acct_id);";
 
-    g.install_recipe(recipe.to_owned());
+    g.install_recipe(recipe.to_owned()).unwrap();
 
     let inputs = g.inputs();
     let outputs = g.outputs();
@@ -150,12 +150,14 @@ fn client(
         };
 
         //let mut get = |id: &DataType| if balances_get.supports_transactions() {
-        let mut get = |id: &DataType| if transactions {
-            balances_get.transactional_lookup(id).map(&f)
-        } else {
-            balances_get
-                .lookup(id, true)
-                .map(|rs| f((rs, Token::empty())))
+        let mut get = |id: &DataType| {
+            if transactions {
+                balances_get.transactional_lookup(id).map(&f)
+            } else {
+                balances_get
+                    .lookup(id, true)
+                    .map(|rs| f((rs, Token::empty())))
+            }
         };
 
         let mut num_requests = 1;
@@ -309,7 +311,6 @@ fn process_latencies(
     //     }
     // }
 
-
     // // Print average latencies.
     // let rl: u64 = read_latencies.iter().sum();
     // let wl: u64 = write_latencies.iter().sum();
@@ -442,7 +443,7 @@ fn main() {
     }
     // setup db
     println!("Attempting to set up bank");
-    let mut bank = setup(transactions);
+    let mut bank = setup();
 
     {
         let transfer_nid = bank.transfers;
