@@ -123,11 +123,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
     }
     g.set_sharding(s.sharding);
     g.set_persistence(persistence_params);
-    if s.local {
-        g.set_local_workers(s.nworkers);
-    } else {
-        g.set_nworkers(s.nworkers);
-    }
+    g.set_nworkers(s.nworkers);
     g.set_local_read_threads(s.nreaders);
     if s.logging {
         g.log_with(distributary::logger_pls());

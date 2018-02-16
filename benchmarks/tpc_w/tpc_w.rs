@@ -81,7 +81,7 @@ fn make(
     if disable_partial {
         b.disable_partial();
     }
-    b.set_local_workers(2);
+    b.set_nworkers(2);
 
     let mut g = b.build_local();
 

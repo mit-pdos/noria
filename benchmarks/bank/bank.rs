@@ -41,7 +41,7 @@ pub fn setup(transactions: bool) -> Box<Bank> {
     // set up graph
     let mut b = ControllerBuilder::default();
     b.log_with(log);
-    b.set_local_workers(2);
+    b.set_nworkers(2);
 
     //let debug_channel = g.create_debug_channel();
 
