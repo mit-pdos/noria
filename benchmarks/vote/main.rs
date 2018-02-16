@@ -169,7 +169,7 @@ where
         set_thread_affinity(bind_generator).unwrap();
     }
 
-    let pool = rayon::Configuration::new()
+    let pool = rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("client-{}", i))
         .num_threads(nthreads)
         .start_handler(|i| {
