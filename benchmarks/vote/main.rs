@@ -3,7 +3,7 @@ extern crate clap;
 extern crate distributary;
 extern crate futures;
 extern crate futures_state_stream;
-extern crate hdrsample;
+extern crate hdrhistogram;
 extern crate hwloc;
 extern crate libc;
 extern crate memcached;
@@ -14,7 +14,7 @@ extern crate tiberius;
 extern crate tokio_core;
 extern crate zipf;
 
-use hdrsample::Histogram;
+use hdrhistogram::Histogram;
 use rand::Rng;
 use std::io;
 use std::fs;
@@ -133,7 +133,7 @@ where
         .value_of("histogram")
         .and_then(|h| fs::File::open(h).ok())
     {
-        use hdrsample::serialization::Deserializer;
+        use hdrhistogram::serialization::Deserializer;
         let mut deserializer = Deserializer::new();
         (
             deserializer.deserialize(&mut f).unwrap(),
@@ -246,8 +246,8 @@ where
     if let Some(h) = global_args.value_of("histogram") {
         match fs::File::create(h) {
             Ok(mut f) => {
-                use hdrsample::serialization::Serializer;
-                use hdrsample::serialization::V2Serializer;
+                use hdrhistogram::serialization::Serializer;
+                use hdrhistogram::serialization::V2Serializer;
                 let mut s = V2Serializer::new();
                 s.serialize(&sjrn_w_t, &mut f).unwrap();
                 s.serialize(&sjrn_r_t, &mut f).unwrap();
