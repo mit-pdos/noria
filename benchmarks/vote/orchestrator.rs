@@ -1,3 +1,4 @@
+#![deny(unused_extern_crates)]
 #![feature(catch_expr)]
 
 #[macro_use]

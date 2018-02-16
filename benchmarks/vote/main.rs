@@ -1,3 +1,5 @@
+#![deny(unused_extern_crates)]
+
 #[macro_use]
 extern crate clap;
 extern crate distributary;

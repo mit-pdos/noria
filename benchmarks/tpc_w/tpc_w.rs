@@ -1,3 +1,5 @@
+#![deny(unused_extern_crates)]
+
 extern crate chrono;
 extern crate distributary;
 extern crate rand;
@@ -7,7 +9,6 @@ mod parameters;
 
 #[macro_use]
 extern crate clap;
-extern crate slog;
 
 use parameters::SampleKeys;
 use std::{thread, time};

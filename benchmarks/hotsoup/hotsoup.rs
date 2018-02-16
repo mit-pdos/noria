@@ -1,3 +1,5 @@
+#![deny(unused_extern_crates)]
+
 extern crate distributary;
 
 mod populate;
