@@ -6,6 +6,7 @@
 #![deny(unused_extern_crates)]
 
 extern crate arccstr;
+extern crate bincode;
 extern crate chrono;
 extern crate fnv;
 extern crate nom_sql;
@@ -16,7 +17,6 @@ extern crate rusqlite;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 
 pub mod addressing;
 pub mod data;
