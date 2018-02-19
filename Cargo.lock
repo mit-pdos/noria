@@ -460,7 +460,7 @@ dependencies = [
  "hyper 0.11.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "mio-pool 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio-pool 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
  "mysql 12.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=6c08e9c28caf40cc3014fd5eecee8d07fbf2023e)",
@@ -1029,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "mio-pool"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "mio 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2286,7 +2286,7 @@ dependencies = [
 "checksum miniz-sys 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "609ce024854aeb19a0ef7567d348aaa5a746b32fb72e336df7fcc16869d7e2b4"
 "checksum mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a637d1ca14eacae06296a008fa7ad955347e34efcb5891cfd8ba05491a37907e"
 "checksum mio 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)" = "7da01a5e23070d92d99b1ecd1cd0af36447c6fd44b0fe283c2db199fa136724f"
-"checksum mio-pool 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "56432be57f96b693d4100d3984f0f945b70fc9c5841560ce5ceb5f4f652a0eb5"
+"checksum mio-pool 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bdf53958b72b604bbe7bccbfca6b496be8ac2916b330738e0ff25f519d77aa15"
 "checksum miow 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3e690c5df6b2f60acd45d56378981e827ff8295562fc8d34f573deb267a59cd1"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum mysql 12.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "371dc85e8622e93b960a1bf265b72220d5e40bd7112f07d5b46e6514a948f37c"
