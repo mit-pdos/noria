@@ -1,7 +1,5 @@
 use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use clap;
-use std::time;
-use std::thread;
 
 use clients::{Parameters, VoteClient};
 use clients::localsoup::graph::RECIPE;
@@ -34,20 +32,10 @@ impl VoteClient for Client {
 
             ch.install_recipe(RECIPE.to_owned()).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
-
-            let pop_batch_size = 100;
-            assert_eq!(params.articles % pop_batch_size, 0);
-            for i in 0..params.articles / pop_batch_size {
-                let reali = pop_batch_size * i;
-                let data: Vec<Vec<DataType>> = (reali..reali + pop_batch_size)
-                    .map(|i| (i as i64, format!("Article #{}", i)))
-                    .map(|(id, title)| vec![id.into(), title.into()])
-                    .collect();
-                m.multi_put(data).unwrap();
-            }
-
-            // allow writes to propagate
-            thread::sleep(time::Duration::from_secs(1));
+            m.batch_put(
+                (0..params.articles)
+                    .map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()]),
+            ).unwrap();
         }
 
         args.value_of("zookeeper").unwrap().to_string()
