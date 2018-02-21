@@ -78,7 +78,8 @@ fn make(
     if disable_partial {
         b.disable_partial();
     }
-    b.set_nworkers(2);
+    b.set_worker_threads(2);
+    b.set_read_threads(1);
 
     let mut g = b.build_local();
 

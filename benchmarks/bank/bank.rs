@@ -43,7 +43,8 @@ pub fn setup() -> Box<Bank> {
     // set up graph
     let mut b = ControllerBuilder::default();
     b.log_with(log);
-    b.set_nworkers(2);
+    b.set_worker_threads(2);
+    b.set_read_threads(1);
 
     //let debug_channel = g.create_debug_channel();
 
