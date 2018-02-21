@@ -32,8 +32,6 @@ EXAMPLES:
 
 pub struct Bank {
     blender: ControllerHandle<LocalAuthority>,
-    transfers: distributary::NodeIndex,
-    balances: distributary::NodeIndex,
     debug_channel: Option<TcpListener>,
 }
 
@@ -62,20 +60,15 @@ pub fn setup() -> Box<Bank> {
 
     g.install_recipe(recipe.to_owned()).unwrap();
 
-    let inputs = g.inputs();
-    let outputs = g.outputs();
-
     Box::new(Bank {
         blender: g,
-        transfers: inputs["transfers"],
-        balances: outputs["balances"],
         debug_channel: None, // Some(debug_channel),
     })
 }
 
 impl Bank {
     fn getter(&mut self) -> distributary::RemoteGetter {
-        self.blender.get_getter(self.balances).unwrap()
+        self.blender.get_getter("balances").unwrap()
     }
     pub fn migrate(&mut self) {
         // XXX(malte): re-implement this
@@ -449,8 +442,7 @@ fn main() {
     let mut bank = setup();
 
     {
-        let transfer_nid = bank.transfers;
-        let mutator = bank.blender.get_mutator(transfer_nid).unwrap();
+        let mutator = bank.blender.get_mutator("transfers").unwrap();
         populate(naccounts, mutator, transactions);
     }
 
@@ -463,8 +455,7 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let transfers_nid = bank.transfers;
-                let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
+                let mutator = bank.blender.get_mutator("transfers").unwrap();
                 let balances_get = bank.getter();
 
                 thread::Builder::new()
@@ -492,8 +483,7 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-            let transfers_nid = bank.transfers;
-            let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
+            let mutator = bank.blender.get_mutator("transfers").unwrap();
             let balances_get = bank.getter();
             let debug_channel = bank.debug_channel.take();
             assert!(debug_channel.is_some());

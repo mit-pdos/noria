@@ -9,13 +9,11 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use std::collections::BTreeMap;
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex};
+use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
 
 pub struct Backend {
     blacklist: Vec<String>,
     r: String,
-    inputs: BTreeMap<String, NodeIndex>,
     log: slog::Logger,
     g: ControllerHandle<LocalAuthority>,
 }
@@ -45,15 +43,12 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
     if !partial {
         b.disable_partial();
     }
-    let mut g = b.build_local();
-
-    let inputs = g.inputs();
+    let g = b.build_local();
 
     //recipe.enable_reuse(reuse);
     Box::new(Backend {
         blacklist: blacklisted_queries,
         r: String::new(),
-        inputs: inputs,
         log: log,
         g: g,
     })

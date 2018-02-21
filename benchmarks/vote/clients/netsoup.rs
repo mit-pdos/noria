@@ -13,12 +13,10 @@ pub(crate) struct Client {
 type Handle = ControllerHandle<ZookeeperAuthority>;
 
 fn make_mutator(c: &mut Handle, view: &str) -> distributary::Mutator {
-    let view = c.inputs()[view];
     c.get_mutator(view).unwrap()
 }
 
 fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
-    let view = c.outputs()[view];
     c.get_getter(view).unwrap()
 }
 

@@ -25,7 +25,7 @@ fn populate_table(backend: &mut Backend, data: &Path, use_txn: bool) -> usize {
     use std::str::FromStr;
 
     let table_name = data.file_stem().unwrap().to_str().unwrap();
-    let mut putter = backend.g.get_mutator(backend.inputs[table_name]).unwrap();
+    let mut putter = backend.g.get_mutator(table_name).unwrap();
 
     let f = File::open(data).unwrap();
     let mut reader = BufReader::new(f);

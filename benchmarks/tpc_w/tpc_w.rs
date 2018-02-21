@@ -15,17 +15,14 @@ use std::{thread, time};
 use std::collections::HashMap;
 use rand::Rng;
 
-use std::collections::BTreeMap;
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex};
+use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
 
 pub struct Backend {
     r: String,
     g: ControllerHandle<LocalAuthority>,
-    inputs: BTreeMap<String, NodeIndex>,
-    outputs: BTreeMap<String, NodeIndex>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
@@ -119,14 +116,9 @@ fn make(
 
     // println!("{}", g);
 
-    let inputs = g.inputs();
-    let outputs = g.outputs();
-
     Backend {
         r: recipe,
         g: g,
-        inputs: inputs,
-        outputs: outputs,
         parallel_prepop: parallel,
         prepop_counts: HashMap::new(),
         barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
@@ -171,46 +163,43 @@ impl Backend {
         read_scale: f32,
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
-        match self.outputs.get(query_name) {
-            None => panic!("no node for {}!", query_name),
-            Some(nd) => {
-                println!("reading {}", query_name);
-                let mut g = self.g.get_getter(*nd).unwrap();
-                let query_name = String::from(query_name);
+        println!("reading {}", query_name);
+        let mut g = self.g
+            .get_getter(query_name)
+            .expect(&format!("no node for {}!", query_name));
+        let query_name = String::from(query_name);
 
-                let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
-                let params = keys.generate_parameter(&query_name, num);
+        let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
+        let params = keys.generate_parameter(&query_name, num);
 
-                let mut read_view = move || {
-                    let mut ok = 0;
+        let mut read_view = move || {
+            let mut ok = 0;
 
-                    let start = time::Instant::now();
-                    for i in 0..num {
-                        match g.lookup(&params[i], true) {
-                            Err(_) => continue,
-                            Ok(datas) => if datas.len() > 0 {
-                                ok += 1;
-                            },
-                        }
-                    }
-                    let dur = dur_to_fsec!(start.elapsed());
-                    println!(
-                        "{}: ({:.2} GETs/sec) (ok: {})!",
-                        query_name,
-                        f64::from(num as i32) / dur,
-                        ok
-                    );
-                };
-
-                if parallel {
-                    Some(thread::spawn(move || {
-                        read_view();
-                    }))
-                } else {
-                    read_view();
-                    None
+            let start = time::Instant::now();
+            for i in 0..num {
+                match g.lookup(&params[i], true) {
+                    Err(_) => continue,
+                    Ok(datas) => if datas.len() > 0 {
+                        ok += 1;
+                    },
                 }
             }
+            let dur = dur_to_fsec!(start.elapsed());
+            println!(
+                "{}: ({:.2} GETs/sec) (ok: {})!",
+                query_name,
+                f64::from(num as i32) / dur,
+                ok
+            );
+        };
+
+        if parallel {
+            Some(thread::spawn(move || {
+                read_view();
+            }))
+        } else {
+            read_view();
+            None
         }
     }
 }

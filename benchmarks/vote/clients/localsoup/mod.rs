@@ -60,7 +60,7 @@ impl VoteClient for Client {
         if verbose {
             println!("Prepopulating with {} articles", params.articles);
         }
-        let mut a = g.graph.get_mutator(g.article).unwrap();
+        let mut a = g.graph.get_mutator("Article").unwrap();
         a.batch_put(
             (0..params.articles).map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()]),
         ).unwrap();
@@ -76,8 +76,8 @@ impl VoteClient for Client {
 
     fn from(soup: &mut Self::Constructor) -> Self {
         Client {
-            r: soup.graph.get_getter(soup.end).unwrap(),
-            w: soup.graph.get_mutator(soup.vote).unwrap(),
+            r: soup.graph.get_getter("ArticleWithVoteCount").unwrap(),
+            w: soup.graph.get_mutator("Vote").unwrap(),
         }
     }
 
