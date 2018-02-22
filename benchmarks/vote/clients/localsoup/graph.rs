@@ -1,5 +1,3 @@
-use time;
-
 use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
                    PersistenceParameters};
 
@@ -23,96 +21,24 @@ pub struct Graph {
 }
 
 pub struct Setup {
-    pub transactions: bool,
     pub stupid: bool,
     pub partial: bool,
     pub sharding: Option<usize>,
-    pub local: bool,
     pub nworkers: usize,
     pub nreaders: usize,
     pub logging: bool,
-    pub concurrent_replays: usize,
-    pub replay_batch_timeout: time::Duration,
-    pub replay_batch_size: usize,
 }
 
-impl Setup {
-    pub fn new(local: bool, nworkers: usize) -> Self {
+impl Default for Setup {
+    fn default() -> Self {
         Setup {
-            transactions: false,
             stupid: false,
             partial: true,
             sharding: None,
             logging: false,
-            local,
-            nworkers,
+            nworkers: 1,
             nreaders: 1,
-            concurrent_replays: 512,
-            replay_batch_timeout: time::Duration::from_millis(1),
-            replay_batch_size: 32,
         }
-    }
-}
-
-impl Setup {
-    #[allow(dead_code)]
-    pub fn enable_logging(mut self) -> Self {
-        self.logging = true;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn set_max_concurrent_replay(mut self, n: usize) -> Self {
-        self.concurrent_replays = n;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn set_read_threads(mut self, n: usize) -> Self {
-        self.nreaders = n;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn set_partial_replay_batch_timeout(mut self, t: time::Duration) -> Self {
-        self.replay_batch_timeout = t;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn set_partial_replay_batch_size(mut self, n: usize) -> Self {
-        self.replay_batch_size = n;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn with_transactions(mut self) -> Self {
-        self.transactions = true;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn with_stupidity(mut self) -> Self {
-        self.stupid = true;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn with_sharding(mut self, s: usize) -> Self {
-        self.sharding = Some(s);
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn without_partial(mut self) -> Self {
-        self.partial = false;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn without_sharding(mut self) -> Self {
-        self.sharding = None;
-        self
     }
 }
 

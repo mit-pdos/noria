@@ -39,9 +39,9 @@ impl VoteClient for Client {
         persistence.log_prefix = "vote".to_string();
 
         // setup db
-        let mut s = graph::Setup::new(true, nworkers);
+        let mut s = graph::Setup::default();
         s.logging = verbose;
-        s.transactions = false;
+        s.nworkers = nworkers;
         s.nreaders = read_threads;
         s.sharding = match value_t_or_exit!(args, "shards", usize) {
             0 => None,
