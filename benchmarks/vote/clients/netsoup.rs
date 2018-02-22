@@ -63,6 +63,7 @@ impl VoteClient for Client {
 
         let rows = self.r
             .multi_lookup(arg, true)
+            .unwrap()
             .into_iter()
             .map(|_rows| {
                 // TODO
