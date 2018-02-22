@@ -25,9 +25,8 @@ impl VoteClient for Client {
         let read_threads = value_t_or_exit!(args, "readthreads", usize);
         let verbose = args.is_present("verbose");
 
-        let queue_length = value_t_or_exit!(args, "write-batch-size", usize);
-        let flush_timeout = time::Duration::from_millis(10);
-        let mode = if args.is_present("durability") {
+        let mut persistence = PersistenceParameters::default();
+        persistence.mode = if args.is_present("durability") {
             if args.is_present("retain-logs-on-exit") {
                 DurabilityMode::Permanent
             } else {
@@ -36,13 +35,8 @@ impl VoteClient for Client {
         } else {
             DurabilityMode::MemoryOnly
         };
-
-        let persistence_params = PersistenceParameters::new(
-            mode,
-            queue_length,
-            flush_timeout,
-            Some(String::from("vote")),
-        );
+        persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
+        persistence.log_prefix = "vote".to_string();
 
         // setup db
         let mut s = graph::Setup::new(true, nworkers);
@@ -54,7 +48,7 @@ impl VoteClient for Client {
             x => Some(x),
         };
         s.stupid = args.is_present("stupid");
-        let mut g = graph::make(s, persistence_params);
+        let mut g = graph::make(s, persistence);
 
         // prepopulate
         if verbose {
