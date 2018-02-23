@@ -1,143 +1,75 @@
-use distributary::srv;
-use distributary::{DataType, Mutator, MutatorBuilder, RemoteGetter, RemoteGetterBuilder};
+use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
+use clap;
 
-use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
+use clients::{Parameters, VoteClient};
+use clients::localsoup::graph::RECIPE;
 
-use std::io;
-use std::io::prelude::*;
-use std::net::{IpAddr, SocketAddr, TcpStream};
-use net2::TcpBuilder;
-use bufstream::BufStream;
-use bincode;
-use vec_map::VecMap;
-
-const ARTICLE_NODE: usize = 1;
-const VOTE_NODE: usize = 2;
-const END_NODE: usize = 4;
-
-pub struct C(
-    BufStream<TcpStream>,
-    VecMap<Mutator>,
-    VecMap<RemoteGetter>,
-    IpAddr,
-);
-
-impl C {
-    pub fn mput(&mut self, view: usize, data: Vec<Vec<DataType>>) {
-        let stream = &mut self.0;
-        let listen_addr = self.3.clone();
-        let mutator = self.1.entry(view).or_insert_with(|| {
-            bincode::serialize_into(
-                stream,
-                &srv::Method::GetMutatorBuilder { view },
-                bincode::Infinite,
-            ).unwrap();
-            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
-            stream.flush().unwrap();
-            let builder: MutatorBuilder =
-                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
-            builder.build(SocketAddr::new(listen_addr, 0))
-        });
-
-        mutator.multi_put(data).unwrap();
-    }
-
-    pub fn query(
-        &mut self,
-        view: usize,
-        keys: Vec<DataType>,
-    ) -> Result<Vec<Vec<Vec<DataType>>>, io::Error> {
-        let stream = &mut self.0;
-        let getter = self.2.entry(view).or_insert_with(|| {
-            bincode::serialize_into(
-                stream,
-                &srv::Method::GetGetterBuilder { view },
-                bincode::Infinite,
-            ).unwrap();
-            bincode::serialize_into(stream, &srv::Method::Flush, bincode::Infinite).unwrap();
-            stream.flush().unwrap();
-            let builder: RemoteGetterBuilder =
-                bincode::deserialize_from(stream, bincode::Infinite).unwrap();
-            println!("Got RemoteGetterBuilder: {:?}", builder);
-            builder.build()
-        });
-
-        Ok(
-            getter
-                .lookup(keys, true)
-                .into_iter()
-                .map(|rs| rs.unwrap_or_default())
-                .collect(),
-        )
-    }
+pub(crate) struct Client {
+    r: distributary::RemoteGetter,
+    #[allow(dead_code)]
+    w: distributary::Mutator,
 }
 
-pub fn make(addr: &str, config: &RuntimeConfig) -> C {
-    let stream = TcpBuilder::new_v4().unwrap();
-    if let Some(ref addr) = config.bind_to {
-        stream.bind(addr).unwrap();
-    }
-    let stream = stream.connect(addr).unwrap();
-    stream.set_nodelay(true).unwrap();
-    let stream = BufStream::new(stream);
-    let sa: SocketAddr = config.bind_to.as_ref().unwrap().parse().unwrap();
-    C(stream, VecMap::new(), VecMap::new(), sa.ip())
+type Handle = ControllerHandle<ZookeeperAuthority>;
+
+fn make_mutator(c: &mut Handle, view: &str) -> distributary::Mutator {
+    c.get_mutator(view).unwrap()
 }
 
-impl Writer for C {
-    fn make_articles<I>(&mut self, articles: I)
-    where
-        I: Iterator<Item = (i64, String)>,
-        I: ExactSizeIterator,
-    {
-        let articles = articles
-            .map(|(aid, title)| vec![aid.into(), title.into()])
+fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
+    c.get_getter(view).unwrap()
+}
+
+impl VoteClient for Client {
+    type Constructor = String;
+
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
+        if params.prime {
+            // for prepop, we need a mutator
+            let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeeper").unwrap()));
+
+            ch.install_recipe(RECIPE.to_owned()).unwrap();
+            let mut m = make_mutator(&mut ch, "Article");
+            m.batch_put(
+                (0..params.articles)
+                    .map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()]),
+            ).unwrap();
+        }
+
+        args.value_of("zookeeper").unwrap().to_string()
+    }
+
+    fn from(control: &mut Self::Constructor) -> Self {
+        let mut ch = Handle::new(ZookeeperAuthority::new(control));
+
+        Client {
+            r: make_getter(&mut ch, "ArticleWithVoteCount"),
+            w: make_mutator(&mut ch, "Vote"),
+        }
+    }
+
+    fn handle_writes(&mut self, ids: &[i32]) {
+        let data: Vec<Vec<DataType>> = ids.into_iter()
+            .map(|&article_id| vec![0.into(), (article_id as usize).into()])
             .collect();
-        self.mput(ARTICLE_NODE, articles);
+
+        self.w.multi_put(data).unwrap();
     }
-    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        let votes = ids.iter()
-            .map(|&(user_id, article_id)| {
-                vec![user_id.into(), article_id.into()]
+
+    fn handle_reads(&mut self, ids: &[i32]) {
+        let arg = ids.into_iter()
+            .map(|&article_id| (article_id as usize).into())
+            .collect();
+
+        let rows = self.r
+            .multi_lookup(arg, true)
+            .unwrap()
+            .into_iter()
+            .map(|_rows| {
+                // TODO
+                //assert_eq!(rows.map(|rows| rows.len()), Ok(1));
             })
-            .collect();
-        self.mput(VOTE_NODE, votes);
-        Period::PreMigration
-    }
-}
-
-impl Reader for C {
-    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let aids = ids.iter()
-            .map(|&(_, article_id)| article_id.into())
-            .collect();
-        let res = self.query(END_NODE, aids).map_err(|_| ()).map(|rows| {
-            assert_eq!(ids.len(), rows.len());
-            rows.into_iter()
-                .map(|rows| {
-                    // rustfmt
-                    match rows.into_iter().next() {
-                        Some(row) => match row[1] {
-                            DataType::TinyText(..) | DataType::Text(..) => {
-                                use std::borrow::Cow;
-                                let t: Cow<_> = (&row[1]).into();
-                                let count: i64 = match row[2].clone() {
-                                    DataType::None => 0,
-                                    d => d.into(),
-                                };
-                                ArticleResult::Article {
-                                    id: row[0].clone().into(),
-                                    title: t.to_string(),
-                                    votes: count,
-                                }
-                            }
-                            _ => unreachable!(),
-                        },
-                        None => ArticleResult::NoSuchArticle,
-                    }
-                })
-                .collect()
-        });
-        (res, Period::PreMigration)
+            .count();
+        assert_eq!(rows, ids.len());
     }
 }

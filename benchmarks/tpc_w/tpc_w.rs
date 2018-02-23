@@ -1,3 +1,5 @@
+#![deny(unused_extern_crates)]
+
 extern crate chrono;
 extern crate distributary;
 extern crate rand;
@@ -8,25 +10,19 @@ mod parameters;
 #[macro_use]
 extern crate clap;
 
-#[macro_use]
-extern crate slog;
-
 use parameters::SampleKeys;
 use std::{thread, time};
 use std::collections::HashMap;
 use rand::Rng;
 
-use std::collections::BTreeMap;
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex};
+use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
 
 pub struct Backend {
     r: String,
     g: ControllerHandle<LocalAuthority>,
-    inputs: BTreeMap<String, NodeIndex>,
-    outputs: BTreeMap<String, NodeIndex>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
@@ -64,11 +60,9 @@ fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
 
 fn make(
     recipe_location: &str,
-    transactions: bool,
     parallel: bool,
     single_query: bool,
     disable_partial: bool,
-    reuse: &str,
 ) -> Backend {
     use std::io::Read;
     use std::fs::File;
@@ -81,7 +75,8 @@ fn make(
     if disable_partial {
         b.disable_partial();
     }
-    b.set_local_workers(2);
+    b.set_worker_threads(2);
+    b.set_read_threads(1);
 
     let mut g = b.build_local();
 
@@ -101,7 +96,7 @@ fn make(
         s
     };
 
-    g.install_recipe(recipe.clone());
+    g.install_recipe(recipe.clone()).unwrap();
 
     // XXX(malte): fix reuse configuration passthrough
     /*match Recipe::from_str(&s, Some(recipe_log.clone())) {
@@ -121,23 +116,17 @@ fn make(
 
     // println!("{}", g);
 
-    let inputs = g.inputs();
-    let outputs = g.outputs();
-
     Backend {
         r: recipe,
         g: g,
-        inputs: inputs,
-        outputs: outputs,
         parallel_prepop: parallel,
         prepop_counts: HashMap::new(),
         barrier: Arc::new(Barrier::new(9)), // N.B.: # base tables
     }
 }
 
-
 impl Backend {
-    fn extend(mut self, query: &str, transactions: bool) -> Backend {
+    fn extend(mut self, query: &str) -> Backend {
         let query_name = query.split(":").next().unwrap();
 
         let mut new_recipe = self.r.clone();
@@ -145,7 +134,7 @@ impl Backend {
         new_recipe.push_str(query);
 
         let start = time::Instant::now();
-        self.g.install_recipe(new_recipe.clone());
+        self.g.install_recipe(new_recipe.clone()).unwrap();
 
         let dur = dur_to_fsec!(start.elapsed());
         println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
@@ -154,7 +143,8 @@ impl Backend {
         self
     }
 
-    fn size(&mut self, query_name: &str) -> usize {
+    #[allow(dead_code)]
+    fn size(&mut self, _query_name: &str) -> usize {
         // XXX(malte): fix -- needs len RPC
         unimplemented!();
         /*match self.outputs.get(query_name) {
@@ -173,46 +163,43 @@ impl Backend {
         read_scale: f32,
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
-        match self.outputs.get(query_name) {
-            None => panic!("no node for {}!", query_name),
-            Some(nd) => {
-                println!("reading {}", query_name);
-                let mut g = self.g.get_getter(*nd).unwrap();
-                let query_name = String::from(query_name);
+        println!("reading {}", query_name);
+        let mut g = self.g
+            .get_getter(query_name)
+            .expect(&format!("no node for {}!", query_name));
+        let query_name = String::from(query_name);
 
-                let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
-                let params = keys.generate_parameter(&query_name, num);
+        let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
+        let params = keys.generate_parameter(&query_name, num);
 
-                let mut read_view = move || {
-                    let mut ok = 0;
+        let mut read_view = move || {
+            let mut ok = 0;
 
-                    let start = time::Instant::now();
-                    for i in 0..num {
-                        match g.lookup(&params[i], true) {
-                            Err(_) => continue,
-                            Ok(datas) => if datas.len() > 0 {
-                                ok += 1;
-                            },
-                        }
-                    }
-                    let dur = dur_to_fsec!(start.elapsed());
-                    println!(
-                        "{}: ({:.2} GETs/sec) (ok: {})!",
-                        query_name,
-                        f64::from(num as i32) / dur,
-                        ok
-                    );
-                };
-
-                if parallel {
-                    Some(thread::spawn(move || {
-                        read_view();
-                    }))
-                } else {
-                    read_view();
-                    None
+            let start = time::Instant::now();
+            for i in 0..num {
+                match g.lookup(&params[i], true) {
+                    Err(_) => continue,
+                    Ok(datas) => if datas.len() > 0 {
+                        ok += 1;
+                    },
                 }
             }
+            let dur = dur_to_fsec!(start.elapsed());
+            println!(
+                "{}: ({:.2} GETs/sec) (ok: {})!",
+                query_name,
+                f64::from(num as i32) / dur,
+                ok
+            );
+        };
+
+        if parallel {
+            Some(thread::spawn(move || {
+                read_view();
+            }))
+        } else {
+            read_view();
+            None
         }
     }
 }
@@ -307,7 +294,6 @@ fn main() {
 
     let rloc = matches.value_of("recipe").unwrap();
     let ploc = matches.value_of("populate_from").unwrap();
-    let transactions = matches.is_present("transactional");
     let parallel_prepop = matches.is_present("parallel_prepopulation");
     let parallel_read = matches.is_present("parallel_read");
     let single_query = matches.is_present("single_query_migration");
@@ -316,7 +302,6 @@ fn main() {
     let read_scale = value_t_or_exit!(matches, "read", f32);
     let write_to = matches.value_of("write_to").unwrap();
     let write = value_t_or_exit!(matches, "write", f32);
-    let reuse = matches.value_of("reuse").unwrap();
     let random = matches.is_present("random");
 
     if read_scale > write {
@@ -324,14 +309,7 @@ fn main() {
     }
 
     println!("Loading TPC-W recipe from {}", rloc);
-    let mut backend = make(
-        &rloc,
-        transactions,
-        parallel_prepop,
-        single_query,
-        disable_partial,
-        reuse,
-    );
+    let mut backend = make(&rloc, parallel_prepop, single_query, disable_partial);
 
     println!("Prepopulating from data files in {}", ploc);
     let (item_write, author_write, order_line_write) = match write_to.as_ref() {
@@ -384,7 +362,7 @@ fn main() {
         let queries = get_queries(&rloc, random);
 
         for (i, q) in queries.iter().enumerate() {
-            backend = backend.extend(&q, transactions);
+            backend = backend.extend(&q);
 
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);

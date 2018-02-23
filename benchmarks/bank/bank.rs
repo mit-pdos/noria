@@ -1,3 +1,5 @@
+#![deny(unused_extern_crates)]
+
 #[macro_use]
 extern crate clap;
 extern crate distributary;
@@ -30,18 +32,17 @@ EXAMPLES:
 
 pub struct Bank {
     blender: ControllerHandle<LocalAuthority>,
-    transfers: distributary::NodeIndex,
-    balances: distributary::NodeIndex,
     debug_channel: Option<TcpListener>,
 }
 
-pub fn setup(transactions: bool) -> Box<Bank> {
+pub fn setup() -> Box<Bank> {
     let log = distributary::logger_pls();
 
     // set up graph
     let mut b = ControllerBuilder::default();
     b.log_with(log);
-    b.set_local_workers(2);
+    b.set_worker_threads(2);
+    b.set_read_threads(1);
 
     //let debug_channel = g.create_debug_channel();
 
@@ -57,22 +58,17 @@ pub fn setup(transactions: bool) -> Box<Bank> {
                   QUERY balances: SELECT debits.acct_id, credits.total AS credit, debits.total AS debit \
                                   FROM credits JOIN debits ON (credits.acct_id = debits.acct_id);";
 
-    g.install_recipe(recipe.to_owned());
-
-    let inputs = g.inputs();
-    let outputs = g.outputs();
+    g.install_recipe(recipe.to_owned()).unwrap();
 
     Box::new(Bank {
         blender: g,
-        transfers: inputs["transfers"],
-        balances: outputs["balances"],
         debug_channel: None, // Some(debug_channel),
     })
 }
 
 impl Bank {
     fn getter(&mut self) -> distributary::RemoteGetter {
-        self.blender.get_getter(self.balances).unwrap()
+        self.blender.get_getter("balances").unwrap()
     }
     pub fn migrate(&mut self) {
         // XXX(malte): re-implement this
@@ -150,12 +146,14 @@ fn client(
         };
 
         //let mut get = |id: &DataType| if balances_get.supports_transactions() {
-        let mut get = |id: &DataType| if transactions {
-            balances_get.transactional_lookup(id).map(&f)
-        } else {
-            balances_get
-                .lookup(id, true)
-                .map(|rs| f((rs, Token::empty())))
+        let mut get = |id: &DataType| {
+            if transactions {
+                balances_get.transactional_lookup(id).map(&f)
+            } else {
+                balances_get
+                    .lookup(id, true)
+                    .map(|rs| f((rs, Token::empty())))
+            }
         };
 
         let mut num_requests = 1;
@@ -309,7 +307,6 @@ fn process_latencies(
     //     }
     // }
 
-
     // // Print average latencies.
     // let rl: u64 = read_latencies.iter().sum();
     // let wl: u64 = write_latencies.iter().sum();
@@ -442,11 +439,10 @@ fn main() {
     }
     // setup db
     println!("Attempting to set up bank");
-    let mut bank = setup(transactions);
+    let mut bank = setup();
 
     {
-        let transfer_nid = bank.transfers;
-        let mutator = bank.blender.get_mutator(transfer_nid).unwrap();
+        let mutator = bank.blender.get_mutator("transfers").unwrap();
         populate(naccounts, mutator, transactions);
     }
 
@@ -459,8 +455,7 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let transfers_nid = bank.transfers;
-                let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
+                let mutator = bank.blender.get_mutator("transfers").unwrap();
                 let balances_get = bank.getter();
 
                 thread::Builder::new()
@@ -488,8 +483,7 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-            let transfers_nid = bank.transfers;
-            let mutator = bank.blender.get_mutator(transfers_nid).unwrap();
+            let mutator = bank.blender.get_mutator("transfers").unwrap();
             let balances_get = bank.getter();
             let debug_channel = bank.debug_channel.take();
             assert!(debug_channel.is_some());

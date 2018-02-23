@@ -1,10 +1,25 @@
-#[cfg(feature = "b_mysql")]
-pub mod mysql;
-#[cfg(feature = "b_mssql")]
-pub mod mssql;
-#[cfg(feature = "b_netsoup")]
-pub mod netsoup;
-#[cfg(feature = "b_memcached")]
-pub mod memcached;
-#[cfg(feature = "b_hybrid")]
-pub mod hybrid;
+use clap;
+
+pub(crate) struct Parameters {
+    pub(crate) prime: bool,
+    pub(crate) articles: usize,
+}
+
+pub(crate) trait VoteClient {
+    type Constructor;
+
+    fn new(&Parameters, &clap::ArgMatches) -> Self::Constructor;
+    fn from(&mut Self::Constructor) -> Self;
+    fn handle_reads(&mut self, requests: &[i32]);
+    fn handle_writes(&mut self, requests: &[i32]);
+
+    fn spawns_threads() -> bool {
+        false
+    }
+}
+
+pub(crate) mod localsoup;
+pub(crate) mod netsoup;
+pub(crate) mod mysql;
+pub(crate) mod mssql;
+pub(crate) mod memcached;

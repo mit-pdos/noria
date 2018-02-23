@@ -1,155 +1,122 @@
-use mysql::{self, OptsBuilder};
+use mysql::{self, Opts, OptsBuilder};
 
-use common::{ArticleResult, Period, Reader, RuntimeConfig, Writer};
-use std::net::ToSocketAddrs;
+use clap;
 
-pub struct RW<'a> {
-    v_prep_1: mysql::Stmt<'a>,
-    v_prep_2: mysql::Stmt<'a>,
-    r_prep: mysql::Stmt<'a>,
-    pool: &'a mysql::Pool,
+use clients::{Parameters, VoteClient};
+
+pub(crate) struct Client {
+    conn: mysql::Conn,
 }
 
-pub fn setup(addr: &str, config: &RuntimeConfig) -> mysql::Pool {
-    use mysql::Opts;
+pub(crate) struct Conf {
+    opts: Opts,
+}
 
-    let addr = format!("mysql://{}", addr);
-    let db = &addr[addr.rfind("/").unwrap() + 1..];
-    let opts = Opts::from_url(&addr[0..addr.rfind("/").unwrap()]).unwrap();
+impl VoteClient for Client {
+    type Constructor = Conf;
 
-    if config.mix.does_write() && !config.should_reuse() {
-        // clear the db (note that we strip of /db so we get default)
-        let mut opts = OptsBuilder::from_opts(opts.clone());
-        if let Some(ref addr) = config.bind_to {
-            opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
+        let addr = args.value_of("address").unwrap();
+        let addr = format!("mysql://{}", addr);
+        let db = args.value_of("database").unwrap();
+        let opts = Opts::from_url(&addr).unwrap();
+
+        if params.prime {
+            let mut opts = OptsBuilder::from_opts(opts.clone());
+            opts.db_name(None::<&str>);
+            opts.init(vec![
+                "SET max_heap_table_size = 4294967296;",
+                "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
+            ]);
+            let mut conn = mysql::Conn::new(opts).unwrap();
+            if conn.query(format!("USE {}", db)).is_ok() {
+                conn.query(format!("DROP DATABASE {}", &db).as_str())
+                    .unwrap();
+            }
+            conn.query(format!("CREATE DATABASE {}", &db).as_str())
+                .unwrap();
+
+            // create tables with indices
+            conn.query(format!("USE {}", db)).unwrap();
+            conn.prep_exec(
+                "CREATE TABLE art (id bigint not null, title varchar(16) not null, votes bigint not null, \
+                 PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
+                (),
+            ).unwrap();
+            conn.prep_exec(
+                "CREATE TABLE vt (u bigint not null, id bigint not null, KEY id (id)) ENGINE = MEMORY;",
+                (),
+            ).unwrap();
+
+            // prepop
+            let mut aid = 0;
+            let bs = 1000;
+            assert_eq!(params.articles % bs, 0);
+            for _ in 0..params.articles / bs {
+                let mut sql = String::new();
+                sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
+                for i in 0..bs {
+                    if i != 0 {
+                        sql.push_str(", ");
+                    }
+                    sql.push_str("(");
+                    sql.push_str(&format!("{}, 'Article #{}'", aid, aid));
+                    sql.push_str(", 0)");
+                    aid += 1;
+                }
+                conn.query(sql).unwrap();
+            }
         }
-        opts.db_name(None::<&str>);
+
+        // now we connect for real
+        let mut opts = OptsBuilder::from_opts(opts);
+        opts.db_name(Some(db));
         opts.init(vec![
             "SET max_heap_table_size = 4294967296;",
             "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
         ]);
-        let pool = mysql::Pool::new_manual(1, 4, opts).unwrap();
-        let mut conn = pool.get_conn().unwrap();
-        if conn.query(format!("USE {}", db)).is_ok() {
-            conn.query(format!("DROP DATABASE {}", &db).as_str())
-                .unwrap();
+        opts.stmt_cache_size(10000);
+
+        Conf { opts: opts.into() }
+    }
+
+    fn from(cnf: &mut Self::Constructor) -> Self {
+        Client {
+            conn: mysql::Conn::new(cnf.opts.clone()).unwrap(),
         }
-        conn.query(format!("CREATE DATABASE {}", &db).as_str())
-            .unwrap();
-        conn.query(format!("USE {}", db)).unwrap();
-
-        drop(conn);
-
-        // create tables with indices
-        pool.prep_exec(
-            "CREATE TABLE art (id bigint, title varchar(16), votes bigint, \
-             PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
-            (),
-        ).unwrap();
-        pool.prep_exec(
-            "CREATE TABLE vt (u bigint, id bigint, KEY id (id)) ENGINE = MEMORY;",
-            (),
-        ).unwrap();
     }
 
-    // now we connect for real
-    let mut opts = OptsBuilder::from_opts(opts);
-    if let Some(ref addr) = config.bind_to {
-        opts.bind_address(Some(addr.to_socket_addrs().unwrap().next().unwrap()));
-    }
-    opts.db_name(Some(db));
-    opts.init(vec![
-        "SET max_heap_table_size = 4294967296;",
-        "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-    ]);
-    mysql::Pool::new_manual(1, 4, opts).unwrap()
-}
+    fn handle_writes(&mut self, ids: &[i32]) {
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
 
-pub fn make<'a>(pool: &'a mysql::Pool, config: &RuntimeConfig) -> RW<'a> {
-    let vals = (1..config.mix.write_size().unwrap_or(1) + 1)
-        .map(|_| "(?, ?)")
-        .collect::<Vec<_>>()
-        .join(", ");
-    let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
-    let v_prep_1 = pool.prepare(vote_qstring).unwrap();
+        let vals = (0..ids.len())
+            .map(|_| "(0, ?)")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
+        self.conn.prep_exec(vote_qstring, &ids).unwrap();
 
-    let vals = (1..config.mix.write_size().unwrap_or(1) + 1)
-        .map(|_| "?")
-        .collect::<Vec<_>>()
-        .join(",");
-    let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN({})", vals);
-    let v_prep_2 = pool.prepare(vote_qstring).unwrap();
-
-    let qstring = (1..config.mix.read_size().unwrap_or(1) + 1)
-        .map(|_| "SELECT id, title, votes FROM art WHERE id = ?")
-        .collect::<Vec<_>>()
-        .join(" UNION ");
-    let r_prep = pool.prepare(qstring).unwrap();
-
-    RW {
-        v_prep_1,
-        v_prep_2,
-        r_prep,
-        pool,
-    }
-}
-
-impl<'a> Writer for RW<'a> {
-    fn make_articles<I>(&mut self, articles: I)
-    where
-        I: Iterator<Item = (i64, String)>,
-        I: ExactSizeIterator,
-    {
-        let mut vals = Vec::with_capacity(articles.len());
-        let args: Vec<_> = articles
-            .map(|(aid, title)| {
-                vals.push("(?, ?, 0)");
-                (aid, title)
-            })
-            .collect();
-        let args: Vec<_> = args.iter()
-            .flat_map(|&(ref aid, ref title)| vec![aid as &_, title as &_])
-            .collect();
-        let vals = vals.join(", ");
-        self.pool
-            .prep_exec(
-                format!("INSERT INTO art (id, title, votes) VALUES {}", vals),
-                &args[..],
-            )
-            .unwrap();
+        let vals = (0..ids.len()).map(|_| "?").collect::<Vec<_>>().join(",");
+        // NOTE: this is *not* correct for duplicate ids
+        let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN ({})", vals);
+        self.conn.prep_exec(vote_qstring, &ids).unwrap();
     }
 
-    fn vote(&mut self, ids: &[(i64, i64)]) -> Period {
-        // register votes
-        let values_1 = ids.iter()
-            .flat_map(|&(ref u, ref a)| vec![u as &_, a as &_])
-            .collect::<Vec<_>>();
-        self.v_prep_1.execute(&values_1[..]).unwrap();
+    fn handle_reads(&mut self, ids: &[i32]) {
+        let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
+        let vals = (0..ids.len()).map(|_| "?").collect::<Vec<_>>().join(",");
+        let qstring = format!("SELECT id, title, votes FROM art WHERE id IN ({})", vals);
 
-        // update vote counts
-        let values_2 = ids.iter().map(|&(_, ref a)| a as &_).collect::<Vec<_>>();
-        self.v_prep_2.execute(&values_2[..]).unwrap();
-
-        Period::PreMigration
-    }
-}
-
-impl<'a> Reader for RW<'a> {
-    fn get(&mut self, ids: &[(i64, i64)]) -> (Result<Vec<ArticleResult>, ()>, Period) {
-        let ids: Vec<_> = ids.iter().map(|&(_, ref a)| a as &_).collect();
-
-        let mut res = Vec::new();
-        let mut qresult = self.r_prep.execute(&ids[..]).unwrap();
+        let mut rows = 0;
+        let mut qresult = self.conn.prep_exec(qstring, &ids).unwrap();
         while qresult.more_results_exists() {
             for row in qresult.by_ref() {
-                let mut rr = row.unwrap();
-                res.push(ArticleResult::Article {
-                    id: rr.get(0).unwrap(),
-                    title: rr.get(1).unwrap(),
-                    votes: rr.get(2).unwrap(),
-                });
+                row.unwrap();
+                rows += 1;
             }
         }
-        (Ok(res), Period::PreMigration)
+
+        // <= because IN() collapses duplicates
+        assert!(rows <= ids.len());
     }
 }
