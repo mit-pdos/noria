@@ -59,6 +59,7 @@ pub struct ControllerInner {
     /// Map from worker address to the address the worker is listening on for reads.
     read_addrs: HashMap<WorkerIdentifier, SocketAddr>,
     pub(super) workers: HashMap<WorkerIdentifier, WorkerStatus>,
+    log_files: HashMap<String, WorkerIdentifier>,
 
     /// State between migrations
     pub(super) deps: HashMap<DomainIndex, (IngressFromBase, EgressForBase)>,
@@ -104,8 +105,9 @@ impl ControllerInner {
             CoordinationPayload::Register {
                 ref addr,
                 ref read_listen_addr,
+                ref log_files,
                 ..
-            } => self.handle_register(&msg, addr, read_listen_addr.clone()),
+            } => self.handle_register(&msg, addr, read_listen_addr.clone(), log_files),
             CoordinationPayload::Heartbeat => self.handle_heartbeat(&msg),
             CoordinationPayload::DomainBooted(..) => Ok(()),
             _ => unimplemented!(),
@@ -167,11 +169,15 @@ impl ControllerInner {
         msg: &CoordinationMessage,
         remote: &SocketAddr,
         read_listen_addr: SocketAddr,
+        log_files: &Vec<String>,
     ) -> Result<(), io::Error> {
         info!(
             self.log,
             "new worker registered from {:?}, which listens on {:?}", msg.source, remote
         );
+
+        self.log_files
+            .extend(log_files.iter().map(|s| (s.clone(), msg.source)));
 
         let sender = Arc::new(Mutex::new(TcpSender::connect(remote)?));
         let ws = WorkerStatus::new(sender.clone());
@@ -296,6 +302,7 @@ impl ControllerInner {
 
             read_addrs: HashMap::default(),
             workers: HashMap::default(),
+            log_files: HashMap::default(),
 
             pending_recovery,
             last_checked_workers: Instant::now(),
