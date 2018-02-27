@@ -21,17 +21,15 @@ struct Conn {
 impl Conn {
     fn new(addr: &str, db: &str) -> Conn {
         let mut core = reactor::Core::new().unwrap();
-        let fc = tiberius::SqlConnection::connect(core.handle(), addr).and_then(|conn| {
-            conn.simple_exec(format!(
-                "USE {}; \
-                 SET NUMERIC_ROUNDABORT OFF; \
-                 SET ANSI_PADDING, ANSI_WARNINGS, \
-                 CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                 QUOTED_IDENTIFIER, ANSI_NULLS ON; \
-                 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                db
-            ))
-        });
+        let fc = tiberius::SqlConnection::connect(core.handle(), addr)
+            .and_then(|conn| conn.simple_exec(format!("USE {}", db)))
+            .and_then(|(_, conn)| conn.simple_exec("SET NUMERIC_ROUNDABORT OFF"))
+            .and_then(|(_, conn)| {
+                conn.simple_exec("SET ANSI_PADDING, ANSI_WARNINGS, CONCAT_NULL_YIELDS_NULL, ARITHABORT,  QUOTED_IDENTIFIER, ANSI_NULLS ON")
+            })
+            .and_then(|(_, conn)| {
+                conn.simple_exec("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+            });
         match core.run(fc) {
             Ok((_, conn)) => {
                 return Conn {
