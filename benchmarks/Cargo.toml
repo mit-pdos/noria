@@ -32,7 +32,7 @@ hdrhistogram = "6.0.0"
 futures-state-stream = "0.1"
 tiberius = { git = "https://github.com/steffengy/tiberius.git" }
 # mysql
-mysql = "12.0.0"
+mysql = "12.2.0"
 # memcached
 memcached-rs = { git = "https://github.com/jonhoo/memcached-rs.git", branch = "expose-multi" }
 # mio

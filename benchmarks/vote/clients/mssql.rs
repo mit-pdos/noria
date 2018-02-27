@@ -30,8 +30,7 @@ impl Conn {
                  QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                  SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                 db
-            )).and_then(|r| r)
-                .collect()
+            ))
         });
         match core.run(fc) {
             Ok((_, conn)) => {
@@ -66,8 +65,7 @@ impl VoteClient for Client {
                  QUOTED_IDENTIFIER, ANSI_NULLS ON; \
                  SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
                 db
-            )).and_then(|r| r)
-                .collect()
+            ))
         };
 
         // Check whether database already exists, or whether we need to create it
@@ -75,29 +73,22 @@ impl VoteClient for Client {
         let fut = tiberius::SqlConnection::connect(core.handle(), addr);
         if params.prime {
             // drop database if possible
-            let x = core.run(fut.and_then(|conn| {
-                conn.simple_exec(format!("DROP DATABASE {};", db))
-                    .and_then(|r| r)
-                    .collect()
-            }));
+            let x =
+                core.run(fut.and_then(|conn| conn.simple_exec(format!("DROP DATABASE {};", db))));
             // we don't care if dropping failed
             drop(x);
 
             // we need to connect again because there's no way to recover the conn if drop fails
             let fut = tiberius::SqlConnection::connect(core.handle(), addr);
-            let fut = fut.and_then(|conn| {
-                conn.simple_exec(format!("CREATE DATABASE {};", db))
-                    .and_then(|r| r)
-                    .collect()
-            }).and_then(|(_, conn)| fixconn(conn))
+            let fut = fut.and_then(|conn| conn.simple_exec(format!("CREATE DATABASE {};", db)))
+                .and_then(|(_, conn)| fixconn(conn))
                 .and_then(|(_, conn)| {
                     conn.simple_exec(
                         "CREATE TABLE art (
                              id bigint NOT NULL PRIMARY KEY NONCLUSTERED,
                              title varchar(16) NOT NULL
                              );",
-                    ).and_then(|r| r)
-                        .collect()
+                    )
                 })
                 .and_then(|(_, conn)| {
                     conn.simple_exec(
@@ -105,8 +96,7 @@ impl VoteClient for Client {
                              u bigint NOT NULL,
                              id bigint NOT NULL index vt_article_idx
                              );",
-                    ).and_then(|r| r)
-                        .collect()
+                    )
                 })
                 .and_then(|(_, conn)| {
                     conn.simple_exec(
@@ -115,13 +105,10 @@ impl VoteClient for Client {
                                 FROM dbo.art AS art, dbo.vt AS vt
                                 WHERE art.id = vt.id
                                 GROUP BY art.id, art.title;",
-                    ).and_then(|r| r)
-                        .collect()
+                    )
                 })
                 .and_then(|(_, conn)| {
                     conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
-                        .and_then(|r| r)
-                        .collect()
                 });
             let mut conn = core.run(fut).unwrap().1;
 
@@ -130,8 +117,6 @@ impl VoteClient for Client {
             let bs = 1000;
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {
-                use tiberius::stmt::ResultStreamExt;
-
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO art (id, title) VALUES ");
                 for i in 0..bs {
@@ -140,7 +125,7 @@ impl VoteClient for Client {
                     }
                     sql.push_str(&format!("({}, 'Article #{}')", aid + i, aid + i));
                 }
-                conn = core.run(conn.exec(sql, &[]).single()).unwrap().1;
+                conn = core.run(conn.exec(sql, &[])).unwrap().1;
 
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO vt (u, id) VALUES ");
@@ -150,7 +135,7 @@ impl VoteClient for Client {
                     }
                     sql.push_str(&format!("(0, {})", aid + i));
                 }
-                conn = core.run(conn.exec(sql, &[]).single()).unwrap().1;
+                conn = core.run(conn.exec(sql, &[])).unwrap().1;
 
                 aid += bs;
             }
@@ -181,13 +166,7 @@ impl VoteClient for Client {
             .join(",");
         let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vote_qstring);
 
-        let fut = self.conn
-            .conn
-            .take()
-            .unwrap()
-            .exec(vote_qstring, &ids)
-            .and_then(|r| r)
-            .collect();
+        let fut = self.conn.conn.take().unwrap().exec(vote_qstring, &ids);
         let (_, conn) = self.conn.core.run(fut).unwrap();
         self.conn.conn = Some(conn);
     }
@@ -277,13 +256,12 @@ impl VoteClient for Client {
         // the borrow of `res`
         let mut rows = 0;
         let conn = {
-            use tiberius::stmt::ResultStreamExt;
             let fut = self.conn
                 .conn
                 .take()
                 .unwrap()
                 .query(qstring, &ids)
-                .for_each_row(|_| {
+                .for_each(|_| {
                     rows += 1;
                     Ok(())
                 });
