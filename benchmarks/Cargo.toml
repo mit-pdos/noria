@@ -84,9 +84,9 @@ path = "vote/stress.rs"
 name = "securecrp"
 path = "securecrp/main.rs"
 
-#[[bin]]
-#name = "piazza"
-#path = "piazza/piazza.rs"
+[[bin]]
+name = "piazza"
+path = "piazza/piazza.rs"
 
 #[[bin]]
 #name = "security-mysql"

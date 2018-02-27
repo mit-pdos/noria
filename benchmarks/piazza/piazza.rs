@@ -29,16 +29,11 @@ enum PopulateType {
 impl Backend {
     pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
-        cb.set_local_workers(2);
         let log = distributary::logger_pls();
         let blender_log = log.clone();
 
         if !partial {
             cb.disable_partial();
-        }
-
-        if shard {
-            cb.enable_sharding(2);
         }
 
         cb.log_with(blender_log);
@@ -59,10 +54,9 @@ impl Backend {
     }
 
     pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let ins = self.g.inputs();
         let mut mutator = self
             .g
-            .get_mutator(ins[name])
+            .get_mutator(name)
             .unwrap();
 
         let start = time::Instant::now();
@@ -132,13 +126,6 @@ impl Backend {
         self.g.install_recipe(rs).unwrap();
 
         Ok(())
-    }
-
-    fn size(&mut self) -> usize {
-        let outs = self.g.outputs();
-        outs.into_iter().fold(0, |acc, (_, ni)| {
-            acc + self.g.get_getter(ni).unwrap().len()
-        })
     }
 }
 
@@ -305,9 +292,8 @@ fn main() {
 
     // if partial, read 25% of the keys
     if partial {
-        let outs = backend.g.outputs();
-        let leaf = outs[&format!("post_count")];
-        let mut getter = backend.g.get_getter(leaf).unwrap();
+        let leaf = format!("post_count");
+        let mut getter = backend.g.get_getter(&leaf).unwrap();
         for author in 0..nusers/4 {
             getter.lookup(&author.into(), false).unwrap();
         }
@@ -327,9 +313,8 @@ fn main() {
 
         // if partial, read 25% of the keys
         if partial {
-            let outs = backend.g.outputs();
-            let leaf = outs[&format!("post_count_u{}", i)];
-            let mut getter = backend.g.get_getter(leaf).unwrap();
+            let leaf = format!("post_count_u{}", i);
+            let mut getter = backend.g.get_getter(&leaf).unwrap();
             for author in 0..nusers/4 {
                 getter.lookup(&author.into(), false).unwrap();
             }
@@ -348,11 +333,10 @@ fn main() {
 
 
     if !partial {
-        let outs = backend.g.outputs();
         let mut dur = time::Duration::from_millis(0);
         for uid in 0..nlogged {
-            let leaf = outs[&format!("post_count_u{}", uid)];
-            let mut getter = backend.g.get_getter(leaf).unwrap();
+            let leaf = format!("post_count_u{}", uid);
+            let mut getter = backend.g.get_getter(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
                 getter.lookup(&author.into(), true).unwrap();
