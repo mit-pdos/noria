@@ -57,15 +57,14 @@ impl VoteClient for Client {
         let db = args.value_of("database").unwrap();
 
         let fixconn = |conn: tiberius::SqlConnection<Box<tiberius::BoxableIo>>| {
-            conn.simple_exec(format!(
-                "USE {}; \
-                 SET NUMERIC_ROUNDABORT OFF; \
-                 SET ANSI_PADDING, ANSI_WARNINGS, \
-                 CONCAT_NULL_YIELDS_NULL, ARITHABORT, \
-                 QUOTED_IDENTIFIER, ANSI_NULLS ON; \
-                 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
-                db
-            ))
+            conn.simple_exec(format!("USE {}", db))
+                .and_then(|(_, conn)| conn.simple_exec("SET NUMERIC_ROUNDABORT OFF"))
+                .and_then(|(_, conn)| {
+                    conn.simple_exec("SET ANSI_PADDING, ANSI_WARNINGS, CONCAT_NULL_YIELDS_NULL, ARITHABORT,  QUOTED_IDENTIFIER, ANSI_NULLS ON")
+                })
+                .and_then(|(_, conn)| {
+                    conn.simple_exec("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+                })
         };
 
         // Check whether database already exists, or whether we need to create it
