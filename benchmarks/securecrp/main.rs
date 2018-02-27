@@ -17,18 +17,13 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
+    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
-        cb.set_local_workers(2);
         let log = distributary::logger_pls();
         let blender_log = log.clone();
 
         if !partial {
             cb.disable_partial();
-        }
-
-        if shard {
-            cb.enable_sharding(2);
         }
 
         cb.log_with(blender_log);
@@ -49,17 +44,7 @@ impl Backend {
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
         self.g.create_universe(user_context.clone());
 
-        self.write_to_user_context(user_context);
         Ok(())
-    }
-
-    fn write_to_user_context(&mut self, uc: HashMap<String, DataType>) {
-        let name = &format!("UserContext_{}", uc.get("id").unwrap());
-        let r: Vec<DataType> = uc.values().cloned().collect();
-        let ins = self.g.inputs();
-        let mut mutator = self.g.get_mutator(ins[name]).unwrap();
-
-        mutator.put(r).unwrap();
     }
 
     fn set_security_config(&mut self, config_file: &str) {
@@ -118,21 +103,21 @@ fn main() {
             Arg::with_name("schema")
                 .short("s")
                 .required(true)
-                .default_value("benchmarks/securecrp/schema.sql")
+                .default_value("benchmarks/securecrp/jeeves_schema.sql")
                 .help("SQL schema file"),
         )
         .arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("benchmarks/securecrp/queries.sql")
+                .default_value("benchmarks/securecrp/jeeves_queries.sql")
                 .help("SQL query file"),
         )
         .arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/securecrp/policies.json")
+                .default_value("benchmarks/securecrp/jeeves_policies.json")
                 .help("Security policies file"),
         )
         .arg(

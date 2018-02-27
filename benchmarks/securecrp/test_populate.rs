@@ -46,8 +46,7 @@ pub fn create_users(backend: &mut Backend) {
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
 
-    let ins = backend.g.inputs();
-    let mut mutator = backend.g.get_mutator(ins["UserProfile"]).unwrap();
+    let mut mutator = backend.g.get_mutator("UserProfile").unwrap();
 
     mutator.multi_put(users).unwrap();
 }
@@ -76,35 +75,31 @@ pub fn create_papers(backend: &mut Backend) {
             "Text",
             "Soup is tasty.",
             "0",
-            "0",
         ],
-        vec!["2", "Is Soup Tasty?", "Text", "Maybe.", "0", "0"],
-        vec!["3", "How To Cook Soup", "Text", "Make it tasty.", "0", "0"],
+        vec!["2", "Is Soup Tasty?", "Text", "Maybe.", "0"],
+        vec!["3", "How To Cook Soup", "Text", "Make it tasty.", "0"],
     ];
-
-    let ins = backend.g.inputs();
 
     let papers: Vec<Vec<DataType>> = papers
         .into_iter()
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
-    let mut mutator = backend.g.get_mutator(ins["Paper"]).unwrap();
+    let mut mutator = backend.g.get_mutator("Paper").unwrap();
     mutator.multi_put(papers).unwrap();
 
     let paper_versions: Vec<Vec<DataType>> = paper_versions
         .into_iter()
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
-    let mut mutator = backend.g.get_mutator(ins["PaperVersion"]).unwrap();
+    let mut mutator = backend.g.get_mutator("PaperVersion").unwrap();
     mutator.multi_put(paper_versions).unwrap();
 }
 
 pub fn dump_papers(backend: &mut Backend, user: &str) {
-    let outs = backend.g.outputs();
 
     let mut get = backend
         .g
-        .get_getter(outs[&format!("PaperList_u{}", user)])
+        .get_getter(&format!("PaperList_u{}", user))
         .unwrap();
 
     for i in 1..4 {
