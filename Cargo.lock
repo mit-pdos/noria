@@ -476,7 +476,7 @@ dependencies = [
  "tarpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tarpc-plugins 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "timer_heap 0.2.0 (git+https://github.com/jonhoo/timer_heap?branch=fine-remaining)",
+ "timer_heap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1885,8 +1885,8 @@ dependencies = [
 
 [[package]]
 name = "timer_heap"
-version = "0.2.0"
-source = "git+https://github.com/jonhoo/timer_heap?branch=fine-remaining#4b3316a19ef4886d2f83b65a3ca1784b7715c3a0"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "tokio-core"
@@ -2400,7 +2400,7 @@ dependencies = [
 "checksum time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)" = "a15375f1df02096fb3317256ce2cee6a1f42fc84ea5ad5fc8c421cfe40c73098"
 "checksum timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5bb9b8201d620a812b747fd1e8c523db6d7961ec3aa0915772256fee504bce7"
 "checksum timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "20b6a7dabffd4febd7b0b95f3c1ba00fb58dd523db07837e93c5c90e34636629"
-"checksum timer_heap 0.2.0 (git+https://github.com/jonhoo/timer_heap?branch=fine-remaining)" = "<none>"
+"checksum timer_heap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fe71c4d1bf15d70c971c2660d9fb00887edd0fb8008507ae3fc996c9c77dfd6e"
 "checksum tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "52b4e32d8edbf29501aabb3570f027c6ceb00ccef6538f4bddba0200503e74e8"
 "checksum tokio-io 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b9532748772222bf70297ec0e2ad0f17213b4a7dd0e6afb68e0a0768f69f4e4f"
 "checksum tokio-proto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8fbb47ae81353c63c487030659494b295f6cb6576242f907f203473b191b0389"
