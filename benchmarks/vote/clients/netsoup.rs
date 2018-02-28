@@ -30,10 +30,10 @@ impl VoteClient for Client {
 
             ch.install_recipe(RECIPE.to_owned()).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
-            m.batch_put(
-                (0..params.articles)
-                    .map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()]),
-            ).unwrap();
+            let articles = (0..params.articles)
+                .map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()])
+                .collect::<Vec<Vec<DataType>>>();
+            m.multi_put(articles).unwrap();
         }
 
         args.value_of("zookeeper").unwrap().to_string()
