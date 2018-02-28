@@ -26,7 +26,11 @@ impl VoteClient for Client {
     fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
         if params.prime {
             // for prepop, we need a mutator
-            let mut ch = Handle::new(ZookeeperAuthority::new(args.value_of("zookeeper").unwrap()));
+            let mut ch = Handle::new(ZookeeperAuthority::new(&format!(
+                "{}/{}",
+                args.value_of("zookeeper").unwrap(),
+                args.value_of("deployment").unwrap()
+            )));
 
             ch.install_recipe(RECIPE.to_owned()).unwrap();
             let mut m = make_mutator(&mut ch, "Article");

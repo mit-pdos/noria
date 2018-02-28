@@ -493,15 +493,23 @@ fn main() {
                 .help("Indicates that the client should not set up the database"),
         )
         .subcommand(
-            SubCommand::with_name("netsoup").arg(
-                Arg::with_name("zookeeper")
-                    .short("z")
-                    .long("zookeeper")
-                    .takes_value(true)
-                    .required(true)
-                    .default_value("127.0.0.1:2181")
-                    .help("Address of Zookeeper instance"),
-            ),
+            SubCommand::with_name("netsoup")
+                .arg(
+                    Arg::with_name("zookeeper")
+                        .short("z")
+                        .long("zookeeper")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:2181")
+                        .help("Address of Zookeeper instance"),
+                )
+                .arg(
+                    Arg::with_name("deployment")
+                        .long("deployment")
+                        .required(true)
+                        .takes_value(true)
+                        .help("Soup deployment ID."),
+                ),
         )
         .subcommand(
             SubCommand::with_name("memcached").arg(

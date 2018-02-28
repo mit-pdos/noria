@@ -282,6 +282,8 @@ pub(crate) fn start<'a>(
                     "target/release/souplet".into(),
                     "--shards".into(),
                     shards.into(),
+                    "--deployment".into(),
+                    "vote-bench".into(),
                     "--address".into(),
                     listen_addr.into(),
                     "-w".into(),
