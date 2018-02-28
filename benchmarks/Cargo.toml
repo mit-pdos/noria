@@ -30,7 +30,7 @@ zipf = "1.0.0"
 hdrhistogram = "6.0.0"
 # mssql
 futures-state-stream = "0.1"
-tiberius = { git = "https://github.com/steffengy/tiberius.git" }
+tiberius = { git = "https://github.com/steffengy/tiberius.git", rev = "63c1329f84dc0f722fe640b7faa7f803e7db6a5a" }
 # mysql
 mysql = "12.2.0"
 # memcached
