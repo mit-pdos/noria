@@ -283,7 +283,7 @@ pub(crate) fn start<'a>(
                     "--shards".into(),
                     shards.into(),
                     "--deployment".into(),
-                    "vote-bench".into(),
+                    "votebench".into(),
                     "--address".into(),
                     listen_addr.into(),
                     "-w".into(),
