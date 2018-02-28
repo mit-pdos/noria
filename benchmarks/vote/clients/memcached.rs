@@ -93,6 +93,6 @@ impl VoteClient for Client {
                 _ => {}
             }
         }
-        assert_eq!(rows, keys.len());
+        assert_eq!(rows, ids.len());
     }
 }
