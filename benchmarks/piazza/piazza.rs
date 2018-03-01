@@ -27,7 +27,7 @@ enum PopulateType {
 }
 
 impl Backend {
-    pub fn new(partial: bool, shard: bool, reuse: &str) -> Backend {
+    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
         let log = distributary::logger_pls();
         let blender_log = log.clone();
