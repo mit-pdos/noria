@@ -280,6 +280,8 @@ pub(crate) fn start<'a>(
                 }
                 cmd.extend(vec![
                     "target/release/souplet".into(),
+                    "--durability".into(),
+                    "memory".into(),
                     "--shards".into(),
                     shards.into(),
                     "--deployment".into(),
