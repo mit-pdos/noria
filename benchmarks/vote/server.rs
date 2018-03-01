@@ -165,6 +165,12 @@ impl<'a> Server<'a> {
         backend: &Backend,
         w: &mut io::Write,
     ) -> Result<(), Box<Error>> {
+        // first, get uptime (for load avgs)
+        let mut c = self.server.exec(&["uptime"])?;
+        w.write_all(b"uptime:\n")?;
+        io::copy(&mut c, w)?;
+        c.wait_eof()?;
+
         match *backend {
             Backend::Memcached => {
                 let mem = self.get_mem("memcached")?
