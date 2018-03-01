@@ -9,6 +9,7 @@ for (arg in args) {
 	articles = as.numeric(sub("a$", "", a[[2]]))
 	target = as.numeric(sub("t$", "", a[[3]]))
 	#read_perc = as.numeric(sub("r$", "", a[[4]]))
+	#skew = a[[5]]
 
 	con <- file(arg, open = "r")
 	actual = 0
@@ -37,6 +38,7 @@ for (arg in args) {
 	ts$target = target
 	ts$actual = actual
 	#ts$readp = read_perc
+	#ts$skew = skew
 	ts <- data.frame(ts)
 
 	t <- rbind(t, ts)

@@ -34,7 +34,7 @@ struct ClientParameters<'a> {
     runtime: usize,
     articles: usize,
     read_percentage: usize,
-    // TODO: distribution
+    skewed: bool,
 }
 
 impl<'a> ClientParameters<'a> {
@@ -43,6 +43,12 @@ impl<'a> ClientParameters<'a> {
         cmd.push(self.listen_addr.into());
         cmd.push("-r".into());
         cmd.push(format!("{}", self.runtime).into());
+        cmd.push("-d".into());
+        if self.skewed {
+            cmd.push("skewed".into());
+        } else {
+            cmd.push("uniform".into());
+        }
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
         cmd.push("--write-every".into());
@@ -73,11 +79,12 @@ impl<'a> ClientParameters<'a> {
 
     fn name(&self, target: usize, ext: &str) -> String {
         format!(
-            "{}.{}a.{}t.{}r.{}",
+            "{}.{}a.{}t.{}r.{}.{}",
             self.backend.uniq_name(),
             self.articles,
             target,
             self.read_percentage,
+            if self.skewed { "skewed" } else { "uniform" },
             ext
         )
     }
@@ -119,6 +126,14 @@ fn main() {
                 .default_value("95")
                 .takes_value(true)
                 .help("The percentage of operations that are reads"),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .possible_values(&["uniform", "skewed"])
+                .default_value("uniform")
+                .takes_value(true)
+                .help("How to distribute keys."),
         )
         .subcommand(
             SubCommand::with_name("ec2")
@@ -176,6 +191,7 @@ fn main() {
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
+    let skewed = args.value_of("distribution").unwrap() == "skewed";
     let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
 
     let mut server = None;
@@ -568,6 +584,7 @@ fn main() {
             runtime,
             read_percentage,
             articles,
+            skewed,
         };
 
         let targets = [
