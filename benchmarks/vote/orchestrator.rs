@@ -589,7 +589,7 @@ fn main() {
 
         let targets = [
             100_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000,
-            12_000_000, 14_000_000,
+            10_000_000,
         ];
         // TODO: run more iterations
         for (i, &target) in targets.iter().enumerate() {
