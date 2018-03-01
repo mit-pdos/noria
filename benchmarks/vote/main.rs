@@ -62,8 +62,9 @@ fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
     C: VoteClient + Send + 'static,
 {
-    // each load generator can generate ~3M reqs/s
-    let per_generator = 3_000_000;
+    // zipf takes ~66ns to generate a random number depending on the CPU,
+    // so each load generator cannot reasonably generate much more than ~1M reqs/s.
+    let per_generator = 1_000_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
     let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
     target /= ngen as f64;
