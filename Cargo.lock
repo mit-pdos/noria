@@ -121,8 +121,8 @@ dependencies = [
  "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "mysql 12.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)",
+ "mysql 12.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -134,7 +134,7 @@ dependencies = [
  "slog 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)",
+ "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git?rev=63c1329f84dc0f722fe640b7faa7f803e7db6a5a)",
  "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -328,7 +328,7 @@ dependencies = [
  "arccstr 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -414,7 +414,7 @@ dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "regex 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -463,8 +463,8 @@ dependencies = [
  "mio 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio-pool 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
- "mysql 12.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)",
+ "mysql 12.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)",
  "num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.5 (git+https://github.com/fintelia/petgraph?branch=serde)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -477,10 +477,9 @@ dependencies = [
  "tarpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tarpc-plugins 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "timer_heap 0.2.0 (git+https://github.com/jonhoo/timer_heap?branch=fine-remaining)",
+ "timer_heap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1067,14 +1066,14 @@ version = "0.1.0"
 dependencies = [
  "core 0.1.0",
  "dataflow 0.1.0",
- "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)",
+ "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)",
  "regex 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "mysql"
-version = "12.1.1"
+version = "12.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bit-vec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1206,7 +1205,7 @@ dependencies = [
 [[package]]
 name = "nom_sql"
 version = "0.0.1"
-source = "git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677#75cec7e5c9104dd9ffbe979b6d881546a7ed2677"
+source = "git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d#159140accbaa6e83ee0d6d6eb22abb2fad03da9d"
 dependencies = [
  "nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1838,7 +1837,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "tiberius"
 version = "0.3.0"
-source = "git+https://github.com/steffengy/tiberius.git#f9d4393beb988604220e65a8c3e76e4270aee7e0"
+source = "git+https://github.com/steffengy/tiberius.git?rev=63c1329f84dc0f722fe640b7faa7f803e7db6a5a#63c1329f84dc0f722fe640b7faa7f803e7db6a5a"
 dependencies = [
  "bitflags 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1886,8 +1885,8 @@ dependencies = [
 
 [[package]]
 name = "timer_heap"
-version = "0.2.0"
-source = "git+https://github.com/jonhoo/timer_heap?branch=fine-remaining#4b3316a19ef4886d2f83b65a3ca1784b7715c3a0"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "tokio-core"
@@ -2061,14 +2060,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "uuid"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "uuid"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "vcpkg"
@@ -2312,7 +2303,7 @@ dependencies = [
 "checksum mio-pool 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0693a65add19c05fb0bd822d81fa9d9a96c45784ed8f74f93a596899ce0a17b1"
 "checksum miow 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3e690c5df6b2f60acd45d56378981e827ff8295562fc8d34f573deb267a59cd1"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
-"checksum mysql 12.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f506e6bb826a8783540e7d8740795328861471aedf5ec1044866721e883085fc"
+"checksum mysql 12.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6f069669d890da52c6d24b26c78fe6781630df149cd74efe187ca3d56e37b803"
 "checksum mysql_common 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "82937dbd5b340ef85f59d4f0422402a91c5aec81b391fb7e5fcb39bc39ba45f4"
 "checksum named_pipe 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "516fe2b5b1131f912a3d4e0cbfec369ca9a65f89d477c15d86ef0fc376faaa55"
 "checksum native-tls 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "f74dbadc8b43df7864539cedb7bc91345e532fdd913cfdc23ad94f4d2d40fbc0"
@@ -2323,7 +2314,7 @@ dependencies = [
 "checksum nodrop 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "9a2228dca57108069a5262f2ed8bd2e82496d2e074a06d1ccc7ce1687b6ae0a2"
 "checksum nom 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a5b8c256fd9471521bcb84c3cdba98921497f1a331cbc15b8030fc63b82050ce"
 "checksum nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
-"checksum nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=75cec7e5c9104dd9ffbe979b6d881546a7ed2677)" = "<none>"
+"checksum nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=159140accbaa6e83ee0d6d6eb22abb2fad03da9d)" = "<none>"
 "checksum num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "4703ad64153382334aa8db57c637364c322d3372e097840c72000dabdcf6156e"
 "checksum num-bigint 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)" = "81b483ea42927c463e191802e7334556b48e7875297564c0e9951bd3a0ae53e3"
 "checksum num-complex 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "26ff8edeab9f1d8cf6b595e35138c2a389ea29f4f57a0e6bc44abf406e4b0077"
@@ -2397,11 +2388,11 @@ dependencies = [
 "checksum thread-pool 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "521ce173ddcb414aff269069162a767bd6503470f8dbd00cf6b576059b143c94"
 "checksum thread_local 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "279ef31c19ededf577bfd12dfae728040a21f635b06a24cd670ff510edd38963"
 "checksum throttled-reader 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d57a2c9d70b741a7afc496022a3626a178174ae1931ce67ebd4128ac89ae9409"
-"checksum tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)" = "<none>"
+"checksum tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git?rev=63c1329f84dc0f722fe640b7faa7f803e7db6a5a)" = "<none>"
 "checksum time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)" = "a15375f1df02096fb3317256ce2cee6a1f42fc84ea5ad5fc8c421cfe40c73098"
 "checksum timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5bb9b8201d620a812b747fd1e8c523db6d7961ec3aa0915772256fee504bce7"
 "checksum timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "20b6a7dabffd4febd7b0b95f3c1ba00fb58dd523db07837e93c5c90e34636629"
-"checksum timer_heap 0.2.0 (git+https://github.com/jonhoo/timer_heap?branch=fine-remaining)" = "<none>"
+"checksum timer_heap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fe71c4d1bf15d70c971c2660d9fb00887edd0fb8008507ae3fc996c9c77dfd6e"
 "checksum tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "52b4e32d8edbf29501aabb3570f027c6ceb00ccef6538f4bddba0200503e74e8"
 "checksum tokio-io 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b9532748772222bf70297ec0e2ad0f17213b4a7dd0e6afb68e0a0768f69f4e4f"
 "checksum tokio-proto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8fbb47ae81353c63c487030659494b295f6cb6576242f907f203473b191b0389"
@@ -2424,7 +2415,6 @@ dependencies = [
 "checksum url 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f808aadd8cfec6ef90e4a14eb46f24511824d1ac596b9682703c87056c8678b7"
 "checksum utf8-ranges 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "662fab6525a98beff2921d7f61a39e7d59e0b425ebc7d0d9e66d316e55124122"
 "checksum uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "bcc7e3b898aa6f6c08e5295b6c89258d1331e9ac578cc992fb818759951bdc22"
-"checksum uuid 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2bcacdce7c75ad110c0dba131d6628c64398593e3895025d043ee2fcf97c4b6e"
 "checksum vcpkg 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9e0a7d8bed3178a8fb112199d466eeca9ed09a14ba8ad67718179b4fd5487d0b"
 "checksum vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "887b5b631c2ad01628bbbaa7dd4c869f80d3186688f8d0b6f58774fbe324988c"
 "checksum version_check 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "6b772017e347561807c1aa192438c5fd74242a670a6cffacc40f2defd1dc069d"

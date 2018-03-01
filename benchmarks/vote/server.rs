@@ -8,17 +8,17 @@ use std::io;
 use std::io::prelude::*;
 
 pub(crate) enum ServerHandle<'a> {
-    Netsoup(ssh2::Channel<'a>, ssh2::Channel<'a>),
+    Netsoup(ssh2::Channel<'a>),
     HandledBySystemd,
 }
 
 impl<'a> ServerHandle<'a> {
     fn end(self, server: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
         match self {
-            ServerHandle::Netsoup(mut c, mut w) => {
+            ServerHandle::Netsoup(mut w) => {
                 // assert_eq!(backend, &Backend::Netsoup);
 
-                // we need to terminate the controller and the worker.
+                // we need to terminate the worker.
                 // the SSH spec does have support for sending signals to remote workers, but
                 // neither OpenSSH nor libssh2 support that feature:
                 //
@@ -26,35 +26,23 @@ impl<'a> ServerHandle<'a> {
                 //  - https://www.libssh2.org/mail/libssh2-devel-archive-2009-09/0079.shtml
                 //
                 // so, instead we have to hack around it by finding the pid and killing it
-                if c.eof() | w.eof() {
-                    // one of them terminated prematurely!
+                if w.eof() {
+                    // terminated prematurely!
                     unimplemented!();
                 }
 
-                let c_killed = server.just_exec(&["pkill", "-f", "target/release/controller"])?;
-                let w_killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
+                let killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
 
-                if !c_killed.is_ok() {
-                    let mut cstdout = String::new();
-                    let mut cstderr = String::new();
-                    c.stderr().read_to_string(&mut cstderr)?;
-                    c.read_to_string(&mut cstdout)?;
-                    println!("controller died");
-                    println!("{}", cstdout);
-                    println!("{}", cstderr);
-                }
-
-                if !w_killed.is_ok() {
-                    let mut wstdout = String::new();
-                    let mut wstderr = String::new();
-                    w.stderr().read_to_string(&mut wstderr)?;
-                    w.read_to_string(&mut wstdout)?;
+                if !killed.is_ok() {
+                    let mut stdout = String::new();
+                    let mut stderr = String::new();
+                    w.stderr().read_to_string(&mut stderr)?;
+                    w.read_to_string(&mut stdout)?;
                     println!("souplet died");
-                    println!("{}", wstdout);
-                    println!("{}", wstderr);
+                    println!("{}", stdout);
+                    println!("{}", stderr);
                 }
 
-                c.wait_eof()?;
                 w.wait_eof()?;
 
                 // also stop zookeeper
@@ -246,16 +234,7 @@ pub(crate) fn start<'a>(
             readers,
             shards,
         } => {
-            // first, build controller if it hasn't been built already
-            match server
-                .in_distributary(has_pl, &["cargo", "b", "--release", "--bin", "controller"])
-            {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => return Ok(Err(e)),
-                Err(e) => return Err(e),
-            }
-
-            // then, build worker if it hasn't been built already
+            // build worker if it hasn't been built already
             match server.in_distributary(has_pl, &["cargo", "b", "--release", "--bin", "souplet"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
@@ -288,43 +267,35 @@ pub(crate) fn start<'a>(
                 }
             }
 
-            // then start the controller
+            // then start the worker (which will also be a controller)
+            // TODO: should we worry about the running directory being on an SSD here?
             let shards = format!("{}", shards.unwrap_or(0));
-            let c = {
-                let mut cmd = vec!["cd", "distributary", "&&"];
+            let w = {
+                let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
+                    .into_iter()
+                    .map(|&s| s.into())
+                    .collect();
+                if has_pl {
+                    cmd.push("perflock".into());
+                }
                 cmd.extend(vec![
-                    "target/release/controller",
-                    "--remote-workers=1",
-                    "--shards",
-                    &shards,
-                    "--address",
-                    listen_addr,
+                    "target/release/souplet".into(),
+                    "--shards".into(),
+                    shards.into(),
+                    "--deployment".into(),
+                    "votebench".into(),
+                    "--address".into(),
+                    listen_addr.into(),
+                    "-w".into(),
+                    format!("{}", workers).into(),
+                    "-r".into(),
+                    format!("{}", readers).into(),
                 ]);
+                let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 server.exec(&cmd[..]).unwrap()
             };
 
-            // and the remote worker
-            // TODO: should we worry about the running directory being on an SSD here?
-            let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
-                .into_iter()
-                .map(|&s| s.into())
-                .collect();
-            if has_pl {
-                cmd.push("perflock".into());
-            }
-            cmd.extend(vec![
-                "target/release/souplet".into(),
-                "--listen".into(),
-                listen_addr.into(),
-                "-w".into(),
-                format!("{}", workers).into(),
-                "-r".into(),
-                format!("{}", readers).into(),
-            ]);
-            let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
-            let w = server.exec(&cmd[..]).unwrap();
-
-            ServerHandle::Netsoup(c, w)
+            ServerHandle::Netsoup(w)
         }
         Backend::Memcached | Backend::Mysql | Backend::Mssql => {
             match server.just_exec(&["sudo", "systemctl", "start", b.systemd_name().unwrap()]) {
