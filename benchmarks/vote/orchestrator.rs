@@ -32,6 +32,7 @@ struct ClientParameters<'a> {
     listen_addr: &'a str,
     backend: &'a Backend,
     runtime: usize,
+    warmup: usize,
     articles: usize,
     read_percentage: usize,
     skewed: bool,
@@ -41,6 +42,8 @@ impl<'a> ClientParameters<'a> {
     fn add_params(&'a self, cmd: &mut Vec<Cow<'a, str>>) {
         cmd.push(self.backend.multiclient_name().into());
         cmd.push(self.listen_addr.into());
+        cmd.push("--warmup".into());
+        cmd.push(format!("{}", self.warmup).into());
         cmd.push("-r".into());
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-d".into());
@@ -116,9 +119,16 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("20")
+                .default_value("30")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("warmup")
+                .long("warmup")
+                .default_value("10")
+                .takes_value(true)
+                .help("Warmup time in seconds"),
         )
         .arg(
             Arg::with_name("read_percentage")
@@ -190,6 +200,7 @@ fn main() {
         .get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
+    let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
     let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
@@ -582,6 +593,7 @@ fn main() {
             backend: &backend,
             listen_addr,
             runtime,
+            warmup,
             read_percentage,
             articles,
             skewed,
