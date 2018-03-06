@@ -25,7 +25,7 @@ use std::io::prelude::*;
 use std::error::Error;
 use std::borrow::Cow;
 
-const SOUP_AMI: &str = "ami-7cbe4901";
+const SOUP_AMI: &str = "ami-7cdc2101";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
