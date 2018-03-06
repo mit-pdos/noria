@@ -783,7 +783,10 @@ fn run_clients(
     }
 
     eprintln!(" .. waiting for benchmark to complete");
+    let mut nworkers = 0;
     for (host, mut chan) in workers {
+        let mut got_lines = true;
+        nworkers += 1;
         if let Ok(ref mut f) = outf {
             // TODO: should we get histogram files here instead and merge them?
 
@@ -791,12 +794,14 @@ fn run_clients(
             chan.read_to_string(&mut stdout).unwrap();
             f.write_all(stdout.as_bytes()).unwrap();
 
+            got_lines = false;
             let mut is_overloaded = false;
             for line in stdout.lines() {
                 if !line.starts_with('#') {
                     let mut fields = line.split_whitespace().skip(1);
                     let pct: u32 = fields.next().unwrap().parse().unwrap();
                     let sjrn: u32 = fields.next().unwrap().parse().unwrap();
+                    got_lines = true;
 
                     if pct == 50 && sjrn > 100_000 {
                         is_overloaded = true;
@@ -824,10 +829,11 @@ fn run_clients(
         chan.wait_eof().unwrap();
         chan.wait_close().unwrap();
 
-        if chan.exit_status().unwrap() != 0 {
+        if !got_lines || chan.exit_status().unwrap() != 0 {
             eprintln!("{} failed to run benchmark client:", host.name);
             eprintln!("{}", stderr);
             eprintln!("");
+            any_not_overloaded = false;
         }
     }
 
