@@ -62,8 +62,9 @@ fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
     C: VoteClient + Send + 'static,
 {
-    // each load generator can generate ~3M reqs/s
-    let per_generator = 3_000_000;
+    // zipf takes ~66ns to generate a random number depending on the CPU,
+    // so each load generator cannot reasonably generate much more than ~1M reqs/s.
+    let per_generator = 1_000_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
     let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
     target /= ngen as f64;
@@ -317,14 +318,15 @@ where
 {
     let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
-    let end = time::Instant::now() + runtime;
+    let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
+
+    let start = time::Instant::now();
+    let end = start + warmup + runtime;
 
     let mut ops = 0;
     let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
-
-    // TODO: warmup
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let mut queued_w = Vec::new();
@@ -351,28 +353,32 @@ where
                 }
                 let done = time::Instant::now();
 
-                let remote_t = done.duration_since(sent);
-                let rmt = if write { &RMT_W } else { &RMT_R };
-                let us = remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
-                rmt.with(|h| {
-                    let mut h = h.borrow_mut();
-                    if h.record(us).is_err() {
-                        let m = h.high();
-                        h.record(m).unwrap();
-                    }
-                });
-
-                let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                for started in queued {
-                    let sjrn_t = done.duration_since(started);
-                    let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
-                    sjrn.with(|h| {
+                if sent.duration_since(start) > warmup {
+                    let remote_t = done.duration_since(sent);
+                    let rmt = if write { &RMT_W } else { &RMT_R };
+                    let us =
+                        remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
+                    rmt.with(|h| {
                         let mut h = h.borrow_mut();
                         if h.record(us).is_err() {
                             let m = h.high();
                             h.record(m).unwrap();
                         }
                     });
+
+                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
+                    for started in queued {
+                        let sjrn_t = done.duration_since(started);
+                        let us =
+                            sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
+                        sjrn.with(|h| {
+                            let mut h = h.borrow_mut();
+                            if h.record(us).is_err() {
+                                let m = h.high();
+                                h.record(m).unwrap();
+                            }
+                        });
+                    }
                 }
             }
         };
@@ -453,8 +459,15 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("15")
+                .default_value("30")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("warmup")
+                .long("warmup")
+                .takes_value(true)
+                .default_value("10")
+                .help("Warmup time in seconds"),
         )
         .arg(
             Arg::with_name("distribution")

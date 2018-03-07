@@ -25,24 +25,33 @@ use std::io::prelude::*;
 use std::error::Error;
 use std::borrow::Cow;
 
-const SOUP_AMI: &str = "ami-1f33c662";
+const SOUP_AMI: &str = "ami-7cdc2101";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
     listen_addr: &'a str,
     backend: &'a Backend,
     runtime: usize,
+    warmup: usize,
     articles: usize,
     read_percentage: usize,
-    // TODO: distribution
+    skewed: bool,
 }
 
 impl<'a> ClientParameters<'a> {
     fn add_params(&'a self, cmd: &mut Vec<Cow<'a, str>>) {
         cmd.push(self.backend.multiclient_name().into());
         cmd.push(self.listen_addr.into());
+        cmd.push("--warmup".into());
+        cmd.push(format!("{}", self.warmup).into());
         cmd.push("-r".into());
         cmd.push(format!("{}", self.runtime).into());
+        cmd.push("-d".into());
+        if self.skewed {
+            cmd.push("skewed".into());
+        } else {
+            cmd.push("uniform".into());
+        }
         cmd.push("-a".into());
         cmd.push(format!("{}", self.articles).into());
         cmd.push("--write-every".into());
@@ -73,11 +82,12 @@ impl<'a> ClientParameters<'a> {
 
     fn name(&self, target: usize, ext: &str) -> String {
         format!(
-            "{}.{}a.{}t.{}r.{}",
+            "{}.{}a.{}t.{}r.{}.{}",
             self.backend.uniq_name(),
             self.articles,
             target,
             self.read_percentage,
+            if self.skewed { "skewed" } else { "uniform" },
             ext
         )
     }
@@ -109,9 +119,16 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("20")
+                .default_value("30")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("warmup")
+                .long("warmup")
+                .default_value("10")
+                .takes_value(true)
+                .help("Warmup time in seconds"),
         )
         .arg(
             Arg::with_name("read_percentage")
@@ -119,6 +136,14 @@ fn main() {
                 .default_value("95")
                 .takes_value(true)
                 .help("The percentage of operations that are reads"),
+        )
+        .arg(
+            Arg::with_name("distribution")
+                .short("d")
+                .possible_values(&["uniform", "skewed"])
+                .default_value("uniform")
+                .takes_value(true)
+                .help("How to distribute keys."),
         )
         .subcommand(
             SubCommand::with_name("ec2")
@@ -175,7 +200,9 @@ fn main() {
         .get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
+    let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
+    let skewed = args.value_of("distribution").unwrap() == "skewed";
     let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
 
     let mut server = None;
@@ -423,12 +450,12 @@ fn main() {
     let backends = vec![
         Backend::Netsoup {
             workers: 2,
-            readers: 32,
+            readers: 14,
             shards: None,
         },
         Backend::Netsoup {
             workers: 2,
-            readers: 32,
+            readers: 14,
             shards: Some(2),
         },
         Backend::Mysql,
@@ -566,13 +593,15 @@ fn main() {
             backend: &backend,
             listen_addr,
             runtime,
+            warmup,
             read_percentage,
             articles,
+            skewed,
         };
 
         let targets = [
             100_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000,
-            12_000_000, 14_000_000,
+            10_000_000,
         ];
         // TODO: run more iterations
         for (i, &target) in targets.iter().enumerate() {
@@ -754,7 +783,10 @@ fn run_clients(
     }
 
     eprintln!(" .. waiting for benchmark to complete");
+    let mut nworkers = 0;
     for (host, mut chan) in workers {
+        let mut got_lines = true;
+        nworkers += 1;
         if let Ok(ref mut f) = outf {
             // TODO: should we get histogram files here instead and merge them?
 
@@ -762,12 +794,14 @@ fn run_clients(
             chan.read_to_string(&mut stdout).unwrap();
             f.write_all(stdout.as_bytes()).unwrap();
 
+            got_lines = false;
             let mut is_overloaded = false;
             for line in stdout.lines() {
                 if !line.starts_with('#') {
                     let mut fields = line.split_whitespace().skip(1);
                     let pct: u32 = fields.next().unwrap().parse().unwrap();
                     let sjrn: u32 = fields.next().unwrap().parse().unwrap();
+                    got_lines = true;
 
                     if pct == 50 && sjrn > 100_000 {
                         is_overloaded = true;
@@ -795,10 +829,11 @@ fn run_clients(
         chan.wait_eof().unwrap();
         chan.wait_close().unwrap();
 
-        if chan.exit_status().unwrap() != 0 {
+        if !got_lines || chan.exit_status().unwrap() != 0 {
             eprintln!("{} failed to run benchmark client:", host.name);
             eprintln!("{}", stderr);
             eprintln!("");
+            any_not_overloaded = false;
         }
     }
 
