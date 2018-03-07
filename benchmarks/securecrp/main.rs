@@ -28,15 +28,15 @@ impl Backend {
 
         cb.log_with(blender_log);
 
-        let mut g = cb.build_local();
-
         match reuse.as_ref() {
-            "finkelstein" => g.enable_reuse(ReuseConfigType::Finkelstein),
-            "full" => g.enable_reuse(ReuseConfigType::Full),
-            "noreuse" => g.enable_reuse(ReuseConfigType::NoReuse),
-            "relaxed" => g.enable_reuse(ReuseConfigType::Relaxed),
+            "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
+            "full" => cb.set_reuse(ReuseConfigType::Full),
+            "noreuse" => cb.set_reuse(ReuseConfigType::NoReuse),
+            "relaxed" => cb.set_reuse(ReuseConfigType::Relaxed),
             _ => panic!("reuse configuration not supported"),
         }
+
+        let g = cb.build_local();
 
         Backend { g: g }
     }
