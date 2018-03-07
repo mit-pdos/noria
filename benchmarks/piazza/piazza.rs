@@ -1,289 +1,364 @@
 extern crate distributary;
+extern crate rand;
 
 #[macro_use]
 extern crate clap;
 
-use std::{thread, time};
-use std::fs::{File, OpenOptions};
+use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::Write;
+use std::{thread, time};
 
-use distributary::{Base, Blender, DataType, Filter, Join, JoinType, Mutator, NodeIndex};
+#[macro_use]
+mod populate;
 
-pub struct Piazza {
-    pub soup: Blender,
-    user: NodeIndex,
-    post: NodeIndex,
-    class: NodeIndex,
-    taking: NodeIndex,
+use populate::{Populate, NANOS_PER_SEC};
+
+pub struct Backend {
+    g: ControllerHandle<LocalAuthority>,
 }
 
-enum Fanout {
-    All,
-    Few,
+#[derive(PartialEq)]
+enum PopulateType {
+    Before,
+    After,
+    NoPopulate,
 }
 
-impl Piazza {
-    // Create the base nodes for our Piazza application
-    pub fn new() -> Self {
-        let mut g = Blender::new();
-        g.log_with(distributary::logger_pls());
+impl Backend {
+    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
+        let mut cb = ControllerBuilder::default();
+        let log = distributary::logger_pls();
+        let blender_log = log.clone();
 
-        let (user, post, class, taking) = g.migrate(|mig| {
-            // add a user account base table
-            let user = mig.add_ingredient("user", &["uid", "username", "hash"], Base::default());
+        if !partial {
+            cb.disable_partial();
+        }
 
-            // add a post base table
-            let post = mig.add_ingredient(
-                "post",
-                &["pid", "cid", "author", "content"],
-                Base::default().with_key(vec![1]),
-            );
+        match reuse.as_ref() {
+            "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
+            "full" => cb.set_reuse(ReuseConfigType::Full),
+            "noreuse" => cb.set_reuse(ReuseConfigType::NoReuse),
+            "relaxed" => cb.set_reuse(ReuseConfigType::Relaxed),
+            _ => panic!("reuse configuration not supported"),
+        }
 
-            // add a class base table
-            let class = mig.add_ingredient("class", &["cid", "classname"], Base::default());
+        cb.log_with(blender_log);
 
-            // associations between users and classes
-            let taking = mig.add_ingredient("taking", &["cid", "uid"], Base::default());
+        let g = cb.build_local();
 
-            (user, post, class, taking)
-        });
-
-        Piazza {
-            soup: g,
-            user: user,
-            post: post,
-            class: class,
-            taking: taking,
+        Backend {
+            g: g,
         }
     }
 
-    pub fn log_user(&mut self, uid: DataType) {
-        use distributary::Operator;
-
-        let post = self.post;
-        let taking = self.taking;
-        self.soup.migrate(|mig| {
-            // classes user is taking
-            let class_filter = Filter::new(taking, &[None, Some((Operator::Equal, uid.into()))]);
-
-            let user_classes = mig.add_ingredient("class_filter", &["cid", "uid"], class_filter);
-            // add visible posts to user
-            // only posts from classes the user is taking should be visible
-            use distributary::JoinSource::*;
-            let j = Join::new(
-                post,
-                user_classes,
-                JoinType::Inner,
-                vec![L(0), B(1, 0), L(2), L(3)],
-            );
-            let visible_posts =
-                mig.add_ingredient("visible_posts", &["pid", "cid", "author", "content"], j);
-
-            // maintain visible_posts
-            mig.maintain(visible_posts, 0);
-        });
-    }
-}
-
-fn populate_users(nusers: i64, mut users_putter: Mutator) {
-    for i in 0..nusers {
-        users_putter
-            .put(vec![i.into(), "user".into(), "pass".into()])
+    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+        let mut mutator = self
+            .g
+            .get_mutator(name)
             .unwrap();
+
+        let start = time::Instant::now();
+
+        let i = records.len();
+        for r in records.drain(..) {
+            mutator.put(r).unwrap();
+        }
+
+        let dur = dur_to_fsec!(start.elapsed());
+        println!(
+            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+            i,
+            name,
+            dur,
+            i as f64 / dur
+        );
+
+        i
+    }
+
+
+    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
+
+        self.g.create_universe(user_context.clone());
+
+        Ok(())
+    }
+
+    fn set_security_config(&mut self, config_file: &str) {
+        use std::io::Read;
+        let mut config = String::new();
+        let mut cf = File::open(config_file).unwrap();
+        cf.read_to_string(&mut config).unwrap();
+
+        // Install recipe with policies
+        self.g.set_security_config(config);
+    }
+
+    fn migrate(
+        &mut self,
+        schema_file: &str,
+        query_file: Option<&str>,
+    ) -> Result<(), String> {
+        use std::io::Read;
+
+        // Read schema file
+        let mut sf = File::open(schema_file).unwrap();
+        let mut s = String::new();
+        sf.read_to_string(&mut s).unwrap();
+
+        let mut rs = s.clone();
+        s.clear();
+
+        // Read query file
+        match query_file {
+            None => (),
+            Some(qf) => {
+                let mut qf = File::open(qf).unwrap();
+                qf.read_to_string(&mut s).unwrap();
+                rs.push_str("\n");
+                rs.push_str(&s);
+            }
+        }
+
+        // Install recipe
+        self.g.install_recipe(rs).unwrap();
+
+        Ok(())
     }
 }
 
-fn populate_classes(nclasses: i64, mut class_putter: Mutator) {
-    for i in 0..nclasses {
-        class_putter.put(vec![i.into(), i.into()]).unwrap();
-    }
-}
+fn make_user(id: i32) -> HashMap<String, DataType> {
+    let mut user = HashMap::new();
+    user.insert(String::from("id"), id.into());
 
-fn populate_taking(nclasses: i64, nusers: i64, mut taking_putter: Mutator, fanout: Fanout) {
-    match fanout {
-        Fanout::Few => for j in 0..nusers {
-            for i in 0..10 {
-                let cid = (j * 10 + i) % nclasses;
-                taking_putter.put(vec![cid.into(), j.into()]).unwrap();
-            }
-        },
-        Fanout::All => for j in 0..nusers {
-            for i in 0..nclasses {
-                taking_putter.put(vec![i.into(), j.into()]).unwrap();
-            }
-        },
-    }
+    user
 }
 
 fn main() {
     use clap::{App, Arg};
     let args = App::new("piazza")
         .version("0.1")
-        .about("Benchmarks Piazza-like application with some security policies.")
+        .about("Benchmarks Piazza-like application with security policies.")
         .arg(
-            Arg::with_name("nclasses")
-                .short("c")
-                .long("classes")
-                .value_name("N")
-                .default_value("100")
-                .help("Number of classes to prepopulate the database with"),
+            Arg::with_name("schema")
+                .short("s")
+                .required(true)
+                .default_value("benchmarks/piazza/schema.sql")
+                .help("Schema file for Piazza application"),
+        )
+        .arg(
+            Arg::with_name("queries")
+                .short("q")
+                .required(true)
+                .default_value("benchmarks/piazza/post-queries.sql")
+                .help("Query file for Piazza application"),
+        )
+        .arg(
+            Arg::with_name("policies")
+                .long("policies")
+                .required(true)
+                .default_value("benchmarks/piazza/complex-policies.json")
+                .help("Security policies file for Piazza application"),
+        )
+        .arg(
+            Arg::with_name("graph")
+                .short("g")
+                .default_value("pgraph.gv")
+                .help("File to dump application's soup graph, if set"),
+        )
+        .arg(
+            Arg::with_name("info")
+                .short("i")
+                .takes_value(true)
+                .help("Directory to dump runtime process info (doesn't work on OSX)"),
+        )
+        .arg(
+            Arg::with_name("reuse")
+                .long("reuse")
+                .default_value("full")
+                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
+                .help("Query reuse algorithm"),
+        )
+        .arg(
+            Arg::with_name("shard")
+                .long("shard")
+                .help("Enable sharding"),
+        )
+        .arg(
+            Arg::with_name("partial")
+                .long("partial")
+                .help("Enable partial materialization"),
+        )
+        .arg(
+            Arg::with_name("populate")
+                .long("populate")
+                .default_value("nopopulate")
+                .possible_values(&["after", "before", "nopopulate"])
+                .help("Populate app with randomly generated data"),
         )
         .arg(
             Arg::with_name("nusers")
                 .short("u")
-                .long("users")
-                .value_name("N")
+                .default_value("1000")
+                .help("Number of users in the db"),
+        )
+        .arg(
+            Arg::with_name("nlogged")
+                .short("l")
+                .default_value("1000")
+                .help("Number of logged users. Must be less or equal than the number of users in the db")
+            )
+        .arg(
+            Arg::with_name("nclasses")
+                .short("c")
                 .default_value("100")
-                .help("Number of users to prepopulate the database with"),
+                .help("Number of classes in the db"),
         )
         .arg(
             Arg::with_name("nposts")
                 .short("p")
-                .long("posts")
-                .value_name("N")
-                .default_value("10000")
-                .help("Number of posts to prepopulate the database with"),
+                .default_value("100000")
+                .help("Number of posts in the db"),
         )
         .arg(
-            Arg::with_name("csv")
-                .long("csv")
-                .required(false)
-                .help("Print output in CSV format."),
-        )
-        .arg(
-            Arg::with_name("fanout")
-                .long("fanout")
-                .short("f")
-                .possible_values(&["all", "few"])
-                .takes_value(true)
-                .default_value("all")
-                .help("Size of the class fanout for each user"),
-        )
-        .arg(
-            Arg::with_name("benchmark")
-                .possible_values(&["write", "migration"])
-                .takes_value(true)
-                .required(true)
-                .help("Benchmark configuration"),
+            Arg::with_name("private")
+                .long("private")
+                .default_value("0.1")
+                .help("Percentage of private posts"),
         )
         .get_matches();
 
 
-    println!("Creating app...");
-    let mut app = Piazza::new();
-    println!("Done with app creation.");
-
-    let nusers = value_t_or_exit!(args, "nusers", i64);
-    let nclasses = value_t_or_exit!(args, "nclasses", i64);
-    let nposts = value_t_or_exit!(args, "nposts", i64);
-    let benchmark = args.value_of("benchmark").unwrap();
-    let fanout = args.value_of("fanout").unwrap();
-    let csv = args.is_present("csv");
-
-    let class_putter = app.soup.get_mutator(app.class);
-    let user_putter = app.soup.get_mutator(app.user);
-    let taking_putter = app.soup.get_mutator(app.taking);
-    let mut post_putter = app.soup.get_mutator(app.post);
-
-    println!("Seeding...",);
-    populate_users(nusers, user_putter);
-    populate_classes(nclasses, class_putter);
-    match fanout.as_ref() {
-        "all" => populate_taking(nclasses, nusers, taking_putter, Fanout::All),
-        "few" => populate_taking(nclasses, nusers, taking_putter, Fanout::Few),
-        _ => {
-            unreachable!();
-        }
-    }
-
-    if benchmark == "migration" {
-        for pid in 0..nposts {
-            post_putter
-                .put(vec![
-                    pid.into(),
-                    (pid % nclasses).into(),
-                    (pid % nusers).into(),
-                    "post".into(),
-                ])
-                .unwrap();
-        }
-    }
-
-    println!("Finished seeding! Sleeping...");
-    thread::sleep(time::Duration::from_millis(100));
-
-
-    let mut times = Vec::new();
-    if csv {
-        File::create("out.csv").unwrap();
-    }
-
     println!("Starting benchmark...");
-    for uid in 0..nusers {
-        let start;
-        let end;
-        start = time::Instant::now();
-        match benchmark.as_ref() {
-            "migration" => {
-                app.log_user(uid.into());
 
-                end = time::Instant::now().duration_since(start);
-            }
-            "write" => {
-                for i in 0..1000 {
-                    post_putter
-                        .put(vec![
-                            i.into(),
-                            (i % nclasses).into(),
-                            (i % nusers).into(),
-                            "post".into(),
-                        ])
-                        .unwrap();
-                }
-                end = time::Instant::now().duration_since(start);
+    // Read arguments
+    let sloc = args.value_of("schema").unwrap();
+    let qloc = args.value_of("queries").unwrap();
+    let ploc = args.value_of("policies").unwrap();
+    let gloc = args.value_of("graph");
+    let iloc = args.value_of("info");
+    let partial = args.is_present("partial");
+    let shard = args.is_present("shard");
+    let reuse = args.value_of("reuse").unwrap();
+    let populate = args.value_of("populate").unwrap_or("nopopulate");;
+    let nusers = value_t_or_exit!(args, "nusers", i32);
+    let nlogged = value_t_or_exit!(args, "nlogged", i32);
+    let nclasses = value_t_or_exit!(args, "nclasses", i32);
+    let nposts = value_t_or_exit!(args, "nposts", i32);
+    let private = value_t_or_exit!(args, "private", f32);
 
-                thread::sleep(time::Duration::from_millis(100));
+    assert!(nlogged <= nusers, "nusers must be greater than nlogged");
 
-                app.log_user(uid.into());
-            }
-            _ => {
-                unreachable!();
-            }
-        };
+    // Initiliaze backend application with some queries and policies
+    println!("Initiliazing database schema...");
+    let mut backend = Backend::new(partial, shard, reuse);
+    backend.migrate(sloc, None).unwrap();
 
-        let time = (end.as_secs() as f64) + (end.subsec_nanos() as f64 / 1_000_000_000.0);
+    backend.set_security_config(ploc);
+    backend.migrate(sloc, Some(qloc)).unwrap();
 
-        times.push(time);
+    let populate = match populate.as_ref() {
+        "before" => PopulateType::Before,
+        "after" => PopulateType::After,
+        _ => PopulateType::NoPopulate,
+    };
 
-        if csv {
-            let mut f = OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open("out.csv")
-                .unwrap();
-            writeln!(f, "{:?},{:?}", uid, time).unwrap();
-        } else {
-            println!("{:?}: {:?}", uid, time);
+    let mut p = Populate::new(nposts, nusers, nclasses, private);
+
+    p.enroll_students();
+    let roles = p.get_roles();
+    let users = p.get_users();
+    let posts = p.get_posts();
+    let classes = p.get_classes();
+
+    backend.populate("Role", roles);
+    println!("Waiting for groups to be constructed...");
+    thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
+
+    backend.populate("User", users);
+    backend.populate("Class", classes);
+
+
+    if populate == PopulateType::Before {
+        backend.populate("Post", posts.clone());
+        println!("Waiting for posts to propagate...");
+        thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
+    }
+
+    println!("Finished writing! Sleeping for 2 seconds...");
+    thread::sleep(time::Duration::from_millis(2000));
+
+    // if partial, read 25% of the keys
+    if partial {
+        let leaf = format!("post_count");
+        let mut getter = backend.g.get_getter(&leaf).unwrap();
+        for author in 0..nusers/4 {
+            getter.lookup(&author.into(), false).unwrap();
         }
     }
 
-    println!("{:?} results ", benchmark);
-    println!("avg: {:?}", avg(&times));
-    println!("max: {:?}", max_duration(&times));
-    println!("min: {:?}", min_duration(&times));
+    // Login a user
+    println!("Login in users...");
+    for i in 0..nlogged {
+        let start = time::Instant::now();
+        backend.login(make_user(i)).is_ok();
+        let dur = dur_to_fsec!(start.elapsed());
+        println!(
+            "Migration {} took {:.2}s!",
+            i,
+            dur,
+        );
+
+        // if partial, read 25% of the keys
+        if partial {
+            let leaf = format!("post_count_u{}", i);
+            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            for author in 0..nusers/4 {
+                getter.lookup(&author.into(), false).unwrap();
+            }
+        }
+
+        if iloc.is_some() && i % 50 == 0 {
+            use std::fs;
+            let fname = format!("{}-{}", iloc.unwrap(), i);
+            fs::copy("/proc/self/status", fname).unwrap();
+        }
+    }
+
+    if populate == PopulateType::After {
+        backend.populate("Post", posts);
+    }
+
+
+    if !partial {
+        let mut dur = time::Duration::from_millis(0);
+        for uid in 0..nlogged {
+            let leaf = format!("post_count_u{}", uid);
+            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let start = time::Instant::now();
+            for author in 0..nusers {
+                getter.lookup(&author.into(), true).unwrap();
+            }
+            dur += start.elapsed();
+        }
+
+        let dur = dur_to_fsec!(dur);
+
+        println!(
+                "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+                nlogged * nusers,
+                dur,
+                (nlogged * nusers) as f64 / dur,
+            );
+    }
 
     println!("Done with benchmark.");
-}
 
-fn max_duration(stats: &Vec<f64>) -> f64 {
-    stats.iter().fold(0f64, |acc, el| f64::max(acc, *el))
-}
-
-fn min_duration(stats: &Vec<f64>) -> f64 {
-    stats.iter().fold(stats[0], |acc, el| f64::min(acc, *el))
-}
-
-
-fn avg(stats: &Vec<f64>) -> f64 {
-    stats.iter().sum::<f64>() / stats.len() as f64
+    if gloc.is_some() {
+        let graph_fname = gloc.unwrap();
+        let mut gf = File::create(graph_fname).unwrap();
+        assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+    }
 }

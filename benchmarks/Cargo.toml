@@ -72,6 +72,14 @@ path = "hotsoup/hotsoup.rs"
 name = "extract_hotcrp_queries"
 path = "hotsoup/extract_queries.rs"
 
+[[bin]]
+name = "securecrp"
+path = "securecrp/main.rs"
+
+[[bin]]
+name = "piazza"
+path = "piazza/piazza.rs"
+
 #[[bin]]
-#name = "piazza"
-#path = "piazza/piazza.rs"
+#name = "security-mysql"
+#path = "piazza/mysql.rs"
