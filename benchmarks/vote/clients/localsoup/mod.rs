@@ -56,7 +56,7 @@ impl VoteClient for Client {
         }
         let mut a = g.graph.get_mutator("Article").unwrap();
         a.batch_put(
-            (0..params.articles).map(|i| vec![(i as i64).into(), format!("Article #{}", i).into()]),
+            (0..params.articles).map(|i| vec![(i as i32).into(), format!("Article #{}", i).into()]),
         ).unwrap();
         if verbose {
             println!("Done with prepopulation");

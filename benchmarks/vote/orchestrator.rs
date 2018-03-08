@@ -25,13 +25,14 @@ use std::io::prelude::*;
 use std::error::Error;
 use std::borrow::Cow;
 
-const SOUP_AMI: &str = "ami-7cbe4901";
+const SOUP_AMI: &str = "ami-7cdc2101";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
     listen_addr: &'a str,
     backend: &'a Backend,
     runtime: usize,
+    warmup: usize,
     articles: usize,
     read_percentage: usize,
     skewed: bool,
@@ -41,6 +42,8 @@ impl<'a> ClientParameters<'a> {
     fn add_params(&'a self, cmd: &mut Vec<Cow<'a, str>>) {
         cmd.push(self.backend.multiclient_name().into());
         cmd.push(self.listen_addr.into());
+        cmd.push("--warmup".into());
+        cmd.push(format!("{}", self.warmup).into());
         cmd.push("-r".into());
         cmd.push(format!("{}", self.runtime).into());
         cmd.push("-d".into());
@@ -116,9 +119,16 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("20")
+                .default_value("30")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("warmup")
+                .long("warmup")
+                .default_value("10")
+                .takes_value(true)
+                .help("Warmup time in seconds"),
         )
         .arg(
             Arg::with_name("read_percentage")
@@ -190,6 +200,7 @@ fn main() {
         .get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
+    let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
     let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
@@ -439,12 +450,12 @@ fn main() {
     let backends = vec![
         Backend::Netsoup {
             workers: 2,
-            readers: 32,
+            readers: 14,
             shards: None,
         },
         Backend::Netsoup {
             workers: 2,
-            readers: 32,
+            readers: 14,
             shards: Some(2),
         },
         Backend::Mysql,
@@ -582,6 +593,7 @@ fn main() {
             backend: &backend,
             listen_addr,
             runtime,
+            warmup,
             read_percentage,
             articles,
             skewed,
@@ -771,7 +783,10 @@ fn run_clients(
     }
 
     eprintln!(" .. waiting for benchmark to complete");
+    let mut nworkers = 0;
     for (host, mut chan) in workers {
+        let mut got_lines = true;
+        nworkers += 1;
         if let Ok(ref mut f) = outf {
             // TODO: should we get histogram files here instead and merge them?
 
@@ -779,12 +794,14 @@ fn run_clients(
             chan.read_to_string(&mut stdout).unwrap();
             f.write_all(stdout.as_bytes()).unwrap();
 
+            got_lines = false;
             let mut is_overloaded = false;
             for line in stdout.lines() {
                 if !line.starts_with('#') {
                     let mut fields = line.split_whitespace().skip(1);
                     let pct: u32 = fields.next().unwrap().parse().unwrap();
                     let sjrn: u32 = fields.next().unwrap().parse().unwrap();
+                    got_lines = true;
 
                     if pct == 50 && sjrn > 100_000 {
                         is_overloaded = true;
@@ -812,10 +829,11 @@ fn run_clients(
         chan.wait_eof().unwrap();
         chan.wait_close().unwrap();
 
-        if chan.exit_status().unwrap() != 0 {
+        if !got_lines || chan.exit_status().unwrap() != 0 {
             eprintln!("{} failed to run benchmark client:", host.name);
             eprintln!("{}", stderr);
             eprintln!("");
+            any_not_overloaded = false;
         }
     }
 

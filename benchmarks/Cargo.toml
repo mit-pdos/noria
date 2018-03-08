@@ -7,7 +7,7 @@ authors = ["The Distributary Developers"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "159140accbaa6e83ee0d6d6eb22abb2fad03da9d" }
+nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "884e763ad7fe8bb49061c42131b377a387708e09" }
 regex = "0.2.2"
 slog = "2.0.6"
 #slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
@@ -72,6 +72,14 @@ path = "hotsoup/hotsoup.rs"
 name = "extract_hotcrp_queries"
 path = "hotsoup/extract_queries.rs"
 
+[[bin]]
+name = "securecrp"
+path = "securecrp/main.rs"
+
+[[bin]]
+name = "piazza"
+path = "piazza/piazza.rs"
+
 #[[bin]]
-#name = "piazza"
-#path = "piazza/piazza.rs"
+#name = "security-mysql"
+#path = "piazza/mysql.rs"

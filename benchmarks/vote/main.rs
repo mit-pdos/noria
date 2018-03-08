@@ -318,14 +318,15 @@ where
 {
     let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
-    let end = time::Instant::now() + runtime;
+    let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
+
+    let start = time::Instant::now();
+    let end = start + warmup + runtime;
 
     let mut ops = 0;
     let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
-
-    // TODO: warmup
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let mut queued_w = Vec::new();
@@ -352,72 +353,99 @@ where
                 }
                 let done = time::Instant::now();
 
-                let remote_t = done.duration_since(sent);
-                let rmt = if write { &RMT_W } else { &RMT_R };
-                let us = remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
-                rmt.with(|h| {
-                    let mut h = h.borrow_mut();
-                    if h.record(us).is_err() {
-                        let m = h.high();
-                        h.record(m).unwrap();
-                    }
-                });
-
-                let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                for started in queued {
-                    let sjrn_t = done.duration_since(started);
-                    let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
-                    sjrn.with(|h| {
+                if sent.duration_since(start) > warmup {
+                    let remote_t = done.duration_since(sent);
+                    let rmt = if write { &RMT_W } else { &RMT_R };
+                    let us =
+                        remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
+                    rmt.with(|h| {
                         let mut h = h.borrow_mut();
                         if h.record(us).is_err() {
                             let m = h.high();
                             h.record(m).unwrap();
                         }
                     });
+
+                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
+                    for started in queued {
+                        let sjrn_t = done.duration_since(started);
+                        let us =
+                            sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
+                        sjrn.with(|h| {
+                            let mut h = h.borrow_mut();
+                            if h.record(us).is_err() {
+                                let m = h.high();
+                                h.record(m).unwrap();
+                            }
+                        });
+                    }
                 }
             }
         };
 
         let mut next = time::Instant::now();
+        let mut forced = None;
         while next < end {
-            let mut now = time::Instant::now();
-            while now >= next {
+            let now = time::Instant::now();
+            // NOTE: while, not if, in case we start falling behind
+            while next <= now {
                 use rand::distributions::IndependentSample;
-
-                // schedule next delivery
-                next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
 
                 // only queue a new request if we're told to. if this is not the case, we've
                 // just been woken up so we can realize we need to send a batch
                 let id = id_rng.gen_range(0, articles);
                 if rng.gen_weighted_bool(every) {
+                    if queued_w.is_empty() && forced.is_none() {
+                        forced = Some(next + max_batch_time);
+                    }
                     queued_w_keys.push(id);
-                    queued_w.push(now);
+                    queued_w.push(next);
                 } else {
+                    if queued_r.is_empty() && forced.is_none() {
+                        forced = Some(next + max_batch_time);
+                    }
                     queued_r_keys.push(id);
-                    queued_r.push(now);
+                    queued_r.push(next);
                 }
 
-                now = time::Instant::now();
+                // schedule next delivery
+                next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
             }
 
+            // in case that took a while:
             let now = time::Instant::now();
-            if !queued_w.is_empty() && now.duration_since(queued_w[0]) > max_batch_time {
-                ops += queued_w.len();
-                pool.spawn(enqueue(
-                    queued_w.split_off(0),
-                    queued_w_keys.split_off(0),
-                    true,
-                ));
-            }
+            if let Some(f) = forced {
+                if f <= now {
+                    // time to send at least one batch
 
-            if !queued_r.is_empty() && now.duration_since(queued_r[0]) > max_batch_time {
-                ops += queued_r.len();
-                pool.spawn(enqueue(
-                    queued_r.split_off(0),
-                    queued_r_keys.split_off(0),
-                    false,
-                ));
+                    if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
+                        ops += queued_w.len();
+                        pool.spawn(enqueue(
+                            queued_w.split_off(0),
+                            queued_w_keys.split_off(0),
+                            true,
+                        ));
+                    }
+
+                    if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
+                        ops += queued_r.len();
+                        pool.spawn(enqueue(
+                            queued_r.split_off(0),
+                            queued_r_keys.split_off(0),
+                            false,
+                        ));
+                    }
+
+                    // since forced = Some, we better have sent at least one batch!
+                    forced = None;
+                    assert!(queued_r.is_empty() || queued_w.is_empty());
+                    if let Some(&qw) = queued_w.get(0) {
+                        forced = Some(qw + max_batch_time);
+                    }
+                    if let Some(&qr) = queued_r.get(0) {
+                        forced = Some(qr + max_batch_time);
+                    }
+                }
             }
 
             atomic::spin_loop_hint();
@@ -454,8 +482,15 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("15")
+                .default_value("30")
                 .help("Benchmark runtime in seconds"),
+        )
+        .arg(
+            Arg::with_name("warmup")
+                .long("warmup")
+                .takes_value(true)
+                .default_value("10")
+                .help("Warmup time in seconds"),
         )
         .arg(
             Arg::with_name("distribution")

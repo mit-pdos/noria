@@ -1,0 +1,23 @@
+{
+    "groups": [
+        {
+            "name": "chairs",
+            "membership": "SELECT username AS uid, level AS gid FROM UserProfile WHERE level = 'chair'",
+            "policies": [
+                {
+                    "table": "Paper",
+                    "predicate": "WHERE Paper.id < 999",
+                    "description": "Chairs can see all papers."
+                }
+            ]
+        }
+    ],
+    "policies": [
+      {
+        "name": "own-papers",
+        "description": "Users can papers that they authored.",
+        "table": "Paper",
+        "predicate": "WHERE Paper.author = UserContext.id;"
+      }
+    ]
+}
