@@ -6,12 +6,141 @@ use dataflow::ops::filter::FilterCondition;
 use std::collections::HashMap;
 
 pub fn optimize(q: MirQuery) -> MirQuery {
+    // impose deterministic filter order to increase reuse
+    canonicalize_filters(&q);
+
+    // drop unnecessary projection operators (e.g., those which just project all of the parent
+    // columns, or ones that follow operators that can themselves project, such as joins).
     //remove_extraneous_projections(&mut q);
+
     q
 }
 
 pub fn optimize_post_reuse(_q: &mut MirQuery) {
     // find_and_merge_filter_chains(q);
+}
+
+fn canonicalize_filters(q: &MirQuery) {
+    // traverse query, collect all filters connected with the same logical operator.
+    // We can swap the order of any filters applied in a direct chain, but not move filters
+    // between parallel chains.
+    let mut chains: Vec<Vec<_>> = Vec::new();
+
+    // depth first search to locate AND-ed filter chains
+    // TODO(malte): this only covers simple, non-nested chains for now
+    let mut node_stack = Vec::new();
+    node_stack.extend(q.roots.iter().cloned());
+    let mut visited_nodes = HashMap::new();
+    let mut active_chain = None;
+    while !node_stack.is_empty() {
+        let n = node_stack.pop().unwrap();
+        let node_name = n.borrow().versioned_name();
+        let mut end_chain = false;
+        if visited_nodes.contains_key(&node_name) {
+            continue;
+        }
+
+        visited_nodes.insert(node_name, true);
+
+        match n.borrow().inner {
+            MirNodeType::Filter { .. } => {
+                if let None = active_chain {
+                    active_chain = Some(Vec::new());
+                }
+
+                if active_chain.as_ref().unwrap().is_empty() {
+                    active_chain.as_mut().unwrap().push(n.clone());
+                } else if n.borrow().ancestors.len() == 1 {
+                    active_chain.as_mut().unwrap().push(n.clone());
+                } else {
+                    chains.push(active_chain.take().unwrap());
+                }
+
+                if n.borrow().children.len() != 1 {
+                    chains.push(active_chain.take().unwrap());
+                }
+            }
+            _ => {
+                // we need this because n most likely will be a children of
+                // last_node. if that's the case, mutably borrowing the
+                // child in end_filter_chain will cause a BorrowMutError
+                // because it was already borrowed in the match.
+                end_chain = true;
+            }
+        }
+
+        if end_chain && active_chain.is_some() {
+            chains.push(active_chain.take().unwrap());
+        }
+
+        for child in n.borrow().children.iter() {
+            node_stack.push(child.clone());
+        }
+    }
+
+    // now reorder the chains in canonical order (alphabetical by filter column)
+    println!("chains: {:?}", chains);
+    for c in chains {
+        if c.len() <= 1 {
+            // nothing to reorder
+            continue;
+        }
+        let mut i = 0;
+        while i + 1 < c.len() {
+            use std::cmp::Ordering;
+
+            let mut n1 = c[i].borrow_mut();
+            let mut n2 = c[i + 1].borrow_mut();
+            let conditions1 = match n1.inner {
+                MirNodeType::Filter { ref conditions } => conditions.clone(),
+                _ => unreachable!(),
+            };
+            let conditions2 = match n2.inner {
+                MirNodeType::Filter { ref conditions } => conditions.clone(),
+                _ => unreachable!(),
+            };
+
+            //
+            let c1: Vec<_> = conditions1
+                .iter()
+                .enumerate()
+                .map(|(i, cc)| (n1.columns[i].clone(), cc))
+                .filter(|cc| cc.1.is_some())
+                .collect();
+            let c2: Vec<_> = conditions2
+                .iter()
+                .enumerate()
+                .map(|(i, cc)| (n1.columns[i].clone(), cc))
+                .filter(|cc| cc.1.is_some())
+                .collect();
+            assert_eq!(c1.len(), 1);
+            assert_eq!(c2.len(), 1);
+
+            match c1[0].0.name.cmp(&c2[0].0.name) {
+                Ordering::Greater => {
+                    // swap the nodes!
+                    println!("hoist filter on {:?} above {:?}", c2[0], c1[0]);
+                    // also need to update other adjacent nodes
+                    let n1_children_tmp = n1.children.clone();
+                    let n2_ancestors_tmp = n2.ancestors.clone();
+                    for an in n1.ancestors.iter_mut() {
+                        an.borrow_mut().children = n1_children_tmp.clone();
+                    }
+                    for cn in n2.children.iter_mut() {
+                        cn.borrow_mut().ancestors = n2_ancestors_tmp.clone();
+                    }
+
+                    n1.children = n2.children.clone();
+                    n2.children = n2.ancestors.clone();
+                    n2.ancestors = n1.ancestors.clone();
+                    n1.ancestors = n1_children_tmp.clone();
+                }
+                _ => (),
+            }
+
+            i += 1;
+        }
+    }
 }
 
 #[allow(dead_code)]
