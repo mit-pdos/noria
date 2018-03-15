@@ -2,7 +2,7 @@
     "groups": [
         {
             "name": "chairs",
-            "membership": "SELECT username AS uid, level AS gid FROM UserProfile WHERE level = 'chair'",
+            "membership": "SELECT username AS uid, level AS gid FROM UserProfile WHERE level = 'chair' AND username = ?",
             "policies": [
                 {
                     "table": "Paper",
