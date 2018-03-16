@@ -3,14 +3,14 @@ use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, No
 
 pub(crate) const RECIPE: &str = "# base tables
 CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
+CREATE TABLE Vote (article_id int, user int);
 
 # read queries
 QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
             FROM Article \
-            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                       FROM Vote GROUP BY Vote.id) AS VoteCount \
-            ON (Article.id = VoteCount.id) WHERE Article.id = ?;";
+            LEFT JOIN (SELECT Vote.article_id, COUNT(user) AS votes \
+                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
+            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
 pub struct Graph {
     setup: Setup,
