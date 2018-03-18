@@ -163,8 +163,7 @@ impl GroupedOperation for ExtremumOperator {
             Extremum::MIN => format!("min({})", self.over),
             Extremum::MAX => format!("max({})", self.over),
         };
-        let group_cols = self
-            .group
+        let group_cols = self.group
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<_>>()

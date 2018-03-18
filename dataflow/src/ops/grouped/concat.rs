@@ -96,7 +96,7 @@ impl GroupConcat {
                     }
                     DataType::Int(ref n) => s.push_str(&n.to_string()),
                     DataType::BigInt(ref n) => s.push_str(&n.to_string()),
-                    DataType::Real(..) => s.push_str(&rec[*i].to_string()),
+                    DataType::Real(..) | DataType::ID(..) => s.push_str(&rec[*i].to_string()),
                     DataType::Timestamp(ref ts) => s.push_str(&ts.format("%+").to_string()),
                     DataType::None => unreachable!(),
                 },
@@ -203,8 +203,7 @@ impl GroupedOperation for GroupConcat {
     }
 
     fn description(&self) -> String {
-        let fields = self
-            .components
+        let fields = self.components
             .iter()
             .map(|c| match *c {
                 TextComponent::Literal(ref s) => format!("\"{}\"", s),

@@ -662,10 +662,45 @@ fn it_auto_increments_columns() {
     let result = read.lookup(&[article_type.into()], true).unwrap();
     assert_eq!(result.len(), 3);
     for i in 0..3 {
-        assert_eq!(result[i][0], (i + 1).into());
+        assert_eq!(result[i][0], DataType::ID(0, (i + 1) as i64));
     }
 }
 
+#[test]
+fn it_auto_increments_columns_with_shards() {
+    let n = 10;
+    let mut builder = ControllerBuilder::default();
+    builder.set_sharding(Some(n));
+    let mut g = builder.build_local();
+    // TODO(ekmartin): Sharding by column is done on the value we pass in, which with auto
+    // increment is always 0, resulting in all rows being put in the same shard.
+    // To still test AUTO_INCREMENT on different shards we make the key be a
+    // non-increment value (id) that we shard on.
+    let sql = "
+        CREATE TABLE Article (id int, aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(id));
+        QUERY Read: SELECT aid FROM Article WHERE type = ?;
+    ";
+
+    g.install_recipe(sql.to_owned()).unwrap();
+    let mut article = g.get_mutator("Article").unwrap();
+    let mut read = g.get_getter("Read").unwrap();
+
+    let article_type = "Interview";
+    for i in 0..n {
+        article
+            .put(vec![(i + 1).into(), 0.into(), article_type.into()])
+            .unwrap();
+    }
+    sleep();
+
+    let result = read.lookup(&[article_type.into()], true).unwrap();
+    assert_eq!(result.len(), n);
+    for i in 0..n {
+        // Since we use n shards, each shard should only hold one row
+        // (and the ID should always be 1):
+        assert_eq!(result[i][0], DataType::ID(i, 1i64));
+    }
+}
 
 #[test]
 #[allow_fail]
@@ -2363,8 +2398,7 @@ fn finkelstein1982_queries() {
 
         // Load queries
         f.read_to_string(&mut s).unwrap();
-        let lines: Vec<String> = s
-            .lines()
+        let lines: Vec<String> = s.lines()
             .filter(|l| !l.is_empty() && !l.starts_with("#"))
             .map(|l| {
                 if !(l.ends_with("\n") || l.ends_with(";")) {
@@ -2396,8 +2430,7 @@ fn tpc_w() {
 
         // Load queries
         f.read_to_string(&mut s).unwrap();
-        let lines: Vec<String> = s
-            .lines()
+        let lines: Vec<String> = s.lines()
             .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .map(|l| {
                 if !(l.ends_with('\n') || l.ends_with(';')) {

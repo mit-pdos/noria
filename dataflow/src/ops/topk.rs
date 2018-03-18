@@ -297,8 +297,7 @@ impl Ingredient for TopK {
     }
 
     fn description(&self) -> String {
-        let group_cols = self
-            .group_by
+        let group_cols = self.group_by
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<_>>()

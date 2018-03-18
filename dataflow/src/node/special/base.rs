@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use vec_map::VecMap;
 
-const INITIAL_AUTO_INCREMENT: i32 = 1;
+const INITIAL_AUTO_INCREMENT: i64 = 1;
 
 /// Base is used to represent the root nodes of the distributary data flow graph.
 ///
@@ -97,27 +97,25 @@ impl Base {
 
     // Replaces 0 values with the next available auto increment value, mutating
     // self.auto_increment_values if there are any changes.
-    fn replace_with_auto_increment(&mut self, row: &mut Vec<DataType>) {
+    fn replace_with_auto_increment(&mut self, row: &mut Vec<DataType>, shard: Option<usize>) {
         for (index, value) in self.auto_increment_values.iter_mut() {
             // When we're given a 0 value, replace it with the incremented version
             // of the last auto increment value for that column (or the initial increment value):
             *value = match (&row[*index], &value) {
-                (&DataType::Int(0), &&mut DataType::None) => DataType::Int(INITIAL_AUTO_INCREMENT),
-                (&DataType::BigInt(0), &&mut DataType::None) => {
-                    DataType::BigInt(INITIAL_AUTO_INCREMENT as i64)
+                (&DataType::Int(0), &&mut DataType::None)
+                | (&DataType::BigInt(0), &&mut DataType::None) => {
+                    DataType::ID(shard.unwrap_or(0), INITIAL_AUTO_INCREMENT)
                 }
-                (&DataType::Int(0), &&mut DataType::Int(i)) => DataType::Int(i + 1),
-                (&DataType::BigInt(0), &&mut DataType::BigInt(i)) => DataType::BigInt(i + 1),
+                (&DataType::Int(0), &&mut DataType::ID(s, i))
+                | (&DataType::BigInt(0), &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
                 // Non-0 values should override existing auto increment values, so that
                 // the auto incrementer continues from there the next time:
-                (&DataType::Int(i), _) => DataType::Int(i),
-                (&DataType::BigInt(i), _) => DataType::BigInt(i),
+                (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as i64),
+                (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i),
                 _ => panic!("tried giving a non-numeric value to a previously numeric column"),
             };
 
-            if *value != row[*index] {
-                row[*index] = value.clone();
-            }
+            row[*index] = value.clone();
         }
     }
 }
@@ -177,11 +175,12 @@ impl Base {
         us: LocalNodeIndex,
         mut rs: Records,
         state: &StateMap,
+        shard: Option<usize>,
     ) -> Records {
         if self.primary_key.is_none() || rs.is_empty() {
             for r in &mut *rs {
                 if let Record::Positive(ref mut u) = r {
-                    self.replace_with_auto_increment(u)
+                    self.replace_with_auto_increment(u, shard)
                 }
 
                 self.fix(r);
@@ -317,7 +316,7 @@ impl Base {
 
         for r in &mut results {
             if let Record::Positive(ref mut u) = r {
-                self.replace_with_auto_increment(u)
+                self.replace_with_auto_increment(u, shard)
             }
 
             self.fix(r);
@@ -363,9 +362,9 @@ mod tests {
         }
     }
 
-    fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R) -> Records {
+    fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R, shard: Option<usize>) -> Records {
         let rs: Records = r.into().into();
-        let mut records = test.base.process(test.local_addr, rs.into(), &test.states);
+        let mut records = test.base.process(test.local_addr, rs.into(), &test.states, shard);
         node::materialize(&mut records, None, test.states.get_mut(&test.local_addr));
         records
     }
@@ -396,7 +395,7 @@ mod tests {
     fn it_forwards() {
         let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into(), "a".into()];
-        assert_eq!(one_base_row(&mut base, rs.clone()), vec![rs].into());
+        assert_eq!(one_base_row(&mut base, rs.clone(), None), vec![rs].into());
     }
 
     #[test]
@@ -404,7 +403,7 @@ mod tests {
         let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into()];
         assert_eq!(
-            one_base_row(&mut base, rs.clone()),
+            one_base_row(&mut base, rs.clone(), None),
             vec![vec![1.into(), "default".into()]].into()
         );
     }
@@ -449,7 +448,7 @@ mod tests {
         let mut n = n.finalize(&graph);
 
         let mut one = move |u: Vec<Record>| {
-            let mut m = n.get_base_mut().unwrap().process(local, u.into(), &states);
+            let mut m = n.get_base_mut().unwrap().process(local, u.into(), &states, None);
             node::materialize(&mut m, None, states.get_mut(&local));
             m
         };
@@ -523,26 +522,27 @@ mod tests {
     fn it_supports_auto_increment_columns() {
         let mut base = setup(vec![0]);
         let strings = vec!["a", "b", "c"];
+        let shard = 10;
         for (i, string) in strings.into_iter().enumerate() {
             let rs: Vec<DataType> = vec![0.into(), string.into()];
             assert_eq!(
-                one_base_row(&mut base, rs),
-                vec![vec![(i + 1).into(), string.into()]].into()
+                one_base_row(&mut base, rs, Some(shard)),
+                vec![vec![DataType::ID(shard, (i + 1) as i64), string.into()]].into()
             );
         }
 
         // Non-0 values should not be overriden by auto increment:
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
-            one_base_row(&mut base, excempt.clone()),
-            vec![excempt].into()
+            one_base_row(&mut base, excempt.clone(), Some(shard)),
+            vec![vec![DataType::ID(shard, 10), "d".into()]].into()
         );
 
         // And the auto increment should then start from that value:
         let regular: Vec<DataType> = vec![0.into(), "e".into()];
         assert_eq!(
-            one_base_row(&mut base, regular),
-            vec![vec![11.into(), "e".into()]].into()
+            one_base_row(&mut base, regular, Some(shard)),
+            vec![vec![DataType::ID(shard, 11), "e".into()]].into()
         );
     }
 }
