@@ -698,7 +698,7 @@ fn it_auto_increments_columns_with_shards() {
     for i in 0..n {
         // Since we use n shards, each shard should only hold one row
         // (and the ID should always be 1):
-        assert_eq!(result[i][0], DataType::ID(i, 1i64));
+        assert_eq!(result[i][0], DataType::ID(i as u32, 1i64));
     }
 }
 

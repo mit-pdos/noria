@@ -104,7 +104,7 @@ impl Base {
             *value = match (&row[*index], &value) {
                 (&DataType::Int(0), &&mut DataType::None)
                 | (&DataType::BigInt(0), &&mut DataType::None) => {
-                    DataType::ID(shard.unwrap_or(0), INITIAL_AUTO_INCREMENT)
+                    DataType::ID(shard.unwrap_or(0) as u32, INITIAL_AUTO_INCREMENT)
                 }
                 (&DataType::Int(0), &&mut DataType::ID(s, i))
                 | (&DataType::BigInt(0), &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
@@ -522,11 +522,11 @@ mod tests {
     fn it_supports_auto_increment_columns() {
         let mut base = setup(vec![0]);
         let strings = vec!["a", "b", "c"];
-        let shard = 10;
+        let shard: u32 = 10;
         for (i, string) in strings.into_iter().enumerate() {
             let rs: Vec<DataType> = vec![0.into(), string.into()];
             assert_eq!(
-                one_base_row(&mut base, rs, Some(shard)),
+                one_base_row(&mut base, rs, Some(shard as usize)),
                 vec![vec![DataType::ID(shard, (i + 1) as i64), string.into()]].into()
             );
         }
@@ -534,14 +534,14 @@ mod tests {
         // Non-0 values should not be overriden by auto increment:
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
-            one_base_row(&mut base, excempt.clone(), Some(shard)),
+            one_base_row(&mut base, excempt.clone(), Some(shard as usize)),
             vec![vec![DataType::ID(shard, 10), "d".into()]].into()
         );
 
         // And the auto increment should then start from that value:
         let regular: Vec<DataType> = vec![0.into(), "e".into()];
         assert_eq!(
-            one_base_row(&mut base, regular, Some(shard)),
+            one_base_row(&mut base, regular, Some(shard as usize)),
             vec![vec![DataType::ID(shard, 11), "e".into()]].into()
         );
     }
