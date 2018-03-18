@@ -95,24 +95,22 @@ impl Base {
         }
     }
 
-    // Replaces 0 values with the next available auto increment value, mutating
+    // Replaces None values with the next available auto increment value, mutating
     // self.auto_increment_values if there are any changes.
     fn replace_with_auto_increment(&mut self, row: &mut Vec<DataType>, shard: Option<usize>) {
         for (index, value) in self.auto_increment_values.iter_mut() {
-            // When we're given a 0 value, replace it with the incremented version
+            // When we're given a None value, replace it with the incremented version
             // of the last auto increment value for that column (or the initial increment value):
             *value = match (&row[*index], &value) {
-                (&DataType::Int(0), &&mut DataType::None)
-                | (&DataType::BigInt(0), &&mut DataType::None) => {
+                (&DataType::None, &&mut DataType::None) => {
                     DataType::ID(shard.unwrap_or(0) as u32, INITIAL_AUTO_INCREMENT)
                 }
-                (&DataType::Int(0), &&mut DataType::ID(s, i))
-                | (&DataType::BigInt(0), &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
-                // Non-0 values should override existing auto increment values, so that
+                (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
+                // Other values should override existing auto increment values, so that
                 // the auto incrementer continues from there the next time:
                 (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as i64),
                 (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i),
-                _ => panic!("tried giving a non-numeric value to a previously numeric column"),
+                _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
             };
 
             row[*index] = value.clone();
@@ -524,14 +522,14 @@ mod tests {
         let strings = vec!["a", "b", "c"];
         let shard: u32 = 10;
         for (i, string) in strings.into_iter().enumerate() {
-            let rs: Vec<DataType> = vec![0.into(), string.into()];
+            let rs: Vec<DataType> = vec![DataType::None, string.into()];
             assert_eq!(
                 one_base_row(&mut base, rs, Some(shard as usize)),
                 vec![vec![DataType::ID(shard, (i + 1) as i64), string.into()]].into()
             );
         }
 
-        // Non-0 values should not be overriden by auto increment:
+        // Explicit values should not be overriden by auto increment:
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
             one_base_row(&mut base, excempt.clone(), Some(shard as usize)),
@@ -539,7 +537,7 @@ mod tests {
         );
 
         // And the auto increment should then start from that value:
-        let regular: Vec<DataType> = vec![0.into(), "e".into()];
+        let regular: Vec<DataType> = vec![DataType::None, "e".into()];
         assert_eq!(
             one_base_row(&mut base, regular, Some(shard as usize)),
             vec![vec![DataType::ID(shard, 11), "e".into()]].into()

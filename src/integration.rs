@@ -654,10 +654,11 @@ fn it_auto_increments_columns() {
     let mut read = g.get_getter("Read").unwrap();
 
     let article_type = "Interview";
-    article.put(vec![0.into(), article_type.into()]).unwrap();
-    article.put(vec![0.into(), article_type.into()]).unwrap();
-    article.put(vec![0.into(), article_type.into()]).unwrap();
-    sleep();
+    for _ in 0..3 {
+        article
+            .put(vec![DataType::None, article_type.into()])
+            .unwrap();
+    }
 
     let result = read.lookup(&[article_type.into()], true).unwrap();
     assert_eq!(result.len(), 3);
@@ -688,7 +689,7 @@ fn it_auto_increments_columns_with_shards() {
     let article_type = "Interview";
     for i in 0..n {
         article
-            .put(vec![(i + 1).into(), 0.into(), article_type.into()])
+            .put(vec![(i + 1).into(), DataType::None, article_type.into()])
             .unwrap();
     }
     sleep();
