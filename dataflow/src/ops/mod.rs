@@ -220,12 +220,12 @@ pub mod test {
     use petgraph::graph::NodeIndex;
 
     pub struct MockGraph {
-        graph: Graph,
-        source: NodeIndex,
-        nut: Option<IndexPair>, // node under test
+        pub graph: Graph,
+        pub source: NodeIndex,
+        pub nut: Option<IndexPair>, // node under test
         pub states: StateMap,
-        nodes: DomainNodes,
-        remap: HashMap<NodeIndex, IndexPair>,
+        pub nodes: DomainNodes,
+        pub remap: HashMap<NodeIndex, IndexPair>,
     }
 
     impl MockGraph {

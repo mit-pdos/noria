@@ -290,6 +290,35 @@ impl Base {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use node;
+    use ops::test::MockGraph;
+
+    fn setup() -> (MockGraph, IndexPair) {
+        let mut g = MockGraph::new();
+        let base_addr = g.add_base_defaults("base", &["x"], vec![DataType::None]);
+        {
+            let global = base_addr.as_global();
+            let node = &mut g.graph[global];
+            let base = node.get_base_mut().unwrap();
+            let state = g.states.get_mut(&*base_addr).unwrap();
+            state.add_key(&[0], None);
+            base.add_column("default".into());
+        }
+        (g, base_addr)
+    }
+
+    fn one_base_row<R: Into<Record>>(mock: &mut MockGraph, base: IndexPair, r: R) -> Records {
+        let mut records = {
+            let rs: Records = r.into().into();
+            let node = &mut mock.graph[base.as_global()];
+            node.get_base_mut()
+                .unwrap()
+                .process(*base, rs.into(), &mock.states)
+        };
+
+        node::materialize(&mut records, None, mock.states.get_mut(&*base));
+        records
+    }
 
     #[test]
     fn it_works_default() {
@@ -311,6 +340,23 @@ mod tests {
         assert_eq!(b.defaults.len(), 0);
         assert_eq!(b.dropped.len(), 0);
         assert_eq!(b.unmodified, true);
+    }
+
+    #[test]
+    fn it_forwards() {
+        let (mut g, base) = setup();
+        let rs: Vec<DataType> = vec![1.into(), "a".into()];
+        assert_eq!(one_base_row(&mut g, base, rs.clone()), vec![rs].into());
+    }
+
+    #[test]
+    fn it_adds_defaults() {
+        let (mut g, base) = setup();
+        let rs: Vec<DataType> = vec![1.into()];
+        assert_eq!(
+            one_base_row(&mut g, base, rs.clone()),
+            vec![vec![1.into(), "default".into()]].into()
+        );
     }
 
     fn test_lots_of_changes_in_same_batch(mut state: Box<State>) {
