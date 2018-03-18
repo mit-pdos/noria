@@ -1,6 +1,5 @@
-use nom_sql::{
-    ArithmeticBase, ArithmeticExpression, Column, ColumnConstraint, ColumnSpecification, OrderType,
-};
+use nom_sql::{ArithmeticBase, ArithmeticExpression, Column, ColumnConstraint, ColumnSpecification,
+              OrderType};
 use std::collections::HashMap;
 
 use basics::{DataType, NodeIndex};
@@ -316,8 +315,7 @@ pub(crate) fn adapt_base_node(
     };
 
     for a in add.iter() {
-        let default_value = match a
-            .constraints
+        let default_value = match a.constraints
             .iter()
             .filter_map(|c| match *c {
                 ColumnConstraint::DefaultValue(ref dv) => Some(dv.into()),
@@ -392,7 +390,20 @@ pub(crate) fn make_base_node(
         })
         .collect::<Vec<DataType>>();
 
-    let base = if pkey_columns.len() > 0 {
+    let auto_increment_columns = column_specs
+        .iter()
+        .enumerate()
+        .filter(|&(_i, &(ref cs, _))| {
+            cs.constraints
+                .iter()
+                .any(|c| *c == ColumnConstraint::AutoIncrement)
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    let mut base =
+        node::special::Base::new(default_values).with_auto_increment(auto_increment_columns);
+    base = if pkey_columns.len() > 0 {
         let pkey_column_ids = pkey_columns
             .iter()
             .map(|pkc| {
@@ -403,9 +414,9 @@ pub(crate) fn make_base_node(
                     .unwrap()
             })
             .collect();
-        node::special::Base::new(default_values).with_key(pkey_column_ids)
+        base.with_key(pkey_column_ids)
     } else {
-        node::special::Base::new(default_values)
+        base
     };
 
     FlowNode::New(mig.add_base(name, column_names.as_slice(), base, transactional))
@@ -578,8 +589,7 @@ pub(crate) fn make_join_node(
 
     let column_names = column_names(columns);
 
-    let projected_cols_left: Vec<Column> = left
-        .borrow()
+    let projected_cols_left: Vec<Column> = left.borrow()
         .columns
         .iter()
         .filter(|c| proj_cols.contains(c))
@@ -708,8 +718,7 @@ pub(crate) fn make_project_node(
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
 
-    let projected_column_ids = emit
-        .iter()
+    let projected_column_ids = emit.iter()
         .map(|c| parent.borrow().column_id_for_column(c))
         .collect::<Vec<_>>();
 
@@ -766,8 +775,7 @@ pub(crate) fn make_topk_node(
         Some(ref o) => {
             assert_eq!(offset, 0); // Non-zero offset not supported
 
-            let columns: Vec<_> = o
-                .iter()
+            let columns: Vec<_> = o.iter()
                 .map(|&(ref c, ref order_type)| {
                     // SQL and Soup disagree on what ascending and descending order means, so do the
                     // conversion here.

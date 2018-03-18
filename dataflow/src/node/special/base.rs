@@ -4,6 +4,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use vec_map::VecMap;
 
+const INITIAL_AUTO_INCREMENT: i32 = 1;
+
 /// Base is used to represent the root nodes of the distributary data flow graph.
 ///
 /// These nodes perform no computation, and their job is merely to persist all received updates and
@@ -16,6 +18,9 @@ pub struct Base {
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
+
+    // column_index -> last used auto increment value (starts out as None):
+    auto_increment_values: HashMap<usize, DataType>,
 }
 
 impl Base {
@@ -29,6 +34,14 @@ impl Base {
     /// Builder with a known primary key.
     pub fn with_key(mut self, primary_key: Vec<usize>) -> Base {
         self.primary_key = Some(primary_key);
+        self
+    }
+
+    pub fn with_auto_increment(mut self, column_indices: Vec<usize>) -> Base {
+        self.auto_increment_values = column_indices
+            .into_iter()
+            .map(|index| (index, DataType::None))
+            .collect();
         self
     }
 
@@ -81,6 +94,32 @@ impl Base {
             row.extend(self.defaults.iter().skip(rlen).cloned());
         }
     }
+
+    // Replaces 0 values with the next available auto increment value, mutating
+    // self.auto_increment_values if there are any changes.
+    fn replace_with_auto_increment(&mut self, row: &mut Vec<DataType>) {
+        for (index, value) in self.auto_increment_values.iter_mut() {
+            // When we're given a 0 value, replace it with the incremented version
+            // of the last auto increment value for that column (or the initial increment value):
+            *value = match (&row[*index], &value) {
+                (&DataType::Int(0), &&mut DataType::None) => DataType::Int(INITIAL_AUTO_INCREMENT),
+                (&DataType::BigInt(0), &&mut DataType::None) => {
+                    DataType::BigInt(INITIAL_AUTO_INCREMENT as i64)
+                }
+                (&DataType::Int(0), &&mut DataType::Int(i)) => DataType::Int(i + 1),
+                (&DataType::BigInt(0), &&mut DataType::BigInt(i)) => DataType::BigInt(i + 1),
+                // Non-0 values should override existing auto increment values, so that
+                // the auto incrementer continues from there the next time:
+                (&DataType::Int(i), _) => DataType::Int(i),
+                (&DataType::BigInt(i), _) => DataType::BigInt(i),
+                _ => panic!("tried giving a non-numeric value to a previously numeric column"),
+            };
+
+            if *value != row[*index] {
+                row[*index] = value.clone();
+            }
+        }
+    }
 }
 
 /// A Base clone must have a different unique_id so that no two copies write to the same file.
@@ -92,6 +131,7 @@ impl Clone for Base {
             primary_key: self.primary_key.clone(),
 
             defaults: self.defaults.clone(),
+            auto_increment_values: self.auto_increment_values.clone(),
             dropped: self.dropped.clone(),
             unmodified: self.unmodified,
         }
@@ -104,6 +144,7 @@ impl Default for Base {
             primary_key: None,
 
             defaults: Vec::new(),
+            auto_increment_values: HashMap::new(),
             dropped: Vec::new(),
             unmodified: true,
         }
@@ -139,13 +180,18 @@ impl Base {
     ) -> Records {
         if self.primary_key.is_none() || rs.is_empty() {
             for r in &mut *rs {
+                if let Record::Positive(ref mut u) = r {
+                    self.replace_with_auto_increment(u)
+                }
+
                 self.fix(r);
             }
 
             return rs;
         }
 
-        let key_cols = &self.primary_key.as_ref().unwrap()[..];
+        // TODO: try removing this .clone:
+        let key_cols = &self.primary_key.as_ref().unwrap().clone()[..];
 
         let mut rs: Vec<_> = rs.into();
         rs.sort_by(|a, b| key_of(key_cols, a).cmp(key_of(key_cols, b)));
@@ -270,6 +316,10 @@ impl Base {
         }
 
         for r in &mut results {
+            if let Record::Positive(ref mut u) = r {
+                self.replace_with_auto_increment(u)
+            }
+
             self.fix(r);
         }
 
@@ -291,32 +341,32 @@ impl Base {
 mod tests {
     use super::*;
     use node;
-    use ops::test::MockGraph;
 
-    fn setup() -> (MockGraph, IndexPair) {
-        let mut g = MockGraph::new();
-        let base_addr = g.add_base_defaults("base", &["x"], vec![DataType::None]);
-        {
-            let global = base_addr.as_global();
-            let node = &mut g.graph[global];
-            let base = node.get_base_mut().unwrap();
-            let state = g.states.get_mut(&*base_addr).unwrap();
-            state.add_key(&[0], None);
-            base.add_column("default".into());
-        }
-        (g, base_addr)
+    struct TestBase {
+        base: Base,
+        local_addr: LocalNodeIndex,
+        states: StateMap,
     }
 
-    fn one_base_row<R: Into<Record>>(mock: &mut MockGraph, base: IndexPair, r: R) -> Records {
-        let mut records = {
-            let rs: Records = r.into().into();
-            let node = &mut mock.graph[base.as_global()];
-            node.get_base_mut()
-                .unwrap()
-                .process(*base, rs.into(), &mock.states)
-        };
+    fn setup(auto_increment_columns: Vec<usize>) -> TestBase {
+        let mut base = Base::new(vec![DataType::None]).with_auto_increment(auto_increment_columns);
+        base.add_column("default".into());
+        let local_addr = unsafe { LocalNodeIndex::make(0) };
+        let mut states = StateMap::default();
+        let mut state = box MemoryState::default();
+        state.add_key(&[0], None);
+        states.insert(local_addr, state);
+        TestBase {
+            base,
+            local_addr,
+            states,
+        }
+    }
 
-        node::materialize(&mut records, None, mock.states.get_mut(&*base));
+    fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R) -> Records {
+        let rs: Records = r.into().into();
+        let mut records = test.base.process(test.local_addr, rs.into(), &test.states);
+        node::materialize(&mut records, None, test.states.get_mut(&test.local_addr));
         records
     }
 
@@ -344,17 +394,17 @@ mod tests {
 
     #[test]
     fn it_forwards() {
-        let (mut g, base) = setup();
+        let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into(), "a".into()];
-        assert_eq!(one_base_row(&mut g, base, rs.clone()), vec![rs].into());
+        assert_eq!(one_base_row(&mut base, rs.clone()), vec![rs].into());
     }
 
     #[test]
     fn it_adds_defaults() {
-        let (mut g, base) = setup();
+        let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into()];
         assert_eq!(
-            one_base_row(&mut g, base, rs.clone()),
+            one_base_row(&mut base, rs.clone()),
             vec![vec![1.into(), "default".into()]].into()
         );
     }
@@ -467,5 +517,32 @@ mod tests {
         );
 
         test_lots_of_changes_in_same_batch(box state);
+    }
+
+    #[test]
+    fn it_supports_auto_increment_columns() {
+        let mut base = setup(vec![0]);
+        let strings = vec!["a", "b", "c"];
+        for (i, string) in strings.into_iter().enumerate() {
+            let rs: Vec<DataType> = vec![0.into(), string.into()];
+            assert_eq!(
+                one_base_row(&mut base, rs),
+                vec![vec![(i + 1).into(), string.into()]].into()
+            );
+        }
+
+        // Non-0 values should not be overriden by auto increment:
+        let excempt: Vec<DataType> = vec![10.into(), "d".into()];
+        assert_eq!(
+            one_base_row(&mut base, excempt.clone()),
+            vec![excempt].into()
+        );
+
+        // And the auto increment should then start from that value:
+        let regular: Vec<DataType> = vec![0.into(), "e".into()];
+        assert_eq!(
+            one_base_row(&mut base, regular),
+            vec![vec![11.into(), "e".into()]].into()
+        );
     }
 }
