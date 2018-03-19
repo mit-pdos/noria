@@ -362,7 +362,8 @@ mod tests {
 
     fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R, shard: Option<usize>) -> Records {
         let rs: Records = r.into().into();
-        let mut records = test.base.process(test.local_addr, rs.into(), &test.states, shard);
+        let mut records = test.base
+            .process(test.local_addr, rs.into(), &test.states, shard);
         node::materialize(&mut records, None, test.states.get_mut(&test.local_addr));
         records
     }
@@ -446,7 +447,9 @@ mod tests {
         let mut n = n.finalize(&graph);
 
         let mut one = move |u: Vec<Record>| {
-            let mut m = n.get_base_mut().unwrap().process(local, u.into(), &states, None);
+            let mut m = n.get_base_mut()
+                .unwrap()
+                .process(local, u.into(), &states, None);
             node::materialize(&mut m, None, states.get_mut(&local));
             m
         };

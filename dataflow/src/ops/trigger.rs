@@ -81,8 +81,7 @@ impl Trigger {
                 ref controller_url,
                 ref group,
             } => {
-                let contexts = ids
-                    .iter()
+                let contexts = ids.iter()
                     .map(|gid| {
                         let mut group_context: HashMap<String, DataType> = HashMap::new();
                         group_context.insert(String::from("id"), gid.clone());

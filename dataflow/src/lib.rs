@@ -52,6 +52,8 @@ mod transactions;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use rand::{thread_rng, Rng};
+
 use checktable::TokenGenerator;
 
 pub type Readers = Arc<
@@ -100,6 +102,7 @@ pub fn shard_by(dt: &basics::DataType, shards: usize) -> usize {
             hasher.write(s.as_bytes());
             hasher.finish() as usize % shards
         }
+        basics::DataType::None => thread_rng().gen_range(0, shards),
         ref x => {
             println!("asked to shard on value {:?}", x);
             unimplemented!();

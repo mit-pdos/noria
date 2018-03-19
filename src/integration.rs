@@ -659,6 +659,7 @@ fn it_auto_increments_columns() {
             .put(vec![DataType::None, article_type.into()])
             .unwrap();
     }
+    sleep();
 
     let result = read.lookup(&[article_type.into()], true).unwrap();
     assert_eq!(result.len(), 3);
@@ -673,12 +674,8 @@ fn it_auto_increments_columns_with_shards() {
     let mut builder = ControllerBuilder::default();
     builder.set_sharding(Some(n));
     let mut g = builder.build_local();
-    // TODO(ekmartin): Sharding by column is done on the value we pass in, which with auto
-    // increment is always 0, resulting in all rows being put in the same shard.
-    // To still test AUTO_INCREMENT on different shards we make the key be a
-    // non-increment value (id) that we shard on.
     let sql = "
-        CREATE TABLE Article (id int, aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(id));
+        CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
     ";
 
@@ -687,20 +684,30 @@ fn it_auto_increments_columns_with_shards() {
     let mut read = g.get_getter("Read").unwrap();
 
     let article_type = "Interview";
-    for i in 0..n {
+    for _ in 0..n {
         article
-            .put(vec![(i + 1).into(), DataType::None, article_type.into()])
+            .put(vec![DataType::None, article_type.into()])
             .unwrap();
     }
     sleep();
 
-    let result = read.lookup(&[article_type.into()], true).unwrap();
-    assert_eq!(result.len(), n);
-    for i in 0..n {
-        // Since we use n shards, each shard should only hold one row
-        // (and the ID should always be 1):
-        assert_eq!(result[i][0], DataType::ID(i as u32, 1i64));
+    let results = read.lookup(&[article_type.into()], true).unwrap();
+    assert_eq!(results.len(), n);
+    let mut shards = vec![0; n];
+    for result in results {
+        match result[0] {
+            DataType::ID(s, v) => {
+                shards[s as usize] = i64::max(v, shards[s as usize]);
+                assert!(s < 10);
+                assert!(v > 0 && s <= 10);
+            }
+            _ => unreachable!(),
+        };
     }
+
+    // Shards are picked at random for auto increment columns,
+    // but the IDs for each shard should sum up to the number of rows we inserted.
+    assert_eq!(shards.into_iter().sum::<i64>(), 10);
 }
 
 #[test]
