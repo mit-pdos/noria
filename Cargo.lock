@@ -331,6 +331,7 @@ dependencies = [
  "nom_sql 0.0.1 (git+https://github.com/ms705/nom-sql.git?rev=3a943c6df6a96de52fec357c40e773a8c1e67351)",
  "petgraph 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "rahashmap 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
