@@ -35,6 +35,8 @@ impl VoteClient for Client {
         } else {
             DurabilityMode::MemoryOnly
         };
+        let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
+        persistence.flush_timeout = time::Duration::new(0, flush_ns);
         persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
         persistence.log_prefix = "vote".to_string();
         persistence.persist_base_nodes = args.is_present("persist-bases");
