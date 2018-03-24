@@ -726,6 +726,13 @@ fn main() {
                         .help("Size of batches processed at base nodes."),
                 )
                 .arg(
+                    Arg::with_name("flush-timeout")
+                        .long("flush-timeout")
+                        .takes_value(true)
+                        .default_value("100000")
+                        .help("Time to wait before processing a merged packet, in nanoseconds."),
+                )
+                .arg(
                     Arg::with_name("stupid")
                         .long("stupid")
                         .help("Make the migration stupid")
