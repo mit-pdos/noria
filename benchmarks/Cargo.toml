@@ -7,7 +7,7 @@ authors = ["The Distributary Developers"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "9fd5a351ad542da7acccf11d290c5bc7c13f7fc9" }
+nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "878e5d1bd05d2e7a33a6ceff311305b9dbdd6c09" }
 regex = "0.2.2"
 slog = "2.0.6"
 #slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
