@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use petgraph;
 
 pub fn assign(
-    log: &Logger,
+    log: Logger,
     graph: &mut Graph,
     source: NodeIndex,
     new: &HashSet<NodeIndex>,

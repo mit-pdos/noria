@@ -134,7 +134,7 @@ pub fn merge_deps(
 
 pub fn finalize(
     deps: HashMap<DomainIndex, (IngressFromBase, EgressForBase)>,
-    log: &Logger,
+    log: Logger,
     txs: &mut HashMap<DomainIndex, DomainHandle>,
     at: i64,
 ) {

@@ -7,7 +7,7 @@ use petgraph;
 use dataflow::ops;
 
 pub fn shard(
-    log: &Logger,
+    log: Logger,
     graph: &mut Graph,
     source: NodeIndex,
     new: &mut HashSet<NodeIndex>,
@@ -62,7 +62,7 @@ pub fn shard(
 
             if s != input_shardings[&ni] {
                 // input is sharded by different key -- need shuffle
-                reshard(log, new, &mut swaps, graph, ni, node, s);
+                reshard(log.clone(), new, &mut swaps, graph, ni, node, s);
             }
             graph.node_weight_mut(node).unwrap().shard_by(s);
             continue;
@@ -122,7 +122,7 @@ pub fn shard(
                 // of that key, we can probably re-use the existing sharding?
                 error!(log, "de-sharding for lack of multi-key sharding support"; "node" => ?node);
                 for (&ni, _) in &input_shardings {
-                    reshard(log, new, &mut swaps, graph, ni, node, Sharding::ForcedNone);
+                    reshard(log.clone(), new, &mut swaps, graph, ni, node, Sharding::ForcedNone);
                 }
             }
             continue;
@@ -159,7 +159,7 @@ pub fn shard(
                     info!(log, "de-sharding node that partitions by output key";
                           "node" => ?node);
                     for (ni, s) in input_shardings.iter_mut() {
-                        reshard(log, new, &mut swaps, graph, *ni, node, Sharding::ForcedNone);
+                        reshard(log.clone(), new, &mut swaps, graph, *ni, node, Sharding::ForcedNone);
                         *s = Sharding::ForcedNone;
                     }
                     // ok to continue since standard shard_by is None
@@ -218,7 +218,7 @@ pub fn shard(
                             let need_sharding = Sharding::ByColumn(col, sharding_factor);
                             if input_shardings[&ni] != need_sharding {
                                 // input is sharded by different key -- need shuffle
-                                reshard(log, new, &mut swaps, graph, ni, node, need_sharding);
+                                reshard(log.clone(), new, &mut swaps, graph, ni, node, need_sharding);
                                 input_shardings.insert(ni, need_sharding);
                             }
                         }
@@ -313,7 +313,7 @@ pub fn shard(
             for &(ni, src) in &srcs {
                 let need_sharding = Sharding::ByColumn(src, sharding_factor);
                 if input_shardings[&ni] != need_sharding {
-                    reshard(log, new, &mut swaps, graph, ni, node, need_sharding);
+                    reshard(log.clone(), new, &mut swaps, graph, ni, node, need_sharding);
                     input_shardings.insert(ni, need_sharding);
                 }
             }
@@ -328,7 +328,7 @@ pub fn shard(
         for &ni in need_sharding.keys() {
             if input_shardings[&ni] != sharding {
                 // ancestor must be forced to right sharding
-                reshard(log, new, &mut swaps, graph, ni, node, sharding);
+                reshard(log.clone(), new, &mut swaps, graph, ni, node, sharding);
                 input_shardings.insert(ni, sharding);
             }
         }
@@ -544,7 +544,7 @@ pub fn shard(
             p
         };
         error!(log, "preventing unsupported sharded shuffle"; "sharder" => ?n);
-        reshard(log, new, &mut swaps, graph, p, n, Sharding::ForcedNone);
+        reshard(log.clone(), new, &mut swaps, graph, p, n, Sharding::ForcedNone);
         graph
             .node_weight_mut(n)
             .unwrap()
@@ -557,7 +557,7 @@ pub fn shard(
 /// Modify the graph such that the path between `src` and `dst` shuffles the input such that the
 /// records received by `dst` are sharded by column `col`.
 fn reshard(
-    log: &Logger,
+    log: Logger,
     new: &mut HashSet<NodeIndex>,
     swaps: &mut HashMap<(NodeIndex, NodeIndex), NodeIndex>,
     graph: &mut Graph,

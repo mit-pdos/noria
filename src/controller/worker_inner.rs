@@ -102,7 +102,7 @@ impl WorkerInner {
             epoch: state.epoch,
             worker_pool: worker::WorkerPool::new(
                 nworker_threads,
-                &log,
+                log.clone(),
                 checktable_addr,
                 channel_coordinator.clone(),
             ).unwrap(),

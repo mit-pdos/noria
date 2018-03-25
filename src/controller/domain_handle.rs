@@ -145,7 +145,7 @@ impl DomainHandle {
     pub fn new<'a>(
         idx: DomainIndex,
         num_shards: usize,
-        log: &Logger,
+        log: Logger,
         graph: &mut Graph,
         config: &DomainConfig,
         nodes: Vec<(NodeIndex, bool)>,
