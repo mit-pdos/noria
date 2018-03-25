@@ -44,7 +44,7 @@ pub struct Materializations {
 
 impl Materializations {
     /// Create a new set of materializations.
-    pub fn new(logger: &Logger) -> Self {
+    pub fn new(logger: Logger) -> Self {
         Materializations {
             log: logger.new(o!()),
 
@@ -61,7 +61,7 @@ impl Materializations {
     }
 
     #[allow(unused)]
-    pub fn set_logger(&mut self, logger: &Logger) {
+    pub fn set_logger(&mut self, logger: Logger) {
         self.log = logger.new(o!());
     }
 

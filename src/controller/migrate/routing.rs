@@ -17,7 +17,7 @@ use slog::Logger;
 /// Add in ingress and egress nodes as appropriate in the graph to facilitate cross-domain
 /// communication.
 pub fn add(
-    log: &Logger,
+    log: Logger,
     graph: &mut Graph,
     source: NodeIndex,
     new: &mut HashSet<NodeIndex>,
@@ -243,7 +243,7 @@ pub fn add(
 }
 
 pub fn connect(
-    log: &Logger,
+    log: Logger,
     graph: &mut Graph,
     domains: &mut HashMap<DomainIndex, DomainHandle>,
     new: &HashSet<NodeIndex>,

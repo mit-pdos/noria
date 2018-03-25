@@ -261,7 +261,7 @@ impl ControllerInner {
             checktable::CheckTableClient::connect(checktable_addr, client::Options::default())
                 .unwrap();
 
-        let mut materializations = Materializations::new(&log);
+        let mut materializations = Materializations::new(log.clone());
         if !state.config.partial_enabled {
             materializations.disable_partial()
         }
@@ -357,7 +357,7 @@ impl ControllerInner {
     #[allow(unused)]
     pub fn log_with(&mut self, log: slog::Logger) {
         self.log = log;
-        self.materializations.set_logger(&self.log);
+        self.materializations.set_logger(self.log.clone());
     }
 
     /// Adds a new user universe.

@@ -121,7 +121,7 @@ pub struct WorkerPool {
 impl WorkerPool {
     pub fn new<A: ToSocketAddrs>(
         n: usize,
-        log: &Logger,
+        log: Logger,
         checktable_addr: A,
         channel_coordinator: Arc<ChannelCoordinator>,
     ) -> io::Result<Self> {

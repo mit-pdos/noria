@@ -349,7 +349,7 @@ impl<'a> Migration<'a> {
         // Shard the graph as desired
         let mut swapped0 = if let Some(shards) = mainline.sharding {
             sharding::shard(
-                &log,
+                log.clone(),
                 &mut mainline.ingredients,
                 mainline.source,
                 &mut new,
@@ -361,7 +361,7 @@ impl<'a> Migration<'a> {
 
         // Assign domains
         assignment::assign(
-            &log,
+            log.clone(),
             &mut mainline.ingredients,
             mainline.source,
             &new,
@@ -370,7 +370,7 @@ impl<'a> Migration<'a> {
         );
 
         // Set up ingress and egress nodes
-        let swapped1 = routing::add(&log, &mut mainline.ingredients, mainline.source, &mut new);
+        let swapped1 = routing::add(log.clone(), &mut mainline.ingredients, mainline.source, &mut new);
 
         // Merge the swap lists
         for ((dst, src), instead) in swapped1 {
@@ -565,7 +565,7 @@ impl<'a> Migration<'a> {
             let d = DomainHandle::new(
                 domain,
                 mainline.ingredients[nodes[0].0].sharded_by().shards(),
-                &log,
+                log.clone(),
                 &mut mainline.ingredients,
                 &mainline.domain_config,
                 nodes,
@@ -584,7 +584,7 @@ impl<'a> Migration<'a> {
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
         debug!(log, "mutating existing domains");
         augmentation::inform(
-            &log,
+            log.clone(),
             &mut mainline,
             uninformed_domain_nodes,
             start_ts,
@@ -638,7 +638,7 @@ impl<'a> Migration<'a> {
         // Set up inter-domain connections
         // NOTE: once we do this, we are making existing domains block on new domains!
         info!(log, "bringing up inter-domain connections");
-        routing::connect(&log, &mut mainline.ingredients, &mut mainline.domains, &new);
+        routing::connect(log.clone(), &mut mainline.ingredients, &mut mainline.domains, &new);
 
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
@@ -656,7 +656,7 @@ impl<'a> Migration<'a> {
             .add_replay_paths(mainline.materializations.domains_on_path.clone())
             .unwrap();
 
-        transactions::finalize(mainline.deps.clone(), &log, &mut mainline.domains, end_ts);
+        transactions::finalize(mainline.deps.clone(), log.clone(), &mut mainline.domains, end_ts);
 
         warn!(log, "migration completed"; "ms" => dur_to_ns!(start.elapsed()) / 1_000_000);
     }
