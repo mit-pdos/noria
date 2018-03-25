@@ -22,10 +22,10 @@ lower_better = true
 #args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "vote", "--", "--avg", "--articles=100000", "--runtime=30", "--getters=4"]
 #regexs = ["^(avg GET): ([0-9.]+)", "(avg PUT): ([0-9.]+)", "^(cumavg GET): ([0-9.]+)"]
 
-[tx-bank]
-command = "cargo"
-args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
-regexs = ["(avg PUT): ([0-9.]+)"]
+#[tx-bank]
+#command = "cargo"
+#args = ["run", "--release", "--manifest-path", "benchmarks/Cargo.toml", "--bin", "bank", "--", "--avg", "--accounts=1000", "--runtime=30", "-t=1"]
+#regexs = ["(avg PUT): ([0-9.]+)"]
 
 #[backfill]
 #command = "cargo"
