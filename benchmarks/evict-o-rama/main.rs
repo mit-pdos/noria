@@ -48,25 +48,28 @@ fn main() {
     let mut awvc = blender.get_getter("ArticleWithVoteCount").unwrap();
 
     println!("Creating articles...");
-    for aid in 1..10_000 {
+    for aid in 1..100 {
         // Make sure the article exists:
-        if awvc.lookup(&aid.into(), true).unwrap().is_empty() {
-            let title = format!("Article {}", aid);
-            let url = "http://pdos.csail.mit.edu";
-            article
-                .put(vec![aid.into(), title.into(), url.into()])
-                .unwrap();
-        }
+        let title = format!("Article {}", aid);
+        let url = "http://pdos.csail.mit.edu";
+        article
+            .put(vec![aid.into(), title.into(), url.into()])
+            .unwrap();
+    }
+
+    for aid in 1..100 {
+        awvc.lookup(&aid.into(), true).unwrap();
     }
 
     // Then create a new vote:
     println!("Casting votes...");
+    let mut aid = 0;
     loop {
         let uid = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
-        let aid = uid % 10_000;
-        vote.put(vec![aid.into(), uid.into()]).unwrap();
+        aid = (aid + 1) % 100;
+        vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
     }
 }
