@@ -24,7 +24,7 @@ fn main() {
         distributary::DurabilityMode::Permanent,
         512,
         Duration::from_millis(1),
-        Some(String::from("evict-o-rama")),
+        Some(String::from("evictorama")),
     );
 
     // set up Soup via recipe
