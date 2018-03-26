@@ -9,9 +9,9 @@ chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
 nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "a7715d36c79ff3ee840a7f749c0e9234e1cf0ad2" }
 regex = "0.2.2"
-slog = "2.0.6"
-#slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
-slog-term = "2.0.1"
+slog = "2.2.2"
+#slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_debug"] }
+slog-term = "2.3.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"
 libc = "0.2"
