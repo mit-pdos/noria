@@ -17,8 +17,9 @@ fn main() {
                             FROM Vote GROUP BY Vote.aid;
                QUERY ArticleWithVoteCount: \
                             SELECT Article.aid, title, url, VoteCount.votes AS votes \
-                            FROM Article, VoteCount \
-                            WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
+                            FROM Article LEFT JOIN VoteCount \
+                                         ON (Article.aid = VoteCount.aid) \
+                            WHERE Article.aid = ?;";
 
     let persistence_params = distributary::PersistenceParameters::new(
         distributary::DurabilityMode::Permanent,
