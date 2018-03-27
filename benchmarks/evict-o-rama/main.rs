@@ -4,6 +4,8 @@ use distributary::ControllerBuilder;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+static NUM_ARTICLES: usize = 10_000;
+
 fn main() {
     // inline recipe definition
     let sql = "# base tables
@@ -32,7 +34,7 @@ fn main() {
     builder.log_with(distributary::logger_pls());
     builder.set_worker_threads(2);
     builder.set_persistence(persistence_params);
-    builder.set_memory_limit(5 * 1024 * 1024);
+    builder.set_memory_limit(100 * 1024);
 
     // TODO: This should be removed when the `it_works_with_reads_before_writes`
     // test passes again.
@@ -47,7 +49,7 @@ fn main() {
     let mut awvc = blender.get_getter("ArticleWithVoteCount").unwrap();
 
     println!("Creating articles...");
-    for aid in 1..100 {
+    for aid in 1..NUM_ARTICLES {
         // Make sure the article exists:
         let title = format!("Article {}", aid);
         let url = "http://pdos.csail.mit.edu";
@@ -56,11 +58,11 @@ fn main() {
             .unwrap();
     }
 
-    for aid in 1..100 {
+    println!("Reading articles...");
+    for aid in 1..NUM_ARTICLES {
         awvc.lookup(&aid.into(), true).unwrap();
     }
 
-    // Then create a new vote:
     println!("Casting votes...");
     let mut aid = 0;
     loop {
@@ -68,7 +70,7 @@ fn main() {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
-        aid = (aid + 1) % 100;
+        aid = (aid + 1) % NUM_ARTICLES;
         vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
     }
 }
