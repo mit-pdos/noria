@@ -72,5 +72,7 @@ fn main() {
             .as_secs() as i64;
         aid = (aid + 1) % NUM_ARTICLES;
         vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
+
+        awvc.lookup(&aid.into(), true).unwrap();
     }
 }
