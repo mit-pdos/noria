@@ -80,6 +80,10 @@ path = "securecrp/main.rs"
 name = "piazza"
 path = "piazza/piazza.rs"
 
+[[bin]]
+name = "evict-o-rama"
+path = "evict-o-rama/main.rs"
+
 #[[bin]]
 #name = "security-mysql"
 #path = "piazza/mysql.rs"
