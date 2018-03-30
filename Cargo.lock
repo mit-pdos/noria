@@ -443,7 +443,7 @@ dependencies = [
  "buf_redux 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
  "core 0.1.0",
- "evmap 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "evmap 3.0.0 (git+https://github.com/ms705/rust-evmap)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -597,8 +597,11 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "3.0.0"
+source = "git+https://github.com/ms705/rust-evmap#261f8e10c95bc16192b747c404c54a92d7aad539"
+dependencies = [
+ "rahashmap 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "failure"
@@ -2427,7 +2430,7 @@ dependencies = [
 "checksum encoding-index-tradchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fd0e20d5688ce3cab59eb3ef3a2083a5c77bf496cb798dc6fcdb75f323890c18"
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 "checksum errno 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b2c858c42ac0b88532f48fca88b0ed947cad4f1f64d904bcd6c9f138f7b95d70"
-"checksum evmap 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7a8cde50c7eb3c8a8222f48e42359cd581e92b8be1b44487703772b048f9d6d7"
+"checksum evmap 3.0.0 (git+https://github.com/ms705/rust-evmap)" = "<none>"
 "checksum failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "934799b6c1de475a012a02dab0ace1ace43789ee4b99bcfbf1a2e3e8ced5de82"
 "checksum failure_derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c7cdda555bb90c9bb67a3b670a0f42de8e73f5981524123ad8578aafec8ddb8b"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
