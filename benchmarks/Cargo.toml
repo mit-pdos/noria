@@ -17,7 +17,6 @@ rayon = "1.0"
 libc = "0.2"
 hwloc = "0.5"
 ssh2 = "0.3"
-whoami = "0.2"
 shellwords = "0.1"
 
 # for benchmarks
@@ -42,11 +41,11 @@ futures = "0.1.14"
 tokio-core = "0.1.8"
 # ec2
 rusoto_core = "0.31.0"
-rusoto_ec2 = "0.31.0"
 rusoto_sts = "0.31.0"
-scopeguard = "0.3.3"
+tsunami = "0.5.10"
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
+failure = "0.1"
 
 [[bin]]
 name = "bank"

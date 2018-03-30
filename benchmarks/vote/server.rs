@@ -1,11 +1,11 @@
-use super::ssh::Ssh;
-use super::Backend;
+use super::{Backend, ConvenientSession};
+use failure::Error;
 use ssh2;
-use std::error::Error;
 use std::borrow::Cow;
-use std::{thread, time};
 use std::io;
 use std::io::prelude::*;
+use std::{thread, time};
+use tsunami::Session;
 
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>),
@@ -13,7 +13,7 @@ pub(crate) enum ServerHandle<'a> {
 }
 
 impl<'a> ServerHandle<'a> {
-    fn end(self, server: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
+    fn end(self, server: &Session, backend: &Backend) -> Result<(), Error> {
         match self {
             ServerHandle::Netsoup(mut w) => {
                 // assert_eq!(backend, &Backend::Netsoup);
@@ -48,7 +48,7 @@ impl<'a> ServerHandle<'a> {
                 // also stop zookeeper
                 match server.just_exec(&["sudo", "systemctl", "stop", "zookeeper"]) {
                     Ok(Ok(_)) => {}
-                    Ok(Err(e)) => Err(e)?,
+                    Ok(Err(e)) => bail!(e),
                     Err(e) => Err(e)?,
                 }
             }
@@ -59,7 +59,7 @@ impl<'a> ServerHandle<'a> {
                 backend.systemd_name().unwrap(),
             ]) {
                 Ok(Ok(_)) => {}
-                Ok(Err(e)) => Err(e)?,
+                Ok(Err(e)) => bail!(e),
                 Err(e) => Err(e)?,
             },
         }
@@ -69,24 +69,22 @@ impl<'a> ServerHandle<'a> {
 
 #[must_use]
 pub(crate) struct Server<'a> {
-    server: &'a Ssh,
+    server: &'a Session,
     listen_addr: &'a str,
-    has_pl: bool,
 
     handle: ServerHandle<'a>,
 }
 
 impl<'a> Server<'a> {
-    pub(crate) fn end(self, backend: &Backend) -> Result<(), Box<Error>> {
+    pub(crate) fn end(self, backend: &Backend) -> Result<(), Error> {
         self.handle.end(self.server, backend)
     }
 
-    pub(crate) fn between_targets(self, backend: &Backend) -> Result<Self, Box<Error>> {
+    pub(crate) fn between_targets(self, backend: &Backend) -> Result<Self, Error> {
         match *backend {
             Backend::Netsoup { .. } | Backend::Memcached => {
                 let s = self.server;
                 let a = self.listen_addr;
-                let p = self.has_pl;
 
                 // these backends need to be cleared after every run
                 eprintln!(" -> restarting server");
@@ -96,7 +94,7 @@ impl<'a> Server<'a> {
                 thread::sleep(time::Duration::from_secs(1));
 
                 // start a new one!
-                let s = start(s, a, p, backend)??;
+                let s = start(s, a, backend)?.or_else(|e| bail!(e))?;
                 eprintln!(" .. server restart completed");
                 Ok(s)
             }
@@ -104,7 +102,7 @@ impl<'a> Server<'a> {
         }
     }
 
-    pub(crate) fn wait(&mut self, client: &Ssh, backend: &Backend) -> Result<(), Box<Error>> {
+    pub(crate) fn wait(&mut self, client: &Session, backend: &Backend) -> Result<(), Error> {
         if let Backend::Netsoup { .. } = *backend {
             // netsoup *worker* doesn't have a well-defined port :/
             thread::sleep(time::Duration::from_secs(10));
@@ -132,10 +130,10 @@ impl<'a> Server<'a> {
                 return Ok(());
             }
         }
-        Err("server never started".into())
+        bail!("server never started")
     }
 
-    fn get_pid(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
+    fn get_pid(&mut self, pgrep: &str) -> Result<Option<usize>, Error> {
         let mut c = self.server.exec(&["pgrep", pgrep])?;
         let mut stdout = String::new();
         c.read_to_string(&mut stdout)?;
@@ -144,8 +142,9 @@ impl<'a> Server<'a> {
         Ok(stdout.lines().next().and_then(|line| line.parse().ok()))
     }
 
-    fn get_mem(&mut self, pgrep: &str) -> Result<Option<usize>, Box<Error>> {
-        let pid = self.get_pid(pgrep)?.ok_or("couldn't find server pid")?;
+    fn get_mem(&mut self, pgrep: &str) -> Result<Option<usize>, Error> {
+        let pid = self.get_pid(pgrep)?
+            .ok_or(format_err!("couldn't find server pid"))?;
         let f = format!("/proc/{}/status", pid);
         let mut c = self.server.exec(&["grep", "VmRSS", &f])?;
 
@@ -164,7 +163,7 @@ impl<'a> Server<'a> {
         &mut self,
         backend: &Backend,
         w: &mut io::Write,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Error> {
         // first, get uptime (for load avgs)
         let mut c = self.server.exec(&["uptime"])?;
         w.write_all(b"uptime:\n")?;
@@ -174,12 +173,12 @@ impl<'a> Server<'a> {
         match *backend {
             Backend::Memcached => {
                 let mem = self.get_mem("memcached")?
-                    .ok_or("couldn't find memcached memory usage")?;
+                    .ok_or(format_err!("couldn't find memcached memory usage"))?;
                 w.write_all(format!("memory: {}", mem).as_bytes())?;
             }
             Backend::Netsoup { .. } => {
                 let mem = self.get_mem("souplet")?
-                    .ok_or("couldn't find souplet memory usage")?;
+                    .ok_or(format_err!("couldn't find souplet memory usage"))?;
                 w.write_all(format!("memory: {}", mem).as_bytes())?;
             }
             Backend::Mysql => {
@@ -229,11 +228,10 @@ impl<'a> Server<'a> {
 }
 
 pub(crate) fn start<'a>(
-    server: &'a Ssh,
+    server: &'a Session,
     listen_addr: &'a str,
-    has_pl: bool,
     b: &Backend,
-) -> Result<Result<Server<'a>, String>, Box<Error>> {
+) -> Result<Result<Server<'a>, String>, Error> {
     let sh = match *b {
         Backend::Netsoup {
             workers,
@@ -241,7 +239,7 @@ pub(crate) fn start<'a>(
             shards,
         } => {
             // build worker if it hasn't been built already
-            match server.in_distributary(has_pl, &["cargo", "b", "--release", "--bin", "souplet"]) {
+            match server.in_distributary(&["cargo", "b", "--release", "--bin", "souplet"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
@@ -269,7 +267,7 @@ pub(crate) fn start<'a>(
             {
                 thread::sleep(time::Duration::from_secs(1));
                 if start.elapsed() > time::Duration::from_secs(10) {
-                    Err("zookeeper wouldn't start")?;
+                    bail!("zookeeper wouldn't start");
                 }
             }
 
@@ -281,9 +279,6 @@ pub(crate) fn start<'a>(
                     .into_iter()
                     .map(|&s| s.into())
                     .collect();
-                if has_pl {
-                    cmd.push("perflock".into());
-                }
                 cmd.extend(vec![
                     "target/release/souplet".into(),
                     "--durability".into(),
@@ -317,7 +312,6 @@ pub(crate) fn start<'a>(
     Ok(Ok(Server {
         server,
         listen_addr,
-        has_pl,
         handle: sh,
     }))
 }
