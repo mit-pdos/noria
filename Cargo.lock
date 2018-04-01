@@ -599,7 +599,7 @@ dependencies = [
 [[package]]
 name = "evmap"
 version = "3.0.0"
-source = "git+https://github.com/ms705/rust-evmap#6d1819fd413a3f762a74cd8c75cb20bc402d2fbf"
+source = "git+https://github.com/ms705/rust-evmap#d85b8af843a935f05650fe85e0eb72ed20395fff"
 dependencies = [
  "rahashmap 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
