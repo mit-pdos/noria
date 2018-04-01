@@ -11,7 +11,7 @@ fn main() {
     let sql = "# base tables
                CREATE TABLE Article (aid int, title varchar(255), \
                                      url text, PRIMARY KEY(aid));
-               CREATE TABLE Vote (aid int, uid int);
+               CREATE TABLE Vote (aid int, uid int, PRIMARY KEY(aid, uid));
 
                # read queries
                VoteCount: SELECT Vote.aid, COUNT(uid) AS votes \
@@ -56,6 +56,7 @@ fn main() {
         article
             .put(vec![aid.into(), title.into(), url.into()])
             .unwrap();
+        vote.put(vec![aid.into(), 1.into()]).unwrap();
     }
 
     println!("Reading articles...");
