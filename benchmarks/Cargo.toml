@@ -26,7 +26,7 @@ clap = "2.25.0"
 rand = "0.4.0"
 zipf = "3.0.0"
 # sampling
-hdrhistogram = "6.0.0"
+hdrhistogram = { git = "https://github.com/ekmartin/HdrHistogram_rust", branch = "nom_4" }
 # mssql
 futures-state-stream = "0.1"
 tiberius = { git = "https://github.com/steffengy/tiberius.git", rev = "63c1329f84dc0f722fe640b7faa7f803e7db6a5a" }
