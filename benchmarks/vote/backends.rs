@@ -8,6 +8,7 @@ pub(crate) enum Backend {
     Mssql,
     Mysql,
     Memcached,
+    Hybrid,
 }
 
 impl Backend {
@@ -17,6 +18,7 @@ impl Backend {
             Backend::Mssql { .. } => "mssql",
             Backend::Mysql { .. } => "mysql",
             Backend::Memcached { .. } => "memcached",
+            Backend::Hybrid { .. } => "hybrid",
         }
     }
 
@@ -25,7 +27,7 @@ impl Backend {
             Backend::Memcached => Some("memcached"),
             Backend::Mysql => Some("mysqld"),
             Backend::Mssql => Some("mssql-server"),
-            Backend::Netsoup { .. } => None,
+            Backend::Netsoup { .. } | Backend::Hybrid { .. } => None,
         }
     }
 
@@ -36,7 +38,7 @@ impl Backend {
                 workers,
                 shards,
             } => format!("netsoup_{}r_{}w_{}s", readers, workers, shards.unwrap_or(0)),
-            Backend::Memcached | Backend::Mysql | Backend::Mssql => {
+            Backend::Hybrid | Backend::Memcached | Backend::Mysql | Backend::Mssql => {
                 self.multiclient_name().to_string()
             }
         }
@@ -46,6 +48,7 @@ impl Backend {
         match *self {
             Backend::Netsoup { .. } => unreachable!(),
             Backend::Memcached => 11211,
+            Backend::Hybrid => 3306,
             Backend::Mysql => 3306,
             Backend::Mssql => 1433,
         }

@@ -10,6 +10,7 @@ use tsunami::Session;
 pub(crate) enum ServerHandle<'a> {
     Netsoup(ssh2::Channel<'a>),
     HandledBySystemd,
+    Hybrid,
 }
 
 impl<'a> ServerHandle<'a> {
@@ -52,6 +53,18 @@ impl<'a> ServerHandle<'a> {
                     Err(e) => Err(e)?,
                 }
             }
+            ServerHandle::Hybrid => {
+                match server.just_exec(&["sudo", "systemctl", "stop", "mysqld"]) {
+                    Ok(Ok(_)) => {}
+                    Ok(Err(e)) => bail!(e),
+                    Err(e) => Err(e)?,
+                }
+                match server.just_exec(&["sudo", "systemctl", "stop", "memcached"]) {
+                    Ok(Ok(_)) => {}
+                    Ok(Err(e)) => bail!(e),
+                    Err(e) => Err(e)?,
+                }
+            }
             ServerHandle::HandledBySystemd => match server.just_exec(&[
                 "sudo",
                 "systemctl",
@@ -82,7 +95,7 @@ impl<'a> Server<'a> {
 
     pub(crate) fn between_targets(self, backend: &Backend) -> Result<Self, Error> {
         match *backend {
-            Backend::Netsoup { .. } | Backend::Memcached => {
+            Backend::Netsoup { .. } | Backend::Memcached | Backend::Hybrid => {
                 let s = self.server;
                 let a = self.listen_addr;
 
@@ -175,6 +188,26 @@ impl<'a> Server<'a> {
                 let mem = self.get_mem("memcached")?
                     .ok_or(format_err!("couldn't find memcached memory usage"))?;
                 w.write_all(format!("memory: {}", mem).as_bytes())?;
+            }
+            Backend::Hybrid => {
+                let mem = self.get_mem("memcached")?
+                    .ok_or(format_err!("couldn't find memcached memory usage"))?;
+                w.write_all(format!("memcached: {}", mem).as_bytes())?;
+
+                let mut c = self.server.exec(&[
+                    "mysql",
+                    "-N",
+                    "-t",
+                    "-u",
+                    "soup",
+                    "soup",
+                    "<",
+                    "distributary/benchmarks/vote/mysql_stat.sql",
+                ])?;
+
+                w.write_all(b"tables:\n")?;
+                io::copy(&mut c, w)?;
+                c.wait_eof()?;
             }
             Backend::Netsoup { .. } => {
                 let mem = self.get_mem("souplet")?
@@ -299,6 +332,18 @@ pub(crate) fn start<'a>(
             };
 
             ServerHandle::Netsoup(w)
+        }
+        Backend::Hybrid => {
+            match server.just_exec(&["sudo", "systemctl", "start", "memcached"]) {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => return Ok(Err(e)),
+                Err(e) => return Err(e),
+            }
+            match server.just_exec(&["sudo", "systemctl", "start", "mysqld"]) {
+                Ok(Ok(_)) => ServerHandle::Hybrid,
+                Ok(Err(e)) => return Ok(Err(e)),
+                Err(e) => return Err(e),
+            }
         }
         Backend::Memcached | Backend::Mysql | Backend::Mssql => {
             match server.just_exec(&["sudo", "systemctl", "start", b.systemd_name().unwrap()]) {

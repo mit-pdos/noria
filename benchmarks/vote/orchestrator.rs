@@ -25,7 +25,7 @@ use std::borrow::Cow;
 use std::io::prelude::*;
 use std::{io, time};
 
-const SOUP_AMI: &str = "ami-7cdc2101";
+const SOUP_AMI: &str = "ami-6817b715";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -211,6 +211,10 @@ fn main() {
         "server",
         1,
         tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, move |host| {
+            // ensure we don't have stale soup (yuck)
+            host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
+                .is_ok();
+
             eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
             host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
@@ -228,6 +232,8 @@ fn main() {
         nclients as u32,
         tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, |host| {
             eprintln!(" -> building vote client on client");
+            host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
+                .is_ok();
             host.just_exec(&[
                 "cd",
                 "distributary",
@@ -248,6 +254,7 @@ fn main() {
 
     // what backends are we benchmarking?
     let backends = vec![
+        Backend::Hybrid,
         Backend::Netsoup {
             workers: 2,
             readers: 14,
