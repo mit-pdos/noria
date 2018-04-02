@@ -598,6 +598,33 @@ fn main() {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("hybrid")
+                .arg(
+                    Arg::with_name("memcached-address")
+                        .long("memcached-address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:11211")
+                        .help("Address of memcached"),
+                )
+                .arg(
+                    Arg::with_name("mysql-address")
+                        .long("mysql-address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:3306")
+                        .help("Address of MySQL server"),
+                )
+                .arg(
+                    Arg::with_name("database")
+                        .long("database")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("soup")
+                        .help("MySQL database to use"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("localsoup")
                 .arg(
                     Arg::with_name("workers")
@@ -661,6 +688,7 @@ fn main() {
         ("memcached", Some(largs)) => run::<clients::memcached::Client>(&args, largs),
         ("mssql", Some(largs)) => run::<clients::mssql::Client>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
+        ("hybrid", Some(largs)) => run::<clients::hybrid::Client>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }
