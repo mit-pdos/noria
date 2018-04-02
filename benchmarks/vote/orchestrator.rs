@@ -142,7 +142,7 @@ fn main() {
         .arg(
             Arg::with_name("stype")
                 .long("server")
-                .default_value("c5.large")
+                .default_value("m5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for server"),
@@ -150,7 +150,7 @@ fn main() {
         .arg(
             Arg::with_name("ctype")
                 .long("client")
-                .default_value("c5.large")
+                .default_value("m5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
@@ -309,8 +309,7 @@ fn main() {
             };
 
             let targets = [
-                100_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000,
-                10_000_000,
+                100_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000
             ];
             // TODO: run more iterations
             for (i, &target) in targets.iter().enumerate() {
