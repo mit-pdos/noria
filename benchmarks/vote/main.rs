@@ -214,12 +214,19 @@ where
             thread::Builder::new()
                 .name(format!("load-gen{}", geni))
                 .spawn(move || {
-                    let rng = rand::thread_rng();
                     let ops = if skewed {
-                        let rng = zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap();
-                        run_generator(pool, clients, rng, target, global_args)
+                        run_generator(
+                            pool,
+                            clients,
+                            || {
+                                let rng = rand::thread_rng();
+                                zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap()
+                            },
+                            target,
+                            global_args,
+                        )
                     } else {
-                        run_generator(pool, clients, rng, target, global_args)
+                        run_generator(pool, clients, || rand::thread_rng(), target, global_args)
                     };
                     finished.wait();
                     ops
@@ -305,15 +312,16 @@ where
     );
 }
 
-fn run_generator<C, R>(
+fn run_generator<C, R, RF>(
     pool: Arc<rayon::ThreadPool>,
     clients: Arc<Vec<Mutex<C>>>,
-    mut id_rng: R,
+    id_rng: RF,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
 where
     C: VoteClient + Send + 'static,
+    RF: Send + FnOnce() -> R,
     R: rand::Rng,
 {
     let articles = value_t_or_exit!(global_args, "articles", i32);
@@ -324,19 +332,28 @@ where
     let end = start + warmup + runtime;
 
     let mut ops = 0;
-    let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
-    let mut queued_w = Vec::new();
-    let mut queued_w_keys = Vec::new();
-    let mut queued_r = Vec::new();
-    let mut queued_r_keys = Vec::new();
-    {
+    let ndone = atomic::AtomicUsize::new(0);
+    pool.scope(|pool| {
+        let first = time::Instant::now();
+        let mut next = time::Instant::now();
+        let mut next_send = None;
+
+        let mut queued_w = Vec::new();
+        let mut queued_w_keys = Vec::new();
+        let mut queued_r = Vec::new();
+        let mut queued_r_keys = Vec::new();
+
+        let mut rng = rand::thread_rng();
+        let mut id_rng = id_rng();
+
+        let ndone = &ndone;
         let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
             let clients = clients.clone();
-            move || {
+            move |_: &_| {
                 let tid = THREAD_ID.with(|tid| *tid.borrow());
 
                 // TODO: avoid the overhead of taking an uncontended lock
@@ -352,6 +369,7 @@ where
                     client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();
+                ndone.fetch_add(1, atomic::Ordering::AcqRel);
 
                 if sent.duration_since(start) > warmup {
                     let remote_t = done.duration_since(sent);
@@ -383,8 +401,6 @@ where
             }
         };
 
-        let mut next = time::Instant::now();
-        let mut next_send = None;
         while next < end {
             let now = time::Instant::now();
             // NOTE: while, not if, in case we start falling behind
@@ -446,14 +462,35 @@ where
                     if let Some(&qr) = queued_r.get(0) {
                         next_send = Some(qr + max_batch_time);
                     }
+
+                    // if the clients aren't keeping up, we want to make sure that we'll still
+                    // finish around the stipulated end time. we unfortunately can't rely on just
+                    // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
+                    // we instead need to stop issuing requests earlier than we otherwise would
+                    // have.
+                    if now < end {
+                        let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
+                        let queued = ops as u64 - clients_completed;
+                        let client_rate = clients_completed / first.elapsed().as_secs();
+                        let client_work_left = queued / client_rate;
+                        if client_work_left > (end - now).as_secs() + 1 {
+                            // no point in continuing to feed work to the clients
+                            // they have enough work to keep them busy until the end
+                            // but make sure we're not still in the warmup phase,
+                            // because the clients *could* speed up
+                            if now.duration_since(start) > warmup {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
             atomic::spin_loop_hint();
         }
-    }
 
-    ops
+        ops
+    })
 }
 
 fn main() {
