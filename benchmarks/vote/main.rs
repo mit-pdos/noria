@@ -383,7 +383,6 @@ where
             }
         };
 
-        let first = time::Instant::now();
         let mut next = time::Instant::now();
         let mut next_send = None;
         while next < end {
