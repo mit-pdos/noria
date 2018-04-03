@@ -331,13 +331,15 @@ where
     let start = time::Instant::now();
     let end = start + warmup + runtime;
 
-    let mut ops = 0;
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let ndone = atomic::AtomicUsize::new(0);
     pool.scope(|pool| {
+        let mut ops = 0;
+        let mut enqueued = 0;
+
         let first = time::Instant::now();
         let mut next = time::Instant::now();
         let mut next_send = None;
@@ -437,6 +439,7 @@ where
 
                     if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
                         ops += queued_w.len();
+                        enqueued += 1;
                         pool.spawn(enqueue(
                             queued_w.split_off(0),
                             queued_w_keys.split_off(0),
@@ -446,6 +449,7 @@ where
 
                     if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
                         ops += queued_r.len();
+                        enqueued += 1;
                         pool.spawn(enqueue(
                             queued_r.split_off(0),
                             queued_r_keys.split_off(0),
@@ -471,7 +475,7 @@ where
                     // *could* speed up
                     if now < end && now.duration_since(start) > warmup {
                         let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
-                        let queued = ops as u64 - clients_completed;
+                        let queued = enqueued as u64 - clients_completed;
                         let client_rate = clients_completed / first.elapsed().as_secs();
                         let client_work_left = queued / client_rate;
                         if client_work_left > (end - now).as_secs() + 1 {
