@@ -361,7 +361,7 @@ where
         // client worker thread.
         {
             let tid = THREAD_ID.with(|tid| *tid.borrow());
-            if let Some(c) = myclient[tid].try_lock().unwrap().take() {
+            if let Some(c) = myclient[tid].lock().unwrap().take() {
                 clients.lock().unwrap().push(c);
             }
         }
@@ -398,10 +398,11 @@ where
                     loop {
                         if let Some(c) = clients.lock().unwrap().pop() {
                             client = myclient[tid].try_lock().unwrap();
+                            assert!(client.is_none());
                             *client = Some(c);
                             break;
                         }
-                        atomic::spin_loop_hint();
+                        thread::yield_now();
                     }
                 }
                 let client = client.as_mut().unwrap();
