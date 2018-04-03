@@ -383,8 +383,9 @@ where
             }
         };
 
+        let first = time::Instant::now();
         let mut next = time::Instant::now();
-        let mut forced = None;
+        let mut next_send = None;
         while next < end {
             let now = time::Instant::now();
             // NOTE: while, not if, in case we start falling behind
@@ -395,14 +396,14 @@ where
                 // just been woken up so we can realize we need to send a batch
                 let id = id_rng.gen_range(0, articles);
                 if rng.gen_weighted_bool(every) {
-                    if queued_w.is_empty() && forced.is_none() {
-                        forced = Some(next + max_batch_time);
+                    if queued_w.is_empty() && next_send.is_none() {
+                        next_send = Some(next + max_batch_time);
                     }
                     queued_w_keys.push(id);
                     queued_w.push(next);
                 } else {
-                    if queued_r.is_empty() && forced.is_none() {
-                        forced = Some(next + max_batch_time);
+                    if queued_r.is_empty() && next_send.is_none() {
+                        next_send = Some(next + max_batch_time);
                     }
                     queued_r_keys.push(id);
                     queued_r.push(next);
@@ -414,7 +415,8 @@ where
 
             // in case that took a while:
             let now = time::Instant::now();
-            if let Some(f) = forced {
+
+            if let Some(f) = next_send {
                 if f <= now {
                     // time to send at least one batch
 
@@ -436,14 +438,14 @@ where
                         ));
                     }
 
-                    // since forced = Some, we better have sent at least one batch!
-                    forced = None;
+                    // since next_send = Some, we better have sent at least one batch!
+                    next_send = None;
                     assert!(queued_r.is_empty() || queued_w.is_empty());
                     if let Some(&qw) = queued_w.get(0) {
-                        forced = Some(qw + max_batch_time);
+                        next_send = Some(qw + max_batch_time);
                     }
                     if let Some(&qr) = queued_r.get(0) {
-                        forced = Some(qr + max_batch_time);
+                        next_send = Some(qr + max_batch_time);
                     }
                 }
             }
