@@ -2,6 +2,7 @@ use clap;
 use clients::{Parameters, VoteClient};
 use memcached::{self, proto::{MultiOperation, ProtoType}};
 use mysql::{self, Opts, OptsBuilder};
+use std::collections::BTreeMap;
 
 pub(crate) struct Client {
     my: mysql::Conn,
@@ -70,7 +71,7 @@ impl VoteClient for Client {
             }
         }
 
-        // then prime mysql
+        // then prime memcached
         if params.prime {
             // prepop
             let mut c = memcached::Client::connect(
@@ -173,13 +174,29 @@ impl VoteClient for Client {
                 vals
             );
 
+            let mut m = Vec::new();
             let mut qresult = self.my.prep_exec(qstring, &ids).unwrap();
             while qresult.more_results_exists() {
                 for row in qresult.by_ref() {
-                    row.unwrap();
+                    let row = row.unwrap();
+                    m.push((
+                        format!("article_{}", row.get::<i64, _>("id").unwrap()),
+                        format!(
+                            "{}, {}",
+                            row.get::<String, _>("title").unwrap(),
+                            row.get::<i64, _>("votes").unwrap()
+                        ),
+                    ));
                     rows += 1;
                 }
             }
+
+            let m: BTreeMap<_, _> = m.iter()
+                .map(|&(ref k, ref v)| (k.as_bytes(), (v.as_bytes(), 0, 0)))
+                .collect();
+
+            // write results back to memcached
+            self.mem.set_multi(m).unwrap();
         }
 
         // <= because IN() collapses duplicates
