@@ -210,6 +210,7 @@ where
         .map(|geni| {
             let pool = pool.clone();
             let clients = clients.clone();
+            let myclient = myclient.clone();
             let finished = finished.clone();
             let global_args = global_args.clone();
 
