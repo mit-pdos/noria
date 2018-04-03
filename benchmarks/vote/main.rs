@@ -126,15 +126,11 @@ where
     };
 
     let mut c = C::new(&params, local_args);
-    let clients: Vec<C> = (0..nthreads).map(|_| VoteClient::from(&mut c)).collect();
-    let clients = Arc::new(Mutex::new(clients));
-
-    // every client thread in the pool needs its own client, but the workers that run load
-    // generators do not! we get around this by client threads taking a client from `clients` and
-    // storing it in its index here when it first receives a job.
-    let myclient: Vec<Mutex<Option<C>>> =
-        (0..(nthreads + ngen)).map(|_| Mutex::default()).collect();
-    let myclient = Arc::new(myclient);
+    let clients: Vec<Mutex<C>> = (0..nthreads)
+        .map(|_| VoteClient::from(&mut c))
+        .map(Mutex::new)
+        .collect();
+    let clients = Arc::new(clients);
 
     let hists = if let Some(mut f) = global_args
         .value_of("histogram")
@@ -176,11 +172,9 @@ where
         set_thread_affinity(bind_generator).unwrap();
     }
 
-    // since load generators are *in* the pool as of ce119f05bfc4358c3d0af97efb792a46fcb5ec86,
-    // we need to make the pool have an extra thread for each load generator
     let pool = rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("client-{}", i))
-        .num_threads(nthreads + ngen)
+        .num_threads(nthreads)
         .start_handler(|i| {
             THREAD_ID.with(|tid| {
                 *tid.borrow_mut() = i;
@@ -210,7 +204,6 @@ where
         .map(|geni| {
             let pool = pool.clone();
             let clients = clients.clone();
-            let myclient = myclient.clone();
             let finished = finished.clone();
             let global_args = global_args.clone();
 
@@ -225,11 +218,11 @@ where
                         run_generator(
                             pool,
                             clients,
-                            myclient,
                             || {
                                 let rng = rand::thread_rng();
                                 zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap()
                             },
+                            finished,
                             target,
                             global_args,
                         )
@@ -237,13 +230,12 @@ where
                         run_generator(
                             pool,
                             clients,
-                            myclient,
                             || rand::thread_rng(),
+                            finished,
                             target,
                             global_args,
                         )
                     };
-                    finished.wait();
                     ops
                 })
                 .unwrap()
@@ -329,9 +321,9 @@ where
 
 fn run_generator<C, R, RF>(
     pool: Arc<rayon::ThreadPool>,
-    clients: Arc<Mutex<Vec<C>>>,
-    myclient: Arc<Vec<Mutex<Option<C>>>>,
+    clients: Arc<Vec<Mutex<C>>>,
     id_rng: RF,
+    finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
@@ -352,195 +344,172 @@ where
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let ndone = atomic::AtomicUsize::new(0);
-    pool.scope(|pool| {
-        // the load generator *also* runs in the pool because of
-        // https://github.com/rayon-rs/rayon/issues/562
-        // this means that the worker thread we're scheduled on *could* have already handled some
-        // jobs introduced by a *different* load generator, in which case it has already "taken"
-        // a client. we need to return that client to the pool so that there's one left for every
-        // client worker thread.
-        {
+
+    let mut ops = 0;
+    let mut enqueued = 0;
+
+    let first = time::Instant::now();
+    let mut next = time::Instant::now();
+    let mut next_send = None;
+
+    let mut queued_w = Vec::new();
+    let mut queued_w_keys = Vec::new();
+    let mut queued_r = Vec::new();
+    let mut queued_r_keys = Vec::new();
+
+    let mut rng = rand::thread_rng();
+    let mut id_rng = id_rng();
+
+    // we *could* use a rayon::scope here to safely access stack variables from inside each job,
+    // but that would *also* force us to place the load generators *on* the thread pool (because of
+    // https://github.com/rayon-rs/rayon/issues/562). that comes with a number of unfortunate
+    // side-effects, such as having to manage allocations of clients to workers, clean exiting,
+    // etc. we *instead* unsafely make the two references we care about (`ndone` and `clients`)
+    // `&'static` so that they can be accessed from inside the jobs. we know this is safe because
+    // of our barrier on `finished`, which will only be passed (and hence the stack frame only
+    // destroyed) when there are no more jobs in the pool. this may change with
+    // https://github.com/rayon-rs/rayon/issues/544, but that's what we have to do for now.
+    use std::mem;
+    let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
+    let clients: &'static Arc<Vec<Mutex<C>>> = unsafe { mem::transmute(&clients) };
+
+    let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
+        move || {
             let tid = THREAD_ID.with(|tid| *tid.borrow());
-            if let Some(c) = myclient[tid].lock().unwrap().take() {
-                clients.lock().unwrap().push(c);
+
+            // TODO: avoid the overhead of taking an uncontended lock
+            let mut client = clients[tid].try_lock().unwrap();
+
+            let sent = time::Instant::now();
+            if write {
+                client.handle_writes(&keys[..]);
+            } else {
+                // deduplicate requested keys, because not doing so would be silly
+                keys.sort_unstable();
+                keys.dedup();
+                client.handle_reads(&keys[..]);
             }
-        }
+            let done = time::Instant::now();
+            ndone.fetch_add(1, atomic::Ordering::AcqRel);
 
-        let mut ops = 0;
-        let mut enqueued = 0;
-
-        let first = time::Instant::now();
-        let mut next = time::Instant::now();
-        let mut next_send = None;
-
-        let mut queued_w = Vec::new();
-        let mut queued_w_keys = Vec::new();
-        let mut queued_r = Vec::new();
-        let mut queued_r_keys = Vec::new();
-
-        let mut rng = rand::thread_rng();
-        let mut id_rng = id_rng();
-
-        let ndone = &ndone;
-        let clients = &clients;
-        let myclient = &myclient;
-        let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-            move |_: &_| {
-                let tid = THREAD_ID.with(|tid| *tid.borrow());
-
-                // TODO: avoid the overhead of taking an uncontended lock
-                let mut client = myclient[tid].try_lock().unwrap();
-                if client.is_none() {
-                    // we haven't taken our client yet; do so now
-                    // avoid deadlock
-                    drop(client);
-                    // we may have to wait for a load generator to give up a client
-                    loop {
-                        if let Some(c) = clients.lock().unwrap().pop() {
-                            client = myclient[tid].try_lock().unwrap();
-                            assert!(client.is_none());
-                            *client = Some(c);
-                            break;
-                        }
-                        thread::yield_now();
+            if sent.duration_since(start) > warmup {
+                let remote_t = done.duration_since(sent);
+                let rmt = if write { &RMT_W } else { &RMT_R };
+                let us = remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
+                rmt.with(|h| {
+                    let mut h = h.borrow_mut();
+                    if h.record(us).is_err() {
+                        let m = h.high();
+                        h.record(m).unwrap();
                     }
-                }
-                let client = client.as_mut().unwrap();
+                });
 
-                let sent = time::Instant::now();
-                if write {
-                    client.handle_writes(&keys[..]);
-                } else {
-                    // deduplicate requested keys, because not doing so would be silly
-                    keys.sort_unstable();
-                    keys.dedup();
-                    client.handle_reads(&keys[..]);
-                }
-                let done = time::Instant::now();
-                ndone.fetch_add(1, atomic::Ordering::AcqRel);
-
-                if sent.duration_since(start) > warmup {
-                    let remote_t = done.duration_since(sent);
-                    let rmt = if write { &RMT_W } else { &RMT_R };
-                    let us =
-                        remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
-                    rmt.with(|h| {
+                let sjrn = if write { &SJRN_W } else { &SJRN_R };
+                for started in queued {
+                    let sjrn_t = done.duration_since(started);
+                    let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
+                    sjrn.with(|h| {
                         let mut h = h.borrow_mut();
                         if h.record(us).is_err() {
                             let m = h.high();
                             h.record(m).unwrap();
                         }
                     });
-
-                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                    for started in queued {
-                        let sjrn_t = done.duration_since(started);
-                        let us =
-                            sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
-                        sjrn.with(|h| {
-                            let mut h = h.borrow_mut();
-                            if h.record(us).is_err() {
-                                let m = h.high();
-                                h.record(m).unwrap();
-                            }
-                        });
-                    }
                 }
             }
-        };
+        }
+    };
 
-        while next < end {
-            let now = time::Instant::now();
-            // NOTE: while, not if, in case we start falling behind
-            while next <= now {
-                use rand::distributions::IndependentSample;
+    while next < end {
+        let now = time::Instant::now();
+        // NOTE: while, not if, in case we start falling behind
+        while next <= now {
+            use rand::distributions::IndependentSample;
 
-                // only queue a new request if we're told to. if this is not the case, we've
-                // just been woken up so we can realize we need to send a batch
-                let id = id_rng.gen_range(0, articles);
-                if rng.gen_weighted_bool(every) {
-                    if queued_w.is_empty() && next_send.is_none() {
-                        next_send = Some(next + max_batch_time);
-                    }
-                    queued_w_keys.push(id);
-                    queued_w.push(next);
-                } else {
-                    if queued_r.is_empty() && next_send.is_none() {
-                        next_send = Some(next + max_batch_time);
-                    }
-                    queued_r_keys.push(id);
-                    queued_r.push(next);
+            // only queue a new request if we're told to. if this is not the case, we've
+            // just been woken up so we can realize we need to send a batch
+            let id = id_rng.gen_range(0, articles);
+            if rng.gen_weighted_bool(every) {
+                if queued_w.is_empty() && next_send.is_none() {
+                    next_send = Some(next + max_batch_time);
                 }
-
-                // schedule next delivery
-                next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
+                queued_w_keys.push(id);
+                queued_w.push(next);
+            } else {
+                if queued_r.is_empty() && next_send.is_none() {
+                    next_send = Some(next + max_batch_time);
+                }
+                queued_r_keys.push(id);
+                queued_r.push(next);
             }
 
-            // in case that took a while:
-            let now = time::Instant::now();
-
-            if let Some(f) = next_send {
-                if f <= now {
-                    // time to send at least one batch
-
-                    if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
-                        ops += queued_w.len();
-                        enqueued += 1;
-                        pool.spawn(enqueue(
-                            queued_w.split_off(0),
-                            queued_w_keys.split_off(0),
-                            true,
-                        ));
-                    }
-
-                    if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
-                        ops += queued_r.len();
-                        enqueued += 1;
-                        pool.spawn(enqueue(
-                            queued_r.split_off(0),
-                            queued_r_keys.split_off(0),
-                            false,
-                        ));
-                    }
-
-                    // since next_send = Some, we better have sent at least one batch!
-                    next_send = None;
-                    assert!(queued_r.is_empty() || queued_w.is_empty());
-                    if let Some(&qw) = queued_w.get(0) {
-                        next_send = Some(qw + max_batch_time);
-                    }
-                    if let Some(&qr) = queued_r.get(0) {
-                        next_send = Some(qr + max_batch_time);
-                    }
-
-                    // if the clients aren't keeping up, we want to make sure that we'll still
-                    // finish around the stipulated end time. we unfortunately can't rely on just
-                    // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
-                    // we instead need to stop issuing requests earlier than we otherwise would
-                    // have. but make sure we're not still in the warmup phase, because the clients
-                    // *could* speed up
-                    if now < end && now.duration_since(start) > warmup {
-                        let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
-                        let queued = enqueued as u64 - clients_completed;
-                        let client_rate = clients_completed / first.elapsed().as_secs();
-                        let client_work_left = queued / client_rate;
-                        if client_work_left > (end - now).as_secs() + 1 {
-                            // no point in continuing to feed work to the clients
-                            // they have enough work to keep them busy until the end
-                            eprintln!(
-                                "load generator quitting early as clients are falling behind"
-                            );
-                            break;
-                        }
-                    }
-                }
-            }
-
-            atomic::spin_loop_hint();
+            // schedule next delivery
+            next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
         }
 
-        ops
-    })
+        // in case that took a while:
+        let now = time::Instant::now();
+
+        if let Some(f) = next_send {
+            if f <= now {
+                // time to send at least one batch
+
+                if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
+                    ops += queued_w.len();
+                    enqueued += 1;
+                    pool.spawn(enqueue(
+                        queued_w.split_off(0),
+                        queued_w_keys.split_off(0),
+                        true,
+                    ));
+                }
+
+                if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
+                    ops += queued_r.len();
+                    enqueued += 1;
+                    pool.spawn(enqueue(
+                        queued_r.split_off(0),
+                        queued_r_keys.split_off(0),
+                        false,
+                    ));
+                }
+
+                // since next_send = Some, we better have sent at least one batch!
+                next_send = None;
+                assert!(queued_r.is_empty() || queued_w.is_empty());
+                if let Some(&qw) = queued_w.get(0) {
+                    next_send = Some(qw + max_batch_time);
+                }
+                if let Some(&qr) = queued_r.get(0) {
+                    next_send = Some(qr + max_batch_time);
+                }
+
+                // if the clients aren't keeping up, we want to make sure that we'll still
+                // finish around the stipulated end time. we unfortunately can't rely on just
+                // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
+                // we instead need to stop issuing requests earlier than we otherwise would
+                // have. but make sure we're not still in the warmup phase, because the clients
+                // *could* speed up
+                if now < end && now.duration_since(start) > warmup {
+                    let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
+                    let queued = enqueued as u64 - clients_completed;
+                    let client_rate = clients_completed / first.elapsed().as_secs();
+                    let client_work_left = queued / client_rate;
+                    if client_work_left > (end - now).as_secs() + 1 {
+                        // no point in continuing to feed work to the clients
+                        // they have enough work to keep them busy until the end
+                        eprintln!("load generator quitting early as clients are falling behind");
+                        break;
+                    }
+                }
+            }
+        }
+
+        atomic::spin_loop_hint();
+    }
+
+    finished.wait();
+    ops
 }
 
 fn main() {
