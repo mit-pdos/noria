@@ -406,6 +406,7 @@ fn run_clients(
         prime_params.add_params(&mut cmd);
         cmd.push("--threads".into());
         cmd.push(format!("{}", ccores).into());
+        cmd.push("2>&1".into());
         let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
 
         match clients[0].ssh.as_ref().unwrap().just_exec(&cmd[..]) {
@@ -547,6 +548,10 @@ fn run_clients(
             eprintln!("{}", stderr);
             eprintln!("");
             any_not_overloaded = false;
+        } else if !stderr.is_empty() {
+            eprintln!("{} reported:", host);
+            let stderr = stderr.trim_right().replace('\n', "\n > ");
+            eprintln!(" > {}", stderr);
         }
     }
 
