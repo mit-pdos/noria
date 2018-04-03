@@ -467,8 +467,9 @@ where
                     // finish around the stipulated end time. we unfortunately can't rely on just
                     // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
                     // we instead need to stop issuing requests earlier than we otherwise would
-                    // have.
-                    if now < end {
+                    // have. but make sure we're not still in the warmup phase, because the clients
+                    // *could* speed up
+                    if now < end && now.duration_since(start) > warmup {
                         let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
                         let queued = ops as u64 - clients_completed;
                         let client_rate = clients_completed / first.elapsed().as_secs();
@@ -476,11 +477,10 @@ where
                         if client_work_left > (end - now).as_secs() + 1 {
                             // no point in continuing to feed work to the clients
                             // they have enough work to keep them busy until the end
-                            // but make sure we're not still in the warmup phase,
-                            // because the clients *could* speed up
-                            if now.duration_since(start) > warmup {
-                                break;
-                            }
+                            eprintln!(
+                                "load generator quitting early as clients are falling behind"
+                            );
+                            break;
                         }
                     }
                 }
