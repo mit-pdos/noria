@@ -172,9 +172,11 @@ where
         set_thread_affinity(bind_generator).unwrap();
     }
 
+    // since load generators are *in* the pool as of ce119f05bfc4358c3d0af97efb792a46fcb5ec86,
+    // we need to make the pool have an extra thread for each load generator
     let pool = rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("client-{}", i))
-        .num_threads(nthreads)
+        .num_threads(nthreads + ngen)
         .start_handler(|i| {
             THREAD_ID.with(|tid| {
                 *tid.borrow_mut() = i;
