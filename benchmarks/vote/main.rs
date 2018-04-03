@@ -126,11 +126,15 @@ where
     };
 
     let mut c = C::new(&params, local_args);
-    let clients: Vec<Mutex<C>> = (0..nthreads)
-        .map(|_| VoteClient::from(&mut c))
-        .map(Mutex::new)
-        .collect();
-    let clients = Arc::new(clients);
+    let clients: Vec<C> = (0..nthreads).map(|_| VoteClient::from(&mut c)).collect();
+    let clients = Arc::new(Mutex::new(clients));
+
+    // every client thread in the pool needs its own client, but the workers that run load
+    // generators do not! we get around this by client threads taking a client from `clients` and
+    // storing it in its index here when it first receives a job.
+    let myclient: Vec<Mutex<Option<C>>> =
+        (0..(nthreads + ngen)).map(|_| Mutex::default()).collect();
+    let myclient = Arc::new(myclient);
 
     let hists = if let Some(mut f) = global_args
         .value_of("histogram")
@@ -220,6 +224,7 @@ where
                         run_generator(
                             pool,
                             clients,
+                            myclient,
                             || {
                                 let rng = rand::thread_rng();
                                 zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap()
@@ -228,7 +233,14 @@ where
                             global_args,
                         )
                     } else {
-                        run_generator(pool, clients, || rand::thread_rng(), target, global_args)
+                        run_generator(
+                            pool,
+                            clients,
+                            myclient,
+                            || rand::thread_rng(),
+                            target,
+                            global_args,
+                        )
                     };
                     finished.wait();
                     ops
@@ -316,7 +328,8 @@ where
 
 fn run_generator<C, R, RF>(
     pool: Arc<rayon::ThreadPool>,
-    clients: Arc<Vec<Mutex<C>>>,
+    clients: Arc<Mutex<Vec<C>>>,
+    myclient: Arc<Vec<Mutex<Option<C>>>>,
     id_rng: RF,
     target: f64,
     global_args: clap::ArgMatches,
@@ -339,6 +352,19 @@ where
     let every = value_t_or_exit!(global_args, "ratio", u32);
     let ndone = atomic::AtomicUsize::new(0);
     pool.scope(|pool| {
+        // the load generator *also* runs in the pool because of
+        // https://github.com/rayon-rs/rayon/issues/562
+        // this means that the worker thread we're scheduled on *could* have already handled some
+        // jobs introduced by a *different* load generator, in which case it has already "taken"
+        // a client. we need to return that client to the pool so that there's one left for every
+        // client worker thread.
+        {
+            let tid = THREAD_ID.with(|tid| *tid.borrow());
+            if let Some(c) = myclient[tid].try_lock().unwrap().take() {
+                clients.lock().unwrap().push(c);
+            }
+        }
+
         let mut ops = 0;
         let mut enqueued = 0;
 
@@ -355,13 +381,29 @@ where
         let mut id_rng = id_rng();
 
         let ndone = &ndone;
+        let clients = &clients;
+        let myclient = &myclient;
         let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-            let clients = clients.clone();
             move |_: &_| {
                 let tid = THREAD_ID.with(|tid| *tid.borrow());
 
                 // TODO: avoid the overhead of taking an uncontended lock
-                let mut client = clients[tid].try_lock().unwrap();
+                let mut client = myclient[tid].try_lock().unwrap();
+                if client.is_none() {
+                    // we haven't taken our client yet; do so now
+                    // avoid deadlock
+                    drop(client);
+                    // we may have to wait for a load generator to give up a client
+                    loop {
+                        if let Some(c) = clients.lock().unwrap().pop() {
+                            client = myclient[tid].try_lock().unwrap();
+                            *client = Some(c);
+                            break;
+                        }
+                        atomic::spin_loop_hint();
+                    }
+                }
+                let client = client.as_mut().unwrap();
 
                 let sent = time::Instant::now();
                 if write {
