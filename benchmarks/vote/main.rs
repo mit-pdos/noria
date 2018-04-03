@@ -508,6 +508,9 @@ where
         atomic::spin_loop_hint();
     }
 
+    // need to drop the pool before waiting so that workers will exit
+    // and thus hit the barrier
+    drop(pool);
     finished.wait();
     ops
 }
