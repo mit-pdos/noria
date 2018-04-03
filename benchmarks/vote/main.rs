@@ -18,12 +18,12 @@ extern crate zipf;
 
 use hdrhistogram::Histogram;
 use rand::Rng;
-use std::io;
-use std::fs;
-use std::time;
-use std::thread;
-use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
+use std::fs;
+use std::io;
+use std::sync::{atomic, Arc, Barrier, Mutex};
+use std::thread;
+use std::time;
 
 thread_local! {
     static THREAD_ID: RefCell<usize> = RefCell::new(1);

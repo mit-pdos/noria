@@ -1,8 +1,8 @@
-use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use clap;
+use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 
-use clients::{Parameters, VoteClient};
 use clients::localsoup::graph::RECIPE;
+use clients::{Parameters, VoteClient};
 
 pub(crate) struct Client {
     r: distributary::RemoteGetter,

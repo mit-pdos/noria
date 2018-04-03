@@ -1,7 +1,7 @@
-use distributary::{self, DataType};
 use clap;
-use std::time;
+use distributary::{self, DataType};
 use std::thread;
+use std::time;
 
 use clients::{Parameters, VoteClient};
 
