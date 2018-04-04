@@ -1266,8 +1266,18 @@ impl Domain {
                         if !index.is_empty() {
                             let mut s = {
                                 let n = self.nodes[&node].borrow();
-                                if n.is_internal() && n.get_base().is_some() {
-                                    State::base()
+                                let params = &self.persistence_parameters;
+                                if n.is_internal() && n.get_base().is_some()
+                                    && params.persist_base_nodes
+                                {
+                                    let base_name = format!(
+                                        "{}_{}_{}",
+                                        params.log_prefix,
+                                        n.name(),
+                                        self.shard.unwrap_or(0),
+                                    );
+
+                                    State::base(base_name, params.mode.clone())
                                 } else {
                                     State::default()
                                 }
@@ -1413,15 +1423,16 @@ impl Domain {
         }
 
         let n = self.nodes[&source].borrow();
+        let data: &Vec<DataType> = &*row;
         if n.is_internal() {
             if let Some(b) = n.get_base() {
-                let mut row = ((*row).clone(), true).into();
+                let mut row = (data.clone(), true).into();
                 b.fix(&mut row);
                 return row;
             }
         }
 
-        return ((*row).clone(), true).into();
+        return (data.clone(), true).into();
     }
 
     fn seed_all(&mut self, tag: Tag, keys: HashSet<Vec<DataType>>, sends: &mut EnqueuedSends) {

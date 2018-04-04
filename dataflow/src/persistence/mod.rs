@@ -14,17 +14,6 @@ use domain;
 use prelude::*;
 use checktable;
 
-/// Indicates to what degree updates should be persisted.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum DurabilityMode {
-    /// Don't do any durability
-    MemoryOnly,
-    /// Delete any log files on exit. Useful mainly for tests.
-    DeleteOnExit,
-    /// Persist updates to disk, and don't delete them later.
-    Permanent,
-}
-
 /// Parameters to control the operation of GroupCommitQueue.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Parameters {
@@ -36,6 +25,8 @@ pub struct Parameters {
     pub mode: DurabilityMode,
     /// Filename prefix for persistent log entries.
     pub log_prefix: String,
+    /// Whether PersistentState or MemoryState should be used for base nodes:
+    pub persist_base_nodes: bool,
 }
 
 impl Default for Parameters {
@@ -45,6 +36,7 @@ impl Default for Parameters {
             flush_timeout: time::Duration::new(0, 100_000),
             mode: DurabilityMode::MemoryOnly,
             log_prefix: String::from("soup"),
+            persist_base_nodes: true,
         }
     }
 }
@@ -68,6 +60,7 @@ impl Parameters {
         queue_capacity: usize,
         flush_timeout: time::Duration,
         log_prefix: Option<String>,
+        persist_base_nodes: bool,
     ) -> Self {
         let log_prefix = log_prefix.unwrap_or(String::from("soup"));
         assert!(!log_prefix.contains("-"));
@@ -77,6 +70,7 @@ impl Parameters {
             flush_timeout,
             mode,
             log_prefix,
+            persist_base_nodes,
         }
     }
 
@@ -189,34 +183,30 @@ impl GroupCommitQueueSet {
         nodes: &DomainNodes,
         ex: &Executor,
     ) -> Option<Box<Packet>> {
-        match self.params.mode {
-            DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
-                if !self.files.contains_key(node) {
-                    let file = self.get_or_create_file(node, nodes);
-                    self.files.insert(node.clone(), file);
-                }
-
-                let mut file = &mut self.files[node].1;
-                {
-                    let data_to_flush: Vec<_> = self.pending_packets[&node]
-                        .iter()
-                        .map(|p| match **p {
-                            Packet::Transaction { ref data, .. }
-                            | Packet::Message { ref data, .. } => data,
-                            _ => unreachable!(),
-                        })
-                        .collect();
-                    serde_json::to_writer(&mut file, &data_to_flush).unwrap();
-                    // Separate log flushes with a newline so that the
-                    // file can be easily parsed later on:
-                    writeln!(&mut file, "").unwrap();
-                }
-
-                file.flush().unwrap();
-                file.get_mut().sync_data().unwrap();
-            }
-            DurabilityMode::MemoryOnly => {}
+        if !self.files.contains_key(node) {
+            let file = self.get_or_create_file(node, nodes);
+            self.files.insert(node.clone(), file);
         }
+
+        let mut file = &mut self.files[node].1;
+        {
+            let data_to_flush: Vec<_> = self.pending_packets[&node]
+                .iter()
+                .map(|p| match **p {
+                    Packet::Transaction { ref data, .. } | Packet::Message { ref data, .. } => {
+                        data
+                    }
+                    _ => unreachable!(),
+                })
+                .collect();
+            serde_json::to_writer(&mut file, &data_to_flush).unwrap();
+            // Separate log flushes with a newline so that the
+            // file can be easily parsed later on:
+            writeln!(&mut file, "").unwrap();
+        }
+
+        file.flush().unwrap();
+        file.get_mut().sync_data().unwrap();
 
         self.wait_start.remove(node);
         Self::merge_packets(&mut self.pending_packets[node], nodes, ex)

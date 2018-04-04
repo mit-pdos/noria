@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -6,7 +7,7 @@ mod state;
 mod keyed_state;
 
 pub use data::{DataType, SizeOf};
-pub use self::state::State;
+pub use self::state::{MemoryState, State};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub struct Tag(pub u32);
@@ -16,9 +17,16 @@ impl Tag {
     }
 }
 
+#[derive(Clone)]
 pub struct Row(pub(crate) Rc<Vec<DataType>>);
 
 unsafe impl Send for Row {}
+
+impl Row {
+    pub fn unpack(self) -> Vec<DataType> {
+        Rc::try_unwrap(self.0).unwrap()
+    }
+}
 
 impl Deref for Row {
     type Target = Vec<DataType>;
@@ -37,7 +45,7 @@ impl SizeOf for Row {
 }
 
 pub enum LookupResult<'a> {
-    Some(&'a [Row]),
+    Some(Cow<'a, [Row]>),
     Missing,
 }
 

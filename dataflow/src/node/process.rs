@@ -150,6 +150,24 @@ impl Node {
                     *t = tracer.take();
                 }
 
+                if i.get_base().is_some() && executor.is_some() {
+                    // Send write-ACKs to all the clients with updates that made
+                    // it into this merged packet:
+                    let m = &mut **m;
+                    let ex = executor.unwrap();
+                    match *m {
+                        Packet::Message {
+                            ref mut senders, ..
+                        } => senders.drain(..).for_each(|src| ex.send_back(src, Ok(0))),
+                        Packet::Transaction {
+                            ref mut senders,
+                            state: TransactionState::Committed(ts, ..),
+                            ..
+                        } => senders.drain(..).for_each(|src| ex.send_back(src, Ok(ts))),
+                        _ => {}
+                    }
+                }
+
                 // When a replay originates at a base node, we replay the data *through* that same
                 // base node because its column set may have changed. However, this replay through
                 // the base node itself should *NOT* update the materialization, because otherwise
@@ -177,28 +195,6 @@ impl Node {
                         materialize(rs, tag, state.get_mut(&addr));
                     });
                 }
-
-                // Send write-ACKs to all the clients with updates that made
-                // it into this merged packet:
-                match (i.get_base(), executor, m) {
-                    (
-                        Some(..),
-                        Some(ex),
-                        &mut box Packet::Message {
-                            ref mut senders, ..
-                        },
-                    ) => senders.drain(..).for_each(|src| ex.send_back(src, Ok(0))),
-                    (
-                        Some(..),
-                        Some(ex),
-                        &mut box Packet::Transaction {
-                            ref mut senders,
-                            state: TransactionState::Committed(ts, ..),
-                            ..
-                        },
-                    ) => senders.drain(..).for_each(|src| ex.send_back(src, Ok(ts))),
-                    _ => {}
-                };
 
                 misses
             }
@@ -277,18 +273,6 @@ pub fn materialize(rs: &mut Records, partial: Option<Tag>, state: Option<&mut St
             }
         });
     } else {
-        for r in rs.iter() {
-            match *r {
-                Record::Positive(ref r) => {
-                    let hit = state.insert(r.clone(), None);
-                    debug_assert!(hit);
-                }
-                Record::Negative(ref r) => {
-                    let hit = state.remove(r);
-                    debug_assert!(hit);
-                }
-                Record::DeleteRequest(..) => unreachable!(),
-            }
-        }
+        state.process_records(rs);
     }
 }

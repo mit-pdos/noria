@@ -715,6 +715,13 @@ fn main() {
                         .help("Enable durability for Base nodes"),
                 )
                 .arg(
+                    Arg::with_name("persist-bases")
+                        .long("persist-bases")
+                        .takes_value(false)
+                        .requires("durability")
+                        .help("Use SQlite for base nodes"),
+                )
+                .arg(
                     Arg::with_name("retain-logs-on-exit")
                         .long("retain-logs-on-exit")
                         .takes_value(false)
@@ -727,6 +734,13 @@ fn main() {
                         .takes_value(true)
                         .default_value("512")
                         .help("Size of batches processed at base nodes."),
+                )
+                .arg(
+                    Arg::with_name("flush-timeout")
+                        .long("flush-timeout")
+                        .takes_value(true)
+                        .default_value("100000")
+                        .help("Time to wait before processing a merged packet, in nanoseconds."),
                 )
                 .arg(
                     Arg::with_name("stupid")
