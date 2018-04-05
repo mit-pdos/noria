@@ -733,6 +733,13 @@ fn main() {
                         .help("Time to wait before processing a merged packet, in nanoseconds."),
                 )
                 .arg(
+                    Arg::with_name("persistence-threads")
+                        .long("persistence-threads")
+                        .takes_value(true)
+                        .default_value("1")
+                        .help("Number of background threads used by PersistentState."),
+                )
+                .arg(
                     Arg::with_name("stupid")
                         .long("stupid")
                         .help("Make the migration stupid")
