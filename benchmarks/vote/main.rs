@@ -492,17 +492,21 @@ where
                 // *could* speed up
                 if now < end && now.duration_since(start) > warmup {
                     let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
-                    if clients_completed > 0 {
-                        let queued = enqueued as u64 - clients_completed;
-                        let client_work_left =
-                            (queued * first.elapsed().as_secs()) / clients_completed;
-                        if client_work_left > (end - now).as_secs() + 1 {
-                            // no point in continuing to feed work to the clients
-                            // they have enough work to keep them busy until the end
-                            eprintln!(
-                                "load generator quitting early as clients are falling behind"
-                            );
-                            break;
+                    let queued = enqueued as u64 - clients_completed;
+                    let dur = first.elapsed().as_secs();
+
+                    if dur > 0 {
+                        let client_rate = clients_completed / dur;
+                        if client_rate > 0 {
+                            let client_work_left = queued / client_rate;
+                            if client_work_left > (end - now).as_secs() + 1 {
+                                // no point in continuing to feed work to the clients
+                                // they have enough work to keep them busy until the end
+                                eprintln!(
+                                    "load generator quitting early as clients are falling behind"
+                                );
+                                break;
+                            }
                         }
                     }
                 }
