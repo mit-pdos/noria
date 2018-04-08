@@ -177,7 +177,7 @@ impl Backend {
 
             let start = time::Instant::now();
             for i in 0..num {
-                match g.lookup(&params[i], true) {
+                match g.lookup(&params[i..(i + 1)], true) {
                     Err(_) => continue,
                     Ok(datas) => if datas.len() > 0 {
                         ok += 1;

@@ -60,7 +60,7 @@ fn main() {
 
     println!("Reading articles...");
     for aid in 1..NUM_ARTICLES {
-        awvc.lookup(&aid.into(), true).unwrap();
+        awvc.lookup(&[aid.into()], true).unwrap();
     }
 
     println!("Casting votes...");
@@ -73,6 +73,6 @@ fn main() {
         aid = (aid + 1) % NUM_ARTICLES;
         vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
 
-        awvc.lookup(&aid.into(), true).unwrap();
+        awvc.lookup(&[aid.into()], true).unwrap();
     }
 }

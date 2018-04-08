@@ -94,7 +94,7 @@ pub fn dump_papers(backend: &mut Backend, user: &str) {
         .get_getter(&format!("PaperList_u{}", user))
         .unwrap();
 
-    println!("{:?}", get.lookup(&0.into(), true));
+    println!("{:?}", get.lookup(&[0.into()], true));
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
@@ -104,5 +104,5 @@ pub fn dump_all_papers(backend: &mut Backend) {
         .get_getter("PaperList")
         .unwrap();
 
-    println!("{:?}", get.lookup(&0.into(), true));
+    println!("{:?}", get.lookup(&[0.into()], true));
 }

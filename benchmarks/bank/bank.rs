@@ -146,7 +146,7 @@ fn client(
         };
 
         //let mut get = |id: &DataType| if balances_get.supports_transactions() {
-        let mut get = |id: &DataType| {
+        let mut get = |id: &[DataType]| {
             if transactions {
                 balances_get.transactional_lookup(id).map(&f)
             } else {
@@ -171,7 +171,7 @@ fn client(
             assert_ne!(dst, src);
 
             let transaction_start = time::Instant::now();
-            let (balance, mut token) = get(&src.into()).unwrap().unwrap();
+            let (balance, mut token) = get(&[src.into()]).unwrap().unwrap();
 
             assert!(
                 balance >= 0 || !transactions,
@@ -263,7 +263,7 @@ fn client(
             }
 
             for (account, balance) in target_balances {
-                assert_eq!(get(&account.into()).unwrap().unwrap().0, balance);
+                assert_eq!(get(&[account.into()]).unwrap().unwrap().0, balance);
             }
             println!("Audit found no irregularities");
         }
