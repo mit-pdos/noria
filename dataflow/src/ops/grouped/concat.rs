@@ -94,8 +94,14 @@ impl GroupConcat {
                         let text: Cow<str> = (&rec[*i]).into();
                         s.push_str(&*text);
                     }
+                    DataType::Byte(ref n) => s.push_str(&n.to_string()),
+                    DataType::UByte(ref n) => s.push_str(&n.to_string()),
+                    DataType::Short(ref n) => s.push_str(&n.to_string()),
+                    DataType::UShort(ref n) => s.push_str(&n.to_string()),
                     DataType::Int(ref n) => s.push_str(&n.to_string()),
+                    DataType::UInt(ref n) => s.push_str(&n.to_string()),
                     DataType::BigInt(ref n) => s.push_str(&n.to_string()),
+                    DataType::UBigInt(ref n) => s.push_str(&n.to_string()),
                     DataType::Real(..) => s.push_str(&rec[*i].to_string()),
                     DataType::Timestamp(ref ts) => s.push_str(&ts.format("%+").to_string()),
                     DataType::None => unreachable!(),

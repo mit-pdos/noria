@@ -24,10 +24,18 @@ const TINYTEXT_WIDTH: usize = 15;
 pub enum DataType {
     /// An empty value.
     None,
+    /// An 8-bit numeric value.
+    Byte(i8),
+    UByte(u8),
+    /// A 16-bit numeric value.
+    Short(i16),
+    UShort(u16),
     /// A 32-bit numeric value.
     Int(i32),
+    UInt(u32),
     /// A 64-bit numeric value.
     BigInt(i64),
+    UBigInt(u64),
     /// A fixed point real value. The first field is the integer part, while the second is the
     /// fractional and must be between -999999999 and 999999999.
     Real(i32, i32),
@@ -47,8 +55,14 @@ impl DataType {
                 let text: Cow<str> = self.into();
                 format!("{}", text)
             }
+            DataType::Byte(n) => format!("{}", n),
+            DataType::UByte(n) => format!("{}", n),
+            DataType::Short(n) => format!("{}", n),
+            DataType::UShort(n) => format!("{}", n),
             DataType::Int(n) => format!("{}", n),
+            DataType::UInt(n) => format!("{}", n),
             DataType::BigInt(n) => format!("{}", n),
+            DataType::UBigInt(n) => format!("{}", n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.
@@ -121,8 +135,89 @@ impl Ord for DataType {
                 let b: Cow<str> = other.into();
                 a.cmp(&b)
             }
-            (&DataType::BigInt(a), &DataType::BigInt(ref b)) => a.cmp(b),
+            // integer types compare to themselves
+            (&DataType::Byte(a), &DataType::Byte(b)) => a.cmp(&b),
+            (&DataType::UByte(a), &DataType::Byte(b)) => a.cmp(&(b as u8)),
+            (&DataType::Byte(a), &DataType::UByte(b)) => (a as u8).cmp(&b),
+            (&DataType::UByte(a), &DataType::UByte(b)) => a.cmp(&b),
+            (&DataType::Short(a), &DataType::Short(b)) => a.cmp(&b),
+            (&DataType::UShort(a), &DataType::Short(b)) => a.cmp(&(b as u16)),
+            (&DataType::Short(a), &DataType::UShort(b)) => (a as u16).cmp(&b),
+            (&DataType::UShort(a), &DataType::UShort(b)) => a.cmp(&b),
             (&DataType::Int(a), &DataType::Int(b)) => a.cmp(&b),
+            (&DataType::UInt(a), &DataType::Int(b)) => a.cmp(&(b as u32)),
+            (&DataType::Int(a), &DataType::UInt(b)) => (a as u32).cmp(&b),
+            (&DataType::UInt(a), &DataType::UInt(b)) => a.cmp(&b),
+            (&DataType::BigInt(a), &DataType::BigInt(ref b)) => a.cmp(b),
+            (&DataType::UBigInt(a), &DataType::BigInt(b)) => a.cmp(&(b as u64)),
+            (&DataType::UBigInt(a), &DataType::UBigInt(ref b)) => a.cmp(b),
+            // integer types compare to each other via widening casts
+            (&DataType::Byte(..), &DataType::Short(..))
+            | (&DataType::Short(..), &DataType::Byte(..)) => {
+                let a: i16 = self.into();
+                let b: i16 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Byte(..), &DataType::UShort(..))
+            | (&DataType::UByte(..), &DataType::Short(..))
+            | (&DataType::UByte(..), &DataType::UShort(..))
+            | (&DataType::UShort(..), &DataType::UByte(..)) => {
+                let a: u16 = self.into();
+                let b: u16 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Byte(..), &DataType::Int(..))
+            | (&DataType::Int(..), &DataType::Byte(..)) => {
+                let a: i32 = self.into();
+                let b: i32 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Byte(..), &DataType::UInt(..))
+            | (&DataType::UByte(..), &DataType::Int(..))
+            | (&DataType::UByte(..), &DataType::UInt(..))
+            | (&DataType::UInt(..), &DataType::UByte(..)) => {
+                let a: u32 = self.into();
+                let b: u32 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Byte(..), &DataType::BigInt(..))
+            | (&DataType::BigInt(..), &DataType::Byte(..)) => {
+                let a: i64 = self.into();
+                let b: i64 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Byte(..), &DataType::UBigInt(..))
+            | (&DataType::UByte(..), &DataType::BigInt(..))
+            | (&DataType::UByte(..), &DataType::UBigInt(..))
+            | (&DataType::UBigInt(..), &DataType::UByte(..)) => {
+                let a: u64 = self.into();
+                let b: u64 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Short(..), &DataType::Int(..))
+            | (&DataType::Int(..), &DataType::Short(..)) => {
+                let a: i32 = self.into();
+                let b: i32 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::UShort(..), &DataType::UInt(..))
+            | (&DataType::UInt(..), &DataType::UShort(..)) => {
+                let a: u32 = self.into();
+                let b: u32 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::Short(..), &DataType::BigInt(..))
+            | (&DataType::BigInt(..), &DataType::Short(..)) => {
+                let a: i64 = self.into();
+                let b: i64 = other.into();
+                a.cmp(&b)
+            }
+            (&DataType::UShort(..), &DataType::UBigInt(..))
+            | (&DataType::UBigInt(..), &DataType::UShort(..)) => {
+                let a: u64 = self.into();
+                let b: u64 = other.into();
+                a.cmp(&b)
+            }
             (&DataType::BigInt(..), &DataType::Int(..))
             | (&DataType::Int(..), &DataType::BigInt(..)) => {
                 let a: i64 = self.into();
@@ -136,7 +231,14 @@ impl Ord for DataType {
             (&DataType::None, &DataType::None) => Ordering::Equal,
 
             // order Ints, Reals, Text, Timestamps, None
-            (&DataType::Int(..), _) | (&DataType::BigInt(..), _) => Ordering::Greater,
+            (&DataType::Byte(..), _)
+            | (&DataType::UByte(..), _)
+            | (&DataType::Short(..), _)
+            | (&DataType::UShort(..), _)
+            | (&DataType::Int(..), _)
+            | (&DataType::UInt(..), _)
+            | (&DataType::BigInt(..), _)
+            | (&DataType::UBigInt(..), _) => Ordering::Greater,
             (&DataType::Real(..), _) => Ordering::Greater,
             (&DataType::Text(..), _) | (&DataType::TinyText(..), _) => Ordering::Greater,
             (&DataType::Timestamp(..), _) => Ordering::Greater,
@@ -152,8 +254,15 @@ impl Hash for DataType {
         // collisions, but the decreased overhead is worth it.
         match *self {
             DataType::None => {}
-            DataType::Int(..) | DataType::BigInt(..) => {
+            DataType::Byte(..) | DataType::Short(..) | DataType::Int(..) | DataType::BigInt(..) => {
                 let n: i64 = self.into();
+                n.hash(state)
+            }
+            DataType::UByte(..)
+            | DataType::UShort(..)
+            | DataType::UInt(..)
+            | DataType::UBigInt(..) => {
+                let n: u64 = self.into();
                 n.hash(state)
             }
             DataType::Real(i, f) => {
@@ -178,6 +287,42 @@ impl From<i64> for DataType {
 impl From<i32> for DataType {
     fn from(s: i32) -> Self {
         DataType::Int(s as i32)
+    }
+}
+
+impl From<i16> for DataType {
+    fn from(s: i16) -> Self {
+        DataType::Short(s as i16)
+    }
+}
+
+impl From<i8> for DataType {
+    fn from(s: i8) -> Self {
+        DataType::Byte(s as i8)
+    }
+}
+
+impl From<u64> for DataType {
+    fn from(s: u64) -> Self {
+        DataType::UBigInt(s)
+    }
+}
+
+impl From<u32> for DataType {
+    fn from(s: u32) -> Self {
+        DataType::UInt(s as u32)
+    }
+}
+
+impl From<u16> for DataType {
+    fn from(s: u16) -> Self {
+        DataType::UShort(s as u16)
+    }
+}
+
+impl From<u8> for DataType {
+    fn from(s: u8) -> Self {
+        DataType::UByte(s as u8)
     }
 }
 
@@ -280,6 +425,8 @@ impl Into<i64> for DataType {
         match self {
             DataType::BigInt(s) => s,
             DataType::Int(s) => s as i64,
+            DataType::Short(s) => s as i64,
+            DataType::Byte(s) => s as i64,
             _ => unreachable!(),
         }
     }
@@ -290,6 +437,40 @@ impl<'a> Into<i64> for &'a DataType {
         match *self {
             DataType::BigInt(s) => s,
             DataType::Int(s) => s as i64,
+            DataType::Short(s) => s as i64,
+            DataType::Byte(s) => s as i64,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Into<u64> for DataType {
+    fn into(self) -> u64 {
+        match self {
+            DataType::BigInt(s) => s as u64,
+            DataType::UBigInt(s) => s,
+            DataType::Int(s) => s as u64,
+            DataType::UInt(s) => s as u64,
+            DataType::Short(s) => s as u64,
+            DataType::UShort(s) => s as u64,
+            DataType::Byte(s) => s as u64,
+            DataType::UByte(s) => s as u64,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> Into<u64> for &'a DataType {
+    fn into(self) -> u64 {
+        match *self {
+            DataType::BigInt(s) => s as u64,
+            DataType::UBigInt(s) => s,
+            DataType::Int(s) => s as u64,
+            DataType::UInt(s) => s as u64,
+            DataType::Short(s) => s as u64,
+            DataType::UShort(s) => s as u64,
+            DataType::Byte(s) => s as u64,
+            DataType::UByte(s) => s as u64,
             _ => unreachable!(),
         }
     }
@@ -297,10 +478,94 @@ impl<'a> Into<i64> for &'a DataType {
 
 impl Into<i32> for DataType {
     fn into(self) -> i32 {
-        if let DataType::Int(s) = self {
-            s
-        } else {
-            unreachable!();
+        match self {
+            DataType::Int(s) => s,
+            DataType::Short(s) => s as i32,
+            DataType::Byte(s) => s as i32,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> Into<i32> for &'a DataType {
+    fn into(self) -> i32 {
+        match *self {
+            DataType::Int(s) => s,
+            DataType::Short(s) => s as i32,
+            DataType::Byte(s) => s as i32,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Into<u32> for DataType {
+    fn into(self) -> u32 {
+        match self {
+            DataType::Int(s) => s as u32,
+            DataType::UInt(s) => s,
+            DataType::Short(s) => s as u32,
+            DataType::UShort(s) => s as u32,
+            DataType::Byte(s) => s as u32,
+            DataType::UByte(s) => s as u32,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> Into<u32> for &'a DataType {
+    fn into(self) -> u32 {
+        match *self {
+            DataType::Int(s) => s as u32,
+            DataType::UInt(s) => s,
+            DataType::Short(s) => s as u32,
+            DataType::UShort(s) => s as u32,
+            DataType::Byte(s) => s as u32,
+            DataType::UByte(s) => s as u32,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Into<i16> for DataType {
+    fn into(self) -> i16 {
+        match self {
+            DataType::Short(s) => s,
+            DataType::Byte(s) => s as i16,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> Into<i16> for &'a DataType {
+    fn into(self) -> i16 {
+        match *self {
+            DataType::Short(s) => s,
+            DataType::Byte(s) => s as i16,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Into<u16> for DataType {
+    fn into(self) -> u16 {
+        match self {
+            DataType::Short(s) => s as u16,
+            DataType::UShort(s) => s,
+            DataType::Byte(s) => s as u16,
+            DataType::UByte(s) => s as u16,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> Into<u16> for &'a DataType {
+    fn into(self) -> u16 {
+        match *self {
+            DataType::Short(s) => s as u16,
+            DataType::UShort(s) => s,
+            DataType::Byte(s) => s as u16,
+            DataType::UByte(s) => s as u16,
+            _ => unreachable!(),
         }
     }
 }
@@ -414,8 +679,14 @@ impl fmt::Debug for DataType {
             }
             DataType::Timestamp(ts) => write!(f, "Timestamp({:?})", ts),
             DataType::Real(..) => write!(f, "Real({})", self),
+            DataType::Byte(n) => write!(f, "Byte({})", n),
+            DataType::UByte(n) => write!(f, "UByte({})", n),
+            DataType::Short(n) => write!(f, "Short({})", n),
+            DataType::UShort(n) => write!(f, "UShort({})", n),
             DataType::Int(n) => write!(f, "Int({})", n),
+            DataType::UInt(n) => write!(f, "UInt({})", n),
             DataType::BigInt(n) => write!(f, "BigInt({})", n),
+            DataType::UBigInt(n) => write!(f, "UBigInt({})", n),
         }
     }
 }
@@ -428,8 +699,14 @@ impl fmt::Display for DataType {
                 let text: Cow<str> = self.into();
                 write!(f, "\"{}\"", text)
             }
+            DataType::Byte(n) => write!(f, "{}", n),
+            DataType::UByte(n) => write!(f, "{}", n),
+            DataType::Short(n) => write!(f, "{}", n),
+            DataType::UShort(n) => write!(f, "{}", n),
             DataType::Int(n) => write!(f, "{}", n),
+            DataType::UInt(n) => write!(f, "{}", n),
             DataType::BigInt(n) => write!(f, "{}", n),
+            DataType::UBigInt(n) => write!(f, "{}", n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.
