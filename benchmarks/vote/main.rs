@@ -315,6 +315,7 @@ fn run_generator<R>(
 where
     R: rand::distributions::Sample<usize>,
 {
+    let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
 
@@ -472,7 +473,7 @@ where
                 // we instead need to stop issuing requests earlier than we otherwise would
                 // have. but make sure we're not still in the warmup phase, because the clients
                 // *could* speed up
-                if now < end && now.duration_since(start) > warmup {
+                if early_exit && now < end && now.duration_since(start) > warmup {
                     let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
                     let queued = enqueued as u64 - clients_completed;
                     let dur = first.elapsed().as_secs();
@@ -577,6 +578,11 @@ fn main() {
             Arg::with_name("no-prime")
                 .long("no-prime")
                 .help("Indicates that the client should not set up the database"),
+        )
+        .arg(
+            Arg::with_name("no-early-exit")
+                .long("no-early-exit")
+                .help("Don't stop generating load when clients fall behind."),
         )
         .subcommand(
             SubCommand::with_name("netsoup")
