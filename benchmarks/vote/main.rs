@@ -709,7 +709,7 @@ fn main() {
                         .long("persist-bases")
                         .takes_value(false)
                         .requires("durability")
-                        .help("Use SQlite for base nodes"),
+                        .help("Persist base nodes to disk"),
                 )
                 .arg(
                     Arg::with_name("retain-logs-on-exit")
