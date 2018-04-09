@@ -715,7 +715,13 @@ fn main() {
                         .long("persist-bases")
                         .takes_value(false)
                         .requires("durability")
-                        .help("Persist base nodes to disk"),
+                        .help("Persist base nodes to disk."),
+                )
+                .arg(
+                    Arg::with_name("log-dir")
+                        .long("log-dir")
+                        .takes_value(true)
+                        .help("Absolute path to the directory where the log files will be written."),
                 )
                 .arg(
                     Arg::with_name("retain-logs-on-exit")
