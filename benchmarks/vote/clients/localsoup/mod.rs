@@ -8,9 +8,9 @@ use clients::{Parameters, VoteClient};
 pub(crate) mod graph;
 
 pub(crate) struct Client {
-    r: distributary::RemoteGetter,
+    r: distributary::RemoteGetter<distributary::ExclusiveConnection>,
     #[allow(dead_code)]
-    w: distributary::Mutator,
+    w: distributary::Mutator<distributary::ExclusiveConnection>,
 }
 
 impl VoteClient for Client {
@@ -70,8 +70,11 @@ impl VoteClient for Client {
 
     fn from(soup: &mut Self::Constructor) -> Self {
         Client {
-            r: soup.graph.get_getter("ArticleWithVoteCount").unwrap(),
-            w: soup.graph.get_mutator("Vote").unwrap(),
+            r: soup.graph
+                .get_getter("ArticleWithVoteCount")
+                .unwrap()
+                .into_exclusive(),
+            w: soup.graph.get_mutator("Vote").unwrap().into_exclusive(),
         }
     }
 

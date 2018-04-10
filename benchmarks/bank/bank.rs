@@ -109,8 +109,8 @@ fn populate(naccounts: i64, mut mutator: distributary::Mutator, transactions: bo
 
 fn client(
     _i: usize,
-    mut mutator: distributary::Mutator,
-    mut balances_get: distributary::RemoteGetter,
+    mut mutator: distributary::Mutator<distributary::ExclusiveConnection>,
+    mut balances_get: distributary::RemoteGetter<distributary::ExclusiveConnection>,
     naccounts: i64,
     start: time::Instant,
     runtime: time::Duration,
@@ -455,8 +455,11 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let mutator = bank.blender.get_mutator("transfers").unwrap();
-                let balances_get = bank.getter();
+                let mutator = bank.blender
+                    .get_mutator("transfers")
+                    .unwrap()
+                    .into_exclusive();
+                let balances_get = bank.getter().into_exclusive();
 
                 thread::Builder::new()
                     .name(format!("bank{}", i))
@@ -483,8 +486,11 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-            let mutator = bank.blender.get_mutator("transfers").unwrap();
-            let balances_get = bank.getter();
+            let mutator = bank.blender
+                .get_mutator("transfers")
+                .unwrap()
+                .into_exclusive();
+            let balances_get = bank.getter().into_exclusive();
             let debug_channel = bank.debug_channel.take();
             assert!(debug_channel.is_some());
 

@@ -5,19 +5,25 @@ use clients::localsoup::graph::RECIPE;
 use clients::{Parameters, VoteClient};
 
 pub(crate) struct Client {
-    r: distributary::RemoteGetter,
+    r: distributary::RemoteGetter<distributary::ExclusiveConnection>,
     #[allow(dead_code)]
-    w: distributary::Mutator,
+    w: distributary::Mutator<distributary::ExclusiveConnection>,
 }
 
 type Handle = ControllerHandle<ZookeeperAuthority>;
 
-fn make_mutator(c: &mut Handle, view: &str) -> distributary::Mutator {
-    c.get_mutator(view).unwrap()
+fn make_mutator(
+    c: &mut Handle,
+    view: &str,
+) -> distributary::Mutator<distributary::ExclusiveConnection> {
+    c.get_mutator(view).unwrap().into_exclusive()
 }
 
-fn make_getter(c: &mut Handle, view: &str) -> distributary::RemoteGetter {
-    c.get_getter(view).unwrap()
+fn make_getter(
+    c: &mut Handle,
+    view: &str,
+) -> distributary::RemoteGetter<distributary::ExclusiveConnection> {
+    c.get_getter(view).unwrap().into_exclusive()
 }
 
 impl VoteClient for Client {
