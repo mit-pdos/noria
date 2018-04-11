@@ -1,20 +1,9 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
-extern crate futures;
-extern crate futures_state_stream;
 extern crate hdrhistogram;
-extern crate hwloc;
 extern crate itertools;
-extern crate libc;
-extern crate memcached;
-extern crate mysql;
 extern crate rand;
-extern crate rayon;
-extern crate tiberius;
-extern crate tokio_core;
-
-mod clients;
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -24,80 +13,61 @@ use clap::{App, Arg};
 use hdrhistogram::Histogram;
 use itertools::Itertools;
 
-use clients::localsoup::graph;
-use distributary::{DataType, DurabilityMode, PersistenceParameters};
+use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode, LocalAuthority,
+                   PersistenceParameters};
 
 // If we .batch_put a huge amount of rows we'll end up with a deadlock when the base
 // domains fill up their TCP buffers trying to send ACKs (which the batch putter
 // isn't reading yet, since it's still busy sending).
 const BATCH_SIZE: usize = 10000;
 
-fn randomness(range: i64, n: i64) -> Vec<i64> {
-    use rand::Rng;
-    let mut u = rand::thread_rng();
-    (0..n).map(|_| u.gen_range(0, range) as i64).collect()
-}
+// Each row takes up 160 bytes with the current
+// serialization scheme (32 for the key, 128 for the value).
+const RECIPE: &str = "
+CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, PRIMARY KEY(id));
+QUERY ReadRow: SELECT * FROM TableRow WHERE id = ?;
+";
 
-fn populate(g: &mut graph::Graph, narticles: i64, nvotes: i64, verbose: bool) {
-    let random = randomness(narticles, nvotes);
-    let mut articles = g.graph.get_mutator("Article").unwrap();
-    let mut votes = g.graph.get_mutator("Vote").unwrap();
+fn populate(g: &mut ControllerHandle<LocalAuthority>, rows: i64, verbose: bool) {
+    let mut mutator = g.get_mutator("TableRow").unwrap();
 
     // prepopulate
     if verbose {
-        eprintln!("Populating with {} articles", narticles);
+        eprintln!("Populating with {} rows", rows);
     }
 
-    (0..narticles)
+    (0..rows)
         .map(|i| {
-            let article: Vec<DataType> = vec![i.into(), format!("Article #{}", i).into()];
-            article
+            let row: Vec<DataType> = vec![i.into(); 10];
+            row
         })
         .chunks(BATCH_SIZE)
         .into_iter()
         .for_each(|chunk| {
             let rs: Vec<Vec<DataType>> = chunk.collect();
-            articles.multi_put(rs).unwrap();
-        });
-
-    if verbose {
-        eprintln!("Populating with {} votes", nvotes);
-    }
-
-    (0..nvotes)
-        .map(|i| {
-            let vote: Vec<DataType> = vec![random[i as usize].into(), i.into()];
-            vote
-        })
-        .chunks(BATCH_SIZE)
-        .into_iter()
-        .for_each(|chunk| {
-            let rs: Vec<Vec<DataType>> = chunk.collect();
-            votes.multi_put(rs).unwrap();
+            mutator.multi_put(rs).unwrap();
         });
 
     thread::sleep(Duration::from_secs(5));
 }
 
-fn perform_reads(g: &mut graph::Graph, narticles: i64, nvotes: i64) {
+fn perform_reads(g: &mut ControllerHandle<LocalAuthority>, reads: i64, rows: i64) {
     let mut hist = Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap();
-    let mut getter = g.graph.get_getter("ArticleWithVoteCount").unwrap();
-    let mut sum = 0;
+    let mut getter = g.get_getter("ReadRow").unwrap();
 
-    // Synchronously read each article once, which should trigger a full replay from the base.
-    for i in 0..narticles {
+    let mut rng = rand::thread_rng();
+    let row_ids = rand::seq::sample_iter(&mut rng, 0..rows, reads as usize).unwrap();
+    // Synchronously read `reads` times, where each read should trigger a full replay from the base.
+    for i in row_ids {
+        let id: DataType = (i as i64).into();
         let start = Instant::now();
-        let rs = getter.lookup(&[i.into()], true).unwrap();
+        let rs = getter.lookup(&[id], true).unwrap();
         let elapsed = start.elapsed();
         let us = elapsed.as_secs() * 1_000_000 + elapsed.subsec_nanos() as u64 / 1_000;
         assert_eq!(rs.len(), 1);
-        assert_eq!(DataType::BigInt(i), rs[0][0]);
-        sum += match rs[0][2] {
-            DataType::Int(votes) => votes as i64,
-            DataType::BigInt(votes) => votes,
-            DataType::None => 0,
-            _ => unreachable!(),
-        };
+        for j in 0..10 {
+            assert_eq!(DataType::BigInt(i), rs[0][j]);
+        }
 
         if hist.record(us).is_err() {
             let m = hist.high();
@@ -105,8 +75,7 @@ fn perform_reads(g: &mut graph::Graph, narticles: i64, nvotes: i64) {
         }
     }
 
-    assert_eq!(nvotes, sum);
-    println!("# articles: {}, votes: {}", narticles, nvotes);
+    println!("# read {} of {} rows", reads, rows);
     println!("read\t50\t{:.2}\t(all µs)", hist.value_at_quantile(0.5));
     println!("read\t95\t{:.2}\t(all µs)", hist.value_at_quantile(0.95));
     println!("read\t99\t{:.2}\t(all µs)", hist.value_at_quantile(0.99));
@@ -118,19 +87,17 @@ fn main() {
         .version("0.1")
         .about("Benchmarks the latency of full replays in a user-curated news aggregator")
         .arg(
-            Arg::with_name("narticles")
-                .short("a")
-                .long("articles")
+            Arg::with_name("rows")
+                .long("rows")
                 .value_name("N")
                 .default_value("100000")
-                .help("Number of articles to prepopulate the database with"),
+                .help("Number of rows to prepopulate the database with"),
         )
         .arg(
-            Arg::with_name("nvotes")
-                .short("v")
-                .long("votes")
-                .default_value("1000000")
-                .help("Number of votes to prepopulate the database with"),
+            Arg::with_name("reads")
+                .long("reads")
+                .default_value("10000")
+                .help("Number of rows to read while benchmarking"),
         )
         .arg(
             Arg::with_name("persist-bases")
@@ -181,8 +148,10 @@ fn main() {
         .arg(Arg::with_name("verbose").long("verbose").short("v"))
         .get_matches();
 
-    let narticles = value_t_or_exit!(args, "narticles", i64);
-    let nvotes = value_t_or_exit!(args, "nvotes", i64);
+    let reads = value_t_or_exit!(args, "reads", i64);
+    let rows = value_t_or_exit!(args, "rows", i64);
+    assert!(reads < rows);
+
     let verbose = args.is_present("verbose");
     let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
 
@@ -200,22 +169,29 @@ fn main() {
         DurabilityMode::DeleteOnExit
     };
 
-    let mut s = graph::Setup::default();
-    s.logging = verbose;
-    s.nworkers = 2;
-    s.nreaders = 1;
-    s.sharding = match value_t_or_exit!(args, "shards", usize) {
+    let mut builder = ControllerBuilder::default();
+    let sharding = match value_t_or_exit!(args, "shards", usize) {
         0 => None,
         x => Some(x),
     };
 
-    let mut g = graph::make(s, persistence);
-    // Prepopulate with narticles and nvotes:
-    populate(&mut g, narticles, nvotes, verbose);
+    builder.set_read_threads(1);
+    builder.set_worker_threads(2);
+    builder.set_persistence(persistence);
+    builder.set_sharding(sharding);
+    if verbose {
+        builder.log_with(distributary::logger_pls());
+    }
+
+    let mut g = builder.build_local();
+    g.install_recipe(RECIPE.to_owned()).unwrap();
+
+    // Prepopulate with n rows:
+    populate(&mut g, rows, verbose);
 
     if verbose {
         eprintln!("Done populating state, now reading articles...");
     }
 
-    perform_reads(&mut g, narticles, nvotes);
+    perform_reads(&mut g, reads, rows);
 }

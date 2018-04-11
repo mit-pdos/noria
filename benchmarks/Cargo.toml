@@ -92,6 +92,10 @@ path = "evict-o-rama/main.rs"
 name = "vote-migration"
 path = "vote-migration/main.rs"
 
+[[bin]]
+name = "replay"
+path = "replay/main.rs"
+
 #[[bin]]
 #name = "security-mysql"
 #path = "piazza/mysql.rs"
