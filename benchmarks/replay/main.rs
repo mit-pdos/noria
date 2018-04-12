@@ -21,8 +21,8 @@ use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode
 // isn't reading yet, since it's still busy sending).
 const BATCH_SIZE: usize = 10000;
 
-// Each row takes up 160 bytes with the current
-// serialization scheme (32 for the key, 128 for the value).
+// Each row takes up 172 bytes with the current
+// serialization scheme (44 for the key, 128 for the value).
 const RECIPE: &str = "
 CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, PRIMARY KEY(id));
 QUERY ReadRow: SELECT * FROM TableRow WHERE id = ?;
