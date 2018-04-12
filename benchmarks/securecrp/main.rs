@@ -18,7 +18,7 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn new(partial: bool, _shard: bool, reuse: &str, ndomains: usize) -> Backend {
+    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
         let log = distributary::logger_pls();
         let blender_log = log.clone();
@@ -27,7 +27,6 @@ impl Backend {
             cb.disable_partial();
         }
 
-        cb.set_fixed_domains(Some(ndomains));
         cb.log_with(blender_log);
 
         match reuse.as_ref() {
@@ -150,17 +149,8 @@ fn main() {
                 .long("populate")
                 .help("Populate app with randomly generated data"),
         )
-        .arg(
-            Arg::with_name("user")
-                .long("user")
-                .default_value("malte")
-        ).arg(
-            Arg::with_name("ndomains")
-                .long("ndomains")
-                .default_value("1")
-        )
+        .arg(Arg::with_name("user").long("user").default_value("malte"))
         .get_matches();
-
 
     println!("Starting SecureCRP...");
 
@@ -173,9 +163,8 @@ fn main() {
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
     let user = args.value_of("user").unwrap();
-    let ndomains: usize = value_t_or_exit!(args, "ndomains", usize);
 
-    let mut backend = Backend::new(partial, shard, reuse, ndomains);
+    let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
