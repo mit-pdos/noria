@@ -5,16 +5,18 @@ extern crate hdrhistogram;
 extern crate itertools;
 extern crate rand;
 
-use std::thread;
+use std::fs;
 use std::time::{Duration, Instant};
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Arc;
 
 use clap::{App, Arg};
 use hdrhistogram::Histogram;
 use itertools::Itertools;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode, LocalAuthority,
-                   PersistenceParameters};
+use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode,
+                   PersistenceParameters, ZookeeperAuthority};
 
 // If we .batch_put a huge amount of rows we'll end up with a deadlock when the base
 // domains fill up their TCP buffers trying to send ACKs (which the batch putter
@@ -28,7 +30,26 @@ CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c
 QUERY ReadRow: SELECT * FROM TableRow WHERE id = ?;
 ";
 
-fn populate(g: &mut ControllerHandle<LocalAuthority>, rows: i64, verbose: bool) {
+fn build_graph(
+    authority: Arc<ZookeeperAuthority>,
+    persistence: PersistenceParameters,
+    verbose: bool,
+) -> ControllerHandle<ZookeeperAuthority> {
+    let mut builder = ControllerBuilder::default();
+    if verbose {
+        builder.log_with(distributary::logger_pls());
+    }
+
+    builder.set_persistence(persistence);
+    // Force a single domain with no shards to avoid deadlocking on replays:
+    builder.set_sharding(None);
+    builder.set_fixed_domains(Some(1));
+    builder.set_read_threads(1);
+    builder.set_worker_threads(1);
+    builder.build(authority)
+}
+
+fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, verbose: bool) {
     let mut mutator = g.get_mutator("TableRow").unwrap();
 
     // prepopulate
@@ -47,11 +68,9 @@ fn populate(g: &mut ControllerHandle<LocalAuthority>, rows: i64, verbose: bool) 
             let rs: Vec<Vec<DataType>> = chunk.collect();
             mutator.multi_put(rs).unwrap();
         });
-
-    thread::sleep(Duration::from_secs(5));
 }
 
-fn perform_reads(g: &mut ControllerHandle<LocalAuthority>, reads: i64, rows: i64) {
+fn perform_reads(g: &mut ControllerHandle<ZookeeperAuthority>, reads: i64, rows: i64) {
     let mut hist = Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap();
     let mut getter = g.get_getter("ReadRow").unwrap();
 
@@ -106,6 +125,13 @@ fn main() {
                 .help("Persist base nodes to disk."),
         )
         .arg(
+            Arg::with_name("use-existing-data")
+                .long("use-existing-data")
+                .requires("retain-logs-on-exit")
+                .takes_value(false)
+                .help("Skips pre-population and instead uses already persisted data."),
+        )
+        .arg(
             Arg::with_name("log-dir")
                 .long("log-dir")
                 .takes_value(true)
@@ -125,6 +151,13 @@ fn main() {
                 .help("Size of batches processed at base nodes."),
         )
         .arg(
+            Arg::with_name("zookeeper-address")
+                .long("zookeeper-address")
+                .takes_value(true)
+                .default_value("127.0.0.1:2181/vote-replay")
+                .help("ZookeeperAuthority address"),
+        )
+        .arg(
             Arg::with_name("flush-timeout")
                 .long("flush-timeout")
                 .takes_value(true)
@@ -137,13 +170,6 @@ fn main() {
                 .takes_value(true)
                 .default_value("1")
                 .help("Number of background threads used by PersistentState."),
-        )
-        .arg(
-            Arg::with_name("shards")
-                .long("shards")
-                .takes_value(true)
-                .default_value("0")
-                .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(Arg::with_name("verbose").long("verbose").short("v"))
         .get_matches();
@@ -163,35 +189,38 @@ fn main() {
     persistence.log_prefix = "vote-replay".to_string();
     persistence.log_dir = args.value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
-    persistence.mode = if args.is_present("retain-logs-on-exit") {
-        DurabilityMode::Permanent
-    } else {
-        DurabilityMode::DeleteOnExit
-    };
+    persistence.mode = DurabilityMode::Permanent;
 
-    let mut builder = ControllerBuilder::default();
-    let sharding = match value_t_or_exit!(args, "shards", usize) {
-        0 => None,
-        x => Some(x),
-    };
+    let authority = Arc::new(ZookeeperAuthority::new(
+        args.value_of("zookeeper-address").unwrap(),
+    ));
 
-    builder.set_read_threads(1);
-    builder.set_worker_threads(2);
-    builder.set_persistence(persistence);
-    builder.set_sharding(sharding);
-    if verbose {
-        builder.log_with(distributary::logger_pls());
+    // Populate in a closure, so we'll have to recover before performing reads.
+    if !args.is_present("use-existing-data") {
+        let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
+        g.install_recipe(RECIPE.to_owned()).unwrap();
+
+        // Prepopulate with n rows:
+        populate(&mut g, rows, verbose);
     }
 
-    let mut g = builder.build_local();
-    g.install_recipe(RECIPE.to_owned()).unwrap();
-
-    // Prepopulate with n rows:
-    populate(&mut g, rows, verbose);
-
+    let mut g = build_graph(authority, persistence, verbose);
+    // Flush disk cache:
+    Command::new("sync")
+        .spawn()
+        .expect("Failed clearing disk buffers");
     if verbose {
         eprintln!("Done populating state, now reading articles...");
     }
 
     perform_reads(&mut g, reads, rows);
+
+    // Remove any log/database files:
+    if !args.is_present("retain-logs-on-exit") {
+        if args.is_present("persist-bases") {
+            fs::remove_dir_all("vote-replay_TableRow_0.db").unwrap();
+        } else {
+            fs::remove_file("vote-replay-log-TableRow-0.json").unwrap();
+        }
+    }
 }
