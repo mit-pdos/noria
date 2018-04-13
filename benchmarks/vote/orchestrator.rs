@@ -26,7 +26,7 @@ use std::borrow::Cow;
 use std::io::prelude::*;
 use std::{io, time};
 
-const SOUP_AMI: &str = "ami-6817b715";
+const SOUP_AMI: &str = "ami-6600db19";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
