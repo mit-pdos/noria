@@ -255,7 +255,7 @@ fn main() {
 
     // what backends are we benchmarking?
     let backends = vec![
-        Backend::Hybrid,
+        Backend::Memcached,
         Backend::Netsoup {
             workers: 2,
             readers: 14,
@@ -267,8 +267,8 @@ fn main() {
             shards: Some(2),
         },
         Backend::Mysql,
+        Backend::Hybrid,
         Backend::Mssql,
-        Backend::Memcached,
     ];
 
     // if the user wants us to terminate, finish whatever we're currently doing first
