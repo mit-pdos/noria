@@ -299,7 +299,7 @@ pub(crate) fn start<'a>(
                 .is_err()
             {
                 thread::sleep(time::Duration::from_secs(1));
-                if start.elapsed() > time::Duration::from_secs(10) {
+                if start.elapsed() > time::Duration::from_secs(30) {
                     bail!("zookeeper wouldn't start");
                 }
             }
