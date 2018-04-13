@@ -38,7 +38,6 @@ for (arg in args) {
 		}
 	} 
 
-	dt <- data.frame(age=rchisq(20,10),group=sample(1:2,20,rep=T))
 	ts <- ts %>% group_by(op, pct) %>% summarize(sjrn = max(sjrn), rmt = max(rmt))
 
 	ts$server = server
