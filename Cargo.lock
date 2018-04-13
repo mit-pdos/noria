@@ -495,7 +495,7 @@ dependencies = [
  "hyper 0.11.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.1.2 (git+https://github.com/jonhoo/memcached-rs.git?branch=expose-multi)",
  "mio 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "mio-pool 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio-pool 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
  "mysql 12.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1057,7 +1057,7 @@ dependencies = [
 
 [[package]]
 name = "mio-pool"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "mio 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2481,7 +2481,7 @@ dependencies = [
 "checksum miniz-sys 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "609ce024854aeb19a0ef7567d348aaa5a746b32fb72e336df7fcc16869d7e2b4"
 "checksum mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a637d1ca14eacae06296a008fa7ad955347e34efcb5891cfd8ba05491a37907e"
 "checksum mio 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)" = "6d771e3ef92d58a8da8df7d6976bfca9371ed1de6619d9d5a5ce5b1f29b85bfe"
-"checksum mio-pool 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "850cfabed4f9f4768714363dc6c3f8e095b39601ecfeffcb56c914947fed212e"
+"checksum mio-pool 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)" = "8147496e63cab45b36c0d02bd03b23fd522ed49bef87cbcce26b6bb2ca0bbb79"
 "checksum miow 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3e690c5df6b2f60acd45d56378981e827ff8295562fc8d34f573deb267a59cd1"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum mysql 12.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f916d63851d87a1c989722a6e165cd7e88dafbd0ecddf9ee5da230950da1f588"
