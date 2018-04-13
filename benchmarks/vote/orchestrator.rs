@@ -6,6 +6,7 @@ extern crate clap;
 extern crate ctrlc;
 #[macro_use]
 extern crate failure;
+extern crate rayon;
 extern crate rusoto_core;
 extern crate rusoto_sts;
 extern crate shellwords;
@@ -281,6 +282,12 @@ fn main() {
         eprintln!("==> failed to set ^C handler: {}", e);
     }
 
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(nclients as usize + 1)
+        .build_global()
+        .unwrap();
+
+    b.wait_limit(time::Duration::from_secs(2 * 3600));
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
