@@ -24,7 +24,7 @@ use rusoto_core::{EnvironmentProvider, Region};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use std::borrow::Cow;
 use std::io::prelude::*;
-use std::{io, time};
+use std::{io, thread, time};
 
 const SOUP_AMI: &str = "ami-6600db19";
 
@@ -287,12 +287,13 @@ fn main() {
         .build_global()
         .unwrap();
 
-    b.wait_limit(time::Duration::from_secs(2 * 3600));
+    b.wait_limit(time::Duration::from_secs(5 * 60));
+    b.set_max_duration(5);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
-        for backend in backends {
+        'out: for backend in backends {
             eprintln!("==> {}", backend.uniq_name());
 
             eprintln!(" -> starting server");
@@ -323,30 +324,38 @@ fn main() {
             };
 
             let targets = [
-                50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000,
-                6_000_000, 8_000_000,
+                5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
+                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000,
             ];
-            // TODO: run more iterations
-            for (i, &target) in targets.iter().enumerate() {
-                if i != 0 {
-                    s = s.between_targets(&backend).unwrap();
 
-                    // wait in case server was restarted
-                    if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
-                        eprintln!("failed to restart {:?}: {:?}", backend, e);
-                        continue;
+            let iters = 3;
+            for iter in 0..iters {
+                for (i, &target) in targets.iter().enumerate() {
+                    if i != 0 {
+                        s = s.between_targets(&backend).unwrap();
+
+                        // wait in case server was restarted
+                        if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
+                            eprintln!("failed to restart {:?}: {:?}", backend, e);
+                            continue;
+                        }
                     }
-                }
 
-                eprintln!(" -> {}", params.name(target, ""));
-                if !run_clients(&clients, ccores, &mut s, target, params) {
-                    // backend clearly couldn't handle the load, so don't run higher targets
-                    break;
-                }
+                    eprintln!(
+                        " -> {} [run {}/{}]",
+                        params.name(target, ""),
+                        iter + 1,
+                        iters
+                    );
+                    if !run_clients(iter, &clients, ccores, &mut s, target, params) {
+                        // backend clearly couldn't handle the load, so don't run higher targets
+                        break;
+                    }
 
-                if !running.load(Ordering::SeqCst) {
-                    // user pressed ^C
-                    break;
+                    if !running.load(Ordering::SeqCst) {
+                        // user pressed ^C
+                        break 'out;
+                    }
                 }
             }
 
@@ -358,6 +367,8 @@ fn main() {
                 // user pressed ^C
                 break;
             }
+
+            thread::sleep(time::Duration::from_secs(10));
         }
 
         if !running.load(Ordering::SeqCst) {
@@ -394,6 +405,7 @@ fn main() {
 
 // returns true if next target is feasible
 fn run_clients(
+    iter: usize,
     clients: &Vec<tsunami::Machine>,
     ccores: u16,
     server: &mut server::Server,
@@ -499,9 +511,18 @@ fn run_clients(
     // let's see how we did
     let mut overloaded = None;
     let mut any_not_overloaded = false;
-    use std::fs::File;
     let fname = params.name(target, "log");
-    let mut outf = File::create(&fname);
+    let mut outf = if iter == 0 {
+        use std::fs::File;
+        File::create(&fname)
+    } else {
+        use std::fs::OpenOptions;
+        OpenOptions::new()
+            .truncate(false)
+            .append(true)
+            .create(true)
+            .open(&fname)
+    };
     if let Err(ref e) = outf {
         eprintln!(" !! failed to open output file {}: {}", fname, e);
     }
