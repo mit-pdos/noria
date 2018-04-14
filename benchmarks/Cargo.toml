@@ -11,7 +11,7 @@ nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "61c5df813445f95
 regex = "0.2.2"
 slog = "2.2.2"
 #slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_debug"] }
-slog-term = "2.3.0"
+slog-term = "2.4.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"
 libc = "0.2"
