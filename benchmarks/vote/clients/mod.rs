@@ -5,17 +5,18 @@ pub(crate) struct Parameters {
     pub(crate) articles: usize,
 }
 
-pub(crate) trait VoteClient {
-    type Constructor;
-
-    fn new(&Parameters, &clap::ArgMatches) -> Self::Constructor;
-    fn from(&mut Self::Constructor) -> Self;
-    fn handle_reads(&mut self, requests: &[i32]);
-    fn handle_writes(&mut self, requests: &[i32]);
-
+pub(crate) trait VoteClientConstructor {
+    type Instance: VoteClient;
+    fn new(&Parameters, &clap::ArgMatches) -> Self;
+    fn make(&mut self) -> Self::Instance;
     fn spawns_threads() -> bool {
         false
     }
+}
+
+pub(crate) trait VoteClient {
+    fn handle_reads(&mut self, requests: &[i32]);
+    fn handle_writes(&mut self, requests: &[i32]);
 }
 
 pub(crate) mod hybrid;

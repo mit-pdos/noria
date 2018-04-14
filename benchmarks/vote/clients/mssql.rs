@@ -1,17 +1,13 @@
+use clap;
+use clients::{Parameters, VoteClient, VoteClientConstructor};
 use futures::Future;
 use futures_state_stream::StateStream;
 use tiberius;
 use tokio_core::reactor;
 
-use clap;
-
-use clients::{Parameters, VoteClient};
-
 pub(crate) struct Client {
     conn: Conn,
 }
-// safe (?) because every Handle associated with Core is also sent
-unsafe impl Send for Client {}
 
 struct Conn {
     conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
@@ -47,10 +43,10 @@ pub(crate) struct Conf {
     db: String,
 }
 
-impl VoteClient for Client {
-    type Constructor = Conf;
+impl VoteClientConstructor for Conf {
+    type Instance = Client;
 
-    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self {
         let addr = args.value_of("address").unwrap();
         let db = args.value_of("database").unwrap();
 
@@ -148,12 +144,14 @@ impl VoteClient for Client {
         }
     }
 
-    fn from(cnf: &mut Self::Constructor) -> Self {
+    fn make(&mut self) -> Self::Instance {
         Client {
-            conn: Conn::new(&cnf.addr, &cnf.db),
+            conn: Conn::new(&self.addr, &self.db),
         }
     }
+}
 
+impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
         let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
 

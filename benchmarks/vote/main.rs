@@ -26,7 +26,7 @@ use std::thread;
 use std::time;
 
 thread_local! {
-    static THREAD_ID: RefCell<usize> = RefCell::new(1);
+    static CLIENT: RefCell<Option<Box<VoteClient>>> = RefCell::new(None);
     static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
     static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
     static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
@@ -56,11 +56,11 @@ fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
 }
 
 mod clients;
-use clients::{Parameters, VoteClient};
+use clients::{Parameters, VoteClient, VoteClientConstructor};
 
-fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
+fn run<CC>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
-    C: VoteClient + Send + 'static,
+    CC: VoteClientConstructor + Send + 'static,
 {
     // zipf takes ~66ns to generate a random number depending on the CPU,
     // so each load generator cannot reasonably generate much more than ~1M reqs/s.
@@ -75,7 +75,7 @@ where
     let mut bind_generator = hwloc::Bitmap::new();
     let mut bind_server = hwloc::Bitmap::new();
 
-    if C::spawns_threads() {
+    if CC::spawns_threads() {
         // we want any threads spawned by the VoteClient (e.g., distributary itself)
         // to be on their own NUMA node if there are many. or rather, we want to ensure that our
         // pool clients/load generators do not interfere with the server.
@@ -125,13 +125,6 @@ where
         _ => unreachable!(),
     };
 
-    let mut c = C::new(&params, local_args);
-    let clients: Vec<Mutex<C>> = (0..nthreads)
-        .map(|_| VoteClient::from(&mut c))
-        .map(Mutex::new)
-        .collect();
-    let clients = Arc::new(clients);
-
     let hists = if let Some(mut f) = global_args
         .value_of("histogram")
         .and_then(|h| fs::File::open(h).ok())
@@ -172,12 +165,13 @@ where
         set_thread_affinity(bind_generator).unwrap();
     }
 
+    let cc = Mutex::new(CC::new(&params, local_args));
     let pool = rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("client-{}", i))
         .num_threads(nthreads)
-        .start_handler(|i| {
-            THREAD_ID.with(|tid| {
-                *tid.borrow_mut() = i;
+        .start_handler(move |_| {
+            CLIENT.with(|c| {
+                *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
             })
         })
         .exit_handler(move |_| {
@@ -203,7 +197,6 @@ where
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
             let pool = pool.clone();
-            let clients = clients.clone();
             let finished = finished.clone();
             let global_args = global_args.clone();
 
@@ -217,7 +210,6 @@ where
                     let ops = if skewed {
                         run_generator(
                             pool,
-                            clients,
                             || {
                                 let rng = rand::thread_rng();
                                 zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap()
@@ -227,14 +219,7 @@ where
                             global_args,
                         )
                     } else {
-                        run_generator(
-                            pool,
-                            clients,
-                            || rand::thread_rng(),
-                            finished,
-                            target,
-                            global_args,
-                        )
+                        run_generator(pool, || rand::thread_rng(), finished, target, global_args)
                     };
                     ops
                 })
@@ -244,8 +229,6 @@ where
 
     drop(pool);
     let ops: usize = generators.into_iter().map(|gen| gen.join().unwrap()).sum();
-    drop(clients);
-    drop(c);
 
     // all done!
     let took = start.elapsed();
@@ -319,16 +302,14 @@ where
     );
 }
 
-fn run_generator<C, R, RF>(
+fn run_generator<R, RF>(
     pool: Arc<rayon::ThreadPool>,
-    clients: Arc<Vec<Mutex<C>>>,
     id_rng: RF,
     finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
 where
-    C: VoteClient + Send + 'static,
     RF: Send + FnOnce() -> R,
     R: rand::Rng,
 {
@@ -364,59 +345,60 @@ where
     // but that would *also* force us to place the load generators *on* the thread pool (because of
     // https://github.com/rayon-rs/rayon/issues/562). that comes with a number of unfortunate
     // side-effects, such as having to manage allocations of clients to workers, clean exiting,
-    // etc. we *instead* unsafely make the two references we care about (`ndone` and `clients`)
-    // `&'static` so that they can be accessed from inside the jobs. we know this is safe because
-    // of our barrier on `finished`, which will only be passed (and hence the stack frame only
-    // destroyed) when there are no more jobs in the pool. this may change with
+    // etc. we *instead* unsafely make the one reference we care about (`ndone`) `&'static` so that
+    // they can be accessed from inside the jobs. we know this is safe because of our barrier on
+    // `finished`, which will only be passed (and hence the stack frame only destroyed) when there
+    // are no more jobs in the pool. this may change with
     // https://github.com/rayon-rs/rayon/issues/544, but that's what we have to do for now.
     use std::mem;
     let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
-    let clients: &'static Arc<Vec<Mutex<C>>> = unsafe { mem::transmute(&clients) };
 
     let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
         move || {
-            let tid = THREAD_ID.with(|tid| *tid.borrow());
+            CLIENT.with(|c| {
+                let mut c = c.borrow_mut();
+                let client = c.as_mut().unwrap();
 
-            // TODO: avoid the overhead of taking an uncontended lock
-            let mut client = clients[tid].try_lock().unwrap();
+                let sent = time::Instant::now();
+                if write {
+                    client.handle_writes(&keys[..]);
+                } else {
+                    // deduplicate requested keys, because not doing so would be silly
+                    keys.sort_unstable();
+                    keys.dedup();
+                    client.handle_reads(&keys[..]);
+                }
+                let done = time::Instant::now();
+                ndone.fetch_add(1, atomic::Ordering::AcqRel);
 
-            let sent = time::Instant::now();
-            if write {
-                client.handle_writes(&keys[..]);
-            } else {
-                // deduplicate requested keys, because not doing so would be silly
-                keys.sort_unstable();
-                keys.dedup();
-                client.handle_reads(&keys[..]);
-            }
-            let done = time::Instant::now();
-            ndone.fetch_add(1, atomic::Ordering::AcqRel);
-
-            if sent.duration_since(start) > warmup {
-                let remote_t = done.duration_since(sent);
-                let rmt = if write { &RMT_W } else { &RMT_R };
-                let us = remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
-                rmt.with(|h| {
-                    let mut h = h.borrow_mut();
-                    if h.record(us).is_err() {
-                        let m = h.high();
-                        h.record(m).unwrap();
-                    }
-                });
-
-                let sjrn = if write { &SJRN_W } else { &SJRN_R };
-                for started in queued {
-                    let sjrn_t = done.duration_since(started);
-                    let us = sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
-                    sjrn.with(|h| {
+                if sent.duration_since(start) > warmup {
+                    let remote_t = done.duration_since(sent);
+                    let rmt = if write { &RMT_W } else { &RMT_R };
+                    let us =
+                        remote_t.as_secs() * 1_000_000 + remote_t.subsec_nanos() as u64 / 1_000;
+                    rmt.with(|h| {
                         let mut h = h.borrow_mut();
                         if h.record(us).is_err() {
                             let m = h.high();
                             h.record(m).unwrap();
                         }
                     });
+
+                    let sjrn = if write { &SJRN_W } else { &SJRN_R };
+                    for started in queued {
+                        let sjrn_t = done.duration_since(started);
+                        let us =
+                            sjrn_t.as_secs() * 1_000_000 + sjrn_t.subsec_nanos() as u64 / 1_000;
+                        sjrn.with(|h| {
+                            let mut h = h.borrow_mut();
+                            if h.record(us).is_err() {
+                                let m = h.high();
+                                h.record(m).unwrap();
+                            }
+                        });
+                    }
                 }
-            }
+            })
         }
     };
 
@@ -751,12 +733,12 @@ fn main() {
         .get_matches();
 
     match args.subcommand() {
-        ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
-        ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
-        ("memcached", Some(largs)) => run::<clients::memcached::Client>(&args, largs),
-        ("mssql", Some(largs)) => run::<clients::mssql::Client>(&args, largs),
-        ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
-        ("hybrid", Some(largs)) => run::<clients::hybrid::Client>(&args, largs),
+        ("localsoup", Some(largs)) => run::<clients::localsoup::Constructor>(&args, largs),
+        ("netsoup", Some(largs)) => run::<clients::netsoup::Constructor>(&args, largs),
+        ("memcached", Some(largs)) => run::<clients::memcached::Constructor>(&args, largs),
+        ("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
+        ("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
+        ("hybrid", Some(largs)) => run::<clients::hybrid::Conf>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }
