@@ -211,7 +211,7 @@ fn main() {
     b.add_set(
         "server",
         1,
-        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, move |host| {
+        tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |host| {
             // ensure we don't have stale soup (yuck)
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
@@ -231,7 +231,7 @@ fn main() {
     b.add_set(
         "client",
         nclients as u32,
-        tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, |host| {
+        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, |host| {
             eprintln!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
