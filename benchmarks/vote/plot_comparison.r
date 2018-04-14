@@ -86,7 +86,7 @@ mx_rmt_norm = max(t[t$pct == 50,]$rmt_norm)
 t$sjrn <- pmin(t$sjrn, 10*mx_rmt) # otherwise ggplot tries to plot all the way to 100k
 t$sjrn_min <- pmin(t$sjrn_min, 10*mx_rmt)
 t$sjrn_max <- pmin(t$sjrn_max, 10*mx_rmt)
-t
+#t
 
 library(ggplot2)
 p <- ggplot(data=t, aes(x=target, y=rmt, color=server, linetype=pct, shape=server, ymin=rmt_min, ymax=rmt_max))
