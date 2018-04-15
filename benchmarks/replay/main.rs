@@ -39,9 +39,7 @@ fn build_graph(
     }
 
     builder.set_persistence(persistence);
-    // Force a single domain with no shards to avoid deadlocking on replays:
     builder.set_sharding(None);
-    builder.set_fixed_domains(Some(1));
     builder.set_read_threads(1);
     builder.set_worker_threads(1);
     builder.build(authority)
