@@ -98,7 +98,7 @@ fn perform_reads(g: &mut ControllerHandle<ZookeeperAuthority>, reads: i64, rows:
 }
 
 fn main() {
-    let args = App::new("vote")
+    let args = App::new("replay")
         .version("0.1")
         .about("Benchmarks the latency of full replays in a user-curated news aggregator")
         .arg(
@@ -150,7 +150,7 @@ fn main() {
             Arg::with_name("zookeeper-address")
                 .long("zookeeper-address")
                 .takes_value(true)
-                .default_value("127.0.0.1:2181/vote-replay")
+                .default_value("127.0.0.1:2181/replay")
                 .help("ZookeeperAuthority address"),
         )
         .arg(
@@ -182,7 +182,7 @@ fn main() {
     persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
     persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
     persistence.persist_base_nodes = args.is_present("persist-bases");
-    persistence.log_prefix = "vote-replay".to_string();
+    persistence.log_prefix = "replay".to_string();
     persistence.log_dir = args.value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
     persistence.mode = DurabilityMode::Permanent;
@@ -214,9 +214,9 @@ fn main() {
     // Remove any log/database files:
     if !args.is_present("retain-logs-on-exit") {
         if args.is_present("persist-bases") {
-            fs::remove_dir_all("vote-replay-TableRow-0.db").unwrap();
+            fs::remove_dir_all("replay-TableRow-0.db").unwrap();
         } else {
-            fs::remove_file("vote-replay-log-TableRow-0.json").unwrap();
+            fs::remove_file("replay-log-TableRow-0.json").unwrap();
         }
     }
 }
