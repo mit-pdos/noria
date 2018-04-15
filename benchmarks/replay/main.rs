@@ -216,7 +216,7 @@ fn main() {
     // Remove any log/database files:
     if !args.is_present("retain-logs-on-exit") {
         if args.is_present("persist-bases") {
-            fs::remove_dir_all("vote-replay_TableRow_0.db").unwrap();
+            fs::remove_dir_all("vote-replay-TableRow-0.db").unwrap();
         } else {
             fs::remove_file("vote-replay-log-TableRow-0.json").unwrap();
         }
