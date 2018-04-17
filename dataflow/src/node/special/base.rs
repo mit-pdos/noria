@@ -94,28 +94,6 @@ impl Base {
             row.extend(self.defaults.iter().skip(rlen).cloned());
         }
     }
-
-    // Replaces None values with the next available auto increment value, mutating
-    // self.auto_increment_values if there are any changes.
-    fn replace_with_auto_increment(&mut self, row: &mut Vec<DataType>, shard: Option<usize>) {
-        for (index, value) in self.auto_increment_values.iter_mut() {
-            // When we're given a None value, replace it with the incremented version
-            // of the last auto increment value for that column (or the initial increment value):
-            *value = match (&row[*index], &value) {
-                (&DataType::None, &&mut DataType::None) => {
-                    DataType::ID(shard.unwrap_or(0) as u32, INITIAL_AUTO_INCREMENT)
-                }
-                (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
-                // Other values should override existing auto increment values, so that
-                // the auto incrementer continues from there the next time:
-                (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as i64),
-                (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i),
-                _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
-            };
-
-            row[*index] = value.clone();
-        }
-    }
 }
 
 /// A Base clone must have a different unique_id so that no two copies write to the same file.
@@ -163,6 +141,32 @@ fn key_of<'a>(key_cols: &'a [usize], r: &'a Record) -> impl Iterator<Item = &'a 
         .map(move |(i, col)| key_val(i, *col, r))
 }
 
+// Replaces None values with the next available auto increment value, mutating
+// auto_increment_values if there are any changes.
+fn replace_with_auto_increment(
+    auto_increment_values: &mut HashMap<usize, DataType>,
+    row: &mut Vec<DataType>,
+    shard: Option<usize>,
+) {
+    for (index, value) in auto_increment_values.iter_mut() {
+        // When we're given a None value, replace it with the incremented version
+        // of the last auto increment value for that column (or the initial increment value):
+        *value = match (&row[*index], &value) {
+            (&DataType::None, &&mut DataType::None) => {
+                DataType::ID(shard.unwrap_or(0) as u32, INITIAL_AUTO_INCREMENT)
+            }
+            (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
+            // Other values should override existing auto increment values, so that
+            // the auto incrementer continues from there the next time:
+            (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as i64),
+            (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i),
+            _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
+        };
+
+        row[*index] = value.clone();
+    }
+}
+
 impl Base {
     pub(crate) fn take(&mut self) -> Self {
         Clone::clone(self)
@@ -178,7 +182,7 @@ impl Base {
         if self.primary_key.is_none() || rs.is_empty() {
             for r in &mut *rs {
                 if let Record::Positive(ref mut u) = r {
-                    self.replace_with_auto_increment(u, shard)
+                    replace_with_auto_increment(&mut self.auto_increment_values, u, shard)
                 }
 
                 self.fix(r);
@@ -187,8 +191,7 @@ impl Base {
             return rs;
         }
 
-        // TODO: try removing this .clone:
-        let key_cols = &self.primary_key.as_ref().unwrap().clone()[..];
+        let key_cols = &self.primary_key.as_ref().unwrap()[..];
 
         let mut rs: Vec<_> = rs.into();
         rs.sort_by(|a, b| key_of(key_cols, a).cmp(key_of(key_cols, b)));
@@ -314,7 +317,7 @@ impl Base {
 
         for r in &mut results {
             if let Record::Positive(ref mut u) = r {
-                self.replace_with_auto_increment(u, shard)
+                replace_with_auto_increment(&mut self.auto_increment_values, u, shard)
             }
 
             self.fix(r);
