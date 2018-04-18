@@ -21,7 +21,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "arccstr"
-version = "1.1.0"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -327,7 +327,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "core"
 version = "0.1.0"
 dependencies = [
- "arccstr 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arccstr 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.3 (git+https://github.com/ms705/nom-sql.git?rev=488fad25f379de6c47e1eb86d15a3b18eb91f501)",
@@ -599,9 +599,9 @@ dependencies = [
 [[package]]
 name = "evmap"
 version = "3.0.0"
-source = "git+https://github.com/ms705/rust-evmap#d85b8af843a935f05650fe85e0eb72ed20395fff"
+source = "git+https://github.com/ms705/rust-evmap#5ccdfa3f948bbbe4cecb0929f7e875477a876d9b"
 dependencies = [
- "rahashmap 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rahashmap 0.2.5 (git+https://github.com/fintelia/rahashmap.git?branch=no-reorder)",
 ]
 
 [[package]]
@@ -1396,15 +1396,15 @@ dependencies = [
 [[package]]
 name = "rahashmap"
 version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/fintelia/rahashmap.git?branch=no-reorder#11157a4f7b413df6f889755bdf0fad14f19ec6d3"
 dependencies = [
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "rahashmap"
-version = "0.2.3"
-source = "git+https://github.com/ms705/rahashmap.git?branch=no-reorder#34b61059dc0fbcae0c112d71e9d89e122909b55d"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2385,7 +2385,7 @@ dependencies = [
 "checksum aho-corasick 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d6531d44de723825aa81398a6415283229725a00fa30713812ab9323faa82fc4"
 "checksum ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
 "checksum antidote 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
-"checksum arccstr 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b44d3e0203574fbd363761edaf108411879eb0b322eadb6f3c1a65b5fb28d796"
+"checksum arccstr 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d0f5e301d8170b612aede3521748aa566e5efdb384f1c9f273d39a83e869979e"
 "checksum arrayref 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0fd1479b7c29641adbd35ff3b5c293922d696a92f25c8c975da3e0acbc87258f"
 "checksum arrayvec 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "a1e964f9e24d588183fcb43503abda40d288c8657dfc27311516ce2f05675aef"
 "checksum assert_infrequent 0.1.0 (git+https://github.com/fintelia/assert_infrequent.git?rev=720e140bc8516d65dad7008abdc1d38796700c09)" = "<none>"
@@ -2525,8 +2525,9 @@ dependencies = [
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
 "checksum proc-macro2 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "49b6a521dc81b643e9a51e0d1cf05df46d5a2f3c0280ea72bcb68276ba64a118"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
-"checksum rahashmap 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "edc0de85e95646e8174f403eda1d7bb7e4dbb1b116ef8e5bc8a0a66dc4c4081f"
-"checksum rahashmap 0.2.3 (git+https://github.com/ms705/rahashmap.git?branch=no-reorder)" = "<none>"
+"checksum quote 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7b0ff51282f28dc1b53fd154298feaa2e77c5ea0dba68e1fd8b03b72fbe13d2a"
+"checksum rahashmap 0.2.5 (git+https://github.com/fintelia/rahashmap.git?branch=no-reorder)" = "<none>"
+"checksum rahashmap 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "9dbf0250fc78951c2c1d73834c5dc3ec4060dcb086c5e993dbddc33c17db2e82"
 "checksum rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "15a732abf9d20f0ad8eeb6f909bf6868722d9a06e1e50802b6a70351f40b4eb1"
 "checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
 "checksum rayon 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80e811e76f1dbf68abf87a759083d34600017fc4e10b6bd5ad84a700f9dba4b1"
