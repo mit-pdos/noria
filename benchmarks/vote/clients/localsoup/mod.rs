@@ -7,15 +7,16 @@ use std::time;
 pub(crate) mod graph;
 
 pub(crate) struct Client {
-    r: distributary::RemoteGetter<distributary::ExclusiveConnection>,
+    _ch: distributary::ControllerHandle<distributary::LocalAuthority>,
+    r: distributary::RemoteGetter,
     #[allow(dead_code)]
-    w: distributary::Mutator<distributary::ExclusiveConnection>,
+    w: distributary::Mutator,
 }
 
 pub(crate) struct Constructor(graph::Graph);
 
-// this is *only* safe because we make the getters and mutators exclusive, *and* we get them under
-// a lock (so the Rcs will still be correct)
+// this is *only* safe because the only method we call is `duplicate` which is safe to call from
+// other threads.
 unsafe impl Send for Constructor {}
 
 impl VoteClientConstructor for Constructor {
@@ -74,14 +75,10 @@ impl VoteClientConstructor for Constructor {
     }
 
     fn make(&mut self) -> Self::Instance {
-        Client {
-            r: self.0
-                .graph
-                .get_getter("ArticleWithVoteCount")
-                .unwrap()
-                .into_exclusive(),
-            w: self.0.graph.get_mutator("Vote").unwrap().into_exclusive(),
-        }
+        let mut ch = self.0.graph.pointer().connect();
+        let r = ch.get_getter("ArticleWithVoteCount").unwrap();
+        let w = ch.get_mutator("Vote").unwrap();
+        Client { _ch: ch, r, w }
     }
 
     fn spawns_threads() -> bool {
