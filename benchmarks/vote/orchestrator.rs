@@ -492,7 +492,7 @@ fn run_clients(
 
                     let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                     let c = ssh.exec(&cmd[..])?;
-                    Ok(c)
+                    c
                 };
 
                 match c {
