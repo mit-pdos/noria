@@ -130,7 +130,6 @@ impl<'a> Server<'a> {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
                 c.wait_eof()?;
-                Ok(())
             };
 
             if let Err(e) = e {
