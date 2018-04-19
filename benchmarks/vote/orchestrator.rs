@@ -256,18 +256,18 @@ fn main() {
     // what backends are we benchmarking?
     let backends = vec![
         Backend::Memcached,
+        Backend::Mysql,
         Backend::Netsoup {
             workers: 2,
             readers: 14,
             shards: None,
         },
+        Backend::Hybrid,
         Backend::Netsoup {
             workers: 2,
             readers: 14,
             shards: Some(2),
         },
-        Backend::Mysql,
-        Backend::Hybrid,
         Backend::Mssql,
     ];
 

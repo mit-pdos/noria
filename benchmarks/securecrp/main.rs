@@ -1,8 +1,6 @@
+extern crate clap;
 extern crate distributary;
 extern crate rand;
-
-#[macro_use]
-extern crate clap;
 extern crate slog;
 
 mod test_populate;
