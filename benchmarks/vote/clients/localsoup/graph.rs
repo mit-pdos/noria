@@ -79,43 +79,42 @@ impl Graph {
     pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
-               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (article_id int, user int);
+               CREATE TABLE Rating (article_id int, user int, stars int);
 
                # read queries
                QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
                             FROM Article \
-                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
-                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
-               U: SELECT id, stars FROM Rating UNION SELECT id, 1 FROM Vote;
+                            LEFT JOIN (SELECT Vote.article_id, COUNT(Vote.user) AS votes \
+                                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
+                            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
+
+               U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 FROM Vote;
                QUERY ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article \
-                            LEFT JOIN (SELECT id, SUM(stars) AS score \
+                            LEFT JOIN (SELECT article_id, SUM(U.stars) AS score \
                                        FROM U \
-                                       GROUP BY id) AS Total
-                            ON (Article.id = Total.id) \
+                                       GROUP BY article_id) AS Total
+                            ON (Article.id = Total.article_id) \
                             WHERE Article.id = ?;";
 
-        // TODO(malte): ends up with partial-above-full due to compound group by key in post-join
-        // aggregation.
         let smart_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (id int, user int, PRIMARY KEY(id));
-               CREATE TABLE Rating (id int, user int, stars int, PRIMARY KEY(id));
+               CREATE TABLE Vote (article_id int, user int);
+               CREATE TABLE Rating (article_id int, user int, stars int);
 
                # read queries
                QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
                             FROM Article \
-                            LEFT JOIN (SELECT Vote.id, COUNT(user) AS votes \
-                                       FROM Vote GROUP BY Vote.id) AS VoteCount \
-                            ON (Article.id = VoteCount.id) WHERE Article.id = ?;
+                            LEFT JOIN (SELECT Vote.article_id, COUNT(Vote.user) AS votes \
+                                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
+                            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
 
-               RatingSum: SELECT id, SUM(stars) AS score FROM Rating GROUP BY id;
-               U: SELECT id, score FROM RatingSum UNION SELECT id, votes FROM VoteCount;
+               RatingSum: SELECT article_id, SUM(Rating.stars) AS score FROM Rating GROUP BY article_id;
+               U: SELECT article_id, score FROM RatingSum UNION SELECT article_id, votes AS score FROM VoteCount;
                QUERY ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
                             FROM Article, U \
-                            WHERE Article.id = U.id AND Article.id = ? \
+                            WHERE Article.id = U.article_id AND Article.id = ? \
                             GROUP BY Article.id;";
 
         if self.setup.stupid {
