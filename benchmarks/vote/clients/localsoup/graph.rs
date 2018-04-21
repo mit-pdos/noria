@@ -90,12 +90,12 @@ impl Graph {
                             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
 
                U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 FROM Vote;
+               Total: SELECT article_id, SUM(U.stars) AS score \
+                           FROM U \
+                           GROUP BY article_id; \
                QUERY ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article \
-                            LEFT JOIN (SELECT article_id, SUM(U.stars) AS score \
-                                       FROM U \
-                                       GROUP BY article_id) AS Total
-                            ON (Article.id = Total.article_id) \
+                            LEFT JOIN Total ON (Article.id = Total.article_id) \
                             WHERE Article.id = ?;";
 
         let smart_recipe = "# base tables
@@ -112,10 +112,11 @@ impl Graph {
 
                RatingSum: SELECT article_id, SUM(Rating.stars) AS score FROM Rating GROUP BY article_id;
                U: SELECT article_id, score FROM RatingSum UNION SELECT article_id, votes AS score FROM VoteCount;
-               QUERY ArticleWithScore: SELECT Article.id, title, SUM(U.score) AS score \
-                            FROM Article, U \
-                            WHERE Article.id = U.article_id AND Article.id = ? \
-                            GROUP BY Article.id;";
+               Score: SELECT U.article_id, SUM(U.score) AS score \
+                            FROM U GROUP BY U.article_id;
+               QUERY ArticleWithScore: SELECT Article.id, title, Score.score \
+                            FROM Article, Score \
+                            WHERE Article.id = Score.article_id AND Article.id = ?;";
 
         if self.setup.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned()).unwrap();
