@@ -54,7 +54,7 @@ impl VoteClientConstructor for Constructor {
             x => Some(x),
         };
         s.stupid = args.is_present("stupid");
-        let mut g = graph::make(s, persistence);
+        let mut g = s.make(persistence);
 
         // prepopulate
         if verbose {

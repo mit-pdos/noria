@@ -13,7 +13,7 @@ QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
 pub struct Graph {
-    setup: Setup,
+    stupid: bool,
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub end: NodeIndex,
@@ -42,35 +42,38 @@ impl Default for Setup {
     }
 }
 
-pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
-    let mut g = ControllerBuilder::default();
-    if !s.partial {
-        g.disable_partial();
-    }
-    g.set_sharding(s.sharding);
-    g.set_persistence(persistence_params);
-    g.set_worker_threads(s.nworkers);
-    g.set_read_threads(s.nreaders);
-    if s.logging {
-        g.log_with(distributary::logger_pls());
-    }
-    let mut graph = g.build_local();
+impl Setup {
+    pub fn make(&self, persistence_params: PersistenceParameters) -> Graph {
+        // XXX: why isn't PersistenceParameters inside self?
+        let mut g = ControllerBuilder::default();
+        if !self.partial {
+            g.disable_partial();
+        }
+        g.set_sharding(self.sharding);
+        g.set_persistence(persistence_params);
+        g.set_worker_threads(self.nworkers);
+        g.set_read_threads(self.nreaders);
+        if self.logging {
+            g.log_with(distributary::logger_pls());
+        }
+        let mut graph = g.build_local();
 
-    graph.install_recipe(RECIPE.to_owned()).unwrap();
-    let inputs = graph.inputs();
-    let outputs = graph.outputs();
+        graph.install_recipe(RECIPE.to_owned()).unwrap();
+        let inputs = graph.inputs();
+        let outputs = graph.outputs();
 
-    if s.logging {
-        println!("inputs {:?}", inputs);
-        println!("outputs {:?}", outputs);
-    }
+        if self.logging {
+            println!("inputs {:?}", inputs);
+            println!("outputs {:?}", outputs);
+        }
 
-    Graph {
-        vote: inputs["Vote"],
-        article: inputs["Article"],
-        end: outputs["ArticleWithVoteCount"],
-        graph,
-        setup: s,
+        Graph {
+            vote: inputs["Vote"],
+            article: inputs["Article"],
+            end: outputs["ArticleWithVoteCount"],
+            stupid: self.stupid,
+            graph,
+        }
     }
 }
 
@@ -118,7 +121,7 @@ impl Graph {
                             FROM Article LEFT JOIN Score ON (Article.id = Score.article_id) \
                             WHERE Article.id = ?;";
 
-        if self.setup.stupid {
+        if self.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned()).unwrap();
         } else {
             self.graph.install_recipe(smart_recipe.to_owned()).unwrap();

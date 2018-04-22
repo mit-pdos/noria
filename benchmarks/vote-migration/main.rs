@@ -9,8 +9,10 @@ mod graph;
 
 use distributary::DataType;
 use rand::Rng;
+use std::io::prelude::*;
+use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
-use std::{thread, time};
+use std::{fs, thread, time};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_ns {
@@ -49,60 +51,7 @@ impl Reporter {
     }
 }
 
-fn main() {
-    use clap::{App, Arg};
-
-    let args = App::new("vote")
-        .version("0.1")
-        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
-        .arg(
-            Arg::with_name("narticles")
-                .short("a")
-                .long("articles")
-                .takes_value(true)
-                .default_value("100000")
-                .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
-            Arg::with_name("runtime")
-                .short("r")
-                .long("runtime")
-                .required(true)
-                .takes_value(true)
-                .help("Benchmark runtime in seconds"),
-        )
-        .arg(
-            Arg::with_name("migrate")
-                .short("m")
-                .long("migrate")
-                .required(true)
-                .takes_value(true)
-                .help("Perform a migration after this many seconds")
-                .conflicts_with("stage"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .help("Enable verbose logging output"),
-        )
-        .arg(
-            Arg::with_name("full")
-                .long("full")
-                .help("Disable partial materialization"),
-        )
-        .arg(
-            Arg::with_name("stupid")
-                .long("stupid")
-                .help("Make the migration stupid"),
-        )
-        .arg(
-            Arg::with_name("shards")
-                .long("shards")
-                .takes_value(true)
-                .help("Use N-way sharding."),
-        )
-        .get_matches();
-
+fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
     let narticles = value_t_or_exit!(args, "narticles", usize);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = time::Duration::from_secs(value_t_or_exit!(args, "migrate", u64));
@@ -116,19 +65,9 @@ fn main() {
     persistence_params.queue_capacity = 1;
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
-    // set config options
-    let mut s = graph::Setup::default();
-    s.partial = !args.is_present("full");
-    s.stupid = args.is_present("stupid");
-    s.sharding = args.value_of("shards")
-        .map(|_| value_t_or_exit!(args, "shards", usize));
-    s.logging = args.is_present("verbose");
-    s.nreaders = 4;
-    s.nworkers = 4;
-
     // make the graph!
     eprintln!("Setting up soup");
-    let mut g = graph::make(s, persistence_params);
+    let mut g = s.make(persistence_params);
     eprintln!("Getting accessors");
     let mut articles = g.graph.get_mutator("Article").unwrap().into_exclusive();
     let mut votes = g.graph.get_mutator("Vote").unwrap().into_exclusive();
@@ -145,11 +84,13 @@ fn main() {
             .unwrap();
     }
 
+    let (stat, stat_rx) = mpsc::channel();
     let barrier = Arc::new(Barrier::new(3));
 
     // start writer that just does a bunch of old writes
     eprintln!("Starting old writer");
     let w1 = {
+        let stat = stat.clone();
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
@@ -165,7 +106,7 @@ fn main() {
                 if let Some(count) = reporter.report(n) {
                     let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                    println!("{:?} OLD: {:.2}", dur_to_ns!(start.elapsed()), count_per_s);
+                    stat.send(("OLD", count_per_s)).unwrap();
                 }
             }
         })
@@ -192,15 +133,26 @@ fn main() {
     barrier.wait();
     let start = time::Instant::now();
 
+    let stats = thread::spawn(move || {
+        let mut w = w;
+        for (stat, val) in stat_rx {
+            let line = format!("{} {} {:.2}", dur_to_ns!(start.elapsed()), stat, val);
+            println!("{}", line);
+            if let Some(ref mut w) = w {
+                writeln!(w, "{}", line).unwrap();
+            }
+        }
+    });
+
     // we now need to wait for migrate_after
     eprintln!("Waiting for migration time...");
     thread::sleep(migrate_after);
 
     // all right, migration time
     eprintln!("Starting migration");
-    println!("{:?} MIG START", dur_to_ns!(start.elapsed()));
+    stat.send(("MIG START", 0.0)).unwrap();
     g.transition();
-    println!("{:?} MIG FINISHED", dur_to_ns!(start.elapsed()));
+    stat.send(("MIG FINISHED", 0.0)).unwrap();
     let mut ratings = g.graph.get_mutator("Rating").unwrap().into_exclusive();
     let mut read_new = g.graph
         .get_getter("ArticleWithScore")
@@ -210,6 +162,7 @@ fn main() {
     // start writer that just does a bunch of new writes
     eprintln!("Starting new writer");
     let w2 = {
+        let stat = stat.clone();
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
@@ -227,7 +180,7 @@ fn main() {
                 if let Some(count) = reporter.report(n) {
                     let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                    println!("{:?} NEW: {:.2}", dur_to_ns!(start.elapsed()), count_per_s);
+                    stat.send(("NEW", count_per_s)).unwrap();
                 }
             }
         })
@@ -236,6 +189,7 @@ fn main() {
     // start reader that keeps probing new read view
     eprintln!("Starting new read probe");
     let r2 = {
+        let stat = stat.clone();
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut hits = 0;
@@ -253,11 +207,7 @@ fn main() {
                 }
 
                 if let Some(count) = reporter.report(1) {
-                    println!(
-                        "{:?} HITF: {:.2}",
-                        dur_to_ns!(start.elapsed()),
-                        hits as f64 / count as f64
-                    );
+                    stat.send(("HITF", hits as f64 / count as f64)).unwrap();
                     hits = 0;
                 }
                 thread::sleep(time::Duration::new(0, 10_000));
@@ -275,5 +225,122 @@ fn main() {
     r1.join().unwrap();
     r2.join().unwrap();
 
-    println!("FIN");
+    stat.send(("FIN", 0.0)).unwrap();
+    drop(stat);
+    stats.join().unwrap();
+}
+
+fn main() {
+    use clap::{App, Arg};
+
+    let args =
+        App::new("vote")
+            .version("0.1")
+            .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
+            .arg(
+                Arg::with_name("narticles")
+                    .short("a")
+                    .long("articles")
+                    .takes_value(true)
+                    .default_value("100000")
+                    .help("Number of articles to prepopulate the database with"),
+            )
+            .arg(
+                Arg::with_name("runtime")
+                    .short("r")
+                    .long("runtime")
+                    .required(true)
+                    .takes_value(true)
+                    .help("Benchmark runtime in seconds"),
+            )
+            .arg(
+                Arg::with_name("migrate")
+                    .short("m")
+                    .long("migrate")
+                    .required(true)
+                    .takes_value(true)
+                    .help("Perform a migration after this many seconds")
+                    .conflicts_with("stage"),
+            )
+            .arg(
+                Arg::with_name("verbose")
+                    .short("v")
+                    .help("Enable verbose logging output"),
+            )
+            .arg(Arg::with_name("all").long("just-do-it").help(
+                "Run all interesting benchmarks and store results to appropriately named files.",
+            ))
+            .arg(
+                Arg::with_name("full")
+                    .long("full")
+                    .conflicts_with("all")
+                    .help("Disable partial materialization"),
+            )
+            .arg(
+                Arg::with_name("stupid")
+                    .long("stupid")
+                    .conflicts_with("all")
+                    .help("Make the migration stupid"),
+            )
+            .arg(
+                Arg::with_name("shards")
+                    .long("shards")
+                    .takes_value(true)
+                    .help("Use N-way sharding."),
+            )
+            .get_matches();
+
+    // set config options
+    let mut s = graph::Setup::default();
+    s.sharding = args.value_of("shards")
+        .map(|_| value_t_or_exit!(args, "shards", usize));
+    s.logging = args.is_present("verbose");
+    s.nreaders = 4;
+    s.nworkers = 4;
+
+    if args.is_present("all") {
+        let narticles = value_t_or_exit!(args, "narticles", usize);
+        let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
+
+        eprintln!("==> full no reuse");
+        s.partial = false;
+        s.stupid = true;
+        one(
+            &s,
+            &args,
+            Some(
+                fs::File::create(format!("vote-no-partial-stupid-{}M.uniform.log", mills)).unwrap(),
+            ),
+        );
+        eprintln!("==> full with reuse");
+        s.partial = false;
+        s.stupid = false;
+        one(
+            &s,
+            &args,
+            Some(
+                fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
+            ),
+        );
+        eprintln!("==> partial no reuse");
+        s.partial = true;
+        s.stupid = true;
+        one(
+            &s,
+            &args,
+            Some(fs::File::create(format!("vote-partial-stupid-{}M.uniform.log", mills)).unwrap()),
+        );
+        eprintln!("==> partial with reuse");
+        s.partial = true;
+        s.stupid = false;
+        one(
+            &s,
+            &args,
+            Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
+        );
+    } else {
+        s.partial = !args.is_present("full");
+        s.stupid = args.is_present("stupid");
+        one(&s, &args, None);
+    }
 }
