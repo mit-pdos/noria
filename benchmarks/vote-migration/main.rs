@@ -123,6 +123,8 @@ fn main() {
     s.sharding = args.value_of("shards")
         .map(|_| value_t_or_exit!(args, "shards", usize));
     s.logging = args.is_present("verbose");
+    s.nreaders = 4;
+    s.nworkers = 4;
 
     // make the graph!
     eprintln!("Setting up soup");
