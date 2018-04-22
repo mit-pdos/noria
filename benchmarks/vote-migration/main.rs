@@ -27,8 +27,8 @@ struct Reporter {
 }
 
 impl Reporter {
-    pub fn report(&mut self) -> Option<usize> {
-        self.count += 1;
+    pub fn report(&mut self, n: usize) -> Option<usize> {
+        self.count += n;
 
         if self.last.elapsed() > self.every {
             let count = Some(self.count);
@@ -157,11 +157,12 @@ fn main() {
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
+                let n = 10;
                 votes
-                    .put(vec![rng.gen_range(0, narticles).into(), 0.into()])
+                    .batch_put((0..n).map(|i| vec![rng.gen_range(0, narticles).into(), i.into()]))
                     .unwrap();
 
-                if let Some(count) = reporter.report() {
+                if let Some(count) = reporter.report(n) {
                     let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     println!("{:?} OLD: {:.2}", dur_to_ns!(start.elapsed()), count_per_s);
@@ -215,11 +216,15 @@ fn main() {
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
+                let n = 10;
                 ratings
-                    .put(vec![rng.gen_range(0, narticles).into(), 0.into(), 5.into()])
+                    .batch_put(
+                        (0..n)
+                            .map(|i| vec![rng.gen_range(0, narticles).into(), i.into(), 5.into()]),
+                    )
                     .unwrap();
 
-                if let Some(count) = reporter.report() {
+                if let Some(count) = reporter.report(n) {
                     let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     println!("{:?} NEW: {:.2}", dur_to_ns!(start.elapsed()), count_per_s);
@@ -247,7 +252,7 @@ fn main() {
                     }
                 }
 
-                if let Some(count) = reporter.report() {
+                if let Some(count) = reporter.report(1) {
                     println!(
                         "{:?} HITF: {:.2}",
                         dur_to_ns!(start.elapsed()),
