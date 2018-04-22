@@ -76,7 +76,7 @@ pub fn make(s: Setup, persistence_params: PersistenceParameters) -> Graph {
 
 impl Graph {
     #[allow(dead_code)]
-    pub fn transition(&mut self) -> (NodeIndex, NodeIndex) {
+    pub fn transition(&mut self) {
         let stupid_recipe = "# base tables
                CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
                CREATE TABLE Vote (article_id int, user int);
@@ -123,9 +123,5 @@ impl Graph {
         } else {
             self.graph.install_recipe(smart_recipe.to_owned()).unwrap();
         }
-
-        let inputs = self.graph.inputs();
-        let outputs = self.graph.outputs();
-        (inputs["Rating"], outputs["ArticleWithScore"])
     }
 }
