@@ -89,7 +89,7 @@ impl Graph {
                                        FROM Vote GROUP BY Vote.article_id) AS VoteCount \
                             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
 
-               U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 FROM Vote;
+               U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 AS stars FROM Vote;
                Total: SELECT article_id, SUM(U.stars) AS score \
                            FROM U \
                            GROUP BY article_id; \
