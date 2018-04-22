@@ -92,7 +92,7 @@ impl Graph {
                U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 AS stars FROM Vote;
                Total: SELECT article_id, SUM(U.stars) AS score \
                            FROM U \
-                           GROUP BY article_id; \
+                           GROUP BY article_id;
                QUERY ArticleWithScore: SELECT Article.id, title, Total.score AS score \
                             FROM Article \
                             LEFT JOIN Total ON (Article.id = Total.article_id) \
