@@ -115,8 +115,8 @@ impl Graph {
                Score: SELECT U.article_id, SUM(U.score) AS score \
                             FROM U GROUP BY U.article_id;
                QUERY ArticleWithScore: SELECT Article.id, title, Score.score \
-                            FROM Article, Score \
-                            WHERE Article.id = Score.article_id AND Article.id = ?;";
+                            FROM Article LEFT JOIN Score ON (Article.id = Score.article_id) \
+                            WHERE Article.id = ?;";
 
         if self.setup.stupid {
             self.graph.install_recipe(stupid_recipe.to_owned()).unwrap();
