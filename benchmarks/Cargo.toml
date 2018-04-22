@@ -24,7 +24,7 @@ shellwords = "0.1"
 clap = "2.25.0"
 # distributions
 rand = "0.4.0"
-zipf = "1.0.0"
+zipf = "3.0.0"
 # sampling
 hdrhistogram = "6.0.0"
 # mssql

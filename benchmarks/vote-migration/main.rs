@@ -8,7 +8,7 @@ extern crate zipf;
 mod graph;
 
 use distributary::DataType;
-use rand::Rng;
+use rand::{distributions::Sample, Rng};
 use std::io::prelude::*;
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -21,6 +21,8 @@ macro_rules! dur_to_ns {
         d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
     }};
 }
+
+use zipf::ZipfDistribution;
 
 struct Reporter {
     last: time::Instant,
@@ -51,7 +53,7 @@ impl Reporter {
     }
 }
 
-fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
+fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::File>) {
     let narticles = value_t_or_exit!(args, "narticles", usize);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = time::Duration::from_secs(value_t_or_exit!(args, "migrate", u64));
@@ -94,13 +96,20 @@ fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
+            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
                 let n = 500;
                 votes
-                    .batch_put((0..n).map(|i| vec![rng.gen_range(0, narticles).into(), i.into()]))
+                    .batch_put((0..n).map(|i| {
+                        // always generate both so that we aren't artifically faster with one
+                        let id_uniform = rng.gen_range(0, narticles);
+                        let id_zipf = zipf.sample(&mut rng);
+                        let id = if skewed { id_zipf } else { id_uniform };
+                        vec![id.into(), i.into()]
+                    }))
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
@@ -118,12 +127,14 @@ fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
+            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                read_old
-                    .lookup(&[DataType::from(rng.gen_range(0, narticles))], true)
-                    .unwrap();
+                let id_uniform = rng.gen_range(0, narticles);
+                let id_zipf = zipf.sample(&mut rng);
+                let id = if skewed { id_zipf } else { id_uniform };
+                read_old.lookup(&[DataType::from(id)], true).unwrap();
                 thread::yield_now();
             }
         })
@@ -166,15 +177,18 @@ fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
+            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
                 let n = 500;
                 ratings
-                    .batch_put(
-                        (0..n)
-                            .map(|i| vec![rng.gen_range(0, narticles).into(), i.into(), 5.into()]),
-                    )
+                    .batch_put((0..n).map(|i| {
+                        let id_uniform = rng.gen_range(0, narticles);
+                        let id_zipf = zipf.sample(&mut rng);
+                        let id = if skewed { id_zipf } else { id_uniform };
+                        vec![id.into(), i.into(), 5.into()]
+                    }))
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
@@ -192,21 +206,30 @@ fn one(s: &graph::Setup, args: &clap::ArgMatches, w: Option<fs::File>) {
         let stat = stat.clone();
         let barrier = barrier.clone();
         thread::spawn(move || {
+            let n = 10;
             let mut hits = 0;
             let mut rng = rand::thread_rng();
+            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
-                match read_new.lookup(&[DataType::from(rng.gen_range(0, narticles))], false) {
-                    Ok(ref rs) if !rs.is_empty() => {
-                        hits += 1;
+                let ids = (0..n)
+                    .map(|_| {
+                        let id_uniform = rng.gen_range(0, narticles);
+                        let id_zipf = zipf.sample(&mut rng);
+                        vec![DataType::from(if skewed { id_zipf } else { id_uniform })]
+                    })
+                    .collect();
+                match read_new.multi_lookup(ids, false) {
+                    Ok(rss) => {
+                        hits += rss.into_iter().filter(|rs| !rs.is_empty()).count();
                     }
                     _ => {
                         // miss, or view not yet ready
                     }
                 }
 
-                if let Some(count) = reporter.report(1) {
+                if let Some(count) = reporter.report(n) {
                     stat.send(("HITF", hits as f64 / count as f64)).unwrap();
                     hits = 0;
                 }
@@ -271,6 +294,12 @@ fn main() {
                 "Run all interesting benchmarks and store results to appropriately named files.",
             ))
             .arg(
+                Arg::with_name("skewed")
+                    .long("skewed")
+                    .conflicts_with("all")
+                    .help("Run with a skewed id distribution"),
+            )
+            .arg(
                 Arg::with_name("full")
                     .long("full")
                     .conflicts_with("all")
@@ -302,45 +331,68 @@ fn main() {
         let narticles = value_t_or_exit!(args, "narticles", usize);
         let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
 
-        eprintln!("==> full no reuse");
+        eprintln!("==> full no reuse (uniform)");
         s.partial = false;
         s.stupid = true;
         one(
             &s,
+            false,
             &args,
             Some(
                 fs::File::create(format!("vote-no-partial-stupid-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        eprintln!("==> full with reuse");
+        eprintln!("==> full with reuse (uniform)");
         s.partial = false;
         s.stupid = false;
         one(
             &s,
+            false,
             &args,
             Some(
                 fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        eprintln!("==> partial no reuse");
+        eprintln!("==> partial no reuse (uniform)");
         s.partial = true;
         s.stupid = true;
         one(
             &s,
+            false,
             &args,
             Some(fs::File::create(format!("vote-partial-stupid-{}M.uniform.log", mills)).unwrap()),
         );
-        eprintln!("==> partial with reuse");
+        eprintln!("==> partial with reuse (uniform)");
         s.partial = true;
         s.stupid = false;
         one(
             &s,
+            false,
             &args,
             Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
         );
+        eprintln!("==> partial no reuse (zipf)");
+        s.partial = true;
+        s.stupid = true;
+        one(
+            &s,
+            true,
+            &args,
+            Some(fs::File::create(format!("vote-partial-stupid-{}M.zipf1.08.log", mills)).unwrap()),
+        );
+        eprintln!("==> partial with reuse (zipf)");
+        s.partial = true;
+        s.stupid = false;
+        one(
+            &s,
+            true,
+            &args,
+            Some(fs::File::create(format!("vote-partial-reuse-{}M.zipf1.08.log", mills)).unwrap()),
+        );
     } else {
+        let skewed = args.is_present("skewed");
         s.partial = !args.is_present("full");
         s.stupid = args.is_present("stupid");
-        one(&s, &args, None);
+        one(&s, skewed, &args, None);
     }
 }
