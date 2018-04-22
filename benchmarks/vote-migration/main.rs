@@ -157,7 +157,7 @@ fn main() {
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                let n = 10;
+                let n = 500;
                 votes
                     .batch_put((0..n).map(|i| vec![rng.gen_range(0, narticles).into(), i.into()]))
                     .unwrap();
@@ -216,7 +216,7 @@ fn main() {
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
-                let n = 10;
+                let n = 500;
                 ratings
                     .batch_put(
                         (0..n)
