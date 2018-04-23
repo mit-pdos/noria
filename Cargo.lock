@@ -392,7 +392,7 @@ dependencies = [
  "petgraph 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "rahashmap 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rocksdb 0.10.0 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb)",
+ "rocksdb 0.10.0 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1)",
  "serde 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -997,7 +997,7 @@ dependencies = [
 [[package]]
 name = "librocksdb-sys"
 version = "5.11.3"
-source = "git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb#fca5f7eac9a93c2bddce77ca06afb8793f99ebcb"
+source = "git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1#7e95a0771b7d146d5048711c8fd2e250494f10a1"
 dependencies = [
  "bindgen 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1629,10 +1629,10 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.10.0"
-source = "git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb#fca5f7eac9a93c2bddce77ca06afb8793f99ebcb"
+source = "git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1#7e95a0771b7d146d5048711c8fd2e250494f10a1"
 dependencies = [
  "libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "librocksdb-sys 5.11.3 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb)",
+ "librocksdb-sys 5.11.3 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1)",
 ]
 
 [[package]]
@@ -2672,7 +2672,7 @@ dependencies = [
 "checksum lazycell 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a6f08839bc70ef4a3fe1d566d5350f519c5912ea86be0df1740a7d247c7fc0ef"
 "checksum libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)" = "6fd41f331ac7c5b8ac259b8bf82c75c0fb2e469bbf37d2becbba9a6a2221965b"
 "checksum libloading 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "fd38073de8f7965d0c17d30546d4bb6da311ab428d1c7a3fc71dff7f9d4979b9"
-"checksum librocksdb-sys 5.11.3 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb)" = "<none>"
+"checksum librocksdb-sys 5.11.3 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1)" = "<none>"
 "checksum libssh2-sys 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "0db4ec23611747ef772db1c4d650f8bd762f07b461727ec998f953c614024b75"
 "checksum libz-sys 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)" = "87f737ad6cc6fd6eefe3d9dc5412f1573865bded441300904d2f42269e140f16"
 "checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
@@ -2738,7 +2738,7 @@ dependencies = [
 "checksum regex-syntax 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "bd90079345f4a4c3409214734ae220fd773c6f2e8a543d07370c6c1c369cfbfb"
 "checksum relay 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1576e382688d7e9deecea24417e350d3062d97e32e45d70b1cde65994ff1489a"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
-"checksum rocksdb 0.10.0 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=fca5f7eac9a93c2bddce77ca06afb8793f99ebcb)" = "<none>"
+"checksum rocksdb 0.10.0 (git+https://github.com/ekmartin/rust-rocksdb.git?rev=7e95a0771b7d146d5048711c8fd2e250494f10a1)" = "<none>"
 "checksum rusoto_core 0.31.0 (registry+https://github.com/rust-lang/crates.io-index)" = "407a38db12e644205491a55ecd93a858c90b817bea7b310f681b28a5a43c3a8e"
 "checksum rusoto_credential 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "afb6ad8cb6cb8e4538011777deebe08e26958ade7f18513914c194ac32ca92fe"
 "checksum rusoto_ec2 0.31.0 (registry+https://github.com/rust-lang/crates.io-index)" = "06c35ca38b571fe8b63ee4f32dcb901e1cd9cd0a83d02a9a7e29a541ea38a7b8"
