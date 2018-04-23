@@ -61,10 +61,6 @@ name = "vote-orchestrator"
 path = "vote/orchestrator.rs"
 
 [[bin]]
-name = "vote-replay"
-path = "vote/replay-latency.rs"
-
-[[bin]]
 name = "tpc_w"
 path = "tpc_w/tpc_w.rs"
 
