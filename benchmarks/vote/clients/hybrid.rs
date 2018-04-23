@@ -54,7 +54,7 @@ impl VoteClientConstructor for Conf {
             ).unwrap();
 
             // prepop
-            let mut aid = 0;
+            let mut aid = 1;
             let bs = 1000;
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {
@@ -79,7 +79,7 @@ impl VoteClientConstructor for Conf {
                 ProtoType::Binary,
             ).unwrap();
 
-            let mut aid = 0;
+            let mut aid = 1;
             let bs = 1000;
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {

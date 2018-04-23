@@ -44,7 +44,7 @@ impl VoteClientConstructor for Constructor {
             let mut m = make_mutator(&mut ch, "Article");
             m.batch_put(
                 (0..params.articles)
-                    .map(|i| vec![(i as i32).into(), format!("Article #{}", i).into()]),
+                    .map(|i| vec![((i+1) as i32).into(), format!("Article #{}", i+1).into()]),
             ).unwrap();
         }
 
