@@ -5,7 +5,6 @@ extern crate hdrhistogram;
 extern crate itertools;
 extern crate rand;
 
-use std::fs;
 use std::time::{Duration, Instant};
 use std::path::PathBuf;
 use std::process::Command;
@@ -115,12 +114,6 @@ fn main() {
                 .help("Number of rows to read while benchmarking"),
         )
         .arg(
-            Arg::with_name("persist-bases")
-                .long("persist-bases")
-                .takes_value(false)
-                .help("Persist base nodes to disk."),
-        )
-        .arg(
             Arg::with_name("use-existing-data")
                 .long("use-existing-data")
                 .requires("retain-logs-on-exit")
@@ -181,24 +174,32 @@ fn main() {
     persistence.flush_timeout = Duration::new(0, flush_ns);
     persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
     persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
-    persistence.persist_base_nodes = args.is_present("persist-bases");
     persistence.log_prefix = "replay".to_string();
     persistence.log_dir = args.value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
-    persistence.mode = DurabilityMode::Permanent;
 
     let authority = Arc::new(ZookeeperAuthority::new(
         args.value_of("zookeeper-address").unwrap(),
     ));
 
     // Populate in a closure, so we'll have to recover before performing reads.
-    if !args.is_present("use-existing-data") {
+    if args.is_present("durability") && !args.is_present("use-existing-data") {
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
         g.install_recipe(RECIPE.to_owned()).unwrap();
 
         // Prepopulate with n rows:
         populate(&mut g, rows, verbose);
     }
+
+    persistence.mode = if args.is_present("durability") {
+        if args.is_present("retain-logs-on-exit") {
+            DurabilityMode::Permanent
+        } else {
+            DurabilityMode::DeleteOnExit
+        }
+    } else {
+        DurabilityMode::MemoryOnly
+    };
 
     let mut g = build_graph(authority, persistence, verbose);
     // Flush disk cache:
@@ -210,13 +211,4 @@ fn main() {
     }
 
     perform_reads(&mut g, reads, rows);
-
-    // Remove any log/database files:
-    if !args.is_present("retain-logs-on-exit") {
-        if args.is_present("persist-bases") {
-            fs::remove_dir_all("replay-TableRow-0.db").unwrap();
-        } else {
-            fs::remove_file("replay-log-TableRow-0.json").unwrap();
-        }
-    }
 }

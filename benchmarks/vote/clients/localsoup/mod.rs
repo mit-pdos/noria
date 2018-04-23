@@ -46,7 +46,6 @@ impl VoteClientConstructor for Constructor {
         persistence.flush_timeout = time::Duration::new(0, flush_ns);
         persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
         persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
-        persistence.persist_base_nodes = args.is_present("persist-bases");
         persistence.log_prefix = "vote".to_string();
         persistence.log_dir = args.value_of("log-dir")
             .and_then(|p| Some(PathBuf::from(p)));

@@ -711,13 +711,6 @@ fn main() {
                         .help("Enable durability for Base nodes"),
                 )
                 .arg(
-                    Arg::with_name("persist-bases")
-                        .long("persist-bases")
-                        .takes_value(false)
-                        .requires("durability")
-                        .help("Persist base nodes to disk."),
-                )
-                .arg(
                     Arg::with_name("log-dir")
                         .long("log-dir")
                         .takes_value(true)
