@@ -42,10 +42,15 @@ impl VoteClientConstructor for Constructor {
             let mut ch = Handle::new(ZookeeperAuthority::new(&zk));
             ch.install_recipe(RECIPE.to_owned()).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
-            m.batch_put(
-                (0..params.articles)
-                    .map(|i| vec![((i+1) as i32).into(), format!("Article #{}", i+1).into()]),
-            ).unwrap();
+            let mut id = 0;
+            while id < params.articles {
+                let end = ::std::cmp::min(id + 1000, params.articles);
+                m.batch_put(
+                    (id..end)
+                        .map(|i| vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]),
+                ).unwrap();
+                id = end;
+            }
         }
 
         Constructor(zk)
