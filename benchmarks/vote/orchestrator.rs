@@ -387,7 +387,7 @@ fn main() {
                 break;
             }
 
-            thread::sleep(time::Duration::from_secs(10));
+            thread::sleep(time::Duration::from_secs(5));
         }
 
         if !running.load(Ordering::SeqCst) {
@@ -437,6 +437,7 @@ fn run_clients(
         eprintln!(" .. prepopulating on {}", clients[0].public_dns);
 
         let mut prime_params = params.clone();
+        prime_params.warmup = 0;
         prime_params.runtime = 0;
         let mut cmd = Vec::<Cow<str>>::new();
         cmd.push("env".into());
