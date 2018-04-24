@@ -5,6 +5,7 @@ extern crate hdrhistogram;
 extern crate itertools;
 extern crate rand;
 
+use std::fs;
 use std::time::{Duration, Instant};
 use std::path::PathBuf;
 use std::process::Command;
@@ -65,7 +66,16 @@ fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, verbose: bo
         });
 }
 
-fn perform_reads(g: &mut ControllerHandle<ZookeeperAuthority>, reads: i64, rows: i64) {
+fn perform_reads(
+    g: &mut ControllerHandle<ZookeeperAuthority>,
+    reads: i64,
+    rows: i64,
+    verbose: bool,
+) {
+    if verbose {
+        eprintln!("Done populating state, now reading articles...");
+    }
+
     let mut hist = Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap();
     let mut getter = g.get_getter("ReadRow").unwrap();
 
@@ -114,23 +124,30 @@ fn main() {
                 .help("Number of rows to read while benchmarking"),
         )
         .arg(
-            Arg::with_name("use-existing-data")
-                .long("use-existing-data")
-                .requires("retain-logs-on-exit")
-                .takes_value(false)
-                .help("Skips pre-population and instead uses already persisted data."),
-        )
-        .arg(
             Arg::with_name("log-dir")
                 .long("log-dir")
                 .takes_value(true)
                 .help("Absolute path to the directory where the log files will be written."),
         )
         .arg(
+            Arg::with_name("durability")
+                .long("durability")
+                .takes_value(false)
+                .help("Enable durability for Base nodes"),
+        )
+        .arg(
             Arg::with_name("retain-logs-on-exit")
                 .long("retain-logs-on-exit")
                 .takes_value(false)
+                .requires("durability")
                 .help("Do not delete the base node logs on exit."),
+        )
+        .arg(
+            Arg::with_name("use-existing-data")
+                .long("use-existing-data")
+                .requires("retain-logs-on-exit")
+                .takes_value(false)
+                .help("Skips pre-population and instead uses already persisted data."),
         )
         .arg(
             Arg::with_name("write-batch-size")
@@ -168,6 +185,7 @@ fn main() {
     assert!(reads < rows);
 
     let verbose = args.is_present("verbose");
+    let durable = args.is_present("durability");
     let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
 
     let mut persistence = PersistenceParameters::default();
@@ -175,6 +193,12 @@ fn main() {
     persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
     persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
     persistence.log_prefix = "replay".to_string();
+    persistence.mode = if durable {
+        DurabilityMode::Permanent
+    } else {
+        DurabilityMode::MemoryOnly
+    };
+
     persistence.log_dir = args.value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
 
@@ -182,33 +206,30 @@ fn main() {
         args.value_of("zookeeper-address").unwrap(),
     ));
 
-    // Populate in a closure, so we'll have to recover before performing reads.
-    if args.is_present("durability") && !args.is_present("use-existing-data") {
+    if !args.is_present("use-existing-data") {
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
         g.install_recipe(RECIPE.to_owned()).unwrap();
 
         // Prepopulate with n rows:
         populate(&mut g, rows, verbose);
+
+        // In memory-only mode we don't want to recover, just read right away:
+        if !durable {
+            perform_reads(&mut g, reads, rows, verbose);
+            return;
+        }
     }
 
-    persistence.mode = if args.is_present("durability") {
-        if args.is_present("retain-logs-on-exit") {
-            DurabilityMode::Permanent
-        } else {
-            DurabilityMode::DeleteOnExit
-        }
-    } else {
-        DurabilityMode::MemoryOnly
-    };
-
+    // Recover the previous graph and perform reads:
     let mut g = build_graph(authority, persistence, verbose);
     // Flush disk cache:
     Command::new("sync")
         .spawn()
         .expect("Failed clearing disk buffers");
-    if verbose {
-        eprintln!("Done populating state, now reading articles...");
-    }
+    perform_reads(&mut g, reads, rows, verbose);
 
-    perform_reads(&mut g, reads, rows);
+    // Remove any log/database files:
+    if !args.is_present("retain-logs-on-exit") {
+        fs::remove_dir_all("replay-TableRow-0.db").unwrap();
+    }
 }
