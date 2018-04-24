@@ -57,6 +57,10 @@ name = "vote"
 path = "vote/main.rs"
 
 [[bin]]
+name = "vote-distributed"
+path = "vote/distributed.rs"
+
+[[bin]]
 name = "vote-orchestrator"
 path = "vote/orchestrator.rs"
 
