@@ -210,16 +210,19 @@ where
                     let ops = if skewed {
                         run_generator(
                             pool,
-                            || {
-                                let rng = rand::thread_rng();
-                                zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap()
-                            },
+                            zipf::ZipfDistribution::new(articles, 1.08).unwrap(),
                             finished,
                             target,
                             global_args,
                         )
                     } else {
-                        run_generator(pool, || rand::thread_rng(), finished, target, global_args)
+                        run_generator(
+                            pool,
+                            rand::distributions::Range::new(1, articles + 1),
+                            finished,
+                            target,
+                            global_args,
+                        )
                     };
                     ops
                 })
@@ -302,18 +305,16 @@ where
     );
 }
 
-fn run_generator<R, RF>(
+fn run_generator<R>(
     pool: Arc<rayon::ThreadPool>,
-    id_rng: RF,
+    mut id_rng: R,
     finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> usize
 where
-    RF: Send + FnOnce() -> R,
-    R: rand::Rng,
+    R: rand::distributions::Sample<usize>,
 {
-    let articles = value_t_or_exit!(global_args, "articles", i32);
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
 
@@ -339,7 +340,6 @@ where
     let mut queued_r_keys = Vec::new();
 
     let mut rng = rand::thread_rng();
-    let mut id_rng = id_rng();
 
     // we *could* use a rayon::scope here to safely access stack variables from inside each job,
     // but that would *also* force us to place the load generators *on* the thread pool (because of
@@ -410,7 +410,7 @@ where
 
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
-            let id = id_rng.gen_range(0, articles);
+            let id = id_rng.sample(&mut rng) as i32;
             if rng.gen_weighted_bool(every) {
                 if queued_w.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);

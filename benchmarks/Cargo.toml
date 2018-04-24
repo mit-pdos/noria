@@ -7,7 +7,7 @@ authors = ["The Distributary Developers"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "f363a641308aae4d3e9f1104fbc56911bd851395" }
+nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "8971f8c899da178fefe6735e59d5d85b44ffc0f2" }
 regex = "0.2.2"
 slog = "2.2.2"
 #slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_debug"] }
@@ -24,7 +24,7 @@ shellwords = "0.1"
 clap = "2.25.0"
 # distributions
 rand = "0.4.0"
-zipf = "1.0.0"
+zipf = "3.0.0"
 # sampling
 hdrhistogram = "6.0.0"
 # mssql
@@ -82,6 +82,10 @@ path = "piazza/piazza.rs"
 [[bin]]
 name = "evict-o-rama"
 path = "evict-o-rama/main.rs"
+
+[[bin]]
+name = "vote-migration"
+path = "vote-migration/main.rs"
 
 #[[bin]]
 #name = "security-mysql"

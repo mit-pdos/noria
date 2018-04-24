@@ -54,16 +54,19 @@ impl VoteClientConstructor for Constructor {
             x => Some(x),
         };
         s.stupid = args.is_present("stupid");
-        let mut g = graph::make(s, persistence);
+        let mut g = s.make(persistence);
 
         // prepopulate
         if verbose {
             println!("Prepopulating with {} articles", params.articles);
         }
         let mut a = g.graph.get_mutator("Article").unwrap();
-        a.batch_put(
-            (0..params.articles).map(|i| vec![(i as i32).into(), format!("Article #{}", i).into()]),
-        ).unwrap();
+        a.batch_put((0..params.articles).map(|i| {
+            vec![
+                ((i + 1) as i32).into(),
+                format!("Article #{}", i + 1).into(),
+            ]
+        })).unwrap();
         if verbose {
             println!("Done with prepopulation");
         }

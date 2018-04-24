@@ -3,6 +3,7 @@
 
 #[macro_use]
 extern crate clap;
+extern crate chrono;
 extern crate ctrlc;
 #[macro_use]
 extern crate failure;
@@ -26,7 +27,7 @@ use std::borrow::Cow;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_AMI: &str = "ami-eebc6691";
+const SOUP_AMI: &str = "ami-83cc79fc";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -342,10 +343,11 @@ fn main() {
                     }
 
                     eprintln!(
-                        " -> {} [run {}/{}]",
+                        " -> {} [run {}/{}] @ {}",
                         params.name(target, ""),
                         iter + 1,
-                        iters
+                        iters,
+                        chrono::Local::now().time()
                     );
                     if !run_clients(iter, &clients, ccores, &mut s, target, params) {
                         // backend clearly couldn't handle the load, so don't run higher targets

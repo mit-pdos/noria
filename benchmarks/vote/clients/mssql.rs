@@ -106,7 +106,7 @@ impl VoteClientConstructor for Conf {
             let mut conn = core.run(fut).unwrap().1;
 
             // prepop
-            let mut aid = 0;
+            let mut aid = 1;
             let bs = 1000;
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {
