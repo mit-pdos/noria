@@ -131,13 +131,15 @@ fn main() {
                 .short("p")
                 .default_value("95")
                 .takes_value(true)
+                .multiple(true)
+                .number_of_values(1)
                 .help("The percentage of operations that are reads"),
         )
         .arg(
             Arg::with_name("distribution")
                 .short("d")
-                .possible_values(&["uniform", "skewed"])
-                .default_value("uniform")
+                .possible_values(&["uniform", "skewed", "both"])
+                .default_value("both")
                 .takes_value(true)
                 .help("How to distribute keys."),
         )
@@ -170,8 +172,16 @@ fn main() {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
-    let skewed = args.value_of("distribution").unwrap() == "skewed";
-    let read_percentage = value_t_or_exit!(args, "read_percentage", usize);
+    let read_percentages: Vec<usize> = args.values_of("read_percentage")
+        .unwrap()
+        .map(|rp| rp.parse().unwrap())
+        .collect();
+    let skewed = match args.value_of("distribution").unwrap() {
+        "uniform" => &[false][..],
+        "skewed" => &[true][..],
+        "both" => &[false, true][..],
+        _ => unreachable!(),
+    };
     let nclients = value_t_or_exit!(args, "clients", i64);
 
     // guess the core counts
@@ -294,7 +304,7 @@ fn main() {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
-        'out: for backend in backends {
+        for backend in backends {
             eprintln!("==> {}", backend.uniq_name());
 
             eprintln!(" -> starting server");
@@ -314,52 +324,56 @@ fn main() {
             }
             eprintln!(" .. server started ");
 
-            let params = ClientParameters {
-                backend: &backend,
-                listen_addr,
-                runtime,
-                warmup,
-                read_percentage,
-                articles,
-                skewed,
-            };
-
             let targets = [
                 5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
                 2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000,
             ];
 
-            let iters = 3;
             let mut first = true;
-            for iter in 0..iters {
-                for &target in &targets {
-                    if first {
-                        first = false;
-                    } else {
-                        s = s.between_targets(&backend).unwrap();
+            'out: for &read_percentage in &read_percentages {
+                for &skewed in skewed {
+                    let params = ClientParameters {
+                        backend: &backend,
+                        listen_addr,
+                        runtime,
+                        warmup,
+                        read_percentage,
+                        articles,
+                        skewed,
+                    };
 
-                        // wait in case server was restarted
-                        if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
-                            eprintln!("failed to restart {:?}: {:?}", backend, e);
-                            continue;
+                    let iters = 3;
+                    for iter in 0..iters {
+                        for &target in &targets {
+                            if first {
+                                first = false;
+                            } else {
+                                s = s.between_targets(&backend).unwrap();
+
+                                // wait in case server was restarted
+                                if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
+                                    eprintln!("failed to restart {:?}: {:?}", backend, e);
+                                    continue;
+                                }
+                            }
+
+                            eprintln!(
+                                " -> {} [run {}/{}] @ {}",
+                                params.name(target, ""),
+                                iter + 1,
+                                iters,
+                                chrono::Local::now().time()
+                            );
+                            if !run_clients(iter, &clients, ccores, &mut s, target, params) {
+                                // backend clearly couldn't handle the load, so don't run higher targets
+                                break;
+                            }
+
+                            if !running.load(Ordering::SeqCst) {
+                                // user pressed ^C
+                                break 'out;
+                            }
                         }
-                    }
-
-                    eprintln!(
-                        " -> {} [run {}/{}] @ {}",
-                        params.name(target, ""),
-                        iter + 1,
-                        iters,
-                        chrono::Local::now().time()
-                    );
-                    if !run_clients(iter, &clients, ccores, &mut s, target, params) {
-                        // backend clearly couldn't handle the load, so don't run higher targets
-                        break;
-                    }
-
-                    if !running.load(Ordering::SeqCst) {
-                        // user pressed ^C
-                        break 'out;
                     }
                 }
             }
