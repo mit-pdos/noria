@@ -97,10 +97,6 @@ where
         }
     }
 
-    if bind_generator.weight() == 0 && bind_server.weight() == 0 {
-        eprintln!("# no numa binding");
-    }
-
     if bind_generator.weight() != 0 && bind_server.weight() == 0 {
         // not enough nodes, so let the OS decide
         eprintln!("# not enough numa cores to do useful binding");
