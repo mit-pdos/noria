@@ -1,95 +1,8 @@
-use buf_redux::BufWriter;
-use buf_redux::strategy::WhenFull;
-
-use serde_json;
-
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::PathBuf;
 use std::time;
 
 use checktable;
 use debug::DebugEventType;
-use domain;
 use prelude::*;
-
-/// Indicates to what degree updates should be persisted.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum DurabilityMode {
-    /// Don't do any durability
-    MemoryOnly,
-    /// Delete any log files on exit. Useful mainly for tests.
-    DeleteOnExit,
-    /// Persist updates to disk, and don't delete them later.
-    Permanent,
-}
-
-/// Parameters to control the operation of GroupCommitQueue.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct Parameters {
-    /// Number of elements to buffer before flushing.
-    pub queue_capacity: usize,
-    /// Amount of time to wait before flushing despite not reaching `queue_capacity`.
-    pub flush_timeout: time::Duration,
-    /// Whether the output files should be deleted when the GroupCommitQueue is dropped.
-    pub mode: DurabilityMode,
-    /// Filename prefix for persistent log entries.
-    pub log_prefix: String,
-}
-
-impl Default for Parameters {
-    fn default() -> Self {
-        Self {
-            queue_capacity: 256,
-            flush_timeout: time::Duration::new(0, 100_000),
-            mode: DurabilityMode::MemoryOnly,
-            log_prefix: String::from("soup"),
-        }
-    }
-}
-
-impl Parameters {
-    /// Parameters to control the persistence mode, and parameters related to persistence.
-    ///
-    /// Three modes are available:
-    ///
-    ///  1. `DurabilityMode::Permanent`: all writes to base nodes should be written to disk.
-    ///  2. `DurabilityMode::DeleteOnExit`: all writes are written to disk, but the log is
-    ///     deleted once the `Blender` is dropped. Useful for tests.
-    ///  3. `DurabilityMode::MemoryOnly`: no writes to disk, store all writes in memory.
-    ///     Useful for baseline numbers.
-    ///
-    /// `queue_capacity` indicates the number of packets that should be buffered until
-    /// flushing, and `flush_timeout` indicates the length of time to wait before flushing
-    /// anyway.
-    pub fn new(
-        mode: DurabilityMode,
-        queue_capacity: usize,
-        flush_timeout: time::Duration,
-        log_prefix: Option<String>,
-    ) -> Self {
-        let log_prefix = log_prefix.unwrap_or(String::from("soup"));
-        assert!(!log_prefix.contains("-"));
-
-        Self {
-            queue_capacity,
-            flush_timeout,
-            mode,
-            log_prefix,
-        }
-    }
-
-    /// The path that would be used for the given domain/shard pair's logs.
-    pub fn log_path(&self, table_name: &str, domain_shard: usize) -> PathBuf {
-        assert!(!table_name.contains("-"));
-
-        PathBuf::from(&format!(
-            "{}-log-{}-{}.json",
-            self.log_prefix, table_name, domain_shard,
-        ))
-    }
-}
 
 pub struct GroupCommitQueueSet {
     /// Packets that are queued to be persisted.
@@ -99,48 +12,20 @@ pub struct GroupCommitQueueSet {
     /// empty. A flush should occur on or before wait_start + timeout.
     wait_start: Map<time::Instant>,
 
-    /// Name of, and handle to the files that packets should be persisted to.
-    files: Map<(PathBuf, BufWriter<File, WhenFull>)>,
-
-    _domain_index: domain::Index,
-    domain_shard: usize,
-
-    params: Parameters,
+    params: PersistenceParameters,
 }
 
 impl GroupCommitQueueSet {
     /// Create a new `GroupCommitQueue`.
-    pub fn new(domain_index: domain::Index, domain_shard: usize, params: &Parameters) -> Self {
+    pub fn new(params: &PersistenceParameters) -> Self {
         assert!(params.queue_capacity > 0);
 
         Self {
             pending_packets: Map::default(),
             wait_start: Map::default(),
-            files: Map::default(),
 
-            _domain_index: domain_index,
-            domain_shard,
             params: params.clone(),
         }
-    }
-
-    fn get_or_create_file(
-        &self,
-        node: &LocalNodeIndex,
-        nodes: &DomainNodes,
-    ) -> (PathBuf, BufWriter<File, WhenFull>) {
-        let path = self.params
-            .log_path(nodes[node].borrow().name(), self.domain_shard);
-        let file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&path)
-            .unwrap();
-
-        (
-            path,
-            BufWriter::with_capacity(self.params.queue_capacity * 1024, file),
-        )
     }
 
     /// Returns None for packet types not relevant to persistence, and the node the packet was
@@ -182,42 +67,13 @@ impl GroupCommitQueueSet {
         needs_flush.and_then(|node| self.flush_internal(&node, nodes, ex))
     }
 
-    /// Flush any pending packets for node to disk (if applicable), and return a merged packet.
+    /// Merge any pending packets.
     fn flush_internal(
         &mut self,
         node: &LocalNodeIndex,
         nodes: &DomainNodes,
         ex: &Executor,
     ) -> Option<Box<Packet>> {
-        match self.params.mode {
-            DurabilityMode::DeleteOnExit | DurabilityMode::Permanent => {
-                if !self.files.contains_key(node) {
-                    let file = self.get_or_create_file(node, nodes);
-                    self.files.insert(node.clone(), file);
-                }
-
-                let mut file = &mut self.files[node].1;
-                {
-                    let data_to_flush: Vec<_> = self.pending_packets[&node]
-                        .iter()
-                        .map(|p| match **p {
-                            Packet::Transaction { ref data, .. }
-                            | Packet::Message { ref data, .. } => data,
-                            _ => unreachable!(),
-                        })
-                        .collect();
-                    serde_json::to_writer(&mut file, &data_to_flush).unwrap();
-                    // Separate log flushes with a newline so that the
-                    // file can be easily parsed later on:
-                    writeln!(&mut file, "").unwrap();
-                }
-
-                file.flush().unwrap();
-                file.get_mut().sync_data().unwrap();
-            }
-            DurabilityMode::MemoryOnly => {}
-        }
-
         self.wait_start.remove(node);
         Self::merge_packets(&mut self.pending_packets[node], nodes, ex)
     }
@@ -452,16 +308,6 @@ impl GroupCommitQueueSet {
             box Packet::Message { .. } => Self::merge_committed_packets(packets.drain(..), None),
             box Packet::Transaction { .. } => Self::merge_transactional_packets(packets, nodes, ex),
             _ => unreachable!(),
-        }
-    }
-}
-
-impl Drop for GroupCommitQueueSet {
-    fn drop(&mut self) {
-        if let DurabilityMode::DeleteOnExit = self.params.mode {
-            for &(ref filename, _) in self.files.values() {
-                fs::remove_file(filename).unwrap();
-            }
         }
     }
 }

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync;
@@ -170,42 +171,48 @@ impl Ingredient for Filter {
         columns: &[usize],
         key: &KeyType,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = &'a [DataType]> + 'a>>> {
+    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         states.get(&*self.src).and_then(|state| {
             let f = self.filter.clone();
+            let filter = move |r: &&Row| {
+                r.iter().enumerate().all(|(i, d)| {
+                    // check if this filter matches
+                    if let Some(ref cond) = f[i] {
+                        match *cond {
+                            FilterCondition::Comparison(ref op, ref f) => {
+                                let v = match *f {
+                                    Value::Constant(ref dt) => dt,
+                                    Value::Column(c) => &r[c],
+                                };
+                                match *op {
+                                    Operator::Equal => d == v,
+                                    Operator::NotEqual => d != v,
+                                    Operator::Greater => d > v,
+                                    Operator::GreaterOrEqual => d >= v,
+                                    Operator::Less => d < v,
+                                    Operator::LessOrEqual => d <= v,
+                                    _ => unimplemented!(),
+                                }
+                            }
+                            FilterCondition::In(ref fs) => fs.contains(d),
+                        }
+                    } else {
+                        // everything matches no condition
+                        true
+                    }
+                })
+            };
+
             match state.lookup(columns, key) {
-                LookupResult::Some(rs) => {
+                LookupResult::Some(Cow::Borrowed(rs)) => {
+                    let r = Box::new(rs.iter().filter(filter).map(|r| Cow::from(&r[..]))) as Box<_>;
+                    Some(Some(r))
+                }
+                LookupResult::Some(Cow::Owned(rs)) => {
                     let r = Box::new(
-                        rs.iter()
-                            .filter(move |r| {
-                                r.iter().enumerate().all(|(i, d)| {
-                                    // check if this filter matches
-                                    if let Some(ref cond) = f[i] {
-                                        match *cond {
-                                            FilterCondition::Comparison(ref op, ref f) => {
-                                                let v = match *f {
-                                                    Value::Constant(ref dt) => dt,
-                                                    Value::Column(c) => &r[c],
-                                                };
-                                                match *op {
-                                                    Operator::Equal => d == v,
-                                                    Operator::NotEqual => d != v,
-                                                    Operator::Greater => d > v,
-                                                    Operator::GreaterOrEqual => d >= v,
-                                                    Operator::Less => d < v,
-                                                    Operator::LessOrEqual => d <= v,
-                                                    _ => unimplemented!(),
-                                                }
-                                            }
-                                            FilterCondition::In(ref fs) => fs.contains(d),
-                                        }
-                                    } else {
-                                        // everything matches no condition
-                                        true
-                                    }
-                                })
-                            })
-                            .map(|r| &r[..]),
+                        rs.into_iter()
+                            .filter(move |ref r| filter(r))
+                            .map(|r| Cow::from(r.unpack())),
                     ) as Box<_>;
                     Some(Some(r))
                 }

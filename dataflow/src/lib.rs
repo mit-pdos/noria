@@ -10,7 +10,6 @@
 
 #[allow(unused_extern_crates)]
 extern crate backtrace;
-extern crate buf_redux;
 extern crate channel;
 extern crate core;
 extern crate evmap;
@@ -43,7 +42,7 @@ pub mod prelude;
 pub mod statistics;
 
 mod domain;
-mod persistence;
+mod group_commit;
 mod processing;
 mod transactions;
 
@@ -55,13 +54,11 @@ use checktable::TokenGenerator;
 pub type Readers = Arc<
     Mutex<HashMap<(core::NodeIndex, usize), (backlog::SingleReadHandle, Option<TokenGenerator>)>>,
 >;
-pub type PersistenceParameters = persistence::Parameters;
 pub type DomainConfig = domain::Config;
 
 pub use checktable::connect_thread_checktable;
 pub use domain::{Domain, DomainBuilder, Index};
 pub use payload::{LocalBypass, Packet};
-pub use persistence::DurabilityMode;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Sharding {

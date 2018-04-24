@@ -9,6 +9,7 @@ chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
 nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "3e7ae4c4d32b77342051d5c217549ab8fcb68e85" }
 regex = "0.2.2"
+itertools = "0.7.2"
 slog = "2.2.2"
 #slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "2.4.0"
@@ -26,7 +27,7 @@ clap = "2.25.0"
 rand = "0.4.0"
 zipf = "3.0.0"
 # sampling
-hdrhistogram = "6.0.0"
+hdrhistogram = { git = "https://github.com/ekmartin/HdrHistogram_rust", branch = "nom_4" }
 # mssql
 futures-state-stream = "0.1"
 tiberius = { git = "https://github.com/steffengy/tiberius.git", rev = "63c1329f84dc0f722fe640b7faa7f803e7db6a5a" }
@@ -86,6 +87,10 @@ path = "evict-o-rama/main.rs"
 [[bin]]
 name = "vote-migration"
 path = "vote-migration/main.rs"
+
+[[bin]]
+name = "replay"
+path = "replay/main.rs"
 
 #[[bin]]
 #name = "security-mysql"

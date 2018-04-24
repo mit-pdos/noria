@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use prelude::*;
@@ -194,7 +195,7 @@ impl Ingredient for NodeOperator {
         columns: &[usize],
         key: &KeyType,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = &'a [DataType]> + 'a>>> {
+    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         impl_ingredient_fn_ref!(self, query_through, columns, key, states)
     }
     fn lookup<'a>(
@@ -204,7 +205,7 @@ impl Ingredient for NodeOperator {
         key: &KeyType,
         domain: &DomainNodes,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = &'a [DataType]> + 'a>>> {
+    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         impl_ingredient_fn_ref!(self, lookup, parent, columns, key, domain, states)
     }
     fn parent_columns(&self, column: usize) -> Vec<(NodeIndex, Option<usize>)> {
@@ -285,7 +286,7 @@ pub mod test {
                 .node_weight_mut(global)
                 .unwrap()
                 .on_commit(&remap);
-            self.states.insert(local, State::default());
+            self.states.insert(local, box MemoryState::default());
             self.remap.insert(global, ip);
             ip
         }
@@ -354,7 +355,7 @@ pub mod test {
             let global = self.graph.add_node(Node::new(name, fields, i, false));
             let local = unsafe { LocalNodeIndex::make(self.remap.len() as u32) };
             if materialized {
-                self.states.insert(local, State::default());
+                self.states.insert(local, box MemoryState::default());
             }
             for parent in parents {
                 self.graph.add_edge(parent, global, ());
@@ -436,11 +437,7 @@ pub mod test {
 
             // if the base node has state, keep it
             if let Some(ref mut state) = self.states.get_mut(&*base) {
-                match data.into() {
-                    Record::Positive(r) => state.insert(r, None),
-                    Record::Negative(_) => unreachable!(),
-                    Record::BaseOperation(..) => unreachable!(),
-                };
+                state.process_records(&mut vec![data].into(), None);
             } else {
                 assert!(
                     false,
@@ -452,7 +449,16 @@ pub mod test {
 
         pub fn unseed(&mut self, base: IndexPair) {
             assert!(self.nut.is_some(), "unseed must happen after set_op");
-            self.states.get_mut(&*base).unwrap().clear();
+            let global = self.nut.unwrap().as_global();
+            let idx = self.graph[global].suggest_indexes(global);
+            let mut state = MemoryState::default();
+            for (tbl, (col, _)) in idx {
+                if tbl == base.as_global() {
+                    state.add_key(&col[..], None);
+                }
+            }
+
+            self.states.insert(*base, box state);
         }
 
         pub fn one<U: Into<Records>>(&mut self, src: IndexPair, u: U, remember: bool) -> Records {

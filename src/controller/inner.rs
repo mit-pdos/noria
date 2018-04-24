@@ -1,9 +1,10 @@
 use channel::tcp::TcpSender;
 use consensus::{Authority, Epoch, STATE_KEY};
+use core::PersistenceParameters;
 use dataflow::payload::{EgressForBase, IngressFromBase};
 use dataflow::prelude::*;
 use dataflow::statistics::GraphStats;
-use dataflow::{checktable, node, payload, DomainConfig, PersistenceParameters};
+use dataflow::{checktable, node, payload, DomainConfig};
 
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
@@ -200,15 +201,6 @@ impl ControllerInner {
                     self.apply_recipe(self.recipe.clone().extend(&r).unwrap())
                         .unwrap();
                 }
-
-                info!(self.log, "Recovering from log");
-                for (_name, index) in self.inputs().iter() {
-                    let node = &self.ingredients[*index];
-                    let domain = self.domains.get_mut(&node.domain()).unwrap();
-                    domain.send(box payload::Packet::StartRecovery).unwrap();
-                    domain.wait_for_ack().unwrap();
-                }
-                info!(self.log, "Recovery complete");
             }
         }
 

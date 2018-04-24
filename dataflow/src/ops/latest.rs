@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use prelude::*;
@@ -75,7 +76,7 @@ impl Ingredient for Latest {
                 match db.lookup(&[self.key], &KeyType::Single(&r[self.key])) {
                     LookupResult::Some(rs) => {
                         debug_assert!(rs.len() <= 1, "a group had more than 1 result");
-                        Some((r, rs.get(0)))
+                        Some((r, rs))
                     }
                     LookupResult::Missing => {
                         // we don't actively materialize holes unless requested by a read. this
@@ -94,9 +95,17 @@ impl Ingredient for Latest {
             });
 
             // buffer emitted records
-            for (r, current) in currents {
-                if let Some(current) = current {
-                    out.push(Record::Negative((**current).clone()));
+            for (r, current_row) in currents {
+                match current_row {
+                    Cow::Owned(mut rs) => {
+                        if rs.len() > 0 {
+                            out.push(Record::Negative(rs.swap_remove(0).unpack()));
+                        }
+                    }
+                    Cow::Borrowed(rs) if rs.len() > 0 => {
+                        out.push(Record::Negative((*rs[0]).clone()));
+                    }
+                    _ => {}
                 }
 
                 // if there was a previous latest for this key, revoke old record

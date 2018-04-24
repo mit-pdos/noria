@@ -179,10 +179,9 @@ impl Ingredient for Base {
 
         let get_current = |current_key: &'_ _| {
             match db.lookup(key_cols, &KeyType::from(current_key)) {
-                LookupResult::Some(rows) => {
+                LookupResult::Some(ref rows) if rows.len() != 1 => {
                     match rows.len() {
                         0 => None,
-                        1 => Some(Cow::Borrowed(&*rows[0])),
                         n => {
                             // primary key, so better be unique!
                             assert_eq!(n, 1, "key {:?} not unique (n = {})!", current_key, n);
@@ -190,6 +189,10 @@ impl Ingredient for Base {
                         }
                     }
                 }
+                LookupResult::Some(Cow::Owned(mut rows)) => {
+                    Some(Cow::from(rows.pop().unwrap().unpack()))
+                }
+                LookupResult::Some(Cow::Borrowed(rows)) => Some(Cow::from(&rows[0][..])),
                 LookupResult::Missing => unreachable!(),
             }
         };
@@ -223,7 +226,7 @@ impl Ingredient for Base {
                     }
                 }
                 Record::Negative(u) => {
-                    assert_eq!(current, Some(Cow::Borrowed(&u)));
+                    assert_eq!(current, Some(Cow::from(&u[..])));
                     if current == was {
                         // save us a clone in a common case
                         was = Some(Cow::Owned(u));
@@ -357,8 +360,7 @@ mod tests {
         assert_eq!(b.unmodified, true);
     }
 
-    #[test]
-    fn lots_of_changes_in_same_batch() {
+    fn test_lots_of_changes_in_same_batch(mut state: Box<State>) {
         use node;
         use ops::base::Base;
         use prelude::*;
@@ -391,7 +393,6 @@ mod tests {
         graph.node_weight_mut(global).unwrap().on_commit(&remap);
         graph.node_weight_mut(global).unwrap().add_to(0.into());
 
-        let mut state = State::default();
         for (_, (col, _)) in graph[global].suggest_indexes(global) {
             state.add_key(&col[..], None);
         }
@@ -457,4 +458,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn lots_of_changes_in_same_batch() {
+        let state = MemoryState::default();
+        test_lots_of_changes_in_same_batch(box state);
+    }
+
+    #[test]
+    fn lots_of_changes_in_same_batch_persistent() {
+        let state = PersistentState::new(
+            String::from("lots_of_changes_in_same_batch_persistent"),
+            None,
+            &PersistenceParameters::default(),
+        );
+
+        test_lots_of_changes_in_same_batch(box state);
+    }
 }

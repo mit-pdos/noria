@@ -315,6 +315,7 @@ fn run_generator<R>(
 where
     R: rand::distributions::Sample<usize>,
 {
+    let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
 
@@ -472,7 +473,7 @@ where
                 // we instead need to stop issuing requests earlier than we otherwise would
                 // have. but make sure we're not still in the warmup phase, because the clients
                 // *could* speed up
-                if now < end && now.duration_since(start) > warmup {
+                if early_exit && now < end && now.duration_since(start) > warmup {
                     let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
                     let queued = enqueued as u64 - clients_completed;
                     let dur = first.elapsed().as_secs();
@@ -577,6 +578,11 @@ fn main() {
             Arg::with_name("no-prime")
                 .long("no-prime")
                 .help("Indicates that the client should not set up the database"),
+        )
+        .arg(
+            Arg::with_name("no-early-exit")
+                .long("no-early-exit")
+                .help("Don't stop generating load when clients fall behind."),
         )
         .subcommand(
             SubCommand::with_name("netsoup")
@@ -705,6 +711,12 @@ fn main() {
                         .help("Enable durability for Base nodes"),
                 )
                 .arg(
+                    Arg::with_name("log-dir")
+                        .long("log-dir")
+                        .takes_value(true)
+                        .help("Absolute path to the directory where the log files will be written."),
+                )
+                .arg(
                     Arg::with_name("retain-logs-on-exit")
                         .long("retain-logs-on-exit")
                         .takes_value(false)
@@ -717,6 +729,20 @@ fn main() {
                         .takes_value(true)
                         .default_value("512")
                         .help("Size of batches processed at base nodes."),
+                )
+                .arg(
+                    Arg::with_name("flush-timeout")
+                        .long("flush-timeout")
+                        .takes_value(true)
+                        .default_value("100000")
+                        .help("Time to wait before processing a merged packet, in nanoseconds."),
+                )
+                .arg(
+                    Arg::with_name("persistence-threads")
+                        .long("persistence-threads")
+                        .takes_value(true)
+                        .default_value("1")
+                        .help("Number of background threads used by PersistentState."),
                 )
                 .arg(
                     Arg::with_name("stupid")

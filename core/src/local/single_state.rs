@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ::*;
 use rand::{Rng, ThreadRng};
 use local::keyed_state::KeyedState;
@@ -299,18 +301,6 @@ impl SingleState {
         keys.iter().map(|k| self.state.evict(k)).sum()
     }
 
-    pub fn clear(&mut self) {
-        self.rows = 0;
-        match self.state {
-            KeyedState::Single(ref mut map) => map.clear(),
-            KeyedState::Double(ref mut map) => map.clear(),
-            KeyedState::Tri(ref mut map) => map.clear(),
-            KeyedState::Quad(ref mut map) => map.clear(),
-            KeyedState::Quin(ref mut map) => map.clear(),
-            KeyedState::Sex(ref mut map) => map.clear(),
-        }
-    }
-
     pub fn values<'a>(&'a self) -> Box<Iterator<Item = &'a Vec<Row>> + 'a> {
         match self.state {
             KeyedState::Single(ref map) => Box::new(map.values()),
@@ -332,13 +322,13 @@ impl SingleState {
     }
     pub fn lookup<'a>(&'a self, key: &KeyType) -> LookupResult<'a> {
         if let Some(rs) = self.state.lookup(key) {
-            LookupResult::Some(&rs[..])
+            LookupResult::Some(Cow::Borrowed(&rs[..]))
         } else {
             if self.partial() {
                 // partially materialized, so this is a hole (empty results would be vec![])
                 LookupResult::Missing
             } else {
-                LookupResult::Some(&[])
+                LookupResult::Some(Cow::Owned(vec![]))
             }
         }
     }
