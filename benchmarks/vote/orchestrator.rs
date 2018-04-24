@@ -330,9 +330,12 @@ fn main() {
             ];
 
             let iters = 3;
+            let mut first = true;
             for iter in 0..iters {
-                for (i, &target) in targets.iter().enumerate() {
-                    if i != 0 {
+                for &target in &targets {
+                    if first {
+                        first = false;
+                    } else {
                         s = s.between_targets(&backend).unwrap();
 
                         // wait in case server was restarted
