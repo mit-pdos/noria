@@ -6,8 +6,6 @@ extern crate distributary;
 extern crate futures;
 extern crate futures_state_stream;
 extern crate hdrhistogram;
-extern crate hwloc;
-extern crate libc;
 extern crate memcached;
 extern crate mysql;
 extern crate rand;
@@ -20,7 +18,6 @@ use hdrhistogram::Histogram;
 use rand::Rng;
 use std::cell::RefCell;
 use std::fs;
-use std::io;
 use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::thread;
 use std::time;
@@ -34,26 +31,6 @@ thread_local! {
 }
 
 const MAX_BATCH_TIME_US: u32 = 1000;
-
-fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
-    use std::mem;
-    let mut cpuset = unsafe { mem::zeroed::<libc::cpu_set_t>() };
-    for cpu in cpus {
-        unsafe { libc::CPU_SET(cpu as usize, &mut cpuset) };
-    }
-    let errno = unsafe {
-        libc::pthread_setaffinity_np(
-            libc::pthread_self(),
-            mem::size_of::<libc::cpu_set_t>(),
-            &cpuset as *const _,
-        )
-    };
-    if errno != 0 {
-        Err(io::Error::from_raw_os_error(errno))
-    } else {
-        Ok(())
-    }
-}
 
 mod clients;
 use clients::{Parameters, VoteClient, VoteClientConstructor};
@@ -71,44 +48,6 @@ where
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
-
-    let mut bind_generator = hwloc::Bitmap::new();
-    let mut bind_server = hwloc::Bitmap::new();
-
-    if CC::spawns_threads() {
-        // we want any threads spawned by the VoteClient (e.g., distributary itself)
-        // to be on their own NUMA node if there are many. or rather, we want to ensure that our
-        // pool clients/load generators do not interfere with the server.
-        let topo = hwloc::Topology::new();
-        if let Ok(nodes) = topo.objects_with_type(&hwloc::ObjectType::NUMANode) {
-            for node in nodes {
-                if let Some(cpus) = node.allowed_cpuset() {
-                    if bind_generator.weight() as usize >= ngen + nthreads {
-                        for cpu in cpus {
-                            bind_server.set(cpu);
-                        }
-                    } else {
-                        for cpu in cpus {
-                            bind_generator.set(cpu);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if bind_generator.weight() != 0 && bind_server.weight() == 0 {
-        // not enough nodes, so let the OS decide
-        eprintln!("# not enough numa cores to do useful binding");
-        bind_generator.clear();
-    }
-
-    if bind_server.weight() != 0 {
-        // set affinity for *this* thread because (quoth man pthread_setaffinity_np):
-        // A new thread created by pthread_create(3) inherits [..] its creator's CPU affinity mask.
-        eprintln!("# bound server threads to: {:?}", bind_server);
-        set_thread_affinity(bind_server).unwrap();
-    }
 
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
@@ -154,12 +93,6 @@ where
         rmt_r_t.clone(),
         finished.clone(),
     );
-
-    if bind_generator.weight() != 0 {
-        // now set the affinity for all of "our" generator/client threads
-        eprintln!("# bound load generators to: {:?}", bind_generator);
-        set_thread_affinity(bind_generator).unwrap();
-    }
 
     let cc = Mutex::new(CC::new(&params, local_args));
     let pool = rayon::ThreadPoolBuilder::new()

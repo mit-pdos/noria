@@ -15,8 +15,6 @@ slog = "2.2.2"
 slog-term = "2.4.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"
-libc = "0.2"
-hwloc = "0.5"
 ssh2 = "0.3"
 shellwords = "0.1"
 
