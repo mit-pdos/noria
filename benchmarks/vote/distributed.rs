@@ -24,7 +24,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-066eda79";
+const SOUP_AMI: &str = "ami-9bf641e4";
 
 fn main() {
     use clap::{App, Arg};
@@ -46,7 +46,7 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("30")
+                .default_value("60")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
         )
@@ -83,7 +83,7 @@ fn main() {
         .arg(
             Arg::with_name("ctype")
                 .long("client")
-                .default_value("c5.4xlarge")
+                .default_value("c5.9xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
@@ -101,7 +101,7 @@ fn main() {
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
-                .default_value("1")
+                .default_value("6")
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn with a scale of 1"),
@@ -117,7 +117,7 @@ fn main() {
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
-                .default_value("2000000")
+                .default_value("1000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
         )
@@ -193,8 +193,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
     let ccores = args.value_of("ctype")
         .and_then(ec2_instance_type_cores)
         .map(|cores| {
-            // one core for load generators to be on the safe side
-            assert!(cores > 2 * for_gen);
+            assert!(cores > for_gen);
             cores - for_gen
         })
         .expect("could not determine client core count");
@@ -402,7 +401,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
         // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
         // otherwise we're severely underutilizing the client machines.
-        let threads = format!("{}", ccores * 2).into();
+        let threads = format!("{}", (ccores + for_gen - 1) / for_gen).into();
         let base_cmd = vec![
             "cd".into(),
             "distributary".into(),
