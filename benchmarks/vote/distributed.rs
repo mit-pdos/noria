@@ -181,7 +181,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
     let shards = value_t_or_exit!(args, "shards", u16);
     let target_per_client = value_t_or_exit!(args, "target", usize);
 
-    let nshards = format!("{}", nclients * shards as u32);
+    let nshards = format!("{}", nservers * shards as u32);
     eprintln!("--> running with {} shards total", nshards);
     eprintln!(
         "--> generating an aggregate {} ops/s",
