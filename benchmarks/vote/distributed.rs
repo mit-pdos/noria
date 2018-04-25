@@ -282,11 +282,19 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         let zookeeper_addr = Cow::Borrowed(&*zookeeper_addr);
 
         if first {
+            let rev = servers[0]
+                .ssh
+                .as_ref()
+                .unwrap()
+                .just_exec(&["git", "-C", "distributary", "rev-parse", "HEAD"])
+                .context("git rev-parse HEAD")?
+                .map_err(failure::err_msg)?;
+            eprintln!("==> revision: {}", rev.trim_right());
             servers[0]
                 .ssh
                 .as_ref()
                 .unwrap()
-                .just_exec(&["git", "-C", "distributary", "fetch", "origin", "2>&1"])
+                .just_exec(&["git", "-C", "distributary", "fetch", "origin"])
                 .context("git fetch origin")?
                 .map_err(failure::err_msg)?;
             let missing = servers[0]
@@ -604,7 +612,7 @@ impl ConvenientSession for tsunami::Session {
         let mut c = self.exec(cmd)?;
 
         let mut stdout = String::new();
-        c.stderr().read_to_string(&mut stdout)?;
+        c.read_to_string(&mut stdout)?;
         let mut stderr = String::new();
         c.stderr().read_to_string(&mut stderr)?;
         c.wait_eof()?;
