@@ -85,47 +85,47 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
-    let finished = Arc::new(Barrier::new(nthreads + ngen));
-    let ts = (
-        sjrn_w_t.clone(),
-        sjrn_r_t.clone(),
-        rmt_w_t.clone(),
-        rmt_r_t.clone(),
-        finished.clone(),
-    );
+    let finished = Arc::new(Barrier::new(nthreads * ngen + ngen));
 
-    let cc = Mutex::new(CC::new(&params, local_args));
-    let pool = rayon::ThreadPoolBuilder::new()
-        .thread_name(|i| format!("client-{}", i))
-        .num_threads(nthreads)
-        .start_handler(move |_| {
-            CLIENT.with(|c| {
-                *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
-            })
-        })
-        .exit_handler(move |_| {
-            SJRN_W
-                .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            SJRN_R
-                .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            RMT_W
-                .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            RMT_R
-                .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            ts.4.wait();
-        })
-        .build()
-        .unwrap();
-    let pool = Arc::new(pool);
-
+    let cc = Arc::new(Mutex::new(CC::new(&params, local_args)));
     let start = time::Instant::now();
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
-            let pool = pool.clone();
+            let ts = (
+                sjrn_w_t.clone(),
+                sjrn_r_t.clone(),
+                rmt_w_t.clone(),
+                rmt_r_t.clone(),
+                finished.clone(),
+            );
+
+            let cc = cc.clone();
+            let pool = rayon::ThreadPoolBuilder::new()
+                .thread_name(move |i| format!("client-{}.{}", geni, i))
+                .num_threads(nthreads)
+                .start_handler(move |_| {
+                    CLIENT.with(|c| {
+                        *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
+                    })
+                })
+                .exit_handler(move |_| {
+                    SJRN_W
+                        .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
+                        .unwrap();
+                    SJRN_R
+                        .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
+                        .unwrap();
+                    RMT_W
+                        .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
+                        .unwrap();
+                    RMT_R
+                        .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                        .unwrap();
+                    ts.4.wait();
+                })
+                .build()
+                .unwrap();
+
             let finished = finished.clone();
             let global_args = global_args.clone();
 
@@ -159,7 +159,6 @@ where
         })
         .collect();
 
-    drop(pool);
     let ops: usize = generators.into_iter().map(|gen| gen.join().unwrap()).sum();
 
     // all done!
@@ -235,7 +234,7 @@ where
 }
 
 fn run_generator<R>(
-    pool: Arc<rayon::ThreadPool>,
+    pool: rayon::ThreadPool,
     mut id_rng: R,
     finished: Arc<Barrier>,
     target: f64,
