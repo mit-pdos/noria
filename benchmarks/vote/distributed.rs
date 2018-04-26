@@ -24,13 +24,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-9bf641e4";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum Backend {
-    Timely,
-    Soup,
-}
+const SOUP_AMI: &str = "ami-72b0000d";
 
 fn main() {
     use clap::{App, Arg};
@@ -157,8 +151,6 @@ fn main() {
     let nservers = value_t_or_exit!(args, "servers", u32);
     let nclients = value_t_or_exit!(args, "clients", u32);
 
-    let backends = [Backend::Timely, Backend::Soup];
-
     for scale in args.values_of("scales").unwrap() {
         match scale.parse::<u32>() {
             Ok(scale) => {
@@ -168,7 +160,7 @@ fn main() {
                     nclients * scale
                 );
 
-                run_one(&args, first, nservers * scale, nclients * scale, &backends)
+                run_one(&args, first, nservers * scale, nclients * scale)
             }
             Err(e) => eprintln!("Ignoring malformed scale factor {}", e),
         }
@@ -181,13 +173,7 @@ fn main() {
     }
 }
 
-fn run_one(
-    args: &clap::ArgMatches,
-    first: bool,
-    nservers: u32,
-    nclients: u32,
-    backends: &[Backend],
-) {
+fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
@@ -341,337 +327,252 @@ fn run_one(
             }
         }
 
-        if backends.contains(&Backend::Soup) {
-            // first, start zookeeper
-            servers[0]
-                .ssh
-                .as_ref()
-                .unwrap()
-                .just_exec(&["sudo", "systemctl", "stop", "zookeeper"])
-                .context("stop zookeeper")?
-                .map_err(failure::err_msg)?;
-            servers[0]
-                .ssh
-                .as_ref()
-                .unwrap()
-                .just_exec(&["sudo", "rm", "-rf", "/var/lib/zookeeper/version-2"])
-                .context("wipe zookeeper")?
-                .map_err(failure::err_msg)?;
-            servers[0]
-                .ssh
-                .as_ref()
-                .unwrap()
-                .just_exec(&["sudo", "systemctl", "start", "zookeeper"])
-                .context("start zookeeper")?
-                .map_err(failure::err_msg)?;
+        // first, start zookeeper
+        servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .just_exec(&["sudo", "systemctl", "stop", "zookeeper"])
+            .context("stop zookeeper")?
+            .map_err(failure::err_msg)?;
+        servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .just_exec(&["sudo", "rm", "-rf", "/var/lib/zookeeper/version-2"])
+            .context("wipe zookeeper")?
+            .map_err(failure::err_msg)?;
+        servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .just_exec(&["sudo", "systemctl", "start", "zookeeper"])
+            .context("start zookeeper")?
+            .map_err(failure::err_msg)?;
 
-            // wait for zookeeper to be running
-            let start = time::Instant::now();
-            while servers[0]
-                .ssh
-                .as_ref()
-                .unwrap()
-                .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
-                .is_err()
-            {
-                thread::sleep(time::Duration::from_secs(1));
-                if start.elapsed() > time::Duration::from_secs(30) {
-                    bail!("zookeeper wouldn't start");
-                }
+        // wait for zookeeper to be running
+        let start = time::Instant::now();
+        while servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .just_exec(&["echo", "-n", ">", "/dev/tcp/127.0.0.1/2181"])?
+            .is_err()
+        {
+            thread::sleep(time::Duration::from_secs(1));
+            if start.elapsed() > time::Duration::from_secs(30) {
+                bail!("zookeeper wouldn't start");
             }
+        }
 
-            // start all souplets
-            // TODO: should we worry about the running directory being on an SSD here?
-            let base_cmd: Vec<_> = {
-                let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
-                    .into_iter()
-                    .map(|&s| s.into())
-                    .collect();
-                cmd.extend(vec![
-                    "env".into(),
-                    "RUST_BACKTRACE=1".into(),
-                    "target/release/souplet".into(),
-                    "--durability".into(),
-                    "memory".into(),
-                    "--shards".into(),
-                    nshards.clone().into(),
-                    "--deployment".into(),
-                    "votebench".into(),
-                    "--zookeeper".into(),
-                    zookeeper_addr.clone(),
-                    "-w".into(),
-                    format!("{}", shards).into(),
-                    "-r".into(),
-                    format!("{}", scores - shards).into(),
-                ]);
-                cmd
-            };
-
-            let souplets: Result<Vec<_>, _> = servers
-                .iter()
-                .map(|s| {
-                    let mut cmd = base_cmd.clone();
-                    cmd.push("--address".into());
-                    cmd.push(Cow::Borrowed(&s.private_ip));
-                    let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
-                    s.ssh.as_ref().unwrap().exec(&cmd[..])
-                })
+        // start all souplets
+        // TODO: should we worry about the running directory being on an SSD here?
+        let base_cmd: Vec<_> = {
+            let mut cmd: Vec<Cow<str>> = ["cd", "distributary", "&&"]
+                .into_iter()
+                .map(|&s| s.into())
                 .collect();
-            let souplets = souplets?;
-
-            // wait a little while for all the souplets to have joined together
-            thread::sleep(time::Duration::from_secs(10));
-
-            // --------------------------------------------------------------------------------
-
-            // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
-            // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
-            // otherwise we're severely underutilizing the client machines.
-            let threads = format!("{}", (ccores + for_gen - 1) / for_gen).into();
-            let base_cmd = vec![
-                "cd".into(),
-                "distributary".into(),
-                "&&".into(),
+            cmd.extend(vec![
                 "env".into(),
                 "RUST_BACKTRACE=1".into(),
-                "target/release/vote".into(),
-                "--threads".into(),
-                threads,
-                "--articles".into(),
-                format!("{}", articles).into(),
-            ];
-            let tail_cmd = vec![
-                "netsoup".into(),
+                "target/release/souplet".into(),
+                "--durability".into(),
+                "memory".into(),
+                "--shards".into(),
+                nshards.clone().into(),
                 "--deployment".into(),
                 "votebench".into(),
                 "--zookeeper".into(),
-                zookeeper_addr,
-            ];
+                zookeeper_addr.clone(),
+                "-w".into(),
+                format!("{}", shards).into(),
+                "-r".into(),
+                format!("{}", scores - shards).into(),
+            ]);
+            cmd
+        };
 
-            // --------------------------------------------------------------------------------
+        let souplets: Result<Vec<_>, _> = servers
+            .iter()
+            .map(|s| {
+                let mut cmd = base_cmd.clone();
+                cmd.push("--address".into());
+                cmd.push(Cow::Borrowed(&s.private_ip));
+                let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
+                s.ssh.as_ref().unwrap().exec(&cmd[..])
+            })
+            .collect();
+        let souplets = souplets?;
 
-            // prime
-            eprintln!(
-                " -> priming from {} @ {}",
-                clients[0].public_dns,
-                chrono::Local::now().time()
-            );
+        // wait a little while for all the souplets to have joined together
+        thread::sleep(time::Duration::from_secs(10));
 
-            {
-                let mut c = vote!(
-                    clients[0].ssh.as_ref().unwrap(),
-                    vec!["-r", "0", "--warmup", "0"],
-                    base_cmd,
-                    tail_cmd
-                )?;
-                let mut stderr = String::new();
-                c.stderr().read_to_string(&mut stderr)?;
-                c.wait_eof()?;
-                if c.exit_status()? != 0 {
-                    bail!("failed to populate:\n{}", stderr);
-                }
+        // --------------------------------------------------------------------------------
+
+        // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
+        // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
+        // otherwise we're severely underutilizing the client machines.
+        let threads = format!("{}", (ccores + for_gen - 1) / for_gen).into();
+        let base_cmd = vec![
+            "cd".into(),
+            "distributary".into(),
+            "&&".into(),
+            "env".into(),
+            "RUST_BACKTRACE=1".into(),
+            "target/release/vote".into(),
+            "--threads".into(),
+            threads,
+            "--articles".into(),
+            format!("{}", articles).into(),
+        ];
+        let tail_cmd = vec![
+            "netsoup".into(),
+            "--deployment".into(),
+            "votebench".into(),
+            "--zookeeper".into(),
+            zookeeper_addr,
+        ];
+
+        // --------------------------------------------------------------------------------
+
+        // prime
+        eprintln!(
+            " -> priming from {} @ {}",
+            clients[0].public_dns,
+            chrono::Local::now().time()
+        );
+
+        {
+            let mut c = vote!(
+                clients[0].ssh.as_ref().unwrap(),
+                vec!["-r", "0", "--warmup", "0"],
+                base_cmd,
+                tail_cmd
+            )?;
+            let mut stderr = String::new();
+            c.stderr().read_to_string(&mut stderr)?;
+            c.wait_eof()?;
+            if c.exit_status()? != 0 {
+                bail!("failed to populate:\n{}", stderr);
             }
-
-            // --------------------------------------------------------------------------------
-
-            let write_every = match read_percentage {
-                0 => 1,
-                100 => {
-                    // very rare
-                    2_000_000_000
-                }
-                n => {
-                    // 95 (%) == 1 in 20
-                    // we want a whole number x such that 1-1/x ~= n/100
-                    // so x - 1 = nx/100
-                    // so x - nx/100 = 1
-                    // so (1 - n/100) x = 1
-                    // so x = 1 / (1 - n/100)
-                    // so 1 / (100 - n)/100
-                    // so 100 / (100 - n)
-                    let div = 100usize.checked_sub(n).expect("percentage >= 100");
-                    if 100 % div != 0 {
-                        panic!("{}% cannot be expressed as 1 in n", n);
-                    }
-                    100 / div
-                }
-            };
-
-            let voters: Result<Vec<_>, _> = clients
-                .iter()
-                .map(|c| {
-                    eprintln!(" -> starting client on {}", c.public_dns);
-                    vote!(
-                        c.ssh.as_ref().unwrap(),
-                        vec![
-                            format!("--no-prime"),
-                            format!("-r"),
-                            format!("{}", runtime),
-                            format!("--warmup"),
-                            format!("{}", warmup),
-                            format!("-d"),
-                            format!("{}", if skewed { "skewed" } else { "uniform" }),
-                            format!("--write-every"),
-                            format!("{}", write_every),
-                            format!("--target"),
-                            format!("{}", target_per_client),
-                        ],
-                        base_cmd,
-                        tail_cmd
-                    )
-                })
-                .collect();
-            let voters = voters?;
-
-            // let's see how we did
-            let mut outf = File::create(&format!(
-                "vote-distributed-{}s.{}a.{}r.{}.{}t.{}h.log",
-                shards,
-                articles,
-                read_percentage,
-                if skewed { "skewed" } else { "uniform" },
-                nclients as usize * target_per_client,
-                nservers,
-            ))?;
-
-            eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
-            for (i, mut chan) in voters.into_iter().enumerate() {
-                let mut stdout = String::new();
-                chan.read_to_string(&mut stdout)?;
-                let mut stderr = String::new();
-                chan.stderr().read_to_string(&mut stderr)?;
-
-                chan.wait_eof()?;
-                chan.wait_close()?;
-
-                if chan.exit_status()? != 0 {
-                    eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
-                    eprintln!("{}", stderr);
-                } else if !stderr.is_empty() {
-                    eprintln!("{} reported:", clients[i].public_dns);
-                    let stderr = stderr.trim_right().replace('\n', "\n > ");
-                    eprintln!(" > {}", stderr);
-                }
-
-                // TODO: should we get histogram files here instead and merge them?
-                outf.write_all(stdout.as_bytes())?;
-            }
-
-            // --------------------------------------------------------------------------------
-
-            for (i, mut souplet) in souplets.into_iter().enumerate() {
-                let killed = servers[i].ssh.as_ref().unwrap().just_exec(&[
-                    "pkill",
-                    "-f",
-                    "target/release/souplet",
-                ])?;
-
-                if !killed.is_ok() {
-                    let mut stdout = String::new();
-                    let mut stderr = String::new();
-                    souplet.stderr().read_to_string(&mut stderr)?;
-                    souplet.read_to_string(&mut stdout)?;
-                    println!("souplet died");
-                    println!("{}", stdout.trim_right().replace('\n', "\n >> "));
-                    println!("{}", stderr.trim_right().replace('\n', "\n !> "));
-                }
-
-                souplet.wait_eof()?;
-                souplet.wait_close()?;
-            }
-
-            // also stop zookeeper
-            servers[0]
-                .ssh
-                .as_ref()
-                .unwrap()
-                .just_exec(&["sudo", "systemctl", "stop", "zookeeper"])
-                .context("stop zookeeper")?
-                .map_err(failure::err_msg)?;
         }
 
         // --------------------------------------------------------------------------------
 
-        if backends.contains(&Backend::Timely) {
-            // write out hosts files
-            let hosts_file = servers
-                .iter()
-                .map(|s| format!("{}:1234", s.private_ip))
-                .collect::<Vec<_>>()
-                .join("\n");
-            for s in &servers {
-                let mut c = s.ssh.as_ref().unwrap().exec(&["cat", ">", "hosts"])?;
-                c.write_all(hosts_file.as_bytes())?;
-                c.flush()?;
+        let write_every = match read_percentage {
+            0 => 1,
+            100 => {
+                // very rare
+                2_000_000_000
             }
-
-            let base_cmd = vec![
-                "env".into(),
-                "RUST_BACKTRACE=1".into(),
-                "eintopf/target/release/eintopf".into(),
-                "--workers".into(),
-                nshards.into(),
-            ];
-
-            let eintopfs: Result<Vec<_>, _> = servers
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    eprintln!(" -> starting eintopf on {}", s.public_dns);
-                    let tail_cmd = vec![
-                        "--timely-cluster".into(),
-                        format!("-h hosts -n {} -p {}", nservers, i).into(),
-                    ];
-                    vote!(
-                        s.ssh.as_ref().unwrap(),
-                        vec![
-                            format!("-r"),
-                            format!("{}", runtime),
-                            format!("-d"),
-                            format!("{}", if skewed { "skewed" } else { "uniform" }),
-                            //format!("--write-every"),
-                            //format!("{}", write_every),
-                        ],
-                        base_cmd,
-                        tail_cmd
-                    )
-                })
-                .collect();
-            let eintopfs = eintopfs?;
-
-            // let's see how we did
-            let mut outf = File::create(&format!(
-                "eintopf-{}s.{}a.{}r.{}.{}t.{}h.log",
-                shards,
-                articles,
-                read_percentage,
-                if skewed { "skewed" } else { "uniform" },
-                nclients as usize * target_per_client,
-                nservers,
-            ))?;
-
-            eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
-            for (i, mut chan) in eintopfs.into_iter().enumerate() {
-                let mut stdout = String::new();
-                chan.read_to_string(&mut stdout)?;
-                let mut stderr = String::new();
-                chan.stderr().read_to_string(&mut stderr)?;
-
-                chan.wait_eof()?;
-                chan.wait_close()?;
-
-                if chan.exit_status()? != 0 {
-                    eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
-                    eprintln!("{}", stderr);
-                } else if !stderr.is_empty() {
-                    eprintln!("{} reported:", clients[i].public_dns);
-                    let stderr = stderr.trim_right().replace('\n', "\n > ");
-                    eprintln!(" > {}", stderr);
+            n => {
+                // 95 (%) == 1 in 20
+                // we want a whole number x such that 1-1/x ~= n/100
+                // so x - 1 = nx/100
+                // so x - nx/100 = 1
+                // so (1 - n/100) x = 1
+                // so x = 1 / (1 - n/100)
+                // so 1 / (100 - n)/100
+                // so 100 / (100 - n)
+                let div = 100usize.checked_sub(n).expect("percentage >= 100");
+                if 100 % div != 0 {
+                    panic!("{}% cannot be expressed as 1 in n", n);
                 }
-
-                outf.write_all(stdout.as_bytes())?;
+                100 / div
             }
+        };
+
+        let voters: Result<Vec<_>, _> = clients
+            .iter()
+            .map(|c| {
+                eprintln!(" -> starting client on {}", c.public_dns);
+                vote!(
+                    c.ssh.as_ref().unwrap(),
+                    vec![
+                        format!("--no-prime"),
+                        format!("-r"),
+                        format!("{}", runtime),
+                        format!("--warmup"),
+                        format!("{}", warmup),
+                        format!("-d"),
+                        format!("{}", if skewed { "skewed" } else { "uniform" }),
+                        format!("--write-every"),
+                        format!("{}", write_every),
+                        format!("--target"),
+                        format!("{}", target_per_client),
+                    ],
+                    base_cmd,
+                    tail_cmd
+                )
+            })
+            .collect();
+        let voters = voters?;
+
+        // let's see how we did
+        let mut outf = File::create(&format!(
+            "vote-distributed-{}s.{}a.{}r.{}.{}t.{}h.log",
+            shards,
+            articles,
+            read_percentage,
+            if skewed { "skewed" } else { "uniform" },
+            nclients as usize * target_per_client,
+            nservers,
+        ))?;
+
+        eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
+        for (i, mut chan) in voters.into_iter().enumerate() {
+            let mut stdout = String::new();
+            chan.read_to_string(&mut stdout)?;
+            let mut stderr = String::new();
+            chan.stderr().read_to_string(&mut stderr)?;
+
+            chan.wait_eof()?;
+            chan.wait_close()?;
+
+            if chan.exit_status()? != 0 {
+                eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
+                eprintln!("{}", stderr);
+            } else if !stderr.is_empty() {
+                eprintln!("{} reported:", clients[i].public_dns);
+                let stderr = stderr.trim_right().replace('\n', "\n > ");
+                eprintln!(" > {}", stderr);
+            }
+
+            // TODO: should we get histogram files here instead and merge them?
+            outf.write_all(stdout.as_bytes())?;
         }
+
+        // --------------------------------------------------------------------------------
+
+        for (i, mut souplet) in souplets.into_iter().enumerate() {
+            let killed = servers[i].ssh.as_ref().unwrap().just_exec(&[
+                "pkill",
+                "-f",
+                "target/release/souplet",
+            ])?;
+
+            if !killed.is_ok() {
+                let mut stdout = String::new();
+                let mut stderr = String::new();
+                souplet.stderr().read_to_string(&mut stderr)?;
+                souplet.read_to_string(&mut stdout)?;
+                println!("souplet died");
+                println!("{}", stdout.trim_right().replace('\n', "\n >> "));
+                println!("{}", stderr.trim_right().replace('\n', "\n !> "));
+            }
+
+            souplet.wait_eof()?;
+            souplet.wait_close()?;
+        }
+
+        // also stop zookeeper
+        servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .just_exec(&["sudo", "systemctl", "stop", "zookeeper"])
+            .context("stop zookeeper")?
+            .map_err(failure::err_msg)?;
 
         Ok(())
     }).unwrap();
