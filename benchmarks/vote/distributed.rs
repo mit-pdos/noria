@@ -593,20 +593,25 @@ fn run_one(
         // --------------------------------------------------------------------------------
 
         if backends.contains(&Backend::Timely) {
-            let base_cmd: Vec<_> = {
-                let mut cmd: Vec<Cow<str>> = ["cd", "eintopf", "&&"]
-                    .into_iter()
-                    .map(|&s| s.into())
-                    .collect();
-                cmd.extend(vec![
-                    "env".into(),
-                    "RUST_BACKTRACE=1".into(),
-                    "target/release/eintopf".into(),
-                    "--workers".into(),
-                    nshards.into(),
-                ]);
-                cmd
-            };
+            // write out hosts files
+            let hosts_file = servers
+                .iter()
+                .map(|s| format!("{}:1234", s.private_ip))
+                .collect::<Vec<_>>()
+                .join("\n");
+            for s in &servers {
+                let c = s.ssh.as_ref().unwrap().exec("cat > hosts")?;
+                c.write_all(hosts_file.as_bytes())?;
+                c.flush()?;
+            }
+
+            let base_cmd = vec![
+                "env".into(),
+                "RUST_BACKTRACE=1".into(),
+                "eintopf/target/release/eintopf".into(),
+                "--workers".into(),
+                nshards.into(),
+            ];
 
             let eintopfs: Result<Vec<_>, _> = servers
                 .iter()
@@ -614,10 +619,9 @@ fn run_one(
                 .map(|(i, s)| {
                     eprintln!(" -> starting eintopf on {}", s.public_dns);
                     let tail_cmd = vec![
-                        format!("--timely-cluster '-h hosts -n {} -p {}", nservers, i).into(),
+                        "--timely-cluster".into(),
+                        format!("-h hosts -n {} -p {}", nservers, i).into(),
                     ];
-                    // TODO: write to hosts file
-                    //cmd.push(Cow::Borrowed(&s.private_ip));
                     vote!(
                         s.ssh.as_ref().unwrap(),
                         vec![
@@ -634,9 +638,6 @@ fn run_one(
                 })
                 .collect();
             let eintopfs = eintopfs?;
-
-            // wait a little while for all the souplets to have joined together
-            thread::sleep(time::Duration::from_secs(10));
 
             // let's see how we did
             let mut outf = File::create(&format!(
@@ -668,7 +669,6 @@ fn run_one(
                     eprintln!(" > {}", stderr);
                 }
 
-                // TODO: should we get histogram files here instead and merge them?
                 outf.write_all(stdout.as_bytes())?;
             }
         }
