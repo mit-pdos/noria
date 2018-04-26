@@ -600,7 +600,7 @@ fn run_one(
                 .collect::<Vec<_>>()
                 .join("\n");
             for s in &servers {
-                let c = s.ssh.as_ref().unwrap().exec("cat > hosts")?;
+                let mut c = s.ssh.as_ref().unwrap().exec(&["cat", ">", "hosts"])?;
                 c.write_all(hosts_file.as_bytes())?;
                 c.flush()?;
             }
