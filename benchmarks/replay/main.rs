@@ -6,10 +6,10 @@ extern crate itertools;
 extern crate rand;
 
 use std::fs;
-use std::time::{Duration, Instant};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
 use hdrhistogram::Histogram;
@@ -26,6 +26,20 @@ const BATCH_SIZE: usize = 10000;
 const RECIPE: &str = "
 CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, PRIMARY KEY(id));
 QUERY ReadRow: SELECT * FROM TableRow WHERE id = ?;
+";
+
+const SECONDARY_RECIPE: &str = "
+CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, PRIMARY KEY(id));
+QUERY ReadRow: SELECT * FROM TableRow WHERE id = ?;
+QUERY query_c1: SELECT * FROM TableRow WHERE c1 = ?;
+QUERY query_c2: SELECT * FROM TableRow WHERE c2 = ?;
+QUERY query_c3: SELECT * FROM TableRow WHERE c3 = ?;
+QUERY query_c4: SELECT * FROM TableRow WHERE c4 = ?;
+QUERY query_c5: SELECT * FROM TableRow WHERE c5 = ?;
+QUERY query_c6: SELECT * FROM TableRow WHERE c6 = ?;
+QUERY query_c7: SELECT * FROM TableRow WHERE c7 = ?;
+QUERY query_c8: SELECT * FROM TableRow WHERE c8 = ?;
+QUERY query_c9: SELECT * FROM TableRow WHERE c9 = ?;
 ";
 
 fn build_graph(
@@ -45,13 +59,8 @@ fn build_graph(
     builder.build(authority)
 }
 
-fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, verbose: bool) {
+fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64) {
     let mut mutator = g.get_mutator("TableRow").unwrap();
-
-    // prepopulate
-    if verbose {
-        eprintln!("Populating with {} rows", rows);
-    }
 
     (0..rows)
         .map(|i| {
@@ -66,10 +75,12 @@ fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, verbose: bo
         });
 }
 
+// Synchronously read `reads` times, where each read should trigger a full replay from the base.
 fn perform_reads(
     g: &mut ControllerHandle<ZookeeperAuthority>,
     reads: i64,
     rows: i64,
+    use_secondary: bool,
     verbose: bool,
 ) {
     if verbose {
@@ -77,13 +88,31 @@ fn perform_reads(
     }
 
     let mut hist = Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap();
-    let mut getter = g.get_getter("ReadRow").unwrap();
-
     let mut rng = rand::thread_rng();
     let row_ids = rand::seq::sample_iter(&mut rng, 0..rows, reads as usize).unwrap();
-    // Synchronously read `reads` times, where each read should trigger a full replay from the base.
+    if use_secondary {
+        perform_secondary_reads(g, &mut hist, row_ids);
+    } else {
+        perform_primary_reads(g, &mut hist, row_ids);
+    }
+
+    println!("# read {} of {} rows", reads, rows);
+    println!("read\t50\t{:.2}\t(all µs)", hist.value_at_quantile(0.5));
+    println!("read\t95\t{:.2}\t(all µs)", hist.value_at_quantile(0.95));
+    println!("read\t99\t{:.2}\t(all µs)", hist.value_at_quantile(0.99));
+    println!("read\t100\t{:.2}\t(all µs)", hist.max());
+}
+
+// Reads every row with the primary key index.
+fn perform_primary_reads(
+    g: &mut ControllerHandle<ZookeeperAuthority>,
+    hist: &mut Histogram<u64>,
+    row_ids: Vec<i64>,
+) {
+    let mut getter = g.get_getter("ReadRow").unwrap();
+
     for i in row_ids {
-        let id: DataType = (i as i64).into();
+        let id: DataType = DataType::BigInt(i);
         let start = Instant::now();
         let rs = getter.lookup(&[id], true).unwrap();
         let elapsed = start.elapsed();
@@ -98,12 +127,37 @@ fn perform_reads(
             hist.record(m).unwrap();
         }
     }
+}
 
-    println!("# read {} of {} rows", reads, rows);
-    println!("read\t50\t{:.2}\t(all µs)", hist.value_at_quantile(0.5));
-    println!("read\t95\t{:.2}\t(all µs)", hist.value_at_quantile(0.95));
-    println!("read\t99\t{:.2}\t(all µs)", hist.value_at_quantile(0.99));
-    println!("read\t100\t{:.2}\t(all µs)", hist.max());
+// Reads each row from one of the secondary indices.
+fn perform_secondary_reads(
+    g: &mut ControllerHandle<ZookeeperAuthority>,
+    hist: &mut Histogram<u64>,
+    row_ids: Vec<i64>,
+) {
+    let indices = 10;
+    let mut getters: Vec<_> = (1..indices)
+        .map(|i| g.get_getter(&format!("query_c{}", i)).unwrap())
+        .collect();
+
+    for i in row_ids {
+        let id: DataType = DataType::BigInt(i);
+        let start = Instant::now();
+        // Pick an arbitrary secondary index to use:
+        let getter = &mut getters[i as usize % (indices - 1)];
+        let rs = getter.lookup(&[id], true).unwrap();
+        let elapsed = start.elapsed();
+        let us = elapsed.as_secs() * 1_000_000 + elapsed.subsec_nanos() as u64 / 1_000;
+        assert_eq!(rs.len(), 1);
+        for j in 0..10 {
+            assert_eq!(DataType::BigInt(i), rs[0][j]);
+        }
+
+        if hist.record(us).is_err() {
+            let m = hist.high();
+            hist.record(m).unwrap();
+        }
+    }
 }
 
 fn main() {
@@ -122,6 +176,11 @@ fn main() {
                 .long("reads")
                 .default_value("10000")
                 .help("Number of rows to read while benchmarking"),
+        )
+        .arg(
+            Arg::with_name("secondary-indices")
+                .long("secondary-indices")
+                .help("Read from secondary indices."),
         )
         .arg(
             Arg::with_name("log-dir")
@@ -186,6 +245,7 @@ fn main() {
 
     let verbose = args.is_present("verbose");
     let durable = args.is_present("durability");
+    let use_secondary = args.is_present("secondary-indices");
     let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
 
     let mut persistence = PersistenceParameters::default();
@@ -208,14 +268,22 @@ fn main() {
 
     if !args.is_present("use-existing-data") {
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
-        g.install_recipe(RECIPE.to_owned()).unwrap();
+        if use_secondary {
+            g.install_recipe(SECONDARY_RECIPE.to_owned()).unwrap();
+        } else {
+            g.install_recipe(RECIPE.to_owned()).unwrap();
+        }
+
+        if verbose {
+            eprintln!("Populating with {} rows", rows);
+        }
 
         // Prepopulate with n rows:
-        populate(&mut g, rows, verbose);
+        populate(&mut g, rows);
 
         // In memory-only mode we don't want to recover, just read right away:
         if !durable {
-            perform_reads(&mut g, reads, rows, verbose);
+            perform_reads(&mut g, reads, rows, use_secondary, verbose);
             return;
         }
     }
@@ -226,7 +294,7 @@ fn main() {
     Command::new("sync")
         .spawn()
         .expect("Failed clearing disk buffers");
-    perform_reads(&mut g, reads, rows, verbose);
+    perform_reads(&mut g, reads, rows, use_secondary, verbose);
 
     // Remove any log/database files:
     if !args.is_present("retain-logs-on-exit") {
