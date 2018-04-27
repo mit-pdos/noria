@@ -75,13 +75,6 @@ fn main() {
                 .help("Number of server machines to spawn with a scale of 1"),
         )
         .arg(
-            Arg::with_name("shards")
-                .long("shards")
-                .required(true)
-                .takes_value(true)
-                .help("Number of shards per machine"),
-        )
-        .arg(
             Arg::with_name("scales")
                 .index(1)
                 .multiple(true)
@@ -128,11 +121,7 @@ fn main() {
 fn run_one(args: &clap::ArgMatches, nservers: u32) {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
-    let shards = value_t_or_exit!(args, "shards", u16);
     let articles = value_t_or_exit!(args, "articles", usize);
-
-    let nshards = format!("{}", nservers * shards as u32);
-    eprintln!("--> running with {} shards total", nshards);
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::new(
@@ -198,13 +187,13 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
                     "RUST_BACKTRACE=1".into(),
                     "eintopf/target/release/eintopf".into(),
                     "--workers".into(),
-                    format!("{}", shards).into(),
+                    "8".into(),
                     "-a".into(),
                     format!("{}", articles).into(),
                     "-r".into(),
                     format!("{}", runtime).into(),
                     "-d".into(),
-                    if skewed { "skewed" } else { "uniform" }.into(),
+                    if skewed { "zipf:1.08" } else { "uniform" }.into(),
                     "-h".into(),
                     "hosts".into(),
                     "-p".into(),
@@ -218,8 +207,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
 
         // let's see how we did
         let mut outf = File::create(&format!(
-            "eintopf-{}s.{}.{}h.log",
-            shards,
+            "eintopf-8s.{}.{}h.log",
             if skewed { "skewed" } else { "uniform" },
             nservers,
         ))?;
