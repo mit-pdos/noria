@@ -31,7 +31,7 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
-const MAX_BATCH_TIME_US: u32 = 1000;
+const MAX_BATCH_TIME_US: u32 = 2500;
 
 mod clients;
 use clients::{Parameters, VoteClient, VoteClientConstructor};
