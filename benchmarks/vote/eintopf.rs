@@ -187,7 +187,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
                     "RUST_BACKTRACE=1".into(),
                     "eintopf/target/release/eintopf".into(),
                     "--workers".into(),
-                    "8".into(),
+                    "12".into(),
                     "-a".into(),
                     format!("{}", articles).into(),
                     "-r".into(),
@@ -207,7 +207,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
 
         // let's see how we did
         let mut outf = File::create(&format!(
-            "eintopf-8s.{}.{}h.log",
+            "eintopf-12s.{}.{}h.log",
             if skewed { "skewed" } else { "uniform" },
             nservers,
         ))?;
