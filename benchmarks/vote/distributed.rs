@@ -253,7 +253,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             /* same as above
             eprintln!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])
-                .context("git pull souplet")?
+                .context("git pull distributary")?
                 .map_err(failure::err_msg)?;
             host.just_exec(&[
                 "cd",
@@ -266,7 +266,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 "benchmarks/Cargo.toml",
                 "--bin",
                 "vote",
-            ]).context("build souplet")?
+            ]).context("build vote")?
                 .map_err(failure::err_msg)?;
             */
             Ok(())
