@@ -101,7 +101,7 @@ fn main() {
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
-                .default_value("6")
+                .default_value("1")
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn with a scale of 1"),
@@ -117,7 +117,7 @@ fn main() {
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
-                .default_value("1000000")
+                .default_value("6000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
         )
@@ -190,7 +190,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
     );
 
     // guess the core counts
-    let for_gen = ((target_per_client + (1_000_000 - 1)) / 1_000_000) as u16;
+    let for_gen = ((target_per_client + (3_000_000 - 1)) / 3_000_000) as u16;
     let ccores = args.value_of("ctype")
         .and_then(ec2_instance_type_cores)
         .map(|cores| {
@@ -412,7 +412,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
         // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
         // otherwise we're severely underutilizing the client machines.
-        let threads = format!("{}", (ccores + for_gen - 1) / for_gen).into();
+        let threads = format!("{}", 2 * (ccores - for_gen)).into();
         let base_cmd = vec![
             "cd".into(),
             "distributary".into(),
