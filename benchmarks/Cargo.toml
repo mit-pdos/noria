@@ -1,3 +1,5 @@
+cargo-features = ["rename-dependency"]
+
 [package]
 name = "benchmarks"
 version = "0.0.1"
@@ -45,6 +47,9 @@ tsunami = "0.5.10"
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"
+
+# for cpupool
+fut20 = { version = "0.2", package = "futures" }
 
 [[bin]]
 name = "bank"

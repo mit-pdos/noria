@@ -26,8 +26,12 @@ pub(crate) trait VoteClient {
 }
 
 impl VoteClient for () {
-    fn handle_reads(&mut self, _: &[i32]) {}
-    fn handle_writes(&mut self, _: &[i32]) {}
+    fn handle_reads(&mut self, _: &[i32]) {
+        ::std::thread::sleep(::time::Duration::from_micros(300));
+    }
+    fn handle_writes(&mut self, _: &[i32]) {
+        ::std::thread::sleep(::time::Duration::from_micros(200));
+    }
 }
 
 pub(crate) mod hybrid;

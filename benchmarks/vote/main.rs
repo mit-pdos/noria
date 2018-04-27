@@ -3,17 +3,18 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
+extern crate fut20;
 extern crate futures;
 extern crate futures_state_stream;
 extern crate hdrhistogram;
 extern crate memcached;
 extern crate mysql;
 extern crate rand;
-extern crate rayon;
 extern crate tiberius;
 extern crate tokio_core;
 extern crate zipf;
 
+use fut20::executor::{Executor, ThreadPool};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use std::cell::RefCell;
@@ -41,7 +42,7 @@ where
 {
     // zipf takes ~66ns to generate a random number depending on the CPU,
     // so each load generator cannot reasonably generate much more than ~1M reqs/s.
-    let per_generator = 1_000_000;
+    let per_generator = 3_000_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
     let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
     target /= ngen as f64;
@@ -85,47 +86,50 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
-    let finished = Arc::new(Barrier::new(nthreads * ngen + ngen));
+    let finished = Arc::new(Barrier::new(nthreads + ngen));
 
     let cc = Arc::new(Mutex::new(CC::new(&params, local_args)));
+    let pool = {
+        let ts = (
+            sjrn_w_t.clone(),
+            sjrn_r_t.clone(),
+            rmt_w_t.clone(),
+            rmt_r_t.clone(),
+            finished.clone(),
+        );
+
+        let cc = cc.clone();
+        ThreadPool::builder()
+            .pool_size(nthreads)
+            .name_prefix("client-")
+            .after_start(move |_| {
+                CLIENT.with(|c| {
+                    *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
+                })
+            })
+            .before_stop(move |_| {
+                SJRN_W
+                    .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                SJRN_R
+                    .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                RMT_W
+                    .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                RMT_R
+                    .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                ts.4.wait();
+            })
+            .create()
+            .unwrap()
+    };
+
     let start = time::Instant::now();
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
-            let ts = (
-                sjrn_w_t.clone(),
-                sjrn_r_t.clone(),
-                rmt_w_t.clone(),
-                rmt_r_t.clone(),
-                finished.clone(),
-            );
-
-            let cc = cc.clone();
-            let pool = rayon::ThreadPoolBuilder::new()
-                .thread_name(move |i| format!("client-{}.{}", geni, i))
-                .num_threads(nthreads)
-                .start_handler(move |_| {
-                    CLIENT.with(|c| {
-                        *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
-                    })
-                })
-                .exit_handler(move |_| {
-                    SJRN_W
-                        .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
-                        .unwrap();
-                    SJRN_R
-                        .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
-                        .unwrap();
-                    RMT_W
-                        .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
-                        .unwrap();
-                    RMT_R
-                        .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
-                        .unwrap();
-                    ts.4.wait();
-                })
-                .build()
-                .unwrap();
-
+            let pool = pool.clone();
             let finished = finished.clone();
             let global_args = global_args.clone();
 
@@ -159,13 +163,25 @@ where
         })
         .collect();
 
-    let ops: usize = generators.into_iter().map(|gen| gen.join().unwrap()).sum();
+    drop(pool);
+    let mut ops = 0;
+    let mut wops = 0;
+    for gen in generators {
+        let (gen, completed) = gen.join().unwrap();
+        ops += gen;
+        wops += completed;
+    }
+    drop(cc);
 
     // all done!
     let took = start.elapsed();
     println!(
-        "# actual ops/s: {:.2}",
+        "# generated ops/s: {:.2}",
         ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
+    );
+    println!(
+        "# actual ops/s: {:.2}",
+        wops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
     );
     println!("# op\tpct\tsojourn\tremote");
 
@@ -234,12 +250,12 @@ where
 }
 
 fn run_generator<R>(
-    pool: rayon::ThreadPool,
+    mut pool: ThreadPool,
     mut id_rng: R,
     finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
-) -> usize
+) -> (usize, usize)
 where
     R: rand::distributions::Sample<usize>,
 {
@@ -257,7 +273,6 @@ where
     let ndone = atomic::AtomicUsize::new(0);
 
     let mut ops = 0;
-    let mut enqueued = 0;
 
     let first = time::Instant::now();
     let mut next = time::Instant::now();
@@ -283,11 +298,12 @@ where
     let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
 
     let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-        move || {
+        move |_: &mut fut20::task::Context| {
             CLIENT.with(|c| {
                 let mut c = c.borrow_mut();
                 let client = c.as_mut().unwrap();
 
+                let n = keys.len();
                 let sent = time::Instant::now();
                 if write {
                     client.handle_writes(&keys[..]);
@@ -298,7 +314,7 @@ where
                     client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();
-                ndone.fetch_add(1, atomic::Ordering::AcqRel);
+                ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
                 if sent.duration_since(start) > warmup {
                     let remote_t = done.duration_since(sent);
@@ -327,10 +343,13 @@ where
                         });
                     }
                 }
+
+                Ok(())
             })
         }
     };
 
+    let mut worker_ops = None;
     while next < end {
         let now = time::Instant::now();
         // NOTE: while, not if, in case we start falling behind
@@ -367,22 +386,20 @@ where
 
                 if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
                     ops += queued_w.len();
-                    enqueued += 1;
-                    pool.spawn(enqueue(
+                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
                         queued_w.split_off(0),
                         queued_w_keys.split_off(0),
                         true,
-                    ));
+                    )))).unwrap();
                 }
 
                 if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
                     ops += queued_r.len();
-                    enqueued += 1;
-                    pool.spawn(enqueue(
+                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
                         queued_r.split_off(0),
                         queued_r_keys.split_off(0),
                         false,
-                    ));
+                    )))).unwrap();
                 }
 
                 // since next_send = Some, we better have sent at least one batch!
@@ -401,22 +418,28 @@ where
                 // we instead need to stop issuing requests earlier than we otherwise would
                 // have. but make sure we're not still in the warmup phase, because the clients
                 // *could* speed up
-                if early_exit && now < end && now.duration_since(start) > warmup {
-                    let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
-                    let queued = enqueued as u64 - clients_completed;
-                    let dur = first.elapsed().as_secs();
+                if now.duration_since(start) > warmup {
+                    if worker_ops.is_none() {
+                        worker_ops = Some(ndone.load(atomic::Ordering::Acquire));
+                    }
 
-                    if dur > 0 {
-                        let client_rate = clients_completed / dur;
-                        if client_rate > 0 {
-                            let client_work_left = queued / client_rate;
-                            if client_work_left > (end - now).as_secs() + 1 {
-                                // no point in continuing to feed work to the clients
-                                // they have enough work to keep them busy until the end
-                                eprintln!(
+                    if early_exit && now < end {
+                        let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
+                        let queued = ops as u64 - clients_completed;
+                        let dur = first.elapsed().as_secs();
+
+                        if dur > 0 {
+                            let client_rate = clients_completed / dur;
+                            if client_rate > 0 {
+                                let client_work_left = queued / client_rate;
+                                if client_work_left > (end - now).as_secs() + 1 {
+                                    // no point in continuing to feed work to the clients
+                                    // they have enough work to keep them busy until the end
+                                    eprintln!(
                                     "load generator quitting early as clients are falling behind"
                                 );
-                                break;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -427,11 +450,13 @@ where
         atomic::spin_loop_hint();
     }
 
+    let worker_ops = worker_ops.map(|start| ndone.load(atomic::Ordering::Acquire) - start);
+
     // need to drop the pool before waiting so that workers will exit
     // and thus hit the barrier
     drop(pool);
     finished.wait();
-    ops
+    (ops, worker_ops.unwrap_or(0))
 }
 
 fn main() {
