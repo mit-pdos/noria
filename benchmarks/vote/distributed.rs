@@ -46,14 +46,14 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("60")
+                .default_value("40")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("10")
+                .default_value("20")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
         )
@@ -117,7 +117,7 @@ fn main() {
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
-                .default_value("6000000")
+                .default_value("5000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
         )
@@ -143,7 +143,7 @@ fn main() {
 
     // init lots of machines in parallel
     rayon::ThreadPoolBuilder::new()
-        .num_threads(100)
+        .num_threads(20)
         .build_global()
         .unwrap();
 
