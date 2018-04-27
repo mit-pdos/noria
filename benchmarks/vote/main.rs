@@ -1,4 +1,5 @@
 #![deny(unused_extern_crates)]
+#![feature(duration_from_micros)]
 
 #[macro_use]
 extern crate clap;
