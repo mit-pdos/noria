@@ -30,7 +30,7 @@ fn main() {
 
     let args = App::new("eintof-distributed")
         .version("0.1")
-        .about("Orchestrate runs of the distributed eitopf benchmark")
+        .about("Orchestrate runs of the distributed eintopf benchmark")
         .arg(
             Arg::with_name("articles")
                 .short("a")
@@ -157,14 +157,14 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
         "server",
         nservers,
         tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |host| {
-            eprintln!(" -> building eitopf on server");
-            host.just_exec(&["git", "-C", "eitopf", "reset", "--hard", "2>&1"])
+            eprintln!(" -> building eintopf on server");
+            host.just_exec(&["git", "-C", "eintopf", "reset", "--hard", "2>&1"])
                 .context("git reset")?
                 .map_err(failure::err_msg)?;
-            host.just_exec(&["git", "-C", "eitopf", "pull", "2>&1"])
+            host.just_exec(&["git", "-C", "eintopf", "pull", "2>&1"])
                 .context("git pull")?
                 .map_err(failure::err_msg)?;
-            host.just_exec(&["cd", "eitopf", "&&", "cargo", "b", "--release"])
+            host.just_exec(&["cd", "eintopf", "&&", "cargo", "b", "--release"])
                 .context("build")?
                 .map_err(failure::err_msg)?;
             Ok(())
