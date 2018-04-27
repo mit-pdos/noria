@@ -527,7 +527,6 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             chan.stderr().read_to_string(&mut stderr)?;
 
             chan.wait_eof()?;
-            chan.wait_close()?;
 
             if chan.exit_status()? != 0 {
                 eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
@@ -552,17 +551,23 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             ])?;
 
             if !killed.is_ok() {
-                let mut stdout = String::new();
-                let mut stderr = String::new();
-                souplet.stderr().read_to_string(&mut stderr)?;
-                souplet.read_to_string(&mut stdout)?;
                 println!("souplet died");
-                println!("{}", stdout.trim_right().replace('\n', "\n >> "));
-                println!("{}", stderr.trim_right().replace('\n', "\n !> "));
+            }
+
+            let mut stdout = String::new();
+            let mut stderr = String::new();
+            souplet.stderr().read_to_string(&mut stderr)?;
+            souplet.read_to_string(&mut stdout)?;
+            let stdout = stdout.trim_right();
+            if !stdout.is_empty() {
+                println!("{}", stdout.replace('\n', "\n >> "));
+            }
+            let stderr = stderr.trim_right();
+            if !stderr.is_empty() {
+                println!("{}", stderr.replace('\n', "\n !> "));
             }
 
             souplet.wait_eof()?;
-            souplet.wait_close()?;
         }
 
         // also stop zookeeper
