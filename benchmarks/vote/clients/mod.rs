@@ -14,9 +14,20 @@ pub(crate) trait VoteClientConstructor {
     }
 }
 
+impl VoteClientConstructor for () {
+    type Instance = ();
+    fn new(_: &Parameters, _: &clap::ArgMatches) -> Self {}
+    fn make(&mut self) -> Self::Instance {}
+}
+
 pub(crate) trait VoteClient {
     fn handle_reads(&mut self, requests: &[i32]);
     fn handle_writes(&mut self, requests: &[i32]);
+}
+
+impl VoteClient for () {
+    fn handle_reads(&mut self, _: &[i32]) {}
+    fn handle_writes(&mut self, _: &[i32]) {}
 }
 
 pub(crate) mod hybrid;

@@ -562,6 +562,7 @@ fn main() {
                         .help("MsSQL database to use"),
                 ),
         )
+        .subcommand(SubCommand::with_name("null"))
         .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
@@ -693,6 +694,7 @@ fn main() {
         ("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
         ("hybrid", Some(largs)) => run::<clients::hybrid::Conf>(&args, largs),
+        ("null", Some(largs)) => run::<()>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }
