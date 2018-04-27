@@ -205,8 +205,10 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
                     format!("{}", runtime).into(),
                     "-d".into(),
                     if skewed { "skewed" } else { "uniform" }.into(),
-                    "--timely-cluster".into(),
-                    format!("'-h hosts -n {} -p {}'", nservers, i).into(),
+                    "-h".into(),
+                    "hosts".into(),
+                    "-p".into(),
+                    format!("{}", i).into(),
                 ];
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 s.ssh.as_ref().unwrap().exec(&cmd[..])
