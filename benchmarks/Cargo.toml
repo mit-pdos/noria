@@ -19,6 +19,7 @@ vec_map = { version = "0.8.0" }
 rayon = "1.0"
 ssh2 = "0.3"
 shellwords = "0.1"
+zookeeper = "0.4.0"
 
 # for benchmarks
 # cli

@@ -177,6 +177,7 @@ dependencies = [
  "tsunami 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zookeeper 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

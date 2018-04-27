@@ -4,6 +4,7 @@ extern crate distributary;
 extern crate hdrhistogram;
 extern crate itertools;
 extern crate rand;
+extern crate zookeeper;
 
 use std::fs;
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ use std::time::{Duration, Instant};
 use clap::{App, Arg};
 use hdrhistogram::Histogram;
 use itertools::Itertools;
+use zookeeper::ZooKeeper;
 
 use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode,
                    PersistenceParameters, ZookeeperAuthority};
@@ -160,6 +162,11 @@ fn perform_secondary_reads(
     }
 }
 
+fn clear_zookeeper(address: &str) {
+    let zk = ZooKeeper::connect(address, Duration::from_secs(1), |_| {}).unwrap();
+    let _ = zk.delete("/state", None);
+}
+
 fn main() {
     let args = App::new("replay")
         .version("0.1")
@@ -262,11 +269,11 @@ fn main() {
     persistence.log_dir = args.value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
 
-    let authority = Arc::new(ZookeeperAuthority::new(
-        args.value_of("zookeeper-address").unwrap(),
-    ));
+    let zk_address = args.value_of("zookeeper-address").unwrap();
+    let authority = Arc::new(ZookeeperAuthority::new(zk_address));
 
     if !args.is_present("use-existing-data") {
+        clear_zookeeper(zk_address);
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
         if use_secondary {
             g.install_recipe(SECONDARY_RECIPE.to_owned()).unwrap();
