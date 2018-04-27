@@ -83,7 +83,7 @@ fn main() {
         .arg(
             Arg::with_name("ctype")
                 .long("client")
-                .default_value("c5.9xlarge")
+                .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
@@ -412,7 +412,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
         // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
         // otherwise we're severely underutilizing the client machines.
-        let threads = format!("{}", 2 * (ccores - for_gen)).into();
+        let threads = format!("{}", 4 * (ccores - for_gen)).into();
         let base_cmd = vec![
             "cd".into(),
             "distributary".into(),
