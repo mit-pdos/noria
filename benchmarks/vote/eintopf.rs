@@ -14,6 +14,7 @@ extern crate ssh2;
 extern crate tsunami;
 
 use failure::Error;
+use failure::ResultExt;
 use rusoto_core::default_tls_client;
 use rusoto_core::{EnvironmentProvider, Region};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
@@ -30,6 +31,15 @@ fn main() {
     let args = App::new("eintof-distributed")
         .version("0.1")
         .about("Orchestrate runs of the distributed eitopf benchmark")
+        .arg(
+            Arg::with_name("articles")
+                .short("a")
+                .long("articles")
+                .value_name("N")
+                .default_value("100000")
+                .takes_value(true)
+                .help("Number of articles to prepopulate the database with"),
+        )
         .arg(
             Arg::with_name("runtime")
                 .short("r")
@@ -119,6 +129,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
     let shards = value_t_or_exit!(args, "shards", u16);
+    let articles = value_t_or_exit!(args, "articles", usize);
 
     let nshards = format!("{}", nservers * shards as u32);
     eprintln!("--> running with {} shards total", nshards);
@@ -145,7 +156,17 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
     b.add_set(
         "server",
         nservers,
-        tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |_host| {
+        tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |host| {
+            eprintln!(" -> building eitopf on server");
+            host.just_exec(&["git", "-C", "eitopf", "reset", "--hard", "2>&1"])
+                .context("git reset")?
+                .map_err(failure::err_msg)?;
+            host.just_exec(&["git", "-C", "eitopf", "pull", "2>&1"])
+                .context("git pull")?
+                .map_err(failure::err_msg)?;
+            host.just_exec(&["cd", "eitopf", "&&", "cargo", "b", "--release"])
+                .context("build")?
+                .map_err(failure::err_msg)?;
             Ok(())
         }).as_user("ubuntu"),
     );
@@ -178,12 +199,14 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
                     "eintopf/target/release/eintopf".into(),
                     "--workers".into(),
                     format!("{}", shards).into(),
+                    "-a".into(),
+                    format!("{}", articles).into(),
                     "-r".into(),
                     format!("{}", runtime).into(),
                     "-d".into(),
                     if skewed { "skewed" } else { "uniform" }.into(),
                     "--timely-cluster".into(),
-                    format!("-h hosts -n {} -p {}", nservers, i).into(),
+                    format!("'-h hosts -n {} -p {}'", nservers, i).into(),
                 ];
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 s.ssh.as_ref().unwrap().exec(&cmd[..])
@@ -243,8 +266,23 @@ impl ConvenientSession for tsunami::Session {
         c.exec(&cmd)?;
         Ok(c)
     }
+    fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error> {
+        let mut c = self.exec(cmd)?;
+
+        let mut stdout = String::new();
+        c.read_to_string(&mut stdout)?;
+        let mut stderr = String::new();
+        c.stderr().read_to_string(&mut stderr)?;
+        c.wait_eof()?;
+
+        if c.exit_status()? != 0 {
+            return Ok(Err(stderr));
+        }
+        Ok(Ok(stdout))
+    }
 }
 
 trait ConvenientSession {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error>;
+    fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error>;
 }
