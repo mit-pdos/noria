@@ -31,6 +31,10 @@ thread_local! {
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
 }
 
+fn throughput(ops: usize, took: time::Duration) -> f64 {
+    ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
+}
+
 const MAX_BATCH_TIME_US: u32 = 2500;
 
 mod clients;
@@ -126,7 +130,6 @@ where
             .unwrap()
     };
 
-    let start = time::Instant::now();
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
             let pool = pool.clone();
@@ -164,8 +167,8 @@ where
         .collect();
 
     drop(pool);
-    let mut ops = 0;
-    let mut wops = 0;
+    let mut ops = 0.0;
+    let mut wops = 0.0;
     for gen in generators {
         let (gen, completed) = gen.join().unwrap();
         ops += gen;
@@ -174,15 +177,8 @@ where
     drop(cc);
 
     // all done!
-    let took = start.elapsed();
-    println!(
-        "# generated ops/s: {:.2}",
-        ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
-    );
-    println!(
-        "# actual ops/s: {:.2}",
-        wops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
-    );
+    println!("# generated ops/s: {:.2}", ops);
+    println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
 
     let sjrn_w_t = sjrn_w_t.lock().unwrap();
@@ -255,7 +251,7 @@ fn run_generator<R>(
     finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
-) -> (usize, usize)
+) -> (f64, f64)
 where
     R: rand::distributions::Sample<usize>,
 {
@@ -420,7 +416,8 @@ where
                 // *could* speed up
                 if now.duration_since(start) > warmup {
                     if worker_ops.is_none() {
-                        worker_ops = Some(ndone.load(atomic::Ordering::Acquire));
+                        worker_ops =
+                            Some((time::Instant::now(), ndone.load(atomic::Ordering::Acquire)));
                     }
 
                     if early_exit && now < end {
@@ -450,13 +447,19 @@ where
         atomic::spin_loop_hint();
     }
 
-    let worker_ops = worker_ops.map(|start| ndone.load(atomic::Ordering::Acquire) - start);
+    let gen = throughput(ops, start.elapsed());
+    let worker_ops = worker_ops.map(|(measured, start)| {
+        throughput(
+            ndone.load(atomic::Ordering::Acquire) - start,
+            measured.elapsed(),
+        )
+    });
 
     // need to drop the pool before waiting so that workers will exit
     // and thus hit the barrier
     drop(pool);
     finished.wait();
-    (ops, worker_ops.unwrap_or(0))
+    (gen, worker_ops.unwrap_or(0.0))
 }
 
 fn main() {
