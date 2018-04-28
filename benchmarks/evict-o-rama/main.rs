@@ -35,7 +35,7 @@ fn main() {
     builder.log_with(distributary::logger_pls());
     builder.set_worker_threads(2);
     builder.set_persistence(persistence_params);
-    builder.set_memory_limit(100 * 1024);
+    builder.set_memory_limit(100 * 1024, Duration::from_millis(1000));
 
     // TODO: This should be removed when the `it_works_with_reads_before_writes`
     // test passes again.
