@@ -81,16 +81,7 @@ impl Graph {
     #[allow(dead_code)]
     pub fn transition(&mut self) {
         let stupid_recipe = "# base tables
-               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (article_id int, user int);
                CREATE TABLE Rating (article_id int, user int, stars int);
-
-               # read queries
-               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article \
-                            LEFT JOIN (SELECT Vote.article_id, COUNT(Vote.user) AS votes \
-                                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
-                            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
 
                U: SELECT article_id, stars FROM Rating UNION SELECT article_id, 1 AS stars FROM Vote;
                Total: SELECT article_id, SUM(U.stars) AS score \
@@ -102,16 +93,7 @@ impl Graph {
                             WHERE Article.id = ?;";
 
         let smart_recipe = "# base tables
-               CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-               CREATE TABLE Vote (article_id int, user int);
                CREATE TABLE Rating (article_id int, user int, stars int);
-
-               # read queries
-               QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
-                            FROM Article \
-                            LEFT JOIN (SELECT Vote.article_id, COUNT(Vote.user) AS votes \
-                                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
-                            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
 
                RatingSum: SELECT article_id, SUM(Rating.stars) AS score FROM Rating GROUP BY article_id;
                U: SELECT article_id, score FROM RatingSum UNION SELECT article_id, votes AS score FROM VoteCount;
@@ -122,9 +104,9 @@ impl Graph {
                             WHERE Article.id = ?;";
 
         if self.stupid {
-            self.graph.install_recipe(stupid_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(stupid_recipe.to_owned()).unwrap();
         } else {
-            self.graph.install_recipe(smart_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(smart_recipe.to_owned()).unwrap();
         }
     }
 }
