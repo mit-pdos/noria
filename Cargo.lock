@@ -174,7 +174,7 @@ dependencies = [
  "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git?rev=63c1329f84dc0f722fe640b7faa7f803e7db6a5a)",
  "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "tsunami 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tsunami 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zookeeper 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2381,7 +2381,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "tsunami"
-version = "0.5.11"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2876,7 +2876,7 @@ dependencies = [
 "checksum tokio-udp 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "137bda266504893ac4774e0ec4c2108f7ccdbcb7ac8dced6305fe9e4e0b5041a"
 "checksum toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "a0263c6c02c4db6c8f7681f9fd35e90de799ebd4cfdeab77a38f4ff6b3d8c0d9"
 "checksum traitobject 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
-"checksum tsunami 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)" = "7ec9c495aa1283808f665f8051c1ae4ce49438473845f9aea0d8f5cc7c781b2a"
+"checksum tsunami 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)" = "21ff91fb021e6253d6513a12ba91b6891d2edfc9435dc010abdbcdf6fb84cee2"
 "checksum two-lock-queue 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "bdabfad4e8dcb814adfc10fbe446a7388a7e0eea8453d419dbc272101dc82fa9"
 "checksum twox-hash 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "475352206e7a290c5fccc27624a163e8d0d115f7bb60ca18a64fc9ce056d7435"
 "checksum typeable 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1410f6f91f21d1612654e7cc69193b0334f909dcf2c790c4826254fbb86f8887"

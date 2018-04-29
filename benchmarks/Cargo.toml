@@ -44,7 +44,7 @@ tokio-core = "0.1.8"
 # ec2
 rusoto_core = "0.31.0"
 rusoto_sts = "0.31.0"
-tsunami = "0.5.10"
+tsunami = "0.5.13"
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"

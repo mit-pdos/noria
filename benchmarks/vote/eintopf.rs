@@ -121,7 +121,13 @@ fn main() {
             Ok(scale) => {
                 eprintln!("==> {} servers", nservers * scale,);
 
-                run_one(&args, nservers * scale)
+                let load = run_one(&args, nservers * scale).unwrap();
+                if load > 16.5 {
+                    eprintln!(" !> server seems overloaded: {}/16", load);
+                // break;
+                } else {
+                    eprintln!(" >> finished; registered load: {}/16", load);
+                }
             }
             Err(e) => eprintln!("Ignoring malformed scale factor {}", e),
         }
@@ -133,7 +139,7 @@ fn main() {
     }
 }
 
-fn run_one(args: &clap::ArgMatches, nservers: u32) {
+fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error> {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
     let articles = value_t_or_exit!(args, "articles", usize);
@@ -254,8 +260,21 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
             outf.write_all(stdout.as_bytes())?;
         }
 
-        Ok(())
-    }).unwrap();
+        // gather server load
+        let load = servers[0]
+            .ssh
+            .as_ref()
+            .unwrap()
+            .cmd("awk '{print $1\" \"$2}' /proc/loadavg")?;
+        // stop iterating through scales for this backend if it's not keeping up
+        let load: f64 = load.trim_right()
+            .split_whitespace()
+            .next()
+            .and_then(|l| l.parse().ok())
+            .unwrap_or(0.0);
+
+        Ok(load)
+    })
 }
 
 impl ConvenientSession for tsunami::Session {
