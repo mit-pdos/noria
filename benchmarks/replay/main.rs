@@ -10,6 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
@@ -298,6 +299,7 @@ fn main() {
 
     assert!(reads < rows);
 
+    let retain_logs = args.is_present("retain-logs-on-exit");
     let verbose = args.is_present("verbose");
     let durable = args.is_present("durability");
     let no_recovery = args.is_present("no-recovery");
@@ -339,7 +341,14 @@ fn main() {
 
         // In memory-only mode we don't want to recover, just read right away:
         if !durable || no_recovery {
+            thread::sleep(Duration::from_secs(5));
             perform_reads(&mut g, reads, rows, skewed, use_secondary, verbose);
+
+            // Remove any log/database files:
+            if !retain_logs && durable {
+                fs::remove_dir_all("replay-TableRow-0.db").unwrap();
+            }
+
             return;
         }
     }
@@ -353,7 +362,7 @@ fn main() {
     perform_reads(&mut g, reads, rows, skewed, use_secondary, verbose);
 
     // Remove any log/database files:
-    if !args.is_present("retain-logs-on-exit") {
+    if !retain_logs {
         fs::remove_dir_all("replay-TableRow-0.db").unwrap();
     }
 }
