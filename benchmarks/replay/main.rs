@@ -232,6 +232,18 @@ fn main() {
                 .help("Enable durability for Base nodes"),
         )
         .arg(
+            Arg::with_name("no-recovery")
+                .long("no-recovery")
+                .requires("durability")
+                .takes_value(false)
+                .help(
+                    "Don't recover before reading.
+                    Dropping the graph will cause SS-tables to be written
+                    no matter the data size, so this could be used to
+                    test reads directly from RocksDB memtables.",
+                ),
+        )
+        .arg(
             Arg::with_name("retain-logs-on-exit")
                 .long("retain-logs-on-exit")
                 .takes_value(false)
@@ -288,6 +300,7 @@ fn main() {
 
     let verbose = args.is_present("verbose");
     let durable = args.is_present("durability");
+    let no_recovery = args.is_present("no-recovery");
     let use_secondary = args.is_present("secondary-indices");
     let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
 
@@ -325,7 +338,7 @@ fn main() {
         populate(&mut g, rows, skewed);
 
         // In memory-only mode we don't want to recover, just read right away:
-        if !durable {
+        if !durable || no_recovery {
             perform_reads(&mut g, reads, rows, skewed, use_secondary, verbose);
             return;
         }
