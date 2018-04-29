@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time;
 
-const SOUP_AMI: &str = "ami-72b0000d";
+const SOUP_AMI: &str = "ami-7edd6001";
 
 fn main() {
     use clap::{App, Arg};
@@ -66,6 +66,13 @@ fn main() {
                 .help("Instance type for servers"),
         )
         .arg(
+            Arg::with_name("shards")
+                .long("shards")
+                .default_value("12")
+                .takes_value(true)
+                .help("Number of shards per souplet"),
+        )
+        .arg(
             Arg::with_name("servers")
                 .long("servers")
                 .short("s")
@@ -73,6 +80,14 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of server machines to spawn with a scale of 1"),
+        )
+        .arg(
+            Arg::with_name("target")
+                .long("load-per-client")
+                .required(true)
+                .default_value("5000000")
+                .takes_value(true)
+                .help("Load to generate on each client"),
         )
         .arg(
             Arg::with_name("scales")
@@ -122,6 +137,8 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let skewed = args.value_of("distribution").unwrap() == "skewed";
     let articles = value_t_or_exit!(args, "articles", usize);
+    let shards = value_t_or_exit!(args, "shards", u16);
+    let target_per_client = value_t_or_exit!(args, "target", usize);
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::new(
@@ -186,8 +203,11 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) {
                     "env".into(),
                     "RUST_BACKTRACE=1".into(),
                     "eintopf/target/release/eintopf".into(),
+                    "--open-loop".into(),
+                    "-b".into(),
+                    format!("{}", target_per_client).into(),
                     "--workers".into(),
-                    "12".into(),
+                    format!("{}", shards).into(),
                     "-a".into(),
                     format!("{}", articles).into(),
                     "-r".into(),
