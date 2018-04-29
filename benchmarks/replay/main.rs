@@ -24,6 +24,9 @@ use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode
 // domains fill up their TCP buffers trying to send ACKs (which the batch putter
 // isn't reading yet, since it's still busy sending).
 const BATCH_SIZE: usize = 10000;
+// With --skewed it'll use this value for all c* columns (secondary indices), so that all rows will
+// be returned when reading SKEWED_KEY later on.
+const SKEWED_KEY: i64 = 0;
 
 const RECIPE: &str = "
 CREATE TABLE TableRow (id int, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, PRIMARY KEY(id));
@@ -61,12 +64,19 @@ fn build_graph(
     builder.build(authority)
 }
 
-fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64) {
+fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
     let mut mutator = g.get_mutator("TableRow").unwrap();
 
     (0..rows)
         .map(|i| {
-            let row: Vec<DataType> = vec![i.into(); 10];
+            let row: Vec<DataType> = if skewed {
+                let mut row = vec![SKEWED_KEY.into(); 10];
+                row[0] = i.into();
+                row
+            } else {
+                vec![i.into(); 10]
+            };
+
             row
         })
         .chunks(BATCH_SIZE)
@@ -82,6 +92,7 @@ fn perform_reads(
     g: &mut ControllerHandle<ZookeeperAuthority>,
     reads: i64,
     rows: i64,
+    skewed: bool,
     use_secondary: bool,
     verbose: bool,
 ) {
@@ -89,11 +100,16 @@ fn perform_reads(
         eprintln!("Done populating state, now reading articles...");
     }
 
-    let mut hist = Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap();
-    let mut rng = rand::thread_rng();
-    let row_ids = rand::seq::sample_iter(&mut rng, 0..rows, reads as usize).unwrap();
+    let mut hist = Histogram::<u64>::new(4).unwrap();
+    let row_ids = if skewed {
+        vec![SKEWED_KEY]
+    } else {
+        let mut rng = rand::thread_rng();
+        rand::seq::sample_iter(&mut rng, 0..rows, reads as usize).unwrap()
+    };
+
     if use_secondary {
-        perform_secondary_reads(g, &mut hist, row_ids);
+        perform_secondary_reads(g, &mut hist, rows, row_ids);
     } else {
         perform_primary_reads(g, &mut hist, row_ids);
     }
@@ -135,6 +151,7 @@ fn perform_primary_reads(
 fn perform_secondary_reads(
     g: &mut ControllerHandle<ZookeeperAuthority>,
     hist: &mut Histogram<u64>,
+    rows: i64,
     row_ids: Vec<i64>,
 ) {
     let indices = 10;
@@ -142,6 +159,7 @@ fn perform_secondary_reads(
         .map(|i| g.get_getter(&format!("query_c{}", i)).unwrap())
         .collect();
 
+    let skewed = row_ids.len() == 1;
     for i in row_ids {
         let id: DataType = DataType::BigInt(i);
         let start = Instant::now();
@@ -150,7 +168,12 @@ fn perform_secondary_reads(
         let rs = getter.lookup(&[id], true).unwrap();
         let elapsed = start.elapsed();
         let us = elapsed.as_secs() * 1_000_000 + elapsed.subsec_nanos() as u64 / 1_000;
-        assert_eq!(rs.len(), 1);
+        if skewed {
+            assert_eq!(rs.len(), rows as usize);
+        } else {
+            assert_eq!(rs.len(), 1);
+        }
+
         for j in 0..10 {
             assert_eq!(DataType::BigInt(i), rs[0][j]);
         }
@@ -176,18 +199,25 @@ fn main() {
                 .long("rows")
                 .value_name("N")
                 .default_value("100000")
-                .help("Number of rows to prepopulate the database with"),
+                .help("Number of rows to prepopulate the database with."),
         )
         .arg(
             Arg::with_name("reads")
                 .long("reads")
                 .default_value("10000")
-                .help("Number of rows to read while benchmarking"),
+                .help("Number of rows to read while benchmarking."),
         )
         .arg(
             Arg::with_name("secondary-indices")
                 .long("secondary-indices")
                 .help("Read from secondary indices."),
+        )
+        .arg(
+            Arg::with_name("skewed")
+                .long("skewed")
+                .requires("secondary-indices")
+                .takes_value(false)
+                .help("Read and write to a single secondary index key."),
         )
         .arg(
             Arg::with_name("log-dir")
@@ -246,8 +276,14 @@ fn main() {
         .arg(Arg::with_name("verbose").long("verbose").short("v"))
         .get_matches();
 
-    let reads = value_t_or_exit!(args, "reads", i64);
+    let skewed = args.is_present("skewed");
     let rows = value_t_or_exit!(args, "rows", i64);
+    let reads = if skewed {
+        1
+    } else {
+        value_t_or_exit!(args, "reads", i64)
+    };
+
     assert!(reads < rows);
 
     let verbose = args.is_present("verbose");
@@ -286,11 +322,11 @@ fn main() {
         }
 
         // Prepopulate with n rows:
-        populate(&mut g, rows);
+        populate(&mut g, rows, skewed);
 
         // In memory-only mode we don't want to recover, just read right away:
         if !durable {
-            perform_reads(&mut g, reads, rows, use_secondary, verbose);
+            perform_reads(&mut g, reads, rows, skewed, use_secondary, verbose);
             return;
         }
     }
@@ -301,7 +337,7 @@ fn main() {
     Command::new("sync")
         .spawn()
         .expect("Failed clearing disk buffers");
-    perform_reads(&mut g, reads, rows, use_secondary, verbose);
+    perform_reads(&mut g, reads, rows, skewed, use_secondary, verbose);
 
     // Remove any log/database files:
     if !args.is_present("retain-logs-on-exit") {
