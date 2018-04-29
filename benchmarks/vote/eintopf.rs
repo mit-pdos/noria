@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time;
 
-const SOUP_AMI: &str = "ami-7edd6001";
+const SOUP_AMI: &str = "ami-98922ee7";
 
 fn main() {
     use clap::{App, Arg};

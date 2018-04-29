@@ -24,7 +24,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-e9893a96";
+const SOUP_AMI: &str = "ami-98922ee7";
 
 fn main() {
     use clap::{App, Arg};
