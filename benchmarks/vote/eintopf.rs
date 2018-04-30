@@ -211,7 +211,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
                     "eintopf/target/release/eintopf".into(),
                     "--open-loop".into(),
                     "-b".into(),
-                    format!("{}", target_per_client).into(),
+                    format!("{}", nservers as usize * target_per_client).into(),
                     "--workers".into(),
                     format!("{}", shards).into(),
                     "-a".into(),
