@@ -353,6 +353,29 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
             ),
         );
+        eprintln!("==> full no reuse (zipf)");
+        s.partial = false;
+        s.stupid = true;
+        one(
+            &s,
+            true,
+            &args,
+            Some(
+                fs::File::create(format!("vote-no-partial-stupid-{}M.zipf1.08.log", mills))
+                    .unwrap(),
+            ),
+        );
+        eprintln!("==> full with reuse (zipf)");
+        s.partial = false;
+        s.stupid = false;
+        one(
+            &s,
+            true,
+            &args,
+            Some(
+                fs::File::create(format!("vote-no-partial-reuse-{}M.zipf1.08.log", mills)).unwrap(),
+            ),
+        );
         eprintln!("==> partial no reuse (uniform)");
         s.partial = true;
         s.stupid = true;
