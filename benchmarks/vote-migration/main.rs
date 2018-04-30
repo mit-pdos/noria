@@ -134,8 +134,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                 let id_uniform = rng.gen_range(0, narticles);
                 let id_zipf = zipf.sample(&mut rng);
                 let id = if skewed { id_zipf } else { id_uniform };
-                read_old.lookup(&[DataType::from(id)], true).unwrap();
-                thread::yield_now();
+                read_old.lookup(&[DataType::from(id)], false).unwrap();
+                thread::sleep(time::Duration::new(0, 10_000));
             }
         })
     };
