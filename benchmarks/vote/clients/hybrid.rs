@@ -44,7 +44,7 @@ impl VoteClientConstructor for Conf {
             // create tables with indices
             conn.query(format!("USE {}", db)).unwrap();
             conn.prep_exec(
-                "CREATE TABLE art (id bigint not null, title varchar(16) not null, \
+                "CREATE TABLE art (id bigint not null, title varchar(16) not null, votes bigint not null, \
                  PRIMARY KEY USING HASH (id)) ENGINE = MEMORY;",
                 (),
             ).unwrap();
@@ -59,12 +59,12 @@ impl VoteClientConstructor for Conf {
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {
                 let mut sql = String::new();
-                sql.push_str("INSERT INTO art (id, title) VALUES ");
+                sql.push_str("INSERT INTO art (id, title, votes) VALUES ");
                 for i in 0..bs {
                     if i != 0 {
                         sql.push_str(", ");
                     }
-                    sql.push_str(&format!("({}, 'Article #{}')", aid, aid));
+                    sql.push_str(&format!("({}, 'Article #{}', 0)", aid, aid));
                     aid += 1;
                 }
                 conn.query(sql).unwrap();
@@ -140,6 +140,11 @@ impl VoteClient for Client {
         let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vals);
         self.my.prep_exec(vote_qstring, &ids).unwrap();
 
+        let vals = (0..ids.len()).map(|_| "?").collect::<Vec<_>>().join(",");
+        // NOTE: this is *not* correct for duplicate ids
+        let vote_qstring = format!("UPDATE art SET votes = votes + 1 WHERE id IN ({})", vals);
+        self.my.prep_exec(vote_qstring, &ids).unwrap();
+
         // and invalidate the cache
         let keys: Vec<_> = ids.into_iter()
             .map(|article_id| format!("article_{}", article_id))
@@ -169,12 +174,7 @@ impl VoteClient for Client {
         if !misses.is_empty() {
             let ids = misses.iter().map(|a| a as &_).collect::<Vec<_>>();
             let vals = (0..misses.len()).map(|_| "?").collect::<Vec<_>>().join(",");
-            let qstring = format!(
-                "SELECT art.id, art.title, COUNT(vt.u) AS votes \
-                 FROM art LEFT JOIN vt ON (vt.id = art.id) \
-                 WHERE art.id IN ({})",
-                vals
-            );
+            let qstring = format!("SELECT art.* FROM art WHERE art.id IN ({})", vals);
 
             let mut m = Vec::new();
             let mut qresult = self.my.prep_exec(qstring, &ids).unwrap();
