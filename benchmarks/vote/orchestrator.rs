@@ -274,15 +274,15 @@ fn main() {
         Backend::Memcached,
         Backend::Mysql,
         Backend::Netsoup {
-            workers: 2,
-            readers: 14,
+            workers: 1,
+            readers: 80,
             shards: None,
         },
         Backend::Hybrid,
         Backend::Netsoup {
-            workers: 2,
-            readers: 14,
-            shards: Some(2),
+            workers: 4,
+            readers: 80,
+            shards: Some(4),
         },
         Backend::Mssql,
     ];
@@ -505,7 +505,7 @@ fn run_clients(
                     params.add_params(&mut cmd);
                     cmd.push("--no-prime".into());
                     cmd.push("--threads".into());
-                    cmd.push(format!("{}", ccores).into());
+                    cmd.push("20".into());
 
                     // so, target ops...
                     // target ops is actually not entirely straightforward to determine. here, we'll
