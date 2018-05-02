@@ -304,7 +304,7 @@ fn main() {
         .unwrap();
 
     b.wait_limit(time::Duration::from_secs(5 * 60));
-    b.set_max_duration(5);
+    b.set_max_duration(6);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
@@ -331,7 +331,8 @@ fn main() {
 
             let targets = [
                 5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
-                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000,
+                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000, 10_000_000,
+                11_000_000, 12_000_000, 13_000_000, 14_000_000, 15_000_000, 16_000_000,
             ];
 
             let mut first = true;
@@ -347,7 +348,7 @@ fn main() {
                         skewed,
                     };
 
-                    let iters = 3;
+                    let iters = 2;
                     for iter in 0..iters {
                         for &target in &targets {
                             if first {
