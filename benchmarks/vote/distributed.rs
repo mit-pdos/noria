@@ -24,7 +24,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-98922ee7";
+const SOUP_AMI: &str = "ami-6977ce16";
 
 fn main() {
     use clap::{App, Arg};
@@ -387,7 +387,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 "-w".into(),
                 format!("{}", shards).into(),
                 "-r".into(),
-                format!("{}", scores - shards).into(),
+                format!("{}", 10 * (scores - shards)).into(),
             ]);
             cmd
         };
@@ -412,7 +412,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         // TODO: in the future, vote threads will be able to handle multiple concurrent threads and
         // we wouldn't need to lie here. for the time being though, we need to oversubscribe,
         // otherwise we're severely underutilizing the client machines.
-        let threads = format!("{}", 8 * (ccores - for_gen)).into();
+        let threads = format!("{}", 6 * (ccores - for_gen)).into();
         let base_cmd = vec![
             "cd".into(),
             "distributary".into(),
