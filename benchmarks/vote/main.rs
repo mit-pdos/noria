@@ -26,17 +26,17 @@ use std::time;
 
 thread_local! {
     static CLIENT: RefCell<Option<Box<VoteClient>>> = RefCell::new(None);
-    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
 }
 
-const MAX_BATCH_TIME_US: u32 = 2500;
+const MAX_BATCH_TIME_US: u32 = 1000;
 
 mod clients;
 use clients::{Parameters, VoteClient, VoteClientConstructor};
@@ -80,10 +80,10 @@ where
         )
     } else {
         (
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
         )
     };
 

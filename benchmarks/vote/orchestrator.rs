@@ -107,7 +107,7 @@ fn main() {
                 .short("a")
                 .long("articles")
                 .value_name("N")
-                .default_value("100000")
+                .default_value("2000000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
         )
@@ -116,14 +116,14 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("30")
+                .default_value("40")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("10")
+                .default_value("20")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
         )
@@ -147,7 +147,7 @@ fn main() {
         .arg(
             Arg::with_name("stype")
                 .long("server")
-                .default_value("m5.4xlarge")
+                .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for server"),
@@ -155,7 +155,7 @@ fn main() {
         .arg(
             Arg::with_name("ctype")
                 .long("client")
-                .default_value("m5.4xlarge")
+                .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
@@ -164,6 +164,7 @@ fn main() {
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
+                .default_value("6")
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn"),
@@ -348,7 +349,7 @@ fn main() {
                         skewed,
                     };
 
-                    let iters = 2;
+                    let iters = 1;
                     for iter in 0..iters {
                         for &target in &targets {
                             if first {
@@ -451,7 +452,7 @@ fn run_clients(
         cmd.push("multiclient.sh".into());
         prime_params.add_params(&mut cmd);
         cmd.push("--threads".into());
-        cmd.push(format!("{}", ccores).into());
+        cmd.push(format!("{}", 6 * ccores).into());
         cmd.push("2>&1".into());
         let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
 
@@ -506,7 +507,7 @@ fn run_clients(
                     params.add_params(&mut cmd);
                     cmd.push("--no-prime".into());
                     cmd.push("--threads".into());
-                    cmd.push("20".into());
+                    cmd.push(format!("{}", 6 * ccores).into());
 
                     // so, target ops...
                     // target ops is actually not entirely straightforward to determine. here, we'll
