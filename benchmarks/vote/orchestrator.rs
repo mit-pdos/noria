@@ -27,7 +27,8 @@ use std::borrow::Cow;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_AMI: &str = "ami-83cc79fc";
+const SOUP_SERVER_AMI: &str = "ami-82c57dfd";
+const SOUP_CLIENT_AMI: &str = "ami-64b8001b";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -222,27 +223,31 @@ fn main() {
     b.add_set(
         "server",
         1,
-        tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |host| {
-            // ensure we don't have stale soup (yuck)
-            host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
-                .is_ok();
+        tsunami::MachineSetup::new(
+            args.value_of("stype").unwrap(),
+            SOUP_SERVER_AMI,
+            move |host| {
+                // ensure we don't have stale soup (yuck)
+                host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
+                    .is_ok();
 
-            eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
-            host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
+                eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
+                host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
-            // TODO: memcached cache size?
-            // TODO: mssql setup?
-            // TODO: mariadb params?
-            let optstr = format!("/OPTIONS=/ s/\"$/ -t {}\"/", scores);
-            host.just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])?
-                .is_ok();
-            Ok(())
-        }),
+                // TODO: memcached cache size?
+                // TODO: mssql setup?
+                // TODO: mariadb params?
+                let optstr = format!("/OPTIONS=/ s/\"$/ -m 4096 -t {}\"/", scores);
+                host.just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])?
+                    .is_ok();
+                Ok(())
+            },
+        ),
     );
     b.add_set(
         "client",
         nclients as u32,
-        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, |host| {
+        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_CLIENT_AMI, |host| {
             eprintln!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
@@ -261,7 +266,7 @@ fn main() {
             ])?
                 .is_ok();
             Ok(())
-        }),
+        }).as_user("ubuntu"),
     );
 
     // what backends are we benchmarking?
