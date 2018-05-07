@@ -24,7 +24,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-6977ce16";
+const SOUP_AMI: &str = "ami-5172ca2e";
 
 fn main() {
     use clap::{App, Arg};
@@ -37,7 +37,7 @@ fn main() {
                 .short("a")
                 .long("articles")
                 .value_name("N")
-                .default_value("100000")
+                .default_value("500000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
         )
@@ -83,7 +83,7 @@ fn main() {
         .arg(
             Arg::with_name("ctype")
                 .long("client")
-                .default_value("c5.2xlarge")
+                .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
@@ -117,7 +117,7 @@ fn main() {
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
-                .default_value("5000000")
+                .default_value("6000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
         )
