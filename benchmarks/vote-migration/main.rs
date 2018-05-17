@@ -73,7 +73,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     eprintln!("Getting accessors");
     let mut articles = g.graph.get_mutator("Article").unwrap().into_exclusive();
     let mut votes = g.graph.get_mutator("Vote").unwrap().into_exclusive();
-    let mut read_old = g.graph
+    let mut read_old = g
+        .graph
         .get_getter("ArticleWithVoteCount")
         .unwrap()
         .into_exclusive();
@@ -165,7 +166,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     g.transition();
     stat.send(("MIG FINISHED", 0.0)).unwrap();
     let mut ratings = g.graph.get_mutator("Rating").unwrap().into_exclusive();
-    let mut read_new = g.graph
+    let mut read_new = g
+        .graph
         .get_getter("ArticleWithScore")
         .unwrap()
         .into_exclusive();
@@ -321,7 +323,8 @@ fn main() {
 
     // set config options
     let mut s = graph::Setup::default();
-    s.sharding = args.value_of("shards")
+    s.sharding = args
+        .value_of("shards")
         .map(|_| value_t_or_exit!(args, "shards", usize));
     s.logging = args.is_present("verbose");
     s.nreaders = 4;

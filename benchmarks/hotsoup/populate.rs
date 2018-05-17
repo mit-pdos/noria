@@ -1,17 +1,17 @@
-use std::io::{self, BufRead, BufReader};
 use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::time;
 
-use distributary::{DataType, Mutator, Token};
 use super::Backend;
+use distributary::{DataType, Mutator, Token};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {
     ($d:expr) => {{
         let d = $d;
         (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
-    }}
+    }};
 }
 
 fn do_put<'a>(mutator: &'a mut Mutator, tx: bool) -> Box<FnMut(Vec<DataType>) + 'a> {

@@ -22,7 +22,7 @@ macro_rules! dur_to_ns {
     ($d:expr) => {{
         let d = $d;
         d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
-    }}
+    }};
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -422,7 +422,8 @@ fn main() {
 
     let avg = args.is_present("avg");
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
-    let migrate_after = args.value_of("migrate")
+    let migrate_after = args
+        .value_of("migrate")
         .map(|_| value_t_or_exit!(args, "migrate", u64))
         .map(time::Duration::from_secs);
     let naccounts = value_t_or_exit!(args, "naccounts", i64) + 1;
@@ -455,7 +456,8 @@ fn main() {
         .into_iter()
         .map(|i| {
             Some({
-                let mutator = bank.blender
+                let mutator = bank
+                    .blender
                     .get_mutator("transfers")
                     .unwrap()
                     .into_exclusive();
@@ -486,7 +488,8 @@ fn main() {
 
     let latency_client = if measure_latency {
         Some({
-            let mutator = bank.blender
+            let mutator = bank
+                .blender
                 .get_mutator("transfers")
                 .unwrap()
                 .into_exclusive();

@@ -73,7 +73,8 @@ impl VoteClientConstructor for Conf {
 
             // we need to connect again because there's no way to recover the conn if drop fails
             let fut = tiberius::SqlConnection::connect(core.handle(), addr);
-            let fut = fut.and_then(|conn| conn.simple_exec(format!("CREATE DATABASE {};", db)))
+            let fut = fut
+                .and_then(|conn| conn.simple_exec(format!("CREATE DATABASE {};", db)))
                 .and_then(|(_, conn)| fixconn(conn))
                 .and_then(|(_, conn)| {
                     conn.simple_exec(
@@ -181,7 +182,8 @@ impl VoteClient for Client {
         // the borrow of `res`
         let mut rows = 0;
         let conn = {
-            let fut = self.conn
+            let fut = self
+                .conn
                 .conn
                 .take()
                 .unwrap()

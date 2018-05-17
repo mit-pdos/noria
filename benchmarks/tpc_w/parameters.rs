@@ -1,10 +1,10 @@
+use distributary::DataType;
 use rand;
 use rand::Rng;
-use distributary::DataType;
 use std::collections::HashSet;
-use std::str::FromStr;
-use std::io::{BufRead, BufReader};
 use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::str::FromStr;
 
 pub struct SampleKeys {
     customer: Vec<Vec<DataType>>,

@@ -267,7 +267,8 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             .unwrap()
             .cmd("awk '{print $1\" \"$2}' /proc/loadavg")?;
         // stop iterating through scales for this backend if it's not keeping up
-        let load: f64 = load.trim_right()
+        let load: f64 = load
+            .trim_right()
             .split_whitespace()
             .next()
             .and_then(|l| l.parse().ok())
@@ -279,7 +280,8 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
 
 impl ConvenientSession for tsunami::Session {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error> {
-        let cmd: Vec<_> = cmd.iter()
+        let cmd: Vec<_> = cmd
+            .iter()
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),

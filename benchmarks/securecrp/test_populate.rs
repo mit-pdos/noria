@@ -1,5 +1,5 @@
-use Backend;
 use distributary::DataType;
+use Backend;
 
 pub fn create_users(backend: &mut Backend) {
     // username varchar(1024),
@@ -42,7 +42,8 @@ pub fn create_users(backend: &mut Backend) {
             "normal",
         ],
     ];
-    let users: Vec<Vec<DataType>> = data.into_iter()
+    let users: Vec<Vec<DataType>> = data
+        .into_iter()
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
 
@@ -76,8 +77,20 @@ pub fn create_papers(backend: &mut Backend) {
             "Soup is tasty.".into(),
             "0".into(),
         ],
-        vec![2.into(), "Is Soup Tasty?".into(), "Text".into(), "Maybe.".into(), "0".into()],
-        vec![3.into(), "How To Cook Soup".into(), "Text".into(), "Make it tasty.".into(), "0".into()],
+        vec![
+            2.into(),
+            "Is Soup Tasty?".into(),
+            "Text".into(),
+            "Maybe.".into(),
+            "0".into(),
+        ],
+        vec![
+            3.into(),
+            "How To Cook Soup".into(),
+            "Text".into(),
+            "Make it tasty.".into(),
+            "0".into(),
+        ],
     ];
 
     let mut mutator = backend.g.get_mutator("Paper").unwrap();
@@ -88,7 +101,6 @@ pub fn create_papers(backend: &mut Backend) {
 }
 
 pub fn dump_papers(backend: &mut Backend, user: &str) {
-
     let mut get = backend
         .g
         .get_getter(&format!("PaperList_u{}", user))
@@ -98,11 +110,7 @@ pub fn dump_papers(backend: &mut Backend, user: &str) {
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
-
-    let mut get = backend
-        .g
-        .get_getter("PaperList")
-        .unwrap();
+    let mut get = backend.g.get_getter("PaperList").unwrap();
 
     println!("{:?}", get.lookup(&[0.into()], true));
 }
