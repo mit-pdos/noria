@@ -1,118 +1,59 @@
 #![deny(unused_extern_crates)]
+#![feature(duration_from_micros)]
 
 #[macro_use]
 extern crate clap;
 extern crate distributary;
+extern crate fut20;
 extern crate futures;
 extern crate futures_state_stream;
 extern crate hdrhistogram;
-extern crate hwloc;
-extern crate libc;
 extern crate memcached;
 extern crate mysql;
 extern crate rand;
-extern crate rayon;
 extern crate tiberius;
 extern crate tokio_core;
 extern crate zipf;
 
+use fut20::executor::{Executor, ThreadPool};
 use hdrhistogram::Histogram;
 use rand::Rng;
-use std::io;
-use std::fs;
-use std::time;
-use std::thread;
-use std::sync::{atomic, Arc, Barrier, Mutex};
 use std::cell::RefCell;
+use std::fs;
+use std::sync::{atomic, Arc, Barrier, Mutex};
+use std::thread;
+use std::time;
 
 thread_local! {
-    static THREAD_ID: RefCell<usize> = RefCell::new(1);
-    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
-    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 100_000, 4).unwrap());
+    static CLIENT: RefCell<Option<Box<VoteClient>>> = RefCell::new(None);
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+}
+
+fn throughput(ops: usize, took: time::Duration) -> f64 {
+    ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
 }
 
 const MAX_BATCH_TIME_US: u32 = 1000;
 
-fn set_thread_affinity(cpus: hwloc::Bitmap) -> io::Result<()> {
-    use std::mem;
-    let mut cpuset = unsafe { mem::zeroed::<libc::cpu_set_t>() };
-    for cpu in cpus {
-        unsafe { libc::CPU_SET(cpu as usize, &mut cpuset) };
-    }
-    let errno = unsafe {
-        libc::pthread_setaffinity_np(
-            libc::pthread_self(),
-            mem::size_of::<libc::cpu_set_t>(),
-            &cpuset as *const _,
-        )
-    };
-    if errno != 0 {
-        Err(io::Error::from_raw_os_error(errno))
-    } else {
-        Ok(())
-    }
-}
-
 mod clients;
-use clients::{Parameters, VoteClient};
+use clients::{Parameters, VoteClient, VoteClientConstructor};
 
-fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
+fn run<CC>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
-    C: VoteClient + Send + 'static,
+    CC: VoteClientConstructor + Send + 'static,
 {
     // zipf takes ~66ns to generate a random number depending on the CPU,
     // so each load generator cannot reasonably generate much more than ~1M reqs/s.
-    let per_generator = 1_000_000;
+    let per_generator = 3_000_000;
     let mut target = value_t_or_exit!(global_args, "ops", f64);
     let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
     target /= ngen as f64;
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
-
-    let mut bind_generator = hwloc::Bitmap::new();
-    let mut bind_server = hwloc::Bitmap::new();
-
-    if C::spawns_threads() {
-        // we want any threads spawned by the VoteClient (e.g., distributary itself)
-        // to be on their own NUMA node if there are many. or rather, we want to ensure that our
-        // pool clients/load generators do not interfere with the server.
-        let topo = hwloc::Topology::new();
-        if let Ok(nodes) = topo.objects_with_type(&hwloc::ObjectType::NUMANode) {
-            for node in nodes {
-                if let Some(cpus) = node.allowed_cpuset() {
-                    if bind_generator.weight() as usize >= ngen + nthreads {
-                        for cpu in cpus {
-                            bind_server.set(cpu);
-                        }
-                    } else {
-                        for cpu in cpus {
-                            bind_generator.set(cpu);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if bind_generator.weight() == 0 && bind_server.weight() == 0 {
-        eprintln!("# no numa binding");
-    }
-
-    if bind_generator.weight() != 0 && bind_server.weight() == 0 {
-        // not enough nodes, so let the OS decide
-        eprintln!("# not enough numa cores to do useful binding");
-        bind_generator.clear();
-    }
-
-    if bind_server.weight() != 0 {
-        // set affinity for *this* thread because (quoth man pthread_setaffinity_np):
-        // A new thread created by pthread_create(3) inherits [..] its creator's CPU affinity mask.
-        eprintln!("# bound server threads to: {:?}", bind_server);
-        set_thread_affinity(bind_server).unwrap();
-    }
 
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
@@ -124,13 +65,6 @@ where
         Some("uniform") => false,
         _ => unreachable!(),
     };
-
-    let mut c = C::new(&params, local_args);
-    let clients: Vec<Mutex<C>> = (0..nthreads)
-        .map(|_| VoteClient::from(&mut c))
-        .map(Mutex::new)
-        .collect();
-    let clients = Arc::new(clients);
 
     let hists = if let Some(mut f) = global_args
         .value_of("histogram")
@@ -146,10 +80,10 @@ where
         )
     } else {
         (
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(1, 100_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
         )
     };
 
@@ -158,52 +92,48 @@ where
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
     let finished = Arc::new(Barrier::new(nthreads + ngen));
-    let ts = (
-        sjrn_w_t.clone(),
-        sjrn_r_t.clone(),
-        rmt_w_t.clone(),
-        rmt_r_t.clone(),
-        finished.clone(),
-    );
 
-    if bind_generator.weight() != 0 {
-        // now set the affinity for all of "our" generator/client threads
-        eprintln!("# bound load generators to: {:?}", bind_generator);
-        set_thread_affinity(bind_generator).unwrap();
-    }
+    let cc = Arc::new(Mutex::new(CC::new(&params, local_args)));
+    let pool = {
+        let ts = (
+            sjrn_w_t.clone(),
+            sjrn_r_t.clone(),
+            rmt_w_t.clone(),
+            rmt_r_t.clone(),
+            finished.clone(),
+        );
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .thread_name(|i| format!("client-{}", i))
-        .num_threads(nthreads)
-        .start_handler(|i| {
-            THREAD_ID.with(|tid| {
-                *tid.borrow_mut() = i;
+        let cc = cc.clone();
+        ThreadPool::builder()
+            .pool_size(nthreads)
+            .name_prefix("client-")
+            .after_start(move |_| {
+                CLIENT.with(|c| {
+                    *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
+                })
             })
-        })
-        .exit_handler(move |_| {
-            SJRN_W
-                .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            SJRN_R
-                .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            RMT_W
-                .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            RMT_R
-                .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            ts.4.wait();
-        })
-        .build()
-        .unwrap();
-    let pool = Arc::new(pool);
+            .before_stop(move |_| {
+                SJRN_W
+                    .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                SJRN_R
+                    .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                RMT_W
+                    .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                RMT_R
+                    .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                    .unwrap();
+                ts.4.wait();
+            })
+            .create()
+            .unwrap()
+    };
 
-    let start = time::Instant::now();
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
             let pool = pool.clone();
-            let clients = clients.clone();
             let finished = finished.clone();
             let global_args = global_args.clone();
 
@@ -214,14 +144,23 @@ where
             thread::Builder::new()
                 .name(format!("load-gen{}", geni))
                 .spawn(move || {
-                    let rng = rand::thread_rng();
                     let ops = if skewed {
-                        let rng = zipf::ZipfDistribution::new(rng, articles, 1.08).unwrap();
-                        run_generator(pool, clients, rng, target, global_args)
+                        run_generator(
+                            pool,
+                            zipf::ZipfDistribution::new(articles, 1.08).unwrap(),
+                            finished,
+                            target,
+                            global_args,
+                        )
                     } else {
-                        run_generator(pool, clients, rng, target, global_args)
+                        run_generator(
+                            pool,
+                            rand::distributions::Range::new(1, articles + 1),
+                            finished,
+                            target,
+                            global_args,
+                        )
                     };
-                    finished.wait();
                     ops
                 })
                 .unwrap()
@@ -229,16 +168,18 @@ where
         .collect();
 
     drop(pool);
-    let ops: usize = generators.into_iter().map(|gen| gen.join().unwrap()).sum();
-    drop(clients);
-    drop(c);
+    let mut ops = 0.0;
+    let mut wops = 0.0;
+    for gen in generators {
+        let (gen, completed) = gen.join().unwrap();
+        ops += gen;
+        wops += completed;
+    }
+    drop(cc);
 
     // all done!
-    let took = start.elapsed();
-    println!(
-        "# actual ops/s: {:.2}",
-        ops as f64 / (took.as_secs() as f64 + took.subsec_nanos() as f64 / 1_000_000_000f64)
-    );
+    println!("# generated ops/s: {:.2}", ops);
+    println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
 
     let sjrn_w_t = sjrn_w_t.lock().unwrap();
@@ -305,43 +246,61 @@ where
     );
 }
 
-fn run_generator<C, R>(
-    pool: Arc<rayon::ThreadPool>,
-    clients: Arc<Vec<Mutex<C>>>,
+fn run_generator<R>(
+    mut pool: ThreadPool,
     mut id_rng: R,
+    finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
-) -> usize
+) -> (f64, f64)
 where
-    C: VoteClient + Send + 'static,
-    R: rand::Rng,
+    R: rand::distributions::Sample<usize>,
 {
-    let articles = value_t_or_exit!(global_args, "articles", i32);
+    let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
 
     let start = time::Instant::now();
     let end = start + warmup + runtime;
 
-    let mut ops = 0;
-    let mut rng = rand::thread_rng();
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
+    let ndone = atomic::AtomicUsize::new(0);
+
+    let mut ops = 0;
+
+    let first = time::Instant::now();
+    let mut next = time::Instant::now();
+    let mut next_send = None;
+
     let mut queued_w = Vec::new();
     let mut queued_w_keys = Vec::new();
     let mut queued_r = Vec::new();
     let mut queued_r_keys = Vec::new();
-    {
-        let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-            let clients = clients.clone();
-            move || {
-                let tid = THREAD_ID.with(|tid| *tid.borrow());
 
-                // TODO: avoid the overhead of taking an uncontended lock
-                let mut client = clients[tid].try_lock().unwrap();
+    let mut rng = rand::thread_rng();
 
+    // we *could* use a rayon::scope here to safely access stack variables from inside each job,
+    // but that would *also* force us to place the load generators *on* the thread pool (because of
+    // https://github.com/rayon-rs/rayon/issues/562). that comes with a number of unfortunate
+    // side-effects, such as having to manage allocations of clients to workers, clean exiting,
+    // etc. we *instead* unsafely make the one reference we care about (`ndone`) `&'static` so that
+    // they can be accessed from inside the jobs. we know this is safe because of our barrier on
+    // `finished`, which will only be passed (and hence the stack frame only destroyed) when there
+    // are no more jobs in the pool. this may change with
+    // https://github.com/rayon-rs/rayon/issues/544, but that's what we have to do for now.
+    use std::mem;
+    let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
+
+    let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
+        move |_: &mut fut20::task::Context| {
+            CLIENT.with(|c| {
+                let mut c = c.borrow_mut();
+                let client = c.as_mut().unwrap();
+
+                let n = keys.len();
                 let sent = time::Instant::now();
                 if write {
                     client.handle_writes(&keys[..]);
@@ -352,6 +311,7 @@ where
                     client.handle_reads(&keys[..]);
                 }
                 let done = time::Instant::now();
+                ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
                 if sent.duration_since(start) > warmup {
                     let remote_t = done.duration_since(sent);
@@ -380,79 +340,127 @@ where
                         });
                     }
                 }
-            }
-        };
 
-        let mut next = time::Instant::now();
-        let mut forced = None;
-        while next < end {
-            let now = time::Instant::now();
-            // NOTE: while, not if, in case we start falling behind
-            while next <= now {
-                use rand::distributions::IndependentSample;
-
-                // only queue a new request if we're told to. if this is not the case, we've
-                // just been woken up so we can realize we need to send a batch
-                let id = id_rng.gen_range(0, articles);
-                if rng.gen_weighted_bool(every) {
-                    if queued_w.is_empty() && forced.is_none() {
-                        forced = Some(next + max_batch_time);
-                    }
-                    queued_w_keys.push(id);
-                    queued_w.push(next);
-                } else {
-                    if queued_r.is_empty() && forced.is_none() {
-                        forced = Some(next + max_batch_time);
-                    }
-                    queued_r_keys.push(id);
-                    queued_r.push(next);
-                }
-
-                // schedule next delivery
-                next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
-            }
-
-            // in case that took a while:
-            let now = time::Instant::now();
-            if let Some(f) = forced {
-                if f <= now {
-                    // time to send at least one batch
-
-                    if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
-                        ops += queued_w.len();
-                        pool.spawn(enqueue(
-                            queued_w.split_off(0),
-                            queued_w_keys.split_off(0),
-                            true,
-                        ));
-                    }
-
-                    if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
-                        ops += queued_r.len();
-                        pool.spawn(enqueue(
-                            queued_r.split_off(0),
-                            queued_r_keys.split_off(0),
-                            false,
-                        ));
-                    }
-
-                    // since forced = Some, we better have sent at least one batch!
-                    forced = None;
-                    assert!(queued_r.is_empty() || queued_w.is_empty());
-                    if let Some(&qw) = queued_w.get(0) {
-                        forced = Some(qw + max_batch_time);
-                    }
-                    if let Some(&qr) = queued_r.get(0) {
-                        forced = Some(qr + max_batch_time);
-                    }
-                }
-            }
-
-            atomic::spin_loop_hint();
+                Ok(())
+            })
         }
+    };
+
+    let mut worker_ops = None;
+    while next < end {
+        let now = time::Instant::now();
+        // NOTE: while, not if, in case we start falling behind
+        while next <= now {
+            use rand::distributions::IndependentSample;
+
+            // only queue a new request if we're told to. if this is not the case, we've
+            // just been woken up so we can realize we need to send a batch
+            let id = id_rng.sample(&mut rng) as i32;
+            if rng.gen_weighted_bool(every) {
+                if queued_w.is_empty() && next_send.is_none() {
+                    next_send = Some(next + max_batch_time);
+                }
+                queued_w_keys.push(id);
+                queued_w.push(next);
+            } else {
+                if queued_r.is_empty() && next_send.is_none() {
+                    next_send = Some(next + max_batch_time);
+                }
+                queued_r_keys.push(id);
+                queued_r.push(next);
+            }
+
+            // schedule next delivery
+            next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
+        }
+
+        // in case that took a while:
+        let now = time::Instant::now();
+
+        if let Some(f) = next_send {
+            if f <= now {
+                // time to send at least one batch
+
+                if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
+                    ops += queued_w.len();
+                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
+                        queued_w.split_off(0),
+                        queued_w_keys.split_off(0),
+                        true,
+                    )))).unwrap();
+                }
+
+                if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
+                    ops += queued_r.len();
+                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
+                        queued_r.split_off(0),
+                        queued_r_keys.split_off(0),
+                        false,
+                    )))).unwrap();
+                }
+
+                // since next_send = Some, we better have sent at least one batch!
+                next_send = None;
+                assert!(queued_r.is_empty() || queued_w.is_empty());
+                if let Some(&qw) = queued_w.get(0) {
+                    next_send = Some(qw + max_batch_time);
+                }
+                if let Some(&qr) = queued_r.get(0) {
+                    next_send = Some(qr + max_batch_time);
+                }
+
+                // if the clients aren't keeping up, we want to make sure that we'll still
+                // finish around the stipulated end time. we unfortunately can't rely on just
+                // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
+                // we instead need to stop issuing requests earlier than we otherwise would
+                // have. but make sure we're not still in the warmup phase, because the clients
+                // *could* speed up
+                if now.duration_since(start) > warmup {
+                    if worker_ops.is_none() {
+                        worker_ops =
+                            Some((time::Instant::now(), ndone.load(atomic::Ordering::Acquire)));
+                    }
+
+                    if early_exit && now < end {
+                        let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
+                        let queued = ops as u64 - clients_completed;
+                        let dur = first.elapsed().as_secs();
+
+                        if dur > 0 {
+                            let client_rate = clients_completed / dur;
+                            if client_rate > 0 {
+                                let client_work_left = queued / client_rate;
+                                if client_work_left > (end - now).as_secs() + 1 {
+                                    // no point in continuing to feed work to the clients
+                                    // they have enough work to keep them busy until the end
+                                    eprintln!(
+                                    "load generator quitting early as clients are falling behind"
+                                );
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        atomic::spin_loop_hint();
     }
 
-    ops
+    let gen = throughput(ops, start.elapsed());
+    let worker_ops = worker_ops.map(|(measured, start)| {
+        throughput(
+            ndone.load(atomic::Ordering::Acquire) - start,
+            measured.elapsed(),
+        )
+    });
+
+    // need to drop the pool before waiting so that workers will exit
+    // and thus hit the barrier
+    drop(pool);
+    finished.wait();
+    (gen, worker_ops.unwrap_or(0.0))
 }
 
 fn main() {
@@ -528,6 +536,11 @@ fn main() {
                 .long("no-prime")
                 .help("Indicates that the client should not set up the database"),
         )
+        .arg(
+            Arg::with_name("no-early-exit")
+                .long("no-early-exit")
+                .help("Don't stop generating load when clients fall behind."),
+        )
         .subcommand(
             SubCommand::with_name("netsoup")
                 .arg(
@@ -578,11 +591,39 @@ fn main() {
                         .help("MsSQL database to use"),
                 ),
         )
+        .subcommand(SubCommand::with_name("null"))
         .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
                     Arg::with_name("address")
                         .long("address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:3306")
+                        .help("Address of MySQL server"),
+                )
+                .arg(
+                    Arg::with_name("database")
+                        .long("database")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("soup")
+                        .help("MySQL database to use"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("hybrid")
+                .arg(
+                    Arg::with_name("memcached-address")
+                        .long("memcached-address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:11211")
+                        .help("Address of memcached"),
+                )
+                .arg(
+                    Arg::with_name("mysql-address")
+                        .long("mysql-address")
                         .takes_value(true)
                         .required(true)
                         .default_value("127.0.0.1:3306")
@@ -628,6 +669,14 @@ fn main() {
                         .help("Enable durability for Base nodes"),
                 )
                 .arg(
+                    Arg::with_name("log-dir")
+                        .long("log-dir")
+                        .takes_value(true)
+                        .help(
+                            "Absolute path to the directory where the log files will be written.",
+                        ),
+                )
+                .arg(
                     Arg::with_name("retain-logs-on-exit")
                         .long("retain-logs-on-exit")
                         .takes_value(false)
@@ -640,6 +689,20 @@ fn main() {
                         .takes_value(true)
                         .default_value("512")
                         .help("Size of batches processed at base nodes."),
+                )
+                .arg(
+                    Arg::with_name("flush-timeout")
+                        .long("flush-timeout")
+                        .takes_value(true)
+                        .default_value("100000")
+                        .help("Time to wait before processing a merged packet, in nanoseconds."),
+                )
+                .arg(
+                    Arg::with_name("persistence-threads")
+                        .long("persistence-threads")
+                        .takes_value(true)
+                        .default_value("1")
+                        .help("Number of background threads used by PersistentState."),
                 )
                 .arg(
                     Arg::with_name("stupid")
@@ -656,11 +719,13 @@ fn main() {
         .get_matches();
 
     match args.subcommand() {
-        ("localsoup", Some(largs)) => run::<clients::localsoup::Client>(&args, largs),
-        ("netsoup", Some(largs)) => run::<clients::netsoup::Client>(&args, largs),
-        ("memcached", Some(largs)) => run::<clients::memcached::Client>(&args, largs),
-        ("mssql", Some(largs)) => run::<clients::mssql::Client>(&args, largs),
-        ("mysql", Some(largs)) => run::<clients::mysql::Client>(&args, largs),
+        ("localsoup", Some(largs)) => run::<clients::localsoup::Constructor>(&args, largs),
+        ("netsoup", Some(largs)) => run::<clients::netsoup::Constructor>(&args, largs),
+        ("memcached", Some(largs)) => run::<clients::memcached::Constructor>(&args, largs),
+        ("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
+        ("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
+        ("hybrid", Some(largs)) => run::<clients::hybrid::Conf>(&args, largs),
+        ("null", Some(largs)) => run::<()>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }
 }

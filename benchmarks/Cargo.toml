@@ -1,3 +1,5 @@
+cargo-features = ["rename-dependency"]
+
 [package]
 name = "benchmarks"
 version = "0.0.1"
@@ -7,27 +9,26 @@ authors = ["The Distributary Developers"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 distributary = { path = ".." }
-nom_sql = { git = "https://github.com/ms705/nom-sql.git", rev = "884e763ad7fe8bb49061c42131b377a387708e09" }
+nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "3e7ae4c4d32b77342051d5c217549ab8fcb68e85" }
 regex = "0.2.2"
-slog = "2.0.6"
-#slog = { version = "2.0.6", features = ["max_level_trace", "release_max_level_debug"] }
-slog-term = "2.0.1"
+itertools = "0.7.2"
+slog = "2.2.2"
+#slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_debug"] }
+slog-term = "2.4.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"
-libc = "0.2"
-hwloc = "0.5"
 ssh2 = "0.3"
-whoami = "0.2"
 shellwords = "0.1"
+zookeeper = "0.4.0"
 
 # for benchmarks
 # cli
 clap = "2.25.0"
 # distributions
 rand = "0.4.0"
-zipf = "1.0.0"
+zipf = "3.0.0"
 # sampling
-hdrhistogram = "6.0.0"
+hdrhistogram = { git = "https://github.com/ekmartin/HdrHistogram_rust", branch = "nom_4" }
 # mssql
 futures-state-stream = "0.1"
 tiberius = { git = "https://github.com/steffengy/tiberius.git", rev = "63c1329f84dc0f722fe640b7faa7f803e7db6a5a" }
@@ -42,11 +43,14 @@ futures = "0.1.14"
 tokio-core = "0.1.8"
 # ec2
 rusoto_core = "0.31.0"
-rusoto_ec2 = "0.31.0"
 rusoto_sts = "0.31.0"
-scopeguard = "0.3.3"
+tsunami = "0.5.13"
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
+failure = "0.1"
+
+# for cpupool
+fut20 = { version = "0.2", package = "futures" }
 
 [[bin]]
 name = "bank"
@@ -55,6 +59,14 @@ path = "bank/bank.rs"
 [[bin]]
 name = "vote"
 path = "vote/main.rs"
+
+[[bin]]
+name = "vote-distributed"
+path = "vote/distributed.rs"
+
+[[bin]]
+name = "vote-eintopf"
+path = "vote/eintopf.rs"
 
 [[bin]]
 name = "vote-orchestrator"
@@ -79,6 +91,18 @@ path = "securecrp/main.rs"
 [[bin]]
 name = "piazza"
 path = "piazza/piazza.rs"
+
+[[bin]]
+name = "evict-o-rama"
+path = "evict-o-rama/main.rs"
+
+[[bin]]
+name = "vote-migration"
+path = "vote-migration/main.rs"
+
+[[bin]]
+name = "replay"
+path = "replay/main.rs"
 
 #[[bin]]
 #name = "security-mysql"

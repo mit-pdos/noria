@@ -1,8 +1,6 @@
-use mysql::{self, Opts, OptsBuilder};
-
 use clap;
-
-use clients::{Parameters, VoteClient};
+use clients::{Parameters, VoteClient, VoteClientConstructor};
+use mysql::{self, Opts, OptsBuilder};
 
 pub(crate) struct Client {
     conn: mysql::Conn,
@@ -12,10 +10,10 @@ pub(crate) struct Conf {
     opts: Opts,
 }
 
-impl VoteClient for Client {
-    type Constructor = Conf;
+impl VoteClientConstructor for Conf {
+    type Instance = Client;
 
-    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self::Constructor {
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self {
         let addr = args.value_of("address").unwrap();
         let addr = format!("mysql://{}", addr);
         let db = args.value_of("database").unwrap();
@@ -49,7 +47,7 @@ impl VoteClient for Client {
             ).unwrap();
 
             // prepop
-            let mut aid = 0;
+            let mut aid = 1;
             let bs = 1000;
             assert_eq!(params.articles % bs, 0);
             for _ in 0..params.articles / bs {
@@ -80,12 +78,14 @@ impl VoteClient for Client {
         Conf { opts: opts.into() }
     }
 
-    fn from(cnf: &mut Self::Constructor) -> Self {
+    fn make(&mut self) -> Self::Instance {
         Client {
-            conn: mysql::Conn::new(cnf.opts.clone()).unwrap(),
+            conn: mysql::Conn::new(self.opts.clone()).unwrap(),
         }
     }
+}
 
+impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
         let ids = ids.into_iter().map(|a| a as &_).collect::<Vec<_>>();
 

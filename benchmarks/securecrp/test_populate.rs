@@ -56,10 +56,10 @@ pub fn create_papers(backend: &mut Backend) {
     // id int,
     // author varchar(1024),
     // accepted tinyint(1),
-    let papers: Vec<Vec<&str>> = vec![
-        vec!["1", "malte", "0"],
-        vec!["2", "lara", "0"],
-        vec!["3", "malte", "0"],
+    let papers: Vec<Vec<DataType>> = vec![
+        vec![1.into(), "malte".into(), "0".into()],
+        vec![2.into(), "lara".into(), "0".into()],
+        vec![3.into(), "malte".into(), "0".into()],
     ];
 
     // PaperVersion
@@ -68,29 +68,21 @@ pub fn create_papers(backend: &mut Backend) {
     // contents varchar(1024),
     // abstract text,
     // time datetime DEFAULT CURRENT_TIMESTAMP,
-    let paper_versions: Vec<Vec<&str>> = vec![
+    let paper_versions: Vec<Vec<DataType>> = vec![
         vec![
-            "1",
-            "Why Soup is Awesome",
-            "Text",
-            "Soup is tasty.",
-            "0",
+            1.into(),
+            "Why Soup is Awesome".into(),
+            "Text".into(),
+            "Soup is tasty.".into(),
+            "0".into(),
         ],
-        vec!["2", "Is Soup Tasty?", "Text", "Maybe.", "0"],
-        vec!["3", "How To Cook Soup", "Text", "Make it tasty.", "0"],
+        vec![2.into(), "Is Soup Tasty?".into(), "Text".into(), "Maybe.".into(), "0".into()],
+        vec![3.into(), "How To Cook Soup".into(), "Text".into(), "Make it tasty.".into(), "0".into()],
     ];
 
-    let papers: Vec<Vec<DataType>> = papers
-        .into_iter()
-        .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
-        .collect();
     let mut mutator = backend.g.get_mutator("Paper").unwrap();
     mutator.multi_put(papers).unwrap();
 
-    let paper_versions: Vec<Vec<DataType>> = paper_versions
-        .into_iter()
-        .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
-        .collect();
     let mut mutator = backend.g.get_mutator("PaperVersion").unwrap();
     mutator.multi_put(paper_versions).unwrap();
 }
@@ -102,7 +94,15 @@ pub fn dump_papers(backend: &mut Backend, user: &str) {
         .get_getter(&format!("PaperList_u{}", user))
         .unwrap();
 
-    for i in 1..4 {
-        println!("{:?}", get.lookup(&format!("{}", i).into(), true));
-    }
+    println!("{:?}", get.lookup(&[0.into()], true));
+}
+
+pub fn dump_all_papers(backend: &mut Backend) {
+
+    let mut get = backend
+        .g
+        .get_getter("PaperList")
+        .unwrap();
+
+    println!("{:?}", get.lookup(&[0.into()], true));
 }

@@ -60,7 +60,6 @@ impl Backend {
         use std::fs::File;
 
         let ref blacklist = self.blacklist;
-        let log = &mut self.log;
 
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
@@ -100,12 +99,12 @@ impl Backend {
             }
         }
 
-        info!(log, "Ignored {} blacklisted queries", blacklisted);
+        info!(self.log, "Ignored {} blacklisted queries", blacklisted);
 
         match self.g.install_recipe(rs.clone()) {
             Ok(ar) => {
-                info!(log, "{} expressions added", ar.expressions_added);
-                info!(log, "{} expressions removed", ar.expressions_removed);
+                info!(self.log, "{} expressions added", ar.expressions_added);
+                info!(self.log, "{} expressions removed", ar.expressions_removed);
             }
             Err(e) => return Err(format!("failed to activate recipe: {}", e)),
         }

@@ -294,8 +294,8 @@ fn main() {
     if partial {
         let leaf = format!("post_count");
         let mut getter = backend.g.get_getter(&leaf).unwrap();
-        for author in 0..nusers/4 {
-            getter.lookup(&author.into(), false).unwrap();
+        for author in 0..nusers / 4 {
+            getter.lookup(&[author.into()], false).unwrap();
         }
     }
 
@@ -315,8 +315,8 @@ fn main() {
         if partial {
             let leaf = format!("post_count_u{}", i);
             let mut getter = backend.g.get_getter(&leaf).unwrap();
-            for author in 0..nusers/4 {
-                getter.lookup(&author.into(), false).unwrap();
+            for author in 0..nusers / 4 {
+                getter.lookup(&[author.into()], false).unwrap();
             }
         }
 
@@ -339,7 +339,7 @@ fn main() {
             let mut getter = backend.g.get_getter(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
-                getter.lookup(&author.into(), true).unwrap();
+                getter.lookup(&[author.into()], true).unwrap();
             }
             dur += start.elapsed();
         }

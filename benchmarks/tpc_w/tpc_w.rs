@@ -166,7 +166,8 @@ impl Backend {
         println!("reading {}", query_name);
         let mut g = self.g
             .get_getter(query_name)
-            .expect(&format!("no node for {}!", query_name));
+            .expect(&format!("no node for {}!", query_name))
+            .into_exclusive();
         let query_name = String::from(query_name);
 
         let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
@@ -177,7 +178,7 @@ impl Backend {
 
             let start = time::Instant::now();
             for i in 0..num {
-                match g.lookup(&params[i], true) {
+                match g.lookup(&params[i..(i + 1)], true) {
                     Err(_) => continue,
                     Ok(datas) => if datas.len() > 0 {
                         ok += 1;

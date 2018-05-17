@@ -1,7 +1,6 @@
+extern crate clap;
 extern crate distributary;
 extern crate rand;
-
-extern crate clap;
 extern crate slog;
 
 mod test_populate;
@@ -148,8 +147,8 @@ fn main() {
                 .long("populate")
                 .help("Populate app with randomly generated data"),
         )
+        .arg(Arg::with_name("user").long("user").default_value("malte"))
         .get_matches();
-
 
     println!("Starting SecureCRP...");
 
@@ -161,6 +160,7 @@ fn main() {
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
+    let user = args.value_of("user").unwrap();
 
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
@@ -169,14 +169,17 @@ fn main() {
 
     if args.is_present("populate") {
         test_populate::create_users(&mut backend);
-        test_populate::create_papers(&mut backend);
     }
 
-    backend.login(make_user("malte")).is_ok();
+    thread::sleep(time::Duration::from_millis(2000));
+    backend.login(make_user(user)).is_ok();
 
     if args.is_present("populate") {
-        test_populate::dump_papers(&mut backend, "malte");
+        test_populate::create_papers(&mut backend);
+        test_populate::dump_papers(&mut backend, user);
     }
+
+    test_populate::dump_all_papers(&mut backend);
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
