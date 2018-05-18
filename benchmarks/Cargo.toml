@@ -52,10 +52,6 @@ failure = "0.1"
 # for cpupool
 fut20 = { version = "0.2", package = "futures" }
 
-#[[bin]]
-#name = "bank"
-#path = "bank/bank.rs"
-
 [[bin]]
 name = "vote"
 path = "vote/main.rs"
