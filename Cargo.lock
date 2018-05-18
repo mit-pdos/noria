@@ -531,7 +531,6 @@ dependencies = [
 name = "dataflow"
 version = "0.1.0"
 dependencies = [
- "api 0.1.0",
  "backtrace 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "basics 0.1.0",
  "channel 0.1.0",
