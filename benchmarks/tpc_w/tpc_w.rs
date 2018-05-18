@@ -18,7 +18,7 @@ use std::{thread, time};
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, LocalControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     r: String,

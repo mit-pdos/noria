@@ -9,7 +9,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{ControllerBuilder, LocalControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     blacklist: Vec<String>,

@@ -1,5 +1,6 @@
 use distributary::{
-    self, ControllerBuilder, LocalControllerHandle, LocalAuthority, NodeIndex, PersistenceParameters,
+    self, ControllerBuilder, LocalAuthority, LocalControllerHandle, NodeIndex,
+    PersistenceParameters,
 };
 
 pub(crate) const RECIPE: &str = "# base tables

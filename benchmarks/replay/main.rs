@@ -19,7 +19,7 @@ use itertools::Itertools;
 use zookeeper::ZooKeeper;
 
 use distributary::{
-    ControllerBuilder, LocalControllerHandle, DataType, DurabilityMode, PersistenceParameters,
+    ControllerBuilder, DataType, DurabilityMode, LocalControllerHandle, PersistenceParameters,
     ZookeeperAuthority,
 };
 

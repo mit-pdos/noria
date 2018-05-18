@@ -5,7 +5,7 @@ extern crate rand;
 extern crate clap;
 
 use distributary::{
-    ControllerBuilder, LocalControllerHandle, DataType, LocalAuthority, ReuseConfigType,
+    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
 };
 use std::collections::HashMap;
 use std::fs::File;
