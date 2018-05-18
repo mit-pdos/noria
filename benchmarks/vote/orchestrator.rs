@@ -174,7 +174,8 @@ fn main() {
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
-    let read_percentages: Vec<usize> = args.values_of("read_percentage")
+    let read_percentages: Vec<usize> = args
+        .values_of("read_percentage")
         .unwrap()
         .map(|rp| rp.parse().unwrap())
         .collect();
@@ -187,7 +188,8 @@ fn main() {
     let nclients = value_t_or_exit!(args, "clients", i64);
 
     // guess the core counts
-    let ccores = args.value_of("ctype")
+    let ccores = args
+        .value_of("ctype")
         .and_then(ec2_instance_type_cores)
         .map(|cores| {
             // one core for load generators to be on the safe side
@@ -198,7 +200,8 @@ fn main() {
             }
         })
         .expect("could not determine client core count");
-    let scores = args.value_of("stype")
+    let scores = args
+        .value_of("stype")
         .and_then(ec2_instance_type_cores)
         .expect("could not determine server core count");
 
@@ -289,8 +292,8 @@ fn main() {
     ];
 
     // if the user wants us to terminate, finish whatever we're currently doing first
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     if let Err(e) = ctrlc::set_handler(move || {
@@ -637,7 +640,8 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
 
 impl ConvenientSession for tsunami::Session {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error> {
-        let cmd: Vec<_> = cmd.iter()
+        let cmd: Vec<_> = cmd
+            .iter()
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),

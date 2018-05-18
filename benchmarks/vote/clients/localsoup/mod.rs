@@ -47,7 +47,8 @@ impl VoteClientConstructor for Constructor {
         persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
         persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
         persistence.log_prefix = "vote".to_string();
-        persistence.log_dir = args.value_of("log-dir")
+        persistence.log_dir = args
+            .value_of("log-dir")
             .and_then(|p| Some(PathBuf::from(p)));
 
         // setup db
@@ -97,7 +98,8 @@ impl VoteClientConstructor for Constructor {
 
 impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
-        let data: Vec<Vec<DataType>> = ids.into_iter()
+        let data: Vec<Vec<DataType>> = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
@@ -105,11 +107,13 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let arg = ids.into_iter()
+        let arg = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into()])
             .collect();
 
-        let rows = self.r
+        let rows = self
+            .r
             .multi_lookup(arg, true)
             .unwrap()
             .into_iter()

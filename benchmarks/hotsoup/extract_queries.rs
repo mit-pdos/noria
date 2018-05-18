@@ -32,9 +32,9 @@ fn traverse(path: &Path) -> Vec<PathBuf> {
 fn process_file(fp: &Path, git_rev: &str) -> Vec<(String, String)> {
     use regex::Regex;
     use std::collections::hash_map::DefaultHasher;
+    use std::fs::File;
     use std::hash::{Hash, Hasher};
     use std::io::Read;
-    use std::fs::File;
 
     let re = "\"((?is)select [^;]* from [^;]*?(?-is))\"(?:, \".*\"\\)| \\.|;|\\s*\\)|,)";
     let query_regex = Regex::new(re).unwrap();
@@ -70,26 +70,14 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
     queries
         .into_iter()
         .filter(|&(_, ref q)| !q.contains("Matches"))
-        .map(|(qn, q)| {
-            (qn, php_str_concat_inset.replace_all(&q, "$cc").to_string())
-        })
-        .map(|(qn, q)| {
-            (qn, php_str_concat.replace_all(&q, "").to_string())
-        })
+        .map(|(qn, q)| (qn, php_str_concat_inset.replace_all(&q, "$cc").to_string()))
+        .map(|(qn, q)| (qn, php_str_concat.replace_all(&q, "").to_string()))
         .map(|(qn, q)| (qn, php_vars.replace_all(&q, "?").to_string()))
-        .map(|(qn, q)| {
-            (qn, linebreaks_tabs.replace_all(&q, " ").to_string())
-        })
+        .map(|(qn, q)| (qn, linebreaks_tabs.replace_all(&q, " ").to_string()))
         .map(|(qn, q)| (qn, incomplete.replace_all(&q, "=?").to_string()))
-        .map(|(qn, q)| {
-            (qn, braces_question_mark.replace_all(&q, "?").to_string())
-        })
-        .map(|(qn, q)| {
-            (qn, question_mark_a.replace_all(&q, "=?").to_string())
-        })
-        .map(|(qn, q)| {
-            (qn, unclosed_quote.replace_all(&q, "=?").to_string())
-        })
+        .map(|(qn, q)| (qn, braces_question_mark.replace_all(&q, "?").to_string()))
+        .map(|(qn, q)| (qn, question_mark_a.replace_all(&q, "=?").to_string()))
+        .map(|(qn, q)| (qn, unclosed_quote.replace_all(&q, "=?").to_string()))
         .map(|(qn, q)| {
             if !q.ends_with(";") {
                 (qn, format!("{};", q))
@@ -104,8 +92,8 @@ const SKIP_FILES: [&str; 1] = ["test02.php"];
 
 fn main() {
     use clap::{App, Arg};
-    use std::io::Write;
     use std::fs::File;
+    use std::io::Write;
 
     let log = distributary::logger_pls();
 
