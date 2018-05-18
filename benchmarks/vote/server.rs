@@ -155,7 +155,8 @@ impl<'a> Server<'a> {
     }
 
     fn get_mem(&mut self, pgrep: &str) -> Result<Option<usize>, Error> {
-        let pid = self.get_pid(pgrep)?
+        let pid = self
+            .get_pid(pgrep)?
             .ok_or(format_err!("couldn't find server pid"))?;
         let f = format!("/proc/{}/status", pid);
         let mut c = self.server.exec(&["grep", "VmRSS", &f])?;
@@ -184,12 +185,14 @@ impl<'a> Server<'a> {
 
         match *backend {
             Backend::Memcached => {
-                let mem = self.get_mem("memcached")?
+                let mem = self
+                    .get_mem("memcached")?
                     .ok_or(format_err!("couldn't find memcached memory usage"))?;
                 w.write_all(format!("memory: {}", mem).as_bytes())?;
             }
             Backend::Hybrid => {
-                let mem = self.get_mem("memcached")?
+                let mem = self
+                    .get_mem("memcached")?
                     .ok_or(format_err!("couldn't find memcached memory usage"))?;
                 w.write_all(format!("memcached: {}", mem).as_bytes())?;
 
@@ -209,7 +212,8 @@ impl<'a> Server<'a> {
                 c.wait_eof()?;
             }
             Backend::Netsoup { .. } => {
-                let mem = self.get_mem("souplet")?
+                let mem = self
+                    .get_mem("souplet")?
                     .ok_or(format_err!("couldn't find souplet memory usage"))?;
                 w.write_all(format!("memory: {}", mem).as_bytes())?;
             }

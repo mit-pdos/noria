@@ -317,7 +317,8 @@ fn main() {
         DurabilityMode::MemoryOnly
     };
 
-    persistence.log_dir = args.value_of("log-dir")
+    persistence.log_dir = args
+        .value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
 
     let zk_address = args.value_of("zookeeper-address").unwrap();

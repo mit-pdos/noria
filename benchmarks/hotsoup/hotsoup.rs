@@ -19,14 +19,15 @@ pub struct Backend {
 }
 
 fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     // load query blacklist
     let mut bf = File::open(blacklist).unwrap();
     let mut s = String::new();
     bf.read_to_string(&mut s).unwrap();
-    let blacklisted_queries = s.lines()
+    let blacklisted_queries = s
+        .lines()
         .filter(|l| !l.is_empty() && !l.starts_with("#"))
         .map(|l| String::from(l.split(":").next().unwrap()))
         .map(|l| String::from(l.split("_").nth(1).unwrap()))
@@ -56,8 +57,8 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
 
 impl Backend {
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
-        use std::io::Read;
         use std::fs::File;
+        use std::io::Read;
 
         let ref blacklist = self.blacklist;
 
@@ -69,7 +70,8 @@ impl Backend {
         // load schema
         sf.read_to_string(&mut s).unwrap();
         // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
-        let mut rs = s.lines()
+        let mut rs = s
+            .lines()
             .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
             .take_while(|l| !l.contains("insert"))
             .collect::<Vec<_>>()
@@ -83,7 +85,8 @@ impl Backend {
                 let mut qf = File::open(qf).unwrap();
                 qf.read_to_string(&mut s).unwrap();
                 rs.push_str("\n");
-                rs.push_str(&s.lines()
+                rs.push_str(&s
+                    .lines()
                     .filter(|ref l| {
                         // make sure to skip blacklisted queries
                         for ref q in blacklist {

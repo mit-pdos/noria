@@ -4,16 +4,16 @@ extern crate chrono;
 extern crate distributary;
 extern crate rand;
 
-mod populate;
 mod parameters;
+mod populate;
 
 #[macro_use]
 extern crate clap;
 
 use parameters::SampleKeys;
-use std::{thread, time};
-use std::collections::HashMap;
 use rand::Rng;
+use std::collections::HashMap;
+use std::{thread, time};
 
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
@@ -33,17 +33,18 @@ macro_rules! dur_to_fsec {
     ($d:expr) => {{
         let d = $d;
         (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
-    }}
+    }};
 }
 
 fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     let mut f = File::open(recipe_location).unwrap();
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
-    let mut queries = s.lines()
+    let mut queries = s
+        .lines()
         .filter(|l| {
             !l.is_empty() && !l.starts_with('#') && !l.starts_with("--") && !l.starts_with("CREATE")
         })
@@ -64,8 +65,8 @@ fn make(
     single_query: bool,
     disable_partial: bool,
 ) -> Backend {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     // set up graph
     let mut b = ControllerBuilder::default();
@@ -87,7 +88,8 @@ fn make(
         // load queries
         f.read_to_string(&mut s).unwrap();
         if single_query {
-            s = s.lines()
+            s = s
+                .lines()
                 .take_while(|l| l.starts_with("CREATE"))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -164,7 +166,8 @@ impl Backend {
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
         println!("reading {}", query_name);
-        let mut g = self.g
+        let mut g = self
+            .g
             .get_getter(query_name)
             .expect(&format!("no node for {}!", query_name))
             .into_exclusive();

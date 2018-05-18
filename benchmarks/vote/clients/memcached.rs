@@ -58,7 +58,8 @@ impl VoteClientConstructor for Constructor {
 impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
         use std::collections::HashMap;
-        let keys: Vec<_> = ids.into_iter()
+        let keys: Vec<_> = ids
+            .into_iter()
             .map(|article_id| format!("article_{}_vc", article_id))
             .collect();
         let ids: HashMap<_, _> = keys.iter().map(|key| (key.as_bytes(), (1, 0, 0))).collect();
@@ -67,7 +68,8 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let keys: Vec<_> = ids.into_iter()
+        let keys: Vec<_> = ids
+            .into_iter()
             .flat_map(|article_id| {
                 vec![
                     format!("article_{}", article_id),

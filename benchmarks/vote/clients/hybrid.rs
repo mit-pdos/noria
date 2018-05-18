@@ -1,7 +1,8 @@
 use clap;
 use clients::{Parameters, VoteClient, VoteClientConstructor};
-use memcached::{self,
-                proto::{MultiOperation, ProtoType}};
+use memcached::{
+    self, proto::{MultiOperation, ProtoType},
+};
 use mysql::{self, Opts, OptsBuilder};
 use std::collections::BTreeMap;
 
@@ -146,7 +147,8 @@ impl VoteClient for Client {
         self.my.prep_exec(vote_qstring, &ids).unwrap();
 
         // and invalidate the cache
-        let keys: Vec<_> = ids.into_iter()
+        let keys: Vec<_> = ids
+            .into_iter()
             .map(|article_id| format!("article_{}", article_id))
             .collect();
         let ids: Vec<_> = keys.iter().map(|key| key.as_bytes()).collect();
@@ -155,7 +157,8 @@ impl VoteClient for Client {
 
     fn handle_reads(&mut self, ids: &[i32]) {
         // first read as much as we can from cache
-        let keys: Vec<_> = ids.into_iter()
+        let keys: Vec<_> = ids
+            .into_iter()
             .map(|article_id| (article_id, format!("article_{}", article_id)))
             .collect();
         let key_bytes: Vec<_> = keys.iter().map(|k| k.1.as_bytes()).collect();
@@ -193,7 +196,8 @@ impl VoteClient for Client {
                 }
             }
 
-            let m: BTreeMap<_, _> = m.iter()
+            let m: BTreeMap<_, _> = m
+                .iter()
                 .map(|&(ref k, ref v)| (k.as_bytes(), (v.as_bytes(), 0, 0)))
                 .collect();
 
