@@ -9,13 +9,13 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalControllerHandle, LocalAuthority};
 
 pub struct Backend {
     blacklist: Vec<String>,
     r: String,
     log: slog::Logger,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {

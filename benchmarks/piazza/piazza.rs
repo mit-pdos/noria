@@ -4,7 +4,9 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
-use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
+use distributary::{
+    ControllerBuilder, LocalControllerHandle, DataType, LocalAuthority, ReuseConfigType,
+};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -16,7 +18,7 @@ mod populate;
 use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 #[derive(PartialEq)]

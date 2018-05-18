@@ -18,11 +18,11 @@ use std::{thread, time};
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalControllerHandle, LocalAuthority};
 
 pub struct Backend {
     r: String,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,

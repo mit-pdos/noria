@@ -18,8 +18,10 @@ use hdrhistogram::Histogram;
 use itertools::Itertools;
 use zookeeper::ZooKeeper;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode,
-                   PersistenceParameters, ZookeeperAuthority};
+use distributary::{
+    ControllerBuilder, LocalControllerHandle, DataType, DurabilityMode, PersistenceParameters,
+    ZookeeperAuthority,
+};
 
 // If we .batch_put a huge amount of rows we'll end up with a deadlock when the base
 // domains fill up their TCP buffers trying to send ACKs (which the batch putter
@@ -52,7 +54,7 @@ fn build_graph(
     authority: Arc<ZookeeperAuthority>,
     persistence: PersistenceParameters,
     verbose: bool,
-) -> ControllerHandle<ZookeeperAuthority> {
+) -> LocalControllerHandle<ZookeeperAuthority> {
     let mut builder = ControllerBuilder::default();
     if verbose {
         builder.log_with(distributary::logger_pls());
@@ -65,7 +67,7 @@ fn build_graph(
     builder.build(authority)
 }
 
-fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
+fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
     let mut mutator = g.get_mutator("TableRow").unwrap();
 
     (0..rows)
@@ -90,7 +92,7 @@ fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, skewed: boo
 
 // Synchronously read `reads` times, where each read should trigger a full replay from the base.
 fn perform_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     reads: i64,
     rows: i64,
     skewed: bool,
@@ -124,7 +126,7 @@ fn perform_reads(
 
 // Reads every row with the primary key index.
 fn perform_primary_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     hist: &mut Histogram<u64>,
     row_ids: Vec<i64>,
 ) {
@@ -150,7 +152,7 @@ fn perform_primary_reads(
 
 // Reads each row from one of the secondary indices.
 fn perform_secondary_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     hist: &mut Histogram<u64>,
     rows: i64,
     row_ids: Vec<i64>,

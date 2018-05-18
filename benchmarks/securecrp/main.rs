@@ -5,14 +5,16 @@ extern crate slog;
 
 mod test_populate;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, ReuseConfigType};
+use distributary::{
+    ControllerBuilder, LocalControllerHandle, DataType, LocalAuthority, ReuseConfigType,
+};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
 
 pub struct Backend {
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 impl Backend {

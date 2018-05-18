@@ -1,5 +1,6 @@
-use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
-                   PersistenceParameters};
+use distributary::{
+    self, ControllerBuilder, LocalControllerHandle, LocalAuthority, NodeIndex, PersistenceParameters,
+};
 
 pub(crate) const RECIPE: &str = "# base tables
 CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
@@ -17,7 +18,7 @@ pub struct Graph {
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub end: NodeIndex,
-    pub graph: ControllerHandle<LocalAuthority>,
+    pub graph: LocalControllerHandle<LocalAuthority>,
 }
 
 pub struct Setup {

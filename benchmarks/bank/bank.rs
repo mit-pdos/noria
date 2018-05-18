@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use mio::net::TcpListener;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, Token};
+use distributary::{ControllerBuilder, LocalControllerHandle, DataType, LocalAuthority, Token};
 
 use rand::Rng;
 
@@ -31,7 +31,7 @@ EXAMPLES:
   bank --avg";
 
 pub struct Bank {
-    blender: ControllerHandle<LocalAuthority>,
+    blender: LocalControllerHandle<LocalAuthority>,
     debug_channel: Option<TcpListener>,
 }
 
