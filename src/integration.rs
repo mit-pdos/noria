@@ -641,9 +641,10 @@ fn it_works_with_reads_before_writes() {
 
 #[test]
 fn it_auto_increments_columns() {
-    let mut builder = ControllerBuilder::default();
-    builder.set_sharding(None);
-    let mut g = builder.build_local();
+    let mut b = ControllerBuilder::default();
+    b.set_sharding(None);
+    b.set_persistence(get_persistence_params("it_auto_increments_columns"));
+    let mut g = b.build_local();
     let sql = "
         CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
@@ -671,9 +672,10 @@ fn it_auto_increments_columns() {
 #[test]
 fn it_auto_increments_columns_with_shards() {
     let n = 10;
-    let mut builder = ControllerBuilder::default();
-    builder.set_sharding(Some(n));
-    let mut g = builder.build_local();
+    let mut b = ControllerBuilder::default();
+    b.set_sharding(Some(n));
+    b.set_persistence(get_persistence_params("it_auto_increments_columns_with_shards"));
+    let mut g = b.build_local();
     let sql = "
         CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
