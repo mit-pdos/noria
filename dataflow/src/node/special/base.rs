@@ -146,14 +146,14 @@ fn key_of<'a>(key_cols: &'a [usize], r: &'a Record) -> impl Iterator<Item = &'a 
 fn replace_with_auto_increment(
     auto_increment_values: &mut HashMap<usize, DataType>,
     row: &mut Vec<DataType>,
-    shard: Option<usize>,
+    shard: usize,
 ) {
     for (index, value) in auto_increment_values.iter_mut() {
         // When we're given a None value, replace it with the incremented version
         // of the last auto increment value for that column (or the initial increment value):
         *value = match (&row[*index], &value) {
             (&DataType::None, &&mut DataType::None) => {
-                DataType::ID(shard.unwrap_or(0) as u32, INITIAL_AUTO_INCREMENT)
+                DataType::ID(shard as u32, INITIAL_AUTO_INCREMENT)
             }
             (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
             // Other values should override existing auto increment values, so that
@@ -177,7 +177,7 @@ impl Base {
         us: LocalNodeIndex,
         mut rs: Records,
         state: &StateMap,
-        shard: Option<usize>,
+        shard: usize,
     ) -> Records {
         if self.primary_key.is_none() || rs.is_empty() {
             for r in &mut *rs {
@@ -363,7 +363,7 @@ mod tests {
         }
     }
 
-    fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R, shard: Option<usize>) -> Records {
+    fn one_base_row<R: Into<Record>>(test: &mut TestBase, r: R, shard: usize) -> Records {
         let rs: Records = r.into().into();
         let mut records = test.base
             .process(test.local_addr, rs.into(), &test.states, shard);
@@ -397,7 +397,7 @@ mod tests {
     fn it_forwards() {
         let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into(), "a".into()];
-        assert_eq!(one_base_row(&mut base, rs.clone(), None), vec![rs].into());
+        assert_eq!(one_base_row(&mut base, rs.clone(), 0), vec![rs].into());
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
         let mut base = setup(vec![]);
         let rs: Vec<DataType> = vec![1.into()];
         assert_eq!(
-            one_base_row(&mut base, rs.clone(), None),
+            one_base_row(&mut base, rs.clone(), 0),
             vec![vec![1.into(), "default".into()]].into()
         );
     }
@@ -452,7 +452,7 @@ mod tests {
         let mut one = move |u: Vec<Record>| {
             let mut m = n.get_base_mut()
                 .unwrap()
-                .process(local, u.into(), &states, None);
+                .process(local, u.into(), &states, 0);
             node::materialize(&mut m, None, states.get_mut(&local));
             m
         };
@@ -530,7 +530,7 @@ mod tests {
         for (i, string) in strings.into_iter().enumerate() {
             let rs: Vec<DataType> = vec![DataType::None, string.into()];
             assert_eq!(
-                one_base_row(&mut base, rs, Some(shard as usize)),
+                one_base_row(&mut base, rs, shard as usize),
                 vec![vec![DataType::ID(shard, (i + 1) as u64), string.into()]].into()
             );
         }
@@ -538,14 +538,14 @@ mod tests {
         // Explicit values should not be overriden by auto increment:
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
-            one_base_row(&mut base, excempt.clone(), Some(shard as usize)),
+            one_base_row(&mut base, excempt.clone(), shard as usize),
             vec![vec![DataType::ID(shard, 10), "d".into()]].into()
         );
 
         // And the auto increment should then start from that value:
         let regular: Vec<DataType> = vec![DataType::None, "e".into()];
         assert_eq!(
-            one_base_row(&mut base, regular, Some(shard as usize)),
+            one_base_row(&mut base, regular, shard as usize),
             vec![vec![DataType::ID(shard, 11), "e".into()]].into()
         );
     }

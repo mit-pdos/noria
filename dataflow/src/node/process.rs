@@ -32,7 +32,7 @@ impl Node {
                 let m = m.as_mut().unwrap();
                 m.map_data(|data| {
                     let old_data = mem::replace(data, Records::default());
-                    let mut rs = b.process(addr, old_data, &*state, on_shard);
+                    let mut rs = b.process(addr, old_data, &*state, on_shard.unwrap_or(0));
 
                     // When a replay originates at a base node, we replay the data *through* that
                     // same base node because its column set may have changed. However, this replay
