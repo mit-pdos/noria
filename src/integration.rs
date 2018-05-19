@@ -677,11 +677,13 @@ fn it_auto_increments_columns_with_shards() {
     let sql = "
         CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
+        QUERY ReadById: SELECT aid FROM Article WHERE aid = ?;
     ";
 
     g.install_recipe(sql.to_owned()).unwrap();
     let mut article = g.get_mutator("Article").unwrap();
     let mut read = g.get_getter("Read").unwrap();
+    let mut read_id = g.get_getter("ReadById").unwrap();
 
     let article_type = "Interview";
     for _ in 0..n {
@@ -695,6 +697,9 @@ fn it_auto_increments_columns_with_shards() {
     assert_eq!(results.len(), n);
     let mut shards = vec![0; n];
     for result in results {
+        let lookup = read_id.lookup(&[result[0].clone()], true).unwrap();
+        assert_eq!(lookup.len(), 1);
+        assert_eq!(lookup[0][0], result[0]);
         match result[0] {
             DataType::ID(s, v) => {
                 shards[s as usize] = u64::max(v, shards[s as usize]);

@@ -103,6 +103,7 @@ pub fn shard_by(dt: &basics::DataType, shards: usize) -> usize {
             hasher.finish() as usize % shards
         }
         basics::DataType::None => thread_rng().gen_range(0, shards),
+        basics::DataType::ID(shard, _) => shard as usize,
         ref x => {
             println!("asked to shard on value {:?}", x);
             unimplemented!();
