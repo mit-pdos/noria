@@ -158,8 +158,8 @@ fn replace_with_auto_increment(
             (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
             // Other values should override existing auto increment values, so that
             // the auto incrementer continues from there the next time:
-            (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as u64),
-            (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as u64),
+            (&DataType::Int(i), _) => DataType::ID(shard as u32, i as u64),
+            (&DataType::BigInt(i), _) => DataType::ID(shard as u32, i as u64),
             _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
         };
 
@@ -534,7 +534,13 @@ mod tests {
                 vec![vec![DataType::ID(shard, (i + 1) as u64), string.into()]].into()
             );
         }
+    }
 
+    #[test]
+    fn it_supports_auto_increment_columns_w_override() {
+        let mut base = setup(vec![0]);
+        let strings = vec!["a", "b", "c"];
+        let shard: u32 = 10;
         // Explicit values should not be overriden by auto increment:
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
