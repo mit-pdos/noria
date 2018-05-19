@@ -29,7 +29,7 @@ pub enum DataType {
     /// A 64-bit numeric value.
     BigInt(i64),
     /// A 64-bit numeric ID, prefixed by its shard index (or 0 if unsharded).
-    ID(u32, i64),
+    ID(u32, u64),
     /// A fixed point real value. The first field is the integer part, while the second is the
     /// fractional and must be between -999999999 and 999999999.
     Real(i32, i32),

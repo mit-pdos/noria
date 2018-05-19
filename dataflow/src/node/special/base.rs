@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use vec_map::VecMap;
 
-const INITIAL_AUTO_INCREMENT: i64 = 1;
+const INITIAL_AUTO_INCREMENT: u64 = 1;
 
 /// Base is used to represent the root nodes of the distributary data flow graph.
 ///
@@ -158,8 +158,8 @@ fn replace_with_auto_increment(
             (&DataType::None, &&mut DataType::ID(s, i)) => DataType::ID(s, i + 1),
             // Other values should override existing auto increment values, so that
             // the auto incrementer continues from there the next time:
-            (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as i64),
-            (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i),
+            (&DataType::Int(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as u64),
+            (&DataType::BigInt(i), &&mut DataType::ID(s, _)) => DataType::ID(s, i as u64),
             _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
         };
 
@@ -531,7 +531,7 @@ mod tests {
             let rs: Vec<DataType> = vec![DataType::None, string.into()];
             assert_eq!(
                 one_base_row(&mut base, rs, Some(shard as usize)),
-                vec![vec![DataType::ID(shard, (i + 1) as i64), string.into()]].into()
+                vec![vec![DataType::ID(shard, (i + 1) as u64), string.into()]].into()
             );
         }
 

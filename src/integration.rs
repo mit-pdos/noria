@@ -664,7 +664,7 @@ fn it_auto_increments_columns() {
     let result = read.lookup(&[article_type.into()], true).unwrap();
     assert_eq!(result.len(), 3);
     for i in 0..3 {
-        assert_eq!(result[i][0], DataType::ID(0, (i + 1) as i64));
+        assert_eq!(result[i][0], DataType::ID(0, (i + 1) as u64));
     }
 }
 
@@ -697,7 +697,7 @@ fn it_auto_increments_columns_with_shards() {
     for result in results {
         match result[0] {
             DataType::ID(s, v) => {
-                shards[s as usize] = i64::max(v, shards[s as usize]);
+                shards[s as usize] = u64::max(v, shards[s as usize]);
                 assert!(s < 10);
                 assert!(v > 0 && s <= 10);
             }
@@ -707,7 +707,7 @@ fn it_auto_increments_columns_with_shards() {
 
     // Shards are picked at random for auto increment columns,
     // but the IDs for each shard should sum up to the number of rows we inserted.
-    assert_eq!(shards.into_iter().sum::<i64>(), 10);
+    assert_eq!(shards.into_iter().sum::<u64>(), 10);
 }
 
 #[test]
