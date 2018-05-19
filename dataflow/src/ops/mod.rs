@@ -220,12 +220,12 @@ pub mod test {
     use petgraph::graph::NodeIndex;
 
     pub struct MockGraph {
-        pub graph: Graph,
-        pub source: NodeIndex,
-        pub nut: Option<IndexPair>, // node under test
+        graph: Graph,
+        source: NodeIndex,
+        nut: Option<IndexPair>, // node under test
         pub states: StateMap,
-        pub nodes: DomainNodes,
-        pub remap: HashMap<NodeIndex, IndexPair>,
+        nodes: DomainNodes,
+        remap: HashMap<NodeIndex, IndexPair>,
     }
 
     impl MockGraph {
@@ -368,7 +368,8 @@ pub mod test {
                 }
             }
             // and get rid of states we don't need
-            let unused: Vec<_> = self.remap
+            let unused: Vec<_> = self
+                .remap
                 .values()
                 .filter_map(|ni| {
                     let ni = *self.graph[ni.as_global()].local_addr();
@@ -493,7 +494,8 @@ pub mod test {
 
         pub fn narrow_base_id(&self) -> IndexPair {
             assert_eq!(self.remap.len(), 2 /* base + nut */);
-            *self.remap
+            *self
+                .remap
                 .values()
                 .skip_while(|&n| n.as_global() == self.nut.unwrap().as_global())
                 .next()

@@ -2406,7 +2406,8 @@ fn finkelstein1982_queries() {
 
         // Load queries
         f.read_to_string(&mut s).unwrap();
-        let lines: Vec<String> = s.lines()
+        let lines: Vec<String> = s
+            .lines()
             .filter(|l| !l.is_empty() && !l.starts_with("#"))
             .map(|l| {
                 if !(l.ends_with("\n") || l.ends_with(";")) {
@@ -2438,7 +2439,8 @@ fn tpc_w() {
 
         // Load queries
         f.read_to_string(&mut s).unwrap();
-        let lines: Vec<String> = s.lines()
+        let lines: Vec<String> = s
+            .lines()
             .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .map(|l| {
                 if !(l.ends_with('\n') || l.ends_with(';')) {
