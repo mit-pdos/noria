@@ -419,7 +419,7 @@ impl ReadHandle {
         match *self {
             ReadHandle::Sharded(ref shards) => {
                 assert_eq!(key.len(), 1);
-                shards[::shard_by(&key[0], shards.len())]
+                shards[::shard_by(&key[0], shards.len(), 0)]
                     .as_ref()
                     .unwrap()
                     .find_and(key, then, block)
@@ -436,7 +436,7 @@ impl ReadHandle {
         match *self {
             ReadHandle::Sharded(ref shards) => {
                 assert_eq!(key.len(), 1);
-                shards[::shard_by(&key[0], shards.len())]
+                shards[::shard_by(&key[0], shards.len(), 0)]
                     .as_ref()
                     .unwrap()
                     .try_find_and(key, then)

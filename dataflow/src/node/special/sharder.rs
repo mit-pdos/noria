@@ -7,6 +7,7 @@ pub struct Sharder {
     txs: Vec<(LocalNodeIndex, ReplicaAddr)>,
     sharded: VecMap<Box<Packet>>,
     shard_by: usize,
+    previous_shard: usize,
 }
 
 impl Clone for Sharder {
@@ -15,6 +16,7 @@ impl Clone for Sharder {
 
         Sharder {
             txs: Vec::new(),
+            previous_shard: self.previous_shard,
             sharded: Default::default(),
             shard_by: self.shard_by,
         }
@@ -25,6 +27,7 @@ impl Sharder {
     pub fn new(by: usize) -> Self {
         Self {
             txs: Default::default(),
+            previous_shard: Default::default(),
             shard_by: by,
             sharded: VecMap::default(),
         }
@@ -36,6 +39,7 @@ impl Sharder {
         Self {
             txs: txs,
             sharded: VecMap::default(),
+            previous_shard: self.previous_shard,
             shard_by: self.shard_by,
         }
     }
@@ -53,13 +57,18 @@ impl Sharder {
     }
 
     #[inline]
-    fn to_shard(&self, r: &Record) -> usize {
+    fn to_shard(&mut self, r: &Record) -> usize {
         self.shard(&r[self.shard_by])
     }
 
     #[inline]
-    fn shard(&self, dt: &DataType) -> usize {
-        ::shard_by(dt, self.txs.len())
+    fn shard(&mut self, dt: &DataType) -> usize {
+        let s = ::shard_by(dt, self.txs.len(), self.previous_shard);
+        if *dt == DataType::None {
+            self.previous_shard = s;
+        }
+
+        s
     }
 
     pub fn process(

@@ -185,6 +185,7 @@ impl DomainBuilder {
         Domain {
             index: self.index,
             shard,
+            previous_shard: Default::default(),
             _nshards: self.nshards,
             domain_addr: addr,
 
@@ -230,6 +231,7 @@ impl DomainBuilder {
 pub struct Domain {
     index: Index,
     shard: Option<usize>,
+    previous_shard: usize,
     _nshards: usize,
     domain_addr: SocketAddr,
 
@@ -429,7 +431,8 @@ impl Domain {
                 0
             } else {
                 assert_eq!(key.len(), 1);
-                ::shard_by(&key[0], triggers.len())
+                self.previous_shard = ::shard_by(&key[0], triggers.len(), self.previous_shard);
+                self.previous_shard
             };
             self.concurrent_replays += 1;
             trace!(self.log, "sending replay request";
@@ -1047,7 +1050,7 @@ impl Domain {
                                             assert_eq!(miss.len(), 1);
 
                                             let n = txs.len();
-                                            &mut txs[::shard_by(&miss[0], n)]
+                                            &mut txs[::shard_by(&miss[0], n, 0)]
                                         };
 
                                         let mut m = box Packet::RequestReaderReplay {

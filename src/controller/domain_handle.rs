@@ -30,12 +30,13 @@ pub struct DomainInputHandle {
 pub(crate) struct BatchSendHandle<'a> {
     dih: &'a mut DomainInputHandle,
     sent: Vec<usize>,
+    previous_shard: usize,
 }
 
 impl<'a> BatchSendHandle<'a> {
     pub(crate) fn new(dih: &'a mut DomainInputHandle) -> Self {
         let sent = vec![0; dih.txs.len()];
-        Self { dih, sent }
+        Self { previous_shard: 0, dih, sent }
     }
 
     pub(crate) fn enqueue(
@@ -72,7 +73,13 @@ impl<'a> BatchSendHandle<'a> {
                             ref row, ..
                         }) => &row[key_col],
                     };
-                    dataflow::shard_by(key, self.dih.txs.len())
+
+                    let s = dataflow::shard_by(key, self.dih.txs.len(), self.previous_shard);
+                    if *key == DataType::None {
+                        self.previous_shard = s;
+                    }
+
+                    s
                 };
                 shard_writes[shard].push(r);
             }

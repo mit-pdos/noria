@@ -279,7 +279,7 @@ impl<E> RemoteGetter<E> {
             assert!(keys.iter().all(|k| k.len() == 1));
             let mut shard_queries = vec![Vec::new(); self.shards.len()];
             for key in keys {
-                let shard = dataflow::shard_by(&key[0], self.shards.len());
+                let shard = dataflow::shard_by(&key[0], self.shards.len(), 0);
                 shard_queries[shard].push(key);
             }
 
@@ -359,7 +359,7 @@ impl<E> RemoteGetter<E> {
             assert!(keys.iter().all(|k| k.len() == 1));
             let mut shard_queries = vec![Vec::new(); self.shards.len()];
             for key in keys {
-                let shard = dataflow::shard_by(&key[0], self.shards.len());
+                let shard = dataflow::shard_by(&key[0], self.shards.len(), 0);
                 shard_queries[shard].push(key);
             }
 
