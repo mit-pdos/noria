@@ -82,7 +82,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }

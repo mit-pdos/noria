@@ -60,7 +60,7 @@ impl Setup {
         }
         let mut graph = g.build_local();
 
-        graph.install_recipe(RECIPE.to_owned()).unwrap();
+        graph.install_recipe(RECIPE).unwrap();
         let inputs = graph.inputs();
         let outputs = graph.outputs();
 
@@ -106,9 +106,9 @@ impl Graph {
                             WHERE Article.id = ?;";
 
         if self.stupid {
-            self.graph.extend_recipe(stupid_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(stupid_recipe).unwrap();
         } else {
-            self.graph.extend_recipe(smart_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(smart_recipe).unwrap();
         }
     }
 }

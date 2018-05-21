@@ -54,7 +54,7 @@ impl Backend {
     }
 
     pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self.g.get_mutator(name).unwrap();
+        let mut mutator = self.g.base(name).unwrap();
 
         let start = time::Instant::now();
 
@@ -114,7 +114,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -284,7 +284,7 @@ fn main() {
     // if partial, read 25% of the keys
     if partial {
         let leaf = format!("post_count");
-        let mut getter = backend.g.get_getter(&leaf).unwrap();
+        let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
         }
@@ -301,7 +301,7 @@ fn main() {
         // if partial, read 25% of the keys
         if partial {
             let leaf = format!("post_count_u{}", i);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
             }
@@ -322,7 +322,7 @@ fn main() {
         let mut dur = time::Duration::from_millis(0);
         for uid in 0..nlogged {
             let leaf = format!("post_count_u{}", uid);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
                 getter.lookup(&[author.into()], true).unwrap();

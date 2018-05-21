@@ -67,7 +67,7 @@ impl VoteClientConstructor for Constructor {
         if verbose {
             println!("Prepopulating with {} articles", params.articles);
         }
-        let mut a = g.graph.get_mutator("Article").unwrap();
+        let mut a = g.graph.base("Article").unwrap();
         a.batch_put((0..params.articles).map(|i| {
             vec![
                 ((i + 1) as i32).into(),
@@ -86,8 +86,8 @@ impl VoteClientConstructor for Constructor {
 
     fn make(&mut self) -> Self::Instance {
         let mut ch = self.0.graph.pointer().connect();
-        let r = ch.get_getter("ArticleWithVoteCount").unwrap();
-        let w = ch.get_mutator("Vote").unwrap();
+        let r = ch.view("ArticleWithVoteCount").unwrap();
+        let w = ch.base("Vote").unwrap();
         Client { _ch: ch, r, w }
     }
 

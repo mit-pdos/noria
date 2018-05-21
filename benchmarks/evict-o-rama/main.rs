@@ -42,12 +42,12 @@ fn main() {
     //builder.disable_partial();
 
     let mut blender = builder.build_local();
-    blender.install_recipe(sql.to_owned()).unwrap();
+    blender.install_recipe(sql).unwrap();
 
     // Get mutators and getter.
-    let mut article = blender.get_mutator("Article").unwrap();
-    let mut vote = blender.get_mutator("Vote").unwrap();
-    let mut awvc = blender.get_getter("ArticleWithVoteCount").unwrap();
+    let mut article = blender.base("Article").unwrap();
+    let mut vote = blender.base("Vote").unwrap();
+    let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
 
     println!("Creating articles...");
     for aid in 1..NUM_ARTICLES {

@@ -19,7 +19,7 @@ macro_rules! dur_to_fsec {
 }
 
 fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-    let mut mutator = backend.g.get_mutator(name).unwrap().into_exclusive();
+    let mut mutator = backend.g.base(name).unwrap().into_exclusive();
 
     let i = records.len();
 

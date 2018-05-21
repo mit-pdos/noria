@@ -104,7 +104,7 @@ impl Backend {
 
         info!(self.log, "Ignored {} blacklisted queries", blacklisted);
 
-        match self.g.install_recipe(rs.clone()) {
+        match self.g.install_recipe(&rs) {
             Ok(ar) => {
                 info!(self.log, "{} expressions added", ar.expressions_added);
                 info!(self.log, "{} expressions removed", ar.expressions_removed);

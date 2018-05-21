@@ -68,7 +68,7 @@ fn build_graph(
 }
 
 fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
-    let mut mutator = g.get_mutator("TableRow").unwrap();
+    let mut mutator = g.base("TableRow").unwrap();
 
     (0..rows)
         .map(|i| {
@@ -130,7 +130,7 @@ fn perform_primary_reads(
     hist: &mut Histogram<u64>,
     row_ids: Vec<i64>,
 ) {
-    let mut getter = g.get_getter("ReadRow").unwrap();
+    let mut getter = g.view("ReadRow").unwrap();
 
     for i in row_ids {
         let id: DataType = DataType::BigInt(i);
@@ -159,7 +159,7 @@ fn perform_secondary_reads(
 ) {
     let indices = 10;
     let mut getters: Vec<_> = (1..indices)
-        .map(|i| g.get_getter(&format!("query_c{}", i)).unwrap())
+        .map(|i| g.view(&format!("query_c{}", i)).unwrap())
         .collect();
 
     let skewed = row_ids.len() == 1;
@@ -330,9 +330,9 @@ fn main() {
         clear_zookeeper(zk_address);
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
         if use_secondary {
-            g.install_recipe(SECONDARY_RECIPE.to_owned()).unwrap();
+            g.install_recipe(SECONDARY_RECIPE).unwrap();
         } else {
-            g.install_recipe(RECIPE.to_owned()).unwrap();
+            g.install_recipe(RECIPE).unwrap();
         }
 
         if verbose {
