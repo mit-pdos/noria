@@ -186,7 +186,7 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
     // sleep "forever"

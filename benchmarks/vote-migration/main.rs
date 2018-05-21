@@ -71,13 +71,14 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     eprintln!("Setting up soup");
     let mut g = s.make(persistence_params);
     eprintln!("Getting accessors");
-    let mut articles = g.graph.table("Article").unwrap().into_exclusive();
-    let mut votes = g.graph.table("Vote").unwrap().into_exclusive();
+    let mut articles = g.graph.table("Article").unwrap().into_exclusive().unwrap();
+    let mut votes = g.graph.table("Vote").unwrap().into_exclusive().unwrap();
     let mut read_old = g
         .graph
         .view("ArticleWithVoteCount")
         .unwrap()
-        .into_exclusive();
+        .into_exclusive()
+        .unwrap();
 
     // prepopulate
     eprintln!("Prepopulating with {} articles", narticles);
@@ -165,8 +166,13 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     stat.send(("MIG START", 0.0)).unwrap();
     g.transition();
     stat.send(("MIG FINISHED", 0.0)).unwrap();
-    let mut ratings = g.graph.table("Rating").unwrap().into_exclusive();
-    let mut read_new = g.graph.view("ArticleWithScore").unwrap().into_exclusive();
+    let mut ratings = g.graph.table("Rating").unwrap().into_exclusive().unwrap();
+    let mut read_new = g
+        .graph
+        .view("ArticleWithScore")
+        .unwrap()
+        .into_exclusive()
+        .unwrap();
 
     // start writer that just does a bunch of new writes
     eprintln!("Starting new writer");

@@ -85,7 +85,7 @@ impl VoteClientConstructor for Constructor {
     }
 
     fn make(&mut self) -> Self::Instance {
-        let mut ch = self.0.graph.pointer().connect();
+        let mut ch = self.0.graph.pointer().connect().unwrap();
         let r = ch.view("ArticleWithVoteCount").unwrap();
         let w = ch.table("Vote").unwrap();
         Client { _ch: ch, r, w }

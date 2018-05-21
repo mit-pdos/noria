@@ -324,7 +324,7 @@ fn main() {
         .and_then(|p| Some(PathBuf::from(p)));
 
     let zk_address = args.value_of("zookeeper-address").unwrap();
-    let authority = Arc::new(ZookeeperAuthority::new(zk_address));
+    let authority = Arc::new(ZookeeperAuthority::new(zk_address).unwrap());
 
     if !args.is_present("use-existing-data") {
         clear_zookeeper(zk_address);

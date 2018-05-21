@@ -170,7 +170,8 @@ impl Backend {
             .g
             .view(query_name)
             .expect(&format!("no node for {}!", query_name))
-            .into_exclusive();
+            .into_exclusive()
+            .unwrap();
         let query_name = String::from(query_name);
 
         let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
@@ -371,7 +372,7 @@ fn main() {
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
             }
         }
     }

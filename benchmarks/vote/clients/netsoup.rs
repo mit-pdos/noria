@@ -15,14 +15,14 @@ fn make_mutator(
     c: &mut Handle,
     view: &str,
 ) -> distributary::Table<distributary::ExclusiveConnection> {
-    c.table(view).unwrap().into_exclusive()
+    c.table(view).unwrap().into_exclusive().unwrap()
 }
 
 fn make_getter(
     c: &mut Handle,
     view: &str,
 ) -> distributary::View<distributary::ExclusiveConnection> {
-    c.view(view).unwrap().into_exclusive()
+    c.view(view).unwrap().into_exclusive().unwrap()
 }
 
 pub(crate) struct Constructor(String);
@@ -39,7 +39,7 @@ impl VoteClientConstructor for Constructor {
 
         if params.prime {
             // for prepop, we need a mutator
-            let mut ch = Handle::new(ZookeeperAuthority::new(&zk));
+            let mut ch = Handle::new(ZookeeperAuthority::new(&zk).unwrap()).unwrap();
             ch.install_recipe(RECIPE).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
             let mut id = 0;
@@ -57,7 +57,7 @@ impl VoteClientConstructor for Constructor {
     }
 
     fn make(&mut self) -> Self::Instance {
-        let mut ch = Handle::new(ZookeeperAuthority::new(&self.0));
+        let mut ch = Handle::new(ZookeeperAuthority::new(&self.0).unwrap()).unwrap();
 
         Client {
             r: make_getter(&mut ch, "ArticleWithVoteCount"),

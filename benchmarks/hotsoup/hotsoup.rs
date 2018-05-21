@@ -290,7 +290,7 @@ fn main() {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
                 panic!(e)
             }
             _ => (),
@@ -299,7 +299,7 @@ fn main() {
         if gloc.is_some() {
             let graph_fname = format!("{}/hotcrp_{}.gv", gloc.unwrap(), schema_version);
             let mut gf = File::create(graph_fname).unwrap();
-            assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+            assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
         }
 
         // on the first auto-upgradeable schema, populate with test data

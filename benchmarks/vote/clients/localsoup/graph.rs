@@ -61,8 +61,8 @@ impl Setup {
         let mut graph = g.build_local();
 
         graph.install_recipe(RECIPE).unwrap();
-        let inputs = graph.inputs();
-        let outputs = graph.outputs();
+        let inputs = graph.inputs().unwrap();
+        let outputs = graph.outputs().unwrap();
 
         if self.logging {
             println!("inputs {:?}", inputs);
