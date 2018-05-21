@@ -4,9 +4,9 @@ use clients::{Parameters, VoteClient, VoteClientConstructor};
 use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 
 pub(crate) struct Client {
-    r: distributary::RemoteGetter<distributary::ExclusiveConnection>,
+    r: distributary::View<distributary::ExclusiveConnection>,
     #[allow(dead_code)]
-    w: distributary::Mutator<distributary::ExclusiveConnection>,
+    w: distributary::Table<distributary::ExclusiveConnection>,
 }
 
 type Handle = ControllerHandle<ZookeeperAuthority>;
@@ -14,14 +14,14 @@ type Handle = ControllerHandle<ZookeeperAuthority>;
 fn make_mutator(
     c: &mut Handle,
     view: &str,
-) -> distributary::Mutator<distributary::ExclusiveConnection> {
-    c.base(view).unwrap().into_exclusive()
+) -> distributary::Table<distributary::ExclusiveConnection> {
+    c.table(view).unwrap().into_exclusive()
 }
 
 fn make_getter(
     c: &mut Handle,
     view: &str,
-) -> distributary::RemoteGetter<distributary::ExclusiveConnection> {
+) -> distributary::View<distributary::ExclusiveConnection> {
     c.view(view).unwrap().into_exclusive()
 }
 
@@ -45,7 +45,7 @@ impl VoteClientConstructor for Constructor {
             let mut id = 0;
             while id < params.articles {
                 let end = ::std::cmp::min(id + 1000, params.articles);
-                m.batch_put(
+                m.batch_insert(
                     (id..end)
                         .map(|i| vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]),
                 ).unwrap();
@@ -73,7 +73,7 @@ impl VoteClient for Client {
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
-        self.w.multi_put(data).unwrap();
+        self.w.insert_all(data).unwrap();
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {

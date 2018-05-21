@@ -19,7 +19,7 @@ macro_rules! dur_to_fsec {
 }
 
 fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-    let mut mutator = backend.g.base(name).unwrap().into_exclusive();
+    let mut mutator = backend.g.table(name).unwrap().into_exclusive();
 
     let i = records.len();
 
@@ -28,7 +28,7 @@ fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<Data
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r).unwrap();
+            mutator.insert(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());

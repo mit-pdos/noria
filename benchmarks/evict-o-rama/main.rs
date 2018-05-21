@@ -45,8 +45,8 @@ fn main() {
     blender.install_recipe(sql).unwrap();
 
     // Get mutators and getter.
-    let mut article = blender.base("Article").unwrap();
-    let mut vote = blender.base("Vote").unwrap();
+    let mut article = blender.table("Article").unwrap();
+    let mut vote = blender.table("Vote").unwrap();
     let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
 
     println!("Creating articles...");
@@ -55,9 +55,9 @@ fn main() {
         let title = format!("Article {}", aid);
         let url = "http://pdos.csail.mit.edu";
         article
-            .put(vec![aid.into(), title.into(), url.into()])
+            .insert(vec![aid.into(), title.into(), url.into()])
             .unwrap();
-        vote.put(vec![aid.into(), 1.into()]).unwrap();
+        vote.insert(vec![aid.into(), 1.into()]).unwrap();
     }
 
     println!("Reading articles...");
@@ -73,7 +73,7 @@ fn main() {
             .unwrap()
             .as_secs() as i64;
         aid = (aid + 1) % NUM_ARTICLES;
-        vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
+        vote.insert(vec![(aid + 1).into(), uid.into()]).unwrap();
 
         awvc.lookup(&[aid.into()], true).unwrap();
     }

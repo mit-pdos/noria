@@ -54,13 +54,13 @@ impl Backend {
     }
 
     pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self.g.base(name).unwrap();
+        let mut mutator = self.g.table(name).unwrap();
 
         let start = time::Instant::now();
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r).unwrap();
+            mutator.insert(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());

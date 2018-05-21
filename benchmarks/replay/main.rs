@@ -68,7 +68,7 @@ fn build_graph(
 }
 
 fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
-    let mut mutator = g.base("TableRow").unwrap();
+    let mut mutator = g.table("TableRow").unwrap();
 
     (0..rows)
         .map(|i| {
@@ -86,7 +86,7 @@ fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed
         .into_iter()
         .for_each(|chunk| {
             let rs: Vec<Vec<DataType>> = chunk.collect();
-            mutator.multi_put(rs).unwrap();
+            mutator.insert_all(rs).unwrap();
         });
 }
 

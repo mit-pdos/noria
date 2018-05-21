@@ -9,9 +9,9 @@ pub(crate) mod graph;
 
 pub(crate) struct Client {
     _ch: distributary::ControllerHandle<distributary::LocalAuthority>,
-    r: distributary::RemoteGetter,
+    r: distributary::View,
     #[allow(dead_code)]
-    w: distributary::Mutator,
+    w: distributary::Table,
 }
 
 pub(crate) struct Constructor(graph::Graph);
@@ -67,8 +67,8 @@ impl VoteClientConstructor for Constructor {
         if verbose {
             println!("Prepopulating with {} articles", params.articles);
         }
-        let mut a = g.graph.base("Article").unwrap();
-        a.batch_put((0..params.articles).map(|i| {
+        let mut a = g.graph.table("Article").unwrap();
+        a.batch_insert((0..params.articles).map(|i| {
             vec![
                 ((i + 1) as i32).into(),
                 format!("Article #{}", i + 1).into(),
@@ -87,7 +87,7 @@ impl VoteClientConstructor for Constructor {
     fn make(&mut self) -> Self::Instance {
         let mut ch = self.0.graph.pointer().connect();
         let r = ch.view("ArticleWithVoteCount").unwrap();
-        let w = ch.base("Vote").unwrap();
+        let w = ch.table("Vote").unwrap();
         Client { _ch: ch, r, w }
     }
 
@@ -103,7 +103,7 @@ impl VoteClient for Client {
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
-        self.w.multi_put(data).unwrap();
+        self.w.insert_all(data).unwrap();
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
