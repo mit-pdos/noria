@@ -4,9 +4,9 @@ use clients::{Parameters, VoteClient, VoteClientConstructor};
 use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 
 pub(crate) struct Client {
-    r: distributary::RemoteGetter<distributary::ExclusiveConnection>,
+    r: distributary::View<distributary::ExclusiveConnection>,
     #[allow(dead_code)]
-    w: distributary::Mutator<distributary::ExclusiveConnection>,
+    w: distributary::Table<distributary::ExclusiveConnection>,
 }
 
 type Handle = ControllerHandle<ZookeeperAuthority>;
@@ -14,15 +14,15 @@ type Handle = ControllerHandle<ZookeeperAuthority>;
 fn make_mutator(
     c: &mut Handle,
     view: &str,
-) -> distributary::Mutator<distributary::ExclusiveConnection> {
-    c.get_mutator(view).unwrap().into_exclusive()
+) -> distributary::Table<distributary::ExclusiveConnection> {
+    c.table(view).unwrap().into_exclusive().unwrap()
 }
 
 fn make_getter(
     c: &mut Handle,
     view: &str,
-) -> distributary::RemoteGetter<distributary::ExclusiveConnection> {
-    c.get_getter(view).unwrap().into_exclusive()
+) -> distributary::View<distributary::ExclusiveConnection> {
+    c.view(view).unwrap().into_exclusive().unwrap()
 }
 
 pub(crate) struct Constructor(String);
@@ -39,13 +39,13 @@ impl VoteClientConstructor for Constructor {
 
         if params.prime {
             // for prepop, we need a mutator
-            let mut ch = Handle::new(ZookeeperAuthority::new(&zk));
-            ch.install_recipe(RECIPE.to_owned()).unwrap();
+            let mut ch = Handle::new(ZookeeperAuthority::new(&zk).unwrap()).unwrap();
+            ch.install_recipe(RECIPE).unwrap();
             let mut m = make_mutator(&mut ch, "Article");
             let mut id = 0;
             while id < params.articles {
                 let end = ::std::cmp::min(id + 1000, params.articles);
-                m.batch_put(
+                m.batch_insert(
                     (id..end)
                         .map(|i| vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]),
                 ).unwrap();
@@ -57,7 +57,7 @@ impl VoteClientConstructor for Constructor {
     }
 
     fn make(&mut self) -> Self::Instance {
-        let mut ch = Handle::new(ZookeeperAuthority::new(&self.0));
+        let mut ch = Handle::new(ZookeeperAuthority::new(&self.0).unwrap()).unwrap();
 
         Client {
             r: make_getter(&mut ch, "ArticleWithVoteCount"),
@@ -73,7 +73,7 @@ impl VoteClient for Client {
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
-        self.w.multi_put(data).unwrap();
+        self.w.insert_all(data).unwrap();
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {

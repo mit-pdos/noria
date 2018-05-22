@@ -18,11 +18,11 @@ use std::{thread, time};
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     r: String,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
@@ -98,7 +98,7 @@ fn make(
         s
     };
 
-    g.install_recipe(recipe.clone()).unwrap();
+    g.install_recipe(&recipe).unwrap();
 
     // XXX(malte): fix reuse configuration passthrough
     /*match Recipe::from_str(&s, Some(recipe_log.clone())) {
@@ -136,7 +136,7 @@ impl Backend {
         new_recipe.push_str(query);
 
         let start = time::Instant::now();
-        self.g.install_recipe(new_recipe.clone()).unwrap();
+        self.g.install_recipe(&new_recipe).unwrap();
 
         let dur = dur_to_fsec!(start.elapsed());
         println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
@@ -152,7 +152,7 @@ impl Backend {
         /*match self.outputs.get(query_name) {
             None => panic!("no node for {}!", query_name),
             Some(nd) => {
-                let g = self.g.get_getter(*nd).unwrap();
+                let g = self.g.view(*nd).unwrap();
                 g.len()
             }
         }*/
@@ -168,9 +168,10 @@ impl Backend {
         println!("reading {}", query_name);
         let mut g = self
             .g
-            .get_getter(query_name)
+            .view(query_name)
             .expect(&format!("no node for {}!", query_name))
-            .into_exclusive();
+            .into_exclusive()
+            .unwrap();
         let query_name = String::from(query_name);
 
         let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
@@ -371,7 +372,7 @@ fn main() {
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
             }
         }
     }

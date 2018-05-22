@@ -1,5 +1,7 @@
-use distributary::{self, ControllerBuilder, ControllerHandle, LocalAuthority, NodeIndex,
-                   PersistenceParameters};
+use distributary::{
+    self, ControllerBuilder, LocalAuthority, LocalControllerHandle, NodeIndex,
+    PersistenceParameters,
+};
 
 pub(crate) const RECIPE: &str = "# base tables
 CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
@@ -17,7 +19,7 @@ pub struct Graph {
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub end: NodeIndex,
-    pub graph: ControllerHandle<LocalAuthority>,
+    pub graph: LocalControllerHandle<LocalAuthority>,
 }
 
 pub struct Setup {
@@ -58,9 +60,9 @@ impl Setup {
         }
         let mut graph = g.build_local();
 
-        graph.install_recipe(RECIPE.to_owned()).unwrap();
-        let inputs = graph.inputs();
-        let outputs = graph.outputs();
+        graph.install_recipe(RECIPE).unwrap();
+        let inputs = graph.inputs().unwrap();
+        let outputs = graph.outputs().unwrap();
 
         if self.logging {
             println!("inputs {:?}", inputs);
@@ -104,9 +106,9 @@ impl Graph {
                             WHERE Article.id = ?;";
 
         if self.stupid {
-            self.graph.extend_recipe(stupid_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(stupid_recipe).unwrap();
         } else {
-            self.graph.extend_recipe(smart_recipe.to_owned()).unwrap();
+            self.graph.extend_recipe(smart_recipe).unwrap();
         }
     }
 }
