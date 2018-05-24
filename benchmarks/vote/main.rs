@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
+extern crate failure;
 extern crate fut20;
 extern crate futures;
 extern crate futures_state_stream;
@@ -26,10 +27,10 @@ use std::time;
 
 thread_local! {
     static CLIENT: RefCell<Option<Box<VoteClient>>> = RefCell::new(None);
-    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
-    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
-    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
-    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
@@ -80,10 +81,10 @@ where
         )
     } else {
         (
-            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
         )
     };
 
@@ -338,6 +339,16 @@ where
                                 h.record(m).unwrap();
                             }
                         });
+                    }
+
+                    if write && RMT_W.with(|h| h.borrow().len() >= 10) {
+                        let t = sent.duration_since(start);
+                        println!(
+                            "{}, {:.2}",
+                            t.as_secs() * 1000 + t.subsec_millis() as u64,
+                            RMT_W.with(|h| h.borrow().value_at_quantile(0.5)),
+                        );
+                        RMT_W.with(|h| h.borrow_mut().clear());
                     }
                 }
 
