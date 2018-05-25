@@ -4,6 +4,9 @@ use clients::{Parameters, VoteClient, VoteClientConstructor};
 use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use failure::Error;
 
+use std::thread;
+use std::time::Duration;
+
 pub(crate) struct Client {
     c: Constructor,
     r: distributary::View<distributary::ExclusiveConnection>,
@@ -93,6 +96,7 @@ impl VoteClient for Client {
                     *self = c;
                     break;
                 }
+                thread::sleep(Duration::from_millis(100));
             }
         }
     }
@@ -119,6 +123,7 @@ impl VoteClient for Client {
                         *self = c;
                         break;
                     }
+                    thread::sleep(Duration::from_millis(100));
                 },
             }
         }
