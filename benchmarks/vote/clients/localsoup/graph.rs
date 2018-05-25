@@ -4,8 +4,8 @@ use distributary::{
 };
 
 pub(crate) const RECIPE: &str = "# base tables
-CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-CREATE TABLE Vote (article_id int, user int);
+Article: CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+Vote: CREATE TABLE Vote (article_id int, user int);
 
 # read queries
 QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
