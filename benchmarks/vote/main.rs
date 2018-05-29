@@ -641,21 +641,6 @@ fn main() {
         .subcommand(
             SubCommand::with_name("localsoup")
                 .arg(
-                    Arg::with_name("workers")
-                        .short("w")
-                        .long("workers")
-                        .takes_value(true)
-                        .default_value("1")
-                        .help("Number of workers to use"),
-                )
-                .arg(
-                    Arg::with_name("readthreads")
-                        .long("read-threads")
-                        .value_name("N")
-                        .default_value("2")
-                        .help("Number of read threads to start"),
-                )
-                .arg(
                     Arg::with_name("shards")
                         .long("shards")
                         .takes_value(true)

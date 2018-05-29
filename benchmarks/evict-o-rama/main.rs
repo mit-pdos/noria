@@ -33,7 +33,6 @@ fn main() {
     // set up Soup via recipe
     let mut builder = ControllerBuilder::default();
     builder.log_with(distributary::logger_pls());
-    builder.set_worker_threads(2);
     builder.set_persistence(persistence_params);
     builder.set_memory_limit(100 * 1024, Duration::from_millis(1000));
 
@@ -41,7 +40,7 @@ fn main() {
     // test passes again.
     //builder.disable_partial();
 
-    let mut blender = builder.build_local();
+    let mut blender = builder.build_local().unwrap();
     blender.install_recipe(sql).unwrap();
 
     // Get mutators and getter.

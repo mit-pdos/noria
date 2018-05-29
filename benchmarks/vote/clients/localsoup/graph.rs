@@ -26,8 +26,6 @@ pub struct Setup {
     pub stupid: bool,
     pub partial: bool,
     pub sharding: Option<usize>,
-    pub nworkers: usize,
-    pub nreaders: usize,
     pub logging: bool,
 }
 
@@ -38,8 +36,6 @@ impl Default for Setup {
             partial: true,
             sharding: None,
             logging: false,
-            nworkers: 1,
-            nreaders: 1,
         }
     }
 }
@@ -53,12 +49,10 @@ impl Setup {
         }
         g.set_sharding(self.sharding);
         g.set_persistence(persistence_params);
-        g.set_worker_threads(self.nworkers);
-        g.set_read_threads(self.nreaders);
         if self.logging {
             g.log_with(distributary::logger_pls());
         }
-        let mut graph = g.build_local();
+        let mut graph = g.build_local().unwrap();
 
         graph.install_recipe(RECIPE).unwrap();
         let inputs = graph.inputs().unwrap();

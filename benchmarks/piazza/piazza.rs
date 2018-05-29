@@ -48,7 +48,7 @@ impl Backend {
 
         cb.log_with(blender_log);
 
-        let g = cb.build_local();
+        let g = cb.build_local().unwrap();
 
         Backend { g: g }
     }
