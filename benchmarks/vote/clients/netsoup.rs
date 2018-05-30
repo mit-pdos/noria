@@ -86,7 +86,8 @@ impl VoteClientConstructor for Constructor {
 
 impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
-        let data: Vec<Vec<DataType>> = ids.into_iter()
+        let data: Vec<Vec<DataType>> = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
@@ -102,7 +103,8 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let arg: Vec<_> = ids.into_iter()
+        let arg = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into()])
             .collect();
 
