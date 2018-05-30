@@ -27,10 +27,10 @@ use std::time;
 
 thread_local! {
     static CLIENT: RefCell<Option<Box<VoteClient>>> = RefCell::new(None);
-    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
-    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
-    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
-    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(1, 1000, 5).unwrap());
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
@@ -81,10 +81,10 @@ where
         )
     } else {
         (
-            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
-            Histogram::<u64>::new_with_bounds(10, 100_000, 5).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
         )
     };
 
