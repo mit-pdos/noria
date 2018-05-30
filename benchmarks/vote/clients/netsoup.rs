@@ -103,7 +103,7 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let arg = ids
+        let arg: Vec<_> = ids
             .into_iter()
             .map(|&article_id| vec![(article_id as usize).into()])
             .collect();
