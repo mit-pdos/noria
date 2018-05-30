@@ -4,16 +4,14 @@ use distributary::{
 };
 
 pub(crate) const RECIPE: &str = "# base tables
-Article: CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
-Vote: CREATE TABLE Vote (article_id int, user int);
-
-VoteCount: SELECT Vote.article_id, COUNT(user) AS votes \
-                       FROM Vote GROUP BY Vote.article_id;
+CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+CREATE TABLE Vote (article_id int, user int);
 
 # read queries
 QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
             FROM Article \
-            LEFT JOIN VoteCount \
+            LEFT JOIN (SELECT Vote.article_id, COUNT(user) AS votes \
+                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
 pub struct Graph {
