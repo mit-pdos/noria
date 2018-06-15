@@ -340,16 +340,6 @@ where
                             }
                         });
                     }
-
-                    if write && RMT_W.with(|h| h.borrow().len() >= 10) {
-                        let t = sent.duration_since(start);
-                        println!(
-                            "{}, {:.2}",
-                            t.as_secs() * 1000 + t.subsec_millis() as u64,
-                            RMT_W.with(|h| h.borrow().value_at_quantile(0.5)),
-                        );
-                        RMT_W.with(|h| h.borrow_mut().clear());
-                    }
                 }
 
                 Ok(())
