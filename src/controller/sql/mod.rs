@@ -47,6 +47,7 @@ pub struct SqlIncorporator {
 
     named_queries: HashMap<String, u64>,
     query_graphs: HashMap<u64, QueryGraph>,
+    base_mir_queries: HashMap<String, MirQuery>,
     mir_queries: HashMap<(u64, UniverseId), MirQuery>,
     num_queries: usize,
 
@@ -54,7 +55,6 @@ pub struct SqlIncorporator {
     view_schemas: HashMap<String, Vec<String>>,
 
     schema_version: usize,
-    transactional: bool,
 
     reuse_type: ReuseConfigType,
 
@@ -72,6 +72,7 @@ impl Default for SqlIncorporator {
 
             named_queries: HashMap::default(),
             query_graphs: HashMap::default(),
+            base_mir_queries: HashMap::default(),
             mir_queries: HashMap::default(),
             num_queries: 0,
 
@@ -79,7 +80,6 @@ impl Default for SqlIncorporator {
             view_schemas: HashMap::default(),
 
             schema_version: 0,
-            transactional: false,
 
             reuse_type: ReuseConfigType::Finkelstein,
             universes: HashMap::default(),
@@ -96,11 +96,6 @@ impl SqlIncorporator {
             mir_converter: SqlToMirConverter::with_logger(lc),
             ..Default::default()
         }
-    }
-
-    /// Make any future base nodes added be transactional.
-    pub fn set_transactional(&mut self, transactional: bool) {
-        self.transactional = transactional;
     }
 
     /// Disable node reuse for future migrations.
@@ -169,6 +164,17 @@ impl SqlIncorporator {
             None => self.mir_converter.get_leaf(name),
             Some(na) => Some(na.clone()),
         }
+    }
+
+    pub fn is_leaf_address(&self, ni: NodeIndex) -> bool {
+        self.leaf_addresses.values().any(|nn| *nn == ni)
+    }
+
+    pub fn get_queries_for_node(&self, ni: NodeIndex) -> Vec<String> {
+        self.leaf_addresses
+            .iter()
+            .filter_map(|(name, idx)| if *idx == ni { Some(name.clone()) } else { None })
+            .collect()
     }
 
     fn consider_query_graph(
@@ -410,9 +416,7 @@ impl SqlIncorporator {
         mut mig: &mut Migration,
     ) -> QueryFlowParts {
         // first, compute the MIR representation of the SQL query
-        let mut mir = self
-            .mir_converter
-            .named_base_to_mir(query_name, query, self.transactional);
+        let mut mir = self.mir_converter.named_base_to_mir(query_name, query);
 
         trace!(self.log, "Base node MIR: {:#?}", mir);
 
@@ -549,10 +553,10 @@ impl SqlIncorporator {
             .remove(query_name)
             .expect("tried to remove unknown query");
 
-        let qg_hash = self
-            .named_queries
-            .remove(query_name)
-            .expect("missing query hash for named query");
+        let qg_hash = self.named_queries.remove(query_name).expect(&format!(
+            "missing query hash for named query \"{}\"",
+            query_name
+        ));
         let mir = self.mir_queries.get(&(qg_hash, mig.universe())).unwrap();
 
         // traverse self.leaf__addresses
@@ -593,6 +597,22 @@ impl SqlIncorporator {
         }
     }
 
+    pub fn remove_base(&mut self, name: &str) {
+        info!(self.log, "Removing base {} from SqlIncorporator", name);
+        if self.base_schemas.remove(name).is_none() {
+            warn!(
+                self.log,
+                "Attempted to remove non-existant base node {} from SqlIncorporator", name
+            );
+        }
+
+        let mir = self
+            .base_mir_queries
+            .get(name)
+            .expect(&format!("tried to remove unknown base {}", name));
+        self.mir_converter.remove_base(name, mir)
+    }
+
     fn register_query(
         &mut self,
         query_name: &str,
@@ -624,7 +644,10 @@ impl SqlIncorporator {
                 self.mir_queries.insert((qg_hash, universe), mir.clone());
                 self.named_queries.insert(query_name.to_owned(), qg_hash);
             }
-            None => (),
+            None => {
+                self.base_mir_queries
+                    .insert(query_name.to_owned(), mir.clone());
+            }
         }
     }
 

@@ -311,12 +311,13 @@
 #![feature(nll)]
 #![feature(entry_or_default)]
 #![deny(missing_docs)]
-#![feature(plugin, use_extern_macros)]
-#![plugin(tarpc_plugins)]
+#![feature(use_extern_macros)]
 #![deny(unused_extern_crates)]
 #![feature(fnbox)]
+#![feature(vec_remove_item)]
+#![feature(catch_expr)]
 
-extern crate assert_infrequent;
+extern crate api;
 extern crate basics;
 extern crate bincode;
 extern crate channel;
@@ -334,7 +335,6 @@ extern crate nom;
 extern crate nom_sql;
 extern crate petgraph;
 extern crate rand;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
@@ -342,9 +342,8 @@ extern crate slab;
 #[macro_use]
 extern crate slog;
 extern crate slog_term;
-extern crate tarpc;
 extern crate timer_heap;
-extern crate tokio_core;
+extern crate tokio;
 extern crate vec_map;
 
 mod controller;
@@ -356,20 +355,14 @@ mod integration;
 
 pub use consensus::{LocalAuthority, ZookeeperAuthority};
 
-pub use basics::{
-    DataType, Datas, DurabilityMode, Modification, NodeIndex, Operation, PersistenceParameters,
-};
+pub use basics::{DataType, Datas, Modification, NodeIndex, Operation};
 
-pub use dataflow::checktable::{Token, TransactionResult};
-pub use dataflow::debug::{DebugEvent, DebugEventType};
-pub use dataflow::prelude::DomainIndex;
+pub use dataflow::{DurabilityMode, PersistenceParameters};
+
+pub use api::*;
 
 pub use controller::sql::reuse::ReuseConfigType;
-pub use controller::{Controller, ControllerBuilder, ControllerHandle, ExclusiveConnection,
-                     Mutator, MutatorBuilder, MutatorError, ReadQuery, ReadReply, RemoteGetter,
-                     RemoteGetterBuilder, RpcError, SharedConnection};
-
-pub use controller::recipe::ActivationResult;
+pub use controller::{Controller, ControllerBuilder, LocalControllerHandle};
 
 /// Just give me a damn terminal logger
 pub fn logger_pls() -> slog::Logger {

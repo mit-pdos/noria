@@ -5,14 +5,16 @@ extern crate slog;
 
 mod test_populate;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, LocalAuthority, ReuseConfigType};
+use distributary::{
+    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
+};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
 
 pub struct Backend {
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 impl Backend {
@@ -80,7 +82,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -184,7 +186,7 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
     // sleep "forever"

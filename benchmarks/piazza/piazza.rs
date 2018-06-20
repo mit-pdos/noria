@@ -4,7 +4,9 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
-use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
+use distributary::{
+    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
+};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -16,7 +18,7 @@ mod populate;
 use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 #[derive(PartialEq)]
@@ -52,13 +54,13 @@ impl Backend {
     }
 
     pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self.g.get_mutator(name).unwrap();
+        let mut mutator = self.g.table(name).unwrap();
 
         let start = time::Instant::now();
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r).unwrap();
+            mutator.insert(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());
@@ -112,7 +114,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -282,7 +284,7 @@ fn main() {
     // if partial, read 25% of the keys
     if partial {
         let leaf = format!("post_count");
-        let mut getter = backend.g.get_getter(&leaf).unwrap();
+        let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
         }
@@ -299,7 +301,7 @@ fn main() {
         // if partial, read 25% of the keys
         if partial {
             let leaf = format!("post_count_u{}", i);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
             }
@@ -320,7 +322,7 @@ fn main() {
         let mut dur = time::Duration::from_millis(0);
         for uid in 0..nlogged {
             let leaf = format!("post_count_u{}", uid);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
                 getter.lookup(&[author.into()], true).unwrap();
@@ -343,6 +345,6 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 }

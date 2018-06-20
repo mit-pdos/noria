@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use rand::{self, Rng};
 
-use data::SizeOf;
-use local::single_state::SingleState;
-use *;
+use basics::data::SizeOf;
+use prelude::*;
+use state::single_state::SingleState;
 
 #[derive(Default)]
 pub struct MemoryState {
@@ -92,7 +92,6 @@ impl State for MemoryState {
                 match *r {
                     Record::Positive(ref r) => self.insert(r.clone(), partial_tag),
                     Record::Negative(ref r) => self.remove(r),
-                    Record::BaseOperation(..) => unreachable!(),
                 }
             });
         } else {
@@ -106,7 +105,6 @@ impl State for MemoryState {
                         let hit = self.remove(r);
                         debug_assert!(hit);
                     }
-                    Record::BaseOperation(..) => unreachable!(),
                 }
             }
         }

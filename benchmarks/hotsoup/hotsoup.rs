@@ -9,13 +9,13 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     blacklist: Vec<String>,
     r: String,
     log: slog::Logger,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
@@ -104,7 +104,7 @@ impl Backend {
 
         info!(self.log, "Ignored {} blacklisted queries", blacklisted);
 
-        match self.g.install_recipe(rs.clone()) {
+        match self.g.install_recipe(&rs) {
             Ok(ar) => {
                 info!(self.log, "{} expressions added", ar.expressions_added);
                 info!(self.log, "{} expressions removed", ar.expressions_removed);
@@ -290,7 +290,7 @@ fn main() {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
                 panic!(e)
             }
             _ => (),
@@ -299,7 +299,7 @@ fn main() {
         if gloc.is_some() {
             let graph_fname = format!("{}/hotcrp_{}.gv", gloc.unwrap(), schema_version);
             let mut gf = File::create(graph_fname).unwrap();
-            assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+            assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
         }
 
         // on the first auto-upgradeable schema, populate with test data
