@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
+extern crate failure;
 extern crate fut20;
 extern crate futures;
 extern crate futures_state_stream;
