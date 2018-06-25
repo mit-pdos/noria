@@ -609,6 +609,7 @@ dependencies = [
  "slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stream-cancel 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "streamunordered 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tarpc 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tarpc-plugins 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2176,6 +2177,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "stream-cancel"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "streamunordered"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3165,6 +3174,7 @@ dependencies = [
 "checksum smallvec 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "312a7df010092e73d6bbaf141957e868d4f30efd2bfd9bb1028ad91abec58514"
 "checksum snowflake 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "27207bb65232eda1f588cf46db2fee75c0808d557f6b3cf19a75f5d6d7c94df1"
 "checksum ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "dee822d619a700f98c4de3b5931f272ecc7cf2e924ceb2df47b61df4ae033a0c"
+"checksum stream-cancel 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "94984bb2ef591a1bac4e58301c957fc670eb7b1b0422ada5e0cb3aea846ed7c6"
 "checksum streamunordered 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f84e93e3d463060c812e0780719173a15a46ca3106ee59ffea93cb4399b65752"
 "checksum string 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "31f98b200e7caca9efca50fc0aa69cd58a5ec81d5f6e75b2f3ecaad2e998972a"
 "checksum strsim 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4f380125926a99e52bc279241539c018323fab05ad6368b56f93d9369ff550"
