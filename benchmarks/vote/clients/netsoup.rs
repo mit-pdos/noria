@@ -111,7 +111,8 @@ impl VoteClient for Client {
         loop {
             match self.r.multi_lookup(arg.clone(), true) {
                 Ok(rows) => {
-                    let rows = rows.into_iter()
+                    let rows = rows
+                        .into_iter()
                         .map(|_rows| {
                             // TODO
                             //assert_eq!(rows.map(|rows| rows.len()), Ok(1));

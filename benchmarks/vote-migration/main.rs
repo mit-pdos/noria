@@ -8,7 +8,7 @@ extern crate zipf;
 mod graph;
 
 use distributary::DataType;
-use rand::{distributions::Sample, Rng};
+use rand::{distributions::Distribution, Rng};
 use std::io::prelude::*;
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -98,7 +98,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             let start = time::Instant::now();
@@ -129,7 +129,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
@@ -181,7 +181,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
@@ -213,7 +213,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let n = 10;
             let mut hits = 0;
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
