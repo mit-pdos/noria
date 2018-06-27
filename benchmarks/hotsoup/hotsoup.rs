@@ -85,20 +85,21 @@ impl Backend {
                 let mut qf = File::open(qf).unwrap();
                 qf.read_to_string(&mut s).unwrap();
                 rs.push_str("\n");
-                rs.push_str(&s
-                    .lines()
-                    .filter(|ref l| {
-                        // make sure to skip blacklisted queries
-                        for ref q in blacklist {
-                            if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
-                                blacklisted += 1;
-                                return false;
+                rs.push_str(
+                    &s.lines()
+                        .filter(|ref l| {
+                            // make sure to skip blacklisted queries
+                            for ref q in blacklist {
+                                if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
+                                    blacklisted += 1;
+                                    return false;
+                                }
                             }
-                        }
-                        true
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"))
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                )
             }
         }
 
