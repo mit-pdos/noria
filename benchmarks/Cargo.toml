@@ -1,5 +1,3 @@
-cargo-features = ["rename-dependency"]
-
 [package]
 name = "benchmarks"
 version = "0.0.1"
