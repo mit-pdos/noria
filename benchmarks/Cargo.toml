@@ -26,7 +26,7 @@ zookeeper = "0.4.0"
 clap = "2.25.0"
 # distributions
 rand = "0.5.0"
-zipf = "3.0.0"
+zipf = "4.0.0"
 # sampling
 hdrhistogram = { git = "https://github.com/ekmartin/HdrHistogram_rust", branch = "nom_4" }
 # mssql
