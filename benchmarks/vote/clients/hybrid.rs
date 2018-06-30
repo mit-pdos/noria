@@ -1,7 +1,8 @@
 use clap;
 use clients::{Parameters, VoteClient, VoteClientConstructor};
 use memcached::{
-    self, proto::{MultiOperation, ProtoType},
+    self,
+    proto::{MultiOperation, ProtoType},
 };
 use mysql::{self, Opts, OptsBuilder};
 use std::collections::BTreeMap;
