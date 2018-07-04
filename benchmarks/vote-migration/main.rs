@@ -1,3 +1,5 @@
+#![feature(duration_as_u128)]
+
 #[macro_use]
 extern crate clap;
 extern crate distributary;
@@ -15,12 +17,6 @@ use std::sync::{Arc, Barrier};
 use std::{fs, thread, time};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
-macro_rules! dur_to_ns {
-    ($d:expr) => {{
-        let d = $d;
-        d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
-    }};
-}
 
 use zipf::ZipfDistribution;
 
@@ -115,7 +111,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
+                    let count_per_ns = count as f64 / every.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("OLD", count_per_s)).unwrap();
                 }
@@ -149,7 +145,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     let stats = thread::spawn(move || {
         let mut w = w;
         for (stat, val) in stat_rx {
-            let line = format!("{} {} {:.2}", dur_to_ns!(start.elapsed()), stat, val);
+            let line = format!("{} {} {:.2}", start.elapsed().as_nanos(), stat, val);
             println!("{}", line);
             if let Some(ref mut w) = w {
                 writeln!(w, "{}", line).unwrap();
@@ -196,7 +192,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
+                    let count_per_ns = count as f64 / every.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("NEW", count_per_s)).unwrap();
                 }
