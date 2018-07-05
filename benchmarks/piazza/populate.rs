@@ -12,7 +12,7 @@ macro_rules! dur_to_fsec {
 }
 
 const CLASSES_PER_STUDENT: usize = 5;
-const TAS_PER_CLASS: usize = 5;
+pub const TAS_PER_CLASS: usize = 5;
 
 pub struct Populate {
     nposts: i32,
