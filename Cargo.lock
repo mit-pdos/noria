@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "async-bincode"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -344,7 +344,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "channel"
 version = "0.1.0"
 dependencies = [
- "async-bincode 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-bincode 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bufstream 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -581,7 +581,7 @@ name = "distributary"
 version = "0.1.0"
 dependencies = [
  "api 0.1.0",
- "async-bincode 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-bincode 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "basics 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2869,7 +2869,7 @@ dependencies = [
 "checksum arrayvec 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "a1e964f9e24d588183fcb43503abda40d288c8657dfc27311516ce2f05675aef"
 "checksum assert_infrequent 0.1.0 (git+https://github.com/fintelia/assert_infrequent.git?rev=720e140bc8516d65dad7008abdc1d38796700c09)" = "<none>"
 "checksum aster 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4ccfdf7355d9db158df68f976ed030ab0f6578af811f5a7bb6dcf221ec24e0e0"
-"checksum async-bincode 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "26a97c9b51e2b840c6fd201bfc4334b12d9719bc07c19122464b78724ee7ef48"
+"checksum async-bincode 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a568cfffdbf336eab2183cdd2caa1c65d30bd7f2d0553e4e89ff13f7b6bc8ec5"
 "checksum atoi 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "baa5dc0129ce09c8c87e2714a0b67c095d4a5e3261a7bbb3d7ac44d43d5dd190"
 "checksum atty 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "2fc4a1aa4c24c0718a250f0681885c1af91419d242f29eb8f2ab28502d80dbd1"
 "checksum backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "89a47830402e9981c5c41223151efcced65a0510c13097c769cede7efb34782a"
