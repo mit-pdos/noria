@@ -44,7 +44,7 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
     if !partial {
         b.disable_partial();
     }
-    let g = b.build_local();
+    let g = b.build_local().unwrap();
 
     //recipe.enable_reuse(reuse);
     Box::new(Backend {

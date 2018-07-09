@@ -37,7 +37,7 @@ impl Backend {
             _ => panic!("reuse configuration not supported"),
         }
 
-        let g = cb.build_local();
+        let g = cb.build_local().unwrap();
 
         Backend { g: g }
     }

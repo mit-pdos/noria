@@ -325,8 +325,6 @@ fn main() {
         .value_of("shards")
         .map(|_| value_t_or_exit!(args, "shards", usize));
     s.logging = args.is_present("verbose");
-    s.nreaders = 4;
-    s.nworkers = 4;
 
     if args.is_present("all") {
         let narticles = value_t_or_exit!(args, "narticles", usize);

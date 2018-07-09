@@ -76,10 +76,8 @@ fn make(
     if disable_partial {
         b.disable_partial();
     }
-    b.set_worker_threads(2);
-    b.set_read_threads(1);
 
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
 
     let recipe = {
         let mut f = File::open(recipe_location).unwrap();
