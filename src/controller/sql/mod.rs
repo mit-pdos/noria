@@ -16,8 +16,9 @@ use controller::Migration;
 use dataflow::prelude::DataType;
 use mir::query::{MirQuery, QueryFlowParts};
 use mir::reuse as mir_reuse;
+use mir::Column;
 use nom_sql::parser as sql_parser;
-use nom_sql::{ArithmeticBase, Column, CreateTableStatement, SqlQuery};
+use nom_sql::{ArithmeticBase, CreateTableStatement, SqlQuery};
 use nom_sql::{CompoundSelectOperator, CompoundSelectStatement, SelectStatement};
 
 use slog;
@@ -293,7 +294,11 @@ impl SqlIncorporator {
                         // present in the query graph (because a later migration added the column to
                         // a base schema after the query was added to the graph). In this case, we
                         // move on to other reuse options.
-                        let params = qg.parameters().into_iter().cloned().collect();
+                        let params = qg
+                            .parameters()
+                            .into_iter()
+                            .map(|c| Column::from(c))
+                            .collect();
                         match mir_reuse::rewind_until_columns_found(mir_query.leaf.clone(), &params)
                         {
                             Some(mn) => {
@@ -1029,14 +1034,11 @@ mod tests {
             );
             // join node
             let new_join_view = get_node(&inc, mig, &format!("q_{:x}_n0", qid));
-            assert_eq!(
-                new_join_view.fields(),
-                &["id", "author", "title", "id", "name"]
-            );
+            assert_eq!(new_join_view.fields(), &["id", "author", "title", "name"]);
             // leaf node
             let new_leaf_view = get_node(&inc, mig, &q.unwrap().name);
             assert_eq!(new_leaf_view.fields(), &["name", "title", "bogokey"]);
-            assert_eq!(new_leaf_view.description(), format!("π[4, 2, lit: 0]"));
+            assert_eq!(new_leaf_view.description(), format!("π[3, 2, lit: 0]"));
         });
     }
 
@@ -1276,6 +1278,57 @@ mod tests {
     }
 
     #[test]
+    fn it_reuses_by_extending_existing_query() {
+        use super::sql_parser;
+        // set up graph
+        let mut g = integration::build_local("it_reuses_by_extending_existing_query");
+        g.migrate(|mig| {
+            let mut inc = SqlIncorporator::default();
+            // Add base tables
+            assert!(
+                inc.add_query(
+                    "CREATE TABLE articles (id int, title varchar(40));",
+                    None,
+                    mig
+                ).is_ok()
+            );
+            assert!(
+                inc.add_query("CREATE TABLE votes (aid int, uid int);", None, mig)
+                    .is_ok()
+            );
+            // Should have source, "articles" and "votes" base tables
+            assert_eq!(mig.graph().node_count(), 3);
+
+            // Add a new query
+            let res = inc.add_parsed_query(
+                sql_parser::parse_query("SELECT COUNT(uid) AS vc FROM votes GROUP BY aid;")
+                    .unwrap(),
+                Some("votecount".into()),
+                false,
+                mig,
+            );
+            assert!(res.is_ok());
+
+            // Add a query that can reuse votecount by extending it.
+            let ncount = mig.graph().node_count();
+            let res = inc.add_parsed_query(
+                sql_parser::parse_query(
+                    "SELECT COUNT(uid) AS vc FROM votes WHERE vc > 5 GROUP BY aid;",
+                ).unwrap(),
+                Some("highvotes".into()),
+                true,
+                mig,
+            );
+            assert!(res.is_ok());
+            // should have added three more nodes: a join, a projection, and a reader
+            let qfp = res.unwrap();
+            assert_eq!(mig.graph().node_count(), ncount + 3);
+            // only the join and projection nodes are returned in the vector of new nodes
+            assert_eq!(qfp.new_nodes.len(), 2);
+        });
+    }
+
+    #[test]
     fn it_incorporates_aggregation_no_group_by() {
         // set up graph
         let mut g = integration::build_local("it_incorporates_aggregation_no_group_by");
@@ -1477,20 +1530,65 @@ mod tests {
                 ],
             );
             let join1_view = get_node(&inc, mig, &format!("q_{:x}_n0", qid));
-            // articles join votes
-            assert_eq!(
-                join1_view.fields(),
-                &["aid", "title", "author", "id", "name"]
-            );
+            // articles join users
+            assert_eq!(join1_view.fields(), &["aid", "title", "author", "name"]);
             let join2_view = get_node(&inc, mig, &format!("q_{:x}_n1", qid));
-            // join1_view join users
+            // join1_view join vptes
             assert_eq!(
                 join2_view.fields(),
-                &["aid", "title", "author", "id", "name", "aid", "uid"]
+                &["aid", "title", "author", "name", "uid"]
             );
             // leaf view
             let leaf_view = get_node(&inc, mig, "q_3");
             assert_eq!(leaf_view.fields(), &["name", "title", "uid", "bogokey"]);
+        });
+    }
+
+    #[test]
+    fn it_incorporates_join_projecting_join_columns() {
+        // set up graph
+        let mut g = integration::build_local("it_incorporates_join_projecting_join_columns");
+        g.migrate(|mig| {
+            let mut inc = SqlIncorporator::default();
+            assert!(
+                inc.add_query("CREATE TABLE users (id int, name varchar(40));", None, mig)
+                    .is_ok()
+            );
+            assert!(
+                inc.add_query(
+                    "CREATE TABLE articles (id int, author int, title varchar(255));",
+                    None,
+                    mig
+                ).is_ok()
+            );
+            let q = "SELECT users.id, users.name, articles.author, articles.title \
+                     FROM articles, users \
+                     WHERE users.id = articles.author;";
+            let q = inc.add_query(q, None, mig);
+            assert!(q.is_ok());
+            let qid = query_id_hash(
+                &["articles", "users"],
+                &[&Column::from("articles.author"), &Column::from("users.id")],
+                &[
+                    &Column::from("users.id"),
+                    &Column::from("users.name"),
+                    &Column::from("articles.author"),
+                    &Column::from("articles.title"),
+                ],
+            );
+            // join node
+            let new_join_view = get_node(&inc, mig, &format!("q_{:x}_n0", qid));
+            assert_eq!(new_join_view.fields(), &["id", "author", "title", "name"]);
+            // leaf node
+            let new_leaf_view = get_node(&inc, mig, &q.unwrap().name);
+            assert_eq!(
+                new_leaf_view.fields(),
+                &["id", "name", "author", "title", "bogokey"]
+            );
+            assert_eq!(
+                new_leaf_view.description(),
+                format!("π[1, 3, 1, 2, lit: 0]")
+            );
         });
     }
 
@@ -1579,14 +1677,11 @@ mod tests {
             );
             // join node
             let new_join_view = get_node(&inc, mig, &format!("q_{:x}_n0", qid));
-            assert_eq!(
-                new_join_view.fields(),
-                &["id", "author", "title", "id", "name"]
-            );
+            assert_eq!(new_join_view.fields(), &["id", "author", "title", "name"]);
             // leaf node
             let new_leaf_view = get_node(&inc, mig, &q.unwrap().name);
             assert_eq!(new_leaf_view.fields(), &["name", "title", "bogokey"]);
-            assert_eq!(new_leaf_view.description(), format!("π[4, 2, lit: 0]"));
+            assert_eq!(new_leaf_view.description(), format!("π[3, 2, lit: 0]"));
         });
     }
 

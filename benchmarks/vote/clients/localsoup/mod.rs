@@ -28,8 +28,6 @@ impl VoteClientConstructor for Constructor {
 
         assert!(params.prime);
 
-        let nworkers = value_t_or_exit!(args, "workers", usize);
-        let read_threads = value_t_or_exit!(args, "readthreads", usize);
         let verbose = args.is_present("verbose");
 
         let mut persistence = PersistenceParameters::default();
@@ -54,8 +52,6 @@ impl VoteClientConstructor for Constructor {
         // setup db
         let mut s = graph::Setup::default();
         s.logging = verbose;
-        s.nworkers = nworkers;
-        s.nreaders = read_threads;
         s.sharding = match value_t_or_exit!(args, "shards", usize) {
             0 => None,
             x => Some(x),

@@ -62,9 +62,7 @@ fn build_graph(
 
     builder.set_persistence(persistence);
     builder.set_sharding(None);
-    builder.set_read_threads(1);
-    builder.set_worker_threads(1);
-    builder.build(authority)
+    builder.build(authority).unwrap()
 }
 
 fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {

@@ -48,7 +48,7 @@ impl Backend {
 
         cb.log_with(blender_log);
 
-        let g = cb.build_local();
+        let g = cb.build_local().unwrap();
 
         Backend { g: g }
     }
@@ -241,7 +241,14 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
-    assert!(nlogged <= nusers, "nusers must be greater than nlogged");
+    assert!(
+        nlogged <= nusers,
+        "nusers must be greater or equal to nlogged"
+    );
+    assert!(
+        nusers >= populate::TAS_PER_CLASS as i32,
+        "nusers must be greater or equal to TAS_PER_CLASS"
+    );
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");

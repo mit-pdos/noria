@@ -90,11 +90,25 @@ pub struct ReplayPathSegment {
     pub partial_key: Option<Vec<usize>>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum SourceSelection {
+    /// Query only the shard of the source that matches the key.
+    ///
+    /// Value is the number of shards.
+    KeyShard(usize),
+    /// Query the same shard of the source as the destination.
+    SameShard,
+    /// Query all shards of the source.
+    ///
+    /// Value is the number of shards.
+    AllShards(usize),
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
-    End(bool, domain::Index, usize),
+    End(SourceSelection, domain::Index),
     Local(Vec<usize>),
 }
 
@@ -287,9 +301,6 @@ pub enum Packet {
     /// The packet is being sent locally, so a pointer is sent to avoid
     /// serialization/deserialization costs.
     Local(LocalBypass<Packet>),
-
-    /// Notify downstream replica what our index is
-    Hey(domain::Index, usize),
 }
 
 impl Packet {
@@ -448,6 +459,14 @@ impl Packet {
         }
     }
 
+    pub fn is_local(&self) -> bool {
+        if let Packet::Local(..) = *self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn make_local(self: Box<Self>) -> Box<Self> {
         Box::new(Packet::Local(LocalBypass::make(self)))
     }
@@ -464,7 +483,7 @@ impl fmt::Debug for Packet {
                 ..
             } => write!(
                 f,
-                "Packet::ReplayPiece({:?}, {}, {} records)",
+                "Packet::ReplayPiece({:?}, tag {}, {} records)",
                 link,
                 tag.id(),
                 data.len()

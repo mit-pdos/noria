@@ -12,6 +12,7 @@ use std::rc::Rc;
 
 use basics::*;
 
+mod column;
 pub mod node;
 mod optimize;
 pub mod query;
@@ -20,6 +21,8 @@ mod rewrite;
 pub mod visualize;
 
 pub type MirNodeRef = Rc<RefCell<node::MirNode>>;
+
+pub use column::Column;
 
 #[derive(Clone, Debug)]
 pub enum FlowNode {

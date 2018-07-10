@@ -17,14 +17,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod plan;
 
-const NANOS_PER_SEC: u64 = 1_000_000_000;
-macro_rules! dur_to_ns {
-    ($d:expr) => {{
-        let d = $d;
-        d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
-    }};
-}
-
 type Indices = HashSet<Vec<usize>>;
 
 pub struct Materializations {
@@ -542,6 +534,69 @@ impl Materializations {
             }
         }
 
+        // check that we don't have any cases where a subgraph is sharded by one column, and then
+        // has a replay path on a duplicated copy of that column. for example, a join with
+        // [B(0, 0), R(0)] where the join's subgraph is sharded by .0, but a downstream replay path
+        // looks up by .1. this causes terrible confusion where the target (correctly) queries only
+        // one shard, but the shard merger expects to have to wait for all shards (since the replay
+        // key and the sharding key do not match at the shard merger).
+        {
+            for &node in new {
+                let n = &graph[node];
+                if !n.is_shard_merger() {
+                    continue;
+                }
+
+                // we don't actually store replay paths anywhere in Materializations (perhaps we
+                // should). however, we can check a proxy for the necessary property by making sure
+                // that our parent's sharding key is never aliased. this will lead to some false
+                // positives (all replay paths may use the same alias as we shard by), but we'll
+                // deal with that.
+                let parent = graph
+                    .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
+                    .next()
+                    .expect("shard mergers must have a parent");
+                let psharding = graph[parent].sharded_by();
+
+                if let Sharding::ByColumn(col, _) = psharding {
+                    // we want to resolve col all the way to its nearest materialized ancestor.
+                    // and then check whether any other cols of the parent alias that source column
+                    let columns: Vec<_> = (0..n.fields().len()).collect();
+                    for path in keys::provenance_of(graph, parent, &columns[..], |_, _, _| None) {
+                        let (mat_anc, cols) = path
+                            .into_iter()
+                            .skip_while(|&(n, _)| !self.have.contains_key(&n))
+                            .next()
+                            .expect(
+                                "since bases are materialized, \
+                                 every path must eventually have a materialized node",
+                            );
+                        let src = cols[col];
+                        if src.is_none() {
+                            continue;
+                        }
+
+                        if let Some((c, res)) = cols
+                            .iter()
+                            .enumerate()
+                            .find(|&(c, res)| c != col && res == &src)
+                        {
+                            // another column in the merger's parent resolved to the source column!
+                            //println!("{}", graphviz(graph, &self));
+                            crit!(self.log, "attempting to merge sharding by aliased column";
+                                      "parent" => mat_anc.index(),
+                                      "aliased" => res,
+                                      "sharded" => parent.index(),
+                                      "alias" => c,
+                                      "shard" => col,
+                            );
+                            //unimplemented!();
+                        }
+                    }
+                }
+            }
+        }
+
         let mut reindex = Vec::with_capacity(new.len());
         let mut make = Vec::with_capacity(new.len());
         let mut topo = petgraph::visit::Topo::new(graph);
@@ -675,7 +730,7 @@ impl Materializations {
 
             if reconstructed {
                 info!(self.log, "reconstruction completed";
-                      "ms" => dur_to_ns!(start.elapsed()) / 1_000_000,
+                      "ms" => start.elapsed().as_millis() as u64,
                       "node" => ni.index(),
                       );
             }

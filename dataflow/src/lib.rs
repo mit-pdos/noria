@@ -1,6 +1,7 @@
 #![feature(nll)]
 #![feature(box_syntax)]
 #![feature(box_patterns)]
+#![feature(duration_as_u128)]
 #![feature(option_filter)]
 #![feature(use_extern_macros)]
 #![feature(entry_or_default)]
@@ -18,6 +19,7 @@ extern crate bincode;
 extern crate channel;
 extern crate evmap;
 extern crate fnv;
+extern crate futures;
 extern crate hyper;
 extern crate itertools;
 extern crate nom_sql;
@@ -32,6 +34,7 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate slog;
+extern crate stream_cancel;
 extern crate tempfile;
 extern crate timekeeper;
 extern crate tokio;

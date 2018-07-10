@@ -35,7 +35,7 @@ fn get_persistence_params(prefix: &str) -> PersistenceParameters {
 pub fn build_local(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
     let mut builder = ControllerBuilder::default();
     builder.set_persistence(get_persistence_params(prefix));
-    builder.build_local()
+    builder.build_local().unwrap()
 }
 
 fn get_settle_time() -> Duration {
@@ -64,7 +64,7 @@ fn it_works_basic() {
         Some(String::from("it_works_basic")),
         1,
     ));
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
     let _ = g.migrate(|mig| {
         let a = mig.add_base("a", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
         let b = mig.add_base("b", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
@@ -535,7 +535,7 @@ fn it_works_with_double_query_through() {
     // all ancestors (and bid comes first). The reader is on aid though, so the sharder should pick
     // that as well (and not bid!).
     builder.set_sharding(None);
-    let mut g = builder.build_local();
+    let mut g = builder.build_local().unwrap();
     let sql = "
         # base tables
         CREATE TABLE A (aid int, other int, PRIMARY KEY(aid));
@@ -605,7 +605,7 @@ fn it_auto_increments_columns() {
     let mut b = ControllerBuilder::default();
     b.set_sharding(None);
     b.set_persistence(get_persistence_params("it_auto_increments_columns"));
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
     let sql = "
         CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
@@ -638,7 +638,7 @@ fn it_auto_increments_columns_with_shards() {
     b.set_persistence(get_persistence_params(
         "it_auto_increments_columns_with_shards",
     ));
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
     let sql = "
         CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
         QUERY Read: SELECT aid FROM Article WHERE type = ?;
@@ -681,7 +681,6 @@ fn it_auto_increments_columns_with_shards() {
 }
 
 #[test]
-#[allow_fail]
 fn forced_shuffle_despite_same_shard() {
     // XXX: this test doesn't currently *fail* despite
     // multiple trailing replay responses that are simply ignored...
@@ -717,7 +716,6 @@ fn forced_shuffle_despite_same_shard() {
 }
 
 #[test]
-#[allow_fail]
 fn double_shuffle() {
     let mut g = build_local("double_shuffle");
     let sql = "
@@ -792,7 +790,7 @@ fn it_recovers_persisted_bases() {
     {
         let mut g = ControllerBuilder::default();
         g.set_persistence(persistence_params.clone());
-        let mut g = g.build(authority.clone());
+        let mut g = g.build(authority.clone()).unwrap();
 
         let sql = "
             CREATE TABLE Car (id int, price int, PRIMARY KEY(id));
@@ -813,7 +811,7 @@ fn it_recovers_persisted_bases() {
 
     let mut g = ControllerBuilder::default();
     g.set_persistence(persistence_params);
-    let mut g = g.build(authority.clone());
+    let mut g = g.build(authority.clone()).unwrap();
     let mut getter = g.view("CarPrice").unwrap();
 
     // Make sure that the new graph contains the old writes
@@ -892,7 +890,7 @@ fn it_recovers_persisted_bases_w_multiple_nodes() {
     {
         let mut g = ControllerBuilder::default();
         g.set_persistence(persistence_parameters.clone());
-        let mut g = g.build(authority.clone());
+        let mut g = g.build(authority.clone()).unwrap();
 
         let sql = "
             CREATE TABLE A (id int, PRIMARY KEY(id));
@@ -915,7 +913,7 @@ fn it_recovers_persisted_bases_w_multiple_nodes() {
     // state that the other one had.
     let mut g = ControllerBuilder::default();
     g.set_persistence(persistence_parameters);
-    let mut g = g.build(authority.clone());
+    let mut g = g.build(authority.clone()).unwrap();
     for (i, table) in tables.iter().enumerate() {
         let mut getter = g.view(&format!("{}ID", table)).unwrap();
         let result = getter.lookup(&[i.into()], true).unwrap();
@@ -976,7 +974,6 @@ fn it_works_with_multiple_arithmetic_expressions() {
 }
 
 #[test]
-#[allow_fail]
 fn it_works_with_join_arithmetic() {
     let mut g = build_local("it_works_with_join_arithmetic");
     let sql = "
@@ -1431,7 +1428,6 @@ fn key_on_added() {
 }
 
 #[test]
-#[allow_fail]
 fn replay_during_replay() {
     // what we're trying to set up here is a case where a join receives a record with a value for
     // the join key that does not exist in the view the record was sent from. since joins only do
@@ -1440,7 +1436,7 @@ fn replay_during_replay() {
     let mut g = ControllerBuilder::default();
     g.disable_partial();
     g.set_persistence(get_persistence_params("replay_during_replay"));
-    let mut g = g.build_local();
+    let mut g = g.build_local().unwrap();
     let (a, u1, u2) = g.migrate(|mig| {
         // we need three bases:
         //
@@ -1533,6 +1529,65 @@ fn replay_during_replay() {
         r.lookup(&[2.into()], true).unwrap(),
         vec![vec![2.into(), "b".into()], vec![2.into(), "b".into()]]
     );
+}
+
+#[test]
+fn cascading_replays_with_sharding() {
+    let mut g = ControllerBuilder::default();
+    g.set_sharding(Some(2));
+    g.set_persistence(get_persistence_params("cascading_replays_with_sharding"));
+    let mut g = g.build_local().unwrap();
+
+    // add each two bases. these are initially unsharded, but f will end up being sharded by u1,
+    // while v will be sharded by u
+
+    // force v to be in a different domain by adding it in a separate migration
+    let v = g.migrate(|mig| mig.add_base("v", &["u", "s"], Base::new(vec!["".into(), 1.into()])));
+    // now add the rest
+    let _ = g.migrate(move |mig| {
+        let f = mig.add_base("f", &["f1", "f2"], Base::new(vec!["".into(), "".into()]));
+        // add a join
+        let jb = Join::new(f, v, JoinType::Inner, vec![B(0, 0), R(1), L(1)]);
+        let j = mig.add_ingredient("j", &["u", "s", "f2"], jb);
+        // aggregate over the join. this will force a shard merger to be inserted because the
+        // group-by column ("f2") isn't the same as the join's output sharding column ("f1"/"u")
+        let a = Aggregation::COUNT.over(j, 0, &[2]);
+        let end = mig.add_ingredient("end", &["u", "c"], a);
+        mig.maintain_anonymous(end, &[0]);
+        (j, end)
+    });
+
+    let mut mutf = g.table("f").unwrap();
+    let mut mutv = g.table("v").unwrap();
+
+    //                f1           f2
+    mutf.insert(vec!["u1".into(), "u3".into()]).unwrap();
+    mutf.insert(vec!["u2".into(), "u3".into()]).unwrap();
+    mutf.insert(vec!["u3".into(), "u1".into()]).unwrap();
+
+    //                u
+    mutv.insert(vec!["u1".into(), 1.into()]).unwrap();
+    mutv.insert(vec!["u2".into(), 1.into()]).unwrap();
+    mutv.insert(vec!["u3".into(), 1.into()]).unwrap();
+
+    sleep();
+
+    let mut e = g.view("end").unwrap();
+
+    assert_eq!(
+        e.lookup(&["u1".into()], true).unwrap(),
+        vec![vec!["u1".into(), 1.into()]]
+    );
+    assert_eq!(
+        e.lookup(&["u2".into()], true).unwrap(),
+        Vec::<Vec<DataType>>::new()
+    );
+    assert_eq!(
+        e.lookup(&["u3".into()], true).unwrap(),
+        vec![vec!["u3".into(), 2.into()]]
+    );
+
+    sleep();
 }
 
 #[test]
@@ -2150,6 +2205,7 @@ fn tpc_w() {
 }
 
 #[test]
+#[allow_fail]
 fn node_removal() {
     // set up graph
     let mut b = ControllerBuilder::default();
@@ -2160,7 +2216,7 @@ fn node_removal() {
         Some(String::from("domain_removal")),
         1,
     ));
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
     let cid = g.migrate(|mig| {
         let a = mig.add_base("a", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
         let b = mig.add_base("b", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
@@ -2228,7 +2284,7 @@ fn remove_query() {
     let r2_txt = "CREATE TABLE b (a int, c text, x text);\n
                   QUERY qa: SELECT a FROM b;";
 
-    let mut g = ControllerBuilder::default().build_local();
+    let mut g = ControllerBuilder::default().build_local().unwrap();
     g.install_recipe(r_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
     assert_eq!(g.outputs().unwrap().len(), 2);

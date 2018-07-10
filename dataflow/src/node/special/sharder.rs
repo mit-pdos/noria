@@ -1,5 +1,7 @@
+use fnv::FnvHashMap;
 use payload;
 use prelude::*;
+use std::collections::VecDeque;
 use vec_map::VecMap;
 
 #[derive(Serialize, Deserialize)]
@@ -76,7 +78,7 @@ impl Sharder {
         m: &mut Option<Box<Packet>>,
         index: LocalNodeIndex,
         is_sharded: bool,
-        output: &mut Vec<(ReplicaAddr, Box<Packet>)>,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         // we need to shard the records inside `m` by their key,
         let mut m = m.take().unwrap();
@@ -131,7 +133,7 @@ impl Sharder {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index.into();
                 shard.link_mut().dst = dst;
-                output.push((addr, shard));
+                output.entry(addr).or_default().push_back(shard);
             }
         }
     }
@@ -143,7 +145,7 @@ impl Sharder {
         keys: &[Vec<DataType>],
         src: LocalNodeIndex,
         is_sharded: bool,
-        output: &mut Vec<(ReplicaAddr, Box<Packet>)>,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         assert!(!is_sharded);
 
@@ -168,7 +170,7 @@ impl Sharder {
 
             for (i, &mut (_, addr)) in self.txs.iter_mut().enumerate() {
                 if let Some(shard) = self.sharded.remove(i) {
-                    output.push((addr, shard));
+                    output.entry(addr).or_default().push_back(shard);
                 }
             }
         } else {
@@ -177,14 +179,14 @@ impl Sharder {
 
             // send to all shards
             for &mut (dst, addr) in self.txs.iter_mut() {
-                output.push((
-                    addr,
-                    Box::new(Packet::EvictKeys {
+                output
+                    .entry(addr)
+                    .or_default()
+                    .push_back(Box::new(Packet::EvictKeys {
                         link: Link { src, dst },
                         keys: keys.to_vec(),
                         tag,
-                    }),
-                ))
+                    }))
             }
         }
     }
