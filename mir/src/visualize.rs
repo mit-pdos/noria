@@ -73,7 +73,10 @@ impl GraphViz for MirNode {
             self.inner.to_graphviz()?,
             self.columns
                 .iter()
-                .map(|c| c.name.as_str())
+                .map(|c| match c.table {
+                    None => c.name.clone(),
+                    Some(ref t) => format!("{}.{}", t, c.name),
+                })
                 .collect::<Vec<_>>()
                 .join(",\\n"),
         )?;
@@ -83,7 +86,17 @@ impl GraphViz for MirNode {
 
 impl GraphViz for MirNodeType {
     fn to_graphviz(&self) -> Result<String, fmt::Error> {
+        use column::Column;
+
         let mut out = String::new();
+
+        let print_col = |c: &Column| -> String {
+            match c.table {
+                None => c.name.clone(),
+                Some(ref t) => format!("{}.{}", t, c.name),
+            }
+        };
+
         match *self {
             MirNodeType::Aggregation {
                 ref on,
@@ -91,12 +104,12 @@ impl GraphViz for MirNodeType {
                 ref kind,
             } => {
                 let op_string = match *kind {
-                    AggregationKind::COUNT => format!("|*|({})", on.name.as_str()),
-                    AggregationKind::SUM => format!("𝛴({})", on.name.as_str()),
+                    AggregationKind::COUNT => format!("\\|*\\|({})", print_col(on)),
+                    AggregationKind::SUM => format!("𝛴({})", print_col(on)),
                 };
                 let group_cols = group_by
                     .iter()
-                    .map(|c| c.name.as_str())
+                    .map(|c| print_col(c))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "{} | γ: {}", op_string, group_cols)?;
@@ -126,12 +139,12 @@ impl GraphViz for MirNodeType {
                 ref kind,
             } => {
                 let op_string = match *kind {
-                    ExtremumKind::MIN => format!("min({})", on.name.as_str()),
-                    ExtremumKind::MAX => format!("max({})", on.name.as_str()),
+                    ExtremumKind::MIN => format!("min({})", print_col(on)),
+                    ExtremumKind::MAX => format!("max({})", print_col(on)),
                 };
                 let group_cols = group_by
                     .iter()
-                    .map(|c| c.name.as_str())
+                    .map(|c| print_col(c))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "{} | γ: {}", op_string, group_cols)?;
@@ -176,7 +189,7 @@ impl GraphViz for MirNodeType {
                 ref on,
                 ref separator,
             } => {
-                write!(out, "||({}, \"{}\")", on.name, separator)?;
+                write!(out, "||({}, \"{}\")", print_col(on), separator)?;
             }
             MirNodeType::Identity => {
                 write!(out, "≡")?;
@@ -189,7 +202,7 @@ impl GraphViz for MirNodeType {
                 let jc = on_left
                     .iter()
                     .zip(on_right)
-                    .map(|(l, r)| format!("{}:{}", l.name, r.name))
+                    .map(|(l, r)| format!("{}:{}", print_col(l), print_col(r)))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "⋈  | on: {}", jc)?;
@@ -197,7 +210,7 @@ impl GraphViz for MirNodeType {
             MirNodeType::Leaf { ref keys, .. } => {
                 let key_cols = keys
                     .iter()
-                    .map(|k| k.name.clone())
+                    .map(|k| print_col(k))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "Leaf | ⚷: {}", key_cols)?;
@@ -210,7 +223,7 @@ impl GraphViz for MirNodeType {
                 let jc = on_left
                     .iter()
                     .zip(on_right)
-                    .map(|(l, r)| format!("{}:{}", l.name, r.name))
+                    .map(|(l, r)| format!("{}:{}", print_col(l), print_col(r)))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "⋉  | on: {}", jc)?;
@@ -218,7 +231,7 @@ impl GraphViz for MirNodeType {
             MirNodeType::Latest { ref group_by } => {
                 let key_cols = group_by
                     .iter()
-                    .map(|k| k.name.clone())
+                    .map(|k| print_col(k))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(out, "⧖ | γ: {}", key_cols)?;
@@ -232,7 +245,7 @@ impl GraphViz for MirNodeType {
                     out,
                     "π: {}{}{}",
                     emit.iter()
-                        .map(|c| c.name.as_str())
+                        .map(|c| print_col(c))
                         .collect::<Vec<_>>()
                         .join(", "),
                     if arithmetic.is_empty() {
@@ -274,7 +287,7 @@ impl GraphViz for MirNodeType {
                     .iter()
                     .map(|c| {
                         c.iter()
-                            .map(|e| e.name.clone())
+                            .map(|e| print_col(e))
                             .collect::<Vec<_>>()
                             .join(", ")
                     })
