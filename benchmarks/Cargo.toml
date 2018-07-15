@@ -17,7 +17,7 @@ vec_map = { version = "0.8.0" }
 rayon = "1.0"
 ssh2 = "0.3"
 shellwords = "0.1"
-zookeeper = { git = "https://github.com/jonhoo/rust-zookeeper.git", branch = "bump-deps" }
+zookeeper = "0.5.3"
 
 # for benchmarks
 # cli
