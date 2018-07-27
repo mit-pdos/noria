@@ -3,7 +3,7 @@ use clients::{Parameters, VoteClient, VoteClientConstructor};
 use futures::Future;
 use futures_state_stream::StateStream;
 use tiberius;
-use tokio_core::reactor;
+use tokio::runtime::current_thread::Runtime;
 
 pub(crate) struct Client {
     conn: Conn,
@@ -11,13 +11,13 @@ pub(crate) struct Client {
 
 struct Conn {
     conn: Option<tiberius::SqlConnection<Box<tiberius::BoxableIo>>>,
-    core: reactor::Core,
+    rt: Runtime,
 }
 
 impl Conn {
     fn new(addr: &str, db: &str) -> Conn {
-        let mut core = reactor::Core::new().unwrap();
-        let fc = tiberius::SqlConnection::connect(core.handle(), addr)
+        let mut rt = Runtime::new().unwrap();
+        let fc = tiberius::SqlConnection::connect(addr)
             .and_then(|conn| conn.simple_exec(format!("USE {}", db)))
             .and_then(|(_, conn)| conn.simple_exec("SET NUMERIC_ROUNDABORT OFF"))
             .and_then(|(_, conn)| {
@@ -26,11 +26,11 @@ impl Conn {
             .and_then(|(_, conn)| {
                 conn.simple_exec("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
             });
-        match core.run(fc) {
+        match rt.block_on(fc) {
             Ok((_, conn)) => {
                 return Conn {
                     conn: Some(conn),
-                    core: core,
+                    rt,
                 }
             }
             Err(_) => panic!("Failed to connect to SQL server"),
@@ -62,17 +62,17 @@ impl VoteClientConstructor for Conf {
         };
 
         // Check whether database already exists, or whether we need to create it
-        let mut core = reactor::Core::new().unwrap();
-        let fut = tiberius::SqlConnection::connect(core.handle(), addr);
+        let mut rt = Runtime::new().unwrap();
+        let fut = tiberius::SqlConnection::connect(addr);
         if params.prime {
             // drop database if possible
-            let x =
-                core.run(fut.and_then(|conn| conn.simple_exec(format!("DROP DATABASE {};", db))));
+            let x = rt
+                .block_on(fut.and_then(|conn| conn.simple_exec(format!("DROP DATABASE {};", db))));
             // we don't care if dropping failed
             drop(x);
 
             // we need to connect again because there's no way to recover the conn if drop fails
-            let fut = tiberius::SqlConnection::connect(core.handle(), addr);
+            let fut = tiberius::SqlConnection::connect(addr);
             let fut = fut
                 .and_then(|conn| conn.simple_exec(format!("CREATE DATABASE {};", db)))
                 .and_then(|(_, conn)| fixconn(conn))
@@ -104,7 +104,7 @@ impl VoteClientConstructor for Conf {
                 .and_then(|(_, conn)| {
                     conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
                 });
-            let mut conn = core.run(fut).unwrap().1;
+            let mut conn = rt.block_on(fut).unwrap().1;
 
             // prepop
             let mut aid = 1;
@@ -119,7 +119,7 @@ impl VoteClientConstructor for Conf {
                     }
                     sql.push_str(&format!("({}, 'Article #{}')", aid + i, aid + i));
                 }
-                conn = core.run(conn.exec(sql, &[])).unwrap().1;
+                conn = rt.block_on(conn.exec(sql, &[])).unwrap().1;
 
                 let mut sql = String::new();
                 sql.push_str("INSERT INTO vt (u, id) VALUES ");
@@ -129,15 +129,15 @@ impl VoteClientConstructor for Conf {
                     }
                     sql.push_str(&format!("(0, {})", aid + i));
                 }
-                conn = core.run(conn.exec(sql, &[])).unwrap().1;
+                conn = rt.block_on(conn.exec(sql, &[])).unwrap().1;
 
                 aid += bs;
             }
         } else {
-            core.run(fut.and_then(fixconn)).unwrap();
+            rt.block_on(fut.and_then(fixconn)).unwrap();
         }
 
-        drop(core);
+        rt.run().unwrap();
 
         Conf {
             addr: addr.to_string(),
@@ -163,7 +163,7 @@ impl VoteClient for Client {
         let vote_qstring = format!("INSERT INTO vt (u, id) VALUES {}", vote_qstring);
 
         let fut = self.conn.conn.take().unwrap().exec(vote_qstring, &ids);
-        let (_, conn) = self.conn.core.run(fut).unwrap();
+        let (_, conn) = self.conn.rt.block_on(fut).unwrap();
         self.conn.conn = Some(conn);
     }
 
@@ -192,7 +192,7 @@ impl VoteClient for Client {
                     rows += 1;
                     Ok(())
                 });
-            self.conn.core.run(fut).unwrap()
+            self.conn.rt.block_on(fut).unwrap()
         };
         self.conn.conn = Some(conn);
 

@@ -20,6 +20,7 @@ use std::time::Duration;
 use std::{env, thread};
 
 const DEFAULT_SETTLE_TIME_MS: u64 = 200;
+const DEFAULT_SHARDING: Option<usize> = Some(2);
 
 // PersistenceParameters with a log_name on the form of `prefix` + timestamp,
 // avoiding collisions between separate test runs (in case an earlier panic causes clean-up to
@@ -33,7 +34,30 @@ fn get_persistence_params(prefix: &str) -> PersistenceParameters {
 
 // Builds a local controller with the given log prefix.
 pub fn build_local(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
+    build(prefix, DEFAULT_SHARDING, false)
+}
+
+#[allow(dead_code)]
+pub fn build_local_unsharded(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
+    build(prefix, None, false)
+}
+
+#[allow(dead_code)]
+pub fn build_local_logging(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
+    build(prefix, DEFAULT_SHARDING, true)
+}
+
+fn build(
+    prefix: &str,
+    sharding: Option<usize>,
+    log: bool,
+) -> LocalControllerHandle<LocalAuthority> {
+    use logger_pls;
     let mut builder = ControllerBuilder::default();
+    if log {
+        builder.log_with(logger_pls());
+    }
+    builder.set_sharding(sharding);
     builder.set_persistence(get_persistence_params(prefix));
     builder.build_local().unwrap()
 }
@@ -2202,6 +2226,48 @@ fn tpc_w() {
                 Err(e) => {
                     println!("{:?}", e);
                     or
+                }
+            }
+        }
+    });
+}
+
+#[test]
+fn lobsters() {
+    use std::fs::File;
+    use std::io::Read;
+
+    // set up graph
+    let mut g = build_local_unsharded("lobsters");
+    g.migrate(|mig| {
+        let mut r = Recipe::blank(None);
+        let mut f = File::open("tests/lobsters-schema.txt").unwrap();
+        let mut s = String::new();
+
+        // Load queries
+        f.read_to_string(&mut s).unwrap();
+        let lines: Vec<String> = s
+            .lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("DROP TABLE"))
+            .map(|l| {
+                if !(l.ends_with('\n') || l.ends_with(';')) {
+                    String::from(l) + "\n"
+                } else {
+                    String::from(l)
+                }
+            })
+            .collect();
+
+        // Add them one by one
+        for (_i, q) in lines.iter().enumerate() {
+            //println!("{}: {}", i, q);
+            r = match r.extend(q) {
+                Ok(mut nr) => {
+                    assert!(nr.activate(mig).is_ok());
+                    nr
+                }
+                Err(e) => {
+                    panic!("{:?}", e);
                 }
             }
         }

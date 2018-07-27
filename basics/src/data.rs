@@ -155,6 +155,7 @@ impl Ord for DataType {
             }
             (&DataType::Timestamp(tsa), &DataType::Timestamp(ref tsb)) => tsa.cmp(tsb),
             (&DataType::None, &DataType::None) => Ordering::Equal,
+            (&DataType::AutoIncrementRequest, &DataType::AutoIncrementRequest) => Ordering::Greater,
 
             // order Ints, Reals, Text, Timestamps, None
             (&DataType::Int(..), _) | (&DataType::BigInt(..), _) => Ordering::Greater,

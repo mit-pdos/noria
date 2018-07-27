@@ -13,7 +13,7 @@ extern crate memcached;
 extern crate mysql;
 extern crate rand;
 extern crate tiberius;
-extern crate tokio_core;
+extern crate tokio;
 extern crate zipf;
 
 use futures_cpupool::CpuPool;
