@@ -22,10 +22,18 @@ pub struct Input {
 #[derive(Debug, Fail)]
 pub enum TableError {
     /// The wrong number of columns was given when inserting a row.
-    #[fail(display = "wrong number of columns specified: expected {}, got {}", _0, _1)]
+    #[fail(
+        display = "wrong number of columns specified: expected {}, got {}",
+        _0,
+        _1
+    )]
     WrongColumnCount(usize, usize),
     /// The wrong number of key columns was given when modifying a row.
-    #[fail(display = "wrong number of key columns used: expected {}, got {}", _0, _1)]
+    #[fail(
+        display = "wrong number of key columns used: expected {}, got {}",
+        _0,
+        _1
+    )]
     WrongKeyColumnCount(usize, usize),
     /// The underlying connection to Soup produced an error.
     #[fail(display = "{}", _0)]
@@ -91,6 +99,11 @@ impl TableBuilder {
             exclusivity: SharedConnection,
         })
     }
+}
+
+#[derive(Debug)]
+pub struct InsertResult {
+    pub auto_increment_id: Option<DataType>,
 }
 
 /// A `Table` is used to perform writes, deletes, and other operations to data in base tables.
@@ -265,7 +278,7 @@ impl<E> Table<E> {
         }
     }
 
-    fn send(&mut self, ops: Vec<TableOperation>) -> Result<(), TransportError> {
+    fn send(&mut self, ops: Vec<TableOperation>) -> Result<Option<DataType>, TransportError> {
         let tracer = self.tracer.take();
         let m = self.prep_records(tracer, ops);
         self.domain_input_handle
@@ -302,7 +315,7 @@ impl<E> Table<E> {
     }
 
     /// Insert a single row of data into this base table.
-    pub fn insert<V>(&mut self, u: V) -> Result<(), TableError>
+    pub fn insert<V>(&mut self, u: V) -> Result<InsertResult, TableError>
     where
         V: Into<Vec<DataType>>,
     {
@@ -314,12 +327,14 @@ impl<E> Table<E> {
             ));
         }
 
-        self.send(data)?;
-        Ok(())
+        let id = self.send(data)?;
+        Ok(InsertResult {
+            auto_increment_id: id,
+        })
     }
 
     /// Insert multiple rows of data into this base table.
-    pub fn insert_all<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub fn insert_all<I, V>(&mut self, i: I) -> Result<InsertResult, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<Vec<DataType>>,
@@ -334,10 +349,11 @@ impl<E> Table<E> {
             })
             .collect::<Result<Vec<_>, _>>()
             .and_then(|data| {
-                self.send(data)?;
-                Ok(())
+                let id = self.send(data)?;
+                Ok(InsertResult {
+                    auto_increment_id: id,
+                })
             })
-            .map(|_| ())
     }
 
     /// Delete the row with the given key from this base table.
@@ -465,10 +481,15 @@ impl DomainInputHandle {
         BatchSendHandle::new(self)
     }
 
-    pub(crate) fn base_send(&mut self, i: Input, key: &[usize]) -> Result<(), TransportError> {
+    pub(crate) fn base_send(
+        &mut self,
+        i: Input,
+        key: &[usize],
+    ) -> Result<Option<DataType>, TransportError> {
         let mut s = BatchSendHandle::new(self);
         s.enqueue(i, key)?;
-        s.wait().map_err(|_| {
+        s.wait().map_err(|err| {
+            println!("err {:?}", err);
             tcp::SendError::IoError(io::Error::new(io::ErrorKind::Other, "write failed")).into()
         })
     }
@@ -537,14 +558,17 @@ impl<'a> BatchSendHandle<'a> {
         Ok(())
     }
 
-    pub(crate) fn wait(self) -> Result<(), TransportError> {
+    pub(crate) fn wait(self) -> Result<Option<DataType>, TransportError> {
+        let mut first_auto_id: Option<Option<DataType>> = None;
         for (shard, n) in self.sent.into_iter().enumerate() {
             for _ in 0..n {
                 use bincode;
-                let _: bool = bincode::deserialize_from(&mut (&mut self.dih.txs[shard]).reader())?;
+                let id =
+                    bincode::deserialize_from(&mut (&mut self.dih.txs[shard]).reader()).unwrap();
+                first_auto_id.get_or_insert(id);
             }
         }
 
-        Ok(())
+        Ok(first_auto_id.unwrap())
     }
 }

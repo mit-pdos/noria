@@ -131,23 +131,23 @@ pub enum RecvError {
     DeserializationError(bincode::Error),
 }
 
-pub enum DualTcpStream<S, T, T2, D> {
-    Passthrough(AsyncBincodeStream<S, T, bool, D>),
+pub enum DualTcpStream<S, T, T2, W, D> {
+    Passthrough(AsyncBincodeStream<S, T, W, D>),
     Upgrade(
-        AsyncBincodeStream<S, T2, bool, D>,
+        AsyncBincodeStream<S, T2, W, D>,
         Box<FnMut(T2) -> T + Send + Sync>,
     ),
 }
 
-impl<S, T, T2> From<S> for DualTcpStream<S, T, T2, SyncDestination> {
+impl<S, T, T2, W> From<S> for DualTcpStream<S, T, T2, W, SyncDestination> {
     fn from(stream: S) -> Self {
         DualTcpStream::Passthrough(AsyncBincodeStream::from(stream))
     }
 }
 
-impl<S, T, T2> DualTcpStream<S, T, T2, SyncDestination> {
+impl<S, T, T2, W> DualTcpStream<S, T, T2, W, SyncDestination> {
     pub fn upgrade<F: 'static + FnMut(T2) -> T + Send + Sync>(stream: S, f: F) -> Self {
-        let s: AsyncBincodeStream<S, T2, bool, SyncDestination> = AsyncBincodeStream::from(stream);
+        let s: AsyncBincodeStream<S, T2, W, SyncDestination> = AsyncBincodeStream::from(stream);
         DualTcpStream::Upgrade(s, Box::new(f))
     }
 
@@ -159,12 +159,13 @@ impl<S, T, T2> DualTcpStream<S, T, T2, SyncDestination> {
     }
 }
 
-impl<S, T, T2, D> Sink for DualTcpStream<S, T, T2, D>
+impl<S, T, T2, W, D> Sink for DualTcpStream<S, T, T2, W, D>
 where
     S: AsyncWrite,
-    AsyncBincodeWriter<S, bool, D>: Sink<SinkItem = bool, SinkError = bincode::Error>,
+    W: Serialize,
+    AsyncBincodeWriter<S, W, D>: Sink<SinkItem = W, SinkError = bincode::Error>,
 {
-    type SinkItem = bool;
+    type SinkItem = W;
     type SinkError = bincode::Error;
     fn start_send(
         &mut self,
@@ -183,7 +184,7 @@ where
     }
 }
 
-impl<S, T, T2, D> Stream for DualTcpStream<S, T, T2, D>
+impl<S, T, T2, W, D> Stream for DualTcpStream<S, T, T2, W, D>
 where
     for<'a> T: Deserialize<'a>,
     for<'a> T2: Deserialize<'a>,

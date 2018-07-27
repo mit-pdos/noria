@@ -175,7 +175,8 @@ impl Base {
         mut ops: Vec<TableOperation>,
         state: &StateMap,
         shard: usize,
-    ) -> Records {
+    ) -> (Records, Option<DataType>) {
+        let mut first_auto_id = None;
         // Replace `None` value keys with an auto incrementing value when
         // self.auto_increment_column is set:
         if let Some(column) = self.auto_increment_column {
@@ -185,12 +186,13 @@ impl Base {
                         replace_with_auto_increment(column, self.auto_increment_value, r);
                     self.auto_increment_value = new_increment;
                     r[column] = DataType::ID(shard as u32, new_increment);
+                    first_auto_id.get_or_insert_with(|| r[column].clone());
                 }
             }
         }
 
         if self.primary_key.is_none() || ops.is_empty() {
-            return ops
+            let rs = ops
                 .into_iter()
                 .map(|r| {
                     if let TableOperation::Insert(mut r) = r {
@@ -201,6 +203,7 @@ impl Base {
                     }
                 })
                 .collect();
+            return (rs, first_auto_id);
         }
 
         let key_cols = &self.primary_key.as_ref().unwrap()[..];
@@ -318,7 +321,7 @@ impl Base {
             self.fix(r);
         }
 
-        results.into()
+        (results.into(), first_auto_id)
     }
 
     pub(crate) fn suggest_indexes(&self, n: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
@@ -364,7 +367,7 @@ mod tests {
 
     fn one_base_row(test: &mut TestBase, r: Vec<DataType>, shard: usize) -> Records {
         let ops = vec![TableOperation::Insert(r)];
-        let mut records = test.base.process(test.local_addr, ops, &test.states, shard);
+        let (mut records, _) = test.base.process(test.local_addr, ops, &test.states, shard);
         node::materialize(&mut records, None, test.states.get_mut(&test.local_addr));
         records
     }
@@ -447,7 +450,7 @@ mod tests {
         let mut n = n.finalize(&graph);
 
         let mut one = move |u: Vec<TableOperation>| {
-            let mut m = n.get_base_mut().unwrap().process(local, u, &states, 0);
+            let (mut m, _) = n.get_base_mut().unwrap().process(local, u, &states, 0);
             node::materialize(&mut m, None, states.get_mut(&local));
             m
         };

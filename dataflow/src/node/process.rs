@@ -37,7 +37,7 @@ impl Node {
                         src,
                         mut senders,
                     }) => {
-                        let mut rs = b.process(addr, data, &*state, on_shard.unwrap_or(0));
+                        let (mut rs, first_auto_id) = b.process(addr, data, &*state, on_shard.unwrap_or(0));
 
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay
@@ -53,7 +53,10 @@ impl Node {
                         // Send write-ACKs to all the clients with updates that made
                         // it into this merged packet:
                         if let Some(ex) = executor {
-                            senders.drain(..).for_each(|src| ex.send_back(src, ()));
+                            // TODO(ekmartin): work around this clone
+                            senders
+                                .drain(..)
+                                .for_each(|src| ex.send_back(src, first_auto_id.clone()));
                         }
 
                         *m = Some(Box::new(Packet::Message {

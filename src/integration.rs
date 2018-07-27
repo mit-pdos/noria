@@ -616,10 +616,12 @@ fn it_auto_increments_columns() {
     let mut read = g.view("Read").unwrap();
 
     let article_type = "Interview";
-    for _ in 0..3 {
-        article
+    for i in 0..3 {
+        let id = article
             .insert(vec![DataType::None, article_type.into()])
             .unwrap();
+
+        assert_eq!(id.auto_increment_id, Some(DataType::ID(0, (i + 1) as u64)));
     }
     sleep();
 
@@ -651,10 +653,15 @@ fn it_auto_increments_columns_with_shards() {
     let mut read_id = g.view("ReadById").unwrap();
 
     let article_type = "Interview";
-    for _ in 0..n {
-        article
+    for i in 0..n {
+        let id = article
             .insert(vec![DataType::None, article_type.into()])
             .unwrap();
+
+        assert_eq!(
+            id.auto_increment_id,
+            Some(DataType::ID((i + 1) as u32, (i + 1) as u64))
+        );
     }
     sleep();
 
