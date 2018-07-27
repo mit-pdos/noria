@@ -660,7 +660,7 @@ fn it_auto_increments_columns_with_shards() {
 
         assert_eq!(
             id.auto_increment_id,
-            Some(DataType::ID((i + 1) as u32, (i + 1) as u64))
+            Some(DataType::ID(((i + 1) % n) as u32, 1))
         );
     }
     sleep();

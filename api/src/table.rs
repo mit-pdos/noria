@@ -96,6 +96,7 @@ impl TableBuilder {
             table_name: self.table_name,
             columns: self.columns,
             schema: self.schema,
+            previous_shard: 0,
             exclusivity: SharedConnection,
         })
     }
@@ -123,6 +124,7 @@ pub struct Table<E = SharedConnection> {
     table_name: String,
     columns: Vec<String>,
     schema: Option<CreateTableStatement>,
+    previous_shard: usize,
 
     #[allow(dead_code)]
     exclusivity: E,
@@ -141,6 +143,7 @@ impl Clone for Table<SharedConnection> {
             table_name: self.table_name.clone(),
             columns: self.columns.clone(),
             schema: self.schema.clone(),
+            previous_shard: self.previous_shard,
             exclusivity: SharedConnection,
         }
     }
@@ -165,6 +168,7 @@ impl Table<SharedConnection> {
             table_name: self.table_name.clone(),
             columns: self.columns.clone(),
             schema: self.schema.clone(),
+            previous_shard: self.previous_shard,
             exclusivity: ExclusiveConnection,
         })
     }
@@ -281,9 +285,13 @@ impl<E> Table<E> {
     fn send(&mut self, ops: Vec<TableOperation>) -> Result<Option<DataType>, TransportError> {
         let tracer = self.tracer.take();
         let m = self.prep_records(tracer, ops);
-        self.domain_input_handle
-            .borrow_mut()
-            .base_send(m, &self.key[..])
+        let (last_shard, id) =
+            self.domain_input_handle
+                .borrow_mut()
+                .base_send(m, &self.key[..], self.previous_shard)?;
+
+        self.previous_shard = last_shard;
+        Ok(id)
     }
 
     /// Perform multiple operations on this base table in one batch.
@@ -306,7 +314,7 @@ impl<E> Table<E> {
 
             let tracer = self.tracer.clone();
             let m = self.prep_records(tracer, data);
-            batch_putter.enqueue(m, &self.key[..])?;
+            self.previous_shard = batch_putter.enqueue(m, &self.key[..], self.previous_shard)?;
         }
 
         self.tracer.take();
@@ -485,33 +493,42 @@ impl DomainInputHandle {
         &mut self,
         i: Input,
         key: &[usize],
-    ) -> Result<Option<DataType>, TransportError> {
+        previous_shard: usize,
+    ) -> Result<(usize, Option<DataType>), TransportError> {
         let mut s = BatchSendHandle::new(self);
-        s.enqueue(i, key)?;
-        s.wait().map_err(|err| {
-            println!("err {:?}", err);
-            tcp::SendError::IoError(io::Error::new(io::ErrorKind::Other, "write failed")).into()
-        })
+        let last_shard = s.enqueue(i, key, previous_shard)?;
+        let id: Option<DataType> = match s.wait() {
+            Ok(id) => id,
+            Err(_) => {
+                return Err(tcp::SendError::IoError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "write failed",
+                )).into())
+            }
+        };
+
+        Ok((last_shard, id))
     }
 }
 
 pub(crate) struct BatchSendHandle<'a> {
     dih: &'a mut DomainInputHandle,
     sent: Vec<usize>,
-    previous_shard: usize,
 }
 
 impl<'a> BatchSendHandle<'a> {
     pub(crate) fn new(dih: &'a mut DomainInputHandle) -> Self {
         let sent = vec![0; dih.txs.len()];
-        Self {
-            dih,
-            sent,
-            previous_shard: 0,
-        }
+        Self { dih, sent }
     }
 
-    pub(crate) fn enqueue(&mut self, mut i: Input, key: &[usize]) -> Result<(), TransportError> {
+    pub(crate) fn enqueue(
+        &mut self,
+        mut i: Input,
+        key: &[usize],
+        previous_shard: usize,
+    ) -> Result<usize, TransportError> {
+        let mut shard = previous_shard;
         if self.dih.txs.len() == 1 {
             self.dih.txs[0].send(i)?;
             self.sent[0] += 1;
@@ -534,9 +551,10 @@ impl<'a> BatchSendHandle<'a> {
                         TableOperation::Update { ref key, .. } => &key[0],
                         TableOperation::InsertOrUpdate { ref row, .. } => &row[key_col],
                     };
-                    let s = shard_by(key, self.dih.txs.len(), self.previous_shard);
+                    let s = shard_by(key, self.dih.txs.len(), shard);
                     if *key == DataType::None {
-                        self.previous_shard = s;
+                        println!("prev shard is now {:?}", s);
+                        shard = s;
                     }
                     s
                 };
@@ -555,7 +573,7 @@ impl<'a> BatchSendHandle<'a> {
             }
         }
 
-        Ok(())
+        Ok(shard)
     }
 
     pub(crate) fn wait(self) -> Result<Option<DataType>, TransportError> {
