@@ -11,6 +11,9 @@ use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 const FLOAT_PRECISION: f64 = 1000_000_000.0;
 const TINYTEXT_WIDTH: usize = 15;
 
+/// A 64-bit numeric ID, prefixed by its shard index (or 0 if unsharded).
+pub type AutoIncrementID = (u32, u64);
+
 /// The main type used for user data throughout the codebase.
 ///
 /// Having this be an enum allows for our code to be agnostic about the types of user data except
@@ -29,7 +32,7 @@ pub enum DataType {
     /// A 64-bit numeric value.
     BigInt(i64),
     /// A 64-bit numeric ID, prefixed by its shard index (or 0 if unsharded).
-    ID(u32, u64),
+    ID(AutoIncrementID),
     /// A fixed point real value. The first field is the integer part, while the second is the
     /// fractional and must be between -999999999 and 999999999.
     Real(i32, i32),
@@ -51,7 +54,7 @@ impl DataType {
             }
             DataType::Int(n) => format!("{}", n),
             DataType::BigInt(n) => format!("{}", n),
-            DataType::ID(s, n) => format!("{}#{}", s, n),
+            DataType::ID((s, n)) => format!("{}#{}", s, n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.
@@ -107,7 +110,7 @@ impl PartialEq for DataType {
                 let b: i64 = other.into();
                 a == b
             }
-            (&DataType::ID(ai, an), &DataType::ID(bi, bn)) => ai == bi && an == bn,
+            (&DataType::ID(aid), &DataType::ID(bid)) => aid == bid,
             (&DataType::Real(ai, af), &DataType::Real(bi, bf)) => ai == bi && af == bf,
             (&DataType::Timestamp(tsa), &DataType::Timestamp(tsb)) => tsa == tsb,
             (&DataType::None, &DataType::None) => true,
@@ -143,7 +146,7 @@ impl Ord for DataType {
                 let b: i64 = other.into();
                 a.cmp(&b)
             }
-            (&DataType::ID(ai, an), &DataType::ID(ref bi, ref bn)) => ai.cmp(bi).then_with(|| an.cmp(bn)),
+            (&DataType::ID(aid), &DataType::ID(ref bid)) => aid.cmp(bid),
             (&DataType::Real(ai, af), &DataType::Real(ref bi, ref bf)) => {
                 ai.cmp(bi).then_with(|| af.cmp(bf))
             }
@@ -172,7 +175,7 @@ impl Hash for DataType {
                 let n: i64 = self.into();
                 n.hash(state)
             }
-            DataType::ID(s, n) => {
+            DataType::ID((s, n)) => {
                 s.hash(state);
                 n.hash(state);
             }
@@ -452,7 +455,7 @@ impl fmt::Display for DataType {
             }
             DataType::Int(n) => write!(f, "{}", n),
             DataType::BigInt(n) => write!(f, "{}", n),
-            DataType::ID(s, n) => write!(f, "{}#{}", s, n),
+            DataType::ID((s, n)) => write!(f, "{}#{}", s, n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.

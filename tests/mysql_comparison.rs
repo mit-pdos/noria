@@ -310,7 +310,7 @@ fn check_query(
                         DataType::None => "NULL".to_owned(),
                         DataType::Int(i) => i.to_string(),
                         DataType::BigInt(i) => i.to_string(),
-                        DataType::ID(_, i) => i.to_string(),
+                        DataType::ID((_, i)) => i.to_string(),
                         DataType::Real(i, f) => ((i as f64) + (f as f64) * 1.0e-9).to_string(),
                         DataType::Text(_) | DataType::TinyText(_) => v.into(),
                         DataType::Timestamp(_) => unimplemented!(),

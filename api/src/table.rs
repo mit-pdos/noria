@@ -104,7 +104,7 @@ impl TableBuilder {
 
 #[derive(Debug)]
 pub struct InsertResult {
-    pub auto_increment_id: Option<DataType>,
+    pub auto_increment_id: Option<AutoIncrementID>,
 }
 
 /// A `Table` is used to perform writes, deletes, and other operations to data in base tables.
@@ -282,7 +282,10 @@ impl<E> Table<E> {
         }
     }
 
-    fn send(&mut self, ops: Vec<TableOperation>) -> Result<Option<DataType>, TransportError> {
+    fn send(
+        &mut self,
+        ops: Vec<TableOperation>,
+    ) -> Result<Option<AutoIncrementID>, TransportError> {
         let tracer = self.tracer.take();
         let m = self.prep_records(tracer, ops);
         let (last_shard, id) =
@@ -494,10 +497,10 @@ impl DomainInputHandle {
         i: Input,
         key: &[usize],
         previous_shard: usize,
-    ) -> Result<(usize, Option<DataType>), TransportError> {
+    ) -> Result<(usize, Option<AutoIncrementID>), TransportError> {
         let mut s = BatchSendHandle::new(self);
         let last_shard = s.enqueue(i, key, previous_shard)?;
-        let id: Option<DataType> = match s.wait() {
+        let id = match s.wait() {
             Ok(id) => id,
             Err(_) => {
                 return Err(tcp::SendError::IoError(io::Error::new(
@@ -553,7 +556,6 @@ impl<'a> BatchSendHandle<'a> {
                     };
                     let s = shard_by(key, self.dih.txs.len(), shard);
                     if *key == DataType::None {
-                        println!("prev shard is now {:?}", s);
                         shard = s;
                     }
                     s
@@ -576,8 +578,8 @@ impl<'a> BatchSendHandle<'a> {
         Ok(shard)
     }
 
-    pub(crate) fn wait(self) -> Result<Option<DataType>, TransportError> {
-        let mut first_auto_id: Option<Option<DataType>> = None;
+    pub(crate) fn wait(self) -> Result<Option<AutoIncrementID>, TransportError> {
+        let mut first_auto_id = None;
         for (shard, n) in self.sent.into_iter().enumerate() {
             for _ in 0..n {
                 use bincode;

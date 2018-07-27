@@ -15,8 +15,8 @@ use controller::recipe::Recipe;
 use controller::sql::reuse::ReuseConfigType;
 use coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::{
-    payload::SourceChannelIdentifier, prelude::DataType, prelude::Executor, Domain, DomainBuilder,
-    DomainConfig, Packet, PersistenceParameters, Readers,
+    payload::SourceChannelIdentifier, prelude::AutoIncrementID, prelude::Executor, Domain,
+    DomainBuilder, DomainConfig, Packet, PersistenceParameters, Readers,
 };
 use failure::{self, ResultExt};
 use fnv::{FnvHashMap, FnvHashSet};
@@ -1010,7 +1010,7 @@ struct Replica {
             BufStream<tokio::net::TcpStream>,
             Box<Packet>,
             Input,
-            Option<DataType>,
+            Option<AutoIncrementID>,
             SyncDestination,
         >,
     >,
@@ -1273,12 +1273,12 @@ impl Replica {
 #[derive(Default)]
 struct Sendback {
     // map from inputi to auto increment IDs to ACK:
-    back: FnvHashMap<usize, Vec<Option<DataType>>>,
+    back: FnvHashMap<usize, Vec<Option<AutoIncrementID>>>,
     pending: FnvHashSet<usize>,
 }
 
 impl Executor for Sendback {
-    fn send_back(&mut self, id: SourceChannelIdentifier, auto_increment: Option<DataType>) {
+    fn send_back(&mut self, id: SourceChannelIdentifier, auto_increment: Option<AutoIncrementID>) {
         self.back
             .entry(id.token)
             .or_insert(vec![])

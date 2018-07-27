@@ -37,7 +37,8 @@ impl Node {
                         src,
                         mut senders,
                     }) => {
-                        let (mut rs, first_auto_id) = b.process(addr, data, &*state, on_shard.unwrap_or(0));
+                        let (mut rs, first_auto_id) =
+                            b.process(addr, data, &*state, on_shard.unwrap_or(0));
 
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay

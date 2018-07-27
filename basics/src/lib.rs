@@ -17,7 +17,9 @@ pub mod local;
 pub mod map;
 
 pub use addressing::{IndexPair, LocalNodeIndex};
-pub use data::{DataType, Datas, Modification, Operation, Record, Records, TableOperation};
+pub use data::{
+    AutoIncrementID, DataType, Datas, Modification, Operation, Record, Records, TableOperation,
+};
 pub use external::{Link, MaterializationStatus};
 pub use local::{DomainIndex, KeyType, Tag};
 pub use map::Map;
@@ -37,7 +39,7 @@ pub fn shard_by(dt: &DataType, shards: usize, previous: usize) -> usize {
             hasher.finish() as usize % shards
         }
         DataType::None => (previous + 1) % shards,
-        DataType::ID(shard, _) => shard as usize,
+        DataType::ID((shard, _)) => shard as usize,
         ref x => {
             unimplemented!("asked to shard on value {:?}", x);
         }
