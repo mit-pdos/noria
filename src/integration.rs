@@ -618,7 +618,7 @@ fn it_auto_increments_columns() {
     let article_type = "Interview";
     for i in 0..3 {
         let id = article
-            .insert(vec![DataType::None, article_type.into()])
+            .insert(vec![DataType::AutoIncrementRequest, article_type.into()])
             .unwrap();
 
         assert_eq!(id.auto_increment_id, Some((0, (i + 1) as u64)));
@@ -655,7 +655,7 @@ fn it_auto_increments_columns_with_shards() {
     let article_type = "Interview";
     for i in 0..n {
         let id = article
-            .insert(vec![DataType::None, article_type.into()])
+            .insert(vec![DataType::AutoIncrementRequest, article_type.into()])
             .unwrap();
 
         assert_eq!(id.auto_increment_id, Some((((i + 1) % n) as u32, 1)));

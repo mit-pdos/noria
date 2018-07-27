@@ -308,6 +308,7 @@ fn check_query(
                 row.into_iter()
                     .map(|v| match v {
                         DataType::None => "NULL".to_owned(),
+                        DataType::AutoIncrementRequest => "NULL".to_owned(),
                         DataType::Int(i) => i.to_string(),
                         DataType::BigInt(i) => i.to_string(),
                         DataType::ID((_, i)) => i.to_string(),

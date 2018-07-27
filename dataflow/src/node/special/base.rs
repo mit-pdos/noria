@@ -142,10 +142,10 @@ fn key_of<'a>(key_cols: &'a [usize], r: &'a TableOperation) -> impl Iterator<Ite
 // Replaces None values with the next available auto increment value, mutating
 // auto_increment_values if there are any changes.
 fn replace_with_auto_increment(column: usize, value: u64, row: &[DataType]) -> u64 {
-    // When we're given a None value, replace it with the incremented version
+    // When we're given an AutoIncrementRequest, replace it with the incremented version
     // of the last auto increment value for that column (or the initial increment value):
     let new_value = match row[column] {
-        DataType::None => value + 1,
+        DataType::AutoIncrementRequest => value + 1,
         // Other values should override existing auto increment values, so that
         // the auto incrementer continues from there the next time:
         DataType::Int(i) => {
@@ -530,7 +530,7 @@ mod tests {
         let strings = vec!["a", "b", "c"];
         let shard: u32 = 10;
         for (i, string) in strings.into_iter().enumerate() {
-            let rs: Vec<DataType> = vec![DataType::None, string.into()];
+            let rs: Vec<DataType> = vec![DataType::AutoIncrementRequest, string.into()];
             assert_eq!(
                 one_base_row(&mut base, rs, shard as usize),
                 vec![vec![DataType::ID((shard, (i + 1) as u64)), string.into()]].into()
@@ -550,7 +550,7 @@ mod tests {
         );
 
         // And the auto increment should then start from that value:
-        let regular: Vec<DataType> = vec![DataType::None, "e".into()];
+        let regular: Vec<DataType> = vec![DataType::AutoIncrementRequest, "e".into()];
         assert_eq!(
             one_base_row(&mut base, regular, shard as usize),
             vec![vec![DataType::ID((shard, 11)), "e".into()]].into()

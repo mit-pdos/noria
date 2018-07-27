@@ -555,7 +555,7 @@ impl<'a> BatchSendHandle<'a> {
                         TableOperation::InsertOrUpdate { ref row, .. } => &row[key_col],
                     };
                     let s = shard_by(key, self.dih.txs.len(), shard);
-                    if *key == DataType::None {
+                    if *key == DataType::AutoIncrementRequest {
                         shard = s;
                     }
                     s

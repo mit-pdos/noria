@@ -38,7 +38,9 @@ pub fn shard_by(dt: &DataType, shards: usize, previous: usize) -> usize {
             hasher.write(s.as_bytes());
             hasher.finish() as usize % shards
         }
-        DataType::None => (previous + 1) % shards,
+        DataType::AutoIncrementRequest => (previous + 1) % shards,
+        // a bit hacky: send all NULL values to the first shard
+        DataType::None => 0,
         DataType::ID((shard, _)) => shard as usize,
         ref x => {
             unimplemented!("asked to shard on value {:?}", x);

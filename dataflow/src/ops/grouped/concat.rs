@@ -99,6 +99,7 @@ impl GroupConcat {
                     DataType::Real(..) | DataType::ID(..) => s.push_str(&rec[*i].to_string()),
                     DataType::Timestamp(ref ts) => s.push_str(&ts.format("%+").to_string()),
                     DataType::None => unreachable!(),
+                    DataType::AutoIncrementRequest => unreachable!(),
                 },
             }
         }
