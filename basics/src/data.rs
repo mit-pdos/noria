@@ -29,12 +29,12 @@ pub enum DataType {
     None,
     /// Request a generated incremental ID for this column.
     AutoIncrementRequest,
+    /// A 64-bit numeric ID, prefixed by its shard index (or 0 if unsharded).
+    AutoIncrementID(u32, u64),
     /// A 32-bit numeric value.
     Int(i32),
     /// A 64-bit numeric value.
     BigInt(i64),
-    /// A 64-bit numeric ID, prefixed by its shard index (or 0 if unsharded).
-    ID(AutoIncrementID),
     /// A fixed point real value. The first field is the integer part, while the second is the
     /// fractional and must be between -999999999 and 999999999.
     Real(i32, i32),
@@ -57,7 +57,7 @@ impl DataType {
             }
             DataType::Int(n) => format!("{}", n),
             DataType::BigInt(n) => format!("{}", n),
-            DataType::ID((s, n)) => format!("{}#{}", s, n),
+            DataType::AutoIncrementID(s, n) => format!("{}#{}", s, n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.
@@ -113,9 +113,12 @@ impl PartialEq for DataType {
                 let b: i64 = other.into();
                 a == b
             }
-            (&DataType::ID(aid), &DataType::ID(bid)) => aid == bid,
+            (&DataType::AutoIncrementID(ai, an), &DataType::AutoIncrementID(bi, bn)) => {
+                ai == bi && an == bn
+            }
             (&DataType::Real(ai, af), &DataType::Real(bi, bf)) => ai == bi && af == bf,
             (&DataType::Timestamp(tsa), &DataType::Timestamp(tsb)) => tsa == tsb,
+            (&DataType::AutoIncrementRequest, &DataType::AutoIncrementRequest) => true,
             (&DataType::None, &DataType::None) => true,
 
             _ => false,
@@ -149,22 +152,24 @@ impl Ord for DataType {
                 let b: i64 = other.into();
                 a.cmp(&b)
             }
-            (&DataType::ID(aid), &DataType::ID(ref bid)) => aid.cmp(bid),
+            (&DataType::AutoIncrementID(ai, an), &DataType::AutoIncrementID(ref bi, ref bn)) => {
+                ai.cmp(bi).then_with(|| an.cmp(bn))
+            }
             (&DataType::Real(ai, af), &DataType::Real(ref bi, ref bf)) => {
                 ai.cmp(bi).then_with(|| af.cmp(bf))
             }
             (&DataType::Timestamp(tsa), &DataType::Timestamp(ref tsb)) => tsa.cmp(tsb),
             (&DataType::None, &DataType::None) => Ordering::Equal,
-            (&DataType::AutoIncrementRequest, &DataType::AutoIncrementRequest) => Ordering::Greater,
+            (&DataType::AutoIncrementRequest, &DataType::AutoIncrementRequest) => Ordering::Equal,
 
-            // order Ints, Reals, Text, Timestamps, None
+            // order Ints, Reals, AutoIncrementID, Text, Timestamps, AutoIncrementRequest, None
             (&DataType::Int(..), _) | (&DataType::BigInt(..), _) => Ordering::Greater,
             (&DataType::Real(..), _) => Ordering::Greater,
-            (&DataType::ID(..), _) => Ordering::Greater,
+            (&DataType::AutoIncrementID(..), _) => Ordering::Greater,
             (&DataType::Text(..), _) | (&DataType::TinyText(..), _) => Ordering::Greater,
             (&DataType::Timestamp(..), _) => Ordering::Greater,
-            (&DataType::None, _) => Ordering::Greater,
             (&DataType::AutoIncrementRequest, _) => Ordering::Greater,
+            (&DataType::None, _) => Ordering::Greater,
         }
     }
 }
@@ -181,7 +186,7 @@ impl Hash for DataType {
                 let n: i64 = self.into();
                 n.hash(state)
             }
-            DataType::ID((s, n)) => {
+            DataType::AutoIncrementID(s, n) => {
                 s.hash(state);
                 n.hash(state);
             }
@@ -445,7 +450,7 @@ impl fmt::Debug for DataType {
             }
             DataType::Timestamp(ts) => write!(f, "Timestamp({:?})", ts),
             DataType::Real(..) => write!(f, "Real({})", self),
-            DataType::ID(..) => write!(f, "ID({})", self),
+            DataType::AutoIncrementID(..) => write!(f, "ID({})", self),
             DataType::Int(n) => write!(f, "Int({})", n),
             DataType::BigInt(n) => write!(f, "BigInt({})", n),
         }
@@ -463,7 +468,7 @@ impl fmt::Display for DataType {
             }
             DataType::Int(n) => write!(f, "{}", n),
             DataType::BigInt(n) => write!(f, "{}", n),
-            DataType::ID((s, n)) => write!(f, "{}#{}", s, n),
+            DataType::AutoIncrementID(s, n) => write!(f, "{}#{}", s, n),
             DataType::Real(i, frac) => {
                 if i == 0 && frac < 0 {
                     // We have to insert the negative sign ourselves.

@@ -177,17 +177,16 @@ impl Base {
         shard: usize,
     ) -> (Records, Option<AutoIncrementID>) {
         let mut first_auto_id = None;
-        // Replace `None` value keys with an auto incrementing value when
-        // self.auto_increment_column is set:
+        // Replace `AutoIncrementRequest` keys with an auto incrementing
+        // value when self.auto_increment_column is set:
         if let Some(column) = self.auto_increment_column {
             for op in &mut ops {
                 if let TableOperation::Insert(ref mut r) = op {
                     let new_increment =
                         replace_with_auto_increment(column, self.auto_increment_value, r);
                     self.auto_increment_value = new_increment;
-                    let id = (shard as u32, new_increment);
-                    r[column] = DataType::ID(id);
-                    first_auto_id.get_or_insert_with(|| id);
+                    r[column] = DataType::AutoIncrementID(shard as u32, new_increment);
+                    first_auto_id.get_or_insert_with(|| (shard as u32, new_increment));
                 }
             }
         }
@@ -533,7 +532,10 @@ mod tests {
             let rs: Vec<DataType> = vec![DataType::AutoIncrementRequest, string.into()];
             assert_eq!(
                 one_base_row(&mut base, rs, shard as usize),
-                vec![vec![DataType::ID((shard, (i + 1) as u64)), string.into()]].into()
+                vec![vec![
+                    DataType::AutoIncrementID(shard, (i + 1) as u64),
+                    string.into(),
+                ]].into()
             );
         }
     }
@@ -546,14 +548,14 @@ mod tests {
         let excempt: Vec<DataType> = vec![10.into(), "d".into()];
         assert_eq!(
             one_base_row(&mut base, excempt.clone(), shard as usize),
-            vec![vec![DataType::ID((shard, 10)), "d".into()]].into()
+            vec![vec![DataType::AutoIncrementID(shard, 10), "d".into()]].into()
         );
 
         // And the auto increment should then start from that value:
         let regular: Vec<DataType> = vec![DataType::AutoIncrementRequest, "e".into()];
         assert_eq!(
             one_base_row(&mut base, regular, shard as usize),
-            vec![vec![DataType::ID((shard, 11)), "e".into()]].into()
+            vec![vec![DataType::AutoIncrementID(shard, 11), "e".into()]].into()
         );
     }
 }

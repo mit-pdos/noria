@@ -652,7 +652,7 @@ fn it_auto_increments_columns() {
     let result = read.lookup(&[article_type.into()], true).unwrap();
     assert_eq!(result.len(), 3);
     for i in 0..3 {
-        assert_eq!(result[i][0], DataType::ID((0, (i + 1) as u64)));
+        assert_eq!(result[i][0], DataType::AutoIncrementID(0, (i + 1) as u64));
     }
 }
 
@@ -694,7 +694,7 @@ fn it_auto_increments_columns_with_shards() {
         assert_eq!(lookup.len(), 1);
         assert_eq!(lookup[0][0], result[0]);
         match result[0] {
-            DataType::ID((s, v)) => {
+            DataType::AutoIncrementID(s, v) => {
                 shards[s as usize] = u64::max(v, shards[s as usize]);
                 assert!(s < 10);
                 assert!(v > 0 && s <= 10);
