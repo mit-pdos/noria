@@ -298,7 +298,7 @@ impl<E> Table<E> {
     }
 
     /// Perform multiple operations on this base table in one batch.
-    pub fn batch_insert<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub fn batch_insert<I, V>(&mut self, i: I) -> Result<InsertResult, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
@@ -321,8 +321,9 @@ impl<E> Table<E> {
         }
 
         self.tracer.take();
-        batch_putter.wait()?;
-        Ok(())
+        Ok(InsertResult {
+            auto_increment_id: batch_putter.wait()?,
+        })
     }
 
     /// Insert a single row of data into this base table.
