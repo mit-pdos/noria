@@ -111,6 +111,14 @@ fn main() {
                 .help("Number of articles to prepopulate the database with"),
         )
         .arg(
+            Arg::with_name("availability_zone")
+                .long("availability-zone")
+                .value_name("AZ")
+                .default_value("us-east-1a")
+                .takes_value(true)
+                .help("EC2 availability zone to use for launching instances"),
+        )
+        .arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
@@ -185,6 +193,7 @@ fn main() {
         _ => unreachable!(),
     };
     let nclients = value_t_or_exit!(args, "clients", i64);
+    let az = args.value_of("availability_zone").unwrap();
 
     // guess the core counts
     let ccores = args
@@ -218,6 +227,7 @@ fn main() {
 
     let mut b = tsunami::TsunamiBuilder::default();
     b.set_region(Region::UsEast1);
+    b.set_availability_zone(az);
     b.use_term_logger();
     b.add_set(
         "server",

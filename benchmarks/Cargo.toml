@@ -43,7 +43,8 @@ tokio = "0.1"
 # ec2
 rusoto_core = "0.32.0"
 rusoto_sts = "0.32.0"
-tsunami = "0.6.0"
+# revert to upstream once https://github.com/jonhoo/tsunami/pull/21 merges
+tsunami = { git = "https://github.com/ms705/tsunami" }
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"

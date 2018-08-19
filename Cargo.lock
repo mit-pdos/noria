@@ -180,7 +180,7 @@ dependencies = [
  "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)",
  "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "tsunami 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tsunami 0.6.0 (git+https://github.com/ms705/tsunami)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zookeeper 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2227,7 +2227,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "tsunami"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/ms705/tsunami#a2a9d5507083b442f18cdd01060253d9291aacff"
 dependencies = [
  "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2721,7 +2721,7 @@ dependencies = [
 "checksum toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "a0263c6c02c4db6c8f7681f9fd35e90de799ebd4cfdeab77a38f4ff6b3d8c0d9"
 "checksum try-lock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ee2aa4715743892880f70885373966c83d73ef1b0838a664ef0c76fffd35e7c2"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
-"checksum tsunami 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "26708c20bad933b4def6af1cb159d8cbc51d5157b83a0ec89460b9f1532c2693"
+"checksum tsunami 0.6.0 (git+https://github.com/ms705/tsunami)" = "<none>"
 "checksum twox-hash 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4f85be565a110ed72ed7048cf56570db04ce0a592c98aa59b7dacde3e5718750"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum ucd-util 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fd2be2d6639d0f8fe6cdda291ad456e23629558d466e2789d2c3e9892bda285d"
