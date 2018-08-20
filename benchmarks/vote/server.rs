@@ -325,10 +325,6 @@ pub(crate) fn start<'a>(
                     "votebench".into(),
                     "--address".into(),
                     listen_addr.into(),
-                    "-w".into(),
-                    format!("{}", workers).into(),
-                    "-r".into(),
-                    format!("{}", readers).into(),
                 ]);
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 server.exec(&cmd[..]).unwrap()
