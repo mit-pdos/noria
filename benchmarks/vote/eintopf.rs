@@ -146,7 +146,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
     let target_per_client = value_t_or_exit!(args, "target", usize);
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::new(Region::UsEast1);
+    let sts = StsClient::simple(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),
