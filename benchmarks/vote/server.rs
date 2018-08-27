@@ -269,11 +269,7 @@ pub(crate) fn start<'a>(
     b: &Backend,
 ) -> Result<Result<Server<'a>, String>, Error> {
     let sh = match *b {
-        Backend::Netsoup {
-            workers,
-            readers,
-            shards,
-        } => {
+        Backend::Netsoup { shards } => {
             // build worker if it hasn't been built already
             match server.in_distributary(&["cargo", "b", "--release", "--bin", "souplet"]) {
                 Ok(Ok(_)) => {}

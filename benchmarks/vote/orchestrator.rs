@@ -282,17 +282,9 @@ fn main() {
     let backends = vec![
         Backend::Memcached,
         Backend::Mysql,
-        Backend::Netsoup {
-            workers: 1,
-            readers: 80,
-            shards: None,
-        },
+        Backend::Netsoup { shards: None },
         Backend::Hybrid,
-        Backend::Netsoup {
-            workers: 4,
-            readers: 80,
-            shards: Some(4),
-        },
+        Backend::Netsoup { shards: Some(4) },
         Backend::Mssql,
     ];
 
