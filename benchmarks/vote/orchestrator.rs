@@ -475,8 +475,7 @@ fn run_clients(
         eprintln!(" .. finished prepopulation");
     }
 
-    let total_threads = ccores as usize * clients.len();
-    let ops_per_thread = target as f64 / total_threads as f64;
+    let target_per_client = (target as f64 / clients.len() as f64).ceil() as usize;
 
     // start all the benchmark clients
     let workers: Vec<_> = clients
@@ -488,13 +487,6 @@ fn run_clients(
                  ..
              }| {
                 let ssh = ssh.as_ref().unwrap();
-
-                // so, target ops...
-                // target ops is actually not entirely straightforward to determine. here, we'll
-                // assume that each client thread is able to process requests at roughly the same
-                // rate, so we divide the target ops among machines based on the number of threads
-                // they have. this may or may not be the right thing.
-                let target = (ops_per_thread * ccores as f64).ceil() as usize;
 
                 eprintln!(
                     " .. starting benchmarker on {} with target {}",
@@ -508,14 +500,8 @@ fn run_clients(
                     cmd.push("--no-prime".into());
                     cmd.push("--threads".into());
                     cmd.push(format!("{}", 6 * ccores).into());
-
-                    // so, target ops...
-                    // target ops is actually not entirely straightforward to determine. here, we'll
-                    // assume that each client thread is able to process requests at roughly the same
-                    // rate, so we divide the target ops among machines based on the number of threads
-                    // they have. this may or may not be the right thing.
                     cmd.push("--target".into());
-                    cmd.push(format!("{}", target).into());
+                    cmd.push(format!("{}", target_per_client).into());
 
                     let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                     let c = ssh.exec(&cmd[..])?;
