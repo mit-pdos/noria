@@ -146,6 +146,19 @@ fn main() {
                 .takes_value(true)
                 .help("How to distribute keys."),
         ).arg(
+            Arg::with_name("backends")
+                .long("backends")
+                .multiple(true)
+                .takes_value(true)
+                .possible_values(&[
+                    "memcached",
+                    "mysql",
+                    "netsoup-0",
+                    "hybrid",
+                    "netsoup-4",
+                    "mssql",
+                ]).help("Which backends to run [all if none are given]"),
+        ).arg(
             Arg::with_name("stype")
                 .long("server")
                 .default_value("c5.4xlarge")
@@ -167,6 +180,11 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn"),
+        ).arg(
+            Arg::with_name("targets")
+                .index(1)
+                .multiple(true)
+                .help("Which target loads to run [something sensible by default]"),
         ).get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
@@ -268,14 +286,29 @@ fn main() {
     );
 
     // what backends are we benchmarking?
-    let backends = vec![
-        Backend::Memcached,
-        Backend::Mysql,
-        Backend::Netsoup { shards: None },
-        Backend::Hybrid,
-        Backend::Netsoup { shards: Some(4) },
-        Backend::Mssql,
-    ];
+    let backends = if let Some(bs) = args.values_of("backends") {
+        bs.filter_map(|b| match b {
+            "memcached" => Some(Backend::Memcached),
+            "mysql" => Some(Backend::Mysql),
+            "netsoup-0" => Some(Backend::Netsoup { shards: None }),
+            "hybrid" => Some(Backend::Hybrid),
+            "netsoup-4" => Some(Backend::Netsoup { shards: Some(4) }),
+            "mssql" => Some(Backend::Mssql),
+            b => {
+                eprintln!("unknown backend '{}' specified", b);
+                None
+            }
+        }).collect()
+    } else {
+        vec![
+            Backend::Memcached,
+            Backend::Mysql,
+            Backend::Netsoup { shards: None },
+            Backend::Hybrid,
+            Backend::Netsoup { shards: Some(4) },
+            Backend::Mssql,
+        ]
+    };
 
     // if the user wants us to terminate, finish whatever we're currently doing first
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -299,6 +332,17 @@ fn main() {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
+
+        let targets = if let Some(ts) = args.values_of("targets") {
+            ts.map(|t| t.parse().unwrap()).collect()
+        } else {
+            vec![
+                5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
+                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000, 10_000_000,
+                11_000_000, 12_000_000, 13_000_000, 14_000_000, 15_000_000, 16_000_000,
+            ]
+        };
+
         for backend in backends {
             eprintln!("==> {}", backend.uniq_name());
 
@@ -318,12 +362,6 @@ fn main() {
                 continue;
             }
             eprintln!(" .. server started ");
-
-            let targets = [
-                5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
-                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000, 10_000_000,
-                11_000_000, 12_000_000, 13_000_000, 14_000_000, 15_000_000, 16_000_000,
-            ];
 
             let mut first = true;
             'out: for &read_percentage in &read_percentages {
