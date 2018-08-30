@@ -23,6 +23,7 @@ use failure::Error;
 use rusoto_core::Region;
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use std::borrow::Cow;
+use std::fs::File;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
@@ -173,6 +174,14 @@ fn main() {
                 .takes_value(true)
                 .help("Instance type for clients"),
         ).arg(
+            Arg::with_name("perf")
+                .long("perf")
+                .help("Run perf and stackcollapse on each run"),
+        ).arg(
+            Arg::with_name("cohost")
+                .long("cohost")
+                .help("Host all clients on a single instance"),
+        ).arg(
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
@@ -201,14 +210,20 @@ fn main() {
         "both" => &[false, true][..],
         _ => unreachable!(),
     };
-    let nclients = value_t_or_exit!(args, "clients", i64);
+    let do_perf = args.is_present("perf");
+    let cohost_clients = args.is_present("cohost");
+    let nclients = value_t_or_exit!(args, "clients", usize);
     let az = args.value_of("availability_zone").unwrap();
 
     // guess the core counts
     let ccores = args
         .value_of("ctype")
         .and_then(ec2_instance_type_cores)
-        .map(|cores| {
+        .map(|mut cores| {
+            if cohost_clients {
+                cores /= nclients as u16;
+            }
+
             // one core for load generators to be on the safe side
             match cores {
                 1 => 1,
@@ -248,6 +263,33 @@ fn main() {
                 host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                     .is_ok();
 
+                if do_perf {
+                    // allow kernel debugging
+                    host.just_exec(&[
+                        "echo",
+                        "0",
+                        "|",
+                        "sudo",
+                        "tee",
+                        "/proc/sys/kernel/kptr_restrict",
+                    ])?.is_ok();
+                    host.just_exec(&[
+                        "echo",
+                        "-1",
+                        "|",
+                        "sudo",
+                        "tee",
+                        "/proc/sys/kernel/perf_event_paranoid",
+                    ])?.is_ok();
+
+                    // get flamegraph
+                    host.just_exec(&[
+                        "git",
+                        "clone",
+                        "https://github.com/brendangregg/FlameGraph.git",
+                    ])?.is_ok();
+                }
+
                 eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
                 host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
@@ -263,7 +305,7 @@ fn main() {
     );
     b.add_set(
         "client",
-        nclients as u32,
+        if cohost_clients { 1 } else { nclients as u32 },
         tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_CLIENT_AMI, |host| {
             eprintln!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
@@ -398,7 +440,9 @@ fn main() {
                                 iters,
                                 chrono::Local::now().time()
                             );
-                            if !run_clients(iter, &clients, ccores, &mut s, target, params) {
+                            if !run_clients(
+                                iter, nclients, do_perf, &clients, ccores, &mut s, target, params,
+                            ) {
                                 // backend clearly couldn't handle the load, so don't run higher targets
                                 break;
                             }
@@ -459,6 +503,8 @@ fn main() {
 // returns true if next target is feasible
 fn run_clients(
     iter: usize,
+    nclients: usize,
+    do_perf: bool,
     clients: &Vec<tsunami::Machine>,
     ccores: u16,
     server: &mut server::Server,
@@ -502,11 +548,13 @@ fn run_clients(
         eprintln!(" .. finished prepopulation");
     }
 
-    let target_per_client = (target as f64 / clients.len() as f64).ceil() as usize;
+    let target_per_client = (target as f64 / nclients as f64).ceil() as usize;
+
+    // little trick to support cohosting
+    let clients = clients.iter().cycle().take(nclients);
 
     // start all the benchmark clients
     let workers: Vec<_> = clients
-        .iter()
         .filter_map(
             |&tsunami::Machine {
                  ref ssh,
@@ -547,12 +595,66 @@ fn run_clients(
             },
         ).collect();
 
+    // wait for warmup to finish
+    thread::sleep(time::Duration::from_secs(params.warmup as u64));
+
+    // do some profiling
+    let perf = if !do_perf || iter != 0 {
+        None
+    } else if let Backend::Netsoup { .. } = params.backend {
+        let r: Result<_, failure::Error> = do catch {
+            server.server.set_compress(true);
+            let mut c = server.server.exec(&["pgrep", "souplet"])?;
+            let mut stdout = String::new();
+            c.read_to_string(&mut stdout)?;
+            c.wait_eof()?;
+
+            // set up
+
+            match stdout
+                .lines()
+                .next()
+                .and_then(|line| line.parse::<usize>().ok())
+            {
+                Some(pid) => {
+                    let pid = format!("{}", pid);
+                    server.server.exec(&[
+                        "perf",
+                        "record",
+                        "-g",
+                        "--call-graph",
+                        "dwarf",
+                        "-p",
+                        &pid,
+                        ">",
+                        "perf.data",
+                    ])?
+                }
+                None => {
+                    Err(format_err!("did not find pid for perf"))?;
+                    unreachable!();
+                }
+            }
+        };
+
+        match r {
+            Ok(mut c) => Some(c),
+            Err(e) => {
+                eprintln!("failed to run perf on server:");
+                eprintln!("{:?}", e);
+                eprintln!("");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // let's see how we did
     let mut overloaded = None;
     let mut any_not_overloaded = false;
     let fname = params.name(target, "log");
     let mut outf = if iter == 0 {
-        use std::fs::File;
         File::create(&fname)
     } else {
         use std::fs::OpenOptions;

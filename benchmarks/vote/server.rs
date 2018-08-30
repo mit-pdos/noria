@@ -82,7 +82,7 @@ impl<'a> ServerHandle<'a> {
 
 #[must_use]
 pub(crate) struct Server<'a> {
-    server: &'a Session,
+    pub(crate) server: &'a Session,
     listen_addr: &'a str,
 
     handle: ServerHandle<'a>,
