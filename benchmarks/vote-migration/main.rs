@@ -1,3 +1,5 @@
+#![feature(duration_as_u128)]
+
 #[macro_use]
 extern crate clap;
 extern crate distributary;
@@ -8,19 +10,13 @@ extern crate zipf;
 mod graph;
 
 use distributary::DataType;
-use rand::{distributions::Sample, Rng};
+use rand::{distributions::Distribution, Rng};
 use std::io::prelude::*;
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::{fs, thread, time};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
-macro_rules! dur_to_ns {
-    ($d:expr) => {{
-        let d = $d;
-        d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64
-    }};
-}
 
 use zipf::ZipfDistribution;
 
@@ -71,18 +67,20 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     eprintln!("Setting up soup");
     let mut g = s.make(persistence_params);
     eprintln!("Getting accessors");
-    let mut articles = g.graph.get_mutator("Article").unwrap().into_exclusive();
-    let mut votes = g.graph.get_mutator("Vote").unwrap().into_exclusive();
-    let mut read_old = g.graph
-        .get_getter("ArticleWithVoteCount")
+    let mut articles = g.graph.table("Article").unwrap().into_exclusive().unwrap();
+    let mut votes = g.graph.table("Vote").unwrap().into_exclusive().unwrap();
+    let mut read_old = g
+        .graph
+        .view("ArticleWithVoteCount")
         .unwrap()
-        .into_exclusive();
+        .into_exclusive()
+        .unwrap();
 
     // prepopulate
     eprintln!("Prepopulating with {} articles", narticles);
     for i in 0..(narticles as i64) {
         articles
-            .put(vec![i.into(), format!("Article #{}", i).into()])
+            .insert(vec![i.into(), format!("Article #{}", i).into()])
             .unwrap();
     }
 
@@ -96,14 +94,14 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
                 let n = 500;
                 votes
-                    .batch_put((0..n).map(|i| {
+                    .batch_insert((0..n).map(|i| {
                         // always generate both so that we aren't artifically faster with one
                         let id_uniform = rng.gen_range(0, narticles);
                         let id_zipf = zipf.sample(&mut rng);
@@ -113,7 +111,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
+                    let count_per_ns = count as f64 / every.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("OLD", count_per_s)).unwrap();
                 }
@@ -127,7 +125,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             barrier.wait();
             let start = time::Instant::now();
             while start.elapsed() < runtime {
@@ -147,7 +145,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     let stats = thread::spawn(move || {
         let mut w = w;
         for (stat, val) in stat_rx {
-            let line = format!("{} {} {:.2}", dur_to_ns!(start.elapsed()), stat, val);
+            let line = format!("{} {} {:.2}", start.elapsed().as_nanos(), stat, val);
             println!("{}", line);
             if let Some(ref mut w) = w {
                 writeln!(w, "{}", line).unwrap();
@@ -164,11 +162,13 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     stat.send(("MIG START", 0.0)).unwrap();
     g.transition();
     stat.send(("MIG FINISHED", 0.0)).unwrap();
-    let mut ratings = g.graph.get_mutator("Rating").unwrap().into_exclusive();
-    let mut read_new = g.graph
-        .get_getter("ArticleWithScore")
+    let mut ratings = g.graph.table("Rating").unwrap().into_exclusive().unwrap();
+    let mut read_new = g
+        .graph
+        .view("ArticleWithScore")
         .unwrap()
-        .into_exclusive();
+        .into_exclusive()
+        .unwrap();
 
     // start writer that just does a bunch of new writes
     eprintln!("Starting new writer");
@@ -177,13 +177,13 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let barrier = barrier.clone();
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
                 let n = 500;
                 ratings
-                    .batch_put((0..n).map(|i| {
+                    .batch_insert((0..n).map(|i| {
                         let id_uniform = rng.gen_range(0, narticles);
                         let id_zipf = zipf.sample(&mut rng);
                         let id = if skewed { id_zipf } else { id_uniform };
@@ -192,7 +192,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     .unwrap();
 
                 if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / dur_to_ns!(every) as f64;
+                    let count_per_ns = count as f64 / every.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("NEW", count_per_s)).unwrap();
                 }
@@ -209,7 +209,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let n = 10;
             let mut hits = 0;
             let mut rng = rand::thread_rng();
-            let mut zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
+            let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             let mut reporter = Reporter::new(every);
             barrier.wait();
             while start.elapsed() < runtime {
@@ -321,11 +321,10 @@ fn main() {
 
     // set config options
     let mut s = graph::Setup::default();
-    s.sharding = args.value_of("shards")
+    s.sharding = args
+        .value_of("shards")
         .map(|_| value_t_or_exit!(args, "shards", usize));
     s.logging = args.is_present("verbose");
-    s.nreaders = 4;
-    s.nworkers = 4;
 
     if args.is_present("all") {
         let narticles = value_t_or_exit!(args, "narticles", usize);

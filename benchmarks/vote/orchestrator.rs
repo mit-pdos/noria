@@ -20,15 +20,14 @@ mod server;
 use backends::Backend;
 
 use failure::Error;
-use rusoto_core::default_tls_client;
-use rusoto_core::{EnvironmentProvider, Region};
+use rusoto_core::Region;
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use std::borrow::Cow;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_SERVER_AMI: &str = "ami-82c57dfd";
-const SOUP_CLIENT_AMI: &str = "ami-5172ca2e";
+const SOUP_SERVER_AMI: &str = "ami-078a14a43873a0ef6";
+const SOUP_CLIENT_AMI: &str = "ami-0d41416ce61c6cb1a";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -110,8 +109,14 @@ fn main() {
                 .default_value("2000000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
+        ).arg(
+            Arg::with_name("availability_zone")
+                .long("availability-zone")
+                .value_name("AZ")
+                .default_value("us-east-1a")
+                .takes_value(true)
+                .help("EC2 availability zone to use for launching instances"),
+        ).arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
@@ -119,15 +124,13 @@ fn main() {
                 .default_value("40")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("warmup")
                 .long("warmup")
                 .default_value("20")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("read_percentage")
                 .short("p")
                 .default_value("95")
@@ -135,32 +138,41 @@ fn main() {
                 .multiple(true)
                 .number_of_values(1)
                 .help("The percentage of operations that are reads"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("distribution")
                 .short("d")
                 .possible_values(&["uniform", "skewed", "both"])
                 .default_value("both")
                 .takes_value(true)
                 .help("How to distribute keys."),
-        )
-        .arg(
+        ).arg(
+            Arg::with_name("backends")
+                .long("backends")
+                .multiple(true)
+                .takes_value(true)
+                .possible_values(&[
+                    "memcached",
+                    "mysql",
+                    "netsoup-0",
+                    "hybrid",
+                    "netsoup-4",
+                    "mssql",
+                ]).help("Which backends to run [all if none are given]"),
+        ).arg(
             Arg::with_name("stype")
                 .long("server")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for server"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("ctype")
                 .long("client")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
@@ -168,13 +180,18 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn"),
-        )
-        .get_matches();
+        ).arg(
+            Arg::with_name("targets")
+                .index(1)
+                .multiple(true)
+                .help("Which target loads to run [something sensible by default]"),
+        ).get_matches();
 
     let runtime = value_t_or_exit!(args, "runtime", usize);
     let warmup = value_t_or_exit!(args, "warmup", usize);
     let articles = value_t_or_exit!(args, "articles", usize);
-    let read_percentages: Vec<usize> = args.values_of("read_percentage")
+    let read_percentages: Vec<usize> = args
+        .values_of("read_percentage")
         .unwrap()
         .map(|rp| rp.parse().unwrap())
         .collect();
@@ -185,9 +202,11 @@ fn main() {
         _ => unreachable!(),
     };
     let nclients = value_t_or_exit!(args, "clients", i64);
+    let az = args.value_of("availability_zone").unwrap();
 
     // guess the core counts
-    let ccores = args.value_of("ctype")
+    let ccores = args
+        .value_of("ctype")
         .and_then(ec2_instance_type_cores)
         .map(|cores| {
             // one core for load generators to be on the safe side
@@ -196,18 +215,14 @@ fn main() {
                 2 => 1,
                 n => n - 1,
             }
-        })
-        .expect("could not determine client core count");
-    let scores = args.value_of("stype")
+        }).expect("could not determine client core count");
+    let scores = args
+        .value_of("stype")
         .and_then(ec2_instance_type_cores)
         .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::new(
-        default_tls_client().unwrap(),
-        EnvironmentProvider,
-        Region::UsEast1,
-    );
+    let sts = StsClient::simple(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),
@@ -220,6 +235,7 @@ fn main() {
 
     let mut b = tsunami::TsunamiBuilder::default();
     b.set_region(Region::UsEast1);
+    b.set_availability_zone(az);
     b.use_term_logger();
     b.add_set(
         "server",
@@ -264,33 +280,39 @@ fn main() {
                 "--bin",
                 "vote",
                 "2>&1",
-            ])?
-                .is_ok();
+            ])?.is_ok();
             Ok(())
         }).as_user("ubuntu"),
     );
 
     // what backends are we benchmarking?
-    let backends = vec![
-        Backend::Memcached,
-        Backend::Mysql,
-        Backend::Netsoup {
-            workers: 1,
-            readers: 80,
-            shards: None,
-        },
-        Backend::Hybrid,
-        Backend::Netsoup {
-            workers: 4,
-            readers: 80,
-            shards: Some(4),
-        },
-        Backend::Mssql,
-    ];
+    let backends = if let Some(bs) = args.values_of("backends") {
+        bs.filter_map(|b| match b {
+            "memcached" => Some(Backend::Memcached),
+            "mysql" => Some(Backend::Mysql),
+            "netsoup-0" => Some(Backend::Netsoup { shards: None }),
+            "hybrid" => Some(Backend::Hybrid),
+            "netsoup-4" => Some(Backend::Netsoup { shards: Some(4) }),
+            "mssql" => Some(Backend::Mssql),
+            b => {
+                eprintln!("unknown backend '{}' specified", b);
+                None
+            }
+        }).collect()
+    } else {
+        vec![
+            Backend::Memcached,
+            Backend::Mysql,
+            Backend::Netsoup { shards: None },
+            Backend::Hybrid,
+            Backend::Netsoup { shards: Some(4) },
+            Backend::Mssql,
+        ]
+    };
 
     // if the user wants us to terminate, finish whatever we're currently doing first
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     if let Err(e) = ctrlc::set_handler(move || {
@@ -310,6 +332,17 @@ fn main() {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
+
+        let targets = if let Some(ts) = args.values_of("targets") {
+            ts.map(|t| t.parse().unwrap()).collect()
+        } else {
+            vec![
+                5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
+                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000, 10_000_000,
+                11_000_000, 12_000_000, 13_000_000, 14_000_000, 15_000_000, 16_000_000,
+            ]
+        };
+
         for backend in backends {
             eprintln!("==> {}", backend.uniq_name());
 
@@ -329,12 +362,6 @@ fn main() {
                 continue;
             }
             eprintln!(" .. server started ");
-
-            let targets = [
-                5_000, 10_000, 50_000, 100_000, 175_000, 250_000, 500_000, 1_000_000, 1_500_000,
-                2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 8_000_000, 10_000_000,
-                11_000_000, 12_000_000, 13_000_000, 14_000_000, 15_000_000, 16_000_000,
-            ];
 
             let mut first = true;
             'out: for &read_percentage in &read_percentages {
@@ -475,8 +502,7 @@ fn run_clients(
         eprintln!(" .. finished prepopulation");
     }
 
-    let total_threads = ccores as usize * clients.len();
-    let ops_per_thread = target as f64 / total_threads as f64;
+    let target_per_client = (target as f64 / clients.len() as f64).ceil() as usize;
 
     // start all the benchmark clients
     let workers: Vec<_> = clients
@@ -488,13 +514,6 @@ fn run_clients(
                  ..
              }| {
                 let ssh = ssh.as_ref().unwrap();
-
-                // so, target ops...
-                // target ops is actually not entirely straightforward to determine. here, we'll
-                // assume that each client thread is able to process requests at roughly the same
-                // rate, so we divide the target ops among machines based on the number of threads
-                // they have. this may or may not be the right thing.
-                let target = (ops_per_thread * ccores as f64).ceil() as usize;
 
                 eprintln!(
                     " .. starting benchmarker on {} with target {}",
@@ -508,14 +527,8 @@ fn run_clients(
                     cmd.push("--no-prime".into());
                     cmd.push("--threads".into());
                     cmd.push(format!("{}", 6 * ccores).into());
-
-                    // so, target ops...
-                    // target ops is actually not entirely straightforward to determine. here, we'll
-                    // assume that each client thread is able to process requests at roughly the same
-                    // rate, so we divide the target ops among machines based on the number of threads
-                    // they have. this may or may not be the right thing.
                     cmd.push("--target".into());
-                    cmd.push(format!("{}", target).into());
+                    cmd.push(format!("{}", target_per_client).into());
 
                     let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                     let c = ssh.exec(&cmd[..])?;
@@ -532,8 +545,7 @@ fn run_clients(
                     }
                 }
             },
-        )
-        .collect();
+        ).collect();
 
     // let's see how we did
     let mut overloaded = None;
@@ -637,12 +649,12 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
 
 impl ConvenientSession for tsunami::Session {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error> {
-        let cmd: Vec<_> = cmd.iter()
+        let cmd: Vec<_> = cmd
+            .iter()
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),
-            })
-            .collect();
+            }).collect();
         let cmd = cmd.join(" ");
         eprintln!("    :> {}", cmd);
 

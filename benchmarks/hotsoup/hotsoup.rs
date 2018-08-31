@@ -9,24 +9,25 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     blacklist: Vec<String>,
     r: String,
     log: slog::Logger,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     // load query blacklist
     let mut bf = File::open(blacklist).unwrap();
     let mut s = String::new();
     bf.read_to_string(&mut s).unwrap();
-    let blacklisted_queries = s.lines()
+    let blacklisted_queries = s
+        .lines()
         .filter(|l| !l.is_empty() && !l.starts_with("#"))
         .map(|l| String::from(l.split(":").next().unwrap()))
         .map(|l| String::from(l.split("_").nth(1).unwrap()))
@@ -43,7 +44,7 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
     if !partial {
         b.disable_partial();
     }
-    let g = b.build_local();
+    let g = b.build_local().unwrap();
 
     //recipe.enable_reuse(reuse);
     Box::new(Backend {
@@ -56,8 +57,8 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
 
 impl Backend {
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
-        use std::io::Read;
         use std::fs::File;
+        use std::io::Read;
 
         let ref blacklist = self.blacklist;
 
@@ -69,7 +70,8 @@ impl Backend {
         // load schema
         sf.read_to_string(&mut s).unwrap();
         // HotCRP schema files have some DROP TABLE and DELETE queries, so skip those
-        let mut rs = s.lines()
+        let mut rs = s
+            .lines()
             .filter(|l| !l.starts_with("DROP") && !l.starts_with("delete"))
             .take_while(|l| !l.contains("insert"))
             .collect::<Vec<_>>()
@@ -83,25 +85,27 @@ impl Backend {
                 let mut qf = File::open(qf).unwrap();
                 qf.read_to_string(&mut s).unwrap();
                 rs.push_str("\n");
-                rs.push_str(&s.lines()
-                    .filter(|ref l| {
-                        // make sure to skip blacklisted queries
-                        for ref q in blacklist {
-                            if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
-                                blacklisted += 1;
-                                return false;
+                rs.push_str(
+                    &s.lines()
+                        .filter(|ref l| {
+                            // make sure to skip blacklisted queries
+                            for ref q in blacklist {
+                                if l.contains(*q) || l.contains("LIKE") || l.contains("like") {
+                                    blacklisted += 1;
+                                    return false;
+                                }
                             }
-                        }
-                        true
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"))
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                )
             }
         }
 
         info!(self.log, "Ignored {} blacklisted queries", blacklisted);
 
-        match self.g.install_recipe(rs.clone()) {
+        match self.g.install_recipe(&rs) {
             Ok(ar) => {
                 info!(self.log, "{} expressions added", ar.expressions_added);
                 info!(self.log, "{} expressions removed", ar.expressions_removed);
@@ -287,7 +291,7 @@ fn main() {
             Err(e) => {
                 let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
                 panic!(e)
             }
             _ => (),
@@ -296,7 +300,7 @@ fn main() {
         if gloc.is_some() {
             let graph_fname = format!("{}/hotcrp_{}.gv", gloc.unwrap(), schema_version);
             let mut gf = File::create(graph_fname).unwrap();
-            assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+            assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
         }
 
         // on the first auto-upgradeable schema, populate with test data

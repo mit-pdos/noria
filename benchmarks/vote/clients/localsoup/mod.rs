@@ -9,9 +9,9 @@ pub(crate) mod graph;
 
 pub(crate) struct Client {
     _ch: distributary::ControllerHandle<distributary::LocalAuthority>,
-    r: distributary::RemoteGetter,
+    r: distributary::View,
     #[allow(dead_code)]
-    w: distributary::Mutator,
+    w: distributary::Table,
 }
 
 pub(crate) struct Constructor(graph::Graph);
@@ -28,8 +28,6 @@ impl VoteClientConstructor for Constructor {
 
         assert!(params.prime);
 
-        let nworkers = value_t_or_exit!(args, "workers", usize);
-        let read_threads = value_t_or_exit!(args, "readthreads", usize);
         let verbose = args.is_present("verbose");
 
         let mut persistence = PersistenceParameters::default();
@@ -47,14 +45,13 @@ impl VoteClientConstructor for Constructor {
         persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
         persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
         persistence.log_prefix = "vote".to_string();
-        persistence.log_dir = args.value_of("log-dir")
+        persistence.log_dir = args
+            .value_of("log-dir")
             .and_then(|p| Some(PathBuf::from(p)));
 
         // setup db
         let mut s = graph::Setup::default();
         s.logging = verbose;
-        s.nworkers = nworkers;
-        s.nreaders = read_threads;
         s.sharding = match value_t_or_exit!(args, "shards", usize) {
             0 => None,
             x => Some(x),
@@ -66,8 +63,8 @@ impl VoteClientConstructor for Constructor {
         if verbose {
             println!("Prepopulating with {} articles", params.articles);
         }
-        let mut a = g.graph.get_mutator("Article").unwrap();
-        a.batch_put((0..params.articles).map(|i| {
+        let mut a = g.graph.table("Article").unwrap();
+        a.batch_insert((0..params.articles).map(|i| {
             vec![
                 ((i + 1) as i32).into(),
                 format!("Article #{}", i + 1).into(),
@@ -84,9 +81,9 @@ impl VoteClientConstructor for Constructor {
     }
 
     fn make(&mut self) -> Self::Instance {
-        let mut ch = self.0.graph.pointer().connect();
-        let r = ch.get_getter("ArticleWithVoteCount").unwrap();
-        let w = ch.get_mutator("Vote").unwrap();
+        let mut ch = self.0.graph.pointer().connect().unwrap();
+        let r = ch.view("ArticleWithVoteCount").unwrap();
+        let w = ch.table("Vote").unwrap();
         Client { _ch: ch, r, w }
     }
 
@@ -97,19 +94,22 @@ impl VoteClientConstructor for Constructor {
 
 impl VoteClient for Client {
     fn handle_writes(&mut self, ids: &[i32]) {
-        let data: Vec<Vec<DataType>> = ids.into_iter()
+        let data: Vec<Vec<DataType>> = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into(), 0.into()])
             .collect();
 
-        self.w.multi_put(data).unwrap();
+        self.w.insert_all(data).unwrap();
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let arg = ids.into_iter()
+        let arg = ids
+            .into_iter()
             .map(|&article_id| vec![(article_id as usize).into()])
             .collect();
 
-        let rows = self.r
+        let rows = self
+            .r
             .multi_lookup(arg, true)
             .unwrap()
             .into_iter()

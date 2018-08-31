@@ -33,7 +33,6 @@ fn main() {
     // set up Soup via recipe
     let mut builder = ControllerBuilder::default();
     builder.log_with(distributary::logger_pls());
-    builder.set_worker_threads(2);
     builder.set_persistence(persistence_params);
     builder.set_memory_limit(100 * 1024, Duration::from_millis(1000));
 
@@ -41,13 +40,13 @@ fn main() {
     // test passes again.
     //builder.disable_partial();
 
-    let mut blender = builder.build_local();
-    blender.install_recipe(sql.to_owned()).unwrap();
+    let mut blender = builder.build_local().unwrap();
+    blender.install_recipe(sql).unwrap();
 
     // Get mutators and getter.
-    let mut article = blender.get_mutator("Article").unwrap();
-    let mut vote = blender.get_mutator("Vote").unwrap();
-    let mut awvc = blender.get_getter("ArticleWithVoteCount").unwrap();
+    let mut article = blender.table("Article").unwrap();
+    let mut vote = blender.table("Vote").unwrap();
+    let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
 
     println!("Creating articles...");
     for aid in 1..NUM_ARTICLES {
@@ -55,9 +54,9 @@ fn main() {
         let title = format!("Article {}", aid);
         let url = "http://pdos.csail.mit.edu";
         article
-            .put(vec![aid.into(), title.into(), url.into()])
+            .insert(vec![aid.into(), title.into(), url.into()])
             .unwrap();
-        vote.put(vec![aid.into(), 1.into()]).unwrap();
+        vote.insert(vec![aid.into(), 1.into()]).unwrap();
     }
 
     println!("Reading articles...");
@@ -73,7 +72,7 @@ fn main() {
             .unwrap()
             .as_secs() as i64;
         aid = (aid + 1) % NUM_ARTICLES;
-        vote.put(vec![(aid + 1).into(), uid.into()]).unwrap();
+        vote.insert(vec![(aid + 1).into(), uid.into()]).unwrap();
 
         awvc.lookup(&[aid.into()], true).unwrap();
     }

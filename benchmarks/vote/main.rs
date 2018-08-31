@@ -4,18 +4,19 @@
 #[macro_use]
 extern crate clap;
 extern crate distributary;
-extern crate fut20;
+extern crate failure;
 extern crate futures;
+extern crate futures_cpupool;
 extern crate futures_state_stream;
 extern crate hdrhistogram;
 extern crate memcached;
 extern crate mysql;
 extern crate rand;
 extern crate tiberius;
-extern crate tokio_core;
+extern crate tokio;
 extern crate zipf;
 
-use fut20::executor::{Executor, ThreadPool};
+use futures_cpupool::CpuPool;
 use hdrhistogram::Histogram;
 use rand::Rng;
 use std::cell::RefCell;
@@ -104,15 +105,15 @@ where
         );
 
         let cc = cc.clone();
-        ThreadPool::builder()
+        futures_cpupool::Builder::new()
             .pool_size(nthreads)
             .name_prefix("client-")
-            .after_start(move |_| {
+            .after_start(move || {
                 CLIENT.with(|c| {
                     *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
                 })
             })
-            .before_stop(move |_| {
+            .before_stop(move || {
                 SJRN_W
                     .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
                     .unwrap();
@@ -128,7 +129,6 @@ where
                 ts.4.wait();
             })
             .create()
-            .unwrap()
     };
 
     let generators: Vec<_> = (0..ngen)
@@ -247,14 +247,14 @@ where
 }
 
 fn run_generator<R>(
-    mut pool: ThreadPool,
-    mut id_rng: R,
+    pool: CpuPool,
+    id_rng: R,
     finished: Arc<Barrier>,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> (f64, f64)
 where
-    R: rand::distributions::Sample<usize>,
+    R: rand::distributions::Distribution<usize>,
 {
     let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
@@ -295,7 +295,7 @@ where
     let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
 
     let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-        move |_: &mut fut20::task::Context| {
+        move || -> Result<(), ()> {
             CLIENT.with(|c| {
                 let mut c = c.borrow_mut();
                 let client = c.as_mut().unwrap();
@@ -341,6 +341,7 @@ where
                     }
                 }
 
+                // need to return something that implements IntoFuture<Item = (), Error = ()>
                 Ok(())
             })
         }
@@ -351,12 +352,12 @@ where
         let now = time::Instant::now();
         // NOTE: while, not if, in case we start falling behind
         while next <= now {
-            use rand::distributions::IndependentSample;
+            use rand::distributions::Distribution;
 
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
             let id = id_rng.sample(&mut rng) as i32;
-            if rng.gen_weighted_bool(every) {
+            if rng.gen_bool(1.0 / every as f64) {
                 if queued_w.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
                 }
@@ -371,7 +372,7 @@ where
             }
 
             // schedule next delivery
-            next += time::Duration::new(0, interarrival.ind_sample(&mut rng) as u32);
+            next += time::Duration::new(0, interarrival.sample(&mut rng) as u32);
         }
 
         // in case that took a while:
@@ -383,20 +384,20 @@ where
 
                 if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
                     ops += queued_w.len();
-                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
+                    pool.spawn_fn(enqueue(
                         queued_w.split_off(0),
                         queued_w_keys.split_off(0),
                         true,
-                    )))).unwrap();
+                    )).forget();
                 }
 
                 if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
                     ops += queued_r.len();
-                    pool.spawn(Box::new(fut20::future::lazy(enqueue(
+                    pool.spawn_fn(enqueue(
                         queued_r.split_off(0),
                         queued_r_keys.split_off(0),
                         false,
-                    )))).unwrap();
+                    )).forget();
                 }
 
                 // since next_send = Some, we better have sent at least one batch!
@@ -640,21 +641,6 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("localsoup")
-                .arg(
-                    Arg::with_name("workers")
-                        .short("w")
-                        .long("workers")
-                        .takes_value(true)
-                        .default_value("1")
-                        .help("Number of workers to use"),
-                )
-                .arg(
-                    Arg::with_name("readthreads")
-                        .long("read-threads")
-                        .value_name("N")
-                        .default_value("2")
-                        .help("Number of read threads to start"),
-                )
                 .arg(
                     Arg::with_name("shards")
                         .long("shards")

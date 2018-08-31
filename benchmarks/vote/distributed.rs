@@ -16,8 +16,7 @@ extern crate tsunami;
 
 use failure::Error;
 use failure::ResultExt;
-use rusoto_core::default_tls_client;
-use rusoto_core::{EnvironmentProvider, Region};
+use rusoto_core::Region;
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use std::borrow::Cow;
 use std::fs::File;
@@ -191,23 +190,21 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
 
     // guess the core counts
     let for_gen = ((target_per_client + (3_000_000 - 1)) / 3_000_000) as u16;
-    let ccores = args.value_of("ctype")
+    let ccores = args
+        .value_of("ctype")
         .and_then(ec2_instance_type_cores)
         .map(|cores| {
             assert!(cores > for_gen);
             cores - for_gen
         })
         .expect("could not determine client core count");
-    let scores = args.value_of("stype")
+    let scores = args
+        .value_of("stype")
         .and_then(ec2_instance_type_cores)
         .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::new(
-        default_tls_client().unwrap(),
-        EnvironmentProvider,
-        Region::UsEast1,
-    );
+    let sts = StsClient::simple(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),
@@ -597,7 +594,8 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
 
 impl ConvenientSession for tsunami::Session {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error> {
-        let cmd: Vec<_> = cmd.iter()
+        let cmd: Vec<_> = cmd
+            .iter()
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),

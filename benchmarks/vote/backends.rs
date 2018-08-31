@@ -1,10 +1,6 @@
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Backend {
-    Netsoup {
-        workers: usize,
-        readers: usize,
-        shards: Option<usize>,
-    },
+    Netsoup { shards: Option<usize> },
     Mssql,
     Mysql,
     Memcached,
@@ -33,11 +29,7 @@ impl Backend {
 
     pub(crate) fn uniq_name(&self) -> String {
         match *self {
-            Backend::Netsoup {
-                readers,
-                workers,
-                shards,
-            } => format!("netsoup_{}r_{}w_{}s", readers, workers, shards.unwrap_or(0)),
+            Backend::Netsoup { shards } => format!("netsoup_{}s", shards.unwrap_or(0)),
             Backend::Hybrid | Backend::Memcached | Backend::Mysql | Backend::Mssql => {
                 self.multiclient_name().to_string()
             }

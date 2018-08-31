@@ -4,25 +4,25 @@ extern crate chrono;
 extern crate distributary;
 extern crate rand;
 
-mod populate;
 mod parameters;
+mod populate;
 
 #[macro_use]
 extern crate clap;
 
 use parameters::SampleKeys;
-use std::{thread, time};
-use std::collections::HashMap;
 use rand::Rng;
+use std::collections::HashMap;
+use std::{thread, time};
 
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, ControllerHandle, LocalAuthority};
+use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     r: String,
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
     parallel_prepop: bool,
     prepop_counts: HashMap<String, usize>,
     barrier: Arc<Barrier>,
@@ -33,17 +33,18 @@ macro_rules! dur_to_fsec {
     ($d:expr) => {{
         let d = $d;
         (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
-    }}
+    }};
 }
 
 fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     let mut f = File::open(recipe_location).unwrap();
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
-    let mut queries = s.lines()
+    let mut queries = s
+        .lines()
         .filter(|l| {
             !l.is_empty() && !l.starts_with('#') && !l.starts_with("--") && !l.starts_with("CREATE")
         })
@@ -64,8 +65,8 @@ fn make(
     single_query: bool,
     disable_partial: bool,
 ) -> Backend {
-    use std::io::Read;
     use std::fs::File;
+    use std::io::Read;
 
     // set up graph
     let mut b = ControllerBuilder::default();
@@ -75,10 +76,8 @@ fn make(
     if disable_partial {
         b.disable_partial();
     }
-    b.set_worker_threads(2);
-    b.set_read_threads(1);
 
-    let mut g = b.build_local();
+    let mut g = b.build_local().unwrap();
 
     let recipe = {
         let mut f = File::open(recipe_location).unwrap();
@@ -87,7 +86,8 @@ fn make(
         // load queries
         f.read_to_string(&mut s).unwrap();
         if single_query {
-            s = s.lines()
+            s = s
+                .lines()
                 .take_while(|l| l.starts_with("CREATE"))
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -96,7 +96,7 @@ fn make(
         s
     };
 
-    g.install_recipe(recipe.clone()).unwrap();
+    g.install_recipe(&recipe).unwrap();
 
     // XXX(malte): fix reuse configuration passthrough
     /*match Recipe::from_str(&s, Some(recipe_log.clone())) {
@@ -134,7 +134,7 @@ impl Backend {
         new_recipe.push_str(query);
 
         let start = time::Instant::now();
-        self.g.install_recipe(new_recipe.clone()).unwrap();
+        self.g.install_recipe(&new_recipe).unwrap();
 
         let dur = dur_to_fsec!(start.elapsed());
         println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
@@ -150,7 +150,7 @@ impl Backend {
         /*match self.outputs.get(query_name) {
             None => panic!("no node for {}!", query_name),
             Some(nd) => {
-                let g = self.g.get_getter(*nd).unwrap();
+                let g = self.g.view(*nd).unwrap();
                 g.len()
             }
         }*/
@@ -164,10 +164,12 @@ impl Backend {
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
         println!("reading {}", query_name);
-        let mut g = self.g
-            .get_getter(query_name)
+        let mut g = self
+            .g
+            .view(query_name)
             .expect(&format!("no node for {}!", query_name))
-            .into_exclusive();
+            .into_exclusive()
+            .unwrap();
         let query_name = String::from(query_name);
 
         let num = ((keys.keys_size(&query_name) as f32) * read_scale) as usize;
@@ -368,7 +370,7 @@ fn main() {
             if gloc.is_some() {
                 let graph_fname = format!("{}/tpcw_{}.gv", gloc.unwrap(), i);
                 let mut gf = File::create(graph_fname).unwrap();
-                assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+                assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
             }
         }
     }

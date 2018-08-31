@@ -18,8 +18,10 @@ use hdrhistogram::Histogram;
 use itertools::Itertools;
 use zookeeper::ZooKeeper;
 
-use distributary::{ControllerBuilder, ControllerHandle, DataType, DurabilityMode,
-                   PersistenceParameters, ZookeeperAuthority};
+use distributary::{
+    ControllerBuilder, DataType, DurabilityMode, LocalControllerHandle, PersistenceParameters,
+    ZookeeperAuthority,
+};
 
 // If we .batch_put a huge amount of rows we'll end up with a deadlock when the base
 // domains fill up their TCP buffers trying to send ACKs (which the batch putter
@@ -52,7 +54,7 @@ fn build_graph(
     authority: Arc<ZookeeperAuthority>,
     persistence: PersistenceParameters,
     verbose: bool,
-) -> ControllerHandle<ZookeeperAuthority> {
+) -> LocalControllerHandle<ZookeeperAuthority> {
     let mut builder = ControllerBuilder::default();
     if verbose {
         builder.log_with(distributary::logger_pls());
@@ -60,13 +62,11 @@ fn build_graph(
 
     builder.set_persistence(persistence);
     builder.set_sharding(None);
-    builder.set_read_threads(1);
-    builder.set_worker_threads(1);
-    builder.build(authority)
+    builder.build(authority).unwrap()
 }
 
-fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
-    let mut mutator = g.get_mutator("TableRow").unwrap();
+fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed: bool) {
+    let mut mutator = g.table("TableRow").unwrap();
 
     (0..rows)
         .map(|i| {
@@ -84,13 +84,13 @@ fn populate(g: &mut ControllerHandle<ZookeeperAuthority>, rows: i64, skewed: boo
         .into_iter()
         .for_each(|chunk| {
             let rs: Vec<Vec<DataType>> = chunk.collect();
-            mutator.multi_put(rs).unwrap();
+            mutator.insert_all(rs).unwrap();
         });
 }
 
 // Synchronously read `reads` times, where each read should trigger a full replay from the base.
 fn perform_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     reads: i64,
     rows: i64,
     skewed: bool,
@@ -124,11 +124,11 @@ fn perform_reads(
 
 // Reads every row with the primary key index.
 fn perform_primary_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     hist: &mut Histogram<u64>,
     row_ids: Vec<i64>,
 ) {
-    let mut getter = g.get_getter("ReadRow").unwrap();
+    let mut getter = g.view("ReadRow").unwrap();
 
     for i in row_ids {
         let id: DataType = DataType::BigInt(i);
@@ -150,14 +150,14 @@ fn perform_primary_reads(
 
 // Reads each row from one of the secondary indices.
 fn perform_secondary_reads(
-    g: &mut ControllerHandle<ZookeeperAuthority>,
+    g: &mut LocalControllerHandle<ZookeeperAuthority>,
     hist: &mut Histogram<u64>,
     rows: i64,
     row_ids: Vec<i64>,
 ) {
     let indices = 10;
     let mut getters: Vec<_> = (1..indices)
-        .map(|i| g.get_getter(&format!("query_c{}", i)).unwrap())
+        .map(|i| g.view(&format!("query_c{}", i)).unwrap())
         .collect();
 
     let skewed = row_ids.len() == 1;
@@ -317,19 +317,20 @@ fn main() {
         DurabilityMode::MemoryOnly
     };
 
-    persistence.log_dir = args.value_of("log-dir")
+    persistence.log_dir = args
+        .value_of("log-dir")
         .and_then(|p| Some(PathBuf::from(p)));
 
     let zk_address = args.value_of("zookeeper-address").unwrap();
-    let authority = Arc::new(ZookeeperAuthority::new(zk_address));
+    let authority = Arc::new(ZookeeperAuthority::new(zk_address).unwrap());
 
     if !args.is_present("use-existing-data") {
         clear_zookeeper(zk_address);
         let mut g = build_graph(authority.clone(), persistence.clone(), verbose);
         if use_secondary {
-            g.install_recipe(SECONDARY_RECIPE.to_owned()).unwrap();
+            g.install_recipe(SECONDARY_RECIPE).unwrap();
         } else {
-            g.install_recipe(RECIPE.to_owned()).unwrap();
+            g.install_recipe(RECIPE).unwrap();
         }
 
         if verbose {

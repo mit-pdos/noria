@@ -4,7 +4,9 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
-use distributary::{ControllerHandle, DataType, ReuseConfigType, ControllerBuilder, LocalAuthority};
+use distributary::{
+    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
+};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -16,7 +18,7 @@ mod populate;
 use populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
-    g: ControllerHandle<LocalAuthority>,
+    g: LocalControllerHandle<LocalAuthority>,
 }
 
 #[derive(PartialEq)]
@@ -46,24 +48,19 @@ impl Backend {
 
         cb.log_with(blender_log);
 
-        let g = cb.build_local();
+        let g = cb.build_local().unwrap();
 
-        Backend {
-            g: g,
-        }
+        Backend { g: g }
     }
 
     pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self
-            .g
-            .get_mutator(name)
-            .unwrap();
+        let mut mutator = self.g.table(name).unwrap();
 
         let start = time::Instant::now();
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r).unwrap();
+            mutator.insert(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());
@@ -78,9 +75,7 @@ impl Backend {
         i
     }
 
-
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-
         self.g.create_universe(user_context.clone());
 
         Ok(())
@@ -96,11 +91,7 @@ impl Backend {
         self.g.set_security_config(config);
     }
 
-    fn migrate(
-        &mut self,
-        schema_file: &str,
-        query_file: Option<&str>,
-    ) -> Result<(), String> {
+    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
 
         // Read schema file
@@ -123,7 +114,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -208,8 +199,10 @@ fn main() {
             Arg::with_name("nlogged")
                 .short("l")
                 .default_value("1000")
-                .help("Number of logged users. Must be less or equal than the number of users in the db")
-            )
+                .help(
+                "Number of logged users. Must be less or equal than the number of users in the db",
+            ),
+        )
         .arg(
             Arg::with_name("nclasses")
                 .short("c")
@@ -230,7 +223,6 @@ fn main() {
         )
         .get_matches();
 
-
     println!("Starting benchmark...");
 
     // Read arguments
@@ -242,14 +234,21 @@ fn main() {
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
-    let populate = args.value_of("populate").unwrap_or("nopopulate");;
+    let populate = args.value_of("populate").unwrap_or("nopopulate");
     let nusers = value_t_or_exit!(args, "nusers", i32);
     let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
-    assert!(nlogged <= nusers, "nusers must be greater than nlogged");
+    assert!(
+        nlogged <= nusers,
+        "nusers must be greater or equal to nlogged"
+    );
+    assert!(
+        nusers >= populate::TAS_PER_CLASS as i32,
+        "nusers must be greater or equal to TAS_PER_CLASS"
+    );
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
@@ -280,7 +279,6 @@ fn main() {
     backend.populate("User", users);
     backend.populate("Class", classes);
 
-
     if populate == PopulateType::Before {
         backend.populate("Post", posts.clone());
         println!("Waiting for posts to propagate...");
@@ -293,7 +291,7 @@ fn main() {
     // if partial, read 25% of the keys
     if partial {
         let leaf = format!("post_count");
-        let mut getter = backend.g.get_getter(&leaf).unwrap();
+        let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
         }
@@ -305,16 +303,12 @@ fn main() {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
-        println!(
-            "Migration {} took {:.2}s!",
-            i,
-            dur,
-        );
+        println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
         if partial {
             let leaf = format!("post_count_u{}", i);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
             }
@@ -331,12 +325,11 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-
     if !partial {
         let mut dur = time::Duration::from_millis(0);
         for uid in 0..nlogged {
             let leaf = format!("post_count_u{}", uid);
-            let mut getter = backend.g.get_getter(&leaf).unwrap();
+            let mut getter = backend.g.view(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
                 getter.lookup(&[author.into()], true).unwrap();
@@ -347,11 +340,11 @@ fn main() {
         let dur = dur_to_fsec!(dur);
 
         println!(
-                "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-                nlogged * nusers,
-                dur,
-                (nlogged * nusers) as f64 / dur,
-            );
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            nlogged * nusers,
+            dur,
+            (nlogged * nusers) as f64 / dur,
+        );
     }
 
     println!("Done with benchmark.");
@@ -359,6 +352,6 @@ fn main() {
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz()).is_ok());
+        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 }

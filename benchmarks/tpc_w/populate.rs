@@ -1,25 +1,25 @@
 use chrono::naive::NaiveDate;
-use chrono::naive::NaiveTime;
 use chrono::naive::NaiveDateTime;
-use std::io::{BufRead, BufReader};
+use chrono::naive::NaiveTime;
 use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::str::FromStr;
-use std::time;
 use std::thread;
+use std::time;
 
-use distributary::DataType;
 use super::Backend;
+use distributary::DataType;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {
     ($d:expr) => {{
         let d = $d;
         (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
-    }}
+    }};
 }
 
 fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-    let mut mutator = backend.g.get_mutator(name).unwrap().into_exclusive();
+    let mut mutator = backend.g.table(name).unwrap().into_exclusive().unwrap();
 
     let i = records.len();
 
@@ -28,7 +28,7 @@ fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<Data
 
         let i = records.len();
         for r in records.drain(..) {
-            mutator.put(r).unwrap();
+            mutator.insert(r).unwrap();
         }
 
         let dur = dur_to_fsec!(start.elapsed());
