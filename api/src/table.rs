@@ -22,10 +22,18 @@ pub struct Input {
 #[derive(Debug, Fail)]
 pub enum TableError {
     /// The wrong number of columns was given when inserting a row.
-    #[fail(display = "wrong number of columns specified: expected {}, got {}", _0, _1)]
+    #[fail(
+        display = "wrong number of columns specified: expected {}, got {}",
+        _0,
+        _1
+    )]
     WrongColumnCount(usize, usize),
     /// The wrong number of key columns was given when modifying a row.
-    #[fail(display = "wrong number of key columns used: expected {}, got {}", _0, _1)]
+    #[fail(
+        display = "wrong number of key columns used: expected {}, got {}",
+        _0,
+        _1
+    )]
     WrongKeyColumnCount(usize, usize),
     /// The underlying connection to Soup produced an error.
     #[fail(display = "{}", _0)]
@@ -88,9 +96,15 @@ impl TableBuilder {
             table_name: self.table_name,
             columns: self.columns,
             schema: self.schema,
+            previous_shard: 0,
             exclusivity: SharedConnection,
         })
     }
+}
+
+#[derive(Debug)]
+pub struct InsertResult {
+    pub auto_increment_id: Option<AutoIncrementID>,
 }
 
 /// A `Table` is used to perform writes, deletes, and other operations to data in base tables.
@@ -110,6 +124,7 @@ pub struct Table<E = SharedConnection> {
     table_name: String,
     columns: Vec<String>,
     schema: Option<CreateTableStatement>,
+    previous_shard: usize,
 
     #[allow(dead_code)]
     exclusivity: E,
@@ -128,6 +143,7 @@ impl Clone for Table<SharedConnection> {
             table_name: self.table_name.clone(),
             columns: self.columns.clone(),
             schema: self.schema.clone(),
+            previous_shard: self.previous_shard,
             exclusivity: SharedConnection,
         }
     }
@@ -152,6 +168,7 @@ impl Table<SharedConnection> {
             table_name: self.table_name.clone(),
             columns: self.columns.clone(),
             schema: self.schema.clone(),
+            previous_shard: self.previous_shard,
             exclusivity: ExclusiveConnection,
         })
     }
@@ -265,16 +282,23 @@ impl<E> Table<E> {
         }
     }
 
-    fn send(&mut self, ops: Vec<TableOperation>) -> Result<(), TransportError> {
+    fn send(
+        &mut self,
+        ops: Vec<TableOperation>,
+    ) -> Result<Option<AutoIncrementID>, TransportError> {
         let tracer = self.tracer.take();
         let m = self.prep_records(tracer, ops);
-        self.domain_input_handle
-            .borrow_mut()
-            .base_send(m, &self.key[..])
+        let (last_shard, id) =
+            self.domain_input_handle
+                .borrow_mut()
+                .base_send(m, &self.key[..], self.previous_shard)?;
+
+        self.previous_shard = last_shard;
+        Ok(id)
     }
 
     /// Perform multiple operations on this base table in one batch.
-    pub fn batch_insert<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub fn batch_insert<I, V>(&mut self, i: I) -> Result<InsertResult, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
@@ -293,16 +317,17 @@ impl<E> Table<E> {
 
             let tracer = self.tracer.clone();
             let m = self.prep_records(tracer, data);
-            batch_putter.enqueue(m, &self.key[..])?;
+            self.previous_shard = batch_putter.enqueue(m, &self.key[..], self.previous_shard)?;
         }
 
         self.tracer.take();
-        batch_putter.wait()?;
-        Ok(())
+        Ok(InsertResult {
+            auto_increment_id: batch_putter.wait()?,
+        })
     }
 
     /// Insert a single row of data into this base table.
-    pub fn insert<V>(&mut self, u: V) -> Result<(), TableError>
+    pub fn insert<V>(&mut self, u: V) -> Result<InsertResult, TableError>
     where
         V: Into<Vec<DataType>>,
     {
@@ -314,12 +339,14 @@ impl<E> Table<E> {
             ));
         }
 
-        self.send(data)?;
-        Ok(())
+        let id = self.send(data)?;
+        Ok(InsertResult {
+            auto_increment_id: id,
+        })
     }
 
     /// Insert multiple rows of data into this base table.
-    pub fn insert_all<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub fn insert_all<I, V>(&mut self, i: I) -> Result<InsertResult, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<Vec<DataType>>,
@@ -334,10 +361,11 @@ impl<E> Table<E> {
             })
             .collect::<Result<Vec<_>, _>>()
             .and_then(|data| {
-                self.send(data)?;
-                Ok(())
+                let id = self.send(data)?;
+                Ok(InsertResult {
+                    auto_increment_id: id,
+                })
             })
-            .map(|_| ())
     }
 
     /// Delete the row with the given key from this base table.
@@ -465,12 +493,25 @@ impl DomainInputHandle {
         BatchSendHandle::new(self)
     }
 
-    pub(crate) fn base_send(&mut self, i: Input, key: &[usize]) -> Result<(), TransportError> {
+    pub(crate) fn base_send(
+        &mut self,
+        i: Input,
+        key: &[usize],
+        previous_shard: usize,
+    ) -> Result<(usize, Option<AutoIncrementID>), TransportError> {
         let mut s = BatchSendHandle::new(self);
-        s.enqueue(i, key)?;
-        s.wait().map_err(|_| {
-            tcp::SendError::IoError(io::Error::new(io::ErrorKind::Other, "write failed")).into()
-        })
+        let last_shard = s.enqueue(i, key, previous_shard)?;
+        let id = match s.wait() {
+            Ok(id) => id,
+            Err(_) => {
+                return Err(tcp::SendError::IoError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "write failed",
+                )).into())
+            }
+        };
+
+        Ok((last_shard, id))
     }
 }
 
@@ -485,7 +526,13 @@ impl<'a> BatchSendHandle<'a> {
         Self { dih, sent }
     }
 
-    pub(crate) fn enqueue(&mut self, mut i: Input, key: &[usize]) -> Result<(), TransportError> {
+    pub(crate) fn enqueue(
+        &mut self,
+        mut i: Input,
+        key: &[usize],
+        previous_shard: usize,
+    ) -> Result<usize, TransportError> {
+        let mut shard = previous_shard;
         if self.dih.txs.len() == 1 {
             self.dih.txs[0].send(i)?;
             self.sent[0] += 1;
@@ -508,7 +555,11 @@ impl<'a> BatchSendHandle<'a> {
                         TableOperation::Update { ref key, .. } => &key[0],
                         TableOperation::InsertOrUpdate { ref row, .. } => &row[key_col],
                     };
-                    shard_by(key, self.dih.txs.len())
+                    let s = shard_by(key, self.dih.txs.len(), shard);
+                    if *key == DataType::AutoIncrementRequest {
+                        shard = s;
+                    }
+                    s
                 };
                 shard_writes[shard].push(r);
             }
@@ -525,17 +576,20 @@ impl<'a> BatchSendHandle<'a> {
             }
         }
 
-        Ok(())
+        Ok(shard)
     }
 
-    pub(crate) fn wait(self) -> Result<(), TransportError> {
+    pub(crate) fn wait(self) -> Result<Option<AutoIncrementID>, TransportError> {
+        let mut first_auto_id = None;
         for (shard, n) in self.sent.into_iter().enumerate() {
             for _ in 0..n {
                 use bincode;
-                let _: bool = bincode::deserialize_from(&mut (&mut self.dih.txs[shard]).reader())?;
+                let id =
+                    bincode::deserialize_from(&mut (&mut self.dih.txs[shard]).reader()).unwrap();
+                first_auto_id.get_or_insert(id);
             }
         }
 
-        Ok(())
+        Ok(first_auto_id.unwrap())
     }
 }

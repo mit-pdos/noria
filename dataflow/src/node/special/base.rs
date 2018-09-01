@@ -16,6 +16,10 @@ pub struct Base {
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
+
+    // Last used auto-increment value:
+    auto_increment_value: u64,
+    auto_increment_column: Option<usize>,
 }
 
 impl Base {
@@ -29,6 +33,11 @@ impl Base {
     /// Builder with a known primary key.
     pub fn with_key(mut self, primary_key: Vec<usize>) -> Base {
         self.primary_key = Some(primary_key);
+        self
+    }
+
+    pub fn with_auto_increment(mut self, column: usize) -> Base {
+        self.auto_increment_column = Some(column);
         self
     }
 
@@ -92,6 +101,8 @@ impl Clone for Base {
             primary_key: self.primary_key.clone(),
 
             defaults: self.defaults.clone(),
+            auto_increment_value: self.auto_increment_value,
+            auto_increment_column: self.auto_increment_column.clone(),
             dropped: self.dropped.clone(),
             unmodified: self.unmodified,
         }
@@ -104,6 +115,8 @@ impl Default for Base {
             primary_key: None,
 
             defaults: Vec::new(),
+            auto_increment_value: 0,
+            auto_increment_column: None,
             dropped: Vec::new(),
             unmodified: true,
         }
@@ -126,6 +139,31 @@ fn key_of<'a>(key_cols: &'a [usize], r: &'a TableOperation) -> impl Iterator<Ite
         .map(move |(i, col)| key_val(i, *col, r))
 }
 
+// Replaces None values with the next available auto increment value, mutating
+// auto_increment_values if there are any changes.
+fn replace_with_auto_increment(column: usize, value: u64, row: &[DataType]) -> u64 {
+    // When we're given an AutoIncrementRequest, replace it with the incremented version
+    // of the last auto increment value for that column (or the initial increment value):
+    let new_value = match row[column] {
+        DataType::AutoIncrementRequest => value + 1,
+        // Other values should override existing auto increment values, so that
+        // the auto incrementer continues from there the next time:
+        DataType::Int(i) => {
+            let i = i as u64;
+            assert!(i > value, "can't override auto increment with lower value");
+            i
+        }
+        DataType::BigInt(i) => {
+            let i = i as u64;
+            assert!(i > value, "can't override auto increment with lower value");
+            i
+        }
+        _ => panic!("tried giving a non-numeric value to an AUTO_INCREMENT column"),
+    };
+
+    new_value
+}
+
 impl Base {
     pub(crate) fn take(&mut self) -> Self {
         Clone::clone(self)
@@ -136,9 +174,25 @@ impl Base {
         us: LocalNodeIndex,
         mut ops: Vec<TableOperation>,
         state: &StateMap,
-    ) -> Records {
+        shard: usize,
+    ) -> (Records, Option<AutoIncrementID>) {
+        let mut first_auto_id = None;
+        // Replace `AutoIncrementRequest` keys with an auto incrementing
+        // value when self.auto_increment_column is set:
+        if let Some(column) = self.auto_increment_column {
+            for op in &mut ops {
+                if let TableOperation::Insert(ref mut r) = op {
+                    let new_increment =
+                        replace_with_auto_increment(column, self.auto_increment_value, r);
+                    self.auto_increment_value = new_increment;
+                    r[column] = DataType::AutoIncrementID(shard as u32, new_increment);
+                    first_auto_id.get_or_insert_with(|| (shard as u32, new_increment));
+                }
+            }
+        }
+
         if self.primary_key.is_none() || ops.is_empty() {
-            return ops
+            let rs = ops
                 .into_iter()
                 .map(|r| {
                     if let TableOperation::Insert(mut r) = r {
@@ -149,6 +203,7 @@ impl Base {
                     }
                 })
                 .collect();
+            return (rs, first_auto_id);
         }
 
         let key_cols = &self.primary_key.as_ref().unwrap()[..];
@@ -266,7 +321,7 @@ impl Base {
             self.fix(r);
         }
 
-        results.into()
+        (results.into(), first_auto_id)
     }
 
     pub(crate) fn suggest_indexes(&self, n: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
@@ -283,6 +338,39 @@ impl Base {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use node;
+
+    struct TestBase {
+        base: Base,
+        local_addr: LocalNodeIndex,
+        states: StateMap,
+    }
+
+    fn setup(auto_increment_column: Option<usize>) -> TestBase {
+        let mut base = Base::new(vec![DataType::None]);
+        if let Some(column) = auto_increment_column {
+            base = base.with_auto_increment(column);
+        }
+
+        base.add_column("default".into());
+        let local_addr = unsafe { LocalNodeIndex::make(0) };
+        let mut states = StateMap::default();
+        let mut state = box MemoryState::default();
+        state.add_key(&[0], None);
+        states.insert(local_addr, state);
+        TestBase {
+            base,
+            local_addr,
+            states,
+        }
+    }
+
+    fn one_base_row(test: &mut TestBase, r: Vec<DataType>, shard: usize) -> Records {
+        let ops = vec![TableOperation::Insert(r)];
+        let (mut records, _) = test.base.process(test.local_addr, ops, &test.states, shard);
+        node::materialize(&mut records, None, test.states.get_mut(&test.local_addr));
+        records
+    }
 
     #[test]
     fn it_works_default() {
@@ -304,6 +392,23 @@ mod tests {
         assert_eq!(b.defaults.len(), 0);
         assert_eq!(b.dropped.len(), 0);
         assert_eq!(b.unmodified, true);
+    }
+
+    #[test]
+    fn it_forwards() {
+        let mut base = setup(None);
+        let rs: Vec<DataType> = vec![1.into(), "a".into()];
+        assert_eq!(one_base_row(&mut base, rs.clone(), 0), vec![rs].into());
+    }
+
+    #[test]
+    fn it_adds_defaults() {
+        let mut base = setup(None);
+        let rs: Vec<DataType> = vec![1.into()];
+        assert_eq!(
+            one_base_row(&mut base, rs.clone(), 0),
+            vec![vec![1.into(), "default".into()]].into()
+        );
     }
 
     fn test_lots_of_changes_in_same_batch(mut state: Box<State>) {
@@ -345,7 +450,7 @@ mod tests {
         let mut n = n.finalize(&graph);
 
         let mut one = move |u: Vec<TableOperation>| {
-            let mut m = n.get_base_mut().unwrap().process(local, u, &states);
+            let (mut m, _) = n.get_base_mut().unwrap().process(local, u, &states, 0);
             node::materialize(&mut m, None, states.get_mut(&local));
             m
         };
@@ -416,5 +521,41 @@ mod tests {
         );
 
         test_lots_of_changes_in_same_batch(box state);
+    }
+
+    #[test]
+    fn it_supports_auto_increment_columns() {
+        let mut base = setup(Some(0));
+        let strings = vec!["a", "b", "c"];
+        let shard: u32 = 10;
+        for (i, string) in strings.into_iter().enumerate() {
+            let rs: Vec<DataType> = vec![DataType::AutoIncrementRequest, string.into()];
+            assert_eq!(
+                one_base_row(&mut base, rs, shard as usize),
+                vec![vec![
+                    DataType::AutoIncrementID(shard, (i + 1) as u64),
+                    string.into(),
+                ]].into()
+            );
+        }
+    }
+
+    #[test]
+    fn it_supports_auto_increment_columns_w_override() {
+        let mut base = setup(Some(0));
+        let shard: u32 = 10;
+        // Explicit values should not be overriden by auto increment:
+        let excempt: Vec<DataType> = vec![10.into(), "d".into()];
+        assert_eq!(
+            one_base_row(&mut base, excempt.clone(), shard as usize),
+            vec![vec![DataType::AutoIncrementID(shard, 10), "d".into()]].into()
+        );
+
+        // And the auto increment should then start from that value:
+        let regular: Vec<DataType> = vec![DataType::AutoIncrementRequest, "e".into()];
+        assert_eq!(
+            one_base_row(&mut base, regular, shard as usize),
+            vec![vec![DataType::AutoIncrementID(shard, 11), "e".into()]].into()
+        );
     }
 }

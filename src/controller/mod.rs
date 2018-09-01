@@ -15,8 +15,8 @@ use controller::recipe::Recipe;
 use controller::sql::reuse::ReuseConfigType;
 use coordination::{CoordinationMessage, CoordinationPayload};
 use dataflow::{
-    payload::SourceChannelIdentifier, prelude::Executor, Domain, DomainBuilder, DomainConfig,
-    Packet, PersistenceParameters, Readers,
+    payload::SourceChannelIdentifier, prelude::AutoIncrementID, prelude::Executor, Domain,
+    DomainBuilder, DomainConfig, Packet, PersistenceParameters, Readers,
 };
 use failure::{self, ResultExt};
 use fnv::{FnvHashMap, FnvHashSet};
@@ -1032,7 +1032,13 @@ struct Replica {
 
     incoming: Valved<tokio::net::Incoming>,
     inputs: StreamUnordered<
-        DualTcpStream<BufStream<tokio::net::TcpStream>, Box<Packet>, Input, SyncDestination>,
+        DualTcpStream<
+            BufStream<tokio::net::TcpStream>,
+            Box<Packet>,
+            Input,
+            Option<AutoIncrementID>,
+            SyncDestination,
+        >,
     >,
     outputs: FnvHashMap<
         ReplicaIndex,
@@ -1078,31 +1084,39 @@ impl Replica {
 
         // first, queue up any additional writes we have to do
         let mut err = Vec::new();
-        self.sendback.back.retain(|&streami, n| {
-            use std::ops::SubAssign;
-
+        self.sendback.back.retain(|&streami, ids| {
             let stream = &mut inputs[streami];
+            let mut not_ready = false;
+            let mut first = true;
+            ids.retain(|id| {
+                if not_ready {
+                    return true;
+                }
 
-            let end = *n;
-            for i in 0..end {
-                match stream.start_send(true) {
+                // TODO(ekmartin): no .clone()
+                let result = match stream.start_send(id.clone()) {
                     Ok(AsyncSink::Ready) => {
-                        if i == 0 {
+                        if first {
                             pending.insert(streami);
                         }
-                        n.sub_assign(1);
+                        false
                     }
                     Ok(AsyncSink::NotReady(_)) => {
-                        break;
+                        not_ready = true;
+                        true
                     }
                     Err(e) => {
                         // start_send shouldn't generally error
                         err.push(e.into());
+                        true
                     }
-                }
-            }
+                };
 
-            *n > 0
+                first = false;
+                result
+            });
+
+            ids.len() > 0
         });
 
         if !err.is_empty() {
@@ -1284,15 +1298,17 @@ impl Replica {
 
 #[derive(Default)]
 struct Sendback {
-    // map from inputi to number of (empty) ACKs
-    back: FnvHashMap<usize, usize>,
+    // map from inputi to auto increment IDs to ACK:
+    back: FnvHashMap<usize, Vec<Option<AutoIncrementID>>>,
     pending: FnvHashSet<usize>,
 }
 
 impl Executor for Sendback {
-    fn send_back(&mut self, id: SourceChannelIdentifier, _: ()) {
-        use std::ops::AddAssign;
-        self.back.entry(id.token).or_insert(0).add_assign(1);
+    fn send_back(&mut self, id: SourceChannelIdentifier, auto_increment: Option<AutoIncrementID>) {
+        self.back
+            .entry(id.token)
+            .or_insert(vec![])
+            .push(auto_increment);
     }
 }
 

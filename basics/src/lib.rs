@@ -17,14 +17,16 @@ pub mod local;
 pub mod map;
 
 pub use addressing::{IndexPair, LocalNodeIndex};
-pub use data::{DataType, Datas, Modification, Operation, Record, Records, TableOperation};
+pub use data::{
+    AutoIncrementID, DataType, Datas, Modification, Operation, Record, Records, TableOperation,
+};
 pub use external::{Link, MaterializationStatus};
 pub use local::{DomainIndex, KeyType, Tag};
 pub use map::Map;
 pub use petgraph::graph::NodeIndex;
 
 #[inline]
-pub fn shard_by(dt: &DataType, shards: usize) -> usize {
+pub fn shard_by(dt: &DataType, shards: usize, previous: usize) -> usize {
     match *dt {
         DataType::Int(n) => n as usize % shards,
         DataType::BigInt(n) => n as usize % shards,
@@ -36,8 +38,10 @@ pub fn shard_by(dt: &DataType, shards: usize) -> usize {
             hasher.write(s.as_bytes());
             hasher.finish() as usize % shards
         }
+        DataType::AutoIncrementRequest => (previous + 1) % shards,
         // a bit hacky: send all NULL values to the first shard
         DataType::None => 0,
+        DataType::AutoIncrementID(shard, _) => shard as usize,
         ref x => {
             unimplemented!("asked to shard on value {:?}", x);
         }

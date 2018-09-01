@@ -625,6 +625,90 @@ fn it_works_with_reads_before_writes() {
 }
 
 #[test]
+fn it_auto_increments_columns() {
+    let mut b = ControllerBuilder::default();
+    b.set_sharding(None);
+    b.set_persistence(get_persistence_params("it_auto_increments_columns"));
+    let mut g = b.build_local().unwrap();
+    let sql = "
+        CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
+        QUERY Read: SELECT aid FROM Article WHERE type = ?;
+    ";
+
+    g.install_recipe(sql).unwrap();
+    let mut article = g.table("Article").unwrap();
+    let mut read = g.view("Read").unwrap();
+
+    let article_type = "Interview";
+    for i in 0..3 {
+        let id = article
+            .insert(vec![DataType::AutoIncrementRequest, article_type.into()])
+            .unwrap();
+
+        assert_eq!(id.auto_increment_id, Some((0, (i + 1) as u64)));
+    }
+    sleep();
+
+    let result = read.lookup(&[article_type.into()], true).unwrap();
+    assert_eq!(result.len(), 3);
+    for i in 0..3 {
+        assert_eq!(result[i][0], DataType::AutoIncrementID(0, (i + 1) as u64));
+    }
+}
+
+#[test]
+fn it_auto_increments_columns_with_shards() {
+    let n = 10;
+    let mut b = ControllerBuilder::default();
+    b.set_sharding(Some(n));
+    b.set_persistence(get_persistence_params(
+        "it_auto_increments_columns_with_shards",
+    ));
+    let mut g = b.build_local().unwrap();
+    let sql = "
+        CREATE TABLE Article (aid int AUTO_INCREMENT, type varchar(255), PRIMARY KEY(aid));
+        QUERY Read: SELECT aid FROM Article WHERE type = ?;
+        QUERY ReadById: SELECT aid FROM Article WHERE aid = ?;
+    ";
+
+    g.install_recipe(sql).unwrap();
+    let mut article = g.table("Article").unwrap();
+    let mut read = g.view("Read").unwrap();
+    let mut read_id = g.view("ReadById").unwrap();
+
+    let article_type = "Interview";
+    for i in 0..n {
+        let id = article
+            .insert(vec![DataType::AutoIncrementRequest, article_type.into()])
+            .unwrap();
+
+        assert_eq!(id.auto_increment_id, Some((((i + 1) % n) as u32, 1)));
+    }
+    sleep();
+
+    let results = read.lookup(&[article_type.into()], true).unwrap();
+    assert_eq!(results.len(), n);
+    let mut shards = vec![0; n];
+    for result in results {
+        let lookup = read_id.lookup(&[result[0].clone()], true).unwrap();
+        assert_eq!(lookup.len(), 1);
+        assert_eq!(lookup[0][0], result[0]);
+        match result[0] {
+            DataType::AutoIncrementID(s, v) => {
+                shards[s as usize] = u64::max(v, shards[s as usize]);
+                assert!(s < 10);
+                assert!(v > 0 && s <= 10);
+            }
+            _ => unreachable!(),
+        };
+    }
+
+    // Shards are picked at random for auto increment columns,
+    // but the IDs for each shard should sum up to the number of rows we inserted.
+    assert_eq!(shards.into_iter().sum::<u64>(), 10);
+}
+
+#[test]
 fn forced_shuffle_despite_same_shard() {
     // XXX: this test doesn't currently *fail* despite
     // multiple trailing replay responses that are simply ignored...

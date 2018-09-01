@@ -387,7 +387,19 @@ pub(crate) fn make_base_node(
         })
         .collect::<Vec<DataType>>();
 
-    let base = if pkey_columns.len() > 0 {
+    let auto_increment_columns = column_specs
+        .iter()
+        .enumerate()
+        .filter(|&(_i, &(ref cs, _))| {
+            cs.constraints
+                .iter()
+                .any(|c| *c == ColumnConstraint::AutoIncrement)
+        })
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
+
+    let mut base = node::special::Base::new(default_values);
+    if pkey_columns.len() > 0 {
         let pkey_column_ids = pkey_columns
             .iter()
             .map(|pkc| {
@@ -398,10 +410,17 @@ pub(crate) fn make_base_node(
                     .unwrap()
             })
             .collect();
-        node::special::Base::new(default_values).with_key(pkey_column_ids)
-    } else {
-        node::special::Base::new(default_values)
-    };
+        base = base.with_key(pkey_column_ids);
+    }
+
+    if auto_increment_columns.len() > 0 {
+        assert!(
+            auto_increment_columns.len() <= 1,
+            "can't auto increment more than one column"
+        );
+
+        base = base.with_auto_increment(auto_increment_columns[0]);
+    }
 
     FlowNode::New(mig.add_base(name, column_names.as_slice(), base))
 }
