@@ -295,8 +295,8 @@ where
     let ndone: &'static atomic::AtomicUsize = unsafe { mem::transmute(&ndone) };
 
     let enqueue = |queued: Vec<_>, mut keys: Vec<_>, write| {
-        move || -> Result<(), ()> {
-            CLIENT.with(|c| {
+        move || -> Result<(), _> {
+            CLIENT.try_with(|c| {
                 let mut c = c.borrow_mut();
                 let client = c.as_mut().unwrap();
 
@@ -340,9 +340,6 @@ where
                         });
                     }
                 }
-
-                // need to return something that implements IntoFuture<Item = (), Error = ()>
-                Ok(())
             })
         }
     };
