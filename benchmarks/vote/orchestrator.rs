@@ -530,6 +530,9 @@ fn run_clients(
         cmd.push("--threads".into());
         cmd.push(format!("{}", 6 * ccores).into());
         cmd.push("2>&1".into());
+        cmd.push("|".into());
+        cmd.push("tee".into());
+        cmd.push("prepop.out".into());
         let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
 
         match clients[0].ssh.as_ref().unwrap().just_exec(&cmd[..]) {
@@ -580,6 +583,12 @@ fn run_clients(
                     cmd.push(format!("{}", 6 * ccores).into());
                     cmd.push("--target".into());
                     cmd.push(format!("{}", target_per_client).into());
+                    // tee stdout and stderr
+                    // https://stackoverflow.com/a/692407/472927
+                    cmd.push(">".into());
+                    cmd.push(">(tee run.out)".into());
+                    cmd.push("2>".into());
+                    cmd.push(">(tee run.err >&2)".into());
 
                     let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                     let c = ssh.exec(&cmd[..])?;
@@ -758,6 +767,7 @@ impl ConvenientSession for tsunami::Session {
             .iter()
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
             }).collect();
         let cmd = cmd.join(" ");
