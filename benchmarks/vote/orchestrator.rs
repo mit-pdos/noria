@@ -786,6 +786,11 @@ fn run_clients(
 }
 
 fn ec2_instance_type_cores(it: &str) -> Option<u16> {
+    if it == "i3.metal" {
+        // https://aws.amazon.com/ec2/instance-types/i3/
+        return Some(72);
+    }
+
     it.rsplitn(2, '.').next().and_then(|itype| match itype {
         "nano" | "micro" | "small" => Some(1),
         "medium" | "large" => Some(2),
