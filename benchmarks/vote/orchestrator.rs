@@ -160,13 +160,6 @@ fn main() {
                     "mssql",
                 ]).help("Which backends to run [all if none are given]"),
         ).arg(
-            Arg::with_name("stype")
-                .long("server")
-                .default_value("c5.4xlarge")
-                .required(true)
-                .takes_value(true)
-                .help("Instance type for server"),
-        ).arg(
             Arg::with_name("ctype")
                 .long("client")
                 .default_value("c5.4xlarge")
@@ -231,10 +224,6 @@ fn main() {
                 n => n - 1,
             }
         }).expect("could not determine client core count");
-    let scores = args
-        .value_of("stype")
-        .and_then(ec2_instance_type_cores)
-        .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::simple(Region::UsEast1);
@@ -256,7 +245,7 @@ fn main() {
         "server",
         1,
         tsunami::MachineSetup::new(
-            args.value_of("stype").unwrap(),
+            "c5.4xlarge",
             SOUP_SERVER_AMI,
             move |host| {
                 // ensure we don't have stale soup (yuck)
@@ -290,13 +279,13 @@ fn main() {
                     ])?.is_ok();
                 }
 
-                eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
+                eprintln!(" -> adjusting ec2 server ami for 16 cores");
                 host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
                 // TODO: memcached cache size?
                 // TODO: mssql setup?
                 // TODO: mariadb params?
-                let optstr = format!("/OPTIONS=/ s/\"$/ -m 4096 -t {}\"/", scores);
+                let optstr = format!("/OPTIONS=/ s/\"$/ -m 4096 -t 16\"/");
                 host.just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])?
                     .is_ok();
                 Ok(())
