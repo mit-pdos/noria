@@ -147,7 +147,7 @@ fn main() {
                 .help("How to distribute keys."),
         ).arg(
             Arg::with_name("backends")
-                .long("backends")
+                .long("backend")
                 .multiple(true)
                 .takes_value(true)
                 .possible_values(&[
