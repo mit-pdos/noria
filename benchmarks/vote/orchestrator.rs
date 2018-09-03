@@ -824,12 +824,12 @@ impl ConvenientSession for tsunami::Session {
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error> {
         let mut c = self.exec(cmd)?;
 
-        let mut stderr = String::new();
-        c.stderr().read_to_string(&mut stderr)?;
+        let mut stdout = String::new();
+        c.read_to_string(&mut stdout)?;
         c.wait_eof()?;
 
         if c.exit_status()? != 0 {
-            return Ok(Err(stderr));
+            return Ok(Err(stdout));
         }
         Ok(Ok(()))
     }
