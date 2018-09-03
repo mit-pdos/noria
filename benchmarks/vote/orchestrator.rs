@@ -551,7 +551,10 @@ fn run_clients(
             }
         }
 
-        eprintln!(" .. finished prepopulation");
+        eprintln!(
+            " .. finished prepopulation @ {}",
+            chrono::Local::now().time()
+        );
     }
 
     let target_per_client = (target as f64 / nclients as f64).ceil() as usize;
