@@ -740,11 +740,44 @@ fn run_clients(
         }
     }
 
-    if let Ok(mut f) = outf {
+    if let Ok(ref mut f) = outf {
         // also gather memory usage and stuff
         if f.write_all(b"# server stats:\n").is_ok() {
-            if let Err(e) = server.write_stats(params.backend, &mut f) {
+            if let Err(e) = server.write_stats(params.backend, f) {
                 eprintln!(" !! failed to gather server stats: {}", e);
+            }
+        }
+    }
+
+    if let Some(mut c) = perf {
+        eprintln!(" .. collecting perf results");
+
+        // make perf exit
+        let mut k = server.server.exec(&["pkill", "perf"]).unwrap();
+        k.wait_eof().unwrap();
+
+        // wait for perf to exit, and then fetch top entries from the report
+        c.wait_eof().unwrap();
+
+        let fname = params.name(target, "folded");
+        if let Ok(mut f) = File::create(&fname) {
+            match server.server.exec(&[
+                "perf",
+                "script",
+                "-i",
+                "perf.data",
+                "|",
+                "FlameGraph/stackcollapse-perf.pl",
+            ]) {
+                Ok(mut c) => {
+                    io::copy(&mut c, &mut f).unwrap();
+                    c.wait_eof().unwrap();
+                }
+                Err(e) => {
+                    eprintln!("failed to parse perf report");
+                    eprintln!("{:?}", e);
+                    eprintln!("");
+                }
             }
         }
     }
