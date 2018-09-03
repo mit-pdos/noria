@@ -166,6 +166,10 @@ fn main() {
                 .takes_value(true)
                 .help("Instance type for clients"),
         ).arg(
+            Arg::with_name("keep")
+                .long("keep")
+                .help("Keep the VMs running after the benchmarks have completed."),
+        ).arg(
             Arg::with_name("perf")
                 .long("perf")
                 .help("Run perf and stackcollapse on each run"),
@@ -465,28 +469,34 @@ fn main() {
             eprintln!("==> terminating early due to ^C");
         }
 
-        eprintln!("==> about to terminate ec2 instances -- press enter to interrupt");
-        match timeout_readwrite::TimeoutReader::new(
-            io::stdin(),
-            Some(time::Duration::from_secs(1 * 60)),
-        ).read(&mut [0u8])
-        {
-            Ok(_) => {
-                // user pressed enter to interrupt
-                // show all the host addresses, and let them do their thing
-                // then wait for an enter to actually terminate
-                eprintln!(" -> delaying shutdown, here are the hosts:");
-                eprintln!("server: {}", server.public_dns);
-                for client in &clients {
-                    eprintln!("client: {}", client.public_dns);
+        eprintln!("==> about to terminate the following ec2 instances:");
+        eprintln!("server: {}", server.public_dns);
+        for client in &clients {
+            eprintln!("client: {}", client.public_dns);
+        }
+
+        let mut keep = args.is_present("keep");
+        if !keep {
+            eprintln!("==> press enter to interrupt");
+            match timeout_readwrite::TimeoutReader::new(
+                io::stdin(),
+                Some(time::Duration::from_secs(1 * 20)),
+            ).read(&mut [0u8])
+            {
+                Ok(_) => {
+                    // user pressed enter to interrupt
+                    keep = true;
                 }
-                eprintln!(" -> press enter to terminate all instances");
-                io::stdin().read(&mut [0u8]).is_ok();
+                Err(_) => {
+                    // doesn't really matter what the error was
+                    // we should shutdown immediately (which we do by not waiting...)
+                }
             }
-            Err(_) => {
-                // doesn't really matter what the error was
-                // we should shutdown immediately (which we do by not waiting...)
-            }
+        }
+
+        if keep {
+            eprintln!(" -> delaying shutdown; press enter to clean up");
+            io::stdin().read(&mut [0u8]).is_ok();
         }
 
         Ok(())
