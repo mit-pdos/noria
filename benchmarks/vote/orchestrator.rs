@@ -369,11 +369,26 @@ fn main() {
         .unwrap();
 
     b.wait_limit(time::Duration::from_secs(5 * 60));
-    b.set_max_duration(6);
+    b.set_max_duration(4);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
+
+        // write out host files for ergonomic ssh
+        let r: io::Result<()> = do catch {
+            let mut f = File::create("server.host")?;
+            writeln!(f, "ubuntu@{}", server.public_dns)?;
+
+            for (i, c) in clients.iter().enumerate() {
+                let mut f = File::create(format!("client-{}.host", i))?;
+                writeln!(f, "ubuntu@{}", c.public_dns)?;
+            }
+        };
+
+        if let Err(e) = r {
+            eprintln!("failed to write out host files: {:?}", e);
+        }
 
         let targets = if let Some(ts) = args.values_of("targets") {
             ts.map(|t| t.parse().unwrap()).collect()
