@@ -21,7 +21,7 @@ impl Backend {
     pub(crate) fn systemd_name(&self) -> Option<&'static str> {
         match *self {
             Backend::Memcached => Some("memcached"),
-            Backend::Mysql => Some("mysqld"),
+            Backend::Mysql => Some("mariadb"),
             Backend::Mssql => Some("mssql-server"),
             Backend::Netsoup { .. } | Backend::Hybrid { .. } => None,
         }

@@ -27,8 +27,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_SERVER_AMI: &str = "ami-078a14a43873a0ef6";
-const SOUP_CLIENT_AMI: &str = "ami-0d41416ce61c6cb1a";
+const SOUP_AMI: &str = "ami-05ac6d3a03c2a445e";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -244,58 +243,48 @@ fn main() {
     b.add_set(
         "server",
         1,
-        tsunami::MachineSetup::new(
-            "c5.4xlarge",
-            SOUP_SERVER_AMI,
-            move |host| {
-                // ensure we don't have stale soup (yuck)
-                host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
-                    .is_ok();
+        tsunami::MachineSetup::new("c5.4xlarge", SOUP_AMI, move |host| {
+            // ensure we don't have stale soup (yuck)
+            host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
+                .is_ok();
 
-                if do_perf {
-                    // allow kernel debugging
-                    host.just_exec(&[
-                        "echo",
-                        "0",
-                        "|",
-                        "sudo",
-                        "tee",
-                        "/proc/sys/kernel/kptr_restrict",
-                    ])?.is_ok();
-                    host.just_exec(&[
-                        "echo",
-                        "-1",
-                        "|",
-                        "sudo",
-                        "tee",
-                        "/proc/sys/kernel/perf_event_paranoid",
-                    ])?.is_ok();
+            if do_perf {
+                // allow kernel debugging
+                host.just_exec(&[
+                    "echo",
+                    "0",
+                    "|",
+                    "sudo",
+                    "tee",
+                    "/proc/sys/kernel/kptr_restrict",
+                ])?.is_ok();
+                host.just_exec(&[
+                    "echo",
+                    "-1",
+                    "|",
+                    "sudo",
+                    "tee",
+                    "/proc/sys/kernel/perf_event_paranoid",
+                ])?.is_ok();
 
-                    // get flamegraph
-                    host.just_exec(&[
-                        "git",
-                        "clone",
-                        "https://github.com/brendangregg/FlameGraph.git",
-                    ])?.is_ok();
-                }
+                // get flamegraph
+                host.just_exec(&[
+                    "git",
+                    "clone",
+                    "https://github.com/brendangregg/FlameGraph.git",
+                ])?.is_ok();
+            }
 
-                eprintln!(" -> adjusting ec2 server ami for 16 cores");
-                host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
+            eprintln!(" -> setting up mssql ramdisk");
+            host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
-                // TODO: memcached cache size?
-                // TODO: mssql setup?
-                // TODO: mariadb params?
-                let optstr = format!("/OPTIONS=/ s/\"$/ -m 4096 -t 16\"/");
-                host.just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])?
-                    .is_ok();
-                Ok(())
-            },
-        ),
+            Ok(())
+        }).as_user("ubuntu"),
     );
     b.add_set(
         "client",
         if cohost_clients { 1 } else { nclients as u32 },
-        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_CLIENT_AMI, |host| {
+        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, |host| {
             eprintln!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();

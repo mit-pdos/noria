@@ -54,12 +54,22 @@ impl<'a> ServerHandle<'a> {
                 }
             }
             ServerHandle::Hybrid => {
-                match server.just_exec(&["sudo", "systemctl", "stop", "mysqld"]) {
+                match server.just_exec(&[
+                    "sudo",
+                    "systemctl",
+                    "stop",
+                    Backend::Mysql.systemd_name().unwrap(),
+                ]) {
                     Ok(Ok(_)) => {}
                     Ok(Err(e)) => bail!(e),
                     Err(e) => Err(e)?,
                 }
-                match server.just_exec(&["sudo", "systemctl", "stop", "memcached"]) {
+                match server.just_exec(&[
+                    "sudo",
+                    "systemctl",
+                    "stop",
+                    Backend::Memcached.systemd_name().unwrap(),
+                ]) {
                     Ok(Ok(_)) => {}
                     Ok(Err(e)) => bail!(e),
                     Err(e) => Err(e)?,
@@ -278,7 +288,7 @@ pub(crate) fn start<'a>(
             }
 
             // wipe zookeeper state
-            match server.just_exec(&["sudo", "rm", "-rf", "/var/zookeeper/version-2"]) {
+            match server.just_exec(&["sudo", "rm", "-rf", "/var/lib/zookeeper/version-2"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
@@ -329,12 +339,22 @@ pub(crate) fn start<'a>(
             ServerHandle::Netsoup(w)
         }
         Backend::Hybrid => {
-            match server.just_exec(&["sudo", "systemctl", "start", "memcached"]) {
+            match server.just_exec(&[
+                "sudo",
+                "systemctl",
+                "start",
+                Backend::Memcached.systemd_name().unwrap(),
+            ]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
             }
-            match server.just_exec(&["sudo", "systemctl", "start", "mysqld"]) {
+            match server.just_exec(&[
+                "sudo",
+                "systemctl",
+                "start",
+                Backend::Mysql.systemd_name().unwrap(),
+            ]) {
                 Ok(Ok(_)) => ServerHandle::Hybrid,
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
