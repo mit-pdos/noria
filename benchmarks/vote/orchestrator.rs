@@ -657,7 +657,6 @@ fn run_clients(
             {
                 Some(pid) => {
                     let pid = format!("{}", pid);
-                    let runtime = format!("{}", params.runtime);
                     match do_perf {
                         Perf::Hot => server.server.exec(&[
                             "perf",
@@ -670,18 +669,22 @@ fn run_clients(
                             ">",
                             "perf.data",
                         ])?,
-                        Perf::Cold => server.server.exec(&[
-                            "sudo",
-                            "offcputime-bpfcc",
-                            "-f",
-                            "-p",
-                            &pid,
-                            &runtime,
-                            ">",
-                            "offcputime.folded",
-                            "2>",
-                            "offcputime.err",
-                        ])?,
+                        Perf::Cold => {
+                            // -5 so that we don't measure the tail end
+                            let runtime = format!("{}", params.runtime - 5);
+                            server.server.exec(&[
+                                "sudo",
+                                "offcputime-bpfcc",
+                                "-f",
+                                "-p",
+                                &pid,
+                                &runtime,
+                                ">",
+                                "offcputime.folded",
+                                "2>",
+                                "offcputime.err",
+                            ])?
+                        }
                         _ => unreachable!(),
                     }
                 }
