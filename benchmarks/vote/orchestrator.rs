@@ -95,6 +95,23 @@ impl<'a> ClientParameters<'a> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Perf {
+    None,
+    Hot,
+    Cold,
+}
+
+impl Perf {
+    fn is_active(&self) -> bool {
+        if let Perf::None = *self {
+            false
+        } else {
+            true
+        }
+    }
+}
+
 fn main() {
     use clap::{App, Arg};
 
@@ -172,7 +189,9 @@ fn main() {
         ).arg(
             Arg::with_name("perf")
                 .long("perf")
-                .help("Run perf and stackcollapse on each run"),
+                .takes_value(true)
+                .possible_values(&["hot", "cold"])
+                .help("Run perf(hot) or offcputime(cold) and stackcollapse on each run"),
         ).arg(
             Arg::with_name("cohost")
                 .long("cohost")
@@ -206,7 +225,12 @@ fn main() {
         "both" => &[false, true][..],
         _ => unreachable!(),
     };
-    let do_perf = args.is_present("perf");
+    let do_perf = match args.value_of("perf") {
+        Some("hot") => Perf::Hot,
+        Some("cold") => Perf::Cold,
+        None => Perf::None,
+        Some(v) => unreachable!("unknown perf type: {}", v),
+    };
     let cohost_clients = args.is_present("cohost");
     let nclients = value_t_or_exit!(args, "clients", usize);
     let az = args.value_of("availability_zone").unwrap();
@@ -252,7 +276,7 @@ fn main() {
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
 
-            if do_perf {
+            if do_perf.is_active() {
                 // allow kernel debugging
                 host.just_exec(&[
                     "echo",
@@ -507,7 +531,7 @@ fn main() {
 fn run_clients(
     iter: usize,
     nclients: usize,
-    do_perf: bool,
+    do_perf: Perf,
     clients: &Vec<tsunami::Machine>,
     ccores: u16,
     server: &mut server::Server,
@@ -614,7 +638,7 @@ fn run_clients(
     thread::sleep(time::Duration::from_secs(params.warmup as u64));
 
     // do some profiling
-    let perf = if !do_perf || iter != 0 {
+    let perf = if !do_perf.is_active() || iter != 0 {
         None
     } else if let Backend::Netsoup { .. } = params.backend {
         let r: Result<_, failure::Error> = do catch {
@@ -633,17 +657,33 @@ fn run_clients(
             {
                 Some(pid) => {
                     let pid = format!("{}", pid);
-                    server.server.exec(&[
-                        "perf",
-                        "record",
-                        "-g",
-                        "--call-graph",
-                        "dwarf",
-                        "-p",
-                        &pid,
-                        ">",
-                        "perf.data",
-                    ])?
+                    let runtime = format!("{}", params.runtime);
+                    match do_perf {
+                        Perf::Hot => server.server.exec(&[
+                            "perf",
+                            "record",
+                            "-g",
+                            "--call-graph",
+                            "dwarf",
+                            "-p",
+                            &pid,
+                            ">",
+                            "perf.data",
+                        ])?,
+                        Perf::Cold => server.server.exec(&[
+                            "sudo",
+                            "offcputime-bpfcc",
+                            "-f",
+                            "-p",
+                            &pid,
+                            &runtime,
+                            ">",
+                            "offcputime.folded",
+                            "2>",
+                            "offcputime.err",
+                        ])?,
+                        _ => unreachable!(),
+                    }
                 }
                 None => {
                     Err(format_err!("did not find pid for perf"))?;
@@ -753,22 +793,30 @@ fn run_clients(
         eprintln!(" .. collecting perf results");
 
         // make perf exit
-        let mut k = server.server.exec(&["pkill", "perf"]).unwrap();
-        k.wait_eof().unwrap();
+        if let Perf::Hot = do_perf {
+            let mut k = server.server.exec(&["pkill", "perf"]).unwrap();
+            k.wait_eof().unwrap();
+        }
 
         // wait for perf to exit, and then fetch top entries from the report
         c.wait_eof().unwrap();
 
         let fname = params.name(target, "folded");
         if let Ok(mut f) = File::create(&fname) {
-            match server.server.exec(&[
-                "perf",
-                "script",
-                "-i",
-                "perf.data",
-                "|",
-                "FlameGraph/stackcollapse-perf.pl",
-            ]) {
+            let k = match do_perf {
+                Perf::Hot => server.server.exec(&[
+                    "perf",
+                    "script",
+                    "-i",
+                    "perf.data",
+                    "|",
+                    "FlameGraph/stackcollapse-perf.pl",
+                ]),
+                Perf::Cold => server.server.exec(&["cat", "offcputime.folded"]),
+                _ => unreachable!(),
+            };
+
+            match k {
                 Ok(mut c) => {
                     io::copy(&mut c, &mut f).unwrap();
                     c.wait_eof().unwrap();
