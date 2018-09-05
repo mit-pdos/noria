@@ -41,11 +41,10 @@ futures = "0.1.14"
 futures-cpupool = "0.1.8"
 tokio = "0.1"
 # ec2
-# after https://github.com/rusoto/rusoto/issues/1102 is resolved,
-# we can upgrade to 0.33 and tsunami 0.7
-rusoto_core = "0.32.0"
-rusoto_sts = "0.32.0"
-tsunami = { git = "https://github.com/jonhoo/tsunami", rev = "98b598cc96d4f0ceb0cde59205c864821a2dff61" }
+# once rusoto 0.34 is release, we can move to version deps here again
+rusoto_core = { git = "https://github.com/rusoto/rusoto.git" }
+rusoto_sts = { git = "https://github.com/rusoto/rusoto.git" }
+tsunami = { git = "https://github.com/jonhoo/tsunami" }
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"

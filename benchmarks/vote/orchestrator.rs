@@ -277,7 +277,7 @@ fn main() {
         }).expect("could not determine client core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::simple(Region::UsEast1);
+    let sts = StsClient::new(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),
