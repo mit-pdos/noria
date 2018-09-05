@@ -158,6 +158,10 @@ fn main() {
                 .takes_value(true)
                 .help("Warmup time in seconds"),
         ).arg(
+            Arg::with_name("metal")
+                .long("metal")
+                .help("Run on bare-metal hardware (i3.metal)"),
+        ).arg(
             Arg::with_name("read_percentage")
                 .short("p")
                 .default_value("95")
@@ -248,6 +252,13 @@ fn main() {
     let nclients = value_t_or_exit!(args, "clients", usize);
     let az = args.value_of("availability_zone").unwrap();
 
+    let stype = if args.is_present("metal") {
+        "i3.metal"
+    } else {
+        "c5.4xlarge"
+    };
+    let scores = ec2_instance_type_cores(stype).unwrap();
+
     // guess the core counts
     let ccores = args
         .value_of("ctype")
@@ -284,7 +295,7 @@ fn main() {
     b.add_set(
         "server",
         1,
-        tsunami::MachineSetup::new("c5.4xlarge", SOUP_AMI, move |host| {
+        tsunami::MachineSetup::new(stype, SOUP_AMI, move |host| {
             // ensure we don't have stale soup (yuck)
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
@@ -387,12 +398,32 @@ fn main() {
         .build_global()
         .unwrap();
 
-    b.wait_limit(time::Duration::from_secs(5 * 60));
+    if stype == "i3.metal" {
+        b.wait_limit(time::Duration::from_secs(10 * 60));
+    } else {
+        b.wait_limit(time::Duration::from_secs(2 * 60));
+    }
     b.set_max_duration(4);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
+
+        if stype == "i3.metal" {
+            let ssh = server.ssh.as_ref().unwrap();
+
+            // also rebuild rocksdb and cargo clean
+            ssh.just_exec(&["cd", "rocksdb", "&&", "make", "clean"]).unwrap().unwrap();
+            ssh.just_exec(&["cd", "rocksdb", "&&", "make", "-j16", "shared_lib"]).unwrap().unwrap();
+            ssh.just_exec(&["cd", "distributary", "&&", "cargo", "clean"]).unwrap().unwrap();
+
+            // disable all the extra cores
+            eprintln!("==> disabling extra cores on bare-metal machine");
+            for core in 16..scores {
+                let core = format!("/sys/devices/system/cpu/cpu{}/online", core);
+                ssh.just_exec(&["echo", "0", "|", "sudo", "tee", &core]).unwrap().unwrap();
+            }
+        }
 
         // write out host files for ergonomic ssh
         let r: io::Result<()> = do catch {
