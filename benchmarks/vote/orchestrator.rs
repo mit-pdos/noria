@@ -100,6 +100,8 @@ enum Perf {
     None,
     Hot,
     Cold,
+    TraceIoPool,
+    TracePool,
 }
 
 impl Perf {
@@ -108,6 +110,14 @@ impl Perf {
             false
         } else {
             true
+        }
+    }
+
+    fn extension(&self) -> &'static str {
+        match *self {
+            Perf::None => unreachable!(),
+            Perf::Hot | Perf::Cold => "folded",
+            Perf::TraceIoPool | Perf::TracePool => "strace",
         }
     }
 }
@@ -191,8 +201,8 @@ fn main() {
             Arg::with_name("perf")
                 .long("perf")
                 .takes_value(true)
-                .possible_values(&["hot", "cold"])
-                .help("Run perf(hot) or offcputime(cold) and stackcollapse on each run"),
+                .possible_values(&["hot", "cold", "trace-io", "trace-pool"])
+                .help("Run perf(hot) or offcputime(cold) and stackcollapse on each run; or produce straces of a pool thread"),
         ).arg(
             Arg::with_name("cohost")
                 .long("cohost")
@@ -229,6 +239,8 @@ fn main() {
     let do_perf = match args.value_of("perf") {
         Some("hot") => Perf::Hot,
         Some("cold") => Perf::Cold,
+        Some("trace-io") => Perf::TraceIoPool,
+        Some("trace-pool") => Perf::TracePool,
         None => Perf::None,
         Some(v) => unreachable!("unknown perf type: {}", v),
     };
@@ -686,6 +698,41 @@ fn run_clients(
                                 "offcputime.err",
                             ])?
                         }
+                        Perf::TraceIoPool | Perf::TracePool => {
+                            let search = match do_perf {
+                                Perf::TraceIoPool => {
+                                    format!(r#"$2 == "tokio-io-pool-2" {{ print $1 }}"#)
+                                },
+                                Perf::TracePool => {
+                                    format!(r#"$2 == "tokio-pool-2" {{ print $1 }}"#)
+                                },
+                                _ => unreachable!(),
+                            };
+                            let mut c = server.server.exec(&["ps", "H", "-o", "tid comm", &pid, "|", "awk", &search])?;
+                            let mut stdout = String::new();
+                            c.read_to_string(&mut stdout)?;
+                            c.wait_eof()?;
+                            let tid = stdout
+                                .lines()
+                                .next()
+                                .and_then(|line| line.parse::<usize>().ok()).unwrap();
+                            let tid = format!("{}", tid);
+
+                            // -5 so that we don't measure the tail end
+                            let runtime = format!("{}s", params.runtime - 5);
+                            server.server.exec(&[
+                                "sudo",
+                                "timeout",
+                                &runtime,
+                                "strace",
+                                "-T",
+                                "-yy",
+                                "-p",
+                                &tid,
+                                "-o",
+                                "strace.out",
+                            ])?
+                        }
                         _ => unreachable!(),
                     }
                 }
@@ -805,7 +852,7 @@ fn run_clients(
         // wait for perf to exit, and then fetch top entries from the report
         c.wait_eof().unwrap();
 
-        let fname = params.name(target, "folded");
+        let fname = params.name(target, do_perf.extension());
         if let Ok(mut f) = File::create(&fname) {
             let k = match do_perf {
                 Perf::Hot => server.server.exec(&[
@@ -817,6 +864,7 @@ fn run_clients(
                     "FlameGraph/stackcollapse-perf.pl",
                 ]),
                 Perf::Cold => server.server.exec(&["cat", "offcputime.folded"]),
+                Perf::TraceIoPool | Perf::TracePool => server.server.exec(&["cat", "strace.out"]),
                 _ => unreachable!(),
             };
 
