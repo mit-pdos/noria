@@ -938,7 +938,7 @@ impl ConvenientSession for tsunami::Session {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
-                "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                "&" | "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
             }).collect();
