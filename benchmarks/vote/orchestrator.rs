@@ -167,6 +167,7 @@ fn main() {
                 .long("backend")
                 .multiple(true)
                 .takes_value(true)
+                .number_of_values(1)
                 .possible_values(&[
                     "memcached",
                     "mysql",
