@@ -1,5 +1,5 @@
+use crate::Backend;
 use distributary::DataType;
-use Backend;
 
 pub fn create_users(backend: &mut Backend) {
     // username varchar(1024),

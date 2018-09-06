@@ -1,20 +1,5 @@
-#![deny(unused_extern_crates)]
-#![feature(duration_from_micros)]
-
 #[macro_use]
 extern crate clap;
-extern crate distributary;
-extern crate failure;
-extern crate futures;
-extern crate futures_cpupool;
-extern crate futures_state_stream;
-extern crate hdrhistogram;
-extern crate memcached;
-extern crate mysql;
-extern crate rand;
-extern crate tiberius;
-extern crate tokio;
-extern crate zipf;
 
 use futures_cpupool::CpuPool;
 use hdrhistogram::Histogram;
@@ -40,7 +25,7 @@ fn throughput(ops: usize, took: time::Duration) -> f64 {
 const MAX_BATCH_TIME_US: u32 = 1000;
 
 mod clients;
-use clients::{Parameters, VoteClient, VoteClientConstructor};
+use self::clients::{Parameters, VoteClient, VoteClientConstructor};
 
 fn run<CC>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where

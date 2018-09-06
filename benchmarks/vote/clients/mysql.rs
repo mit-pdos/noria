@@ -1,5 +1,5 @@
 use clap;
-use clients::{Parameters, VoteClient, VoteClientConstructor};
+use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
 use mysql::{self, Opts, OptsBuilder};
 
 pub(crate) struct Client {

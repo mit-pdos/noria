@@ -1,17 +1,7 @@
 #![deny(unused_extern_crates)]
-#![feature(catch_expr)]
 
 #[macro_use]
 extern crate clap;
-extern crate chrono;
-extern crate ctrlc;
-extern crate failure;
-extern crate rayon;
-extern crate rusoto_core;
-extern crate rusoto_sts;
-extern crate shellwords;
-extern crate ssh2;
-extern crate tsunami;
 
 use failure::Error;
 use failure::ResultExt;
@@ -146,7 +136,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
     let target_per_client = value_t_or_exit!(args, "target", usize);
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::simple(Region::UsEast1);
+    let sts = StsClient::new(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),

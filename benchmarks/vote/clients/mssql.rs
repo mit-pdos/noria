@@ -1,5 +1,5 @@
 use clap;
-use clients::{Parameters, VoteClient, VoteClientConstructor};
+use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
 use futures::Future;
 use futures_state_stream::StateStream;
 use tiberius;

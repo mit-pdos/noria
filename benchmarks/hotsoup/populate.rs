@@ -66,8 +66,8 @@ pub fn populate(backend: &mut Backend, data_location: &str, use_txn: bool) -> io
 
     let dir = Path::new(data_location);
     if dir.is_dir() {
-        for entry in try!(fs::read_dir(dir)) {
-            let entry = try!(entry);
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
             let path = entry.path();
             if path.is_file() {
                 populate_table(backend, &path, use_txn);

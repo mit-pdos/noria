@@ -1,6 +1,3 @@
-extern crate distributary;
-extern crate rand;
-
 #[macro_use]
 extern crate clap;
 
@@ -15,7 +12,7 @@ use std::{thread, time};
 #[macro_use]
 mod populate;
 
-use populate::{Populate, NANOS_PER_SEC};
+use crate::populate::{Populate, NANOS_PER_SEC};
 
 pub struct Backend {
     g: LocalControllerHandle<LocalAuthority>,

@@ -1,23 +1,13 @@
-#![deny(unused_extern_crates)]
-#![feature(catch_expr)]
+#![feature(try_blocks)]
 
 #[macro_use]
 extern crate clap;
-extern crate chrono;
-extern crate ctrlc;
 #[macro_use]
 extern crate failure;
-extern crate rayon;
-extern crate rusoto_core;
-extern crate rusoto_sts;
-extern crate shellwords;
-extern crate ssh2;
-extern crate timeout_readwrite;
-extern crate tsunami;
 
 mod backends;
 mod server;
-use backends::Backend;
+use self::backends::Backend;
 
 use failure::Error;
 use rusoto_core::Region;
@@ -447,7 +437,7 @@ fn main() {
         let listen_addr = &server.private_ip;
 
         // write out host files for ergonomic ssh
-        let r: io::Result<()> = do catch {
+        let r: io::Result<()> = try {
             let mut f = File::create("server.host")?;
             writeln!(f, "ubuntu@{}", server.public_dns)?;
 
@@ -666,7 +656,7 @@ fn run_clients(
                     public_dns, target
                 );
 
-                let c: Result<_, Box<Error>> = do catch {
+                let c: Result<_, Box<Error>> = try {
                     let mut cmd = Vec::<Cow<str>>::new();
                     cmd.push("multiclient.sh".into());
                     params.add_params(&mut cmd);
@@ -706,7 +696,7 @@ fn run_clients(
     let perf = if !do_perf.is_active() || iter != 0 {
         None
     } else if let Backend::Netsoup { .. } = params.backend {
-        let r: Result<_, failure::Error> = do catch {
+        let r: Result<_, failure::Error> = try {
             server.server.set_compress(true);
             let mut c = server.server.exec(&["pgrep", "souplet"])?;
             let mut stdout = String::new();
@@ -798,7 +788,7 @@ fn run_clients(
         };
 
         match r {
-            Ok(mut c) => Some(c),
+            Ok(c) => Some(c),
             Err(e) => {
                 eprintln!("failed to run perf on server:");
                 eprintln!("{:?}", e);
