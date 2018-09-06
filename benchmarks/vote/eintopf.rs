@@ -28,8 +28,7 @@ fn main() {
                 .default_value("100000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
@@ -37,31 +36,27 @@ fn main() {
                 .default_value("60")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("distribution")
                 .short("d")
                 .possible_values(&["uniform", "skewed"])
                 .required(true)
                 .takes_value(true)
                 .help("How to distribute keys."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("stype")
                 .long("server")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for servers"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("shards")
                 .long("shards")
                 .default_value("12")
                 .takes_value(true)
                 .help("Number of shards per souplet"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("servers")
                 .long("servers")
                 .short("s")
@@ -69,23 +64,20 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of server machines to spawn with a scale of 1"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
                 .default_value("5000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("scales")
                 .index(1)
                 .multiple(true)
                 .required(true)
                 .help("Scaling factors to try"),
-        )
-        .get_matches();
+        ).get_matches();
 
     // if the user wants us to terminate, finish whatever we're currently doing first
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -212,8 +204,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
                 ];
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 s.ssh.as_ref().unwrap().exec(&cmd[..])
-            })
-            .collect();
+            }).collect();
         let eintopfs = eintopfs?;
 
         // let's see how we did
@@ -270,8 +261,7 @@ impl ConvenientSession for tsunami::Session {
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),
-            })
-            .collect();
+            }).collect();
         let cmd = cmd.join(" ");
         eprintln!("    :> {}", cmd);
 

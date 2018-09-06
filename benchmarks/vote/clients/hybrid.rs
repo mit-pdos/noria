@@ -93,8 +93,7 @@ impl VoteClientConstructor for Conf {
                             format!("article_{}", article_id),
                             format!("Article #{}, 0", article_id),
                         )
-                    })
-                    .collect();
+                    }).collect();
                 let mut m = BTreeMap::new();
                 for &(ref k, ref v) in &articles {
                     m.insert(k.as_bytes(), (v.as_bytes(), 0, 0));

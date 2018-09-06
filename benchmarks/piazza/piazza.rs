@@ -135,90 +135,76 @@ fn main() {
                 .required(true)
                 .default_value("benchmarks/piazza/schema.sql")
                 .help("Schema file for Piazza application"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
                 .default_value("benchmarks/piazza/post-queries.sql")
                 .help("Query file for Piazza application"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
                 .default_value("benchmarks/piazza/complex-policies.json")
                 .help("Security policies file for Piazza application"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("graph")
                 .short("g")
                 .default_value("pgraph.gv")
                 .help("File to dump application's soup graph, if set"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("info")
                 .short("i")
                 .takes_value(true)
                 .help("Directory to dump runtime process info (doesn't work on OSX)"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("reuse")
                 .long("reuse")
                 .default_value("full")
                 .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
                 .help("Query reuse algorithm"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("shard")
                 .long("shard")
                 .help("Enable sharding"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("partial")
                 .long("partial")
                 .help("Enable partial materialization"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("populate")
                 .long("populate")
                 .default_value("nopopulate")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("nusers")
                 .short("u")
                 .default_value("1000")
                 .help("Number of users in the db"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("nlogged")
                 .short("l")
                 .default_value("1000")
                 .help(
                 "Number of logged users. Must be less or equal than the number of users in the db",
             ),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("nclasses")
                 .short("c")
                 .default_value("100")
                 .help("Number of classes in the db"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("nposts")
                 .short("p")
                 .default_value("100000")
                 .help("Number of posts in the db"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("private")
                 .long("private")
                 .default_value("0.1")
                 .help("Percentage of private posts"),
-        )
-        .get_matches();
+        ).get_matches();
 
     println!("Starting benchmark...");
 

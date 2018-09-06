@@ -244,7 +244,9 @@ impl<'a> Server<'a> {
                 c.wait_eof()?;
             }
             Backend::Mssql => {
-                let mut c = self.server.exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
+                let mut c = self
+                    .server
+                    .exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
                 w.write_all(b"disk:\n")?;
                 io::copy(&mut c, w)?;
                 c.wait_eof()?;

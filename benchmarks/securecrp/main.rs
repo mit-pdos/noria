@@ -106,50 +106,42 @@ fn main() {
                 .required(true)
                 .default_value("benchmarks/securecrp/jeeves_schema.sql")
                 .help("SQL schema file"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
                 .default_value("benchmarks/securecrp/jeeves_queries.sql")
                 .help("SQL query file"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
                 .default_value("benchmarks/securecrp/jeeves_policies.json")
                 .help("Security policies file"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("graph")
                 .short("g")
                 .default_value("graph.gv")
                 .help("File to dump graph"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("reuse")
                 .long("reuse")
                 .default_value("full")
                 .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
                 .help("Query reuse algorithm"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("shard")
                 .long("shard")
                 .help("Enable sharding"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("partial")
                 .long("partial")
                 .help("Enable partial materialization"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("populate")
                 .long("populate")
                 .help("Populate app with randomly generated data"),
-        )
-        .arg(Arg::with_name("user").long("user").default_value("malte"))
+        ).arg(Arg::with_name("user").long("user").default_value("malte"))
         .get_matches();
 
     println!("Starting SecureCRP...");

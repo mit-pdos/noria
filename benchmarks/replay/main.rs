@@ -79,8 +79,7 @@ fn populate(g: &mut LocalControllerHandle<ZookeeperAuthority>, rows: i64, skewed
             };
 
             row
-        })
-        .chunks(BATCH_SIZE)
+        }).chunks(BATCH_SIZE)
         .into_iter()
         .for_each(|chunk| {
             let rs: Vec<Vec<DataType>> = chunk.collect();
@@ -201,38 +200,32 @@ fn main() {
                 .value_name("N")
                 .default_value("100000")
                 .help("Number of rows to prepopulate the database with."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("reads")
                 .long("reads")
                 .default_value("10000")
                 .help("Number of rows to read while benchmarking."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("secondary-indices")
                 .long("secondary-indices")
                 .help("Read from secondary indices."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("skewed")
                 .long("skewed")
                 .requires("secondary-indices")
                 .takes_value(false)
                 .help("Read and write to a single secondary index key."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("log-dir")
                 .long("log-dir")
                 .takes_value(true)
                 .help("Absolute path to the directory where the log files will be written."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("durability")
                 .long("durability")
                 .takes_value(false)
                 .help("Enable durability for Base nodes"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("no-recovery")
                 .long("no-recovery")
                 .requires("durability")
@@ -243,50 +236,43 @@ fn main() {
                     no matter the data size, so this could be used to
                     test reads directly from RocksDB memtables.",
                 ),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("retain-logs-on-exit")
                 .long("retain-logs-on-exit")
                 .takes_value(false)
                 .requires("durability")
                 .help("Do not delete the base node logs on exit."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("use-existing-data")
                 .long("use-existing-data")
                 .requires("retain-logs-on-exit")
                 .takes_value(false)
                 .help("Skips pre-population and instead uses already persisted data."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("write-batch-size")
                 .long("write-batch-size")
                 .takes_value(true)
                 .default_value("512")
                 .help("Size of batches processed at base nodes."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("zookeeper-address")
                 .long("zookeeper-address")
                 .takes_value(true)
                 .default_value("127.0.0.1:2181/replay")
                 .help("ZookeeperAuthority address"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("flush-timeout")
                 .long("flush-timeout")
                 .takes_value(true)
                 .default_value("100000")
                 .help("Time to wait before processing a merged packet, in nanoseconds."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("persistence-threads")
                 .long("persistence-threads")
                 .takes_value(true)
                 .default_value("1")
                 .help("Number of background threads used by PersistentState."),
-        )
-        .arg(Arg::with_name("verbose").long("verbose").short("v"))
+        ).arg(Arg::with_name("verbose").long("verbose").short("v"))
         .get_matches();
 
     let skewed = args.is_present("skewed");

@@ -116,8 +116,7 @@ impl VoteClient for Client {
             .map(|_rows| {
                 // TODO
                 //assert_eq!(rows.map(|rows| rows.len()), Ok(1));
-            })
-            .count();
+            }).count();
         assert_eq!(rows, ids.len());
     }
 }

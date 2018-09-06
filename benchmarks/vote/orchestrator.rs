@@ -332,8 +332,7 @@ fn main() {
                     "--bin",
                     "souplet",
                     "2>&1",
-                ])?
-                    .is_ok();
+                ])?.is_ok();
                 Ok(())
             };
 
@@ -368,8 +367,7 @@ fn main() {
                     "--bin",
                     "vote",
                     "2>&1",
-                ])?
-                    .is_ok();
+                ])?.is_ok();
                 Ok(())
             };
 
@@ -759,7 +757,8 @@ fn run_clients(
                             let tid = stdout
                                 .lines()
                                 .next()
-                                .and_then(|line| line.parse::<usize>().ok()).unwrap();
+                                .and_then(|line| line.parse::<usize>().ok())
+                                .unwrap();
                             let tid = format!("{}", tid);
 
                             // -5 so that we don't measure the tail end
