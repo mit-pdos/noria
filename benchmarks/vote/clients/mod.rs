@@ -7,7 +7,7 @@ pub(crate) struct Parameters {
 
 pub(crate) trait VoteClientConstructor {
     type Instance: VoteClient;
-    fn new(&Parameters, &clap::ArgMatches) -> Self;
+    fn new(params: &Parameters, args: &clap::ArgMatches) -> Self;
     fn make(&mut self) -> Self::Instance;
     fn spawns_threads() -> bool {
         false
@@ -27,10 +27,10 @@ pub(crate) trait VoteClient {
 
 impl VoteClient for () {
     fn handle_reads(&mut self, _: &[i32]) {
-        ::std::thread::sleep(::time::Duration::from_micros(300));
+        ::std::thread::sleep(::std::time::Duration::from_micros(300));
     }
     fn handle_writes(&mut self, _: &[i32]) {
-        ::std::thread::sleep(::time::Duration::from_micros(200));
+        ::std::thread::sleep(::std::time::Duration::from_micros(200));
     }
 }
 

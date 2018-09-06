@@ -1,18 +1,9 @@
 #![deny(unused_extern_crates)]
-#![feature(catch_expr)]
 
 #[macro_use]
 extern crate clap;
-extern crate chrono;
-extern crate ctrlc;
 #[macro_use]
 extern crate failure;
-extern crate rayon;
-extern crate rusoto_core;
-extern crate rusoto_sts;
-extern crate shellwords;
-extern crate ssh2;
-extern crate tsunami;
 
 use failure::Error;
 use failure::ResultExt;
@@ -204,7 +195,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::simple(Region::UsEast1);
+    let sts = StsClient::new(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),

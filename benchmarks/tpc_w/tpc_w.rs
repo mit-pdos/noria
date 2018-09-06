@@ -1,16 +1,10 @@
-#![deny(unused_extern_crates)]
-
-extern crate chrono;
-extern crate distributary;
-extern crate rand;
-
 mod parameters;
 mod populate;
 
 #[macro_use]
 extern crate clap;
 
-use parameters::SampleKeys;
+use crate::parameters::SampleKeys;
 use rand::Rng;
 use std::collections::HashMap;
 use std::{thread, time};
@@ -209,7 +203,7 @@ impl Backend {
 
 fn main() {
     use clap::{App, Arg};
-    use populate::*;
+    use crate::populate::*;
 
     let matches = App::new("tpc_w")
         .version("0.1")

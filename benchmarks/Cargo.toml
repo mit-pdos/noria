@@ -1,7 +1,10 @@
+cargo-features = ["edition"]
+
 [package]
 name = "benchmarks"
 version = "0.0.1"
 authors = ["The Distributary Developers"]
+edition = '2018'
 
 [dependencies]
 channel = { path = "../channel" }

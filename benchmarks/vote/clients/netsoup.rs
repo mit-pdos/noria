@@ -1,6 +1,6 @@
 use clap;
-use clients::localsoup::graph::RECIPE;
-use clients::{Parameters, VoteClient, VoteClientConstructor};
+use crate::clients::localsoup::graph::RECIPE;
+use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
 use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use failure::Error;
 

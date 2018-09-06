@@ -1,23 +1,13 @@
-#![deny(unused_extern_crates)]
-#![feature(catch_expr)]
+#![feature(try_blocks)]
 
 #[macro_use]
 extern crate clap;
-extern crate chrono;
-extern crate ctrlc;
 #[macro_use]
 extern crate failure;
-extern crate rayon;
-extern crate rusoto_core;
-extern crate rusoto_sts;
-extern crate shellwords;
-extern crate ssh2;
-extern crate timeout_readwrite;
-extern crate tsunami;
 
 mod backends;
 mod server;
-use backends::Backend;
+use self::backends::Backend;
 
 use failure::Error;
 use rusoto_core::Region;
@@ -333,6 +323,21 @@ fn main() {
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
 
+        // write out host files for ergonomic ssh
+        let r: io::Result<()> = try {
+            let mut f = File::create("server.host")?;
+            writeln!(f, "ubuntu@{}", server.public_dns)?;
+
+            for (i, c) in clients.iter().enumerate() {
+                let mut f = File::create(format!("client-{}.host", i))?;
+                writeln!(f, "ubuntu@{}", c.public_dns)?;
+            }
+        };
+
+        if let Err(e) = r {
+            eprintln!("failed to write out host files: {:?}", e);
+        }
+
         let targets = if let Some(ts) = args.values_of("targets") {
             ts.map(|t| t.parse().unwrap()).collect()
         } else {
@@ -520,7 +525,7 @@ fn run_clients(
                     public_dns, target
                 );
 
-                let c: Result<_, Box<Error>> = do catch {
+                let c: Result<_, Box<Error>> = try {
                     let mut cmd = Vec::<Cow<str>>::new();
                     cmd.push("multiclient.sh".into());
                     params.add_params(&mut cmd);
@@ -546,6 +551,117 @@ fn run_clients(
                 }
             },
         ).collect();
+
+    // wait for warmup to finish
+    thread::sleep(time::Duration::from_secs(params.warmup as u64));
+
+    // do some profiling
+    let perf = if !do_perf.is_active() || iter != 0 {
+        None
+    } else if let Backend::Netsoup { .. } = params.backend {
+        let r: Result<_, failure::Error> = try {
+            server.server.set_compress(true);
+            let mut c = server.server.exec(&["pgrep", "souplet"])?;
+            let mut stdout = String::new();
+            c.read_to_string(&mut stdout)?;
+            c.wait_eof()?;
+
+            // set up
+
+            match stdout
+                .lines()
+                .next()
+                .and_then(|line| line.parse::<usize>().ok())
+            {
+                Some(pid) => {
+                    let pid = format!("{}", pid);
+                    match do_perf {
+                        Perf::Hot => server.server.exec(&[
+                            "perf",
+                            "record",
+                            "-g",
+                            "--call-graph",
+                            "dwarf",
+                            "-p",
+                            &pid,
+                            ">",
+                            "perf.data",
+                        ])?,
+                        Perf::Cold => {
+                            // -5 so that we don't measure the tail end
+                            let runtime = format!("{}", params.runtime - 5);
+                            server.server.exec(&[
+                                "sudo",
+                                "offcputime-bpfcc",
+                                "-f",
+                                "-p",
+                                &pid,
+                                &runtime,
+                                ">",
+                                "offcputime.folded",
+                                "2>",
+                                "offcputime.err",
+                            ])?
+                        }
+                        Perf::TraceIoPool | Perf::TracePool => {
+                            let search = match do_perf {
+                                Perf::TraceIoPool => {
+                                    format!(r#"$2 == "tokio-io-pool-2" {{ print $1 }}"#)
+                                }
+                                Perf::TracePool => {
+                                    format!(r#"$2 == "tokio-pool-2" {{ print $1 }}"#)
+                                }
+                                _ => unreachable!(),
+                            };
+                            let mut c = server
+                                .server
+                                .exec(&["ps", "H", "-o", "tid comm", &pid, "|", "awk", &search])?;
+                            let mut stdout = String::new();
+                            c.read_to_string(&mut stdout)?;
+                            c.wait_eof()?;
+                            let tid = stdout
+                                .lines()
+                                .next()
+                                .and_then(|line| line.parse::<usize>().ok()).unwrap();
+                            let tid = format!("{}", tid);
+
+                            // -5 so that we don't measure the tail end
+                            let runtime = format!("{}s", params.runtime - 5);
+                            server.server.exec(&[
+                                "sudo",
+                                "timeout",
+                                &runtime,
+                                "strace",
+                                "-T",
+                                "-yy",
+                                "-p",
+                                &tid,
+                                "-o",
+                                "strace.out",
+                            ])?
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                None => {
+                    Err(format_err!("did not find pid for perf"))?;
+                    unreachable!();
+                }
+            }
+        };
+
+        match r {
+            Ok(c) => Some(c),
+            Err(e) => {
+                eprintln!("failed to run perf on server:");
+                eprintln!("{:?}", e);
+                eprintln!("");
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     // let's see how we did
     let mut overloaded = None;

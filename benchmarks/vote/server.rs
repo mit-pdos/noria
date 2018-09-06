@@ -126,7 +126,7 @@ impl<'a> Server<'a> {
         client.set_timeout(10000);
         // sql server can be *really* slow to start b/c EBS is slow
         while start.elapsed() < time::Duration::from_secs(5 * 60) {
-            let e: Result<(), ssh2::Error> = do catch {
+            let e: Result<(), ssh2::Error> = try {
                 let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
                 c.send_eof()?;
                 c.wait_eof()?;
