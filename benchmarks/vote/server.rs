@@ -32,19 +32,20 @@ impl<'a> ServerHandle<'a> {
                     unimplemented!();
                 }
 
-                let killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
+                let _ = server.just_exec(&["pkill", "-f", "souplet"])?;
 
-                if !killed.is_ok() {
-                    let mut stdout = String::new();
-                    let mut stderr = String::new();
-                    w.stderr().read_to_string(&mut stderr)?;
-                    w.read_to_string(&mut stdout)?;
-                    println!("souplet died");
+                let mut stdout = String::new();
+                let mut stderr = String::new();
+                w.stderr().read_to_string(&mut stderr)?;
+                w.read_to_string(&mut stdout)?;
+                w.wait_eof()?;
+
+                if !stderr.is_empty() {
+                    println!("souplet stdout");
                     println!("{}", stdout);
+                    println!("souplet stderr");
                     println!("{}", stderr);
                 }
-
-                w.wait_eof()?;
 
                 // also stop zookeeper
                 match server.just_exec(&["sudo", "systemctl", "stop", "zookeeper"]) {
@@ -324,7 +325,7 @@ pub(crate) fn start<'a>(
                     .map(|&s| s.into())
                     .collect();
                 cmd.extend(vec![
-                    "target/release/souplet".into(),
+                    "/home/ubuntu/target/release/souplet".into(),
                     "--durability".into(),
                     "memory".into(),
                     "--shards".into(),

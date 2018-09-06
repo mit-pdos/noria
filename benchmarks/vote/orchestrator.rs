@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_AMI: &str = "ami-043095dbbda834f82";
+const SOUP_AMI: &str = "ami-0045afb291973573a";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -144,7 +144,7 @@ fn main() {
         ).arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("20")
+                .default_value("40")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
         ).arg(
@@ -557,7 +557,7 @@ fn main() {
             eprintln!("==> press enter to interrupt");
             match timeout_readwrite::TimeoutReader::new(
                 io::stdin(),
-                Some(time::Duration::from_secs(1 * 20)),
+                Some(time::Duration::from_secs(10)),
             ).read(&mut [0u8])
             {
                 Ok(_) => {

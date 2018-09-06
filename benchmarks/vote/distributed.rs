@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-5172ca2e";
+const SOUP_AMI: &str = "ami-0045afb291973573a";
 
 fn main() {
     use clap::{App, Arg};
@@ -41,7 +41,7 @@ fn main() {
         ).arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("20")
+                .default_value("40")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
         ).arg(
@@ -195,6 +195,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
 
     let mut b = tsunami::TsunamiBuilder::default();
     b.set_region(Region::UsEast1);
+    b.set_availability_zone("us-east-1a");
     b.use_term_logger();
     b.add_set(
         "server",
@@ -349,7 +350,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             cmd.extend(vec![
                 "env".into(),
                 "RUST_BACKTRACE=1".into(),
-                "target/release/souplet".into(),
+                "/home/ubuntu/target/release/souplet".into(),
                 "--durability".into(),
                 "memory".into(),
                 "--shards".into(),
@@ -358,10 +359,6 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 "votebench".into(),
                 "--zookeeper".into(),
                 zookeeper_addr.clone(),
-                "-w".into(),
-                format!("{}", shards).into(),
-                "-r".into(),
-                format!("{}", 10 * (scores - shards)).into(),
             ]);
             cmd
         };
@@ -392,7 +389,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             "&&".into(),
             "env".into(),
             "RUST_BACKTRACE=1".into(),
-            "target/release/vote".into(),
+            "/home/ubuntu/target/release/vote".into(),
             "--threads".into(),
             threads,
             "--articles".into(),
@@ -519,7 +516,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             let killed = servers[i].ssh.as_ref().unwrap().just_exec(&[
                 "pkill",
                 "-f",
-                "target/release/souplet",
+                "/home/ubuntu/target/release/souplet",
             ])?;
 
             if !killed.is_ok() {
