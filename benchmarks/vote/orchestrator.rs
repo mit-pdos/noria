@@ -257,7 +257,7 @@ fn main() {
     } else {
         "c5.4xlarge"
     };
-    let scores = ec2_instance_type_cores(stype).unwrap();
+    let ctype = args.value_of("ctype").unwrap();
 
     // guess the core counts
     let ccores = args
@@ -330,29 +330,65 @@ fn main() {
             eprintln!(" -> setting up mssql ramdisk");
             host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
+            let build = |host: &tsunami::Session| {
+                eprintln!(" -> building souplet on server");
+                host.just_exec(&[
+                    "cd",
+                    "distributary",
+                    "&&",
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--bin",
+                    "souplet",
+                    "2>&1",
+                ])?
+                    .is_ok();
+                Ok(())
+            };
+
+            if stype == "i3.metal" {
+                tidy_metal(&host, build)?;
+            } else {
+                build(&host)?;
+            }
+
             Ok(())
         }).as_user("ubuntu"),
     );
+    let xctype = ctype.to_string();
     b.add_set(
         "client",
         if cohost_clients { 1 } else { nclients as u32 },
-        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, |host| {
-            eprintln!(" -> building vote client on client");
+        tsunami::MachineSetup::new(ctype, SOUP_AMI, move |host| {
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
-            host.just_exec(&[
-                "cd",
-                "distributary",
-                "&&",
-                "cargo",
-                "b",
-                "--release",
-                "--manifest-path",
-                "benchmarks/Cargo.toml",
-                "--bin",
-                "vote",
-                "2>&1",
-            ])?.is_ok();
+
+            let build = |host: &tsunami::Session| {
+                eprintln!(" -> building vote client on client");
+                host.just_exec(&[
+                    "cd",
+                    "distributary",
+                    "&&",
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--manifest-path",
+                    "benchmarks/Cargo.toml",
+                    "--bin",
+                    "vote",
+                    "2>&1",
+                ])?
+                    .is_ok();
+                Ok(())
+            };
+
+            if xctype == "i3.metal" {
+                tidy_metal(&host, build)?;
+            } else {
+                build(&host)?;
+            }
+
             Ok(())
         }).as_user("ubuntu"),
     );
@@ -398,32 +434,17 @@ fn main() {
         .build_global()
         .unwrap();
 
-    if stype == "i3.metal" {
+    if stype == "i3.metal" || ctype == "i3.metal" {
         b.wait_limit(time::Duration::from_secs(10 * 60));
     } else {
         b.wait_limit(time::Duration::from_secs(2 * 60));
     }
+
     b.set_max_duration(4);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
         let listen_addr = &server.private_ip;
-
-        if stype == "i3.metal" {
-            let ssh = server.ssh.as_ref().unwrap();
-
-            // also rebuild rocksdb and cargo clean
-            ssh.just_exec(&["cd", "rocksdb", "&&", "make", "clean"]).unwrap().unwrap();
-            ssh.just_exec(&["cd", "rocksdb", "&&", "make", "-j16", "shared_lib"]).unwrap().unwrap();
-            ssh.just_exec(&["cd", "distributary", "&&", "cargo", "clean"]).unwrap().unwrap();
-
-            // disable all the extra cores
-            eprintln!("==> disabling extra cores on bare-metal machine");
-            for core in 16..scores {
-                let core = format!("/sys/devices/system/cpu/cpu{}/online", core);
-                ssh.just_exec(&["echo", "0", "|", "sudo", "tee", &core]).unwrap().unwrap();
-            }
-        }
 
         // write out host files for ergonomic ssh
         let r: io::Result<()> = do catch {
@@ -733,13 +754,15 @@ fn run_clients(
                             let search = match do_perf {
                                 Perf::TraceIoPool => {
                                     format!(r#"$2 == "tokio-io-pool-2" {{ print $1 }}"#)
-                                },
+                                }
                                 Perf::TracePool => {
                                     format!(r#"$2 == "tokio-pool-2" {{ print $1 }}"#)
-                                },
+                                }
                                 _ => unreachable!(),
                             };
-                            let mut c = server.server.exec(&["ps", "H", "-o", "tid comm", &pid, "|", "awk", &search])?;
+                            let mut c = server
+                                .server
+                                .exec(&["ps", "H", "-o", "tid comm", &pid, "|", "awk", &search])?;
                             let mut stdout = String::new();
                             c.read_to_string(&mut stdout)?;
                             c.wait_eof()?;
@@ -931,6 +954,32 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
         }
         _ => None,
     })
+}
+
+fn tidy_metal<F>(host: &tsunami::Session, build: F) -> Result<(), Error>
+where
+    F: FnOnce(&tsunami::Session) -> Result<(), Error>,
+{
+    // rebuild rocksdb and cargo clean
+    host.just_exec(&["cd", "rocksdb", "&&", "make", "clean"])?
+        .expect("rocksdb make clean");
+    host.just_exec(&["cd", "rocksdb", "&&", "make", "-j32", "shared_lib"])?
+        .expect("rocksdb make shared_lib");
+    host.just_exec(&["cd", "distributary", "&&", "cargo", "clean"])?
+        .expect("cargo clean");
+
+    // then build
+    build(host)?;
+
+    // and then disable all the extra cores
+    let cores = ec2_instance_type_cores("i3.metal").unwrap();
+    eprintln!(" -> disabling extra cores on bare-metal machine");
+    for corei in 16..cores {
+        let core = format!("/sys/devices/system/cpu/cpu{}/online", corei);
+        host.just_exec(&["echo", "0", "|", "sudo", "tee", &core])?
+            .expect(&format!("disable core {}", corei));
+    }
+    Ok(())
 }
 
 impl ConvenientSession for tsunami::Session {
