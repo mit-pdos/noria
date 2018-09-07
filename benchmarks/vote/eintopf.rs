@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time;
 
-const SOUP_AMI: &str = "ami-6977ce16";
+const SOUP_AMI: &str = "ami-0a979d5bb8e9cf9bb";
 
 fn main() {
     use clap::{App, Arg};
@@ -150,6 +150,15 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             host.just_exec(&["git", "-C", "eintopf", "reset", "--hard", "2>&1"])
                 .context("git reset")?
                 .map_err(failure::err_msg)?;
+            host.just_exec(&[
+                "git",
+                "-C",
+                "eintopf",
+                "checkout",
+                "open_loop_query",
+                "2>&1",
+            ]).context("git pull")?
+            .map_err(failure::err_msg)?;
             host.just_exec(&["git", "-C", "eintopf", "pull", "2>&1"])
                 .context("git pull")?
                 .map_err(failure::err_msg)?;
@@ -185,7 +194,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
                 let cmd: Vec<Cow<_>> = vec![
                     "env".into(),
                     "RUST_BACKTRACE=1".into(),
-                    "eintopf/target/release/eintopf".into(),
+                    "/home/ubuntu/target/release/eintopf".into(),
                     "--open-loop".into(),
                     "-b".into(),
                     format!("{}", nservers as usize * target_per_client).into(),
