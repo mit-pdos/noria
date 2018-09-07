@@ -32,19 +32,20 @@ impl<'a> ServerHandle<'a> {
                     unimplemented!();
                 }
 
-                let killed = server.just_exec(&["pkill", "-f", "target/release/souplet"])?;
+                let _ = server.just_exec(&["pkill", "-f", "souplet"])?;
 
-                if !killed.is_ok() {
-                    let mut stdout = String::new();
-                    let mut stderr = String::new();
-                    w.stderr().read_to_string(&mut stderr)?;
-                    w.read_to_string(&mut stdout)?;
-                    println!("souplet died");
+                let mut stdout = String::new();
+                let mut stderr = String::new();
+                w.stderr().read_to_string(&mut stderr)?;
+                w.read_to_string(&mut stdout)?;
+                w.wait_eof()?;
+
+                if !stderr.is_empty() {
+                    println!("souplet stdout");
                     println!("{}", stdout);
+                    println!("souplet stderr");
                     println!("{}", stderr);
                 }
-
-                w.wait_eof()?;
 
                 // also stop zookeeper
                 match server.just_exec(&["sudo", "systemctl", "stop", "zookeeper"]) {
@@ -54,12 +55,22 @@ impl<'a> ServerHandle<'a> {
                 }
             }
             ServerHandle::Hybrid => {
-                match server.just_exec(&["sudo", "systemctl", "stop", "mysqld"]) {
+                match server.just_exec(&[
+                    "sudo",
+                    "systemctl",
+                    "stop",
+                    Backend::Mysql.systemd_name().unwrap(),
+                ]) {
                     Ok(Ok(_)) => {}
                     Ok(Err(e)) => bail!(e),
                     Err(e) => Err(e)?,
                 }
-                match server.just_exec(&["sudo", "systemctl", "stop", "memcached"]) {
+                match server.just_exec(&[
+                    "sudo",
+                    "systemctl",
+                    "stop",
+                    Backend::Memcached.systemd_name().unwrap(),
+                ]) {
                     Ok(Ok(_)) => {}
                     Ok(Err(e)) => bail!(e),
                     Err(e) => Err(e)?,
@@ -82,7 +93,7 @@ impl<'a> ServerHandle<'a> {
 
 #[must_use]
 pub(crate) struct Server<'a> {
-    server: &'a Session,
+    pub(crate) server: &'a Session,
     listen_addr: &'a str,
 
     handle: ServerHandle<'a>,
@@ -234,7 +245,9 @@ impl<'a> Server<'a> {
                 c.wait_eof()?;
             }
             Backend::Mssql => {
-                let mut c = self.server.exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
+                let mut c = self
+                    .server
+                    .exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
                 w.write_all(b"disk:\n")?;
                 io::copy(&mut c, w)?;
                 c.wait_eof()?;
@@ -278,7 +291,7 @@ pub(crate) fn start<'a>(
             }
 
             // wipe zookeeper state
-            match server.just_exec(&["sudo", "rm", "-rf", "/var/zookeeper/version-2"]) {
+            match server.just_exec(&["sudo", "rm", "-rf", "/var/lib/zookeeper/version-2"]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
@@ -312,7 +325,7 @@ pub(crate) fn start<'a>(
                     .map(|&s| s.into())
                     .collect();
                 cmd.extend(vec![
-                    "target/release/souplet".into(),
+                    "/home/ubuntu/target/release/souplet".into(),
                     "--durability".into(),
                     "memory".into(),
                     "--shards".into(),
@@ -329,12 +342,22 @@ pub(crate) fn start<'a>(
             ServerHandle::Netsoup(w)
         }
         Backend::Hybrid => {
-            match server.just_exec(&["sudo", "systemctl", "start", "memcached"]) {
+            match server.just_exec(&[
+                "sudo",
+                "systemctl",
+                "start",
+                Backend::Memcached.systemd_name().unwrap(),
+            ]) {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),
             }
-            match server.just_exec(&["sudo", "systemctl", "start", "mysqld"]) {
+            match server.just_exec(&[
+                "sudo",
+                "systemctl",
+                "start",
+                Backend::Mysql.systemd_name().unwrap(),
+            ]) {
                 Ok(Ok(_)) => ServerHandle::Hybrid,
                 Ok(Err(e)) => return Ok(Err(e)),
                 Err(e) => return Err(e),

@@ -92,8 +92,7 @@ impl Backend {
                                 }
                             }
                             true
-                        })
-                        .collect::<Vec<_>>()
+                        }).collect::<Vec<_>>()
                         .join("\n"),
                 )
             }
@@ -129,80 +128,67 @@ fn main() {
                 .short("g")
                 .value_name("DIR")
                 .help("Directory to dump graphs for each schema version into (if set)."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("populate_from")
                 .short("p")
                 .required(true)
                 .default_value("benchmarks/hotsoup/testdata")
                 .help("Location of the HotCRP test data for population."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("schemas")
                 .short("s")
                 .required(true)
                 .default_value("benchmarks/hotsoup/schemas")
                 .help("Location of the HotCRP query recipes to move through."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
                 .default_value("benchmarks/hotsoup/queries")
                 .help("Location of the HotCRP schema recipes to move through."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("blacklist")
                 .short("b")
                 .default_value("benchmarks/hotsoup/query_blacklist.txt")
                 .help("File with blacklisted queries to skip."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("no-partial")
                 .long("no-partial")
                 .help("Disable partial materialization"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("no-sharding")
                 .long("no-sharding")
                 .help("Disable partial materialization"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("populate_at")
                 .default_value("11")
                 .long("populate_at")
                 .help("Schema version to populate database at; must be compatible with test data."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("reuse")
                 .long("reuse")
                 .default_value("finkelstein")
                 .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
                 .help("Query reuse algorithm to use."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("start_at")
                 .default_value("1")
                 .long("start_at")
                 .help("Schema version to start at; versions prior to this will be skipped."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("stop_at")
                 .default_value("161")
                 .long("stop_at")
                 .help("Schema version to stop at; versions after this will be skipped."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("base_only")
                 .long("base_only")
                 .help("Only add base tables, not queries."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("transactional")
                 .short("t")
                 .help("Use transactional writes."),
-        )
-        .get_matches();
+        ).get_matches();
 
     let blloc = matches.value_of("blacklist").unwrap();
     let gloc = matches.value_of("graphs");
@@ -250,15 +236,13 @@ fn main() {
             let fname = String::from(k.file_name().unwrap().to_str().unwrap());
             let ver = u64::from_str(&fname[7..fname.len() - 4]).unwrap();
             (ver, k)
-        })
-        .collect::<Vec<(u64, PathBuf)>>();
+        }).collect::<Vec<(u64, PathBuf)>>();
     let mut schema_files = schema_files
         .into_iter()
         .map(|k| {
             let fname = String::from(k.file_name().unwrap().to_str().unwrap());
             (u64::from_str(&fname[7..fname.len() - 4]).unwrap(), k)
-        })
-        .collect::<Vec<(u64, PathBuf)>>();
+        }).collect::<Vec<(u64, PathBuf)>>();
     query_files.sort_by_key(|t| t.0);
     schema_files.sort_by_key(|t| t.0);
 

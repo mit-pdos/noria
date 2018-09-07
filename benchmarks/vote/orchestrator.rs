@@ -13,11 +13,11 @@ use failure::Error;
 use rusoto_core::Region;
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use std::borrow::Cow;
+use std::fs::File;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_SERVER_AMI: &str = "ami-078a14a43873a0ef6";
-const SOUP_CLIENT_AMI: &str = "ami-0d41416ce61c6cb1a";
+const SOUP_AMI: &str = "ami-0045afb291973573a";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -85,6 +85,33 @@ impl<'a> ClientParameters<'a> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Perf {
+    None,
+    Hot,
+    Cold,
+    TraceIoPool,
+    TracePool,
+}
+
+impl Perf {
+    fn is_active(&self) -> bool {
+        if let Perf::None = *self {
+            false
+        } else {
+            true
+        }
+    }
+
+    fn extension(&self) -> &'static str {
+        match *self {
+            Perf::None => unreachable!(),
+            Perf::Hot | Perf::Cold => "folded",
+            Perf::TraceIoPool | Perf::TracePool => "strace",
+        }
+    }
+}
+
 fn main() {
     use clap::{App, Arg};
 
@@ -117,9 +144,13 @@ fn main() {
         ).arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("20")
+                .default_value("40")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
+        ).arg(
+            Arg::with_name("metal")
+                .long("metal")
+                .help("Run on bare-metal hardware (i3.metal)"),
         ).arg(
             Arg::with_name("read_percentage")
                 .short("p")
@@ -137,9 +168,10 @@ fn main() {
                 .help("How to distribute keys."),
         ).arg(
             Arg::with_name("backends")
-                .long("backends")
+                .long("backend")
                 .multiple(true)
                 .takes_value(true)
+                .number_of_values(1)
                 .possible_values(&[
                     "memcached",
                     "mysql",
@@ -149,19 +181,26 @@ fn main() {
                     "mssql",
                 ]).help("Which backends to run [all if none are given]"),
         ).arg(
-            Arg::with_name("stype")
-                .long("server")
-                .default_value("c5.4xlarge")
-                .required(true)
-                .takes_value(true)
-                .help("Instance type for server"),
-        ).arg(
             Arg::with_name("ctype")
                 .long("client")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
+        ).arg(
+            Arg::with_name("keep")
+                .long("keep")
+                .help("Keep the VMs running after the benchmarks have completed."),
+        ).arg(
+            Arg::with_name("perf")
+                .long("perf")
+                .takes_value(true)
+                .possible_values(&["hot", "cold", "trace-io", "trace-pool"])
+                .help("Run perf(hot) or offcputime(cold) and stackcollapse on each run; or produce straces of a pool thread"),
+        ).arg(
+            Arg::with_name("cohost")
+                .long("cohost")
+                .help("Host all clients on a single instance"),
         ).arg(
             Arg::with_name("clients")
                 .long("clients")
@@ -191,14 +230,34 @@ fn main() {
         "both" => &[false, true][..],
         _ => unreachable!(),
     };
-    let nclients = value_t_or_exit!(args, "clients", i64);
+    let do_perf = match args.value_of("perf") {
+        Some("hot") => Perf::Hot,
+        Some("cold") => Perf::Cold,
+        Some("trace-io") => Perf::TraceIoPool,
+        Some("trace-pool") => Perf::TracePool,
+        None => Perf::None,
+        Some(v) => unreachable!("unknown perf type: {}", v),
+    };
+    let cohost_clients = args.is_present("cohost");
+    let nclients = value_t_or_exit!(args, "clients", usize);
     let az = args.value_of("availability_zone").unwrap();
+
+    let stype = if args.is_present("metal") {
+        "i3.metal"
+    } else {
+        "c5.4xlarge"
+    };
+    let ctype = args.value_of("ctype").unwrap();
 
     // guess the core counts
     let ccores = args
         .value_of("ctype")
         .and_then(ec2_instance_type_cores)
-        .map(|cores| {
+        .map(|mut cores| {
+            if cohost_clients {
+                cores /= nclients as u16;
+            }
+
             // one core for load generators to be on the safe side
             match cores {
                 1 => 1,
@@ -206,13 +265,9 @@ fn main() {
                 n => n - 1,
             }
         }).expect("could not determine client core count");
-    let scores = args
-        .value_of("stype")
-        .and_then(ec2_instance_type_cores)
-        .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
-    let sts = StsClient::simple(Region::UsEast1);
+    let sts = StsClient::new(Region::UsEast1);
     let provider = StsAssumeRoleSessionCredentialsProvider::new(
         sts,
         "arn:aws:sts::125163634912:role/soup".to_owned(),
@@ -230,47 +285,98 @@ fn main() {
     b.add_set(
         "server",
         1,
-        tsunami::MachineSetup::new(
-            args.value_of("stype").unwrap(),
-            SOUP_SERVER_AMI,
-            move |host| {
-                // ensure we don't have stale soup (yuck)
-                host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
-                    .is_ok();
-
-                eprintln!(" -> adjusting ec2 server ami for {} cores", scores);
-                host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
-
-                // TODO: memcached cache size?
-                // TODO: mssql setup?
-                // TODO: mariadb params?
-                let optstr = format!("/OPTIONS=/ s/\"$/ -m 4096 -t {}\"/", scores);
-                host.just_exec(&["sudo", "sed", "-i", &optstr, "/etc/sysconfig/memcached"])?
-                    .is_ok();
-                Ok(())
-            },
-        ),
-    );
-    b.add_set(
-        "client",
-        nclients as u32,
-        tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_CLIENT_AMI, |host| {
-            eprintln!(" -> building vote client on client");
+        tsunami::MachineSetup::new(stype, SOUP_AMI, move |host| {
+            // ensure we don't have stale soup (yuck)
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
                 .is_ok();
-            host.just_exec(&[
-                "cd",
-                "distributary",
-                "&&",
-                "cargo",
-                "b",
-                "--release",
-                "--manifest-path",
-                "benchmarks/Cargo.toml",
-                "--bin",
-                "vote",
-                "2>&1",
-            ])?.is_ok();
+
+            if do_perf.is_active() {
+                // allow kernel debugging
+                host.just_exec(&[
+                    "echo",
+                    "0",
+                    "|",
+                    "sudo",
+                    "tee",
+                    "/proc/sys/kernel/kptr_restrict",
+                ])?.is_ok();
+                host.just_exec(&[
+                    "echo",
+                    "-1",
+                    "|",
+                    "sudo",
+                    "tee",
+                    "/proc/sys/kernel/perf_event_paranoid",
+                ])?.is_ok();
+
+                // get flamegraph
+                host.just_exec(&[
+                    "git",
+                    "clone",
+                    "https://github.com/brendangregg/FlameGraph.git",
+                ])?.is_ok();
+            }
+
+            eprintln!(" -> setting up mssql ramdisk");
+            host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
+
+            let build = |host: &tsunami::Session| {
+                eprintln!(" -> building souplet on server");
+                host.just_exec(&[
+                    "cd",
+                    "distributary",
+                    "&&",
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--bin",
+                    "souplet",
+                    "2>&1",
+                ])?.is_ok();
+                Ok(())
+            };
+
+            if stype == "i3.metal" {
+                tidy_metal(&host, build)?;
+            } else {
+                build(&host)?;
+            }
+
+            Ok(())
+        }).as_user("ubuntu"),
+    );
+    let xctype = ctype.to_string();
+    b.add_set(
+        "client",
+        if cohost_clients { 1 } else { nclients as u32 },
+        tsunami::MachineSetup::new(ctype, SOUP_AMI, move |host| {
+            host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])?
+                .is_ok();
+
+            let build = |host: &tsunami::Session| {
+                eprintln!(" -> building vote client on client");
+                host.just_exec(&[
+                    "cd",
+                    "distributary",
+                    "&&",
+                    "cargo",
+                    "b",
+                    "--release",
+                    "--manifest-path",
+                    "benchmarks/Cargo.toml",
+                    "--bin",
+                    "vote",
+                    "2>&1",
+                ])?.is_ok();
+                Ok(())
+            };
+
+            if xctype == "i3.metal" {
+                tidy_metal(&host, build)?;
+            } else {
+                build(&host)?;
+            }
+
             Ok(())
         }).as_user("ubuntu"),
     );
@@ -316,8 +422,13 @@ fn main() {
         .build_global()
         .unwrap();
 
-    b.wait_limit(time::Duration::from_secs(5 * 60));
-    b.set_max_duration(6);
+    if stype == "i3.metal" || ctype == "i3.metal" {
+        b.wait_limit(time::Duration::from_secs(10 * 60));
+    } else {
+        b.wait_limit(time::Duration::from_secs(2 * 60));
+    }
+
+    b.set_max_duration(4);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
@@ -403,7 +514,9 @@ fn main() {
                                 iters,
                                 chrono::Local::now().time()
                             );
-                            if !run_clients(iter, &clients, ccores, &mut s, target, params) {
+                            if !run_clients(
+                                iter, nclients, do_perf, &clients, ccores, &mut s, target, params,
+                            ) {
                                 // backend clearly couldn't handle the load, so don't run higher targets
                                 break;
                             }
@@ -433,28 +546,34 @@ fn main() {
             eprintln!("==> terminating early due to ^C");
         }
 
-        eprintln!("==> about to terminate ec2 instances -- press enter to interrupt");
-        match timeout_readwrite::TimeoutReader::new(
-            io::stdin(),
-            Some(time::Duration::from_secs(1 * 60)),
-        ).read(&mut [0u8])
-        {
-            Ok(_) => {
-                // user pressed enter to interrupt
-                // show all the host addresses, and let them do their thing
-                // then wait for an enter to actually terminate
-                eprintln!(" -> delaying shutdown, here are the hosts:");
-                eprintln!("server: {}", server.public_dns);
-                for client in &clients {
-                    eprintln!("client: {}", client.public_dns);
+        eprintln!("==> about to terminate the following ec2 instances:");
+        eprintln!("server: {}", server.public_dns);
+        for client in &clients {
+            eprintln!("client: {}", client.public_dns);
+        }
+
+        let mut keep = args.is_present("keep");
+        if !keep {
+            eprintln!("==> press enter to interrupt");
+            match timeout_readwrite::TimeoutReader::new(
+                io::stdin(),
+                Some(time::Duration::from_secs(10)),
+            ).read(&mut [0u8])
+            {
+                Ok(_) => {
+                    // user pressed enter to interrupt
+                    keep = true;
                 }
-                eprintln!(" -> press enter to terminate all instances");
-                io::stdin().read(&mut [0u8]).is_ok();
+                Err(_) => {
+                    // doesn't really matter what the error was
+                    // we should shutdown immediately (which we do by not waiting...)
+                }
             }
-            Err(_) => {
-                // doesn't really matter what the error was
-                // we should shutdown immediately (which we do by not waiting...)
-            }
+        }
+
+        if keep {
+            eprintln!(" -> delaying shutdown; press enter to clean up");
+            io::stdin().read(&mut [0u8]).is_ok();
         }
 
         Ok(())
@@ -464,6 +583,8 @@ fn main() {
 // returns true if next target is feasible
 fn run_clients(
     iter: usize,
+    nclients: usize,
+    do_perf: Perf,
     clients: &Vec<tsunami::Machine>,
     ccores: u16,
     server: &mut server::Server,
@@ -486,6 +607,9 @@ fn run_clients(
         cmd.push("--threads".into());
         cmd.push(format!("{}", 6 * ccores).into());
         cmd.push("2>&1".into());
+        cmd.push("|".into());
+        cmd.push("tee".into());
+        cmd.push("prepop.out".into());
         let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
 
         match clients[0].ssh.as_ref().unwrap().just_exec(&cmd[..]) {
@@ -504,14 +628,19 @@ fn run_clients(
             }
         }
 
-        eprintln!(" .. finished prepopulation");
+        eprintln!(
+            " .. finished prepopulation @ {}",
+            chrono::Local::now().time()
+        );
     }
 
-    let target_per_client = (target as f64 / clients.len() as f64).ceil() as usize;
+    let target_per_client = (target as f64 / nclients as f64).ceil() as usize;
+
+    // little trick to support cohosting
+    let clients = clients.iter().cycle().take(nclients);
 
     // start all the benchmark clients
     let workers: Vec<_> = clients
-        .iter()
         .filter_map(
             |&tsunami::Machine {
                  ref ssh,
@@ -534,6 +663,12 @@ fn run_clients(
                     cmd.push(format!("{}", 6 * ccores).into());
                     cmd.push("--target".into());
                     cmd.push(format!("{}", target_per_client).into());
+                    // tee stdout and stderr
+                    // https://stackoverflow.com/a/692407/472927
+                    cmd.push(">".into());
+                    cmd.push(">(tee run.out)".into());
+                    cmd.push("2>".into());
+                    cmd.push(">(tee run.err >&2)".into());
 
                     let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                     let c = ssh.exec(&cmd[..])?;
@@ -622,7 +757,8 @@ fn run_clients(
                             let tid = stdout
                                 .lines()
                                 .next()
-                                .and_then(|line| line.parse::<usize>().ok()).unwrap();
+                                .and_then(|line| line.parse::<usize>().ok())
+                                .unwrap();
                             let tid = format!("{}", tid);
 
                             // -5 so that we don't measure the tail end
@@ -668,7 +804,6 @@ fn run_clients(
     let mut any_not_overloaded = false;
     let fname = params.name(target, "log");
     let mut outf = if iter == 0 {
-        use std::fs::File;
         File::create(&fname)
     } else {
         use std::fs::OpenOptions;
@@ -739,11 +874,53 @@ fn run_clients(
         }
     }
 
-    if let Ok(mut f) = outf {
+    if let Ok(ref mut f) = outf {
         // also gather memory usage and stuff
         if f.write_all(b"# server stats:\n").is_ok() {
-            if let Err(e) = server.write_stats(params.backend, &mut f) {
+            if let Err(e) = server.write_stats(params.backend, f) {
                 eprintln!(" !! failed to gather server stats: {}", e);
+            }
+        }
+    }
+
+    if let Some(mut c) = perf {
+        eprintln!(" .. collecting perf results");
+
+        // make perf exit
+        if let Perf::Hot = do_perf {
+            let mut k = server.server.exec(&["pkill", "perf"]).unwrap();
+            k.wait_eof().unwrap();
+        }
+
+        // wait for perf to exit, and then fetch top entries from the report
+        c.wait_eof().unwrap();
+
+        let fname = params.name(target, do_perf.extension());
+        if let Ok(mut f) = File::create(&fname) {
+            let k = match do_perf {
+                Perf::Hot => server.server.exec(&[
+                    "perf",
+                    "script",
+                    "-i",
+                    "perf.data",
+                    "|",
+                    "FlameGraph/stackcollapse-perf.pl",
+                ]),
+                Perf::Cold => server.server.exec(&["cat", "offcputime.folded"]),
+                Perf::TraceIoPool | Perf::TracePool => server.server.exec(&["cat", "strace.out"]),
+                _ => unreachable!(),
+            };
+
+            match k {
+                Ok(mut c) => {
+                    io::copy(&mut c, &mut f).unwrap();
+                    c.wait_eof().unwrap();
+                }
+                Err(e) => {
+                    eprintln!("failed to parse perf report");
+                    eprintln!("{:?}", e);
+                    eprintln!("");
+                }
             }
         }
     }
@@ -752,6 +929,11 @@ fn run_clients(
 }
 
 fn ec2_instance_type_cores(it: &str) -> Option<u16> {
+    if it == "i3.metal" {
+        // https://aws.amazon.com/ec2/instance-types/i3/
+        return Some(72);
+    }
+
     it.rsplitn(2, '.').next().and_then(|itype| match itype {
         "nano" | "micro" | "small" => Some(1),
         "medium" | "large" => Some(2),
@@ -763,12 +945,39 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
     })
 }
 
+fn tidy_metal<F>(host: &tsunami::Session, build: F) -> Result<(), Error>
+where
+    F: FnOnce(&tsunami::Session) -> Result<(), Error>,
+{
+    // rebuild rocksdb and cargo clean
+    host.just_exec(&["cd", "rocksdb", "&&", "make", "clean"])?
+        .expect("rocksdb make clean");
+    host.just_exec(&["cd", "rocksdb", "&&", "make", "-j32", "shared_lib"])?
+        .expect("rocksdb make shared_lib");
+    host.just_exec(&["cd", "distributary", "&&", "cargo", "clean"])?
+        .expect("cargo clean");
+
+    // then build
+    build(host)?;
+
+    // and then disable all the extra cores
+    let cores = ec2_instance_type_cores("i3.metal").unwrap();
+    eprintln!(" -> disabling extra cores on bare-metal machine");
+    for corei in 16..cores {
+        let core = format!("/sys/devices/system/cpu/cpu{}/online", corei);
+        host.just_exec(&["echo", "0", "|", "sudo", "tee", &core])?
+            .expect(&format!("disable core {}", corei));
+    }
+    Ok(())
+}
+
 impl ConvenientSession for tsunami::Session {
     fn exec<'a>(&'a self, cmd: &[&str]) -> Result<ssh2::Channel<'a>, Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
-                "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                "&" | "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
             }).collect();
         let cmd = cmd.join(" ");
@@ -784,12 +993,12 @@ impl ConvenientSession for tsunami::Session {
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error> {
         let mut c = self.exec(cmd)?;
 
-        let mut stderr = String::new();
-        c.stderr().read_to_string(&mut stderr)?;
+        let mut stdout = String::new();
+        c.read_to_string(&mut stdout)?;
         c.wait_eof()?;
 
         if c.exit_status()? != 0 {
-            return Ok(Err(stderr));
+            return Ok(Err(stdout));
         }
         Ok(Ok(()))
     }

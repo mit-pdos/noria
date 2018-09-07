@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{thread, time};
 
-const SOUP_AMI: &str = "ami-5172ca2e";
+const SOUP_AMI: &str = "ami-0045afb291973573a";
 
 fn main() {
     use clap::{App, Arg};
@@ -30,8 +30,7 @@ fn main() {
                 .default_value("500000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
@@ -39,46 +38,40 @@ fn main() {
                 .default_value("40")
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("warmup")
                 .long("warmup")
-                .default_value("20")
+                .default_value("40")
                 .takes_value(true)
                 .help("Warmup time in seconds"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("read_percentage")
                 .short("p")
                 .default_value("95")
                 .takes_value(true)
                 .help("The percentage of operations that are reads"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("distribution")
                 .short("d")
                 .possible_values(&["uniform", "skewed"])
                 .required(true)
                 .takes_value(true)
                 .help("How to distribute keys."),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("stype")
                 .long("server")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for server"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("ctype")
                 .long("client")
                 .default_value("c5.4xlarge")
                 .required(true)
                 .takes_value(true)
                 .help("Instance type for clients"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("servers")
                 .long("servers")
                 .short("s")
@@ -86,8 +79,7 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of server machines to spawn with a scale of 1"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("clients")
                 .long("clients")
                 .short("c")
@@ -95,30 +87,26 @@ fn main() {
                 .required(true)
                 .takes_value(true)
                 .help("Number of client machines to spawn with a scale of 1"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("shards")
                 .long("shards")
                 .required(true)
                 .takes_value(true)
                 .help("Number of shards per souplet"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("target")
                 .long("load-per-client")
                 .required(true)
                 .default_value("6000000")
                 .takes_value(true)
                 .help("Load to generate on each client"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("scales")
                 .index(1)
                 .multiple(true)
                 .required(true)
                 .help("Scaling factors to try"),
-        )
-        .get_matches();
+        ).get_matches();
 
     // if the user wants us to terminate, finish whatever we're currently doing first
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -187,8 +175,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         .map(|cores| {
             assert!(cores > for_gen);
             cores - for_gen
-        })
-        .expect("could not determine client core count");
+        }).expect("could not determine client core count");
     let scores = args
         .value_of("stype")
         .and_then(ec2_instance_type_cores)
@@ -208,6 +195,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
 
     let mut b = tsunami::TsunamiBuilder::default();
     b.set_region(Region::UsEast1);
+    b.set_availability_zone("us-east-1a");
     b.use_term_logger();
     b.add_set(
         "server",
@@ -306,8 +294,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                     "log",
                     "--oneline",
                     "..origin/master",
-                ])
-                .context("git log --online ..origin/master")?
+                ]).context("git log --online ..origin/master")?
                 .map_err(failure::err_msg)?;
             if !missing.is_empty() {
                 eprintln!("==> missing commits from origin:");
@@ -363,7 +350,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             cmd.extend(vec![
                 "env".into(),
                 "RUST_BACKTRACE=1".into(),
-                "target/release/souplet".into(),
+                "/home/ubuntu/target/release/souplet".into(),
                 "--durability".into(),
                 "memory".into(),
                 "--shards".into(),
@@ -372,10 +359,6 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 "votebench".into(),
                 "--zookeeper".into(),
                 zookeeper_addr.clone(),
-                "-w".into(),
-                format!("{}", shards).into(),
-                "-r".into(),
-                format!("{}", 10 * (scores - shards)).into(),
             ]);
             cmd
         };
@@ -388,8 +371,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 cmd.push(Cow::Borrowed(&s.private_ip));
                 let cmd: Vec<_> = cmd.iter().map(|s| &**s).collect();
                 s.ssh.as_ref().unwrap().exec(&cmd[..])
-            })
-            .collect();
+            }).collect();
         let souplets = souplets?;
 
         // wait a little while for all the souplets to have joined together
@@ -407,7 +389,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             "&&".into(),
             "env".into(),
             "RUST_BACKTRACE=1".into(),
-            "target/release/vote".into(),
+            "/home/ubuntu/target/release/vote".into(),
             "--threads".into(),
             threads,
             "--articles".into(),
@@ -492,8 +474,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                     base_cmd,
                     tail_cmd
                 )
-            })
-            .collect();
+            }).collect();
         let voters = voters?;
 
         // let's see how we did
@@ -535,7 +516,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             let killed = servers[i].ssh.as_ref().unwrap().just_exec(&[
                 "pkill",
                 "-f",
-                "target/release/souplet",
+                "/home/ubuntu/target/release/souplet",
             ])?;
 
             if !killed.is_ok() {
@@ -590,8 +571,7 @@ impl ConvenientSession for tsunami::Session {
             .map(|&arg| match arg {
                 "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 _ => shellwords::escape(arg),
-            })
-            .collect();
+            }).collect();
         let cmd = cmd.join(" ");
         eprintln!("    :> {}", cmd);
 
