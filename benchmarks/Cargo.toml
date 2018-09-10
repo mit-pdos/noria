@@ -29,10 +29,10 @@ clap = "2.25.0"
 rand = "0.5.0"
 zipf = "4.0.0"
 # sampling
-hdrhistogram = { git = "https://github.com/ekmartin/HdrHistogram_rust", branch = "nom_4" }
+hdrhistogram = "6.1"
 # mssql
 futures-state-stream = "0.1"
-tiberius = { git = "https://github.com/steffengy/tiberius.git" }
+tiberius = "0.3"
 # mysql
 mysql = "14.0.0"
 # memcached
@@ -44,10 +44,9 @@ futures = "0.1.14"
 futures-cpupool = "0.1.8"
 tokio = "0.1"
 # ec2
-# once rusoto 0.34 is release, we can move to version deps here again
-rusoto_core = { git = "https://github.com/rusoto/rusoto.git" }
-rusoto_sts = { git = "https://github.com/rusoto/rusoto.git" }
-tsunami = { git = "https://github.com/jonhoo/tsunami" }
+rusoto_core = "0.34"
+rusoto_sts = "0.34"
+tsunami = "0.7.1"
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"
