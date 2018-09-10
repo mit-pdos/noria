@@ -110,6 +110,12 @@ where
                 RMT_R
                     .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
                     .unwrap();
+                // tokio relies heavily on TLS, and Runtime can't be dropped while TLS teardown is
+                // happening: https://gitter.im/tokio-rs/dev?at=5b96e0af7189ae6fdda687b6
+                // so, we drop it explicitly here.
+                CLIENT.with(|c| {
+                    *c.borrow_mut() = None;
+                });
                 ts.4.wait();
             }).create()
     };
