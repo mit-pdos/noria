@@ -176,10 +176,6 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             assert!(cores > for_gen);
             cores - for_gen
         }).expect("could not determine client core count");
-    let scores = args
-        .value_of("stype")
-        .and_then(ec2_instance_type_cores)
-        .expect("could not determine server core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::new(Region::UsEast1);
