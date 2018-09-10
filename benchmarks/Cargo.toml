@@ -6,6 +6,9 @@ version = "0.0.1"
 authors = ["The Distributary Developers"]
 edition = '2018'
 
+[features]
+orchestration = ["rusoto_core", "rusoto_sts", "tsunami"]
+
 [dependencies]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
@@ -44,9 +47,9 @@ futures = "0.1.14"
 futures-cpupool = "0.1.8"
 tokio = "0.1"
 # ec2
-rusoto_core = "0.34"
-rusoto_sts = "0.34"
-tsunami = "0.7.1"
+rusoto_core = { optional = true, version = "0.34" }
+rusoto_sts = { optional = true, version = "0.34" }
+tsunami = { optional = true, version = "0.7.1" }
 timeout-readwrite = "0.1"
 ctrlc = "3.1"
 failure = "0.1"
@@ -58,14 +61,17 @@ path = "vote/main.rs"
 [[bin]]
 name = "vote-distributed"
 path = "vote/distributed.rs"
+required-features = ["orchestration"]
 
 [[bin]]
 name = "vote-eintopf"
 path = "vote/eintopf.rs"
+required-features = ["orchestration"]
 
 [[bin]]
 name = "vote-orchestrator"
 path = "vote/orchestrator.rs"
+required-features = ["orchestration"]
 
 [[bin]]
 name = "tpc_w"
