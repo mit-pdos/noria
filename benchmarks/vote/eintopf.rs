@@ -150,15 +150,12 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             host.just_exec(&["git", "-C", "eintopf", "reset", "--hard", "2>&1"])
                 .context("git reset")?
                 .map_err(failure::err_msg)?;
-            host.just_exec(&[
-                "git",
-                "-C",
-                "eintopf",
-                "checkout",
-                "open_loop_query",
-                "2>&1",
-            ]).context("git pull")?
-            .map_err(failure::err_msg)?;
+            host.just_exec(&["git", "-C", "eintopf", "pull", "2>&1"])
+                .context("git fetch")?
+                .map_err(failure::err_msg)?;
+            host.just_exec(&["git", "-C", "eintopf", "checkout", "dataplane", "2>&1"])
+                .context("git pull")?
+                .map_err(failure::err_msg)?;
             host.just_exec(&["git", "-C", "eintopf", "pull", "2>&1"])
                 .context("git pull")?
                 .map_err(failure::err_msg)?;
