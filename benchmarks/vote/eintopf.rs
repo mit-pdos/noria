@@ -215,8 +215,9 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
 
         // let's see how we did
         let mut outf = File::create(&format!(
-            "eintopf-12s.{}.{}h.log",
+            "eintopf-12s.{}.{}t.{}h.log",
             if skewed { "skewed" } else { "uniform" },
+            nservers as usize * target_per_client,
             nservers,
         ))?;
 
