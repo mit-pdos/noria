@@ -534,14 +534,19 @@ fn main() {
                         .help("Soup deployment ID."),
                 ),
         ).subcommand(
-            SubCommand::with_name("memcached").arg(
-                Arg::with_name("address")
-                    .long("address")
-                    .takes_value(true)
-                    .required(true)
-                    .default_value("127.0.0.1:11211")
-                    .help("Address of memcached"),
-            ),
+            SubCommand::with_name("memcached")
+                .arg(
+                    Arg::with_name("address")
+                        .long("address")
+                        .takes_value(true)
+                        .required(true)
+                        .default_value("127.0.0.1:11211")
+                        .help("Address of memcached"),
+                ).arg(
+                    Arg::with_name("fast")
+                        .long("fast")
+                        .help("Only fetch vote counts, not titles."),
+                ),
         ).subcommand(
             SubCommand::with_name("mssql")
                 .arg(

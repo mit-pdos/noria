@@ -3,14 +3,15 @@ use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
 use memcached;
 use memcached::proto::{MultiOperation, ProtoType};
 
-pub struct Constructor(String);
-pub struct Client(memcached::Client);
+pub struct Constructor(String, bool);
+pub struct Client(memcached::Client, bool);
 
 impl VoteClientConstructor for Constructor {
     type Instance = Client;
 
     fn new(params: &Parameters, args: &clap::ArgMatches) -> Self {
         let addr = args.value_of("address").unwrap();
+        let fast = args.is_present("fast");
 
         if params.prime {
             // prepop
@@ -44,12 +45,12 @@ impl VoteClientConstructor for Constructor {
             }
         }
 
-        Constructor(addr.to_string())
+        Constructor(addr.to_string(), fast)
     }
 
     fn make(&mut self) -> Self::Instance {
         memcached::Client::connect(&[(&format!("tcp://{}", self.0), 1)], ProtoType::Binary)
-            .map(Client)
+            .map(|c| Client(c, self.1))
             .unwrap()
     }
 }
@@ -67,30 +68,47 @@ impl VoteClient for Client {
     }
 
     fn handle_reads(&mut self, ids: &[i32]) {
-        let keys: Vec<_> = ids
-            .into_iter()
-            .flat_map(|article_id| {
-                vec![
-                    format!("article_{}", article_id),
-                    format!("article_{}_vc", article_id),
-                ]
-            }).collect();
-        let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
-
         let mut rows = 0;
-        let vals = self.0.get_multi(&keys[..]).unwrap();
-        for (i, key) in keys.iter().enumerate() {
-            if i % 2 == 1 {
-                // already read
-                continue;
-            }
+        if self.1 {
+            // fast -- don't fetch titles
+            let keys: Vec<_> = ids
+                .into_iter()
+                .flat_map(|article_id| vec![format!("article_{}_vc", article_id)])
+                .collect();
+            let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
 
-            // title (vc has key i+1)
-            match (vals.get(&**key), vals.get(keys[i + 1])) {
-                (Some(_), Some(_)) => {
+            let vals = self.0.get_multi(&keys[..]).unwrap();
+            for key in keys {
+                if vals.get(key).is_some() {
                     rows += 1;
                 }
-                _ => {}
+            }
+        } else {
+            // slow -- also fetch titles
+            let keys: Vec<_> = ids
+                .into_iter()
+                .flat_map(|article_id| {
+                    vec![
+                        format!("article_{}", article_id),
+                        format!("article_{}_vc", article_id),
+                    ]
+                }).collect();
+            let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
+
+            let vals = self.0.get_multi(&keys[..]).unwrap();
+            for (i, key) in keys.iter().enumerate() {
+                if i % 2 == 1 {
+                    // already read
+                    continue;
+                }
+
+                // title (vc has key i+1)
+                match (vals.get(&**key), vals.get(keys[i + 1])) {
+                    (Some(_), Some(_)) => {
+                        rows += 1;
+                    }
+                    _ => {}
+                }
             }
         }
         assert_eq!(rows, ids.len());
