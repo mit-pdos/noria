@@ -123,7 +123,7 @@ fn main() {
                 .short("a")
                 .long("articles")
                 .value_name("N")
-                .default_value("2000000")
+                .default_value("500000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
         ).arg(
@@ -428,7 +428,7 @@ fn main() {
         b.wait_limit(time::Duration::from_secs(2 * 60));
     }
 
-    b.set_max_duration(4);
+    b.set_max_duration(6);
     b.run_as(provider, |mut hosts| {
         let server = hosts.remove("server").unwrap().swap_remove(0);
         let clients = hosts.remove("client").unwrap();
