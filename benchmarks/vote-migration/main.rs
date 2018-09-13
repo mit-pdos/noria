@@ -318,6 +318,39 @@ fn main() {
         let narticles = value_t_or_exit!(args, "narticles", usize);
         let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
 
+        // do the ones we need for the paper first
+        eprintln!("==> full no reuse (zipf)");
+        s.partial = false;
+        s.stupid = true;
+        one(
+            &s,
+            true,
+            &args,
+            Some(
+                fs::File::create(format!("vote-no-partial-stupid-{}M.zipf1.08.log", mills))
+                    .unwrap(),
+            ),
+        );
+        eprintln!("==> partial with reuse (uniform)");
+        s.partial = true;
+        s.stupid = false;
+        one(
+            &s,
+            false,
+            &args,
+            Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
+        );
+        eprintln!("==> partial with reuse (zipf)");
+        s.partial = true;
+        s.stupid = false;
+        one(
+            &s,
+            true,
+            &args,
+            Some(fs::File::create(format!("vote-partial-reuse-{}M.zipf1.08.log", mills)).unwrap()),
+        );
+
+        // then the rest
         eprintln!("==> full no reuse (uniform)");
         s.partial = false;
         s.stupid = true;
@@ -340,18 +373,6 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        eprintln!("==> full no reuse (zipf)");
-        s.partial = false;
-        s.stupid = true;
-        one(
-            &s,
-            true,
-            &args,
-            Some(
-                fs::File::create(format!("vote-no-partial-stupid-{}M.zipf1.08.log", mills))
-                    .unwrap(),
-            ),
-        );
         eprintln!("==> full with reuse (zipf)");
         s.partial = false;
         s.stupid = false;
@@ -372,15 +393,6 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-stupid-{}M.uniform.log", mills)).unwrap()),
         );
-        eprintln!("==> partial with reuse (uniform)");
-        s.partial = true;
-        s.stupid = false;
-        one(
-            &s,
-            false,
-            &args,
-            Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
-        );
         eprintln!("==> partial no reuse (zipf)");
         s.partial = true;
         s.stupid = true;
@@ -389,15 +401,6 @@ fn main() {
             true,
             &args,
             Some(fs::File::create(format!("vote-partial-stupid-{}M.zipf1.08.log", mills)).unwrap()),
-        );
-        eprintln!("==> partial with reuse (zipf)");
-        s.partial = true;
-        s.stupid = false;
-        one(
-            &s,
-            true,
-            &args,
-            Some(fs::File::create(format!("vote-partial-reuse-{}M.zipf1.08.log", mills)).unwrap()),
         );
     } else {
         let skewed = args.is_present("skewed");
