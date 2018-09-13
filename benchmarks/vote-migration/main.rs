@@ -253,59 +253,70 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
 fn main() {
     use clap::{App, Arg};
 
-    let args =
-        App::new("vote")
-            .version("0.1")
-            .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
-            .arg(
-                Arg::with_name("narticles")
-                    .short("a")
-                    .long("articles")
-                    .takes_value(true)
-                    .default_value("100000")
-                    .help("Number of articles to prepopulate the database with"),
-            ).arg(
-                Arg::with_name("runtime")
-                    .short("r")
-                    .long("runtime")
-                    .required(true)
-                    .takes_value(true)
-                    .help("Benchmark runtime in seconds"),
-            ).arg(
-                Arg::with_name("migrate")
-                    .short("m")
-                    .long("migrate")
-                    .required(true)
-                    .takes_value(true)
-                    .help("Perform a migration after this many seconds")
-                    .conflicts_with("stage"),
-            ).arg(
-                Arg::with_name("verbose")
-                    .short("v")
-                    .help("Enable verbose logging output"),
-            ).arg(Arg::with_name("all").long("just-do-it").help(
-                "Run all interesting benchmarks and store results to appropriately named files.",
-            )).arg(
-                Arg::with_name("skewed")
-                    .long("skewed")
-                    .conflicts_with("all")
-                    .help("Run with a skewed id distribution"),
-            ).arg(
-                Arg::with_name("full")
-                    .long("full")
-                    .conflicts_with("all")
-                    .help("Disable partial materialization"),
-            ).arg(
-                Arg::with_name("stupid")
-                    .long("stupid")
-                    .conflicts_with("all")
-                    .help("Make the migration stupid"),
-            ).arg(
-                Arg::with_name("shards")
-                    .long("shards")
-                    .takes_value(true)
-                    .help("Use N-way sharding."),
-            ).get_matches();
+    let args = App::new("vote")
+        .version("0.1")
+        .about("Benchmarks user-curated news aggregator throughput for in-memory Soup")
+        .arg(
+            Arg::with_name("narticles")
+                .short("a")
+                .long("articles")
+                .takes_value(true)
+                .default_value("100000")
+                .help("Number of articles to prepopulate the database with"),
+        ).arg(
+            Arg::with_name("runtime")
+                .short("r")
+                .long("runtime")
+                .required(true)
+                .takes_value(true)
+                .help("Benchmark runtime in seconds"),
+        ).arg(
+            Arg::with_name("migrate")
+                .short("m")
+                .long("migrate")
+                .required(true)
+                .takes_value(true)
+                .help("Perform a migration after this many seconds")
+                .conflicts_with("stage"),
+        ).arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .help("Enable verbose logging output"),
+        ).arg(
+            Arg::with_name("relevant")
+                .long("just-do-it")
+                .help(
+                    "Run all interesting benchmarks and store \
+                     results to appropriately named files.",
+                ).conflicts_with("all"),
+        ).arg(
+            Arg::with_name("all")
+                .long("do-it-all")
+                .help(
+                    "Run all benchmarks and store \
+                     results to appropriately named files.",
+                ).conflicts_with("relevant"),
+        ).arg(
+            Arg::with_name("skewed")
+                .long("skewed")
+                .conflicts_with("all")
+                .help("Run with a skewed id distribution"),
+        ).arg(
+            Arg::with_name("full")
+                .long("full")
+                .conflicts_with("all")
+                .help("Disable partial materialization"),
+        ).arg(
+            Arg::with_name("stupid")
+                .long("stupid")
+                .conflicts_with("all")
+                .help("Make the migration stupid"),
+        ).arg(
+            Arg::with_name("shards")
+                .long("shards")
+                .takes_value(true)
+                .help("Use N-way sharding."),
+        ).get_matches();
 
     // set config options
     let mut s = graph::Setup::default();
@@ -314,7 +325,7 @@ fn main() {
         .map(|_| value_t_or_exit!(args, "shards", usize));
     s.logging = args.is_present("verbose");
 
-    if args.is_present("all") {
+    if args.is_present("all") || args.is_present("relevant") {
         let narticles = value_t_or_exit!(args, "narticles", usize);
         let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
 
@@ -349,6 +360,10 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-reuse-{}M.zipf1.08.log", mills)).unwrap()),
         );
+
+        if !args.is_present("all") {
+            return;
+        }
 
         // then the rest
         eprintln!("==> full no reuse (uniform)");
