@@ -204,7 +204,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let stat = stat.clone();
         let barrier = barrier.clone();
         thread::spawn(move || {
-            let n = 10;
+            let n = 100;
             let mut hits = 0;
             let mut rng = rand::thread_rng();
             let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
@@ -230,7 +230,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     stat.send(("HITF", hits as f64 / count as f64)).unwrap();
                     hits = 0;
                 }
-                thread::sleep(time::Duration::new(0, 10_000));
+                thread::sleep(time::Duration::new(0, 10_000_000));
             }
         })
     };
