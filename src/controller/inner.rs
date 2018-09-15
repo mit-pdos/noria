@@ -13,6 +13,7 @@ use std::{io, time};
 use api::builders::*;
 use api::ActivationResult;
 use crate::controller::migrate::materialization::Materializations;
+use crate::controller::migrate::NUM_READER_REPLICAS;
 use crate::controller::{ControllerState, DomainHandle, Migration, Recipe, WorkerIdentifier};
 use crate::coordination::CoordinationMessage;
 
@@ -898,7 +899,7 @@ impl ControllerInner {
         graphviz(&self.ingredients, &self.materializations)
     }
 
-    fn remove_leaf(&mut self, mut leaf: NodeIndex) -> Result<(), String> {
+    fn remove_leaf(&mut self, leaf: NodeIndex) -> Result<(), String> {
         let mut removals = vec![];
         let start = leaf;
         assert!(!self.ingredients[leaf].is_source());
@@ -909,6 +910,7 @@ impl ControllerInner {
             leaf.index()
         );
 
+        let mut nodes = vec![];
         if self
             .ingredients
             .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
@@ -938,30 +940,38 @@ impl ControllerInner {
                 );
                 unreachable!();
             }
-            // nodes can have only one reader attached
-            assert!(readers.len() <= 1);
+            // nodes can only have as many readers as the number of reader replicas
+            assert!(readers.len() <= NUM_READER_REPLICAS);
             debug!(
                         self.log,
                         "Removing query leaf \"{}\"", self.ingredients[leaf].name();
                         "node" => leaf.index(),
                     );
             if !readers.is_empty() {
-                removals.push(readers[0]);
-                leaf = readers[0];
+                for reader in readers {
+                    removals.push(reader);
+                    nodes.push(reader);
+                }
             } else {
                 unreachable!();
             }
         }
 
-        // `node` now does not have any children any more
-        assert_eq!(
-            self.ingredients
-                .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .count(),
-            0
-        );
+        // If the start node didn't have any children, it can be removed immediately
+        if nodes.is_empty() {
+            nodes.push(leaf);
+        }
 
-        let mut nodes = vec![leaf];
+        // The nodes we remove first do not have children any more
+        for node in &nodes {
+            assert_eq!(
+                self.ingredients
+                    .neighbors_directed(*node, petgraph::EdgeDirection::Outgoing)
+                    .count(),
+                0
+            );
+        }
+
         while let Some(node) = nodes.pop() {
             let mut parents = self
                 .ingredients

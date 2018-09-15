@@ -1,5 +1,6 @@
 use basics::DataType;
 use consensus::LocalAuthority;
+use crate::controller::migrate::NUM_READER_REPLICAS;
 use crate::controller::recipe::Recipe;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::{ControllerBuilder, LocalControllerHandle};
@@ -2260,7 +2261,7 @@ fn remove_query() {
     let mut g = ControllerBuilder::default().build_local().unwrap();
     g.install_recipe(r_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 2);
+    assert_eq!(g.outputs().unwrap().len(), 2 * NUM_READER_REPLICAS);
 
     let mut mutb = g.table("b").unwrap();
     let mut qa = g.view("qa").unwrap();
@@ -2277,7 +2278,7 @@ fn remove_query() {
     // Remove qb and check that the graph still functions as expected.
     g.install_recipe(r2_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), 1 * NUM_READER_REPLICAS);
     assert!(g.view("qb").is_err());
 
     mutb.insert(vec![42.into(), "6".into(), "7".into()])
