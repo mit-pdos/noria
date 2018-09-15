@@ -35,9 +35,7 @@ pub struct Reader {
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
-    // TODO(ygina): derive number of replicas directly from graph structure
-    replica_i: usize,
-    replicas: usize,
+    is_replica: bool,
     state: Option<Vec<usize>>,
 }
 
@@ -49,21 +47,19 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
-            replica_i: self.replica_i,
-            replicas: self.replicas,
+            is_replica: self.is_replica,
         }
     }
 }
 
 impl Reader {
-    pub fn new(for_node: NodeIndex, replica_i: usize, replicas: usize) -> Self {
+    pub fn new(for_node: NodeIndex, is_replica: bool) -> Self {
         Reader {
             writer: None,
             streamers: Vec::new(),
             state: None,
             for_node,
-            replica_i,
-            replicas,
+            is_replica,
         }
     }
 
@@ -73,12 +69,8 @@ impl Reader {
         self.for_node
     }
 
-    pub fn replica_index(&self) -> usize {
-        self.replica_i
-    }
-
-    pub fn replicas(&self) -> usize {
-        self.replicas
+    pub fn is_replica(&self) -> bool {
+        self.is_replica
     }
 
     #[allow(dead_code)]
@@ -97,8 +89,7 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
-            replica_i: self.replica_i,
-            replicas: self.replicas,
+            is_replica: self.is_replica,
         }
     }
 

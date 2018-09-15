@@ -28,6 +28,7 @@ pub struct Node {
     taken: bool,
 
     sharded_by: Sharding,
+    replicas: Vec<NodeIndex>,
 }
 
 // constructors
@@ -50,6 +51,7 @@ impl Node {
             taken: false,
 
             sharded_by: Sharding::None,
+            replicas: Vec::new(),
         }
     }
 
@@ -104,6 +106,11 @@ impl Node {
     /// Set this node's sharding property.
     pub fn shard_by(&mut self, s: Sharding) {
         self.sharded_by = s;
+    }
+
+    /// Add a reader replica to this node.
+    pub fn add_replica(&mut self, ni: NodeIndex) {
+        self.replicas.push(ni)
     }
 
     pub fn on_commit(&mut self, remap: &HashMap<NodeIndex, IndexPair>) {
@@ -331,6 +338,25 @@ impl Node {
     }
 }
 
+// reader replication
+impl Node {
+    pub fn has_replicas(&self) -> bool {
+        !self.replicas.is_empty()
+    }
+
+    pub fn num_replicas(&self) -> usize {
+        self.replicas.len()
+    }
+
+    pub fn get_replicas(&self) -> &[NodeIndex] {
+        &self.replicas[..]
+    }
+
+    pub fn is_replica(&self) -> bool {
+        self.with_reader(|r| r.is_replica()).unwrap_or(false)
+    }
+}
+
 // is this or that?
 impl Node {
     pub fn is_source(&self) -> bool {
@@ -371,11 +397,6 @@ impl Node {
         } else {
             false
         }
-    }
-
-    pub fn is_reader_replica(&self) -> bool {
-        self.with_reader(|r| r.replica_index() > 0)
-            .unwrap_or(false)
     }
 
     pub fn is_ingress(&self) -> bool {

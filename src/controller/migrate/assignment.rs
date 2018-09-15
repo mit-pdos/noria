@@ -110,7 +110,7 @@ pub fn assign(
                 };
             }
 
-            if n.is_reader_replica() {
+            if n.is_replica() {
                 // replicas are always in their own domain to distribute the load.
                 return next_domain();
             }

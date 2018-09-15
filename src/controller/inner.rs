@@ -518,27 +518,12 @@ impl ControllerInner {
     }
 
     fn find_view_for(&self, node: NodeIndex) -> Option<NodeIndex> {
-        // reader should be a child of the given node. however, due to sharding, it may not be an
-        // *immediate* child. furthermore, once we go beyond depth 1, we may accidentally hit an
-        // *unrelated* reader node. to account for this, readers keep track of what node they are
-        // "for", and we simply search for the appropriate reader by that metric. since we know
-        // that the reader must be relatively close, a BFS search is the way to go.
-        let mut bfs = Bfs::new(&self.ingredients, node);
-        let mut readers = vec![];
-        while let Some(child) = bfs.next(&self.ingredients) {
-            if self.ingredients[child]
-                .with_reader(|r| r.is_for() == node)
-                .unwrap_or(false)
-            {
-                readers.push(child);
-
-                // Exit the loop if we've found all the replicas.
-                let replicas = self.ingredients[child].with_reader(|r| r.replicas()).unwrap();
-                if readers.len() == replicas {
-                    break;
-                }
-            }
-        }
+        // reader should be a child of the given node. however, due to sharding and replication,
+        // it may not be an *immediate* child. furthermore, once we go beyond depth 1, we may
+        // accidentally hit an *unrelated* reader node. to account for this, nodes cache their
+        // readers so we can easily query data.
+        // TODO(ygina): Does this break sharding?
+        let readers = self.ingredients[node].get_replicas();
 
         // TODO(ygina): select a reader more smartly, or randomly.
         // Always select the first reader in the list, if it exists.

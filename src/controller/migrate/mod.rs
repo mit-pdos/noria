@@ -216,7 +216,8 @@ impl<'a> Migration<'a> {
             // make a reader and its replicas
             let mut readers = vec![];
             for i in 0..NUM_READER_REPLICAS {
-                let r = node::special::Reader::new(n, i, NUM_READER_REPLICAS);
+                let is_replica = i > 0;
+                let r = node::special::Reader::new(n, is_replica);
                 let r = if let Some(name) = name.clone() {
                     if i == 0 {
                         self.mainline.ingredients[n].named_mirror(r, name)
@@ -228,6 +229,7 @@ impl<'a> Migration<'a> {
                 };
                 let r = self.mainline.ingredients.add_node(r);
                 self.mainline.ingredients.add_edge(n, r, ());
+                self.mainline.ingredients[n].add_replica(r);
                 readers.push(r);
             }
             self.readers.insert(n, readers);
