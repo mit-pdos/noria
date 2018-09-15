@@ -13,7 +13,6 @@ use std::{io, time};
 use api::builders::*;
 use api::ActivationResult;
 use crate::controller::migrate::materialization::Materializations;
-use crate::controller::migrate::NUM_READER_REPLICAS;
 use crate::controller::{ControllerState, DomainHandle, Migration, Recipe, WorkerIdentifier};
 use crate::coordination::CoordinationMessage;
 
@@ -918,6 +917,7 @@ impl ControllerInner {
         );
 
         let mut nodes = vec![];
+        let mut egress_node = None;
         if self
             .ingredients
             .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
@@ -934,12 +934,19 @@ impl ControllerInner {
                     if self.ingredients[*ni].is_reader() {
                         true
                     } else {
-                        has_non_reader_children = true;
+                        if egress_node.is_some() || !self.ingredients[*ni].is_egress() {
+                            has_non_reader_children = true;
+                        } else {
+                            egress_node = Some(ni.clone());
+                        }
                         false
                     }
                 }).collect();
             if has_non_reader_children {
-                // should never happen, since we remove nodes in reverse topological order
+                // The leaf node can only have non-reader children if its reader has replicas.
+                // Then the non-reader child is a single egress node that connects the leaf to
+                // replicas in other domains. Otherwise impossible, since we remove nodes in
+                // reverse topological order.
                 crit!(
                     self.log,
                     "not removing node {} yet, as it still has non-reader children",
@@ -947,8 +954,8 @@ impl ControllerInner {
                 );
                 unreachable!();
             }
-            // nodes can only have as many readers as the number of reader replicas
-            assert!(readers.len() <= NUM_READER_REPLICAS);
+            // nodes can only have one reader
+            assert!(readers.len() <= 1);
             debug!(
                         self.log,
                         "Removing query leaf \"{}\"", self.ingredients[leaf].name();
@@ -967,6 +974,24 @@ impl ControllerInner {
         // If the start node didn't have any children, it can be removed immediately
         if nodes.is_empty() {
             nodes.push(leaf);
+        }
+
+        // If there's an egress node, that means the reader replicas are on different domains.
+        // Remove all those leaf nodes as well.
+        match egress_node {
+            Some(ni) => {
+                let mut bfs = Bfs::new(&self.ingredients, ni);
+                while let Some(child) = bfs.next(&self.ingredients) {
+                    if self.ingredients
+                        .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
+                        .count() == 0
+                    {
+                        removals.push(child);
+                        nodes.push(child);
+                    }
+                }
+            },
+            None => {},
         }
 
         // The nodes we remove first do not have children any more
