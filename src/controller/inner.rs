@@ -525,18 +525,25 @@ impl ControllerInner {
         // "for", and we simply search for the appropriate reader by that metric. since we know
         // that the reader must be relatively close, a BFS search is the way to go.
         let mut bfs = Bfs::new(&self.ingredients, node);
-        let mut reader = None;
+        let mut readers = vec![];
         while let Some(child) = bfs.next(&self.ingredients) {
             if self.ingredients[child]
                 .with_reader(|r| r.is_for() == node)
                 .unwrap_or(false)
             {
-                reader = Some(child);
-                break;
+                readers.push(child);
+
+                // Exit the loop if we've found all the replicas.
+                let replicas = self.ingredients[child].with_reader(|r| r.replicas()).unwrap();
+                if readers.len() == replicas {
+                    break;
+                }
             }
         }
 
-        reader
+        // TODO(ygina): select a reader more smartly, or randomly.
+        // Always select the first reader in the list, if it exists.
+        readers.get(0).and_then(|r| Some(*r))
     }
 
     /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
