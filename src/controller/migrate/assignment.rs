@@ -18,6 +18,7 @@ pub fn assign(
     //
     //  - the child of a Sharder is always in a different domain from the sharder
     //  - shard merge nodes are never in the same domain as their sharded ancestors
+    //  - reader replicas are always in different domains from each other
 
     let mut topo_list = Vec::with_capacity(new.len());
     let mut topo = petgraph::visit::Topo::new(&*graph);
@@ -107,6 +108,11 @@ pub fn assign(
                     // there are no bases like us, so we need a new domain :'(
                     next_domain()
                 };
+            }
+
+            if n.is_reader_replica() {
+                // replicas are always in their own domain to distribute the load.
+                return next_domain();
             }
 
             if graph[node].name().starts_with("BOUNDARY_") {

@@ -373,6 +373,11 @@ impl Node {
         }
     }
 
+    pub fn is_reader_replica(&self) -> bool {
+        self.with_reader(|r| r.replica_index() > 0)
+            .unwrap_or(false)
+    }
+
     pub fn is_ingress(&self) -> bool {
         if let NodeType::Ingress = self.inner {
             true
