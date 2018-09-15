@@ -2188,7 +2188,7 @@ fn node_removal() {
         1,
     ));
     let mut g = b.build_local().unwrap();
-    let cid = g.migrate(|mig| {
+    let cids = g.migrate(|mig| {
         let a = mig.add_base("a", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
         let b = mig.add_base("b", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
 
@@ -2220,7 +2220,9 @@ fn node_removal() {
         vec![vec![1.into(), 2.into()]]
     );
 
-    g.remove_node(cid).unwrap();
+    for cid in cids {
+        g.remove_node(cid).unwrap();
+    }
 
     // update value again
     mutb.insert(vec![id.clone(), 4.into()]).unwrap();

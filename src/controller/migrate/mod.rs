@@ -44,6 +44,9 @@ pub(super) enum ColumnChange {
     Drop(usize),
 }
 
+/// The number of replicas per reader node, including the original reader node.
+pub const NUM_READER_REPLICAS: usize = 3;
+
 /// A `Migration` encapsulates a number of changes to the Soup data flow graph.
 ///
 /// Only one `Migration` can be in effect at any point in time. No changes are made to the running
@@ -52,7 +55,7 @@ pub struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
     pub(super) added: Vec<NodeIndex>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
-    pub(super) readers: HashMap<NodeIndex, NodeIndex>,
+    pub(super) readers: HashMap<NodeIndex, Vec<NodeIndex>>,
 
     pub(super) start: Instant,
     pub(super) log: slog::Logger,
@@ -210,16 +213,24 @@ impl<'a> Migration<'a> {
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
-            // make a reader
-            let r = node::special::Reader::new(n);
-            let r = if let Some(name) = name {
-                self.mainline.ingredients[n].named_mirror(r, name)
-            } else {
-                self.mainline.ingredients[n].mirror(r)
-            };
-            let r = self.mainline.ingredients.add_node(r);
-            self.mainline.ingredients.add_edge(n, r, ());
-            self.readers.insert(n, r);
+            // make a reader and its replicas
+            let mut readers = vec![];
+            for i in 0..NUM_READER_REPLICAS {
+                let r = node::special::Reader::new(n);
+                let r = if let Some(name) = name.clone() {
+                    if i == 0 {
+                        self.mainline.ingredients[n].named_mirror(r, name)
+                    } else {
+                        self.mainline.ingredients[n].named_mirror(r, format!("{}_r{}", name, i))
+                    }
+                } else {
+                    self.mainline.ingredients[n].mirror(r)
+                };
+                let r = self.mainline.ingredients.add_node(r);
+                self.mainline.ingredients.add_edge(n, r, ());
+                readers.push(r);
+            }
+            self.readers.insert(n, readers);
         }
     }
 
@@ -227,15 +238,17 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
-    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
+    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> Vec<NodeIndex> {
         self.ensure_reader_for(n, None);
-        let ri = self.readers[&n];
+        let ris = &self.readers[&n];
 
-        self.mainline.ingredients[ri]
-            .with_reader_mut(|r| r.set_key(key))
-            .unwrap();
+        for ri in ris {
+            self.mainline.ingredients[*ri]
+                .with_reader_mut(|r| r.set_key(key))
+                .unwrap();
+        }
 
-        ri
+        ris.to_vec()
     }
 
     /// Set up the given node such that its output can be efficiently queried.
@@ -244,11 +257,13 @@ impl<'a> Migration<'a> {
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
         self.ensure_reader_for(n, Some(name));
 
-        let ri = self.readers[&n];
+        let ris = &self.readers[&n];
 
-        self.mainline.ingredients[ri]
-            .with_reader_mut(|r| r.set_key(key))
-            .unwrap();
+        for ri in ris {
+            self.mainline.ingredients[*ri]
+                .with_reader_mut(|r| r.set_key(key))
+                .unwrap();
+        }
     }
 
     /// Commit the changes introduced by this `Migration` to the master `Soup`.
@@ -265,8 +280,10 @@ impl<'a> Migration<'a> {
         let mut new: HashSet<_> = self.added.into_iter().collect();
 
         // Readers are nodes too.
-        for (_parent, reader) in self.readers {
-            new.insert(reader);
+        for (_parent, readers) in self.readers {
+            for reader in readers {
+                new.insert(reader);
+            }
         }
 
         // Shard the graph as desired
