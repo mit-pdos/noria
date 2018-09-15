@@ -2044,7 +2044,7 @@ fn recipe_activates_and_migrates() {
     // still one base node
     assert_eq!(g.inputs().unwrap().len(), 1);
     // two leaf nodes
-    assert_eq!(g.outputs().unwrap().len(), 2);
+    assert_eq!(g.outputs().unwrap().len(), 2 * NUM_READER_REPLICAS);
 }
 
 #[test]
@@ -2064,7 +2064,7 @@ fn recipe_activates_and_migrates_with_join() {
     // still two base nodes
     assert_eq!(g.inputs().unwrap().len(), 2);
     // one leaf node
-    assert_eq!(g.outputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), 1 * NUM_READER_REPLICAS);
 }
 
 fn test_queries(test: &str, file: &'static str, shard: bool, reuse: bool, log: bool) {
