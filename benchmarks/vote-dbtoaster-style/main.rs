@@ -87,6 +87,7 @@ fn main() {
 
     let mut rng = rand::thread_rng();
     let mut v = g.graph.table("Vote").unwrap();
+    v.i_promise_dst_is_same_process();
 
     // start the benchmark
     let start = time::Instant::now();

@@ -621,6 +621,10 @@ fn main() {
                         .takes_value(false)
                         .help("Enable durability for Base nodes"),
                 ).arg(
+                    Arg::with_name("fudge-rpcs")
+                        .long("fudge-rpcs")
+                        .help("Send pointers instead of serializing data for writes"),
+                ).arg(
                     Arg::with_name("log-dir")
                         .long("log-dir")
                         .takes_value(true)
