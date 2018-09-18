@@ -55,7 +55,7 @@ fn main() {
     persistence.mode = DurabilityMode::MemoryOnly;
     let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
     persistence.flush_timeout = time::Duration::new(0, flush_ns);
-    persistence.queue_capacity = batch;
+    persistence.queue_capacity = 1;
     persistence.log_prefix = "vote-dbtoaster".to_string();
 
     // setup db
