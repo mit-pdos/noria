@@ -7,7 +7,7 @@ extern crate rand;
 #[path = "../vote/clients/localsoup/graph.rs"]
 mod graph;
 
-use distributary::{DataType, DurabilityMode, PersistenceParameters};
+use distributary::{DataType, DurabilityMode, PersistenceParameters, TableOperation};
 use rand::Rng;
 use std::{thread, time};
 
@@ -91,12 +91,16 @@ fn main() {
     // start the benchmark
     let start = time::Instant::now();
     let mut n = 0;
-    for _ in (0..votes).step_by(batch) {
-        v.insert_all(
-            (0..batch).map(|_| vec![DataType::from(rng.gen_range(0, articles) + 1), 0.into()]),
-        ).unwrap();
+    v.batch_insert_then_wait((0..votes).step_by(batch).map(|_| {
         n += batch;
-    }
+        (0..batch)
+            .map(|_| {
+                TableOperation::from(vec![
+                    DataType::from(rng.gen_range(0, articles) + 1),
+                    0.into(),
+                ])
+            }).collect()
+    })).unwrap();
     let took = start.elapsed();
 
     // all done!
