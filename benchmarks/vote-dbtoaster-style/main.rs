@@ -20,8 +20,7 @@ fn main() {
             Arg::with_name("articles")
                 .short("a")
                 .long("articles")
-                .value_name("N")
-                .default_value("100000")
+                .default_value("500000")
                 .help("Number of articles to prepopulate the database with"),
         ).arg(
             Arg::with_name("votes")
