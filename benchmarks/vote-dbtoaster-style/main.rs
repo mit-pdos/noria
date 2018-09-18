@@ -102,5 +102,5 @@ fn main() {
     // all done!
     println!("# votes: {}", n);
     println!("# took: {:?}", took);
-    println!("# achieved ops/s: {:.2}", n as u128 / took.as_nanos());
+    println!("# achieved ops/s: {:.2}", n as f64 / took.as_nanos() as f64);
 }
