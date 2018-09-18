@@ -104,6 +104,10 @@ name = "vote-migration"
 path = "vote-migration/main.rs"
 
 [[bin]]
+name = "vote-dbtoaster-style"
+path = "vote-dbtoaster-style/main.rs"
+
+[[bin]]
 name = "replay"
 path = "replay/main.rs"
 
