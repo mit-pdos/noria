@@ -77,11 +77,10 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
 
     // prepopulate
     eprintln!("Prepopulating with {} articles", narticles);
-    for i in 0..(narticles as i64) {
-        articles
-            .insert(vec![i.into(), format!("Article #{}", i).into()])
-            .unwrap();
-    }
+    articles
+        .batch_insert(
+            (0..narticles).map(|i| vec![(i as i32).into(), format!("Article #{}", i + 1).into()]),
+        ).unwrap();
 
     let (stat, stat_rx) = mpsc::channel();
     let barrier = Arc::new(Barrier::new(3));
