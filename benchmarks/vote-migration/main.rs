@@ -1,5 +1,7 @@
 #![feature(duration_as_u128)]
 
+const WRITE_BATCH_SIZE: usize = 1000;
+
 #[macro_use]
 extern crate clap;
 extern crate distributary;
@@ -95,36 +97,24 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             barrier.wait();
 
+            let mut reporter = Reporter::new(every);
             let start = time::Instant::now();
             while start.elapsed() < runtime {
                 let start_batch = time::Instant::now();
-                let end_batch = start_batch + every;
-                let batch = 500;
-                let mut n = 0;
                 votes
-                    .batch_insert_then_wait(
-                        (0..)
-                            .map(|i| {
-                                // always generate both so that we aren't artifically faster with one
-                                (0..batch)
-                                    .map(|ii| {
-                                        let id_uniform = rng.gen_range(0, narticles);
-                                        let id_zipf = zipf.sample(&mut rng);
-                                        let id = if skewed { id_zipf } else { id_uniform };
-                                        TableOperation::from(vec![
-                                            DataType::from(id),
-                                            (i + ii).into(),
-                                        ])
-                                    }).collect()
-                            }).take_while(|_| {
-                                n += batch;
-                                time::Instant::now() < end_batch
-                            }),
-                    ).unwrap();
+                    .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
+                        // always generate both so that we aren't artifically faster with one
+                        let id_uniform = rng.gen_range(0, narticles);
+                        let id_zipf = zipf.sample(&mut rng);
+                        let id = if skewed { id_zipf } else { id_uniform };
+                        TableOperation::from(vec![DataType::from(id), i.into()])
+                    })).unwrap();
 
-                let count_per_ns = n as f64 / every.as_nanos() as f64;
-                let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                stat.send(("OLD", count_per_s)).unwrap();
+                if let Some(count) = reporter.report(WRITE_BATCH_SIZE) {
+                    let count_per_ns = count as f64 / start_batch.elapsed().as_nanos() as f64;
+                    let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
+                    stat.send(("OLD", count_per_s)).unwrap();
+                }
             }
         })
     };
@@ -190,37 +180,23 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
             barrier.wait();
 
+            let mut reporter = Reporter::new(every);
             let start = time::Instant::now();
             while start.elapsed() < runtime {
                 let start_batch = time::Instant::now();
-                let end_batch = start_batch + every;
-                let batch = 500;
-                let mut n = 0;
                 ratings
-                    .batch_insert_then_wait(
-                        (0..)
-                            .map(|i| {
-                                // always generate both so that we aren't artifically faster with one
-                                (0..batch)
-                                    .map(|ii| {
-                                        let id_uniform = rng.gen_range(0, narticles);
-                                        let id_zipf = zipf.sample(&mut rng);
-                                        let id = if skewed { id_zipf } else { id_uniform };
-                                        TableOperation::from(vec![
-                                            DataType::from(id),
-                                            (i + ii).into(),
-                                            5.into(),
-                                        ])
-                                    }).collect()
-                            }).take_while(|_| {
-                                n += batch;
-                                time::Instant::now() < end_batch
-                            }),
-                    ).unwrap();
+                    .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
+                        let id_uniform = rng.gen_range(0, narticles);
+                        let id_zipf = zipf.sample(&mut rng);
+                        let id = if skewed { id_zipf } else { id_uniform };
+                        TableOperation::from(vec![DataType::from(id), i.into(), 5.into()])
+                    })).unwrap();
 
-                let count_per_ns = n as f64 / every.as_nanos() as f64;
-                let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                stat.send(("OLD", count_per_s)).unwrap();
+                if let Some(count) = reporter.report(WRITE_BATCH_SIZE) {
+                    let count_per_ns = count as f64 / start_batch.elapsed().as_nanos() as f64;
+                    let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
+                    stat.send(("NEW", count_per_s)).unwrap();
+                }
             }
         })
     };
