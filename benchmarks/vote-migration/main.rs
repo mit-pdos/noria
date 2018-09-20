@@ -100,7 +100,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                 let start_batch = time::Instant::now();
                 let end_batch = start_batch + every;
                 let batch = 500;
-                let mut n = -1;
+                let mut n = 0;
                 votes
                     .batch_insert_then_wait(
                         (0..)
@@ -118,12 +118,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                     }).collect()
                             }).take_while(|_| {
                                 n += batch;
-                                if n % 1000 == 0 {
-                                    // only check time every so often
-                                    time::Instant::now() < end_batch
-                                } else {
-                                    true
-                                }
+                                time::Instant::now() < end_batch
                             }),
                     ).unwrap();
 
@@ -200,7 +195,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                 let start_batch = time::Instant::now();
                 let end_batch = start_batch + every;
                 let batch = 500;
-                let mut n = -1;
+                let mut n = 0;
                 ratings
                     .batch_insert_then_wait(
                         (0..)
@@ -219,12 +214,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                     }).collect()
                             }).take_while(|_| {
                                 n += batch;
-                                if n % 1000 == 0 {
-                                    // only check time every so often
-                                    time::Instant::now() < end_batch
-                                } else {
-                                    true
-                                }
+                                time::Instant::now() < end_batch
                             }),
                     ).unwrap();
 
