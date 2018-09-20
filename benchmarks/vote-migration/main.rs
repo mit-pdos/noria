@@ -111,7 +111,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                 vec![id.into(), i.into()]
                             }).take_while(|_| {
                                 n += 1;
-                                if n % 10000 == 0 {
+                                if n % 1000 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
@@ -204,7 +204,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                 vec![id.into(), i.into(), 5.into()]
                             }).take_while(|_| {
                                 n += 1;
-                                if n % 10000 == 0 {
+                                if n % 1000 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
