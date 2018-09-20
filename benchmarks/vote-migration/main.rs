@@ -117,8 +117,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                         ])
                                     }).collect()
                             }).take_while(|_| {
-                                n += 1;
-                                if n % 100 == 0 {
+                                n += batch;
+                                if n % 1000 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
@@ -218,8 +218,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                                         ])
                                     }).collect()
                             }).take_while(|_| {
-                                n += 1;
-                                if n % 100 == 0 {
+                                n += batch;
+                                if n % 1000 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
