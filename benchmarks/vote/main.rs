@@ -638,12 +638,6 @@ fn main() {
                         .requires("durability")
                         .help("Do not delete the base node logs on exit."),
                 ).arg(
-                    Arg::with_name("write-batch-size")
-                        .long("write-batch-size")
-                        .takes_value(true)
-                        .default_value("512")
-                        .help("Size of batches processed at base nodes."),
-                ).arg(
                     Arg::with_name("flush-timeout")
                         .long("flush-timeout")
                         .takes_value(true)

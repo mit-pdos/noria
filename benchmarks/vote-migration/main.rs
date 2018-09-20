@@ -60,7 +60,6 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
 
     // default persistence (memory only)
     let mut persistence_params = distributary::PersistenceParameters::default();
-    persistence_params.queue_capacity = 1;
     persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
 
     // make the graph!

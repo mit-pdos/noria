@@ -249,12 +249,6 @@ fn main() {
                 .takes_value(false)
                 .help("Skips pre-population and instead uses already persisted data."),
         ).arg(
-            Arg::with_name("write-batch-size")
-                .long("write-batch-size")
-                .takes_value(true)
-                .default_value("512")
-                .help("Size of batches processed at base nodes."),
-        ).arg(
             Arg::with_name("zookeeper-address")
                 .long("zookeeper-address")
                 .takes_value(true)
@@ -295,7 +289,6 @@ fn main() {
     let mut persistence = PersistenceParameters::default();
     persistence.flush_timeout = Duration::new(0, flush_ns);
     persistence.persistence_threads = value_t_or_exit!(args, "persistence-threads", i32);
-    persistence.queue_capacity = value_t_or_exit!(args, "write-batch-size", usize);
     persistence.log_prefix = "replay".to_string();
     persistence.mode = if durable {
         DurabilityMode::Permanent
