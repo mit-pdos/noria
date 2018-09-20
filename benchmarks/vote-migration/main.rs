@@ -78,7 +78,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     // prepopulate
     eprintln!("Prepopulating with {} articles", narticles);
     articles
-        .batch_insert(
+        .insert_then_wait(
             (0..narticles).map(|i| vec![(i as i32).into(), format!("Article #{}", i + 1).into()]),
         ).unwrap();
 
@@ -93,25 +93,36 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
             let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
-            let mut reporter = Reporter::new(every);
             barrier.wait();
+
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                let n = 500;
+                let start_batch = time::Instant::now();
+                let end_batch = start_batch + every;
+                let mut n = -1;
                 votes
-                    .batch_insert((0..n).map(|i| {
-                        // always generate both so that we aren't artifically faster with one
-                        let id_uniform = rng.gen_range(0, narticles);
-                        let id_zipf = zipf.sample(&mut rng);
-                        let id = if skewed { id_zipf } else { id_uniform };
-                        vec![id.into(), i.into()]
-                    })).unwrap();
+                    .insert_then_wait(
+                        (0..)
+                            .map(|i| {
+                                // always generate both so that we aren't artifically faster with one
+                                let id_uniform = rng.gen_range(0, narticles);
+                                let id_zipf = zipf.sample(&mut rng);
+                                let id = if skewed { id_zipf } else { id_uniform };
+                                vec![id.into(), i.into()]
+                            }).take_while(|_| {
+                                n += 1;
+                                if n % 10000 == 0 {
+                                    // only check time every so often
+                                    time::Instant::now() < end_batch
+                                } else {
+                                    true
+                                }
+                            }),
+                    ).unwrap();
 
-                if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / every.as_nanos() as f64;
-                    let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                    stat.send(("OLD", count_per_s)).unwrap();
-                }
+                let count_per_ns = n as f64 / every.as_nanos() as f64;
+                let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
+                stat.send(("OLD", count_per_s)).unwrap();
             }
         })
     };
@@ -175,23 +186,36 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
             let zipf = ZipfDistribution::new(narticles, 1.08).unwrap();
-            let mut reporter = Reporter::new(every);
             barrier.wait();
-            while start.elapsed() < runtime {
-                let n = 500;
-                ratings
-                    .batch_insert((0..n).map(|i| {
-                        let id_uniform = rng.gen_range(0, narticles);
-                        let id_zipf = zipf.sample(&mut rng);
-                        let id = if skewed { id_zipf } else { id_uniform };
-                        vec![id.into(), i.into(), 5.into()]
-                    })).unwrap();
 
-                if let Some(count) = reporter.report(n) {
-                    let count_per_ns = count as f64 / every.as_nanos() as f64;
-                    let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
-                    stat.send(("NEW", count_per_s)).unwrap();
-                }
+            let start = time::Instant::now();
+            while start.elapsed() < runtime {
+                let start_batch = time::Instant::now();
+                let end_batch = start_batch + every;
+                let mut n = -1;
+                ratings
+                    .insert_then_wait(
+                        (0..)
+                            .map(|i| {
+                                // always generate both so that we aren't artifically faster with one
+                                let id_uniform = rng.gen_range(0, narticles);
+                                let id_zipf = zipf.sample(&mut rng);
+                                let id = if skewed { id_zipf } else { id_uniform };
+                                vec![id.into(), i.into(), 5.into()]
+                            }).take_while(|_| {
+                                n += 1;
+                                if n % 10000 == 0 {
+                                    // only check time every so often
+                                    time::Instant::now() < end_batch
+                                } else {
+                                    true
+                                }
+                            }),
+                    ).unwrap();
+
+                let count_per_ns = n as f64 / every.as_nanos() as f64;
+                let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
+                stat.send(("OLD", count_per_s)).unwrap();
             }
         })
     };
