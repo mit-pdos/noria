@@ -36,12 +36,6 @@ fn main() {
                 .default_value("2500")
                 .help("Size of batches"),
         ).arg(
-            Arg::with_name("flush-timeout")
-                .long("flush-timeout")
-                .takes_value(true)
-                .default_value("100000")
-                .help("Time to wait before processing a merged packet, in nanoseconds."),
-        ).arg(
             Arg::with_name("verbose")
                 .short("v")
                 .help("Include logging output"),
@@ -53,8 +47,8 @@ fn main() {
 
     let mut persistence = PersistenceParameters::default();
     persistence.mode = DurabilityMode::MemoryOnly;
-    let flush_ns = value_t_or_exit!(args, "flush-timeout", u32);
-    persistence.flush_timeout = time::Duration::new(0, flush_ns);
+    // force tuple-at-a-time
+    persistence.flush_timeout = time::Duration::new(0, 0);
     persistence.log_prefix = "vote-dbtoaster".to_string();
 
     // setup db

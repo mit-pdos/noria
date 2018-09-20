@@ -641,7 +641,7 @@ fn main() {
                     Arg::with_name("flush-timeout")
                         .long("flush-timeout")
                         .takes_value(true)
-                        .default_value("100000")
+                        .default_value("1000000")
                         .help("Time to wait before processing a merged packet, in nanoseconds."),
                 ).arg(
                     Arg::with_name("persistence-threads")
