@@ -182,7 +182,6 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             barrier.wait();
 
             let mut reporter = Reporter::new(every);
-            let start = time::Instant::now();
             while start.elapsed() < runtime {
                 ratings
                     .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
