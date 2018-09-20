@@ -9,7 +9,7 @@ extern crate zipf;
 #[path = "../vote/clients/localsoup/graph.rs"]
 mod graph;
 
-use distributary::DataType;
+use distributary::{DataType, TableOperation};
 use rand::{distributions::Distribution, Rng};
 use std::io::prelude::*;
 use std::sync::mpsc;
@@ -99,19 +99,26 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             while start.elapsed() < runtime {
                 let start_batch = time::Instant::now();
                 let end_batch = start_batch + every;
+                let batch = 500;
                 let mut n = -1;
                 votes
-                    .insert_then_wait(
+                    .batch_insert_then_wait(
                         (0..)
                             .map(|i| {
                                 // always generate both so that we aren't artifically faster with one
-                                let id_uniform = rng.gen_range(0, narticles);
-                                let id_zipf = zipf.sample(&mut rng);
-                                let id = if skewed { id_zipf } else { id_uniform };
-                                vec![id.into(), i.into()]
+                                (0..batch)
+                                    .map(|ii| {
+                                        let id_uniform = rng.gen_range(0, narticles);
+                                        let id_zipf = zipf.sample(&mut rng);
+                                        let id = if skewed { id_zipf } else { id_uniform };
+                                        TableOperation::from(vec![
+                                            DataType::from(id),
+                                            (i + ii).into(),
+                                        ])
+                                    }).collect()
                             }).take_while(|_| {
                                 n += 1;
-                                if n % 1000 == 0 {
+                                if n % 100 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
@@ -192,19 +199,27 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             while start.elapsed() < runtime {
                 let start_batch = time::Instant::now();
                 let end_batch = start_batch + every;
+                let batch = 500;
                 let mut n = -1;
                 ratings
-                    .insert_then_wait(
+                    .batch_insert_then_wait(
                         (0..)
                             .map(|i| {
                                 // always generate both so that we aren't artifically faster with one
-                                let id_uniform = rng.gen_range(0, narticles);
-                                let id_zipf = zipf.sample(&mut rng);
-                                let id = if skewed { id_zipf } else { id_uniform };
-                                vec![id.into(), i.into(), 5.into()]
+                                (0..batch)
+                                    .map(|ii| {
+                                        let id_uniform = rng.gen_range(0, narticles);
+                                        let id_zipf = zipf.sample(&mut rng);
+                                        let id = if skewed { id_zipf } else { id_uniform };
+                                        TableOperation::from(vec![
+                                            DataType::from(id),
+                                            (i + ii).into(),
+                                            5.into(),
+                                        ])
+                                    }).collect()
                             }).take_while(|_| {
                                 n += 1;
-                                if n % 1000 == 0 {
+                                if n % 100 == 0 {
                                     // only check time every so often
                                     time::Instant::now() < end_batch
                                 } else {
