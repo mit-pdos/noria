@@ -29,12 +29,14 @@ struct Reporter {
 }
 
 impl Reporter {
-    pub fn report(&mut self, n: usize) -> Option<usize> {
+    pub fn report(&mut self, n: usize) -> Option<(time::Duration, usize)> {
         self.count += n;
 
-        if self.last.elapsed() > self.every {
-            let count = Some(self.count);
-            self.last = time::Instant::now();
+        let now = time::Instant::now();
+        let elapsed = now - self.last;
+        if elapsed > self.every {
+            let count = Some((elapsed, self.count));
+            self.last = now;
             self.count = 0;
             count
         } else {
@@ -100,7 +102,6 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let mut reporter = Reporter::new(every);
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                let start_batch = time::Instant::now();
                 votes
                     .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
                         // always generate both so that we aren't artifically faster with one
@@ -110,8 +111,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         TableOperation::from(vec![DataType::from(id), i.into()])
                     })).unwrap();
 
-                if let Some(count) = reporter.report(WRITE_BATCH_SIZE) {
-                    let count_per_ns = count as f64 / start_batch.elapsed().as_nanos() as f64;
+                if let Some((took, count)) = reporter.report(WRITE_BATCH_SIZE) {
+                    let count_per_ns = count as f64 / took.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("OLD", count_per_s)).unwrap();
                 }
@@ -183,7 +184,6 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let mut reporter = Reporter::new(every);
             let start = time::Instant::now();
             while start.elapsed() < runtime {
-                let start_batch = time::Instant::now();
                 ratings
                     .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
                         let id_uniform = rng.gen_range(0, narticles);
@@ -192,8 +192,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         TableOperation::from(vec![DataType::from(id), i.into(), 5.into()])
                     })).unwrap();
 
-                if let Some(count) = reporter.report(WRITE_BATCH_SIZE) {
-                    let count_per_ns = count as f64 / start_batch.elapsed().as_nanos() as f64;
+                if let Some((took, count)) = reporter.report(WRITE_BATCH_SIZE) {
+                    let count_per_ns = count as f64 / took.as_nanos() as f64;
                     let count_per_s = count_per_ns * NANOS_PER_SEC as f64;
                     stat.send(("NEW", count_per_s)).unwrap();
                 }
@@ -229,7 +229,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                     }
                 }
 
-                if let Some(count) = reporter.report(n) {
+                if let Some((_, count)) = reporter.report(n) {
                     stat.send(("HITF", hits as f64 / count as f64)).unwrap();
                     hits = 0;
                 }
