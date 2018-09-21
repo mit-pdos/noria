@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time;
 
-const SOUP_AMI: &str = "ami-03f1fbf7b78d248c0";
+const SOUP_AMI: &str = "ami-05df93bcec8de09d8";
 
 fn main() {
     use clap::{App, Arg};
