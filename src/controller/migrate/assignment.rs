@@ -110,9 +110,11 @@ pub fn assign(
                 };
             }
 
-            if n.is_replica() {
-                // replicas are always in their own domain to distribute the load.
-                return next_domain();
+            // replicas are always in their own domain to distribute the load.
+            if let Some(index) = n.replica_index() {
+                if index > 0 {
+                    return next_domain();
+                }
             }
 
             if graph[node].name().starts_with("BOUNDARY_") {

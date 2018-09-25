@@ -352,8 +352,8 @@ impl Node {
         &self.replicas[..]
     }
 
-    pub fn is_replica(&self) -> bool {
-        self.with_reader(|r| r.is_replica()).unwrap_or(false)
+    pub fn replica_index(&self) -> Option<usize> {
+        self.with_reader(|r| r.replica_index()).unwrap_or(None)
     }
 }
 

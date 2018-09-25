@@ -35,7 +35,7 @@ pub struct Reader {
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
-    is_replica: bool,
+    replica_index: Option<usize>,
     state: Option<Vec<usize>>,
 }
 
@@ -47,19 +47,19 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
-            is_replica: self.is_replica,
+            replica_index: self.replica_index,
         }
     }
 }
 
 impl Reader {
-    pub fn new(for_node: NodeIndex, is_replica: bool) -> Self {
+    pub fn new(for_node: NodeIndex, replica_index: Option<usize>) -> Self {
         Reader {
             writer: None,
             streamers: Vec::new(),
             state: None,
             for_node,
-            is_replica,
+            replica_index,
         }
     }
 
@@ -69,8 +69,8 @@ impl Reader {
         self.for_node
     }
 
-    pub fn is_replica(&self) -> bool {
-        self.is_replica
+    pub fn replica_index(&self) -> Option<usize> {
+        self.replica_index
     }
 
     #[allow(dead_code)]
@@ -89,7 +89,7 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
-            is_replica: self.is_replica,
+            replica_index: self.replica_index,
         }
     }
 

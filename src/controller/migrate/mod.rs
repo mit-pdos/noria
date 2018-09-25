@@ -216,8 +216,8 @@ impl<'a> Migration<'a> {
             // make a reader and its replicas
             let mut readers = vec![];
             for i in 0..NUM_READER_REPLICAS {
-                let is_replica = i > 0;
-                let r = node::special::Reader::new(n, is_replica);
+                // TODO: replica index is None if there is exactly one replica
+                let r = node::special::Reader::new(n, Some(i));
                 let r = if let Some(name) = name.clone() {
                     if i == 0 {
                         self.mainline.ingredients[n].named_mirror(r, name)
