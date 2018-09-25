@@ -355,8 +355,31 @@ impl<'a> Migration<'a> {
             }
         }
         let swapped = swapped0;
-        let mut sorted_new = new.iter().collect::<Vec<_>>();
+
+        // First sort all the non replica nodes.
+        let mut new_non_replicas = HashSet::new();
+        let mut replica_map = HashMap::new();
+        for &ni in new.iter() {
+            if let Some(for_node) = mainline.ingredients[ni]
+                    .with_reader(|r| Some(r.is_for()))
+                    .unwrap_or(None) {
+                if let Some(_) = mainline.ingredients[ni].replica_index() {
+                    if !replica_map.contains_key(&for_node) {
+                        replica_map.insert(for_node, HashSet::new());
+                    }
+                    replica_map.get_mut(&for_node).unwrap().insert(ni);
+                }
+            } else {
+                new_non_replicas.insert(ni);
+            }
+        }
+
+        // Then group all the replica readers together.
+        let mut sorted_new = new_non_replicas.iter().collect::<Vec<_>>();
         sorted_new.sort();
+        for (_, readers) in &mut replica_map {
+            sorted_new.append(&mut readers.iter().collect::<Vec<_>>());
+        }
 
         // Find all nodes for domains that have changed
         let changed_domains: HashSet<DomainIndex> = sorted_new
