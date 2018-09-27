@@ -956,19 +956,14 @@ impl ControllerInner {
                     nodes.push(reader);
                 }
             } else {
-                unreachable!();
+                // The reader had replicas, which were all removed along with the egress node.
             }
         }
 
-        // If the start node didn't have any children, it can be removed immediately
-        if nodes.is_empty() {
-            nodes.push(leaf);
-        }
-
-        // If there's an egress node, that means the reader replicas are on different domains.
-        // Remove all those leaf nodes as well.
         match egress_node {
             Some(ni) => {
+                // If there's an egress node, that means the reader replicas are on different
+                // domains. Remove all those leaf nodes as well.
                 let mut bfs = Bfs::new(&self.ingredients, ni);
                 while let Some(child) = bfs.next(&self.ingredients) {
                     if self.ingredients
@@ -980,7 +975,12 @@ impl ControllerInner {
                     }
                 }
             },
-            None => {},
+            None => {
+                // If the start node didn't have any children, it can be removed immediately
+                if nodes.is_empty() {
+                    nodes.push(leaf);
+                }
+            },
         }
 
         // The nodes we remove first do not have children any more
