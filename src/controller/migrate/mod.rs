@@ -336,6 +336,45 @@ impl<'a> Migration<'a> {
         }
     }
 
+    /// Places the domains and their nodes on workers according to the round robin iterator. This
+    /// is used to ensure, for example, that replicas of the same reader and shards of the same
+    /// node end up on different workers. It is also currently used to approximately distribute
+    /// domains across the remaining workers equally. In the future, we'd like to place the domain
+    /// on the machine with the fewest domains already assigned. This does not take into account
+    /// replicas and shards that were NOT created for their very first time.
+    fn place_round_robin(
+            mainline: &'a mut ControllerInner,
+            log: &slog::Logger,
+            mut placer: &'a mut Box<Iterator<Item = (WorkerIdentifier, WorkerEndpoint)>>,
+            mut workers: &'a mut Vec<WorkerEndpoint>,
+            uninformed_domain_nodes: &mut HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
+            changed_domains: &HashSet<DomainIndex>) {
+        for domain in changed_domains {
+            if mainline.domains.contains_key(&domain) {
+                // this is not a new domain
+                continue;
+            }
+
+            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let d = DomainHandle::new(
+                *domain,
+                mainline.ingredients[nodes[0].0].sharded_by().shards(),
+                &log,
+                &mut mainline.ingredients,
+                &mainline.domain_config,
+                nodes,
+                &mainline.persistence,
+                &mainline.listen_addr,
+                &mainline.channel_coordinator,
+                &mainline.debug_channel,
+                &mut placer,
+                &mut workers,
+                mainline.epoch,
+            );
+            mainline.domains.insert(*domain, d);
+        }
+    }
+
     /// Commit the changes introduced by this `Migration` to the master `Soup`.
     ///
     /// This will spin up an execution thread for each new thread domain, and hook those new
@@ -522,30 +561,14 @@ impl<'a> Migration<'a> {
 
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
-        for domain in changed_domains {
-            if mainline.domains.contains_key(&domain) {
-                // this is not a new domain
-                continue;
-            }
-
-            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
-            let d = DomainHandle::new(
-                domain,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
-                &log,
-                &mut mainline.ingredients,
-                &mainline.domain_config,
-                nodes,
-                &mainline.persistence,
-                &mainline.listen_addr,
-                &mainline.channel_coordinator,
-                &mainline.debug_channel,
-                &mut placer,
-                &mut workers,
-                mainline.epoch,
-            );
-            mainline.domains.insert(domain, d);
-        }
+        Self::place_round_robin(
+            mainline,
+            &log,
+            &mut placer,
+            &mut workers,
+            &mut uninformed_domain_nodes,
+            &changed_domains,
+        );
 
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
         debug!(log, "mutating existing domains");
