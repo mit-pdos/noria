@@ -35,7 +35,9 @@ zipf = "4.0.0"
 hdrhistogram = "6.1"
 # mssql
 futures-state-stream = "0.1"
-tiberius = "0.3"
+# move back to versioned once a new release is cut after 0.3.0
+# https://github.com/steffengy/tiberius/issues/56#issuecomment-422475667
+tiberius = { git = "https://github.com/steffengy/tiberius.git" }
 # mysql
 mysql = "14.0.0"
 # memcached
@@ -100,6 +102,10 @@ path = "evict-o-rama/main.rs"
 [[bin]]
 name = "vote-migration"
 path = "vote-migration/main.rs"
+
+[[bin]]
+name = "vote-dbtoaster-style"
+path = "vote-dbtoaster-style/main.rs"
 
 [[bin]]
 name = "replay"

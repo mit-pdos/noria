@@ -621,6 +621,10 @@ fn main() {
                         .takes_value(false)
                         .help("Enable durability for Base nodes"),
                 ).arg(
+                    Arg::with_name("fudge-rpcs")
+                        .long("fudge-rpcs")
+                        .help("Send pointers instead of serializing data for writes"),
+                ).arg(
                     Arg::with_name("log-dir")
                         .long("log-dir")
                         .takes_value(true)
@@ -634,16 +638,10 @@ fn main() {
                         .requires("durability")
                         .help("Do not delete the base node logs on exit."),
                 ).arg(
-                    Arg::with_name("write-batch-size")
-                        .long("write-batch-size")
-                        .takes_value(true)
-                        .default_value("512")
-                        .help("Size of batches processed at base nodes."),
-                ).arg(
                     Arg::with_name("flush-timeout")
                         .long("flush-timeout")
                         .takes_value(true)
-                        .default_value("100000")
+                        .default_value("1000000")
                         .help("Time to wait before processing a merged packet, in nanoseconds."),
                 ).arg(
                     Arg::with_name("persistence-threads")

@@ -27,6 +27,7 @@ pub struct Setup {
     pub partial: bool,
     pub sharding: Option<usize>,
     pub logging: bool,
+    pub threads: Option<usize>,
 }
 
 impl Default for Setup {
@@ -36,6 +37,7 @@ impl Default for Setup {
             partial: true,
             sharding: None,
             logging: false,
+            threads: None,
         }
     }
 }
@@ -51,6 +53,9 @@ impl Setup {
         g.set_persistence(persistence_params);
         if self.logging {
             g.log_with(distributary::logger_pls());
+        }
+        if let Some(threads) = self.threads {
+            g.set_threads(threads);
         }
         let mut graph = g.build_local().unwrap();
 

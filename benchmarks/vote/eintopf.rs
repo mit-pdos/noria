@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time;
 
-const SOUP_AMI: &str = "ami-03f1fbf7b78d248c0";
+const SOUP_AMI: &str = "ami-05df93bcec8de09d8";
 
 fn main() {
     use clap::{App, Arg};
@@ -28,6 +28,13 @@ fn main() {
                 .default_value("100000")
                 .takes_value(true)
                 .help("Number of articles to prepopulate the database with"),
+        ).arg(
+            Arg::with_name("availability_zone")
+                .long("availability-zone")
+                .value_name("AZ")
+                .default_value("us-east-1a")
+                .takes_value(true)
+                .help("EC2 availability zone to use for launching instances"),
         ).arg(
             Arg::with_name("runtime")
                 .short("r")
@@ -126,6 +133,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
     let articles = value_t_or_exit!(args, "articles", usize);
     let shards = value_t_or_exit!(args, "shards", u16);
     let target_per_client = value_t_or_exit!(args, "target", usize);
+    let az = args.value_of("availability_zone").unwrap();
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::new(Region::UsEast1);
@@ -141,6 +149,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
 
     let mut b = tsunami::TsunamiBuilder::default();
     b.set_region(Region::UsEast1);
+    b.set_availability_zone(az);
     b.use_term_logger();
     b.add_set(
         "server",
