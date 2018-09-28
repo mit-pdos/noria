@@ -465,85 +465,17 @@ impl<'a> Migration<'a> {
         }
         let swapped = swapped0;
 
-        // First bucket the replica and non-replica nodes.
-        // TODO(ygina): There's a lot of duplicated ops and it's kinda ugly how we later manage
-        // to group the reader node with its ingress node.
-        let mut new_non_replicas_set = HashSet::new();
-        let mut replica_map = HashMap::new();
-        for &ni in new.iter() {
-            if let Some(for_node) = mainline.ingredients[ni]
-                    .with_reader(|r| Some(r.is_for()))
-                    .unwrap_or(None) {
-                // This is an ingress node to a reader replica.
-                if let Some(_) = mainline.ingredients[ni].replica_index() {
-                    if !replica_map.contains_key(&for_node) {
-                        replica_map.insert(for_node, HashSet::new());
-                    }
-                    replica_map.get_mut(&for_node).unwrap().insert(ni);
-                }
-            } else {
-                new_non_replicas_set.insert(ni);
-            }
-        }
-
-        // TODO(ygina): why was this sorted before?
-        let new_non_replicas = new_non_replicas_set.iter().collect::<Vec<_>>();
-        let mut new_replicas = Vec::new();
-        for (_, readers) in &mut replica_map {
-            new_replicas.append(&mut readers.iter().collect::<Vec<_>>());
-        }
-
-        let mut domain_new_non_replicas = new_non_replicas
+        // Assign local addresses to all new nodes, and initialize them.
+        let mut domain_new_nodes = new
             .iter()
-            .filter(|&&&ni| ni != mainline.source)
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
-            .fold(HashMap::new(), |mut dns, (d, ni)| {
-                debug!(log, "pushing {} {}", d.index(), ni.index());
-                dns.entry(d).or_insert_with(Vec::new).push(ni);
-                dns
-            });
-
-        let mut domain_new_replicas = new_replicas
-            .iter()
-            .filter(|&&&ni| ni != mainline.source)
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
+            .filter(|&ni| *ni != mainline.source)
+            .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
+            .map(|&ni| (mainline.ingredients[ni].domain(), ni))
             .fold(HashMap::new(), |mut dns, (d, ni)| {
                 dns.entry(d).or_insert_with(Vec::new).push(ni);
                 dns
             });
-
-        for (domain, nodes) in &mut domain_new_replicas {
-            // Each replica (an ingress node and the reader node) should be in its own domain.
-            // This domain should be new, and no other nodes should be placed in this domain.
-            // Move the reader node from non replicas to be with the ingress node in replicas.
-            let mut reader = domain_new_non_replicas.remove(&domain).unwrap();
-            assert_eq!(reader.len(), 1);
-            assert_eq!(nodes.len(), 1);
-            assert!(!mainline.domains.contains_key(&domain));
-            nodes.append(&mut reader);
-        }
-
-        // Find all nodes for domains that have changed
-        let changed_domains_non_replicas: Vec<DomainIndex> = new_non_replicas
-            .iter()
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| mainline.ingredients[ni].domain())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        let changed_domains_replicas: Vec<DomainIndex> = new_replicas
-            .iter()
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| mainline.ingredients[ni].domain())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        // Assign local addresses to all new nodes, and initialize them
-        Self::assign_local_addresses(&mut mainline, &log, &mut domain_new_non_replicas, &swapped);
-        Self::assign_local_addresses(&mut mainline, &log, &mut domain_new_replicas, &swapped);
+        Self::assign_local_addresses(&mut mainline, &log, &mut domain_new_nodes, &swapped);
         if let Some(shards) = mainline.sharding {
             sharding::validate(&log, &mainline.ingredients, mainline.source, &new, shards)
         };
@@ -596,6 +528,72 @@ impl<'a> Migration<'a> {
         let mut placer: Box<Iterator<Item = (WorkerIdentifier, WorkerEndpoint)>> =
             Box::new(placer_workers.into_iter().cycle());
 
+        // Bucket reader replica nodes and the non-replica nodes separately.
+        let mut replica_map = HashMap::new();
+        let mut other_nodes = HashSet::new();
+        for &ni in new
+                .iter()
+                .filter(|&&ni| ni != mainline.source)
+                .filter(|&&ni| !mainline.ingredients[ni].is_dropped())
+                .into_iter() {
+            // Check if the node is a reader, and then insert it in the replica map. The value
+            // is a list of readers that are for the same node, and the key is the node the
+            // readers are for. Later, we will also add the associated ingress node to the replica
+            // map, since readers are all located on their own domains.
+            if let Some(for_node) = mainline.ingredients[ni]
+                    .with_reader(|r| Some(r.is_for()))
+                    .unwrap_or(None) {
+                if mainline.ingredients[ni].replica_index().is_some() {
+                    replica_map.entry(for_node).or_insert(HashSet::new());
+                    replica_map.get_mut(&for_node).unwrap().insert(ni);
+                }
+            } else {
+                other_nodes.insert(ni);
+            }
+        }
+
+        // Obtain a vec of DomainIndexes in the order that we want to assign them to workers.
+        // For replicas, all replicas for the same reader should be consecutive. For non-replicas,
+        // it doesn't really matter unless we want the ordering to be deterministic.
+        let mut changed_domains_replicas = Vec::new();
+        for (_, readers) in &mut replica_map {
+            let mut domains = readers
+                .iter()
+                .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
+                .map(|&ni| mainline.ingredients[ni].domain())
+                .collect::<Vec<_>>();
+            changed_domains_replicas.append(&mut domains);
+        }
+        let changed_domains_other = other_nodes
+            .iter()
+            .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
+            .map(|&ni| mainline.ingredients[ni].domain())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .filter(|&domain| !changed_domains_replicas.contains(&domain))
+            .collect::<Vec<_>>();
+
+        // Check invariants on the (non)-replica data structures. Each changed replica domain
+        // should be just created. The domain should contain the reader node and its ingress node,
+        // and no other nodes. Also, each new reader node should be in a unique domain.
+        assert_eq!(
+            changed_domains_replicas.len(),
+            changed_domains_replicas.iter().collect::<HashSet<_>>().len()
+        );
+        for domain in &changed_domains_replicas {
+            assert!(!mainline.domains.contains_key(&domain));
+            let nodes: &Vec<_> = uninformed_domain_nodes.get(&domain).unwrap();
+            assert_eq!(nodes.len(), 2);
+            let (ni_a, _) = nodes.get(0).unwrap();
+            let (ni_b, _) = nodes.get(1).unwrap();
+            assert!(
+                (mainline.ingredients[*ni_a].is_reader()
+                    && mainline.ingredients[*ni_b].is_ingress())
+                || (mainline.ingredients[*ni_a].is_ingress()
+                    && mainline.ingredients[*ni_b].is_reader())
+            );
+        }
+
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
         Self::place_round_robin(
@@ -612,7 +610,7 @@ impl<'a> Migration<'a> {
             &mut placer,
             &mut workers,
             &mut uninformed_domain_nodes,
-            &changed_domains_non_replicas,
+            &changed_domains_other,
         );
 
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
