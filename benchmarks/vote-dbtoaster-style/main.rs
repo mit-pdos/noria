@@ -22,24 +22,28 @@ fn main() {
                 .long("articles")
                 .default_value("500000")
                 .help("Number of articles to prepopulate the database with"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("votes")
                 .index(1)
                 .value_name("VOTES")
                 .default_value("50000000")
                 .help("Number of votes to issue"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("batch-size")
                 .short("b")
                 .long("batch-size")
                 .takes_value(true)
                 .default_value("2500")
                 .help("Size of batches"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .help("Include logging output"),
-        ).get_matches();
+        )
+        .get_matches();
 
     let articles = value_t_or_exit!(args, "articles", usize);
     let votes = value_t_or_exit!(args, "votes", usize);
@@ -70,7 +74,8 @@ fn main() {
             ((i + 1) as i32).into(),
             format!("Article #{}", i + 1).into(),
         ]
-    })).unwrap();
+    }))
+    .unwrap();
     if args.is_present("verbose") {
         eprintln!("==> done with prepopulation");
     }
@@ -93,8 +98,10 @@ fn main() {
                     DataType::from(rng.gen_range(0, articles) + 1),
                     0.into(),
                 ])
-            }).collect()
-    })).unwrap();
+            })
+            .collect()
+    }))
+    .unwrap();
     let took = start.elapsed();
 
     // all done!

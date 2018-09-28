@@ -43,7 +43,8 @@ fn populate_table(backend: &mut Backend, data: &Path, use_txn: bool) -> usize {
                 .map(|s| match i64::from_str(s) {
                     Ok(v) => v.into(),
                     Err(_) => s.into(),
-                }).collect();
+                })
+                .collect();
             do_put(&mut putter, use_txn)(rec);
         }
         i += 1;

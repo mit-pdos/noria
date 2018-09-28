@@ -65,7 +65,8 @@ impl VoteClientConstructor for Constructor {
                 m.batch_insert(
                     (id..end)
                         .map(|i| vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]),
-                ).unwrap();
+                )
+                .unwrap();
                 id = end;
             }
         }
@@ -116,7 +117,8 @@ impl VoteClient for Client {
                         .map(|_rows| {
                             // TODO
                             //assert_eq!(rows.map(|rows| rows.len()), Ok(1));
-                        }).count();
+                        })
+                        .count();
                     assert_eq!(rows, ids.len());
                     break;
                 }

@@ -68,7 +68,8 @@ impl VoteClientConstructor for Constructor {
                 ((i + 1) as i32).into(),
                 format!("Article #{}", i + 1).into(),
             ]
-        })).unwrap();
+        }))
+        .unwrap();
         if verbose {
             println!("Done with prepopulation");
         }
@@ -121,7 +122,8 @@ impl VoteClient for Client {
             .map(|_rows| {
                 // TODO
                 //assert_eq!(rows.map(|rows| rows.len()), Ok(1));
-            }).count();
+            })
+            .count();
         assert_eq!(rows, ids.len());
     }
 }

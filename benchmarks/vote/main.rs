@@ -97,7 +97,8 @@ where
                 CLIENT.with(|c| {
                     *c.borrow_mut() = Some(Box::new(cc.lock().unwrap().make()));
                 })
-            }).before_stop(move || {
+            })
+            .before_stop(move || {
                 SJRN_W
                     .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
                     .unwrap();
@@ -117,7 +118,8 @@ where
                     *c.borrow_mut() = None;
                 });
                 ts.4.wait();
-            }).create()
+            })
+            .create()
     };
 
     let generators: Vec<_> = (0..ngen)
@@ -151,8 +153,10 @@ where
                         )
                     };
                     ops
-                }).unwrap()
-        }).collect();
+                })
+                .unwrap()
+        })
+        .collect();
 
     drop(pool);
     let mut ops = 0.0;
@@ -372,7 +376,8 @@ where
                         queued_w.split_off(0),
                         queued_w_keys.split_off(0),
                         true,
-                    )).forget();
+                    ))
+                    .forget();
                 }
 
                 if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
@@ -381,7 +386,8 @@ where
                         queued_r.split_off(0),
                         queued_r_keys.split_off(0),
                         false,
-                    )).forget();
+                    ))
+                    .forget();
                 }
 
                 // since next_send = Some, we better have sent at least one batch!
@@ -461,33 +467,38 @@ fn main() {
                 .value_name("N")
                 .default_value("100000")
                 .help("Number of articles to prepopulate the database with"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
                 .value_name("N")
                 .default_value("4")
                 .help("Number of client load threads to run"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
                 .value_name("N")
                 .default_value("30")
                 .help("Benchmark runtime in seconds"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("warmup")
                 .long("warmup")
                 .takes_value(true)
                 .default_value("10")
                 .help("Warmup time in seconds"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("distribution")
                 .short("d")
                 .possible_values(&["uniform", "skewed"])
                 .default_value("uniform")
                 .help("Key distribution"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("histogram")
                 .long("histogram")
                 .help("Output serialized HdrHistogram to a file")
@@ -497,26 +508,31 @@ fn main() {
                      There are four histograms, written out in order: \
                      sojourn-write, sojourn-read, remote-write, and remote-read",
                 ),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("ops")
                 .long("target")
                 .default_value("1000000")
                 .help("Target operations per second"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("ratio")
                 .long("write-every")
                 .default_value("19")
                 .value_name("N")
                 .help("1-in-N chance of a write"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("no-prime")
                 .long("no-prime")
                 .help("Indicates that the client should not set up the database"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("no-early-exit")
                 .long("no-early-exit")
                 .help("Don't stop generating load when clients fall behind."),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("netsoup")
                 .arg(
                     Arg::with_name("zookeeper")
@@ -526,14 +542,16 @@ fn main() {
                         .required(true)
                         .default_value("127.0.0.1:2181")
                         .help("Address of Zookeeper instance"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("deployment")
                         .long("deployment")
                         .required(true)
                         .takes_value(true)
                         .help("Soup deployment ID."),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("memcached")
                 .arg(
                     Arg::with_name("address")
@@ -542,12 +560,14 @@ fn main() {
                         .required(true)
                         .default_value("127.0.0.1:11211")
                         .help("Address of memcached"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("fast")
                         .long("fast")
                         .help("Only fetch vote counts, not titles."),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("mssql")
                 .arg(
                     Arg::with_name("address")
@@ -556,8 +576,10 @@ fn main() {
                         .required(true)
                         .default_value(
                             "server=tcp:127.0.0.1,1433;username=SA;TrustServerCertificate=true;",
-                        ).help("Address of MsSQL server"),
-                ).arg(
+                        )
+                        .help("Address of MsSQL server"),
+                )
+                .arg(
                     Arg::with_name("database")
                         .long("database")
                         .takes_value(true)
@@ -565,7 +587,8 @@ fn main() {
                         .default_value("soup")
                         .help("MsSQL database to use"),
                 ),
-        ).subcommand(SubCommand::with_name("null"))
+        )
+        .subcommand(SubCommand::with_name("null"))
         .subcommand(
             SubCommand::with_name("mysql")
                 .arg(
@@ -575,7 +598,8 @@ fn main() {
                         .required(true)
                         .default_value("127.0.0.1:3306")
                         .help("Address of MySQL server"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("database")
                         .long("database")
                         .takes_value(true)
@@ -583,7 +607,8 @@ fn main() {
                         .default_value("soup")
                         .help("MySQL database to use"),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("hybrid")
                 .arg(
                     Arg::with_name("memcached-address")
@@ -592,14 +617,16 @@ fn main() {
                         .required(true)
                         .default_value("127.0.0.1:11211")
                         .help("Address of memcached"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("mysql-address")
                         .long("mysql-address")
                         .takes_value(true)
                         .required(true)
                         .default_value("127.0.0.1:3306")
                         .help("Address of MySQL server"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("database")
                         .long("database")
                         .takes_value(true)
@@ -607,7 +634,8 @@ fn main() {
                         .default_value("soup")
                         .help("MySQL database to use"),
                 ),
-        ).subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("localsoup")
                 .arg(
                     Arg::with_name("shards")
@@ -615,51 +643,60 @@ fn main() {
                         .takes_value(true)
                         .default_value("2")
                         .help("Shard the graph this many ways (0 = disable sharding)."),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("durability")
                         .long("durability")
                         .takes_value(false)
                         .help("Enable durability for Base nodes"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("fudge-rpcs")
                         .long("fudge-rpcs")
                         .help("Send pointers instead of serializing data for writes"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("log-dir")
                         .long("log-dir")
                         .takes_value(true)
                         .help(
                             "Absolute path to the directory where the log files will be written.",
                         ),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("retain-logs-on-exit")
                         .long("retain-logs-on-exit")
                         .takes_value(false)
                         .requires("durability")
                         .help("Do not delete the base node logs on exit."),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("flush-timeout")
                         .long("flush-timeout")
                         .takes_value(true)
                         .default_value("1000000")
                         .help("Time to wait before processing a merged packet, in nanoseconds."),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("persistence-threads")
                         .long("persistence-threads")
                         .takes_value(true)
                         .default_value("1")
                         .help("Number of background threads used by PersistentState."),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("stupid")
                         .long("stupid")
                         .help("Make the migration stupid")
                         .requires("migrate"),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("verbose")
                         .short("v")
                         .help("Include logging output"),
                 ),
-        ).get_matches();
+        )
+        .get_matches();
 
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::Constructor>(&args, largs),

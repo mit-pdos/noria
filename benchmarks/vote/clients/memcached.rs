@@ -33,7 +33,8 @@ impl VoteClientConstructor for Constructor {
                             format!("article_{}_vc", article_id),
                             b"0",
                         )
-                    }).collect();
+                    })
+                    .collect();
                 let mut m = BTreeMap::new();
                 for &(ref tkey, ref title, ref vck, ref vc) in &articles {
                     m.insert(tkey.as_bytes(), (title.as_bytes(), 0, 0));
@@ -92,7 +93,8 @@ impl VoteClient for Client {
                         format!("article_{}", article_id),
                         format!("article_{}_vc", article_id),
                     ]
-                }).collect();
+                })
+                .collect();
             let keys: Vec<_> = keys.iter().map(|k| k.as_bytes()).collect();
 
             let vals = self.0.get_multi(&keys[..]).unwrap();
