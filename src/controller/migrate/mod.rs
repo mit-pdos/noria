@@ -465,11 +465,14 @@ impl<'a> Migration<'a> {
         let swapped = swapped0;
 
         // Assign local addresses to all new nodes, and initialize them.
-        let mut domain_new_nodes = new
+        let mut sorted_new = new.iter().collect::<Vec<_>>();
+        sorted_new.sort();
+
+        let mut domain_new_nodes = sorted_new
             .iter()
-            .filter(|&ni| *ni != mainline.source)
-            .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
-            .map(|&ni| (mainline.ingredients[ni].domain(), ni))
+            .filter(|&&&ni| ni != mainline.source)
+            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
+            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
             .fold(HashMap::new(), |mut dns, (d, ni)| {
                 dns.entry(d).or_insert_with(Vec::new).push(ni);
                 dns
@@ -530,10 +533,10 @@ impl<'a> Migration<'a> {
         // Bucket reader replica nodes and the non-replica nodes separately.
         let mut replica_map = HashMap::new();
         let mut other_nodes = HashSet::new();
-        for &ni in new
+        for &&ni in sorted_new
                 .iter()
-                .filter(|&&ni| ni != mainline.source)
-                .filter(|&&ni| !mainline.ingredients[ni].is_dropped())
+                .filter(|&&&ni| ni != mainline.source)
+                .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
                 .into_iter() {
             // Check if the node is a reader, and then insert it in the replica map. The value
             // is a list of readers that are for the same node, and the key is the node the
