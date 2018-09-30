@@ -243,7 +243,8 @@ impl Reader {
                             .map(|r| r.into())
                             .collect(),
                     )
-                }.is_ok()
+                }
+                .is_ok()
             });
         }
     }

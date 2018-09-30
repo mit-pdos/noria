@@ -17,9 +17,11 @@ fn traverse(path: &Path) -> Vec<PathBuf> {
         let path = entry.path();
         if path.is_file() {
             match path.extension() {
-                Some(e) => if e.to_str().unwrap() == "php" || e.to_str().unwrap() == "inc" {
-                    files.push(path.clone())
-                },
+                Some(e) => {
+                    if e.to_str().unwrap() == "php" || e.to_str().unwrap() == "inc" {
+                        files.push(path.clone())
+                    }
+                }
                 _ => (),
             }
         } else if path.is_dir() {
@@ -84,7 +86,8 @@ fn reformat(queries: Vec<(String, String)>) -> Vec<(String, String)> {
             } else {
                 (qn, q.to_string())
             }
-        }).collect()
+        })
+        .collect()
 }
 
 const SKIP_FILES: [&str; 1] = ["test02.php"];
@@ -104,21 +107,24 @@ fn main() {
                 .index(1)
                 .help("Location of the HotCRP code to work on.")
                 .required(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("output")
                 .short("o")
                 .long("output")
                 .value_name("FILE")
                 .help("Location to write output recipe to.")
                 .required(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("git_rev")
                 .short("g")
                 .long("git_rev")
                 .value_name("REV")
                 .help("Git revision that we're extracting for.")
                 .required(true),
-        ).get_matches();
+        )
+        .get_matches();
 
     let path = matches.value_of("source").unwrap();
     let output = matches.value_of("output").unwrap();

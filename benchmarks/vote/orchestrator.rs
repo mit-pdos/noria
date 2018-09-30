@@ -264,7 +264,8 @@ fn main() {
                 2 => 1,
                 n => n - 1,
             }
-        }).expect("could not determine client core count");
+        })
+        .expect("could not determine client core count");
 
     // https://github.com/rusoto/rusoto/blob/master/AWS-CREDENTIALS.md
     let sts = StsClient::new(Region::UsEast1);
@@ -299,7 +300,8 @@ fn main() {
                     "sudo",
                     "tee",
                     "/proc/sys/kernel/kptr_restrict",
-                ])?.is_ok();
+                ])?
+                .is_ok();
                 host.just_exec(&[
                     "echo",
                     "-1",
@@ -307,14 +309,16 @@ fn main() {
                     "sudo",
                     "tee",
                     "/proc/sys/kernel/perf_event_paranoid",
-                ])?.is_ok();
+                ])?
+                .is_ok();
 
                 // get flamegraph
                 host.just_exec(&[
                     "git",
                     "clone",
                     "https://github.com/brendangregg/FlameGraph.git",
-                ])?.is_ok();
+                ])?
+                .is_ok();
             }
 
             eprintln!(" -> setting up mssql ramdisk");
@@ -332,7 +336,8 @@ fn main() {
                     "--bin",
                     "souplet",
                     "2>&1",
-                ])?.is_ok();
+                ])?
+                .is_ok();
                 Ok(())
             };
 
@@ -343,7 +348,8 @@ fn main() {
             }
 
             Ok(())
-        }).as_user("ubuntu"),
+        })
+        .as_user("ubuntu"),
     );
     let xctype = ctype.to_string();
     b.add_set(
@@ -367,7 +373,8 @@ fn main() {
                     "--bin",
                     "vote",
                     "2>&1",
-                ])?.is_ok();
+                ])?
+                .is_ok();
                 Ok(())
             };
 
@@ -378,7 +385,8 @@ fn main() {
             }
 
             Ok(())
-        }).as_user("ubuntu"),
+        })
+        .as_user("ubuntu"),
     );
 
     // what backends are we benchmarking?
@@ -394,7 +402,8 @@ fn main() {
                 eprintln!("unknown backend '{}' specified", b);
                 None
             }
-        }).collect()
+        })
+        .collect()
     } else {
         vec![
             Backend::Memcached,
@@ -558,7 +567,8 @@ fn main() {
             match timeout_readwrite::TimeoutReader::new(
                 io::stdin(),
                 Some(time::Duration::from_secs(10)),
-            ).read(&mut [0u8])
+            )
+            .read(&mut [0u8])
             {
                 Ok(_) => {
                     // user pressed enter to interrupt
@@ -577,7 +587,8 @@ fn main() {
         }
 
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 // returns true if next target is feasible
@@ -685,7 +696,8 @@ fn run_clients(
                     }
                 }
             },
-        ).collect();
+        )
+        .collect();
 
     // wait for warmup to finish
     thread::sleep(time::Duration::from_secs(params.warmup as u64));
@@ -979,7 +991,8 @@ impl ConvenientSession for tsunami::Session {
                 "&" | "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
                 arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
-            }).collect();
+            })
+            .collect();
         let cmd = cmd.join(" ");
         eprintln!("    :> {}", cmd);
 

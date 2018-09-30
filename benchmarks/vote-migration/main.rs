@@ -84,7 +84,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     articles
         .insert_then_wait(
             (0..narticles).map(|i| vec![(i as i32).into(), format!("Article #{}", i + 1).into()]),
-        ).unwrap();
+        )
+        .unwrap();
 
     let (stat, stat_rx) = mpsc::channel();
     let barrier = Arc::new(Barrier::new(3));
@@ -109,7 +110,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         let id_zipf = zipf.sample(&mut rng);
                         let id = if skewed { id_zipf } else { id_uniform };
                         TableOperation::from(vec![DataType::from(id), i.into()])
-                    })).unwrap();
+                    }))
+                    .unwrap();
 
                 if let Some((took, count)) = reporter.report(WRITE_BATCH_SIZE) {
                     let count_per_ns = count as f64 / took.as_nanos() as f64;
@@ -189,7 +191,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         let id_zipf = zipf.sample(&mut rng);
                         let id = if skewed { id_zipf } else { id_uniform };
                         TableOperation::from(vec![DataType::from(id), i.into(), 5.into()])
-                    })).unwrap();
+                    }))
+                    .unwrap();
 
                 if let Some((took, count)) = reporter.report(WRITE_BATCH_SIZE) {
                     let count_per_ns = count as f64 / took.as_nanos() as f64;
@@ -218,7 +221,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         let id_uniform = rng.gen_range(0, narticles);
                         let id_zipf = zipf.sample(&mut rng);
                         vec![DataType::from(if skewed { id_zipf } else { id_uniform })]
-                    }).collect();
+                    })
+                    .collect();
                 match read_new.multi_lookup(ids, false) {
                     Ok(rss) => {
                         hits += rss.into_iter().filter(|rs| !rs.is_empty()).count();
@@ -265,14 +269,16 @@ fn main() {
                 .takes_value(true)
                 .default_value("100000")
                 .help("Number of articles to prepopulate the database with"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("runtime")
                 .short("r")
                 .long("runtime")
                 .required(true)
                 .takes_value(true)
                 .help("Benchmark runtime in seconds"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("migrate")
                 .short("m")
                 .long("migrate")
@@ -280,45 +286,55 @@ fn main() {
                 .takes_value(true)
                 .help("Perform a migration after this many seconds")
                 .conflicts_with("stage"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .help("Enable verbose logging output"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("relevant")
                 .long("just-do-it")
                 .help(
                     "Run all interesting benchmarks and store \
                      results to appropriately named files.",
-                ).conflicts_with("all"),
-        ).arg(
+                )
+                .conflicts_with("all"),
+        )
+        .arg(
             Arg::with_name("all")
                 .long("do-it-all")
                 .help(
                     "Run all benchmarks and store \
                      results to appropriately named files.",
-                ).conflicts_with("relevant"),
-        ).arg(
+                )
+                .conflicts_with("relevant"),
+        )
+        .arg(
             Arg::with_name("skewed")
                 .long("skewed")
                 .conflicts_with("all")
                 .help("Run with a skewed id distribution"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("full")
                 .long("full")
                 .conflicts_with("all")
                 .help("Disable partial materialization"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("stupid")
                 .long("stupid")
                 .conflicts_with("all")
                 .help("Make the migration stupid"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("shards")
                 .long("shards")
                 .takes_value(true)
                 .help("Use N-way sharding."),
-        ).get_matches();
+        )
+        .get_matches();
 
     // set config options
     let mut s = graph::Setup::default();

@@ -83,14 +83,16 @@ impl VoteClientConstructor for Conf {
                              title varchar(16) NOT NULL
                              );",
                     )
-                }).and_then(|(_, conn)| {
+                })
+                .and_then(|(_, conn)| {
                     conn.simple_exec(
                         "CREATE TABLE vt (
                              u bigint NOT NULL,
                              id bigint NOT NULL index vt_article_idx
                              );",
                     )
-                }).and_then(|(_, conn)| {
+                })
+                .and_then(|(_, conn)| {
                     conn.simple_exec(
                         "CREATE VIEW dbo.awvc WITH SCHEMABINDING AS
                                 SELECT art.id, art.title, COUNT_BIG(*) AS votes
@@ -98,7 +100,8 @@ impl VoteClientConstructor for Conf {
                                 WHERE art.id = vt.id
                                 GROUP BY art.id, art.title;",
                     )
-                }).and_then(|(_, conn)| {
+                })
+                .and_then(|(_, conn)| {
                     conn.simple_exec("CREATE UNIQUE CLUSTERED INDEX ix ON dbo.awvc (id);")
                 });
             let mut conn = rt.block_on(fut).unwrap().1;
