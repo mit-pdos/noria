@@ -2,7 +2,7 @@ extern crate clap;
 extern crate nom_sql;
 extern crate regex;
 
-extern crate distributary;
+extern crate noria;
 #[macro_use]
 extern crate slog;
 
@@ -97,7 +97,7 @@ fn main() {
     use std::fs::File;
     use std::io::Write;
 
-    let log = distributary::logger_pls();
+    let log = noria::logger_pls();
 
     let matches = App::new("extract_queries")
         .version("0.1")

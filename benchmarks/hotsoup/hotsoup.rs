@@ -5,7 +5,7 @@ extern crate clap;
 #[macro_use]
 extern crate slog;
 
-use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
+use noria::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     blacklist: Vec<String>,
@@ -31,7 +31,7 @@ fn make(blacklist: &str, sharding: bool, partial: bool) -> Box<Backend> {
 
     // set up graph
     let mut b = ControllerBuilder::default();
-    let log = distributary::logger_pls();
+    let log = noria::logger_pls();
     let blender_log = log.clone();
     b.log_with(blender_log);
     if !sharding {

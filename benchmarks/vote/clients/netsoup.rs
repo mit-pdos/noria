@@ -1,7 +1,7 @@
 use clap;
 use crate::clients::localsoup::graph::RECIPE;
 use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
-use distributary::{self, ControllerHandle, DataType, ZookeeperAuthority};
+use noria::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use failure::Error;
 
 use std::thread;
@@ -9,9 +9,9 @@ use std::time::Duration;
 
 pub(crate) struct Client {
     c: Constructor,
-    r: distributary::View<distributary::ExclusiveConnection>,
+    r: noria::View<noria::ExclusiveConnection>,
     #[allow(dead_code)]
-    w: distributary::Table<distributary::ExclusiveConnection>,
+    w: noria::Table<noria::ExclusiveConnection>,
 }
 
 type Handle = ControllerHandle<ZookeeperAuthority>;
@@ -19,14 +19,14 @@ type Handle = ControllerHandle<ZookeeperAuthority>;
 fn make_mutator(
     c: &mut Handle,
     view: &str,
-) -> Result<distributary::Table<distributary::ExclusiveConnection>, Error> {
+) -> Result<noria::Table<noria::ExclusiveConnection>, Error> {
     Ok(c.table(view)?.into_exclusive()?)
 }
 
 fn make_getter(
     c: &mut Handle,
     view: &str,
-) -> Result<distributary::View<distributary::ExclusiveConnection>, Error> {
+) -> Result<noria::View<noria::ExclusiveConnection>, Error> {
     Ok(c.view(view)?.into_exclusive()?)
 }
 

@@ -1,4 +1,4 @@
-use distributary::{
+use noria::{
     self, ControllerBuilder, LocalAuthority, LocalControllerHandle, NodeIndex,
     PersistenceParameters,
 };
@@ -52,7 +52,7 @@ impl Setup {
         g.set_sharding(self.sharding);
         g.set_persistence(persistence_params);
         if self.logging {
-            g.log_with(distributary::logger_pls());
+            g.log_with(noria::logger_pls());
         }
         if let Some(threads) = self.threads {
             g.set_threads(threads);

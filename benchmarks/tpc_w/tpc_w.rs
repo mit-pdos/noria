@@ -12,7 +12,7 @@ use std::{thread, time};
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
 
-use distributary::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
+use noria::{ControllerBuilder, LocalAuthority, LocalControllerHandle};
 
 pub struct Backend {
     r: String,
@@ -65,7 +65,7 @@ fn make(
     // set up graph
     let mut b = ControllerBuilder::default();
 
-    let main_log = distributary::logger_pls();
+    let main_log = noria::logger_pls();
     b.log_with(main_log);
     if disable_partial {
         b.disable_partial();

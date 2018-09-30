@@ -1,6 +1,6 @@
-extern crate distributary;
+extern crate noria;
 
-use distributary::ControllerBuilder;
+use noria::ControllerBuilder;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -22,8 +22,8 @@ fn main() {
                                          ON (Article.aid = VoteCount.aid) \
                             WHERE Article.aid = ?;";
 
-    let persistence_params = distributary::PersistenceParameters::new(
-        distributary::DurabilityMode::Permanent,
+    let persistence_params = noria::PersistenceParameters::new(
+        noria::DurabilityMode::Permanent,
         Duration::from_millis(1),
         Some(String::from("evictorama")),
         1,
@@ -31,7 +31,7 @@ fn main() {
 
     // set up Soup via recipe
     let mut builder = ControllerBuilder::default();
-    builder.log_with(distributary::logger_pls());
+    builder.log_with(noria::logger_pls());
     builder.set_persistence(persistence_params);
     builder.set_memory_limit(100 * 1024, Duration::from_millis(1000));
 

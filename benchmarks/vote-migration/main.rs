@@ -4,14 +4,14 @@ const WRITE_BATCH_SIZE: usize = 1000;
 
 #[macro_use]
 extern crate clap;
-extern crate distributary;
+extern crate noria;
 extern crate rand;
 extern crate zipf;
 
 #[path = "../vote/clients/localsoup/graph.rs"]
 mod graph;
 
-use distributary::{DataType, TableOperation};
+use noria::{DataType, TableOperation};
 use rand::{distributions::Distribution, Rng};
 use std::io::prelude::*;
 use std::sync::mpsc;
@@ -63,8 +63,8 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     let every = time::Duration::from_millis(200);
 
     // default persistence (memory only)
-    let mut persistence_params = distributary::PersistenceParameters::default();
-    persistence_params.mode = distributary::DurabilityMode::MemoryOnly;
+    let mut persistence_params = noria::PersistenceParameters::default();
+    persistence_params.mode = noria::DurabilityMode::MemoryOnly;
 
     // make the graph!
     eprintln!("Setting up soup");

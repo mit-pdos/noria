@@ -3,7 +3,7 @@ extern crate clap;
 extern crate nom_sql;
 extern crate regex;
 
-extern crate distributary;
+extern crate noria;
 #[macro_use]
 extern crate slog;
 
@@ -95,7 +95,7 @@ fn process_file(fp: &Path) -> Vec<String> {
 fn main() {
     use clap::{App, Arg};
 
-    let log = distributary::logger_pls();
+    let log = noria::logger_pls();
 
     let matches = App::new("process_paper_queries")
         .version("0.1")

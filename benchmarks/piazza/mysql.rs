@@ -1,13 +1,13 @@
 #![feature(type_ascription)]
 #[macro_use]
 extern crate clap;
-extern crate distributary;
+extern crate noria;
 #[macro_use]
 extern crate mysql;
 extern crate rand;
 
 use mysql as my;
-use distributary::DataType;
+use noria::DataType;
 
 #[macro_use]
 mod populate;

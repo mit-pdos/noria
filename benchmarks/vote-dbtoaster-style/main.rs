@@ -7,7 +7,7 @@ extern crate rand;
 #[path = "../vote/clients/localsoup/graph.rs"]
 mod graph;
 
-use distributary::{DataType, DurabilityMode, PersistenceParameters, TableOperation};
+use noria::{DataType, DurabilityMode, PersistenceParameters, TableOperation};
 use rand::Rng;
 use std::{thread, time};
 

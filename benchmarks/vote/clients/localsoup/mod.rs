@@ -1,6 +1,6 @@
 use clap;
 use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
-use distributary::{self, DataType};
+use noria::{self, DataType};
 use std::path::PathBuf;
 use std::thread;
 use std::time;
@@ -8,10 +8,10 @@ use std::time;
 pub(crate) mod graph;
 
 pub(crate) struct Client {
-    _ch: distributary::ControllerHandle<distributary::LocalAuthority>,
-    r: distributary::View,
+    _ch: noria::ControllerHandle<noria::LocalAuthority>,
+    r: noria::View,
     #[allow(dead_code)]
-    w: distributary::Table,
+    w: noria::Table,
 }
 
 pub(crate) struct Constructor(graph::Graph, bool);
@@ -24,7 +24,7 @@ impl VoteClientConstructor for Constructor {
     type Instance = Client;
 
     fn new(params: &Parameters, args: &clap::ArgMatches) -> Self {
-        use distributary::{DurabilityMode, PersistenceParameters};
+        use noria::{DurabilityMode, PersistenceParameters};
 
         assert!(params.prime);
 

@@ -1,11 +1,11 @@
 extern crate clap;
-extern crate distributary;
+extern crate noria;
 extern crate rand;
 extern crate slog;
 
 mod test_populate;
 
-use distributary::{
+use noria::{
     ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
 };
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ pub struct Backend {
 impl Backend {
     pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
-        let log = distributary::logger_pls();
+        let log = noria::logger_pls();
         let blender_log = log.clone();
 
         if !partial {

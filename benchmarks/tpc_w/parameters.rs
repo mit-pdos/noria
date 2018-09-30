@@ -1,4 +1,4 @@
-use distributary::DataType;
+use noria::DataType;
 use rand;
 use rand::Rng;
 use std::collections::HashSet;

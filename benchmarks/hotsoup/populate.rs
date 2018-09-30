@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time;
 
 use super::Backend;
-use distributary::{DataType, Table};
+use noria::{DataType, Table};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {

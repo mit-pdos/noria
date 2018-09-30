@@ -8,7 +8,7 @@ use std::thread;
 use std::time;
 
 use super::Backend;
-use distributary::DataType;
+use noria::DataType;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 macro_rules! dur_to_fsec {

@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate clap;
-extern crate distributary;
+extern crate noria;
 extern crate hdrhistogram;
 extern crate itertools;
 extern crate rand;
@@ -18,7 +18,7 @@ use hdrhistogram::Histogram;
 use itertools::Itertools;
 use zookeeper::ZooKeeper;
 
-use distributary::{
+use noria::{
     ControllerBuilder, DataType, DurabilityMode, LocalControllerHandle, PersistenceParameters,
     ZookeeperAuthority,
 };
@@ -57,7 +57,7 @@ fn build_graph(
 ) -> LocalControllerHandle<ZookeeperAuthority> {
     let mut builder = ControllerBuilder::default();
     if verbose {
-        builder.log_with(distributary::logger_pls());
+        builder.log_with(noria::logger_pls());
     }
 
     builder.set_persistence(persistence);

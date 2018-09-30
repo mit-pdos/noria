@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-use distributary::{
+use noria::{
     ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
 };
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ enum PopulateType {
 impl Backend {
     pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = ControllerBuilder::default();
-        let log = distributary::logger_pls();
+        let log = noria::logger_pls();
         let blender_log = log.clone();
 
         if !partial {
