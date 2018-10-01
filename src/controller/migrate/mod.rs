@@ -211,13 +211,20 @@ impl<'a> Migration<'a> {
         self.mainline.graph()
     }
 
-    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
+    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>, num_replicas: usize) {
         if !self.readers.contains_key(&n) {
-            // make a reader and its replicas
             let mut readers = vec![];
-            for i in 0..NUM_READER_REPLICAS {
-                // TODO: replica index is None if there is exactly one replica
-                let r = node::special::Reader::new(n, Some(i));
+            for i in 0..num_replicas {
+                let replica_i = {
+                    if num_replicas == 0 {
+                        None
+                    } else {
+                        Some(i)
+                    }
+                };
+
+                // Make a reader node
+                let r = node::special::Reader::new(n, replica_i);
                 let r = if let Some(name) = name.clone() {
                     if i == 0 {
                         self.mainline.ingredients[n].named_mirror(r, name)
@@ -227,11 +234,20 @@ impl<'a> Migration<'a> {
                 } else {
                     self.mainline.ingredients[n].mirror(r)
                 };
+
+                // Add it to the graph along with an edge to the node it reads for
                 let r = self.mainline.ingredients.add_node(r);
                 self.mainline.ingredients.add_edge(n, r, ());
                 self.mainline.ingredients[n].add_replica(r);
+                debug!(self.log,
+                      "adding reader node";
+                      "node" => r.index(),
+                      "for_node" => n.index(),
+                      "replica_index" => replica_i
+                );
                 readers.push(r);
             }
+
             self.readers.insert(n, readers);
         }
     }
@@ -241,7 +257,7 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> Vec<NodeIndex> {
-        self.ensure_reader_for(n, None);
+        self.ensure_reader_for(n, None, NUM_READER_REPLICAS);
         let ris = &self.readers[&n];
 
         for ri in ris {
@@ -257,7 +273,7 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        self.ensure_reader_for(n, Some(name));
+        self.ensure_reader_for(n, Some(name), NUM_READER_REPLICAS);
 
         let ris = &self.readers[&n];
 
