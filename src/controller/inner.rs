@@ -798,7 +798,7 @@ impl ControllerInner {
                 topo_removals.reverse();
 
                 for leaf in topo_removals {
-                    self.remove_leaf(leaf)?;
+                    self.remove_query_node(leaf)?;
                 }
 
                 // now remove bases
@@ -907,7 +907,7 @@ impl ControllerInner {
         graphviz(&self.ingredients, &self.materializations)
     }
 
-    fn remove_leaf(&mut self, leaf: NodeIndex) -> Result<(), String> {
+    fn remove_query_node(&mut self, leaf: NodeIndex) -> Result<(), String> {
         let mut removals = vec![];
         let start = leaf;
         assert!(!self.ingredients[leaf].is_source());
@@ -926,38 +926,37 @@ impl ControllerInner {
             .count()
             > 0
         {
-            // This query leaf node has children -- typically, these are readers, but they can also
-            // include egress nodes or other, dependent queries.
-            let mut has_non_reader_children = false;
+            // This query leaf node has children -- typically, these are readers, but they can
+            // also be egress nodes or other, dependent queries. If the reader has replicas, we
+            // are looking for a single egress node that connects the leaf to replicas in other
+            // domains.
+            let mut has_other_children = false;
             let readers: Vec<_> = self
                 .ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .filter(|ni| {
-                    if self.ingredients[*ni].is_reader() {
+                .filter(|&ni| {
+                    if self.ingredients[ni].is_reader() {
                         true
                     } else {
-                        if egress_node.is_some() || !self.ingredients[*ni].is_egress() {
-                            has_non_reader_children = true;
+                        if egress_node.is_some() || !self.ingredients[ni].is_egress() {
+                            has_other_children = true;
                         } else {
-                            egress_node = Some(ni.clone());
+                            egress_node = Some(ni);
                         }
                         false
                     }
                 })
                 .collect();
-            if has_non_reader_children {
-                // The leaf node can only have non-reader children if its reader has replicas.
-                // Then the non-reader child is a single egress node that connects the leaf to
-                // replicas in other domains. Otherwise impossible, since we remove nodes in
-                // reverse topological order.
+            if has_other_children {
+                // should never happen, since we remove nodes in reverse topological order
                 crit!(
                     self.log,
-                    "not removing node {} yet, as it still has non-reader children",
+                    "not removing node {} yet, as it still has non-reader-related children",
                     leaf.index()
                 );
                 unreachable!();
             }
-            // nodes can only have one reader
+            // nodes can have only one reader attached
             assert!(readers.len() <= 1);
             debug!(
                         self.log,
@@ -968,9 +967,14 @@ impl ControllerInner {
                 for reader in readers {
                     removals.push(reader);
                     nodes.push(reader);
+                    debug!(
+                        self.log, "Removing reader";
+                        "node" => reader.index(),
+                        "leaf" => leaf.index(),
+                    );
                 }
             } else {
-                // The reader had replicas, which were all removed along with the egress node.
+                // The reader had replicas, which will all be removed along with the egress node.
             }
         }
 
@@ -988,6 +992,11 @@ impl ControllerInner {
                         nodes.push(child);
                     }
                 }
+                debug!(
+                    self.log, "Removing egress node and its children";
+                    "node" => ni.index(),
+                    "leaf" => leaf.index(),
+                );
             },
             None => {
                 // If the start node didn't have any children, it can be removed immediately

@@ -590,6 +590,12 @@ impl<'a> Migration<'a> {
             .into_iter()
             .filter(|&domain| !changed_domains_replicas.contains(&domain))
             .collect::<Vec<_>>();
+        debug!(
+            log,
+            "found changed domains";
+            "replica domains" => format!("{:?}", changed_domains_replicas),
+            "other domains" => format!("{:?}", changed_domains_other),
+        );
 
         // Check invariants on the (non)-replica data structures. Each changed replica domain
         // should be just created. The domain should contain the reader node and its ingress node,
