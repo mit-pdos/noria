@@ -1,9 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-use noria::{
-    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
-};
+use noria::{ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;

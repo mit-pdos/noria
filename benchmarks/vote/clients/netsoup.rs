@@ -1,8 +1,8 @@
 use clap;
 use crate::clients::localsoup::graph::RECIPE;
 use crate::clients::{Parameters, VoteClient, VoteClientConstructor};
-use noria::{self, ControllerHandle, DataType, ZookeeperAuthority};
 use failure::Error;
+use noria::{self, ControllerHandle, DataType, ZookeeperAuthority};
 
 use std::thread;
 use std::time::Duration;

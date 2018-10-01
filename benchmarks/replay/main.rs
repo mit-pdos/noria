@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate clap;
-extern crate noria;
 extern crate hdrhistogram;
 extern crate itertools;
+extern crate noria;
 extern crate rand;
 extern crate zookeeper;
 
