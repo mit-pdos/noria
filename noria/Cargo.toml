@@ -1,5 +1,5 @@
 [package]
-name = "api"
+name = "noria"
 version = "0.1.0"
 authors = ["The Noria developers <noria@pdos.csail.mit.edu>"]
 
@@ -17,9 +17,22 @@ bincode = "1.0.0"
 vec_map = { version = "0.8.0", features = ["eders"] }
 
 # local deps
+basics = { path = "../basics" }
 channel = { path = "../channel" }
 consensus = { path = "../consensus" }
-basics = { path = "../basics" }
 
 [dev-dependencies]
 backtrace = { version = "0.3.2", features = ["serialize-serde"] }
+slog = "2.4.0"
+#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_trace"] }
+slog-term = "2.4.0"
+
+[lib]
+path = "src/lib.rs"
+name = "noria"
+
+[[example]]
+name = "basic-recipe"
+
+[[example]]
+name = "basic-distribution"

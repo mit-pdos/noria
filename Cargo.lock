@@ -15,27 +15,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "assert_infrequent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "basics 0.1.0",
- "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "channel 0.1.0",
- "consensus 0.1.0",
- "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "arccstr"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -147,43 +126,6 @@ dependencies = [
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "benchmarks"
-version = "0.0.1"
-dependencies = [
- "channel 0.1.0",
- "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ctrlc 3.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-cpupool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-state-stream 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hdrhistogram 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "memcached-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
- "mysql 14.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "noria 0.1.0",
- "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "rayon 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "regex 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "rusoto_core 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rusoto_sts 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "shellwords 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)",
- "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "tsunami 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "zipf 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "zookeeper 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -383,7 +325,6 @@ dependencies = [
 name = "consensus"
 version = "0.1.0"
 dependencies = [
- "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -495,7 +436,6 @@ dependencies = [
 name = "dataflow"
 version = "0.1.0"
 dependencies = [
- "api 0.1.0",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "basics 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -506,6 +446,7 @@ dependencies = [
  "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "noria 0.1.0",
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rahashmap 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1256,7 +1197,66 @@ dependencies = [
 name = "noria"
 version = "0.1.0"
 dependencies = [
- "api 0.1.0",
+ "assert_infrequent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "basics 0.1.0",
+ "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "channel 0.1.0",
+ "consensus 0.1.0",
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "noria-benchmarks"
+version = "0.0.1"
+dependencies = [
+ "channel 0.1.0",
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ctrlc 3.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-cpupool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-state-stream 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hdrhistogram 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memcached-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mysql 14.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "noriad 0.1.0",
+ "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rayon 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto_core 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto_sts 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shellwords 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)",
+ "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tsunami 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zipf 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zookeeper 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "noriad"
+version = "0.1.0"
+dependencies = [
  "async-bincode 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "basics 0.1.0",
@@ -1277,6 +1277,7 @@ dependencies = [
  "mysql 14.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "noria 0.1.0",
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1295,6 +1296,7 @@ dependencies = [
  "tokio-threadpool 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zookeeper 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

@@ -1,8 +1,15 @@
 extern crate noria;
+#[macro_use]
+extern crate slog;
+extern crate slog_term;
 
 use noria::{ControllerHandle, ZookeeperAuthority};
 
+use slog::Drain;
+use slog::Logger;
+use slog_term::term_full;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -18,17 +25,8 @@ fn main() {
                 FROM Article, VoteCount \
                 WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
-    // let persistence_params = noria::PersistenceParameters::new(
-    //     noria::DurabilityMode::Permanent,
-    //     512,
-    //     Duration::from_millis(1),
-    //     Some(String::from("example")),
-    //     1,
-    // );
-
-    let log = noria::logger_pls();
-
-    // set up Soup via recipe
+    // set up Noria via recipe
+    let log = Logger::root(Mutex::new(term_full()).fuse(), o!());
     let mut auth = ZookeeperAuthority::new("127.0.0.1:2181/basicdist").unwrap();
     auth.log_with(log.clone());
 

@@ -1,8 +1,11 @@
+cargo-features = ["rename-dependency"]
+
 [package]
-name = "benchmarks"
+name = "noria-benchmarks"
 version = "0.0.1"
 authors = ["The Noria developers <noria@pdos.csail.mit.edu>"]
 edition = '2018'
+publish = false
 
 [features]
 orchestration = ["rusoto_core", "rusoto_sts", "tsunami"]
@@ -10,7 +13,7 @@ orchestration = ["rusoto_core", "rusoto_sts", "tsunami"]
 [dependencies]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
-noria = { path = ".." }
+noria = { path = "../noriad", package = "noriad" }
 nom-sql = "0.0.4"
 regex = "1.0.0"
 itertools = "0.7.2"

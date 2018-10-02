@@ -1,6 +1,6 @@
 extern crate noria;
 
-use noria::ControllerBuilder;
+use noria::ControllerHandle;
 
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -20,27 +20,15 @@ fn main() {
                             FROM Article, VoteCount \
                             WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
-    let persistence_params = noria::PersistenceParameters::new(
-        noria::DurabilityMode::Permanent,
-        Duration::from_millis(1),
-        Some(String::from("example")),
-        1,
-    );
+    let mut srv = ControllerHandle::from_zk("127.0.0.1:2181/basicdist").unwrap();
 
-    // set up Soup via recipe
-    let mut builder = ControllerBuilder::default();
-
-    builder.log_with(noria::logger_pls());
-    builder.set_persistence(persistence_params);
-
-    let mut blender = builder.build_local().unwrap();
-    blender.install_recipe(sql).unwrap();
-    println!("{}", blender.graphviz().unwrap());
+    srv.install_recipe(sql).unwrap();
+    println!("{}", srv.graphviz().unwrap());
 
     // Get mutators and getter.
-    let mut article = blender.table("Article").unwrap();
-    let mut vote = blender.table("Vote").unwrap();
-    let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
+    let mut article = srv.table("Article").unwrap();
+    let mut vote = srv.table("Vote").unwrap();
+    let mut awvc = srv.view("ArticleWithVoteCount").unwrap();
 
     println!("Creating article...");
     let aid = 1;

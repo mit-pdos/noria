@@ -47,7 +47,7 @@ pub struct ControllerDescriptor {
 /// underlying connections to Soup. This means that a `ControllerHandle` is *not* `Send` or `Sync`.
 /// To establish more connections to Soup for use by other threads, use
 /// `ControllerHandle::connect()` or call the `into_exclusive` method on a given view or table.
-pub struct ControllerHandle<A: Authority> {
+pub struct ControllerHandle<A> {
     url: Option<String>,
     local_port: Option<u16>,
     authority: Arc<A>,
@@ -70,6 +70,14 @@ impl<A: Authority> ControllerPointer<A> {
     /// Construct another `ControllerHandle` to this controller.
     pub fn connect(&self) -> Result<ControllerHandle<A>, failure::Error> {
         ControllerHandle::make(self.0.clone())
+    }
+}
+
+impl ControllerHandle<consensus::ZookeeperAuthority> {
+    /// Fetch information about the current Soup controller from Zookeeper running at the given
+    /// address, and create a `ControllerHandle` from that.
+    pub fn from_zk(zookeeper_address: &str) -> Result<Self, failure::Error> {
+        ControllerHandle::new(consensus::ZookeeperAuthority::new(zookeeper_address)?)
     }
 }
 
@@ -137,14 +145,6 @@ impl<A: Authority> ControllerHandle<A> {
     /// You *probably* want to use `ControllerHandle::from_zk` instead.
     pub fn new(authority: A) -> Result<Self, failure::Error> {
         Self::make(Arc::new(authority))
-    }
-
-    /// Fetch information about the current Soup controller from Zookeeper running at the given
-    /// address, and create a `ControllerHandle` from that.
-    pub fn from_zk(
-        zookeeper_address: &str,
-    ) -> Result<ControllerHandle<consensus::ZookeeperAuthority>, failure::Error> {
-        ControllerHandle::new(consensus::ZookeeperAuthority::new(zookeeper_address)?)
     }
 
     #[doc(hidden)]
@@ -303,7 +303,7 @@ impl<A: Authority> ControllerHandle<A> {
     }
 }
 
-impl<A: Authority> Drop for ControllerHandle<A> {
+impl<A> Drop for ControllerHandle<A> {
     fn drop(&mut self) {
         drop(self.req.take());
         self.rt.take().unwrap().join().unwrap();
