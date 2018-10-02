@@ -11,7 +11,7 @@ orchestration = ["rusoto_core", "rusoto_sts", "tsunami"]
 channel = { path = "../channel" }
 chrono = { version = "0.4.0", features = ["serde"] }
 noria = { path = ".." }
-nom-sql = { git = "https://github.com/ms705/nom-sql.git", rev = "791c0f5117b6e02c1e3f146cc4a2689ef7da7a54" }
+nom-sql = "0.0.4"
 regex = "1.0.0"
 itertools = "0.7.2"
 slog = "2.2.2"
