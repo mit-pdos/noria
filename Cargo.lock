@@ -116,19 +116,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "basics"
-version = "0.1.0"
-dependencies = [
- "arccstr 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "bincode"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -313,6 +300,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "arccstr 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "internal 0.1.0",
+ "noria 0.1.0",
+ "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "conhash"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -437,13 +437,14 @@ name = "dataflow"
 version = "0.1.0"
 dependencies = [
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "basics 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
+ "common 0.1.0",
  "evmap 4.0.0 (git+https://github.com/ms705/rust-evmap)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "internal 0.1.0",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "noria 0.1.0",
@@ -807,6 +808,14 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "internal"
+version = "0.1.0"
+dependencies = [
+ "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "iovec"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1047,9 +1056,10 @@ dependencies = [
 name = "mir"
 version = "0.1.0"
 dependencies = [
- "basics 0.1.0",
+ "common 0.1.0",
  "dataflow 0.1.0",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1197,16 +1207,20 @@ dependencies = [
 name = "noria"
 version = "0.1.0"
 dependencies = [
+ "arccstr 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "assert_infrequent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "basics 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "consensus 0.1.0",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "internal 0.1.0",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.79 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1259,11 +1273,11 @@ version = "0.1.0"
 dependencies = [
  "async-bincode 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "backtrace 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "basics 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bufstream 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "channel 0.1.0",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "consensus 0.1.0",
  "dataflow 0.1.0",
  "diff 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1272,6 +1286,7 @@ dependencies = [
  "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "hostname 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "internal 0.1.0",
  "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "mir 0.1.0",
  "mysql 14.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
