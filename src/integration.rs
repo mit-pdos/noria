@@ -435,61 +435,6 @@ fn it_works_w_partial_mat_below_empty() {
 }
 
 #[test]
-fn it_works_with_replicas() {
-    // set up graph
-    let mut g = build_local("it_works_with_replicas");
-    let (a, b) = g.migrate(|mig| {
-        let a = mig.add_base("a", &["a", "b"], Base::default());
-        let b = mig.add_base("b", &["a", "b"], Base::default());
-        (a, b)
-    });
-
-    let mut muta = g.table("a").unwrap();
-    let id: DataType = 1.into();
-
-    // send a few values on a
-    muta.insert(vec![id.clone(), 1.into()]).unwrap();
-    muta.insert(vec![id.clone(), 2.into()]).unwrap();
-    muta.insert(vec![id.clone(), 3.into()]).unwrap();
-
-    // give it some time to propagate
-    sleep();
-
-    let _ = g.migrate(move |mig| {
-        let mut emits = HashMap::new();
-        emits.insert(a, vec![0, 1]);
-        emits.insert(b, vec![0, 1]);
-        let u = Union::new(emits);
-        let c = mig.add_ingredient("c", &["a", "b"], u);
-        mig.maintain_anonymous(c, &[0]);
-        c
-    });
-
-    // give it some time to propagate
-    sleep();
-
-    let cqs = g.view_replicas("c").unwrap();
-
-    // should have multiple replicas
-    assert!(cqs.len() > 1);
-
-    for mut cq in cqs {
-        // because the reader is partial, we should have no key until we read
-        assert_eq!(cq.len().unwrap(), 0);
-
-        // now do some reads
-        let res = cq.lookup(&[id.clone()], true).unwrap();
-        assert_eq!(res.len(), 3);
-        assert!(res.iter().any(|r| r == &vec![id.clone(), 1.into()]));
-        assert!(res.iter().any(|r| r == &vec![id.clone(), 2.into()]));
-        assert!(res.iter().any(|r| r == &vec![id.clone(), 3.into()]));
-
-        // should have one key in the reader now
-        assert_eq!(cq.len().unwrap(), 1);
-    }
-}
-
-#[test]
 fn it_works_deletion() {
     // set up graph
     let mut g = build_local("it_works_deletion");

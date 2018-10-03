@@ -204,43 +204,28 @@ impl<A: Authority> ControllerHandle<A> {
         self.rpc("outputs", &())
     }
 
-    /// Obtain a `View` that allows you to query the given external view.
-    /// The `View` is of an arbitrary replica.
+    /// Obtain a `View` that allows you to query the given external view. If the view has
+    /// replicas, returns a `View` in round robin order each time the api is called.
     pub fn view(&mut self, name: &str) -> Result<View, failure::Error> {
-        let replicas = self.view_replicas(name)?;
-        match replicas.get(0) {
-            Some(r) => Ok(r.clone()),
-            None => Err(format_err!("view {} does not exist", name)),
-        }
-    }
-
-    /// Obtain a list of `View`s that allow you to query the given external view.
-    /// Each view corresponds to a single reader replica.
-    pub fn view_replicas(&mut self, name: &str) -> Result<Vec<View>, failure::Error> {
         // This call attempts to detect if this function is being called in a loop. If this
         // is getting false positives, then it is safe to increase the allowed hit count.
         #[cfg(debug_assertions)]
         assert_infrequent::at_most(200);
 
-        let view_builders = self.rpc::<_, Vec<ViewBuilder>>("view_builder", name)
+        let mut g = self.rpc::<_, ViewBuilder>("view_builder", name)
             .context(format!("building View for {}", name))?;
 
-        let mut views = Vec::new();
-        for mut g in view_builders {
-            if let Some(port) = self.local_port {
-                g = g.with_local_port(port);
-            }
-
-            let g = g.build(&mut self.views)?;
-
-            if self.local_port.is_none() {
-                self.local_port = Some(g.local_addr().unwrap().port());
-            }
-
-            views.push(g);
+        if let Some(port) = self.local_port {
+            g = g.with_local_port(port);
         }
 
-        Ok(views)
+        let g = g.build(&mut self.views)?;
+
+        if self.local_port.is_none() {
+            self.local_port = Some(g.local_addr().unwrap().port());
+        }
+
+        Ok(g)
     }
 
     /// Obtain a `Table` that allows you to perform writes, deletes, and other operations on the

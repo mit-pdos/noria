@@ -28,6 +28,7 @@ pub struct Node {
     taken: bool,
 
     sharded_by: Sharding,
+    replica_index: usize,
     replicas: Vec<NodeIndex>,
 }
 
@@ -51,6 +52,7 @@ impl Node {
             taken: false,
 
             sharded_by: Sharding::None,
+            replica_index: 0,
             replicas: Vec::new(),
         }
     }
@@ -350,6 +352,17 @@ impl Node {
 
     pub fn get_replicas(&self) -> &[NodeIndex] {
         &self.replicas[..]
+    }
+
+    /// Returns replicas in round robin order each time the method is called.
+    pub fn next_replica(&mut self) -> Option<NodeIndex> {
+        if self.num_replicas() > 0 {
+            self.replica_index += 1;
+            self.replica_index %= self.num_replicas();
+            Some(*self.replicas.get(self.replica_index).unwrap())
+        } else {
+            None
+        }
     }
 
     pub fn replica_index(&self) -> Option<usize> {

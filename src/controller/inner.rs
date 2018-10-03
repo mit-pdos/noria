@@ -522,51 +522,41 @@ impl ControllerInner {
             .collect()
     }
 
-    fn find_views_for(&self, node: NodeIndex) -> &[NodeIndex] {
+    /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
+    /// (already maintained) reader node. If the view has replicas, a `ViewBuilder` is returned
+    /// for each view in round robin order.
+    ///
+    /// The name of the reader node is `name`, or if it is a replica, `name_r[REPLICA_NUMBER]`.
+    pub fn view_builder(&mut self, name: &str) -> Option<ViewBuilder> {
+        // first try to resolve the node via the recipe, which handles aliasing between identical
+        // queries.
+        let node = match self.recipe.node_addr_for(name) {
+            Ok(ni) => ni,
+            Err(_) => {
+                // if the recipe doesn't know about this query, traverse the graph.
+                // we need this do deal with manually constructed graphs (e.g., in tests).
+                *self.outputs().get(name)?
+            }
+        };
+
         // reader should be a child of the given node. however, due to sharding and replication,
         // it may not be an *immediate* child. furthermore, once we go beyond depth 1, we may
         // accidentally hit an *unrelated* reader node. to account for this, nodes cache their
         // readers so we can easily query data.
-        self.ingredients[node].get_replicas()
-    }
+        self.ingredients[node].next_replica().map(|ri| {
+            let domain = self.ingredients[ri].domain();
+            let columns = self.ingredients[ri].fields().to_vec();
+            let shards = (0..self.domains[&domain].shards())
+                .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
+                .collect();
 
-    /// Obtain a list of `ViewBuilder`s that can be sent to a client. Each `ViewBuilder`
-    /// corresponds to a single replica, which can be used to query a given (already maintained)
-    /// reader node called `name`, `name_r1`, `name_r2`, etc.
-    pub fn view_builder(&self, name: &str) -> Vec<ViewBuilder> {
-        // first try to resolve the node via the recipe, which handles aliasing between identical
-        // queries.
-        let node = match self.recipe.node_addr_for(name) {
-            Ok(ni) => Some(ni),
-            Err(_) => {
-                // if the recipe doesn't know about this query, traverse the graph.
-                // we need this do deal with manually constructed graphs (e.g., in tests).
-                self.outputs().get(name).map(|ni| *ni)
+            ViewBuilder {
+                local_ports: vec![],
+                node: ri,
+                columns,
+                shards,
             }
-        };
-
-        if node.is_none() {
-            return Vec::new();
-        }
-
-        let node = node.unwrap();
-        self.find_views_for(node)
-            .iter()
-            .map(|r| {
-                let domain = self.ingredients[*r].domain();
-                let columns = self.ingredients[*r].fields().to_vec();
-                let shards = (0..self.domains[&domain].shards())
-                    .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
-                    .collect();
-
-                ViewBuilder {
-                    local_ports: vec![],
-                    node: *r,
-                    columns,
-                    shards,
-                }
-            })
-            .collect::<Vec<ViewBuilder>>()
+        })
     }
 
     /// Obtain a TableBuild that can be used to construct a Table to perform writes and deletes
@@ -734,7 +724,7 @@ impl ControllerInner {
         let uid = &[uid];
         if context.get("group").is_none() {
             for g in groups {
-                let rgb: Option<ViewBuilder> = self.view_builder(&g).get(0).map(|v| v.clone());
+                let rgb: Option<ViewBuilder> = self.view_builder(&g);
                 let mut view = rgb.map(|rgb| rgb.build_exclusive().unwrap()).unwrap();
                 let my_groups: Vec<DataType> = view
                     .lookup(uid, true)
