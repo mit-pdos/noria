@@ -41,9 +41,6 @@ pub(super) enum ColumnChange {
     Drop(usize),
 }
 
-/// The number of replicas per reader node, including the original reader node.
-pub const NUM_READER_REPLICAS: usize = 3;
-
 /// A `Migration` encapsulates a number of changes to the Soup data flow graph.
 ///
 /// Only one `Migration` can be in effect at any point in time. No changes are made to the running
@@ -236,7 +233,7 @@ impl<'a> Migration<'a> {
                 let r = self.mainline.ingredients.add_node(r);
                 self.mainline.ingredients.add_edge(n, r, ());
                 self.mainline.ingredients[n].add_replica(r);
-                debug!(self.log,
+                info!(self.log,
                       "adding reader node";
                       "node" => r.index(),
                       "for_node" => n.index(),
@@ -254,7 +251,7 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> Vec<NodeIndex> {
-        self.ensure_reader_for(n, None, NUM_READER_REPLICAS);
+        self.ensure_reader_for(n, None, self.mainline.replicas);
         let ris = &self.readers[&n];
 
         for ri in ris {
@@ -270,7 +267,7 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        self.ensure_reader_for(n, Some(name), NUM_READER_REPLICAS);
+        self.ensure_reader_for(n, Some(name), self.mainline.replicas);
 
         let ris = &self.readers[&n];
 

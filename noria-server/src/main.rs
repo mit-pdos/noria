@@ -105,6 +105,13 @@ fn main() {
                 .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(
+            Arg::with_name("replicas")
+                .long("replicas")
+                .takes_value(true)
+                .default_value("3")
+                .help("Each reader has this many replicas (at least 1)."),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
@@ -127,6 +134,7 @@ fn main() {
         0 => None,
         x => Some(x),
     };
+    let replicas = value_t_or_exit!(matches, "replicas", usize);
     let verbose = matches.is_present("verbose");
     let deployment_name = matches.value_of("deployment").unwrap();
 
@@ -138,6 +146,7 @@ fn main() {
         builder.set_memory_limit(memory, Duration::from_millis(memory_check_freq));
     }
     builder.set_sharding(sharding);
+    builder.set_replicas(replicas);
     builder.set_quorum(quorum);
     if matches.is_present("nopartial") {
         builder.disable_partial();

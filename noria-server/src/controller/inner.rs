@@ -36,6 +36,7 @@ pub struct ControllerInner {
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
+    pub(super) replicas: usize,
 
     pub(super) domain_config: DomainConfig,
 
@@ -433,6 +434,7 @@ impl ControllerInner {
 
             materializations,
             sharding: state.config.sharding,
+            replicas: state.config.replicas,
             domain_config: state.config.domain_config,
             persistence: state.config.persistence,
             heartbeat_every: state.config.heartbeat_every,

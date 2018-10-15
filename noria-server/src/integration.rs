@@ -1,4 +1,3 @@
-use crate::controller::migrate::NUM_READER_REPLICAS;
 use crate::controller::recipe::Recipe;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::{ControllerBuilder, LocalControllerHandle};
@@ -20,6 +19,7 @@ use std::{env, thread};
 
 const DEFAULT_SETTLE_TIME_MS: u64 = 200;
 const DEFAULT_SHARDING: Option<usize> = Some(2);
+pub const DEFAULT_REPLICAS: usize = 3;
 
 // PersistenceParameters with a log_name on the form of `prefix` + timestamp,
 // avoiding collisions between separate test runs (in case an earlier panic causes clean-up to
@@ -33,22 +33,23 @@ fn get_persistence_params(prefix: &str) -> PersistenceParameters {
 
 // Builds a local controller with the given log prefix.
 pub fn build_local(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, DEFAULT_SHARDING, false)
+    build(prefix, DEFAULT_SHARDING, DEFAULT_REPLICAS, false)
 }
 
 #[allow(dead_code)]
 pub fn build_local_unsharded(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, None, false)
+    build(prefix, None, DEFAULT_REPLICAS, false)
 }
 
 #[allow(dead_code)]
 pub fn build_local_logging(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, DEFAULT_SHARDING, true)
+    build(prefix, DEFAULT_SHARDING, DEFAULT_REPLICAS, true)
 }
 
 fn build(
     prefix: &str,
     sharding: Option<usize>,
+    replicas: usize,
     log: bool,
 ) -> LocalControllerHandle<LocalAuthority> {
     use crate::logger_pls;
@@ -58,6 +59,7 @@ fn build(
     }
     builder.set_sharding(sharding);
     builder.set_persistence(get_persistence_params(prefix));
+    builder.set_replicas(replicas);
     builder.build_local().unwrap()
 }
 
@@ -2044,7 +2046,7 @@ fn recipe_activates_and_migrates() {
     // still one base node
     assert_eq!(g.inputs().unwrap().len(), 1);
     // two leaf nodes
-    assert_eq!(g.outputs().unwrap().len(), 2 * NUM_READER_REPLICAS);
+    assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 }
 
 #[test]
@@ -2064,7 +2066,7 @@ fn recipe_activates_and_migrates_with_join() {
     // still two base nodes
     assert_eq!(g.inputs().unwrap().len(), 2);
     // one leaf node
-    assert_eq!(g.outputs().unwrap().len(), 1 * NUM_READER_REPLICAS);
+    assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
 }
 
 fn test_queries(test: &str, file: &'static str, shard: bool, reuse: bool, log: bool) {
@@ -2263,7 +2265,7 @@ fn remove_query() {
     let mut g = ControllerBuilder::default().build_local().unwrap();
     g.install_recipe(r_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 2 * NUM_READER_REPLICAS);
+    assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 
     let mut mutb = g.table("b").unwrap();
     let mut qa = g.view("qa").unwrap();
@@ -2280,7 +2282,7 @@ fn remove_query() {
     // Remove qb and check that the graph still functions as expected.
     g.install_recipe(r2_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 1 * NUM_READER_REPLICAS);
+    assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
     assert!(g.view("qb").is_err());
 
     mutb.insert(vec![42.into(), "6".into(), "7".into()])

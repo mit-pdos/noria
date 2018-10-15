@@ -942,8 +942,6 @@ impl<'a> ToFlowParts for &'a str {
 #[cfg(test)]
 mod tests {
     use super::{SqlIncorporator, ToFlowParts};
-    // TODO(ygina): don't hardcode number of replicas
-    use crate::controller::migrate::NUM_READER_REPLICAS;
     use crate::controller::Migration;
     use crate::integration;
     use dataflow::prelude::*;
@@ -1004,7 +1002,7 @@ mod tests {
             );
             // Should now have source, "users", a leaf projection node for the new selection, and
             // a reader node
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 1);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 1);
 
             // Invalid query should fail parsing and add no nodes
             assert!(
@@ -1013,7 +1011,7 @@ mod tests {
                     .is_err()
             );
             // Should still only have source, "users" and the two nodes for the above selection
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 1);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 1);
         });
     }
 
@@ -1140,7 +1138,7 @@ mod tests {
             );
             assert!(res.is_ok());
             // added the aggregation and the edge view, and a reader
-            assert_eq!(mig.graph().node_count(), NUM_READER_REPLICAS + 4);
+            assert_eq!(mig.graph().node_count(), integration::DEFAULT_REPLICAS + 4);
             // check aggregation view
             let f = Box::new(FunctionExpression::Count(
                 Column::from("votes.userid"),
@@ -1189,7 +1187,7 @@ mod tests {
             let qfp = res.unwrap();
             assert_eq!(qfp.new_nodes.len(), 2);
             // expect three new nodes: filter, project, reader
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 2);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 2);
             // should have ended up with a different leaf node
             assert_ne!(qfp.query_leaf, leaf);
         });
@@ -1234,7 +1232,7 @@ mod tests {
             assert!(res.is_ok());
             // should have added two more nodes (project and reader)
             let qfp = res.unwrap();
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 1);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 1);
             // should NOT have ended up with the same leaf node
             assert_ne!(qfp.query_leaf, leaf);
         });
@@ -1280,7 +1278,7 @@ mod tests {
             assert!(res.is_ok());
             // should have added two more nodes: one identity node and one reader node
             let qfp = res.unwrap();
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 1);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 1);
             // only the identity node is returned in the vector of new nodes
             assert_eq!(qfp.new_nodes.len(), 1);
             assert_eq!(get_node(&inc, mig, &qfp.name).description(true), "≡");
@@ -1299,7 +1297,7 @@ mod tests {
             assert!(res.is_ok());
             // should have added two more nodes: one projection node and one reader node
             let qfp = res.unwrap();
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 1);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 1);
             // only the projection node is returned in the vector of new nodes
             assert_eq!(qfp.new_nodes.len(), 1);
             assert_eq!(
@@ -1359,7 +1357,7 @@ mod tests {
             assert!(res.is_ok());
             // should have added three more nodes: a join, a projection, and a reader
             let qfp = res.unwrap();
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 2);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 2);
             // only the join and projection nodes are returned in the vector of new nodes
             assert_eq!(qfp.new_nodes.len(), 2);
         });
@@ -1385,7 +1383,7 @@ mod tests {
             let res = inc.add_query("SELECT COUNT(votes.userid) AS count FROM votes;", None, mig);
             assert!(res.is_ok());
             // added the aggregation, a project helper, the edge view, and reader
-            assert_eq!(mig.graph().node_count(), NUM_READER_REPLICAS + 5);
+            assert_eq!(mig.graph().node_count(), integration::DEFAULT_REPLICAS + 5);
             // check project helper node
             let f = Box::new(FunctionExpression::Count(
                 Column::from("votes.userid"),
@@ -1441,7 +1439,7 @@ mod tests {
             );
             assert!(res.is_ok());
             // added the aggregation, a project helper, the edge view, and reader
-            assert_eq!(mig.graph().node_count(), NUM_READER_REPLICAS + 4);
+            assert_eq!(mig.graph().node_count(), integration::DEFAULT_REPLICAS + 4);
             // check aggregation view
             let f = Box::new(FunctionExpression::Count(Column::from("votes.aid"), false));
             let qid = query_id_hash(
@@ -1807,7 +1805,7 @@ mod tests {
             // should NOT have ended up with the same leaf node
             assert_ne!(qfp.query_leaf, leaf);
             // should have added three more nodes (filter, project and reader)
-            assert_eq!(mig.graph().node_count(), ncount + NUM_READER_REPLICAS + 2);
+            assert_eq!(mig.graph().node_count(), ncount + integration::DEFAULT_REPLICAS + 2);
         });
     }
 

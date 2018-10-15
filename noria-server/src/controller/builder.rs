@@ -57,6 +57,11 @@ impl ControllerBuilder {
         self.config.sharding = shards;
     }
 
+    /// Set number of reader replicas
+    pub fn set_replicas(&mut self, replicas: usize) {
+        self.config.replicas = replicas;
+    }
+
     /// Set how many workers the controller should wait for before starting. More workers can join
     /// later, but they won't be assigned any of the initial domains.
     pub fn set_quorum(&mut self, quorum: usize) {
