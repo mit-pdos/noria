@@ -744,16 +744,23 @@ impl ControllerInner {
         // it may not be an *immediate* child. furthermore, once we go beyond depth 1, we may
         // accidentally hit an *unrelated* reader node. to account for this, nodes cache their
         // readers so we can easily query data.
-        self.ingredients[node].next_replica().map(|ri| {
-            let domain = self.ingredients[ri].domain();
-            let columns = self.ingredients[ri].fields().to_vec();
+        self.ingredients[node].next_replica().map(|ni| {
+            info!(
+                self.log,
+                "creating view builder";
+                "name" => name,
+                "node_index" => ni.index(),
+                "replica_index" => self.ingredients[ni].replica_index().unwrap(),
+            );
+            let domain = self.ingredients[ni].domain();
+            let columns = self.ingredients[ni].fields().to_vec();
             let shards = (0..self.domains[&domain].shards())
                 .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
                 .collect();
 
             ViewBuilder {
                 local_ports: vec![],
-                node: ri,
+                node: ni,
                 columns,
                 shards,
             }
