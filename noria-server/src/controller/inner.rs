@@ -498,7 +498,7 @@ impl ControllerInner {
     pub(crate) fn place_domain(
         &mut self,
         idx: DomainIndex,
-        identifier: WorkerIdentifier,
+        identifiers: Vec<WorkerIdentifier>,
         num_shards: Option<usize>,
         log: &Logger,
         nodes: Vec<(NodeIndex, bool)>,
@@ -534,6 +534,8 @@ impl ControllerInner {
             };
 
             // send domain to worker
+            let identifier = identifiers.get(i)
+                .expect("number of identifiers should match number of shards");
             let w = self.workers.get_mut(&identifier).unwrap();
             info!(
                 log,
@@ -609,7 +611,7 @@ impl ControllerInner {
             .enumerate()
             .map(|(i, worker)| {
                 let tx = txs.remove(&i).unwrap();
-                DomainShardHandle { worker, tx }
+                DomainShardHandle { worker: *worker, tx }
             })
             .collect();
 

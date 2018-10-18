@@ -371,28 +371,33 @@ impl<'a> Migration<'a> {
                 continue;
             }
 
-            // find a worker identifier
-            let wi = loop {
-                if let Some(wi) = wis.next() {
-                    let w = mainline.workers.get(&wi).unwrap();
-                    if w.healthy {
-                        break wi;
+            // find a worker identifier for each shard
+            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let num_shards = mainline.ingredients[nodes[0].0].sharded_by().shards();
+            let mut identifiers = Vec::new();
+            for _ in 0..num_shards.unwrap_or(1) {
+                let wi = loop {
+                    if let Some(wi) = wis.next() {
+                        let w = mainline.workers.get(&wi).unwrap();
+                        if w.healthy {
+                            break wi;
+                        }
+                    } else {
+                        wis = mainline.workers
+                            .keys()
+                            .map(|wi| wi.clone())
+                            .collect::<Vec<WorkerIdentifier>>()
+                            .into_iter();
                     }
-                } else {
-                    wis = mainline.workers
-                        .keys()
-                        .map(|wi| wi.clone())
-                        .collect::<Vec<WorkerIdentifier>>()
-                        .into_iter();
-                }
-            };
+                };
+                identifiers.push(wi);
+            }
 
             // place the domain on the worker
-            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
             let d = mainline.place_domain(
                 *domain,
-                wi,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
+                identifiers,
+                num_shards,
                 &log,
                 nodes,
             );
