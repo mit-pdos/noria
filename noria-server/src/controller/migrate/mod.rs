@@ -20,7 +20,7 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
+use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use std::collections::{HashMap, HashSet};
@@ -359,15 +359,39 @@ impl<'a> Migration<'a> {
             log: &slog::Logger,
             uninformed_domain_nodes: &mut HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
             changed_domains: &Vec<DomainIndex>) {
+        // TODO(malte): simple round-robin placement for the moment
+        let mut wis = mainline.workers
+            .keys()
+            .map(|wi| wi.clone())
+            .collect::<Vec<WorkerIdentifier>>()
+            .into_iter();
         for domain in changed_domains {
             if mainline.domains.contains_key(&domain) {
                 // this is not a new domain
                 continue;
             }
 
+            // find a worker identifier
+            let wi = loop {
+                if let Some(wi) = wis.next() {
+                    let w = mainline.workers.get(&wi).unwrap();
+                    if w.healthy {
+                        break wi;
+                    }
+                } else {
+                    wis = mainline.workers
+                        .keys()
+                        .map(|wi| wi.clone())
+                        .collect::<Vec<WorkerIdentifier>>()
+                        .into_iter();
+                }
+            };
+
+            // place the domain on the worker
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
             let d = mainline.place_domain(
                 *domain,
+                wi,
                 mainline.ingredients[nodes[0].0].sharded_by().shards(),
                 &log,
                 nodes,
