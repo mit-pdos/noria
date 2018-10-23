@@ -105,6 +105,13 @@ fn main() {
                 .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(
+            Arg::with_name("threads")
+                .long("threads")
+                .takes_value(true)
+                .default_value("0")
+                .help("Number of pool threads to use (0 = #cores)"),
+        )
+        .arg(
             Arg::with_name("replicas")
                 .long("replicas")
                 .takes_value(true)
@@ -134,6 +141,10 @@ fn main() {
         0 => None,
         x => Some(x),
     };
+    let threads = match value_t_or_exit!(matches, "threads", usize) {
+        0 => None,
+        x => Some(x),
+    };
     let replicas = value_t_or_exit!(matches, "replicas", usize);
     let verbose = matches.is_present("verbose");
     let deployment_name = matches.value_of("deployment").unwrap();
@@ -146,6 +157,9 @@ fn main() {
         builder.set_memory_limit(memory, Duration::from_millis(memory_check_freq));
     }
     builder.set_sharding(sharding);
+    if let Some(threads) = threads {
+      builder.set_threads(threads);
+    }
     builder.set_replicas(replicas);
     builder.set_quorum(quorum);
     if matches.is_present("nopartial") {
