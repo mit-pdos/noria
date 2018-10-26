@@ -39,6 +39,7 @@ pub mod ops;
 pub mod payload;
 pub mod prelude;
 pub mod state;
+pub mod timestamp;
 
 mod domain;
 mod group_commit;
