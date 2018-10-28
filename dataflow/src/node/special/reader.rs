@@ -1,6 +1,8 @@
 use backlog;
 use channel;
 use prelude::*;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
 #[derive(Clone, Debug, PartialEq)]
@@ -29,13 +31,14 @@ impl From<Vec<DataType>> for StreamUpdate {
 #[derive(Serialize, Deserialize)]
 pub struct Reader {
     #[serde(skip)]
-    writer: Option<backlog::WriteHandle>,
+    writer: Option<Arc<Mutex<backlog::WriteHandle>>>,
 
     #[serde(skip)]
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
+    uid: Option<DataType>
 }
 
 impl Clone for Reader {
@@ -46,17 +49,19 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
+            uid: self.uid.clone()
         }
     }
 }
 
 impl Reader {
-    pub fn new(for_node: NodeIndex) -> Self {
+    pub fn new(for_node: NodeIndex, uid: Option<DataType>) -> Self {
         Reader {
             writer: None,
             streamers: Vec::new(),
             state: None,
             for_node,
+            uid
         }
     }
 
@@ -66,13 +71,20 @@ impl Reader {
         self.for_node
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn writer(&self) -> Option<&backlog::WriteHandle> {
-        self.writer.as_ref()
+    pub(crate) fn universe(&self) -> Option<DataType> {
+        self.uid.clone()
     }
 
-    pub(crate) fn writer_mut(&mut self) -> Option<&mut backlog::WriteHandle> {
-        self.writer.as_mut()
+    #[allow(dead_code)]
+    // pub(crate) fn writer(&self) -> Option<&backlog::WriteHandle> {
+    //     let lock = self.writer.clone().unwrap().lock().unwrap();
+    //     Some(&*lock)
+    // }
+    //
+    //
+
+    pub(crate) fn writer_mut(&self) -> Option<Arc<Mutex<backlog::WriteHandle>>> {
+        self.writer.clone()
     }
 
     pub fn take(&mut self) -> Self {
@@ -82,6 +94,7 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
+            uid: self.uid.clone()
         }
     }
 
@@ -98,13 +111,12 @@ impl Reader {
     }
 
     pub fn is_partial(&self) -> bool {
-        match self.writer {
-            None => false,
-            Some(ref state) => state.is_partial(),
-        }
+        let w = self.writer_mut().unwrap();
+        let w = w.lock().unwrap();
+        w.is_partial()
     }
 
-    pub(crate) fn set_write_handle(&mut self, wh: backlog::WriteHandle) {
+    pub(crate) fn set_write_handle(&mut self, wh: Arc<Mutex<backlog::WriteHandle>>) {
         assert!(self.writer.is_none());
         self.writer = Some(wh);
     }
@@ -121,9 +133,13 @@ impl Reader {
         }
     }
 
+    // TODO double check that this hacky fix is actually valid...
     pub fn state_size(&self) -> Option<u64> {
         use basics::data::SizeOf;
-        self.writer.as_ref().map(|w| w.deep_size_of())
+        let writer = self.writer_mut().unwrap();
+        let writer = writer.lock().unwrap();
+        Some(writer.deep_size_of())
+
     }
 
     /// Evict a randomly selected key, returning the number of bytes evicted.
@@ -131,7 +147,11 @@ impl Reader {
     /// single key at a time here.
     pub fn evict_random_key(&mut self) -> u64 {
         let mut bytes_freed = 0;
-        if let Some(ref mut handle) = self.writer {
+        let w = self.writer_mut();
+        let w = w.unwrap();
+        let w = w.lock().unwrap();
+
+        if let Some(ref mut handle) = Some(w) {
             use rand;
             let mut rng = rand::thread_rng();
             bytes_freed = handle.evict_random_key(&mut rng);
@@ -142,16 +162,22 @@ impl Reader {
 
     pub fn on_eviction(&mut self, _key_columns: &[usize], keys: &[Vec<DataType>]) {
         // NOTE: *could* be None if reader has been created but its state hasn't been built yet
-        if let Some(w) = self.writer.as_mut() {
+        let w = self.writer_mut();
+        let w = w.unwrap();
+        let w = w.lock().unwrap();
+
+        if let Some(ref mut handle) = Some(w) {
             for k in keys {
-                w.mut_with_key(&k[..]).mark_hole();
+                handle.mut_with_key(&k[..]).mark_hole();
             }
-            w.swap();
-        }
+            handle.swap();
+        };
     }
 
     pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
-        if let Some(ref mut state) = self.writer {
+        let writer = self.writer_mut().unwrap();
+        let writer = writer.lock().unwrap();
+        if let Some(ref mut state) = Some(writer) {
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.

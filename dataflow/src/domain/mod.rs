@@ -13,6 +13,8 @@ use std::time;
 
 use api;
 pub use basics::DomainIndex as Index;
+pub use basics::DataType;
+
 use channel::poll::{PollEvent, ProcessResult};
 use channel::{DomainConnectionBuilder, TcpSender};
 use futures;
@@ -25,6 +27,10 @@ use stream_cancel::Valve;
 use timekeeper::{RealTime, SimpleTracker, ThreadTime, Timer, TimerSet};
 use tokio::{self, prelude::*};
 use Readers;
+
+use std::sync::Mutex;
+use srmap;
+use backlog;
 
 type EnqueuedSends = FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>;
 
@@ -119,6 +125,10 @@ pub struct DomainBuilder {
     pub debug_addr: Option<SocketAddr>,
     /// Configuration parameters for the domain.
     pub config: Config,
+
+    pub context: HashMap<String, DataType>,
+
+    pub universe_id: DataType,
 }
 
 unsafe impl Send for DomainBuilder {}
@@ -151,12 +161,13 @@ impl DomainBuilder {
 
         let group_commit_queues = GroupCommitQueueSet::new(&self.persistence_parameters);
 
+        println!("IN DOMAIN BUILDER: context is {:?} uid is {:?}", self.context.clone(), self.universe_id.clone());
+
         Domain {
             index: self.index,
             shard: self.shard,
             _nshards: self.nshards,
             domain_addr: addr,
-
             persistence_parameters: self.persistence_parameters,
             nodes: self.nodes,
             state: StateMap::default(),
@@ -192,6 +203,9 @@ impl DomainBuilder {
             wait_time: Timer::new(),
             process_times: TimerSet::new(),
             process_ptimes: TimerSet::new(),
+            context: self.context.clone(),
+            universe_id: self.universe_id.clone(),
+            srmap_handles: Vec::new()
         }
     }
 }
@@ -201,7 +215,6 @@ pub struct Domain {
     shard: Option<usize>,
     _nshards: usize,
     domain_addr: SocketAddr,
-
     nodes: DomainNodes,
     state: StateMap,
     log: Logger,
@@ -232,6 +245,9 @@ pub struct Domain {
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
 
+    srmap_handles: Vec<(Arc<Mutex<backlog::SingleReadHandle>>,
+                        Arc<Mutex<backlog::WriteHandle>>)>,
+
     group_commit_queues: GroupCommitQueueSet,
 
     state_size: Arc<AtomicUsize>,
@@ -240,6 +256,8 @@ pub struct Domain {
     wait_time: Timer<SimpleTracker, RealTime>,
     process_times: TimerSet<LocalNodeIndex, SimpleTracker, RealTime>,
     process_ptimes: TimerSet<LocalNodeIndex, SimpleTracker, ThreadTime>,
+    context: HashMap<String, DataType>,
+    universe_id: DataType
 }
 
 impl Domain {
@@ -826,6 +844,7 @@ impl Domain {
                         use payload::InitialState;
                         match state {
                             InitialState::PartialLocal(index) => {
+                                println!("unrelated creation 1");
                                 if !self.state.contains_key(&node) {
                                     self.state.insert(node, box MemoryState::default());
                                 }
@@ -838,6 +857,7 @@ impl Domain {
                                 }
                             }
                             InitialState::IndexedLocal(index) => {
+                                println!("unrelated creation 1");
                                 if !self.state.contains_key(&node) {
                                     self.state.insert(node, box MemoryState::default());
                                 }
@@ -853,8 +873,14 @@ impl Domain {
                                 cols,
                                 key,
                                 trigger_domain: (trigger_domain, shards),
+                                prepare,
+                                domain_info
                             } => {
                                 use backlog;
+                                use std::sync::Arc;
+                                println!("HELLO gid: {:?}, cols: {:?}, key: {:?}, domain_info: {:?}", gid.clone(), cols.clone(), key.clone(), domain_info.clone());
+
+                                let srmap = true;
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
                                     .map(|shard| {
@@ -889,27 +915,51 @@ impl Domain {
                                                 }).fold(sender, move |sender, m| {
                                                     sender.send(m).map_err(|e| {
                                                         // domain went away?
-                                                        eprintln!(
-                                                            "replay source went away: {:?}",
-                                                            e
-                                                        );
+                                                        // println!(
+                                                        //     "replay source went away: {:?}",
+                                                        //     e
+                                                        // );
                                                     })
                                                 }).map(|_| ()),
                                         );
                                         tx
                                     }).collect::<Vec<_>>();
-                                let (r_part, w_part) =
-                                    backlog::new_partial(cols, &k[..], move |miss| {
-                                        let n = txs.len();
-                                        let tx = if n == 1 {
-                                            &txs[0]
-                                        } else {
-                                            // TODO: compound reader
-                                            assert_eq!(miss.len(), 1);
-                                            &txs[::shard_by(&miss[0], n)]
-                                        };
-                                        tx.unbounded_send(Vec::from(miss)).unwrap();
-                                    });
+
+                                let (r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
+                                                           Arc<Mutex<backlog::WriteHandle>>);
+                                match domain_info {
+                                    Some(info) => {
+                                        let domain_index = info.0;
+                                        assert_eq!(domain_index, self.index.index());
+                                        let offset = info.1;
+                                        let (tr_part, tw_part) = self.srmap_handles[offset].clone();
+                                        println!("REUSING SRMAP: domain_info: {:?}", info.clone());
+                                        println!("SRMAP Handles len array: {:?}, looking for offset: {:?}", self.srmap_handles.clone().len(), offset.clone());
+                                        r_part = tr_part;
+                                        w_part = tw_part;
+                                    },
+                                    None => {
+                                        // SRMap does not yet exist, create it
+                                        let (tr_part, tw_part) = backlog::new_partial(srmap, self.context.clone(), cols, &k[..], move |miss| {
+                                            let n = txs.len();
+                                            let tx = if n == 1 {
+                                                &txs[0]
+                                            } else {
+                                                // TODO: compound reader
+                                                assert_eq!(miss.len(), 1);
+                                                &txs[::shard_by(&miss[0], n)]
+                                            };
+                                            tx.unbounded_send(Vec::from(miss)).unwrap();
+                                        });
+                                        let (tr_part, tw_part) = (Arc::new(Mutex::new(tr_part)), Arc::new(Mutex::new(tw_part)));
+                                        r_part = tr_part;
+                                        w_part = tw_part;
+                                        self.srmap_handles.push((r_part.clone(), w_part.clone()));
+                                        println!("MAKING NEW SRMAP");
+                                        println!("Pushing onto SRMap handles array... new len: {:?}", self.srmap_handles.clone().len());
+
+                                    }
+                                };
 
                                 let mut n = self.nodes[&node].borrow_mut();
                                 n.with_reader_mut(|r| {
@@ -922,14 +972,49 @@ impl Domain {
                                                 r_part
                                             ).is_none()
                                     );
+                                    let uid = r.universe();
+                                    match uid {
+                                        Some(id) => {
+                                            let id = id.to_string();
+                                            let id : u32 = id.parse::<u32>().unwrap();
+                                            w_part.lock().unwrap().add_user(id as usize)
+                                        },
+                                        None => {},
+                                    };
 
                                     // make sure Reader is actually prepared to receive state
                                     r.set_write_handle(w_part)
                                 }).unwrap();
                             }
-                            InitialState::Global { gid, cols, key } => {
+                            InitialState::Global { gid, cols, key, prepare, domain_info } => {
                                 use backlog;
-                                let (r_part, w_part) = backlog::new(cols, &key[..]);
+                                use std::sync::Arc;
+                                println!("HELLO gid: {:?}, cols: {:?}, key: {:?}, domain_info: {:?}", gid.clone(), cols.clone(), key.clone(), domain_info.clone());
+                                let srmap = true;
+                                let (r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
+                                                           Arc<Mutex<backlog::WriteHandle>>);
+                                match domain_info {
+                                    Some(info) => {
+                                        let domain_index = info.0;
+                                        assert_eq!(domain_index, self.index.index());
+                                        let offset = info.1;
+                                        let (tr_part, tw_part) = self.srmap_handles[offset].clone();
+                                        r_part = tr_part;
+                                        w_part = tw_part;
+                                        println!("REUSING SRMAP: domain_info: {:?}", info.clone());
+                                        println!("SRMAP Handles len array: {:?}, looking for offset: {:?}", self.srmap_handles.clone().len(), offset.clone());
+                                    },
+                                    None => {
+                                        let (tr_part, tw_part) = backlog::new(srmap, self.context.clone(), cols, &key[..]);
+                                        let tr_part = Arc::new(Mutex::new(tr_part));
+                                        let tw_part = Arc::new(Mutex::new(tw_part));
+                                        self.srmap_handles.push((tr_part.clone(), tw_part.clone()));
+                                        r_part = tr_part;
+                                        w_part = tw_part;
+                                        println!("MAKING NEW SRMAP");
+                                        println!("Pushing onto SRMap handles array... new len: {:?}", self.srmap_handles.clone().len());
+                                    }
+                                };
 
                                 let mut n = self.nodes[&node].borrow_mut();
                                 n.with_reader_mut(|r| {
@@ -942,6 +1027,16 @@ impl Domain {
                                                 r_part
                                             ).is_none()
                                     );
+
+                                    let uid = r.universe();
+                                    match uid {
+                                        Some(id) => {
+                                            let id = id.to_string();
+                                            let id : u32 = id.parse::<u32>().unwrap();
+                                            w_part.lock().unwrap().add_user(id as usize)
+                                        },
+                                        None => {},
+                                    };
 
                                     // make sure Reader is actually prepared to receive state
                                     r.set_write_handle(w_part)
@@ -957,6 +1052,8 @@ impl Domain {
                         trigger,
                     } => {
                         // let coordinator know that we've registered the tagged path
+                        // println!("HERE5");
+
                         self.control_reply_tx
                             .send(ControlReplyPacket::ack())
                             .unwrap();
@@ -1023,6 +1120,7 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
+                        // println!("HERE6");
                         let still_miss = self.nodes[&node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
@@ -1030,6 +1128,9 @@ impl Domain {
                                     .writer_mut()
                                     .expect("reader replay requested for non-materialized reader");
                                 // ensure that all writes have been applied
+
+                                let mut w = w.lock().unwrap();
+
                                 w.swap();
                                 w.with_key(&key[..])
                                     .try_find_and(|_| ())
@@ -1049,6 +1150,7 @@ impl Domain {
                         }
                     }
                     Packet::RequestPartialReplay { tag, key } => {
+                        // println!("HERE7");
                         trace!(
                             self.log,
                            "got replay request";
@@ -1058,6 +1160,7 @@ impl Domain {
                         self.seed_replay(tag, &key[..], sends);
                     }
                     Packet::StartReplay { tag, from } => {
+                        // println!("HERE8");
                         use std::thread;
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
@@ -1228,7 +1331,8 @@ impl Domain {
                                 n.with_reader_mut(|r| {
                                     if let Some(ref mut state) = r.writer_mut() {
                                         trace!(self.log, "swapping state"; "local" => node.id());
-                                        state.swap();
+                                        let w = &mut *state.lock().unwrap();
+                                        w.swap();
                                         trace!(self.log, "state swapped"; "local" => node.id());
                                     }
                                 }).unwrap();
@@ -1721,7 +1825,11 @@ impl Domain {
                                     // we must be filling a hole in a Reader. we need to ensure
                                     // that the hole for the key we're replaying ends up being
                                     // filled, even if that hole is empty!
-                                    r.writer_mut().map(|wh| {
+                                    let w = r.writer_mut();
+                                    let w = w.unwrap();
+                                    let w = w.lock().unwrap();
+                                    let w = Some(w);
+                                    w.map(|mut wh| {
                                         for key in backfill_keys.iter() {
                                             wh.mut_with_key(&key[..]).mark_filled();
                                         }
@@ -1775,6 +1883,7 @@ impl Domain {
                                 } else {
                                     n.with_reader_mut(|r| {
                                         r.writer_mut().map(|wh| {
+                                            let mut wh = wh.lock().unwrap();
                                             for miss in &missed_on {
                                                 wh.mut_with_key(&miss[..]).mark_hole();
                                             }
@@ -1784,7 +1893,10 @@ impl Domain {
                             } else if is_reader {
                                 // we filled a hole! swap the reader.
                                 n.with_reader_mut(|r| {
-                                    r.writer_mut().map(|wh| wh.swap());
+                                    r.writer_mut().map(|wh| {
+                                        let mut wh = wh.lock().unwrap();
+                                        wh.swap();
+                                    });
                                 }).unwrap();
                                 // and also unmark the replay request
                                 if let Some(ref mut prev) =
@@ -1807,6 +1919,7 @@ impl Domain {
                             } else {
                                 n.with_reader_mut(|r| {
                                     r.writer_mut().map(|wh| {
+                                        let mut wh = wh.lock().unwrap();
                                         for key in &captured {
                                             wh.mut_with_key(&key[..]).mark_hole();
                                         }

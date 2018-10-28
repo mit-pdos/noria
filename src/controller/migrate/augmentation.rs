@@ -22,6 +22,8 @@ pub fn inform(
     nodes: HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
 ) {
     let source = controller.source;
+
+    println!("augmentation::inform, looking at nodes: {:?}", nodes.clone());
     for (domain, nodes) in nodes {
         let log = log.new(o!("domain" => domain.index()));
         let ctx = controller.domains.get_mut(&domain).unwrap();

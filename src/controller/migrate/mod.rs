@@ -246,6 +246,31 @@ impl<'a> Migration<'a> {
 
         let ri = self.readers[&n];
 
+        let mut leaf_to_query = HashMap::new();
+        for (query_n, node_list) in self.mainline.query_to_leaves.iter() {
+           for node in node_list.clone() {
+               leaf_to_query.insert(node, query_n);
+           }
+        }
+
+        match leaf_to_query.get(&n.clone()) {
+            Some(query) => {
+                match self.mainline.query_to_readers.get_mut(query.clone()) {
+                   Some(reader_set) => {
+                       reader_set.insert(ri.clone());
+                   },
+                   None => {
+                       let mut reader_set = HashSet::new();
+                       reader_set.insert(ri.clone());
+                       self.mainline.query_to_readers.insert(query.clone().to_string(), reader_set);
+                   }
+               };
+            },
+            None => {
+                println!("In maintain: node {:?} is not in query_to_leaves...", n.clone());
+            }
+        }
+
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
@@ -258,7 +283,8 @@ impl<'a> Migration<'a> {
     /// new updates should be sent to introduce them into the Soup.
     pub fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
-
+        println!("in migration::commit. query_to_readers: {:?}", self.mainline.query_to_readers.clone());
+        
         let log = self.log;
         let start = self.start;
         let mut mainline = self.mainline;
@@ -285,10 +311,8 @@ impl<'a> Migration<'a> {
         // Assign domains
         assignment::assign(
             &log,
-            &mut mainline.ingredients,
-            mainline.source,
+            &mut mainline,
             &new,
-            &mut mainline.ndomains,
         );
 
         // Set up ingress and egress nodes

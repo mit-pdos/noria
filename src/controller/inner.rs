@@ -4,7 +4,7 @@ use consensus::{Authority, Epoch, STATE_KEY};
 use dataflow::prelude::*;
 use dataflow::{node, payload, DomainConfig};
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -60,6 +60,10 @@ pub struct ControllerInner {
 
     /// Current recipe
     recipe: Recipe,
+
+    pub(super) query_to_leaves: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_readers: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_domain: HashMap<String, usize>,
 
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
@@ -390,6 +394,9 @@ impl ControllerInner {
 
             pending_recovery,
             last_checked_workers: Instant::now(),
+            query_to_leaves: HashMap::default(),
+            query_to_readers: HashMap::default(),
+            query_to_domain: HashMap::default(),
         }
     }
 

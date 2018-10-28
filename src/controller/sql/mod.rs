@@ -142,10 +142,11 @@ impl SqlIncorporator {
         name: Option<String>,
         is_leaf: bool,
         mig: &mut Migration,
+        global_name: Option<String>
     ) -> Result<QueryFlowParts, String> {
         match name {
             None => self.nodes_for_query(query, is_leaf, mig),
-            Some(n) => self.nodes_for_named_query(query, n, is_leaf, mig),
+            Some(n) => self.nodes_for_named_query(query, n, is_leaf, mig, global_name),
         }
     }
 
@@ -406,7 +407,7 @@ impl SqlIncorporator {
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`.
         // Note that we don't need to optimize the MIR here, because the query is trivial.
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
 
         self.register_query(query_name, None, &mir, mig.universe());
 
@@ -427,7 +428,7 @@ impl SqlIncorporator {
         // no optimization, because standalone base nodes can't be optimized
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
 
         // remember the schema in case we need it later
         // on base table schema change, we will overwrite the existing schema here.
@@ -456,7 +457,7 @@ impl SqlIncorporator {
             .iter()
             .enumerate()
             .map(|(i, sq)| {
-                self.add_select_query(&format!("{}_csq_{}", query_name, i), &sq.1, false, mig)
+                self.add_select_query(&format!("{}_csq_{}", query_name, i), &sq.1, false, mig, None)
                     .1
                     .unwrap()
             }).collect();
@@ -470,7 +471,7 @@ impl SqlIncorporator {
             is_leaf,
         );
 
-        let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig, None);
+        let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig, None, None);
 
         self.register_query(query_name, None, &combined_mir_query, mig.universe());
 
@@ -485,6 +486,7 @@ impl SqlIncorporator {
         sq: &SelectStatement,
         is_leaf: bool,
         mig: &mut Migration,
+        global_name: Option<String>
     ) -> (QueryFlowParts, Option<MirQuery>) {
         let (qg, reuse) = self.consider_query_graph(&query_name, mig.universe(), sq);
         match reuse {
@@ -499,7 +501,7 @@ impl SqlIncorporator {
                 (qfp, None)
             }
             QueryGraphReuse::ExtendExisting(mqs) => {
-                let qfp = self.extend_existing_query(&query_name, sq, qg, mqs, is_leaf, mig);
+                let qfp = self.extend_existing_query(&query_name, sq, qg, mqs, is_leaf, mig, global_name);
                 (qfp, None)
             }
             QueryGraphReuse::ReaderOntoExisting(mn, project_columns, params) => {
@@ -553,7 +555,7 @@ impl SqlIncorporator {
         }
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
 
         // register local state
         self.register_query(query_name, Some(qg), &mir, universe);
@@ -674,6 +676,7 @@ impl SqlIncorporator {
         reuse_mirs: Vec<(u64, UniverseId)>,
         is_leaf: bool,
         mut mig: &mut Migration,
+        global_name: Option<String>
     ) -> QueryFlowParts {
         use mir::reuse::merge_mir_for_queries;
         use mir::visualize::GraphViz;
@@ -735,7 +738,7 @@ impl SqlIncorporator {
             post_reuse_opt_mir.to_graphviz().unwrap()
         );
 
-        let qfp = mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig, table_mapping);
+        let qfp = mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig, table_mapping, global_name);
 
         info!(
             self.log,
@@ -760,7 +763,7 @@ impl SqlIncorporator {
             SqlQuery::Select(_) | SqlQuery::CompoundSelect(_) => format!("q_{}", self.num_queries),
             _ => panic!("only CREATE TABLE and SELECT queries can be added to the graph!"),
         };
-        self.nodes_for_named_query(q, name, is_leaf, mig)
+        self.nodes_for_named_query(q, name, is_leaf, mig, None)
     }
 
     /// Runs some standard rewrite passes on the query.
@@ -792,7 +795,7 @@ impl SqlIncorporator {
                     let (sq, column) = query_from_condition_base(&cond_base);
 
                     let qfp = self
-                        .add_parsed_query(sq, None, false, mig)
+                        .add_parsed_query(sq, None, false, mig, None)
                         .expect("failed to add subquery");
                     *cond_base = field_with_table_name(qfp.name.clone(), column);
                 }
@@ -805,6 +808,7 @@ impl SqlIncorporator {
                                     alias.clone(),
                                     false,
                                     mig,
+                                    None,
                                 ).expect("failed to add subquery in join");
                             JoinRightSide::Table(Table {
                                 name: qfp.name.clone(),
@@ -855,6 +859,7 @@ impl SqlIncorporator {
         query_name: String,
         is_leaf: bool,
         mig: &mut Migration,
+        global_name: Option<String>
     ) -> Result<QueryFlowParts, String> {
         let q = self.rewrite_query(q, mig);
 
@@ -869,7 +874,7 @@ impl SqlIncorporator {
                 self.add_compound_query(&query_name, csq, is_leaf, mig)
                     .unwrap()
             }
-            SqlQuery::Select(ref sq) => self.add_select_query(&query_name, sq, is_leaf, mig).0,
+            SqlQuery::Select(ref sq) => self.add_select_query(&query_name, sq, is_leaf, mig, global_name).0,
             SqlQuery::CreateView(ref cvq) => {
                 use nom_sql::SelectSpecification;
                 match *cvq.definition {
@@ -877,7 +882,7 @@ impl SqlIncorporator {
                         self.add_compound_query(&cvq.name, csq, is_leaf, mig)?
                     }
                     SelectSpecification::Simple(ref sq) => {
-                        self.add_select_query(&cvq.name, sq, is_leaf, mig).0
+                        self.add_select_query(&cvq.name, sq, is_leaf, mig, None).0
                     }
                 }
             }
@@ -941,7 +946,7 @@ impl<'a> ToFlowParts for &'a str {
 
         // if ok, manufacture a node for the query structure we got
         match parsed_query {
-            Ok(q) => inc.add_parsed_query(q, name, true, mig),
+            Ok(q) => inc.add_parsed_query(q, name, true, mig, None),
             Err(e) => Err(String::from(e)),
         }
     }

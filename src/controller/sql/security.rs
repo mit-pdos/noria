@@ -107,7 +107,7 @@ impl Multiverse for SqlIncorporator {
         for policy in universe_policies {
             if !policy.is_row_policy() {
                 let qfp = self
-                    .add_parsed_query(policy.predicate(), None, false, mig)
+                    .add_parsed_query(policy.predicate(), None, false, mig, None)
                     .unwrap();
                 let rewrite_view = qfp.name.clone();
                 let rw_pol = RewritePolicy {
@@ -181,7 +181,7 @@ impl Multiverse for SqlIncorporator {
 
         let parsed_query = sql_parser::parse_query(&s).unwrap();
 
-        self.add_parsed_query(parsed_query, Some(name), false, mig)
+        self.add_parsed_query(parsed_query, Some(name), false, mig, None)
             .unwrap()
     }
 }

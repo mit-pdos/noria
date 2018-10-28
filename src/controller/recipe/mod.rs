@@ -13,7 +13,7 @@ use nom_sql::SqlQuery;
 use nom::{self, is_alphanumeric, multispace};
 use nom_sql::CreateTableStatement;
 use slog;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str;
 use std::vec::Vec;
 
@@ -289,14 +289,17 @@ impl Recipe {
             // add the universe-specific query
             // don't use query name to avoid conflict with global queries
             let (id, group) = mig.universe();
+            let mut in_group = false;
             let new_name = if n.is_some() {
                 match group {
-                    Some(ref g) => Some(format!(
+                    Some(ref g) => {
+                        let in_group = true;
+                        Some(format!(
                         "{}_{}{}",
                         n.clone().unwrap(),
                         g.to_string(),
                         id.to_string()
-                    )),
+                    ))},
                     None => Some(format!("{}_u{}", n.clone().unwrap(), id.to_string())),
                 }
             } else {
@@ -309,17 +312,19 @@ impl Recipe {
                 .inc
                 .as_mut()
                 .unwrap()
-                .add_parsed_query(q, new_name, is_leaf, mig)?;
+                .add_parsed_query(q, new_name.clone(), is_leaf, mig, n.clone())?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
-            let query_name = match n {
+            let query_name = match n.clone() {
                 Some(name) => name,
                 None => qfp.name.clone(),
             };
 
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
+
+        println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
 
         Ok(result)
     }
@@ -372,6 +377,7 @@ impl Recipe {
                     Some(group.name()),
                     true,
                     mig,
+                    None
                 )?;
 
                 /// Add trigger node below group membership views
@@ -403,7 +409,7 @@ impl Recipe {
                 .inc
                 .as_mut()
                 .unwrap()
-                .add_parsed_query(q, n.clone(), is_leaf, mig)?;
+                .add_parsed_query(q, n.clone(), is_leaf, mig, None)?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.

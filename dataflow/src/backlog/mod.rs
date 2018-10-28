@@ -1,31 +1,36 @@
 use basics::data::SizeOf;
 use basics::{DataType, Record};
-use fnv::FnvBuildHasher;
 use std::borrow::Cow;
 
 use rand::{Rng, ThreadRng};
 use std::sync::Arc;
+use std::collections::HashMap;
+use fnv::FnvBuildHasher;
 
 /// Allocate a new end-user facing result table.
-pub(crate) fn new(cols: usize, key: &[usize]) -> (SingleReadHandle, WriteHandle) {
-    new_inner(cols, key, None)
+pub(crate) fn new(srmap: bool, context: HashMap<String, DataType>, cols: usize, key: &[usize]) -> (SingleReadHandle, WriteHandle) {
+    new_inner(srmap, context, cols, key, None)
 }
 
 /// Allocate a new partially materialized end-user facing result table.
 ///
 /// Misses in this table will call `trigger` to populate the entry, and retry until successful.
 pub(crate) fn new_partial<F>(
+    srmap: bool,
+    context: HashMap<String, DataType>,
     cols: usize,
     key: &[usize],
-    trigger: F,
+    trigger: F
 ) -> (SingleReadHandle, WriteHandle)
 where
     F: Fn(&[DataType]) + 'static + Send + Sync,
 {
-    new_inner(cols, key, Some(Arc::new(trigger)))
+    new_inner(srmap, context, cols, key, Some(Arc::new(trigger)))
 }
 
 fn new_inner(
+    srmap: bool,
+    mut context: HashMap<String, DataType>,
     cols: usize,
     key: &[usize],
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
@@ -45,6 +50,17 @@ fn new_inner(
         contiguous
     };
 
+    let mut srmap = false;
+
+    macro_rules! make_srmap {
+    ($variant:tt) => {{
+            use srmap;
+            println!("actually making srmap nice");
+            let (r, w) = srmap::srmap::construct(-1);
+            (multir::Handle::$variant(context.clone(), r), multiw::Handle::$variant(context.clone(), w))
+        }};
+    }
+
     macro_rules! make {
         ($variant:tt) => {{
             use evmap;
@@ -52,16 +68,32 @@ fn new_inner(
                 .with_meta(-1)
                 .with_hasher(FnvBuildHasher::default())
                 .construct();
-
             (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
     }
 
-    let (r, w) = match key.len() {
-        0 => unreachable!(),
-        1 => make!(Single),
-        2 => make!(Double),
-        _ => make!(Many),
+    // println!("CONTEXT in new partial: {:?}", context.clone());
+
+    let context_size =  context.clone().len();
+
+    if context_size > 0 {
+        srmap = true;
+        println!("MAKING SRMAP. context: {:?}", context.clone());
+        // println!("CHECKPOINT: context: {:?}", context.clone());
+    } else {
+        context.insert("id".to_string(), "0".into());
+        println!("MAKING EVMAP.");
+    }
+
+    srmap = true;
+    let (r, w) = match (key.len(), srmap) {
+        (0, _) => unreachable!(),
+        (1, true) => make_srmap!(SingleSR),
+        // (1, false) => make!(Single),
+        (2, true) => make_srmap!(DoubleSR),
+        // (2, false) => make!(Double),
+        (_, true) => make_srmap!(ManySR),
+        (_, false) => unreachable!()
     };
 
     let w = WriteHandle {
@@ -71,11 +103,13 @@ fn new_inner(
         cols: cols,
         contiguous,
         mem_size: 0,
+        context: context.clone(),
     };
     let r = SingleReadHandle {
         handle: r,
         trigger: trigger,
         key: Vec::from(key),
+        context: context.clone(),
     };
 
     (r, w)
@@ -112,6 +146,7 @@ pub(crate) struct WriteHandle {
     key: Vec<usize>,
     contiguous: bool,
     mem_size: usize,
+    context: HashMap<String, DataType>,
 }
 
 type Key<'a> = Cow<'a, [DataType]>;
@@ -199,6 +234,10 @@ impl WriteHandle {
             handle: self,
             key: key.into(),
         }
+    }
+
+    pub(crate) fn add_user(&mut self, uid: usize) {
+        self.handle.add_user(uid)
     }
 
     pub(crate) fn with_key<'a, K>(&'a self, key: K) -> WriteHandleEntry<'a>
@@ -297,6 +336,7 @@ pub struct SingleReadHandle {
     handle: multir::Handle,
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
     key: Vec<usize>,
+    context: HashMap<String, DataType>,
 }
 
 impl SingleReadHandle {

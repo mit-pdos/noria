@@ -1,23 +1,34 @@
 //! Functions for assigning new nodes to thread domains.
-
 use dataflow::prelude::*;
 use petgraph;
 use slog::Logger;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use crate::controller::Recipe;
+use crate::controller::inner::ControllerInner;
 
 pub fn assign(
     log: &Logger,
-    graph: &mut Graph,
-    source: NodeIndex,
+    mainline: &mut ControllerInner,
     new: &HashSet<NodeIndex>,
-    ndomains: &mut usize,
-) {
+)  {
+
+    let mut graph = &mut mainline.ingredients;
+    let source = mainline.source;
+    let mut ndomains = &mut mainline.ndomains;
     // we need to walk the data flow graph and assign domains to all new nodes.
     // we generally want as few domains as possible, but in *some* cases we must make new ones.
     // specifically:
     //
     //  - the child of a Sharder is always in a different domain from the sharder
     //  - shard merge nodes are never in the same domain as their sharded ancestors
+
+    println!("Assigning nodes to domains. Query to readers map: {:?}", mainline.query_to_readers.clone());
+    let mut reader_to_query = HashMap::new();
+    for (query_n, node_list) in mainline.query_to_readers.iter() {
+        for node in node_list.clone() {
+            reader_to_query.insert(node, query_n);
+        }
+    }
 
     let mut topo_list = Vec::with_capacity(new.len());
     let mut topo = petgraph::visit::Topo::new(&*graph);
@@ -39,16 +50,54 @@ pub fn assign(
         *ndomains - 1
     };
 
+    let mut domain_map = &mut mainline.query_to_domain;
+
     for node in topo_list {
         let assignment = (|| {
             let graph = &*graph;
             let n = &graph[node];
 
+            let mut srmap_assignment : usize = 0;
+            let mut assigned = false;
+            let mut srmap_reader_node = false;
+            let mut srmap_query = "".to_string();
+
+            // Check to see if this is a node that shares an SRMap
+            match reader_to_query.get(&node) {
+                // If it does share an SRMap, see if another node sharing that SRMap was already
+                // assigned to a domain, and if it was, place this node in the same domain
+                Some(query) => {
+                    srmap_reader_node = true;
+                    match domain_map.get(query.clone()) {
+                        Some(domain) => {
+                            srmap_query = query.to_string();
+                            srmap_assignment = *domain;
+                            assigned = true;
+                        },
+                        None => {
+                            srmap_query = query.to_string();
+                        },
+                    }
+                },
+                None => {}
+            };
+
+            // this is a reader node that accesses an SRMap that was already placed in a domain.
+            // assign this reader node to that same domain.
+            if assigned {
+                return srmap_assignment;
+            }
+
             if n.is_shard_merger() {
                 // shard mergers are always in their own domain.
                 // we *could* use the same domain for multiple separate shard mergers
                 // but it's unlikely that would do us any good.
-                return next_domain();
+
+                let domain_assignment = next_domain();
+                if srmap_reader_node {
+                    domain_map.insert(srmap_query.clone(), domain_assignment);
+                }
+                return domain_assignment;
             }
 
             if n.is_base() {
@@ -102,15 +151,27 @@ pub fn assign(
                 }
 
                 return if let Some(friendly_base) = friendly_base {
-                    friendly_base.domain().index()
+                    let domain_assignment = friendly_base.domain().index();
+                    if srmap_reader_node {
+                        domain_map.insert(srmap_query.clone(), domain_assignment);
+                    }
+                    domain_assignment
                 } else {
                     // there are no bases like us, so we need a new domain :'(
-                    next_domain()
+                    let domain_assignment = next_domain();
+                    if srmap_reader_node {
+                        domain_map.insert(srmap_query.clone(), domain_assignment);
+                    }
+                    domain_assignment
                 };
             }
 
             if graph[node].name().starts_with("BOUNDARY_") {
-                return next_domain();
+                let domain_assignment = next_domain();
+                if srmap_reader_node {
+                    domain_map.insert(srmap_query.clone(), domain_assignment);
+                }
+                return domain_assignment;
             }
 
             let any_parents = move |prime: &Fn(&Node) -> bool, check: &Fn(&Node) -> bool| {
@@ -193,10 +254,22 @@ pub fn assign(
                 }
             }
 
-            assignment.unwrap_or_else(|| {
-                // no other options left -- we need a new domain
-                next_domain()
-            })
+            match assignment {
+                Some(domain_assignment) => {
+                    if srmap_reader_node {
+                        domain_map.insert(srmap_query.clone(), domain_assignment);
+                    }
+                    return domain_assignment;
+                },
+                None => {
+                    let domain_assignment = next_domain();
+                    if srmap_reader_node {
+                        domain_map.insert(srmap_query.clone(), domain_assignment);
+                    }
+                    return domain_assignment;
+                }
+            }
+
         })();
 
         debug!(log, "node added to domain";
@@ -205,4 +278,5 @@ pub fn assign(
            "domain" => ?assignment);
         graph[node].add_to(assignment.into());
     }
+
 }
