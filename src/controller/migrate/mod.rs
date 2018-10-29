@@ -248,7 +248,7 @@ impl<'a> Migration<'a> {
         let ri = self.readers[&n];
 
         let mut leaf_to_query = HashMap::new();
-        for (query_n, node_list) in self.mainline.query_to_leaves.iter() {
+        for (query_n, node_list) in self.mainline.map_meta.query_to_leaves.iter() {
            for node in node_list.clone() {
                leaf_to_query.insert(node, query_n);
            }
@@ -256,14 +256,14 @@ impl<'a> Migration<'a> {
 
         match leaf_to_query.get(&n.clone()) {
             Some(query) => {
-                match self.mainline.query_to_readers.get_mut(query.clone()) {
+                match self.mainline.map_meta.query_to_readers.get_mut(query.clone()) {
                    Some(reader_set) => {
                        reader_set.insert(ri.clone());
                    },
                    None => {
                        let mut reader_set = HashSet::new();
                        reader_set.insert(ri.clone());
-                       self.mainline.query_to_readers.insert(query.clone().to_string(), reader_set);
+                       self.mainline.map_meta.query_to_readers.insert(query.clone().to_string(), reader_set);
                    }
                };
             },
@@ -284,7 +284,7 @@ impl<'a> Migration<'a> {
     /// new updates should be sent to introduce them into the Soup.
     pub fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
-        println!("in migration::commit. query_to_readers: {:?}", self.mainline.query_to_readers.clone());
+        println!("in migration::commit. query_to_readers: {:?}", self.mainline.map_meta.query_to_readers.clone());
 
         let log = self.log;
         let start = self.start;
@@ -595,7 +595,7 @@ impl<'a> Migration<'a> {
             &new,
             &mut mainline.domains,
             &mainline.workers,
-            &mut mainline.map_meta, 
+            &mut mainline.map_meta,
         );
 
         warn!(log, "migration completed"; "ms" => start.elapsed().as_millis() as u64);

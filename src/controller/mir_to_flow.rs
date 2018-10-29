@@ -176,7 +176,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                 }
                 MirNodeType::Leaf { ref keys, .. } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
-                    
+
                     let parent = mir_node.ancestors[0].clone();
                     let na = parent.borrow().flow_node_addr().unwrap();
 
@@ -189,12 +189,12 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                     }
 
                     if g_name != "".to_string() {
-                        if !mig.mainline.query_to_leaves.contains_key(&g_name.clone()) {
+                        if !mig.mainline.map_meta.query_to_leaves.contains_key(&g_name.clone()) {
                             let mut associated_nodes = HashSet::new();
                             associated_nodes.insert(na.clone());
-                            mig.mainline.query_to_leaves.insert(g_name.clone(), associated_nodes);
+                            mig.mainline.map_meta.query_to_leaves.insert(g_name.clone(), associated_nodes);
                         } else {
-                            match mig.mainline.query_to_leaves.get_mut(&g_name.clone()) {
+                            match mig.mainline.map_meta.query_to_leaves.get_mut(&g_name.clone()) {
                                Some(list) => list.insert(na.clone()),
                                None => false
                            };

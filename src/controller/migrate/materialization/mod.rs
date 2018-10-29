@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::controller::inner::ControllerInner;
-use crate::controller::inner::SRMapMeta;
+use crate::controller::inner::MapMeta;
 
 mod plan;
 
@@ -705,92 +705,48 @@ impl Materializations {
 
         // then, we start prepping new nodes
         for ni in make {
-            let mut prep_node = false;
+            // We're checking to see if this node will share an SRMap. If it's an SRMap node,
+            // we'll figure out the materialization information and set a flag as such.
+            // If it's not, then we still need to materialize a map for it (whether it be an SRMAP
+            // or other), but we won't add it to the Vec of SRMap handles stored in the domain.
+            let mut srmap_node = false;
+            let mut materialization_info : Option<(usize, usize)> = None;
             // Check if this node should share an SRMap
             match reader_to_q.get(&ni) {
                 Some(query) => {
+                    srmap_node = true;
                     // Check to see if SRMap was already materialized
-                    match map_meta.query_to_materialization(&query) {
+                    match map_meta.query_to_materialization.get(query.clone()) {
                         // If it was materialized, figure out where it's located (domain and offset)
                         Some(info) => {
-
+                            materialization_info = Some(info.clone());
                         },
                         // If it wasn't materialized, materialize it!
                         None => {
-                            prep_node = true;
+                            match map_meta.query_to_domain.get(query.clone()) {
+                                Some(domain) => {
+                                    let mut new_offset = 0;
+                                    match map_meta.domain_to_offset.get_mut(&domain) {
+                                        Some(offset) => {
+                                            new_offset = *offset + 1;
+                                            materialization_info = Some((domain.clone(), new_offset.clone()));
+                                            println!("Updating domain {:?}'s offset to {:?}", domain.clone(), new_offset.clone());
+                                        },
+                                        None => {
+                                            materialization_info = Some((domain.clone(), 0));
+                                        }
+                                    };
+                                    map_meta.domain_to_offset.insert(domain.clone(), new_offset);
+                                },
+                                None => {
+                                    panic!("SRMap node should be assigned to a domain!");
+                                }
+                            }
                         }
                     }
                 },
-                None => {
-                    prep_node = true;
-                }
+                None => {}
             }
-
-
-
-            match reader_to_q.get(&ni) {
-                // This is a reader node for an SRMap, check if SRMap already exists, o/w materialize
-                // state and update tracking of this
-                Some(query) => {
-                    // Figure out which domain the SRMap is supposed to be in
-                    match map_meta.query_to_domain.get(query.clone()) {
-                        Some(domain) => {
-                            match map_meta.query_to_domain.get(&*domain) {
-                                Some(rep_node) => {
-                                    // SRMap already materialized
-                                    // Update node_to_domain_handle to point to the right things
-                                    match srmap_meta.node_to_domain_info.get(&*rep_node) {
-                                        Some(domain_info) => {
-                                            let domain_i = domain_info.clone();
-                                            srmap_meta.node_to_domain_info.insert(ni.clone(), *domain_info);
-                                        },
-                                        None => {}
-                                    }
-                                }
-                                None => {
-                                    srmap_meta.domain_to_rep_node.insert(domain.clone(), ni.clone());
-                                    // Check what index into the domain's SRMap vec this SRmap will be
-                                    match srmap_meta.domain_to_offset.get_mut(&domain) {
-                                        Some(mut offset) => {
-                                            let mut new_offset = *offset + 1;
-                                            let domain_i = (domain.clone(), new_offset.clone());
-                                            srmap_meta.domain_to_offset.insert(domain.clone(), new_offset);
-                                            srmap_meta.node_to_domain_info.insert(ni.clone(), domain_i.clone());
-                                        }
-                                        None => {
-                                            let domain_i = (domain.clone(), 0);
-                                            srmap_meta.domain_to_offset.insert(domain.clone(), 0);
-                                            srmap_meta.node_to_domain_info.insert(ni.clone(), domain_i.clone());
-                                        }
-                                    }
-                                    // Need to materialize SRMap
-                                    prep_node = true;
-                                }
-                            }
-                        },
-                        None => {}
-                    }
-                },
-                // Not a reader node for an SRMap, continue as per usual
-                None => {
-                    prep_node = true;
-                }
-            }
-
-            if prep_node {
-                println!("PREP planning to materialize node {:?}", ni.clone());
-            } else {
-                println!("PREP not materializing node {:?}", ni.clone());
-            }
-
-            prep_node = true;
-
-            let mut dom_i = None;
-            match srmap_meta.node_to_domain_info.get(&ni.clone()) {
-                Some(d) => {dom_i = Some(*d);},
-                None => {dom_i = None;}
-            }
-            // let dom_i = Some(*di.unwrap());
 
             let n = &graph[ni];
 
@@ -803,7 +759,7 @@ impl Materializations {
                 }).unwrap_or_else(HashSet::new);
 
             let start = ::std::time::Instant::now();
-            self.ready_one(ni, &mut index_on, graph, domains, workers, prep_node, dom_i);
+            self.ready_one(ni, &mut index_on, graph, domains, workers, srmap_node, materialization_info);
             let reconstructed = index_on.is_empty();
 
             // communicate to the domain in charge of a particular node that it should start
@@ -845,8 +801,8 @@ impl Materializations {
         graph: &Graph,
         domains: &mut HashMap<DomainIndex, DomainHandle>,
         workers: &HashMap<WorkerIdentifier, WorkerStatus>,
-        prep_node: bool,
-        di: Option<(usize, usize)>,
+        srmap_node: bool,
+        materialization_info: Option<(usize, usize)>,
     ) {
         let n = &graph[ni];
         let mut has_state = !index_on.is_empty();
@@ -885,7 +841,7 @@ impl Materializations {
         info!(self.log, "beginning reconstruction of {:?}", n);
         let log = self.log.new(o!("node" => ni.index()));
         let log = mem::replace(&mut self.log, log);
-        self.setup(ni, index_on, graph, domains, workers, prep_node, di);
+        self.setup(ni, index_on, graph, domains, workers, srmap_node, materialization_info);
         mem::replace(&mut self.log, log);
 
         // NOTE: the state has already been marked ready by the replay completing, but we want to
@@ -903,8 +859,8 @@ impl Materializations {
         graph: &Graph,
         domains: &mut HashMap<DomainIndex, DomainHandle>,
         workers: &HashMap<WorkerIdentifier, WorkerStatus>,
-        prep_node: bool,
-        di: Option<(usize, usize)>
+        srmap_node: bool,
+        materialization_info: Option<(usize, usize)>
     ) {
         if index_on.is_empty() {
             // we must be reconstructing a Reader.
@@ -924,7 +880,7 @@ impl Materializations {
             for index in index_on.drain() {
                 plan.add(index);
             }
-            plan.finalize(prep_node, di)
+            plan.finalize(srmap_node, materialization_info)
         };
 
         if !pending.is_empty() {

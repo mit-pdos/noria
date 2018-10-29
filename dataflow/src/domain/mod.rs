@@ -873,13 +873,13 @@ impl Domain {
                                 cols,
                                 key,
                                 trigger_domain: (trigger_domain, shards),
-                                prepare,
-                                domain_info 
+                                srmap_node,
+                                materialization_info
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
 
-                                let srmap = true;
+
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
                                     .map(|shard| {
@@ -924,122 +924,232 @@ impl Domain {
                                         tx
                                     }).collect::<Vec<_>>();
 
-                                let (r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
+                                let (mut r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
                                                            Arc<Mutex<backlog::WriteHandle>>);
-                                match domain_info {
+
+                                let mut create_new_srmap = true;
+                                let mut append_to_handles = false;
+
+                                // If materialization info isn't None, then we're dealing with a
+                                // reader node that is supposed to share an SRMap. Compare the
+                                // offset information with the current length of the handle vector.
+                                // If the offset is larger, that means the map has yet to be
+                                // materialized, and we must do so here and append it to the
+                                // handle vector. If the offset is a valid index, that means the
+                                // map was already materialized and we can just clone the handle.
+
+                                match materialization_info {
+                                    // This is a reader node that shares an SRMap.
                                     Some(info) => {
                                         let domain_index = info.0;
                                         assert_eq!(domain_index, self.index.index());
-                                        let offset = info.1;
-                                        let (tr_part, tw_part) = self.srmap_handles[offset].clone();
-                                        println!("REUSING SRMAP: domain_info: {:?}", info.clone());
-                                        println!("SRMAP Handles len array: {:?}, looking for offset: {:?}", self.srmap_handles.clone().len(), offset.clone());
-                                        r_part = tr_part;
-                                        w_part = tw_part;
-                                    },
-                                    None => {
-                                        // SRMap does not yet exist, create it
-                                        let (tr_part, tw_part) = backlog::new_partial(srmap, self.context.clone(), cols, &k[..], move |miss| {
-                                            let n = txs.len();
-                                            let tx = if n == 1 {
-                                                &txs[0]
-                                            } else {
-                                                // TODO: compound reader
-                                                assert_eq!(miss.len(), 1);
-                                                &txs[::shard_by(&miss[0], n)]
-                                            };
-                                            tx.unbounded_send(Vec::from(miss)).unwrap();
-                                        });
-                                        let (tr_part, tw_part) = (Arc::new(Mutex::new(tr_part)), Arc::new(Mutex::new(tw_part)));
-                                        r_part = tr_part;
-                                        w_part = tw_part;
-                                        self.srmap_handles.push((r_part.clone(), w_part.clone()));
-                                        println!("MAKING NEW SRMAP");
-                                        println!("Pushing onto SRMap handles array... new len: {:?}", self.srmap_handles.clone().len());
 
-                                    }
+                                        let offset = info.1;
+                                        let handle_vector_size = self.srmap_handles.len();
+
+                                        if offset >= handle_vector_size {
+                                            // SRMap not created --> plan to create one.
+                                            append_to_handles = true;
+                                        } else {
+                                            // SRMap created --> get set of handles.
+                                            create_new_srmap = false;
+                                            let (tr_part, tw_part) = self.srmap_handles[offset].clone();
+                                            r_part = tr_part;
+                                            w_part = tw_part;
+
+                                            let mut n = self.nodes[&node].borrow_mut();
+                                            n.with_reader_mut(|r| {
+                                                assert!(
+                                                    self.readers
+                                                        .lock()
+                                                        .unwrap()
+                                                        .insert(
+                                                            (gid, *self.shard.as_ref().unwrap_or(&0)),
+                                                            r_part
+                                                        ).is_none()
+                                                );
+                                                let uid = r.universe();
+                                                match uid {
+                                                    Some(id) => {
+                                                        let id = id.to_string();
+                                                        let id : u32 = id.parse::<u32>().unwrap();
+                                                        w_part.lock().unwrap().add_user(id as usize)
+                                                    },
+                                                    None => {},
+                                                };
+
+                                                // make sure Reader is actually prepared to receive state
+                                                r.set_write_handle(w_part)
+                                            }).unwrap();
+                                        }
+                                    },
+                                    None => {}
                                 };
 
-                                let mut n = self.nodes[&node].borrow_mut();
-                                n.with_reader_mut(|r| {
-                                    assert!(
-                                        self.readers
-                                            .lock()
-                                            .unwrap()
-                                            .insert(
-                                                (gid, *self.shard.as_ref().unwrap_or(&0)),
-                                                r_part
-                                            ).is_none()
-                                    );
-                                    let uid = r.universe();
-                                    match uid {
-                                        Some(id) => {
-                                            let id = id.to_string();
-                                            let id : u32 = id.parse::<u32>().unwrap();
-                                            w_part.lock().unwrap().add_user(id as usize)
-                                        },
-                                        None => {},
-                                    };
+                                let srmap = true;
 
-                                    // make sure Reader is actually prepared to receive state
-                                    r.set_write_handle(w_part)
-                                }).unwrap();
+                                // Create new SRMap if one doesn't already exist.
+                                if create_new_srmap {
+                                    let (tr_part, tw_part) = backlog::new_partial(srmap, self.context.clone(), cols, &k[..], move |miss| {
+                                        let n = txs.len();
+                                        let tx = if n == 1 {
+                                            &txs[0]
+                                        } else {
+                                            // TODO: compound reader
+                                            assert_eq!(miss.len(), 1);
+                                            &txs[::shard_by(&miss[0], n)]
+                                        };
+                                        tx.unbounded_send(Vec::from(miss)).unwrap();
+                                    });
+                                    let (tr_part, tw_part) = (Arc::new(Mutex::new(tr_part)), Arc::new(Mutex::new(tw_part)));
+                                    r_part = tr_part;
+                                    w_part = tw_part;
+
+                                    // Append to handles if this reader shares an SRMap.
+                                    if append_to_handles {
+                                        self.srmap_handles.push((r_part.clone(), w_part.clone()));
+                                    }
+
+                                    let mut n = self.nodes[&node].borrow_mut();
+                                    n.with_reader_mut(|r| {
+                                        assert!(
+                                            self.readers
+                                                .lock()
+                                                .unwrap()
+                                                .insert(
+                                                    (gid, *self.shard.as_ref().unwrap_or(&0)),
+                                                    r_part
+                                                ).is_none()
+                                        );
+                                        let uid = r.universe();
+                                        match uid {
+                                            Some(id) => {
+                                                let id = id.to_string();
+                                                let id : u32 = id.parse::<u32>().unwrap();
+                                                w_part.lock().unwrap().add_user(id as usize)
+                                            },
+                                            None => {},
+                                        };
+
+                                        // make sure Reader is actually prepared to receive state
+                                        r.set_write_handle(w_part)
+                                    }).unwrap();
+                                }
                             }
-                            InitialState::Global { gid, cols, key, prepare, domain_info } => {
+                            InitialState::Global { gid, cols, key, srmap_node, materialization_info } => {
                                 use backlog;
                                 use std::sync::Arc;
 
-                                let srmap = true;
-                                let (r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
+                                let (mut r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
                                                            Arc<Mutex<backlog::WriteHandle>>);
-                                match domain_info {
-                                    Some(info) => {
-                                        let domain_index = info.0;
-                                        assert_eq!(domain_index, self.index.index());
-                                        let offset = info.1;
-                                        let (tr_part, tw_part) = self.srmap_handles[offset].clone();
-                                        r_part = tr_part;
-                                        w_part = tw_part;
-                                        println!("REUSING SRMAP: domain_info: {:?}", info.clone());
-                                        println!("SRMAP Handles len array: {:?}, looking for offset: {:?}", self.srmap_handles.clone().len(), offset.clone());
-                                    },
-                                    None => {
-                                        let (tr_part, tw_part) = backlog::new(srmap, self.context.clone(), cols, &key[..]);
-                                        let tr_part = Arc::new(Mutex::new(tr_part));
-                                        let tw_part = Arc::new(Mutex::new(tw_part));
-                                        self.srmap_handles.push((tr_part.clone(), tw_part.clone()));
-                                        r_part = tr_part;
-                                        w_part = tw_part;
-                                        println!("MAKING NEW SRMAP");
-                                        println!("Pushing onto SRMap handles array... new len: {:?}", self.srmap_handles.clone().len());
-                                    }
+                                let srmap = true;
+                                let mut create_new_srmap = true;
+                                let mut append_to_handles = false;
+
+                                // If materialization info isn't None, then we're dealing with a
+                                // reader node that is supposed to share an SRMap. Compare the
+                                // offset information with the current length of the handle vector.
+                                // If the offset is larger, that means the map has yet to be
+                                // materialized, and we must do so here and append it to the
+                                // handle vector. If the offset is a valid index, that means the
+                                // map was already materialized and we can just clone the handle.
+
+                                match materialization_info {
+                                   // This is a reader node that shares an SRMap.
+                                   Some(info) => {
+                                       let domain_index = info.0;
+                                       assert_eq!(domain_index, self.index.index());
+
+                                       let offset = info.1;
+                                       let handle_vector_size = self.srmap_handles.len();
+
+                                       if offset >= handle_vector_size {
+                                           // SRMap not created --> plan to create one.
+                                           create_new_srmap = true;
+                                           append_to_handles = true;
+                                       } else {
+                                           // SRMap created --> get set of handles.
+                                           create_new_srmap = false;
+                                           let (tr_part, tw_part) = self.srmap_handles[offset].clone();
+                                           r_part = tr_part;
+                                           w_part = tw_part;
+
+                                           let mut n = self.nodes[&node].borrow_mut();
+                                           n.with_reader_mut(|r| {
+                                               assert!(
+                                                   self.readers
+                                                       .lock()
+                                                       .unwrap()
+                                                       .insert(
+                                                           (gid, *self.shard.as_ref().unwrap_or(&0)),
+                                                           r_part
+                                                       ).is_none()
+                                               );
+
+                                               let uid = r.universe();
+                                               match uid {
+                                                   Some(id) => {
+                                                       let mut id = id.to_string();
+                                                       if id == "global".to_string() {
+                                                           id = "0".to_string();
+                                                       }
+                                                       let id : u32 = id.parse::<u32>().unwrap();
+                                                       w_part.lock().unwrap().add_user(id as usize)
+                                                   },
+                                                   None => {},
+                                               };
+
+                                               // make sure Reader is actually prepared to receive state
+                                               r.set_write_handle(w_part)
+                                           }).unwrap();
+                                       }
+                                   },
+                                   None => {}
                                 };
 
-                                let mut n = self.nodes[&node].borrow_mut();
-                                n.with_reader_mut(|r| {
-                                    assert!(
-                                        self.readers
-                                            .lock()
-                                            .unwrap()
-                                            .insert(
-                                                (gid, *self.shard.as_ref().unwrap_or(&0)),
-                                                r_part
-                                            ).is_none()
-                                    );
+                                // Create new SRMap if one doesn't already exist.
+                                if create_new_srmap {
+                                    let (tr_part, tw_part) = backlog::new(srmap, self.context.clone(), cols, &key[..]);
+                                    let tr_part = Arc::new(Mutex::new(tr_part));
+                                    let tw_part = Arc::new(Mutex::new(tw_part));
+                                    r_part = tr_part;
+                                    w_part = tw_part;
 
-                                    let uid = r.universe();
-                                    match uid {
-                                        Some(id) => {
-                                            let id = id.to_string();
-                                            let id : u32 = id.parse::<u32>().unwrap();
-                                            w_part.lock().unwrap().add_user(id as usize)
-                                        },
-                                        None => {},
-                                    };
+                                    // Append to handles if this reader shares an SRMap.
+                                    if append_to_handles {
+                                       self.srmap_handles.push((r_part.clone(), w_part.clone()));
+                                    }
 
-                                    // make sure Reader is actually prepared to receive state
-                                    r.set_write_handle(w_part)
-                                }).unwrap();
+                                    let mut n = self.nodes[&node].borrow_mut();
+                                    n.with_reader_mut(|r| {
+                                        assert!(
+                                            self.readers
+                                                .lock()
+                                                .unwrap()
+                                                .insert(
+                                                    (gid, *self.shard.as_ref().unwrap_or(&0)),
+                                                    r_part
+                                                ).is_none()
+                                        );
+
+                                        let uid = r.universe();
+                                        match uid {
+                                            Some(id) => {
+                                                let mut id = id.to_string();
+                                                println!("ID: {:?}", id.clone());
+                                                if id == "global".to_string() {
+                                                    id = "0".to_string();
+                                                }
+                                                let id : u32 = id.parse::<u32>().unwrap();
+                                                w_part.lock().unwrap().add_user(id as usize)
+                                            },
+                                            None => {},
+                                        };
+
+                                        // make sure Reader is actually prepared to receive state
+                                        r.set_write_handle(w_part)
+                                    }).unwrap();
+                                }
                             }
                         }
                     }
