@@ -114,6 +114,7 @@ impl<A: Authority> LocalControllerHandle<A> {
             .get("id")
             .expect("Universe context must have id")
             .clone();
+
         self.rpc::<_, ()>("create_universe", &context).unwrap();
 
         // Write to Context table
@@ -128,6 +129,7 @@ impl<A: Authority> LocalControllerHandle<A> {
             .iter()
             .map(|&f| context.get(f).unwrap().clone())
             .collect();
+
         let mut table = self.table(&bname).unwrap();
 
         table.insert(record).unwrap();
