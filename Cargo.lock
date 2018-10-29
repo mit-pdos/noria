@@ -1358,7 +1358,7 @@ dependencies = [
  "slog 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)",
+ "tiberius 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsunami 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2139,8 +2139,8 @@ dependencies = [
 
 [[package]]
 name = "tiberius"
-version = "0.3.0"
-source = "git+https://github.com/steffengy/tiberius.git#95e2857b830cc28b3547c29c1247082640a7a531"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2971,7 +2971,7 @@ dependencies = [
 "checksum termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "689a3bdfaab439fd92bc87df5c4c78417d3cbe537487274e9b0b2dce76e92096"
 "checksum textwrap 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "307686869c93e71f94da64286f9a9524c0f308a9e1c87a583de8e9c9039ad3f6"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
-"checksum tiberius 0.3.0 (git+https://github.com/steffengy/tiberius.git)" = "<none>"
+"checksum tiberius 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "af3c1aff87fd9e875a187827fffece5659b62f936e3ab4a0742fee1c7309b767"
 "checksum time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "d825be0eb33fda1a7e68012d51e9c7f451dc1a69391e7fdc197060bb8c56667b"
 "checksum timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a5bb9b8201d620a812b747fd1e8c523db6d7961ec3aa0915772256fee504bce7"
 "checksum timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "20b6a7dabffd4febd7b0b95f3c1ba00fb58dd523db07837e93c5c90e34636629"
