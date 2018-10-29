@@ -121,11 +121,15 @@ pub enum InitialState {
         cols: usize,
         key: Vec<usize>,
         trigger_domain: (domain::Index, usize),
+        prepare: bool,
+        domain_info: Option<(usize, usize)>
     },
     Global {
         gid: petgraph::graph::NodeIndex,
         cols: usize,
         key: Vec<usize>,
+        prepare: bool,
+        domain_info: Option<(usize, usize)>
     },
 }
 

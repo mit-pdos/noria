@@ -43,16 +43,16 @@ pub(crate) fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    readers.get(&target).unwrap().clone()
+                    let r = readers.get(&target).unwrap().clone();
+                    r.clone().lock().unwrap().clone()
                 });
 
                 let mut ret = Vec::with_capacity(keys.len());
                 ret.resize(keys.len(), Vec::new());
-
                 // first do non-blocking reads for all keys to see if we can return immediately
                 let found = keys
                     .iter_mut()
-                    .map(|key| {
+                    .map(|key| { //TODO pass thru uid
                         let rs = reader.try_find_and(key, dup).map(|r| r.0);
                         (key, rs)
                     }).enumerate();
@@ -120,7 +120,8 @@ pub(crate) fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    readers.get(&target).unwrap().clone()
+                    let r = readers.get(&target).unwrap().clone();
+                    r.clone().lock().unwrap().clone()
                 });
 
                 reader.len()
@@ -151,7 +152,8 @@ impl Future for BlockingRead {
             let target = &self.target;
             let reader = readers_cache.entry(self.target.clone()).or_insert_with(|| {
                 let readers = s.lock().unwrap();
-                readers.get(target).unwrap().clone()
+                let r = readers.get(target).unwrap().clone();
+                r.clone().lock().unwrap().clone()
             });
 
             let mut triggered = false;

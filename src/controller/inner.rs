@@ -40,6 +40,26 @@ impl WorkerStatus {
     }
 }
 
+
+#[derive(Clone)]
+pub(crate) struct MapMeta {
+    pub(super) query_to_leaves: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_readers: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_domain: HashMap<String, usize>,
+    pub(super) query_to_materialization: HashMap<String, (usize, usize)>, // Query -> (DomainIndex, Offset)
+}
+
+impl MapMeta {
+    pub fn new() -> Self {
+        MapMeta {
+            query_to_leaves: HashMap::default(),
+            query_to_readers: HashMap::default(),
+            query_to_domain: HashMap::default(),
+            query_to_materialization: HashMap::default(),
+        }
+    }
+}
+
 /// `Controller` is the core component of the alternate Soup implementation.
 ///
 /// It keeps track of the structure of the underlying data flow graph and its domains. `Controller`
@@ -61,10 +81,7 @@ pub struct ControllerInner {
     /// Current recipe
     recipe: Recipe,
 
-    pub(super) query_to_leaves: HashMap<String, HashSet<NodeIndex>>,
-    pub(super) query_to_readers: HashMap<String, HashSet<NodeIndex>>,
-    pub(super) query_to_domain: HashMap<String, usize>,
-
+    pub(super) map_meta: MapMeta,
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
     pub(super) debug_channel: Option<SocketAddr>,
@@ -394,9 +411,7 @@ impl ControllerInner {
 
             pending_recovery,
             last_checked_workers: Instant::now(),
-            query_to_leaves: HashMap::default(),
-            query_to_readers: HashMap::default(),
-            query_to_domain: HashMap::default(),
+            map_meta: MapMeta::new(),
         }
     }
 

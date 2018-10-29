@@ -52,6 +52,9 @@ impl DomainHandle {
         placer: &'a mut Box<Iterator<Item = (WorkerIdentifier, WorkerEndpoint)>>,
         workers: &'a mut Vec<WorkerEndpoint>,
         epoch: Epoch,
+        context: HashMap<String, DataType>,
+        universe_id: DataType,
+        //srmap_handles: Vec<(Arc<Mutex<srmap::ReadHandle>>, Arc<Mutex<srmap::WriteHandle>>)>,
     ) -> Self {
         // NOTE: warning to future self...
         // the code currently relies on the fact that the domains that are sharded by the same key
@@ -61,6 +64,7 @@ impl DomainHandle {
         let mut txs = HashMap::new();
         let mut cr_rxs = Vec::new();
         let mut assignments = Vec::new();
+
         let mut nodes = Some(Self::build_descriptors(graph, nodes));
 
         for i in 0..num_shards.unwrap_or(1) {
@@ -72,15 +76,19 @@ impl DomainHandle {
 
             let control_listener =
                 std::net::TcpListener::bind(SocketAddr::new(listen_addr.clone(), 0)).unwrap();
+
+            println!("IN DOMAIN HANDLE, context {:?} uid {:?}", context.clone(), universe_id.clone());
             let domain = DomainBuilder {
                 index: idx,
                 shard: if num_shards.is_some() { Some(i) } else { None },
                 nshards: num_shards.unwrap_or(1),
                 config: config.clone(),
-                nodes,
+                nodes: nodes,
                 persistence_parameters: persistence_params.clone(),
                 control_addr: control_listener.local_addr().unwrap(),
                 debug_addr: debug_addr.clone(),
+                context: context.clone(),
+                universe_id: universe_id.clone(),
             };
 
             // TODO(malte): simple round-robin placement for the moment
@@ -103,13 +111,18 @@ impl DomainHandle {
                 source: src,
                 payload: CoordinationPayload::AssignDomain(domain),
             }).unwrap();
+            // println!("here1");
 
             assignments.push(identifier);
 
             let stream =
                 mio::net::TcpStream::from_stream(control_listener.accept().unwrap().0).unwrap();
             cr_rxs.push(TcpReceiver::new(stream));
+            // println!("here2");
+
         }
+
+        // println!("here3");
 
         let mut cr_poll = PollingLoop::from_receivers(cr_rxs);
         cr_poll.run_polling_loop(|event| match event {
@@ -197,13 +210,14 @@ impl DomainHandle {
     }
 
     fn build_descriptors(graph: &mut Graph, nodes: Vec<(NodeIndex, bool)>) -> DomainNodes {
-        nodes
-            .into_iter()
-            .map(|(ni, _)| {
-                let node = graph.node_weight_mut(ni).unwrap().take();
-                node.finalize(graph)
-            }).map(|nd| (*nd.local_addr(), cell::RefCell::new(nd)))
-            .collect()
+            nodes
+                .into_iter()
+                .map(|(ni, _)| {
+                    let node = graph.node_weight_mut(ni).unwrap().take();
+                    node.finalize(graph)
+                })
+                .map(|nd| (*nd.local_addr(), cell::RefCell::new(nd)))
+                .collect()
     }
 
     pub(super) fn send_to_healthy(

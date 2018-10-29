@@ -2,7 +2,6 @@ use basics::DataType;
 use srmap;
 use std::collections::HashMap;
 use fnv::FnvBuildHasher;
-use srmap;
 
 #[derive(Clone)]
 pub(super) enum Handle {

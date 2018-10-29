@@ -211,7 +211,8 @@ impl<'a> Migration<'a> {
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
             // make a reader
-            let r = node::special::Reader::new(n);
+            let uid = self.universe().0;
+            let r = node::special::Reader::new(n, Some(uid));
             let r = if let Some(name) = name {
                 self.mainline.ingredients[n].named_mirror(r, name)
             } else {
@@ -284,7 +285,7 @@ impl<'a> Migration<'a> {
     pub fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
         println!("in migration::commit. query_to_readers: {:?}", self.mainline.query_to_readers.clone());
-        
+
         let log = self.log;
         let start = self.start;
         let mut mainline = self.mainline;
@@ -504,6 +505,11 @@ impl<'a> Migration<'a> {
             }
 
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let universe_id = match self.context.get("id") {
+                Some(id) => id.clone(),
+                None => "global".into(),
+            };
+
             let d = DomainHandle::new(
                 domain,
                 mainline.ingredients[nodes[0].0].sharded_by().shards(),
@@ -518,6 +524,8 @@ impl<'a> Migration<'a> {
                 &mut placer,
                 &mut workers,
                 mainline.epoch,
+                self.context.clone(),
+                universe_id.clone()
             );
             mainline.domains.insert(domain, d);
         }
@@ -587,6 +595,7 @@ impl<'a> Migration<'a> {
             &new,
             &mut mainline.domains,
             &mainline.workers,
+            &mut mainline.map_meta, 
         );
 
         warn!(log, "migration completed"; "ms" => start.elapsed().as_millis() as u64);

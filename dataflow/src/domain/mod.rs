@@ -874,11 +874,10 @@ impl Domain {
                                 key,
                                 trigger_domain: (trigger_domain, shards),
                                 prepare,
-                                domain_info
+                                domain_info 
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
-                                println!("HELLO gid: {:?}, cols: {:?}, key: {:?}, domain_info: {:?}", gid.clone(), cols.clone(), key.clone(), domain_info.clone());
 
                                 let srmap = true;
                                 let k = key.clone(); // ugh
@@ -989,7 +988,7 @@ impl Domain {
                             InitialState::Global { gid, cols, key, prepare, domain_info } => {
                                 use backlog;
                                 use std::sync::Arc;
-                                println!("HELLO gid: {:?}, cols: {:?}, key: {:?}, domain_info: {:?}", gid.clone(), cols.clone(), key.clone(), domain_info.clone());
+
                                 let srmap = true;
                                 let (r_part, mut w_part): (Arc<Mutex<backlog::SingleReadHandle>>,
                                                            Arc<Mutex<backlog::WriteHandle>>);

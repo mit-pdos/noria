@@ -13,7 +13,7 @@ use nom_sql::SqlQuery;
 use nom::{self, is_alphanumeric, multispace};
 use nom_sql::CreateTableStatement;
 use slog;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str;
 use std::vec::Vec;
 

@@ -3,7 +3,6 @@ use dataflow::prelude::*;
 use petgraph;
 use slog::Logger;
 use std::collections::{HashMap, HashSet};
-use crate::controller::Recipe;
 use crate::controller::inner::ControllerInner;
 
 pub fn assign(
@@ -22,9 +21,9 @@ pub fn assign(
     //  - the child of a Sharder is always in a different domain from the sharder
     //  - shard merge nodes are never in the same domain as their sharded ancestors
 
-    println!("Assigning nodes to domains. Query to readers map: {:?}", mainline.query_to_readers.clone());
+    println!("Assigning nodes to domains. Query to readers map: {:?}", mainline.map_meta.query_to_readers.clone());
     let mut reader_to_query = HashMap::new();
-    for (query_n, node_list) in mainline.query_to_readers.iter() {
+    for (query_n, node_list) in mainline.map_meta.query_to_readers.iter() {
         for node in node_list.clone() {
             reader_to_query.insert(node, query_n);
         }
@@ -50,7 +49,7 @@ pub fn assign(
         *ndomains - 1
     };
 
-    let mut domain_map = &mut mainline.query_to_domain;
+    let mut domain_map = &mut mainline.map_meta.query_to_domain;
 
     for node in topo_list {
         let assignment = (|| {

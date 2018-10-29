@@ -12,6 +12,7 @@ extern crate basics;
 extern crate bincode;
 extern crate channel;
 extern crate evmap;
+extern crate srmap;
 extern crate fnv;
 extern crate futures;
 extern crate hyper;
@@ -50,7 +51,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time;
 
-pub type Readers = Arc<Mutex<HashMap<(basics::NodeIndex, usize), backlog::SingleReadHandle>>>;
+pub type Readers = Arc<Mutex<HashMap<(basics::NodeIndex, usize), Arc<Mutex<backlog::SingleReadHandle>>>>>;
 pub type DomainConfig = domain::Config;
 
 pub use domain::{Domain, DomainBuilder, Index};
