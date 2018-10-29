@@ -272,6 +272,7 @@ impl Recipe {
         };
 
         if self.security_config.is_some() {
+            println!("setting security config! in recipe::create_universe"); 
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
                 universe_groups,

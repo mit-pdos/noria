@@ -746,6 +746,8 @@ impl ControllerInner {
 
         let mut universe_groups = HashMap::new();
 
+
+        println!("groups: {:?}", groups.clone());
         let uid = context
             .get("id")
             .expect("Universe context must have id")
@@ -764,6 +766,8 @@ impl ControllerInner {
                 universe_groups.insert(g, my_groups);
             }
         }
+
+        println!("Universe groups: {:?}", universe_groups.clone());
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
@@ -787,6 +791,7 @@ impl ControllerInner {
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;
         let url = config.1;
+        println!("Setting security config: p {:?}, url {:?}", p.clone(), url.clone());
         self.recipe.set_security_config(&p, url);
         Ok(())
     }

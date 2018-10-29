@@ -1556,7 +1556,7 @@ fn make_nodes_for_selection(
 
         println!("Made security boundary...");
 
-        println!("UNIVERSE IS A MEMBER OF: {:?}", self.universe.member_of); 
+        println!("UNIVERSE IS A MEMBER OF: {:?}", self.universe.member_of);
         let mut ancestors =
             self.universe
                 .member_of
