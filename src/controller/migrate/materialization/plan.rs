@@ -349,7 +349,7 @@ impl<'a> Plan<'a> {
     /// instantaneous.
     ///
     /// Returns a list of backfill replays that need to happen before the migration is complete.
-    pub fn finalize(mut self, srmap_node: bool, materialization_info: Option<(usize, usize)>) -> Vec<PendingReplay> {
+    pub fn finalize(mut self, srmap_node: bool, materialization_info: Option<(usize, usize)>, uid: Option<usize>) -> Vec<PendingReplay> {
         use dataflow::payload::InitialState;
 
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
@@ -371,6 +371,7 @@ impl<'a> Plan<'a> {
                         trigger_domain: (last_domain, num_shards),
                         srmap_node: srmap_node,
                         materialization_info: materialization_info,
+                        uid: uid,
                     }
                 } else {
                     InitialState::Global {
@@ -379,6 +380,7 @@ impl<'a> Plan<'a> {
                         gid: self.node,
                         srmap_node: srmap_node,
                         materialization_info: materialization_info,
+                        uid: uid
                     }
                 }
             }).ok()

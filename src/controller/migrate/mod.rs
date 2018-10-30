@@ -232,6 +232,9 @@ impl<'a> Migration<'a> {
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
+        let uid = self.universe().0;
+        self.mainline.map_meta.reader_to_uid.insert(ri.clone(), uid.clone());
+
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
@@ -246,6 +249,16 @@ impl<'a> Migration<'a> {
         self.ensure_reader_for(n, Some(name));
 
         let ri = self.readers[&n];
+
+        let uid = self.universe().0.to_string();
+
+        let mut uint = 0;
+        if uid != "global".to_string() {
+            uint = uid.parse().unwrap();
+        }
+        let uid : usize = uint as usize;
+
+        self.mainline.map_meta.reader_to_uid.insert(ri.clone(), uid.clone());
 
         let mut leaf_to_query = HashMap::new();
         for (query_n, node_list) in self.mainline.map_meta.query_to_leaves.iter() {

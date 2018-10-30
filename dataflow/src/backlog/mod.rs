@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use fnv::FnvBuildHasher;
 
 /// Allocate a new end-user facing result table.
-pub(crate) fn new(srmap: bool, context: HashMap<String, DataType>, cols: usize, key: &[usize]) -> (SingleReadHandle, WriteHandle) {
-    new_inner(srmap, context, cols, key, None)
+pub(crate) fn new(srmap: bool, cols: usize, key: &[usize], uid: usize) -> (SingleReadHandle, WriteHandle) {
+    new_inner(srmap, cols, key, None, uid)
 }
 
 /// Allocate a new partially materialized end-user facing result table.
@@ -17,23 +17,23 @@ pub(crate) fn new(srmap: bool, context: HashMap<String, DataType>, cols: usize, 
 /// Misses in this table will call `trigger` to populate the entry, and retry until successful.
 pub(crate) fn new_partial<F>(
     srmap: bool,
-    context: HashMap<String, DataType>,
     cols: usize,
     key: &[usize],
-    trigger: F
+    trigger: F,
+    uid: usize,
 ) -> (SingleReadHandle, WriteHandle)
 where
     F: Fn(&[DataType]) + 'static + Send + Sync,
 {
-    new_inner(srmap, context, cols, key, Some(Arc::new(trigger)))
+    new_inner(srmap, cols, key, Some(Arc::new(trigger)), uid)
 }
 
 fn new_inner(
     srmap: bool,
-    mut context: HashMap<String, DataType>,
     cols: usize,
     key: &[usize],
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
+    uid: usize,
 ) -> (SingleReadHandle, WriteHandle) {
     let contiguous = {
         let mut contiguous = true;
@@ -57,7 +57,7 @@ fn new_inner(
             use srmap;
             println!("actually making srmap nice");
             let (r, w) = srmap::srmap::construct(-1);
-            (multir::Handle::$variant(context.clone(), r), multiw::Handle::$variant(context.clone(), w))
+            (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
     }
 
@@ -70,19 +70,6 @@ fn new_inner(
                 .construct();
             (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
-    }
-
-    // println!("CONTEXT in new partial: {:?}", context.clone());
-
-    let context_size =  context.clone().len();
-
-    if context_size > 0 {
-        srmap = true;
-        println!("MAKING SRMAP. context: {:?}", context.clone());
-        // println!("CHECKPOINT: context: {:?}", context.clone());
-    } else {
-        context.insert("id".to_string(), "0".into());
-        println!("MAKING EVMAP.");
     }
 
     srmap = true;
@@ -103,13 +90,13 @@ fn new_inner(
         cols: cols,
         contiguous,
         mem_size: 0,
-        context: context.clone(),
+        uid: uid.clone()
     };
     let r = SingleReadHandle {
         handle: r,
         trigger: trigger,
         key: Vec::from(key),
-        context: context.clone(),
+        uid: uid.clone()
     };
 
     (r, w)
@@ -146,7 +133,7 @@ pub(crate) struct WriteHandle {
     key: Vec<usize>,
     contiguous: bool,
     mem_size: usize,
-    context: HashMap<String, DataType>,
+    uid: usize,
 }
 
 type Key<'a> = Cow<'a, [DataType]>;
@@ -160,39 +147,39 @@ pub(crate) struct WriteHandleEntry<'a> {
 }
 
 impl<'a> MutWriteHandleEntry<'a> {
-    pub fn mark_filled(self) {
+    pub fn mark_filled(self, uid: usize) {
         if let Some((None, _)) = self
             .handle
             .handle
-            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
+            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty(), uid)
         {
-            self.handle.handle.clear(self.key)
+            self.handle.handle.clear(self.key, uid)
         } else {
             unreachable!("attempted to fill already-filled key");
         }
     }
 
-    pub fn mark_hole(self) {
+    pub fn mark_hole(self, uid: usize) {
         let size = self
             .handle
             .handle
             .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
                 rs.iter().map(|r| r.deep_size_of()).sum()
-            }).map(|r| r.0.unwrap_or(0))
+            }, uid.clone()).map(|r| r.0.unwrap_or(0))
             .unwrap_or(0);
         self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
-        self.handle.handle.empty(self.key)
+        self.handle.handle.empty(self.key, uid)
     }
 }
 
 impl<'a> WriteHandleEntry<'a> {
-    pub(crate) fn try_find_and<F, T>(self, mut then: F) -> Result<(Option<T>, i64), ()>
+    pub(crate) fn try_find_and<F, T>(self, mut then: F, uid: usize) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         self.handle
             .handle
-            .meta_get_and(self.key, &mut then)
+            .meta_get_and(self.key, &mut then, uid)
             .ok_or(())
     }
 }
@@ -226,6 +213,10 @@ where
 }
 
 impl WriteHandle {
+    pub(crate) fn universe(&self) -> usize{
+        self.uid.clone()
+    }
+
     pub(crate) fn mut_with_key<'a, K>(&'a mut self, key: K) -> MutWriteHandleEntry<'a>
     where
         K: Into<Key<'a>>,
@@ -274,11 +265,11 @@ impl WriteHandle {
     /// Add a new set of records to the backlog.
     ///
     /// These will be made visible to readers after the next call to `swap()`.
-    pub(crate) fn add<I>(&mut self, rs: I)
+    pub(crate) fn add<I>(&mut self, rs: I, uid: usize)
     where
         I: IntoIterator<Item = Record>,
     {
-        let mem_delta = self.handle.add(&self.key[..], self.cols, rs);
+        let mem_delta = self.handle.add(&self.key[..], self.cols, rs, uid);
         if mem_delta > 0 {
             self.mem_size += mem_delta as usize;
         } else if mem_delta < 0 {
@@ -336,10 +327,14 @@ pub struct SingleReadHandle {
     handle: multir::Handle,
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
     key: Vec<usize>,
-    context: HashMap<String, DataType>,
+    uid: usize
 }
 
 impl SingleReadHandle {
+    pub fn universe(&self) -> usize{
+        self.uid.clone()
+    }
+
     /// Trigger a replay of a missing key from a partially materialized view.
     pub fn trigger(&self, key: &[DataType]) {
         assert!(
@@ -359,12 +354,12 @@ impl SingleReadHandle {
     /// swapped in by the writer.
     ///
     /// Holes in partially materialized state are returned as `Ok((None, _))`.
-    pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F, uid: usize) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         self.handle
-            .meta_get_and(key, &mut then)
+            .meta_get_and(key, &mut then, uid)
             .ok_or(())
             .map(|(mut records, meta)| {
                 if records.is_none() && self.trigger.is_none() {
@@ -404,7 +399,7 @@ impl ReadHandle {
     /// swapped in by the writer.
     ///
     /// A hole in partially materialized state is returned as `Ok((None, _))`.
-    pub fn try_find_and<F, T>(&self, key: &[DataType], then: F) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &[DataType], then: F, uid: usize) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
@@ -414,9 +409,9 @@ impl ReadHandle {
                 shards[::shard_by(&key[0], shards.len())]
                     .as_ref()
                     .unwrap()
-                    .try_find_and(key, then)
+                    .try_find_and(key, then, uid)
             }
-            ReadHandle::Singleton(ref srh) => srh.as_ref().unwrap().try_find_and(key, then),
+            ReadHandle::Singleton(ref srh) => srh.as_ref().unwrap().try_find_and(key, then, uid),
         }
     }
 

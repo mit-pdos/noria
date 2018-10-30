@@ -166,9 +166,16 @@ impl Reader {
         let w = w.unwrap();
         let w = w.lock().unwrap();
 
+        let uid: String = self.uid.clone().unwrap().to_string();
+        let mut uint = 0;
+        if uid != "global".to_string() {
+            uint = uid.parse().unwrap();
+        }
+        let uid : usize = uint as usize;
+
         if let Some(ref mut handle) = Some(w) {
             for k in keys {
-                handle.mut_with_key(&k[..]).mark_hole();
+                handle.mut_with_key(&k[..]).mark_hole(uid.clone());
             }
             handle.swap();
         };
@@ -181,10 +188,17 @@ impl Reader {
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
+
+            let uid: String = self.uid.clone().unwrap().to_string();
+            let mut uint = 0;
+            if uid != "global".to_string() {
+                uint = uid.parse().unwrap();
+            }
+            let uid : usize = uint as usize;
             if m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
+                        match state.entry_from_record(&row[..]).try_find_and(|_| (), uid.clone()) {
                             Ok((None, _)) => {
                                 // row would miss in partial state.
                                 // leave it blank so later lookup triggers replay.
@@ -201,13 +215,19 @@ impl Reader {
                 });
             }
 
+            let uid: String = self.uid.clone().unwrap().to_string();
+            let mut uint = 0;
+            if uid != "global".to_string() {
+                uint = uid.parse().unwrap();
+            }
+            let uid : usize = uint as usize;
             // it *can* happen that multiple readers miss (and thus request replay for) the
             // same hole at the same time. we need to make sure that we ignore any such
             // duplicated replay.
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
+                        match state.entry_from_record(&row[..]).try_find_and(|_| (), uid.clone()) {
                             Ok((None, _)) => {
                                 // filling a hole with replay -- ok
                                 true
@@ -229,9 +249,9 @@ impl Reader {
             }
 
             if self.streamers.is_empty() {
-                state.add(m.take_data());
+                state.add(m.take_data(), uid.clone());
             } else {
-                state.add(m.data().iter().cloned());
+                state.add(m.data().iter().cloned(), uid.clone());
             }
 
             if swap {

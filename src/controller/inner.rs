@@ -48,6 +48,7 @@ pub(crate) struct MapMeta {
     pub(super) query_to_domain: HashMap<String, usize>,
     pub(super) query_to_materialization: HashMap<String, (usize, usize)>, // Query -> (DomainIndex, Offset)
     pub(super) domain_to_offset: HashMap<usize, usize>,
+    pub(super) reader_to_uid: HashMap<NodeIndex, usize>,
 
 }
 
@@ -59,6 +60,7 @@ impl MapMeta {
             query_to_domain: HashMap::default(),
             query_to_materialization: HashMap::default(),
             domain_to_offset: HashMap::default(),
+            reader_to_uid: HashMap::default(),
         }
     }
 }

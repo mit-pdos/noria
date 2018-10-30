@@ -670,7 +670,7 @@ impl Materializations {
                 info!(self.log, "adding partial index to existing {:?}", n);
                 let log = self.log.new(o!("node" => node.index()));
                 let log = mem::replace(&mut self.log, log);
-                self.setup(node, &mut index_on, graph, domains, workers, true, None);
+                self.setup(node, &mut index_on, graph, domains, workers, true, None, None);
                 mem::replace(&mut self.log, log);
                 index_on.clear();
             } else if !n.sharded_by().is_none() {
@@ -711,6 +711,9 @@ impl Materializations {
             // or other), but we won't add it to the Vec of SRMap handles stored in the domain.
             let mut srmap_node = false;
             let mut materialization_info : Option<(usize, usize)> = None;
+            let mut uid = None;
+
+            println!("Query to materialization: {:?}", map_meta.query_to_materialization.clone());
             // Check if this node should share an SRMap
             match reader_to_q.get(&ni) {
                 Some(query) => {
@@ -737,6 +740,13 @@ impl Materializations {
                                         }
                                     };
                                     map_meta.domain_to_offset.insert(domain.clone(), new_offset);
+                                    match materialization_info {
+                                        Some(info) => {
+                                            println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
+                                            map_meta.query_to_materialization.insert(query.clone().to_string(), info.clone());
+                                        },
+                                        None => {}
+                                    }
                                 },
                                 None => {
                                     panic!("SRMap node should be assigned to a domain!");
@@ -747,6 +757,11 @@ impl Materializations {
                 },
                 None => {}
             }
+
+            match map_meta.reader_to_uid.get(&ni) {
+                Some(id) => { uid = Some(id.clone()); },
+                None => {}
+            };
 
             let n = &graph[ni];
 
@@ -759,7 +774,7 @@ impl Materializations {
                 }).unwrap_or_else(HashSet::new);
 
             let start = ::std::time::Instant::now();
-            self.ready_one(ni, &mut index_on, graph, domains, workers, srmap_node, materialization_info);
+            self.ready_one(ni, &mut index_on, graph, domains, workers, srmap_node, materialization_info, uid);
             let reconstructed = index_on.is_empty();
 
             // communicate to the domain in charge of a particular node that it should start
@@ -803,6 +818,7 @@ impl Materializations {
         workers: &HashMap<WorkerIdentifier, WorkerStatus>,
         srmap_node: bool,
         materialization_info: Option<(usize, usize)>,
+        uid: Option<usize>,
     ) {
         let n = &graph[ni];
         let mut has_state = !index_on.is_empty();
@@ -841,7 +857,7 @@ impl Materializations {
         info!(self.log, "beginning reconstruction of {:?}", n);
         let log = self.log.new(o!("node" => ni.index()));
         let log = mem::replace(&mut self.log, log);
-        self.setup(ni, index_on, graph, domains, workers, srmap_node, materialization_info);
+        self.setup(ni, index_on, graph, domains, workers, srmap_node, materialization_info, uid);
         mem::replace(&mut self.log, log);
 
         // NOTE: the state has already been marked ready by the replay completing, but we want to
@@ -860,7 +876,8 @@ impl Materializations {
         domains: &mut HashMap<DomainIndex, DomainHandle>,
         workers: &HashMap<WorkerIdentifier, WorkerStatus>,
         srmap_node: bool,
-        materialization_info: Option<(usize, usize)>
+        materialization_info: Option<(usize, usize)>,
+        uid: Option<usize>,
     ) {
         if index_on.is_empty() {
             // we must be reconstructing a Reader.
@@ -880,7 +897,7 @@ impl Materializations {
             for index in index_on.drain() {
                 plan.add(index);
             }
-            plan.finalize(srmap_node, materialization_info)
+            plan.finalize(srmap_node, materialization_info, uid)
         };
 
         if !pending.is_empty() {

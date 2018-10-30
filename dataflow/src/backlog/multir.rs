@@ -5,9 +5,9 @@ use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub(super) enum Handle {
-    SingleSR(HashMap<String, DataType>, srmap::srmap::ReadHandle<DataType, Vec<DataType>, i64>),
-    DoubleSR(HashMap<String, DataType>, srmap::srmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64>),
-    ManySR(HashMap<String, DataType>, srmap::srmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64>),
+    SingleSR(srmap::srmap::ReadHandle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::srmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::srmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64>),
     // Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     // Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
@@ -17,11 +17,11 @@ impl Handle {
     pub fn len(&self) -> usize {
         match *self {
             // Handle::Single(ref h) => h.len(),
-            Handle::SingleSR(ref context, ref h) => h.len(),
+            Handle::SingleSR(ref h) => h.len(),
             // Handle::Double(ref h) => h.len(),
-            Handle::DoubleSR(ref context, ref h) => h.len(),
+            Handle::DoubleSR(ref h) => h.len(),
             // Handle::Many(ref h) => h.len(),
-            Handle::ManySR(ref context, ref h) => h.len(),
+            Handle::ManySR(ref h) => h.len(),
         }
     }
 
@@ -33,13 +33,13 @@ impl Handle {
             // Handle::Single(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Double(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Many(ref h) => h.for_each(|_, v| f(v)),
-            Handle::SingleSR(ref context, ref h) => h.for_each(|_, v| f(v)),
-            Handle::DoubleSR(ref context, ref h) => h.for_each(|_, v| f(v)),
-            Handle::ManySR(ref context, ref h) => h.for_each(|_, v| f(v)),
+            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::ManySR(ref h) => h.for_each(|_, v| f(v)),
         }
     }
 
-    pub fn meta_get_and<F, T>(&self, key: &[DataType], then: F) -> Option<(Option<T>, i64)>
+    pub fn meta_get_and<F, T>(&self, key: &[DataType], then: F, uid: usize) -> Option<(Option<T>, i64)>
     where
         F: FnOnce(&[Vec<DataType>]) -> T,
     {
@@ -48,15 +48,9 @@ impl Handle {
             //     assert_eq!(key.len(), 1);
             //     h.meta_get_and(&key[0], then)
             // },
-            Handle::SingleSR(ref context, ref h) => {
+            Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
-                let uid = context
-                    .get("id").unwrap().to_string()
-                    .clone();
-                let uint: i32 = uid.parse().unwrap();
-                let uid : usize = uint as usize;
-
-                h.meta_get_and(&key[0], then, uid.clone())
+                h.meta_get_and(&key[0], then, uid)
             },
             // Handle::Double(ref h) => {
             //     assert_eq!(key.len(), 2);
@@ -86,14 +80,8 @@ impl Handle {
             //         v
             //     }
             // },
-            Handle::DoubleSR(ref context, ref h) => {
+            Handle::DoubleSR(ref h) => {
                 assert_eq!(key.len(), 2);
-                let uid = context
-                    .get("id").unwrap().to_string()
-                    .clone();
-                let uint: i32 = uid.parse().unwrap();
-                let uid : usize = uint as usize;
-                let srmap = context.get("srmap").unwrap();
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
                 // we're not guaranteed that they have the same memory layout
                 // we *could* just clone DataType, but that would mean dealing with string refcounts
@@ -115,7 +103,7 @@ impl Handle {
                         1,
                     );
 
-                    let v = h.meta_get_and(&stack_key, then, uid.clone());
+                    let v = h.meta_get_and(&stack_key, then, uid);
                     mem::forget(stack_key);
                     v
                 }
@@ -123,13 +111,8 @@ impl Handle {
             // Handle::Many(ref h) => {
             //     h.meta_get_and(&key.to_vec(), then)
             //  },
-             Handle::ManySR(ref context, ref h) => {
-                 let uid = context
-                     .get("id").unwrap().to_string()
-                     .clone();
-                 let uint: i32 = uid.parse().unwrap();
-                 let uid : usize = uint as usize;
-                 h.meta_get_and(&key.to_vec(), then, uid.clone())
+             Handle::ManySR(ref h) => {
+                 h.meta_get_and(&key.to_vec(), then, uid)
               },
         }
     }
