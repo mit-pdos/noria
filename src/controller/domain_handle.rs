@@ -106,7 +106,6 @@ impl DomainHandle {
                 source: src,
                 payload: CoordinationPayload::AssignDomain(domain),
             }).unwrap();
-            // println!("here1");
 
             assignments.push(identifier);
 

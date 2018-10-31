@@ -378,12 +378,12 @@ impl SingleReadHandle {
     /// swapped in by the writer.
     ///
     /// Holes in partially materialized state are returned as `Ok((None, _))`.
-    pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F, uid: usize) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         self.handle
-            .meta_get_and(key, &mut then, uid)
+            .meta_get_and(key, &mut then, self.uid.clone())
             .ok_or(())
             .map(|(mut records, meta)| {
                 if records.is_none() && self.trigger.is_none() {
@@ -423,7 +423,7 @@ impl ReadHandle {
     /// swapped in by the writer.
     ///
     /// A hole in partially materialized state is returned as `Ok((None, _))`.
-    pub fn try_find_and<F, T>(&self, key: &[DataType], then: F, uid: usize) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &[DataType], then: F) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
@@ -433,9 +433,9 @@ impl ReadHandle {
                 shards[::shard_by(&key[0], shards.len())]
                     .as_ref()
                     .unwrap()
-                    .try_find_and(key, then, uid)
+                    .try_find_and(key, then)
             }
-            ReadHandle::Singleton(ref srh) => srh.as_ref().unwrap().try_find_and(key, then, uid),
+            ReadHandle::Singleton(ref srh) => srh.as_ref().unwrap().try_find_and(key, then),
         }
     }
 

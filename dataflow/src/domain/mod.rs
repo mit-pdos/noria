@@ -993,6 +993,9 @@ impl Domain {
                                         };
                                         tx.unbounded_send(Vec::from(miss)).unwrap();
                                     }, ids.clone());
+
+                                    println!("CREATING NEW SRMAP. ids: {:?}", ids.clone());
+
                                     r_part = tr_part;
                                     w_part = tw_part;
 
@@ -1091,6 +1094,7 @@ impl Domain {
 
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
+                                    println!("CREATING NEW SRMAP. ids: {:?}", ids.clone());
                                     let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids.clone());
                                     r_part = tr_part;
                                     w_part = tw_part;

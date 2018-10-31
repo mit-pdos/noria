@@ -251,7 +251,6 @@ impl Materializations {
                 }
             }
         }
-        println!("here1");
         // we need to compute which views can be partial, and which can not.
         // in addition, we need to figure out what indexes each view should have.
         // this is surprisingly difficult to get right.
@@ -713,7 +712,6 @@ impl Materializations {
             let mut materialization_info : Option<(usize, usize)> = None;
             let mut uid = None;
 
-            println!("Query to materialization: {:?}", map_meta.query_to_materialization.clone());
             // Check if this node should share an SRMap
             match reader_to_q.get(&ni) {
                 Some(query) => {
@@ -733,7 +731,6 @@ impl Materializations {
                                         Some(offset) => {
                                             new_offset = *offset + 1;
                                             materialization_info = Some((domain.clone(), new_offset.clone()));
-                                            println!("Updating domain {:?}'s offset to {:?}", domain.clone(), new_offset.clone());
                                         },
                                         None => {
                                             materialization_info = Some((domain.clone(), 0));

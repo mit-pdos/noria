@@ -51,8 +51,9 @@ pub(crate) fn handle_message(
                 // first do non-blocking reads for all keys to see if we can return immediately
                 let found = keys
                     .iter_mut()
-                    .map(|key| { //TODO pass thru uid
-                        let rs = reader.try_find_and(key, dup, uid.clone()).map(|r| r.0);
+                    .map(|key| {
+                        println!("Attempting to find key: {:?}", key.clone());
+                        let rs = reader.try_find_and(key, dup).map(|r| r.0);
                         (key, rs)
                     }).enumerate();
 
@@ -153,8 +154,6 @@ impl Future for BlockingRead {
                 readers.get(target).unwrap().clone()
             });
 
-            let uid = reader.universe();
-
             let mut triggered = false;
             let mut missing = false;
             let now = time::Instant::now();
@@ -165,7 +164,7 @@ impl Future for BlockingRead {
                     // note that this *does* mean we'll trigger replay multiple times for things
                     // that miss and aren't replayed in time, which is a little sad. but at the
                     // same time, that replay trigger will just be ignored by the target domain.
-                    match reader.try_find_and(key, dup, uid.clone()).map(|r| r.0) {
+                    match reader.try_find_and(key, dup).map(|r| r.0) {
                         Ok(Some(rs)) => {
                             self.read[i] = rs;
                             key.clear();

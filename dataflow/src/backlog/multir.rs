@@ -49,6 +49,7 @@ impl Handle {
             //     h.meta_get_and(&key[0], then)
             // },
             Handle::SingleSR(ref h) => {
+                println!("Reading key {:?}, uid: {:?}", key.clone(), uid.clone());
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then, uid)
             },
