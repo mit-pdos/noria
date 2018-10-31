@@ -52,8 +52,6 @@ impl DomainHandle {
         placer: &'a mut Box<Iterator<Item = (WorkerIdentifier, WorkerEndpoint)>>,
         workers: &'a mut Vec<WorkerEndpoint>,
         epoch: Epoch,
-        context: HashMap<String, DataType>,
-        universe_id: DataType,
         //srmap_handles: Vec<(Arc<Mutex<srmap::ReadHandle>>, Arc<Mutex<srmap::WriteHandle>>)>,
     ) -> Self {
         // NOTE: warning to future self...
@@ -77,7 +75,6 @@ impl DomainHandle {
             let control_listener =
                 std::net::TcpListener::bind(SocketAddr::new(listen_addr.clone(), 0)).unwrap();
 
-            println!("IN DOMAIN HANDLE, context {:?} uid {:?}", context.clone(), universe_id.clone());
             let domain = DomainBuilder {
                 index: idx,
                 shard: if num_shards.is_some() { Some(i) } else { None },
@@ -87,8 +84,6 @@ impl DomainHandle {
                 persistence_parameters: persistence_params.clone(),
                 control_addr: control_listener.local_addr().unwrap(),
                 debug_addr: debug_addr.clone(),
-                context: context.clone(),
-                universe_id: universe_id.clone(),
             };
 
             // TODO(malte): simple round-robin placement for the moment

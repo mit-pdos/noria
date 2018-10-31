@@ -1,8 +1,6 @@
 use backlog;
 use channel;
 use prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
 #[derive(Clone, Debug, PartialEq)]
@@ -31,14 +29,13 @@ impl From<Vec<DataType>> for StreamUpdate {
 #[derive(Serialize, Deserialize)]
 pub struct Reader {
     #[serde(skip)]
-    writer: Option<Arc<Mutex<backlog::WriteHandle>>>,
+    writer: Option<backlog::WriteHandle>,
 
     #[serde(skip)]
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
-    uid: Option<DataType>
 }
 
 impl Clone for Reader {
@@ -49,19 +46,17 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
-            uid: self.uid.clone()
         }
     }
 }
 
 impl Reader {
-    pub fn new(for_node: NodeIndex, uid: Option<DataType>) -> Self {
+    pub fn new(for_node: NodeIndex) -> Self {
         Reader {
             writer: None,
             streamers: Vec::new(),
             state: None,
             for_node,
-            uid
         }
     }
 
@@ -71,20 +66,13 @@ impl Reader {
         self.for_node
     }
 
-    pub(crate) fn universe(&self) -> Option<DataType> {
-        self.uid.clone()
+    #[allow(dead_code)]
+    pub(crate) fn writer(&self) -> Option<&backlog::WriteHandle> {
+        self.writer.as_ref()
     }
 
-    #[allow(dead_code)]
-    // pub(crate) fn writer(&self) -> Option<&backlog::WriteHandle> {
-    //     let lock = self.writer.clone().unwrap().lock().unwrap();
-    //     Some(&*lock)
-    // }
-    //
-    //
-
-    pub(crate) fn writer_mut(&self) -> Option<Arc<Mutex<backlog::WriteHandle>>> {
-        self.writer.clone()
+    pub(crate) fn writer_mut(&mut self) -> Option<&mut backlog::WriteHandle> {
+        self.writer.as_mut()
     }
 
     pub fn take(&mut self) -> Self {
@@ -94,7 +82,6 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
-            uid: self.uid.clone()
         }
     }
 
@@ -111,12 +98,13 @@ impl Reader {
     }
 
     pub fn is_partial(&self) -> bool {
-        let w = self.writer_mut().unwrap();
-        let w = w.lock().unwrap();
-        w.is_partial()
+        match self.writer {
+            None => false,
+            Some(ref state) => state.is_partial(),
+        }
     }
 
-    pub(crate) fn set_write_handle(&mut self, wh: Arc<Mutex<backlog::WriteHandle>>) {
+    pub(crate) fn set_write_handle(&mut self, wh: backlog::WriteHandle) {
         assert!(self.writer.is_none());
         self.writer = Some(wh);
     }
@@ -133,13 +121,9 @@ impl Reader {
         }
     }
 
-    // TODO double check that this hacky fix is actually valid...
     pub fn state_size(&self) -> Option<u64> {
         use basics::data::SizeOf;
-        let writer = self.writer_mut().unwrap();
-        let writer = writer.lock().unwrap();
-        Some(writer.deep_size_of())
-
+        self.writer.as_ref().map(|w| w.deep_size_of())
     }
 
     /// Evict a randomly selected key, returning the number of bytes evicted.
@@ -147,11 +131,7 @@ impl Reader {
     /// single key at a time here.
     pub fn evict_random_key(&mut self) -> u64 {
         let mut bytes_freed = 0;
-        let w = self.writer_mut();
-        let w = w.unwrap();
-        let w = w.lock().unwrap();
-
-        if let Some(ref mut handle) = Some(w) {
+        if let Some(ref mut handle) = self.writer {
             use rand;
             let mut rng = rand::thread_rng();
             bytes_freed = handle.evict_random_key(&mut rng);
@@ -162,43 +142,23 @@ impl Reader {
 
     pub fn on_eviction(&mut self, _key_columns: &[usize], keys: &[Vec<DataType>]) {
         // NOTE: *could* be None if reader has been created but its state hasn't been built yet
-        let w = self.writer_mut();
-        let w = w.unwrap();
-        let w = w.lock().unwrap();
-
-        let uid: String = self.uid.clone().unwrap().to_string();
-        let mut uint = 0;
-        if uid != "global".to_string() {
-            uint = uid.parse().unwrap();
-        }
-        let uid : usize = uint as usize;
-
-        if let Some(ref mut handle) = Some(w) {
+        if let Some(w) = self.writer.as_mut() {
             for k in keys {
-                handle.mut_with_key(&k[..]).mark_hole(uid.clone());
+                w.mut_with_key(&k[..]).mark_hole();
             }
-            handle.swap();
-        };
+            w.swap();
+        }
     }
 
     pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
-        let writer = self.writer_mut().unwrap();
-        let writer = writer.lock().unwrap();
-        if let Some(ref mut state) = Some(writer) {
+        if let Some(ref mut state) = self.writer {
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
-
-            let uid: String = self.uid.clone().unwrap().to_string();
-            let mut uint = 0;
-            if uid != "global".to_string() {
-                uint = uid.parse().unwrap();
-            }
-            let uid : usize = uint as usize;
             if m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        match state.entry_from_record(&row[..]).try_find_and(|_| (), uid.clone()) {
+                        match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // row would miss in partial state.
                                 // leave it blank so later lookup triggers replay.
@@ -215,19 +175,13 @@ impl Reader {
                 });
             }
 
-            let uid: String = self.uid.clone().unwrap().to_string();
-            let mut uint = 0;
-            if uid != "global".to_string() {
-                uint = uid.parse().unwrap();
-            }
-            let uid : usize = uint as usize;
             // it *can* happen that multiple readers miss (and thus request replay for) the
             // same hole at the same time. we need to make sure that we ignore any such
             // duplicated replay.
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        match state.entry_from_record(&row[..]).try_find_and(|_| (), uid.clone()) {
+                        match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // filling a hole with replay -- ok
                                 true
@@ -249,9 +203,9 @@ impl Reader {
             }
 
             if self.streamers.is_empty() {
-                state.add(m.take_data(), uid.clone());
+                state.add(m.take_data());
             } else {
-                state.add(m.data().iter().cloned(), uid.clone());
+                state.add(m.data().iter().cloned());
             }
 
             if swap {

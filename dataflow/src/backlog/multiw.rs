@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use fnv::FnvBuildHasher;
 use evmap;
 
+#[derive(Clone)]
 pub(super) enum Handle {
     SingleSR(srmap::srmap::WriteHandle<DataType, Vec<DataType>, i64>),
     DoubleSR(srmap::srmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64>),

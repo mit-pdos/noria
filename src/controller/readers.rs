@@ -43,8 +43,7 @@ pub(crate) fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    let r = readers.get(&target).unwrap().clone();
-                    r.clone().lock().unwrap().clone()
+                    readers.get(&target).unwrap().clone()
                 });
                 let uid = reader.universe();
                 let mut ret = Vec::with_capacity(keys.len());
@@ -120,8 +119,7 @@ pub(crate) fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    let r = readers.get(&target).unwrap().clone();
-                    r.clone().lock().unwrap().clone()
+                    readers.get(&target).unwrap().clone()
                 });
 
                 reader.len()
@@ -152,8 +150,7 @@ impl Future for BlockingRead {
             let target = &self.target;
             let reader = readers_cache.entry(self.target.clone()).or_insert_with(|| {
                 let readers = s.lock().unwrap();
-                let r = readers.get(target).unwrap().clone();
-                r.clone().lock().unwrap().clone()
+                readers.get(target).unwrap().clone()
             });
 
             let uid = reader.universe();

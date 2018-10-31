@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use rand::{Rng, ThreadRng};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::collections::HashMap;
 use fnv::FnvBuildHasher;
 
@@ -126,6 +127,7 @@ fn key_to_double<'a>(k: Key<'a>) -> Cow<'a, (DataType, DataType)> {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct WriteHandle {
     handle: multiw::Handle,
     partial: bool,
@@ -147,39 +149,39 @@ pub(crate) struct WriteHandleEntry<'a> {
 }
 
 impl<'a> MutWriteHandleEntry<'a> {
-    pub fn mark_filled(self, uid: usize) {
+    pub fn mark_filled(self) {
         if let Some((None, _)) = self
             .handle
             .handle
-            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty(), uid)
+            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty(), self.handle.uid.clone())
         {
-            self.handle.handle.clear(self.key, uid)
+            self.handle.handle.clear(self.key, self.handle.uid.clone())
         } else {
             unreachable!("attempted to fill already-filled key");
         }
     }
 
-    pub fn mark_hole(self, uid: usize) {
+    pub fn mark_hole(self) {
         let size = self
             .handle
             .handle
             .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
                 rs.iter().map(|r| r.deep_size_of()).sum()
-            }, uid.clone()).map(|r| r.0.unwrap_or(0))
+            }, self.handle.uid.clone()).map(|r| r.0.unwrap_or(0))
             .unwrap_or(0);
         self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
-        self.handle.handle.empty(self.key, uid)
+        self.handle.handle.empty(self.key, self.handle.uid.clone())
     }
 }
 
 impl<'a> WriteHandleEntry<'a> {
-    pub(crate) fn try_find_and<F, T>(self, mut then: F, uid: usize) -> Result<(Option<T>, i64), ()>
+    pub(crate) fn try_find_and<F, T>(self, mut then: F) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         self.handle
             .handle
-            .meta_get_and(self.key, &mut then, uid)
+            .meta_get_and(self.key, &mut then, self.handle.uid.clone())
             .ok_or(())
     }
 }
@@ -213,6 +215,19 @@ where
 }
 
 impl WriteHandle {
+
+    pub fn clone_with_uid (&self, uid: usize) -> WriteHandle {
+        WriteHandle {
+            handle: self.handle.clone(),
+            partial: self.partial.clone(),
+            cols: self.cols.clone(),
+            key: self.key.clone(),
+            contiguous: self.contiguous.clone(),
+            mem_size: self.mem_size.clone(),
+            uid: uid,
+        }
+    }
+
     pub(crate) fn universe(&self) -> usize{
         self.uid.clone()
     }
@@ -265,11 +280,11 @@ impl WriteHandle {
     /// Add a new set of records to the backlog.
     ///
     /// These will be made visible to readers after the next call to `swap()`.
-    pub(crate) fn add<I>(&mut self, rs: I, uid: usize)
+    pub(crate) fn add<I>(&mut self, rs: I)
     where
         I: IntoIterator<Item = Record>,
     {
-        let mem_delta = self.handle.add(&self.key[..], self.cols, rs, uid);
+        let mem_delta = self.handle.add(&self.key[..], self.cols, rs, self.uid.clone());
         if mem_delta > 0 {
             self.mem_size += mem_delta as usize;
         } else if mem_delta < 0 {
@@ -331,6 +346,15 @@ pub struct SingleReadHandle {
 }
 
 impl SingleReadHandle {
+    pub fn clone_with_uid (&self, uid: usize) -> SingleReadHandle {
+        SingleReadHandle {
+            handle: self.handle.clone(),
+            trigger: self.trigger.clone(),
+            key: self.key.clone(),
+            uid: uid
+        }
+    }
+
     pub fn universe(&self) -> usize{
         self.uid.clone()
     }
@@ -577,6 +601,57 @@ mod tests {
             .unwrap()
         );
     }
+
+    // #[test]
+    // fn srmap_works() {
+    //     let k = "x".to_string();
+    //     let v = "x".to_string();
+    //     let v2 = "x2".to_string();
+    //     let uid1: usize = 0 as usize;
+    //     let uid2: usize = 1 as usize;
+    //
+    //     let (r1, mut w1) = new(true, cols: 2, key: &[0], uid1.clone());
+    //
+    //
+    //     // create two users
+    //     w.add_user(uid1);
+    //     w.add_user(uid2);
+    //
+    //     w.insert(k.clone(), v.clone(), uid1.clone());
+    //     let lock = r.get_lock();
+    //     println!("After first insert: {:?}", lock.read().unwrap());
+    //
+    //     w.insert(k.clone(), v.clone(), uid2.clone());
+    //     println!("After second insert: {:?}", lock.read().unwrap());
+    //
+    //     w.insert(k.clone(), v2.clone(), uid2.clone());
+    //     println!("After overlapping insert: {:?}", lock.read().unwrap());
+    //
+    //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
+    //     assert_eq!(v, true);
+    //
+    //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
+    //     assert_eq!(v, true);
+    //
+    //     w.remove(k.clone(), uid1.clone());
+    //     println!("After remove: {:?}", lock.read().unwrap());
+    //
+    //     let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
+    //     println!("V: {:?}", v);
+    //     match v {
+    //         Some(val) => assert_eq!(val, false),
+    //         None => {}
+    //     };
+    //
+    //     w.remove(k.clone(), uid2.clone());
+    //     println!("After user specific remove {:?}", lock.read().unwrap());
+    //
+    //     w.remove_user(uid1);
+    //     println!("After removing u1 {:?}", lock.read().unwrap());
+    //
+    //     w.remove_user(uid2);
+    //     println!("After removing u2 {:?}", lock.read().unwrap());
+    // }
 
     #[test]
     fn absorb_negative_later() {

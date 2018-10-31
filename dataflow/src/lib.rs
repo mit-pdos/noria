@@ -51,7 +51,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time;
 
-pub type Readers = Arc<Mutex<HashMap<(basics::NodeIndex, usize), Arc<Mutex<backlog::SingleReadHandle>>>>>;
+pub type Readers = Arc<Mutex<HashMap<(petgraph::graph::NodeIndex, usize), backlog::SingleReadHandle>>>;
 pub type DomainConfig = domain::Config;
 
 pub use domain::{Domain, DomainBuilder, Index};

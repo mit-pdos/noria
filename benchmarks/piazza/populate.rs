@@ -64,6 +64,9 @@ impl Populate {
 
             self.tas.insert(i.into(), tas);
         }
+
+        println!("PIAZZA STUDENTS: {:?} TAS: {:?}", self.students, self.tas);
+
     }
 
     pub fn get_roles(&mut self) -> Vec<Vec<DataType>> {

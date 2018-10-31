@@ -210,9 +210,8 @@ impl<'a> Migration<'a> {
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
+            let r = node::special::Reader::new(n);
             // make a reader
-            let uid = self.universe().0;
-            let r = node::special::Reader::new(n, Some(uid));
             let r = if let Some(name) = name {
                 self.mainline.ingredients[n].named_mirror(r, name)
             } else {
@@ -537,8 +536,6 @@ impl<'a> Migration<'a> {
                 &mut placer,
                 &mut workers,
                 mainline.epoch,
-                self.context.clone(),
-                universe_id.clone()
             );
             mainline.domains.insert(domain, d);
         }
