@@ -54,7 +54,6 @@ impl Backend {
         let mut mutator = self.g.table(name).unwrap();
 
         let start = time::Instant::now();
-
         let i = records.len();
         for r in records.drain(..) {
             mutator.insert(r).unwrap();

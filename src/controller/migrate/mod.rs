@@ -231,9 +231,6 @@ impl<'a> Migration<'a> {
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
-        let uid = self.universe().0;
-        self.mainline.map_meta.reader_to_uid.insert(ri.clone(), uid.clone());
-
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();

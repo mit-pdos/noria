@@ -475,249 +475,311 @@ mod tests {
     use super::*;
 
     #[test]
-    fn store_works() {
-        let a = vec![1.into(), "a".into()];
+    fn srmap_works() {
+        let global: usize = 0 as usize;
+        let u1: usize = 1 as usize;
+        let u2: usize = 2 as usize;
 
-        let (r, mut w) = new(2, &[0]);
+        let rec1 = vec![1.into(), "a".into()];
+        let rec2 = vec![2.into(), "b".into()];
+        let rec1_ = vec![1.into(), "b".into()];
 
-        // initially, store is uninitialized
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Err(()));
+        // create new map
+        let (r, mut w) = new(true, 2, &[0], global.clone());
 
-        w.swap();
 
-        // after first swap, it is empty, but ready
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
+        let r1 = r.clone_with_uid(u1.clone());
+        let r2 = r.clone_with_uid(u2.clone());
 
-        w.add(vec![Record::Positive(a.clone())]);
+        let mut w1 = w.clone_with_uid(u1.clone());
+        let mut w2 = w.clone_with_uid(u2.clone());
 
-        // it is empty even after an add (we haven't swapped yet)
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
+        // Register SRMap users
+        w.add_user(global.clone());
+        w.add_user(u1.clone());
+        w.add_user(u2.clone());
 
-        w.swap();
+        w.add(vec![Record::Positive(rec1.clone())]);
+        w1.add(vec![Record::Positive(rec2.clone())]);
+        w2.add(vec![Record::Positive(rec1_.clone())]);
 
-        // but after the swap, the record is there!
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
-            .0
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn busybusybusy() {
-        use std::thread;
-
-        let n = 10000;
-        let (r, mut w) = new(1, &[0]);
-        thread::spawn(move || {
-            for i in 0..n {
-                w.add(vec![Record::Positive(vec![i.into()])]);
-                w.swap();
-            }
-        });
-
-        for i in 0..n {
-            let i = &[i.into()];
-            loop {
-                match r.try_find_and(i, |rs| rs.len()) {
-                    Ok((None, _)) => continue,
-                    Ok((Some(1), _)) => break,
-                    Ok((Some(i), _)) => assert_ne!(i, 1),
-                    Err(()) => continue,
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn minimal_query() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.swap();
-        w.add(vec![Record::Positive(b.clone())]);
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
-            .0
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn non_minimal_query() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-        let c = vec![1.into(), "c".into()];
-
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
-        w.swap();
-        w.add(vec![Record::Positive(c.clone())]);
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
-            .0
-            .unwrap()
-        );
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
-            .0
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn absorb_negative_immediate() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
-        w.add(vec![Record::Negative(a.clone())]);
-        w.swap();
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
-            .0
-            .unwrap()
-        );
+        //
+        // w.insert(k.clone(), v.clone(), uid2.clone());
+        // println!("After second insert: {:?}", lock.read().unwrap());
+        //
+        // w.insert(k.clone(), v2.clone(), uid2.clone());
+        // println!("After overlapping insert: {:?}", lock.read().unwrap());
+        //
+        // let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
+        // assert_eq!(v, true);
+        //
+        // let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
+        // assert_eq!(v, true);
+        //
+        // w.remove(k.clone(), uid1.clone());
+        // println!("After remove: {:?}", lock.read().unwrap());
+        //
+        // let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
+        // println!("V: {:?}", v);
+        // match v {
+        //     Some(val) => assert_eq!(val, false),
+        //     None => {}
+        // };
+        //
+        // w.remove(k.clone(), uid2.clone());
+        // println!("After user specific remove {:?}", lock.read().unwrap());
+        //
+        // w.remove_user(uid1);
+        // println!("After removing u1 {:?}", lock.read().unwrap());
+        //
+        // w.remove_user(uid2);
+        // println!("After removing u2 {:?}", lock.read().unwrap());
     }
 
     // #[test]
-    // fn srmap_works() {
-    //     let k = "x".to_string();
-    //     let v = "x".to_string();
-    //     let v2 = "x2".to_string();
-    //     let uid1: usize = 0 as usize;
-    //     let uid2: usize = 1 as usize;
+    // fn store_works() {
+    //     let a = vec![1.into(), "a".into()];
     //
-    //     let (r1, mut w1) = new(true, cols: 2, key: &[0], uid1.clone());
+    //     let (r, mut w) = new(2, &[0]);
     //
+    //     // initially, store is uninitialized
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Err(()));
     //
-    //     // create two users
-    //     w.add_user(uid1);
-    //     w.add_user(uid2);
+    //     w.swap();
     //
-    //     w.insert(k.clone(), v.clone(), uid1.clone());
-    //     let lock = r.get_lock();
-    //     println!("After first insert: {:?}", lock.read().unwrap());
+    //     // after first swap, it is empty, but ready
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
     //
-    //     w.insert(k.clone(), v.clone(), uid2.clone());
-    //     println!("After second insert: {:?}", lock.read().unwrap());
+    //     w.add(vec![Record::Positive(a.clone())]);
     //
-    //     w.insert(k.clone(), v2.clone(), uid2.clone());
-    //     println!("After overlapping insert: {:?}", lock.read().unwrap());
+    //     // it is empty even after an add (we haven't swapped yet)
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
     //
-    //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
-    //     assert_eq!(v, true);
+    //     w.swap();
     //
-    //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
-    //     assert_eq!(v, true);
-    //
-    //     w.remove(k.clone(), uid1.clone());
-    //     println!("After remove: {:?}", lock.read().unwrap());
-    //
-    //     let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
-    //     println!("V: {:?}", v);
-    //     match v {
-    //         Some(val) => assert_eq!(val, false),
-    //         None => {}
-    //     };
-    //
-    //     w.remove(k.clone(), uid2.clone());
-    //     println!("After user specific remove {:?}", lock.read().unwrap());
-    //
-    //     w.remove_user(uid1);
-    //     println!("After removing u1 {:?}", lock.read().unwrap());
-    //
-    //     w.remove_user(uid2);
-    //     println!("After removing u2 {:?}", lock.read().unwrap());
+    //     // but after the swap, the record is there!
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
     // }
-
-    #[test]
-    fn absorb_negative_later() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
-        w.swap();
-        w.add(vec![Record::Negative(a.clone())]);
-        w.swap();
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
-            .0
-            .unwrap()
-        );
-    }
-
-    #[test]
-    fn absorb_multi() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-        let c = vec![1.into(), "c".into()];
-
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![
-            Record::Positive(a.clone()),
-            Record::Positive(b.clone()),
-        ]);
-        w.swap();
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
-            .0
-            .unwrap()
-        );
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
-            .0
-            .unwrap()
-        );
-
-        w.add(vec![
-            Record::Negative(a.clone()),
-            Record::Positive(c.clone()),
-            Record::Negative(c.clone()),
-        ]);
-        w.swap();
-
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-        assert!(
-            r.try_find_and(&a[0..1], |rs| rs
-                .iter()
-                .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
-            .0
-            .unwrap()
-        );
-    }
+    //
+    // #[test]
+    // fn busybusybusy() {
+    //     use std::thread;
+    //
+    //     let n = 10000;
+    //     let (r, mut w) = new(1, &[0]);
+    //     thread::spawn(move || {
+    //         for i in 0..n {
+    //             w.add(vec![Record::Positive(vec![i.into()])]);
+    //             w.swap();
+    //         }
+    //     });
+    //
+    //     for i in 0..n {
+    //         let i = &[i.into()];
+    //         loop {
+    //             match r.try_find_and(i, |rs| rs.len()) {
+    //                 Ok((None, _)) => continue,
+    //                 Ok((Some(1), _)) => break,
+    //                 Ok((Some(i), _)) => assert_ne!(i, 1),
+    //                 Err(()) => continue,
+    //             }
+    //         }
+    //     }
+    // }
+    //
+    // #[test]
+    // fn minimal_query() {
+    //     let a = vec![1.into(), "a".into()];
+    //     let b = vec![1.into(), "b".into()];
+    //
+    //     let (r, mut w) = new(2, &[0]);
+    //     w.add(vec![Record::Positive(a.clone())]);
+    //     w.swap();
+    //     w.add(vec![Record::Positive(b.clone())]);
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    // }
+    //
+    // #[test]
+    // fn non_minimal_query() {
+    //     let a = vec![1.into(), "a".into()];
+    //     let b = vec![1.into(), "b".into()];
+    //     let c = vec![1.into(), "c".into()];
+    //
+    //     let (r, mut w) = new(2, &[0]);
+    //     w.add(vec![Record::Positive(a.clone())]);
+    //     w.add(vec![Record::Positive(b.clone())]);
+    //     w.swap();
+    //     w.add(vec![Record::Positive(c.clone())]);
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    // }
+    //
+    // #[test]
+    // fn absorb_negative_immediate() {
+    //     let a = vec![1.into(), "a".into()];
+    //     let b = vec![1.into(), "b".into()];
+    //
+    //     let (r, mut w) = new(2, &[0]);
+    //     w.add(vec![Record::Positive(a.clone())]);
+    //     w.add(vec![Record::Positive(b.clone())]);
+    //     w.add(vec![Record::Negative(a.clone())]);
+    //     w.swap();
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    // }
+    //
+    // // #[test]
+    // // fn srmap_works() {
+    // //     let k = "x".to_string();
+    // //     let v = "x".to_string();
+    // //     let v2 = "x2".to_string();
+    // //     let uid1: usize = 0 as usize;
+    // //     let uid2: usize = 1 as usize;
+    // //
+    // //     let (r1, mut w1) = new(true, cols: 2, key: &[0], uid1.clone());
+    // //
+    // //
+    // //     // create two users
+    // //     w.add_user(uid1);
+    // //     w.add_user(uid2);
+    // //
+    // //     w.insert(k.clone(), v.clone(), uid1.clone());
+    // //     let lock = r.get_lock();
+    // //     println!("After first insert: {:?}", lock.read().unwrap());
+    // //
+    // //     w.insert(k.clone(), v.clone(), uid2.clone());
+    // //     println!("After second insert: {:?}", lock.read().unwrap());
+    // //
+    // //     w.insert(k.clone(), v2.clone(), uid2.clone());
+    // //     println!("After overlapping insert: {:?}", lock.read().unwrap());
+    // //
+    // //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
+    // //     assert_eq!(v, true);
+    // //
+    // //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
+    // //     assert_eq!(v, true);
+    // //
+    // //     w.remove(k.clone(), uid1.clone());
+    // //     println!("After remove: {:?}", lock.read().unwrap());
+    // //
+    // //     let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
+    // //     println!("V: {:?}", v);
+    // //     match v {
+    // //         Some(val) => assert_eq!(val, false),
+    // //         None => {}
+    // //     };
+    // //
+    // //     w.remove(k.clone(), uid2.clone());
+    // //     println!("After user specific remove {:?}", lock.read().unwrap());
+    // //
+    // //     w.remove_user(uid1);
+    // //     println!("After removing u1 {:?}", lock.read().unwrap());
+    // //
+    // //     w.remove_user(uid2);
+    // //     println!("After removing u2 {:?}", lock.read().unwrap());
+    // // }
+    //
+    // #[test]
+    // fn absorb_negative_later() {
+    //     let a = vec![1.into(), "a".into()];
+    //     let b = vec![1.into(), "b".into()];
+    //
+    //     let (r, mut w) = new(2, &[0]);
+    //     w.add(vec![Record::Positive(a.clone())]);
+    //     w.add(vec![Record::Positive(b.clone())]);
+    //     w.swap();
+    //     w.add(vec![Record::Negative(a.clone())]);
+    //     w.swap();
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    // }
+    //
+    // #[test]
+    // fn absorb_multi() {
+    //     let a = vec![1.into(), "a".into()];
+    //     let b = vec![1.into(), "b".into()];
+    //     let c = vec![1.into(), "c".into()];
+    //
+    //     let (r, mut w) = new(2, &[0]);
+    //     w.add(vec![
+    //         Record::Positive(a.clone()),
+    //         Record::Positive(b.clone()),
+    //     ]);
+    //     w.swap();
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == a[0] && r[1] == a[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    //
+    //     w.add(vec![
+    //         Record::Negative(a.clone()),
+    //         Record::Positive(c.clone()),
+    //         Record::Negative(c.clone()),
+    //     ]);
+    //     w.swap();
+    //
+    //     assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+    //     assert!(
+    //         r.try_find_and(&a[0..1], |rs| rs
+    //             .iter()
+    //             .any(|r| r[0] == b[0] && r[1] == b[1])).unwrap()
+    //         .0
+    //         .unwrap()
+    //     );
+    // }
 }

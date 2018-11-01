@@ -1347,6 +1347,7 @@ mod tests {
                 Some("votecount".into()),
                 false,
                 mig,
+                None
             );
             assert!(res.is_ok());
 
@@ -1359,6 +1360,7 @@ mod tests {
                 Some("highvotes".into()),
                 true,
                 mig,
+                None
             );
             assert!(res.is_ok());
             // should have added three more nodes: a join, a projection, and a reader
