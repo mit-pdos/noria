@@ -121,7 +121,10 @@ impl Default for ControllerConfig {
             sharding: Some(2),
             #[cfg(not(test))]
             sharding: None,
+            #[cfg(test)]
             replicas: 3,
+            #[cfg(not(test))]
+            replicas: 1,
             partial_enabled: true,
             domain_config: DomainConfig {
                 concurrent_replays: 512,

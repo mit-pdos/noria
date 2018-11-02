@@ -115,7 +115,7 @@ fn main() {
             Arg::with_name("replicas")
                 .long("replicas")
                 .takes_value(true)
-                .default_value("3")
+                .default_value("1")
                 .help("Each reader has this many replicas (at least 1)."),
         )
         .arg(
