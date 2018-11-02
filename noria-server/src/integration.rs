@@ -2045,7 +2045,7 @@ fn recipe_activates_and_migrates() {
     g.extend_recipe(r1_txt).unwrap();
     // still one base node
     assert_eq!(g.inputs().unwrap().len(), 1);
-    // two leaf nodes
+    // two leaf nodes * number of replicas
     assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 }
 
@@ -2065,7 +2065,7 @@ fn recipe_activates_and_migrates_with_join() {
 
     // still two base nodes
     assert_eq!(g.inputs().unwrap().len(), 2);
-    // one leaf node
+    // one leaf node * number of replicas
     assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
 }
 
