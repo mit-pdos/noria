@@ -736,20 +736,22 @@ impl ControllerInner {
         // accidentally hit an *unrelated* reader node. to account for this, nodes cache their
         // readers so we can easily query data.
         self.ingredients[node].next_replica().map(|ni| {
-            info!(
-                self.log,
-                "creating view builder";
-                "name" => name,
-                "node_index" => ni.index(),
-                "replica_index" => self.ingredients[ni].replica_index().unwrap(),
-            );
+            let rname = self.ingredients[ni].name();
             let domain = self.ingredients[ni].domain();
             let columns = self.ingredients[ni].fields().to_vec();
             let shards = (0..self.domains[&domain].shards())
                 .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
                 .collect();
+            info!(
+                self.log,
+                "creating view builder";
+                "name" => rname,
+                "node_index" => ni.index(),
+                "replica_index" => self.ingredients[ni].replica_index().unwrap(),
+            );
 
             ViewBuilder {
+                name: rname.to_string(),
                 local_ports: vec![],
                 node: ni,
                 columns,

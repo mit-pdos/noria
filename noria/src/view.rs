@@ -59,6 +59,7 @@ pub enum ReadReply {
 #[doc(hidden)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewBuilder {
+    pub name: String,
     pub node: NodeIndex,
     pub columns: Vec<String>,
     pub shards: Vec<SocketAddr>,
@@ -76,6 +77,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
+            name: self.name,
             node: self.node,
             columns: self.columns,
             shard_addrs: self.shards,
@@ -124,6 +126,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
+            name: self.name,
             node: self.node,
             columns: self.columns,
             shard_addrs: self.shards,
@@ -140,6 +143,7 @@ impl ViewBuilder {
 /// get a handle that can be sent to a different thread (i.e., one with its own dedicated
 /// connections), call `View::into_exclusive`.
 pub struct View<E = SharedConnection> {
+    name: String,
     node: NodeIndex,
     columns: Vec<String>,
     shards: Vec<ViewRpc>,
@@ -152,6 +156,7 @@ pub struct View<E = SharedConnection> {
 impl Clone for View<SharedConnection> {
     fn clone(&self) -> Self {
         View {
+            name: self.name.clone(),
             node: self.node,
             columns: self.columns.clone(),
             shards: self.shards.clone(),
@@ -168,6 +173,7 @@ impl View<SharedConnection> {
     /// threads.
     pub fn into_exclusive(self) -> io::Result<View<ExclusiveConnection>> {
         ViewBuilder {
+            name: self.name,
             node: self.node,
             local_ports: vec![],
             columns: self.columns,
@@ -182,6 +188,11 @@ impl View<SharedConnection> {
     allow(clippy::len_without_is_empty)
 )]
 impl<E> View<E> {
+    /// Get the name of the corresponding reader node.
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
         self.columns.as_slice()

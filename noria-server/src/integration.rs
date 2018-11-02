@@ -2292,3 +2292,39 @@ fn remove_query() {
     assert_eq!(qa.lookup(&[0.into()], true).unwrap().len(), 3);
     assert_eq!(qb.lookup(&[0.into()], true).unwrap().len(), 1);
 }
+
+#[test]
+fn replica_writes() {
+    let txt = "CREATE TABLE x (a int);\n
+               QUERY q: SELECT a from x;\n";
+
+    let mut g = ControllerBuilder::default().build_local().unwrap();
+    g.install_recipe(txt).unwrap();
+    assert_eq!(g.inputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), DEFAULT_REPLICAS);
+    assert!(DEFAULT_REPLICAS > 1);
+
+    let mut mutx = g.table("x").unwrap();
+    let mut q1 = g.view("q").unwrap().into_exclusive().unwrap();
+    let mut q2 = g.view("q").unwrap().into_exclusive().unwrap();
+    let mut q3 = g.view("q").unwrap().into_exclusive().unwrap();
+
+    // These are actually views to different replicas
+    assert_eq!(q1.name(), "q_r1");
+    assert_eq!(q2.name(), "q_r2");
+    assert_eq!(q3.name(), "q");
+
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 0);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 0);
+    assert_eq!(q3.lookup(&[0.into()], true).unwrap().len(), 0);
+
+    mutx.insert(vec![13.into()]).unwrap();
+    mutx.insert(vec![21.into()]).unwrap();
+    mutx.insert(vec![34.into()]).unwrap();
+    sleep();
+
+    // Writes are reflected in all replicas
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 3);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
+    assert_eq!(q3.lookup(&[0.into()], true).unwrap().len(), 3);
+}
