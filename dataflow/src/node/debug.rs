@@ -97,12 +97,13 @@ impl Node {
                     Some(k) => format!("{:?}", k),
                 };
                 s.push_str(&format!(
-                    "{{ {{ {} / {} {} }} | (reader / ⚷: {}) | {} }}",
+                    "{{ {{ {} / {} {} }} | (reader / ⚷: {}) | {} | {:?} }}",
                     addr,
                     Self::escape(self.name()),
                     materialized,
                     key,
                     sharding,
+                    r.get_materialization_info()
                 ))
             }
             NodeType::Internal(ref i) => {

@@ -23,8 +23,8 @@ esac
 declare -a setups=(
     "--reuse full"
     "--reuse noreuse"
-    "--reuse full --partial"
-    "--reuse noreuse --partial"
+    # "--reuse full --partial"
+    # "--reuse noreuse --partial"
 )
 
 declare -a setup_names=(
@@ -50,4 +50,3 @@ do
         -l $nuser -u $nuser -i $1/$name/info/info -p 1000000 -c 1000 --populate before --private 0.2 $setup --policies $policies -q $queries > $1/$name/results-$name.out 2> $1/$name/results-$name.log
 
 done
-

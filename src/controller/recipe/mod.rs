@@ -272,7 +272,7 @@ impl Recipe {
         };
 
         if self.security_config.is_some() {
-            println!("setting security config! in recipe::create_universe"); 
+            println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
                 universe_groups,
@@ -410,7 +410,7 @@ impl Recipe {
                 .inc
                 .as_mut()
                 .unwrap()
-                .add_parsed_query(q, n.clone(), is_leaf, mig, None)?;
+                .add_parsed_query(q, n.clone(), is_leaf, mig, n.clone())?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.

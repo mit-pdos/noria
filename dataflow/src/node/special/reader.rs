@@ -36,6 +36,7 @@ pub struct Reader {
 
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
+    materialization_info: Option<(usize, usize)>,
 }
 
 impl Clone for Reader {
@@ -46,6 +47,7 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
+            materialization_info: None
         }
     }
 }
@@ -57,6 +59,7 @@ impl Reader {
             streamers: Vec::new(),
             state: None,
             for_node,
+            materialization_info: None
         }
     }
 
@@ -82,7 +85,17 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
+            materialization_info: None
         }
+    }
+
+    pub fn set_materialization_info(&mut self, mat_info: Option<(usize, usize)>) {
+        println!("Setting reader mat info to: {:?}", mat_info.clone()); 
+        self.materialization_info = mat_info;
+    }
+
+    pub fn get_materialization_info(& self) -> Option<(usize, usize)> {
+        self.materialization_info.clone()
     }
 
     pub fn add_streamer(

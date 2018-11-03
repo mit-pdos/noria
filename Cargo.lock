@@ -513,7 +513,7 @@ dependencies = [
  "serde_derive 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "srmap 0.1.15",
+ "srmap 0.1.15 (git+https://github.com/alanamarzoev/srmap.git)",
  "stream-cancel 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1861,6 +1861,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "srmap"
 version = "0.1.15"
+source = "git+https://github.com/alanamarzoev/srmap.git#291ad1c5e6b755fb7e6c72c8968a2c4bd985682a"
+dependencies = [
+ "serde 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "srmap"
+version = "0.1.15"
 dependencies = [
  "serde 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2711,6 +2721,7 @@ dependencies = [
 "checksum slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5951a808c40f419922ee014c15b6ae1cd34d963538b57d8a4778b9ca3fff1e0b"
 "checksum smallvec 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)" = "153ffa32fd170e9944f7e0838edf824a754ec4c1fc64746fcc9fe1f8fa602e5d"
 "checksum snowflake 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "27207bb65232eda1f588cf46db2fee75c0808d557f6b3cf19a75f5d6d7c94df1"
+"checksum srmap 0.1.15 (git+https://github.com/alanamarzoev/srmap.git)" = "<none>"
 "checksum ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "dee822d619a700f98c4de3b5931f272ecc7cf2e924ceb2df47b61df4ae033a0c"
 "checksum stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 "checksum stream-cancel 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "70ca51531fcfd7c1bbcadf5c88cac46baf54c22fc009f430dac389c88791911f"
