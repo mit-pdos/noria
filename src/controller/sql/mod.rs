@@ -555,7 +555,7 @@ impl SqlIncorporator {
         }
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, table_mapping.clone(), None);
 
         // register local state
         self.register_query(query_name, Some(qg), &mir, universe);

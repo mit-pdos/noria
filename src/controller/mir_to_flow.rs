@@ -246,6 +246,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                         arithmetic,
                         literals,
                         mig,
+                        table_mapping.clone()
                     )
                 }
                 MirNodeType::Reuse { ref node } => {
@@ -455,6 +456,7 @@ pub(crate) fn make_union_node(
     // column_id_for_column doesn't take into consideration table aliases
     // which might cause improper ordering of columns in a union node
     // eg. Q6 in finkelstein.txt
+    println!("this one");
     for (i, n) in ancestors.clone().iter().enumerate() {
         let emit_cols = emit[i]
             .iter()
@@ -712,6 +714,8 @@ pub(crate) fn make_latest_node(
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
 
+    println!("this one2");
+
     let group_col_indx = group_by
         .iter()
         .map(|c| parent.borrow().column_id_for_column(c, None))
@@ -749,13 +753,15 @@ pub(crate) fn make_project_node(
     arithmetic: &Vec<(String, ArithmeticExpression)>,
     literals: &Vec<(String, DataType)>,
     mig: &mut Migration,
+    table_mapping: Option<HashMap<String,String>>
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
+    println!("this one3");
 
     let projected_column_ids = emit
         .iter()
-        .map(|c| parent.borrow().column_id_for_column(c, None))
+        .map(|c| parent.borrow().column_id_for_column(c, table_mapping.clone()))
         .collect::<Vec<_>>();
 
     let (_, literal_values): (Vec<_>, Vec<_>) = literals.iter().cloned().unzip();
@@ -793,6 +799,7 @@ pub(crate) fn make_distinct_node(
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
+    println!("this one4");
 
     let group_by_indx = if group_by.is_empty() {
         // no query parameters, so we index on the first column
@@ -884,6 +891,7 @@ pub(crate) fn materialize_leaf_node(
     // already been added.
 
     // TODO(malte): consider the case when the projected columns need reordering
+    println!("this one6");
 
     if !key_cols.is_empty() {
         let key_cols: Vec<_> = key_cols

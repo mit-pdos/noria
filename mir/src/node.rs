@@ -252,6 +252,8 @@ impl MirNode {
 
                                                 ind = ind + 1;
                                             }
+                                            println!("*here2");
+
                                             panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
                                                    c, self.name, self.columns);
                                         },
@@ -266,6 +268,8 @@ impl MirNode {
                                                         }
                                                         ind = ind + 1;
                                                     }
+                                                    println!("*here3");
+
                                                     panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
                                                            c, self.name, self.columns);
                                                 },
@@ -287,10 +291,14 @@ impl MirNode {
                                                 }
                                                 ind = ind + 1;
                                             }
+                                            println!("*here4");
+
                                             panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
                                                    c, self.name, self.columns);
                                         },
                                         None => {
+                                            println!("*here5");
+
                                             panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
                                                    c, self.name, self.columns);
                                         }
@@ -300,6 +308,7 @@ impl MirNode {
                         },
                         // panic if no mapping was passed in
                         None => {
+                            println!("*here1");
                             panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
                                    c, self.name, self.columns);
                         }

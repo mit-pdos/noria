@@ -13,40 +13,36 @@ digraph {{
     10 [style="filled", fillcolor="/set312/4", label="{{ 10 / l6 / q_1d561268e2bd9b08_n1 | π[0, 1, lit: 0]  } | uid, \ngid, \nbogokey | unsharded }"]
     11 [style="filled", fillcolor="/set312/4", label="{ { 11 / l7 / ta | █ } | (reader / ⚷: [2]) | unsharded | None }"]
     12 [style="filled", fillcolor="/set312/4", label="{{ 12 / l8 / ta-trigger | T | █ } | uid, \ngid | unsharded }"]
-    13 [style="filled", fillcolor="/set312/1", label="{{ 13 / l1 / q_602cb0616bda1d69_n0 | \|*\| γ[2] | █ } | p_author, \ncount(p_id) | unsharded }"]
-    14 [style="filled", fillcolor="/set312/1", label="{{ 14 / l2 / q_602cb0616bda1d69_n1 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    15 [style="filled", fillcolor="/set312/1", label="{ { 15 / l3 / post_count | █ } | (reader / ⚷: [2]) | unsharded | None }"]
-    16 [style="filled", fillcolor="/set312/5", label="{ { 16 / l0 / GroupContext_ta_0 | B | █ } | group, \nid | unsharded }"]
-    17 [style="filled,rounded", fillcolor="/set312/1", label="{{ 17 / l4 / sp_523a2b69799e3038_n0_f0 | σ[f4 = 1]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
-    18 [style="filled", fillcolor="/set312/1", label="{{ 18 / l5 / q_602cb0616bda1d69_u0_n0 | \|*\| γ[2] | █ } | p_author, \ncount(p_id) | unsharded }"]
-    19 [style="filled", fillcolor="/set312/1", label="{{ 19 / l6 / post_count_ta0 | π[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    20 [style="filled", fillcolor="/set312/6", label="{ { 20 / l0 / GroupContext_ta_1 | B | █ } | group, \nid | unsharded }"]
-    21 [style="filled", fillcolor="/set312/1", label="{{ 21 / l7 / post_count_ta1 | π[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    22 [style="filled", fillcolor="/set312/7", label="{ { 22 / l0 / GroupContext_ta_2 | B | █ } | group, \nid | unsharded }"]
-    23 [style="filled", fillcolor="/set312/1", label="{{ 23 / l8 / post_count_ta2 | π[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    24 [style="filled", fillcolor="/set312/8", label="{ { 24 / l0 / GroupContext_ta_4 | B | █ } | group, \nid | unsharded }"]
-    25 [style="filled", fillcolor="/set312/1", label="{{ 25 / l9 / post_count_ta4 | π[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    26 [style="filled", fillcolor="/set312/9", label="{ { 26 / l0 / GroupContext_ta_3 | B | █ } | group, \nid | unsharded }"]
-    27 [style="filled", fillcolor="/set312/1", label="{{ 27 / l10 / post_count_ta3 | π[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    28 [style="filled", fillcolor="/set312/10", label="{ { 28 / l0 / UserContext_0 | B | █ } | id | unsharded }"]
-    29 [style="filled,rounded", fillcolor="/set312/1", label="{{ 29 / l11 / sp_f57527980b248578_n0_f0 | σ[f4 = 1]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
-    30 [style="filled", fillcolor="/set312/1", label="{{ 30 / l12 / q_602cb0616bda1d69_u0_n0 | \|*\| γ[2] | █ } | p_author, \ncount(p_id) | unsharded }"]
-    31 [style="filled", fillcolor="/set312/1", label="{{ 31 / l13 / q_602cb0616bda1d69_u0_n1 | 27:[0, 1] ⋃ 30:[0, 1]  } | p_author, \ncount(p_id) | unsharded }"]
-    32 [style="filled", fillcolor="/set312/1", label="{{ 32 / l14 / q_602cb0616bda1d69_u0_n2 | 𝛴(1) γ[0] | █ } | p_author, \ncount(p_id) | unsharded }"]
-    33 [style="filled", fillcolor="/set312/1", label="{{ 33 / l15 / q_602cb0616bda1d69_n3_u0 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    34 [style="filled", fillcolor="/set312/1", label="{ { 34 / l16 / post_count_u0 | █ } | (reader / ⚷: [2]) | unsharded | None }"]
-    35 [style="filled", fillcolor="/set312/11", label="{ { 35 / l0 / UserContext_1 | B | █ } | id | unsharded }"]
-    36 [style="filled", fillcolor="/set312/1", label="{{ 36 / l17 / q_602cb0616bda1d69_n1_u1 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    37 [style="filled", fillcolor="/set312/1", label="{ { 37 / l18 / post_count_u1 | █ } | (reader / ⚷: [2]) | unsharded | None }"]
-    38 [style="filled", fillcolor="/set312/12", label="{ { 38 / l0 / UserContext_2 | B | █ } | id | unsharded }"]
-    39 [style="filled", fillcolor="/set312/1", label="{{ 39 / l19 / q_602cb0616bda1d69_n1_u2 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    40 [style="filled", fillcolor="/set312/1", label="{ { 40 / l20 / post_count_u2 | █ } | (reader / ⚷: [2]) | unsharded | None }"]
-    41 [style="filled", fillcolor="/set312/1", label="{ { 41 / l0 / UserContext_3 | B | █ } | id | unsharded }"]
-    42 [style="filled", fillcolor="/set312/1", label="{{ 42 / l21 / q_602cb0616bda1d69_n1_u3 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    43 [style="filled", fillcolor="/set312/1", label="{ { 43 / l22 / post_count_u3 | █ } | (reader / ⚷: [2]) | unsharded | None }"]
-    44 [style="filled", fillcolor="/set312/2", label="{ { 44 / l0 / UserContext_4 | B | █ } | id | unsharded }"]
-    45 [style="filled", fillcolor="/set312/1", label="{{ 45 / l23 / q_602cb0616bda1d69_n1_u4 | π[0, 1, lit: 0]  } | p_author, \ncount(p_id), \nbogokey | unsharded }"]
-    46 [style="filled", fillcolor="/set312/1", label="{ { 46 / l24 / post_count_u4 | █ } | (reader / ⚷: [2]) | unsharded | None }"]
+    13 [style="filled", fillcolor="/set312/1", label="{{ 13 / l1 / q_3ac8c7be6ad751ec_n0 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    14 [style="filled", fillcolor="/set312/1", label="{ { 14 / l2 / post_count | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    15 [style="filled", fillcolor="/set312/5", label="{ { 15 / l0 / GroupContext_ta_3 | B | █ } | group, \nid | unsharded }"]
+    16 [style="filled,rounded", fillcolor="/set312/1", label="{{ 16 / l3 / sp_a738f1709211c67d_n0_f0 | σ[f4 = 1]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    17 [style="filled", fillcolor="/set312/1", label="{{ 17 / l4 / post_count_ta3 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    18 [style="filled", fillcolor="/set312/6", label="{ { 18 / l0 / GroupContext_ta_2 | B | █ } | group, \nid | unsharded }"]
+    19 [style="filled", fillcolor="/set312/1", label="{{ 19 / l5 / post_count_ta2 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    20 [style="filled", fillcolor="/set312/7", label="{ { 20 / l0 / GroupContext_ta_1 | B | █ } | group, \nid | unsharded }"]
+    21 [style="filled", fillcolor="/set312/1", label="{{ 21 / l6 / post_count_ta1 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    22 [style="filled", fillcolor="/set312/8", label="{ { 22 / l0 / GroupContext_ta_4 | B | █ } | group, \nid | unsharded }"]
+    23 [style="filled", fillcolor="/set312/1", label="{{ 23 / l7 / post_count_ta4 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    24 [style="filled", fillcolor="/set312/9", label="{ { 24 / l0 / GroupContext_ta_0 | B | █ } | group, \nid | unsharded }"]
+    25 [style="filled", fillcolor="/set312/1", label="{{ 25 / l8 / post_count_ta0 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    26 [style="filled", fillcolor="/set312/10", label="{ { 26 / l0 / UserContext_0 | B | █ } | id | unsharded }"]
+    27 [style="filled,rounded", fillcolor="/set312/1", label="{{ 27 / l9 / sp_f57527980b248578_n0_f0 | σ[f4 = 1]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    28 [style="filled", fillcolor="/set312/1", label="{{ 28 / l10 / q_3ac8c7be6ad751ec_u0_n0 | 25:[0, 1, 2, 3, 4, 5] ⋃ 27:[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    29 [style="filled", fillcolor="/set312/1", label="{{ 29 / l11 / q_3ac8c7be6ad751ec_n1_u0 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    30 [style="filled", fillcolor="/set312/1", label="{ { 30 / l12 / post_count_u0 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    31 [style="filled", fillcolor="/set312/11", label="{ { 31 / l0 / UserContext_1 | B | █ } | id | unsharded }"]
+    32 [style="filled", fillcolor="/set312/1", label="{{ 32 / l13 / q_3ac8c7be6ad751ec_n0_u1 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    33 [style="filled", fillcolor="/set312/1", label="{ { 33 / l14 / post_count_u1 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    34 [style="filled", fillcolor="/set312/12", label="{ { 34 / l0 / UserContext_2 | B | █ } | id | unsharded }"]
+    35 [style="filled", fillcolor="/set312/1", label="{{ 35 / l15 / q_3ac8c7be6ad751ec_n0_u2 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    36 [style="filled", fillcolor="/set312/1", label="{ { 36 / l16 / post_count_u2 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    37 [style="filled", fillcolor="/set312/1", label="{ { 37 / l0 / UserContext_3 | B | █ } | id | unsharded }"]
+    38 [style="filled", fillcolor="/set312/1", label="{{ 38 / l17 / q_3ac8c7be6ad751ec_n0_u3 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    39 [style="filled", fillcolor="/set312/1", label="{ { 39 / l18 / post_count_u3 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    40 [style="filled", fillcolor="/set312/2", label="{ { 40 / l0 / UserContext_4 | B | █ } | id | unsharded }"]
+    41 [style="filled", fillcolor="/set312/1", label="{{ 41 / l19 / q_3ac8c7be6ad751ec_n0_u4 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    42 [style="filled", fillcolor="/set312/1", label="{ { 42 / l20 / post_count_u4 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
     0 -> 1
     0 -> 2
     0 -> 3
@@ -61,37 +57,33 @@ digraph {{
     10 -> 12
     1 -> 13
     13 -> 14
-    14 -> 15
-    0 -> 16
-    1 -> 17
-    17 -> 18
-    18 -> 19
+    0 -> 15
+    1 -> 16
+    16 -> 17
+    0 -> 18
+    16 -> 19
     0 -> 20
-    18 -> 21
+    16 -> 21
     0 -> 22
-    18 -> 23
+    16 -> 23
     0 -> 24
-    18 -> 25
+    16 -> 25
     0 -> 26
-    18 -> 27
-    0 -> 28
-    1 -> 29
+    1 -> 27
+    25 -> 28
+    27 -> 28
+    28 -> 29
     29 -> 30
-    27 -> 31
-    30 -> 31
-    31 -> 32
+    0 -> 31
+    27 -> 32
     32 -> 33
-    33 -> 34
-    0 -> 35
-    30 -> 36
-    36 -> 37
-    0 -> 38
-    30 -> 39
-    39 -> 40
-    0 -> 41
-    30 -> 42
-    42 -> 43
-    0 -> 44
-    30 -> 45
-    45 -> 46
+    0 -> 34
+    27 -> 35
+    35 -> 36
+    0 -> 37
+    27 -> 38
+    38 -> 39
+    0 -> 40
+    27 -> 41
+    41 -> 42
 }}
