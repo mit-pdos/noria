@@ -93,6 +93,7 @@ pub enum Packet {
         data: Records,
         tracer: Tracer,
         senders: Vec<SourceChannelIdentifier>,
+        time: Time,
     },
 
     /// Update that is part of a tagged data-flow replay path.
@@ -335,12 +336,14 @@ impl Packet {
                 ref data,
                 ref tracer,
                 ref senders,
+                time,
             } => Packet::Message {
                 link: link.clone(),
                 src: None,
                 data: data.clone(),
                 tracer: tracer.clone(),
                 senders: senders.clone(),
+                time,
             },
             Packet::ReplayPiece {
                 ref link,

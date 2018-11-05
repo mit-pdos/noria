@@ -1,10 +1,11 @@
 
+use std::collections::BTreeMap;
 use prelude::*;
 
 #[derive(Copy, Clone, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Time(u64);
 
-#[derive(Copy, Clone, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TimestampAssigner(u64);
 impl TimestampAssigner {
     pub fn assign(&mut self) -> Time {
@@ -13,17 +14,8 @@ impl TimestampAssigner {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Path(u64);
-
-#[derive(Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PathAssigner(u64);
-impl PathAssigner {
-    pub fn assign(&mut self) -> Path {
-        self.0 += 1;
-        Path(self.0 - 1)
-    }
-}
 
 #[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TimeComponent {
@@ -96,5 +88,20 @@ impl ViewTimeState {
             path: self.paths.lookup(ancestor, time_component.path),
             ..time_component
         }
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct PathAssignments {
+    /// Map from node to the path assignments for each shard of it.
+    assignments: BTreeMap<NodeIndex, Vec<PathMap>>,
+}
+impl PathAssignments {
+    pub fn add_node(&mut self, node: NodeIndex, shards: usize, graph: &Graph) {
+        unimplemented!()
+    }
+
+    pub fn node_assignment(&self, node: NodeIndex, shard: usize) -> &PathMap {
+        &self.assignments[&node][shard]
     }
 }

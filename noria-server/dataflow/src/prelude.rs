@@ -35,3 +35,7 @@ pub type ChannelCoordinator = noria::channel::ChannelCoordinator<(DomainIndex, u
 pub trait Executor {
     fn send_back(&mut self, client: SourceChannelIdentifier, ack: ());
 }
+
+// time
+pub use timestamp::Time;
+pub use timestamp::VectorTime;

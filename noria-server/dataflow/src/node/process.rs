@@ -63,6 +63,7 @@ impl Node {
                             data: rs,
                             tracer,
                             senders,
+                            time: b.assign_timestamp(),
                         }));
                     }
                     Some(ref p) => {

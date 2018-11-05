@@ -1,4 +1,5 @@
 use noria::{Modification, Operation, TableOperation};
+use timestamp::TimestampAssigner;
 use prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -17,6 +18,8 @@ pub struct Base {
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
+
+    timestamp_assigner: TimestampAssigner,
 }
 
 impl Base {
@@ -82,6 +85,10 @@ impl Base {
             row.extend(self.defaults.iter().skip(rlen).cloned());
         }
     }
+
+    pub fn assign_timestamp(&mut self) -> Time {
+        self.timestamp_assigner.assign()
+    }
 }
 
 /// A Base clone must have a different unique_id so that no two copies write to the same file.
@@ -107,6 +114,7 @@ impl Default for Base {
             defaults: Vec::new(),
             dropped: Vec::new(),
             unmodified: true,
+            timestamp_assigner: Default::default(),
         }
     }
 }
