@@ -495,6 +495,11 @@ impl ControllerInner {
         self.persistence = params;
     }
 
+    // Assigns nodes to this domain, and shards the domain across multiple workers.
+    //
+    // Each worker identifier in `identifiers` corresponds to a single shard in `num_shards`,
+    // thus the logic of which worker gets which shard is determined by the code that calls
+    // this method. That code must also ensure the workers are healthy.
     pub(crate) fn place_domain(
         &mut self,
         idx: DomainIndex,
@@ -731,10 +736,6 @@ impl ControllerInner {
             }
         };
 
-        // reader should be a child of the given node. however, due to sharding and replication,
-        // it may not be an *immediate* child. furthermore, once we go beyond depth 1, we may
-        // accidentally hit an *unrelated* reader node. to account for this, nodes cache their
-        // readers so we can easily query data.
         self.ingredients[node].next_replica().map(|ni| {
             let rname = self.ingredients[ni].name();
             let domain = self.ingredients[ni].domain();

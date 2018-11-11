@@ -225,10 +225,13 @@ impl<A: Authority> ControllerHandle<A> {
                 if let Some(port) = self.local_port {
                     g = g.with_local_port(port);
                 }
+
                 let g = g.build(&mut self.views)?;
+
                 if self.local_port.is_none() {
                     self.local_port = Some(g.local_addr().unwrap().port());
                 }
+
                 Ok(g)
             })
     }

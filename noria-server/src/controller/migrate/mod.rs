@@ -207,7 +207,7 @@ impl<'a> Migration<'a> {
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>, num_replicas: usize) {
         if !self.readers.contains_key(&n) {
-            let mut readers = vec![];
+            let mut readers = Vec::with_capacity(num_replicas);
             for i in 0..num_replicas {
                 let replica_i = {
                     if num_replicas == 0 {
@@ -548,8 +548,7 @@ impl<'a> Migration<'a> {
         for &&ni in sorted_new
                 .iter()
                 .filter(|&&&ni| ni != mainline.source)
-                .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-                .into_iter() {
+                .filter(|&&&ni| !mainline.ingredients[ni].is_dropped()) {
             // Check if the node is a reader, and then insert it in the replica map. The value
             // is a list of readers that are for the same node, and the key is the node the
             // readers are for. Later, we will also add the associated ingress node to the replica

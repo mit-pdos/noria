@@ -189,8 +189,8 @@ impl View<SharedConnection> {
 )]
 impl<E> View<E> {
     /// Get the name of the corresponding reader node.
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// Get the list of columns in this view.
