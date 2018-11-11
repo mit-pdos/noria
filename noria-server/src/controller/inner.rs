@@ -737,7 +737,7 @@ impl ControllerInner {
         };
 
         self.ingredients[node].next_replica().map(|ni| {
-            let rname = self.ingredients[ni].name();
+            let name = self.ingredients[ni].name().to_string();
             let domain = self.ingredients[ni].domain();
             let columns = self.ingredients[ni].fields().to_vec();
             let shards = (0..self.domains[&domain].shards())
@@ -746,13 +746,13 @@ impl ControllerInner {
             info!(
                 self.log,
                 "creating view builder";
-                "name" => rname,
+                "name" => &name,
                 "node_index" => ni.index(),
                 "replica_index" => self.ingredients[ni].replica_index().unwrap(),
             );
 
             ViewBuilder {
-                name: rname.to_string(),
+                name,
                 local_ports: vec![],
                 node: ni,
                 columns,
