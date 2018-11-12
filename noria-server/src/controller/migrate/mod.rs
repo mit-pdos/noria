@@ -220,11 +220,7 @@ impl<'a> Migration<'a> {
                 // Make a reader node
                 let r = node::special::Reader::new(n, replica_i);
                 let r = if let Some(name) = name.clone() {
-                    if i == 0 {
-                        self.mainline.ingredients[n].named_mirror(r, name)
-                    } else {
-                        self.mainline.ingredients[n].named_mirror(r, format!("{}_r{}", name, i))
-                    }
+                    self.mainline.ingredients[n].named_mirror(r, format!("{}_{}", name, i))
                 } else {
                     self.mainline.ingredients[n].mirror(r)
                 };

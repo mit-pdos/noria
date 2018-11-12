@@ -720,10 +720,10 @@ impl ControllerInner {
     }
 
     /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
-    /// (already maintained) reader node. If the view has replicas, a `ViewBuilder` is returned
-    /// for each view in round robin order.
+    /// (already maintained) reader node. If the reader has multiple replicas, a `ViewBuilder`
+    /// is returned for each replica in round robin order.
     ///
-    /// The name of the reader node is `name`, or if it is a replica, `name_r[REPLICA_NUMBER]`.
+    /// `name` is the name of the query.
     pub fn view_builder(&mut self, name: &str) -> Option<ViewBuilder> {
         // first try to resolve the node via the recipe, which handles aliasing between identical
         // queries.
@@ -732,7 +732,14 @@ impl ControllerInner {
             Err(_) => {
                 // if the recipe doesn't know about this query, traverse the graph.
                 // we need this do deal with manually constructed graphs (e.g., in tests).
-                *self.outputs().get(name)?
+                if let Some(ni) = self.outputs().get(name) {
+                    *ni
+                } else {
+                    // depending on how the graph was constructed, the outputs may be suffixed
+                    // with the replica index.
+                    let reader_name = format!("{}_0", name);
+                    *self.outputs().get(&reader_name)?
+                }
             }
         };
 
