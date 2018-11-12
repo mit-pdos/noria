@@ -281,9 +281,17 @@ impl<'a> Migration<'a> {
     fn assign_local_addresses(
             mainline: &'a mut ControllerInner,
             log: &slog::Logger,
-            domain_new_nodes: &mut HashMap<DomainIndex, Vec<NodeIndex>>,
+            sorted_new: &Vec<&NodeIndex>,
             swapped: &HashMap<(NodeIndex, NodeIndex), NodeIndex>) {
-        for (domain, nodes) in &mut domain_new_nodes.iter() {
+        let domain_new_nodes = sorted_new
+            .iter()
+            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
+            .fold(HashMap::new(), |mut dns, (d, ni)| {
+                dns.entry(d).or_insert_with(Vec::new).push(ni);
+                dns
+            });
+
+        for (domain, nodes) in domain_new_nodes.iter() {
             // Number of pre-existing nodes
             let mut nnodes = mainline.remap.get(domain).map(HashMap::len).unwrap_or(0);
 
@@ -419,9 +427,9 @@ impl<'a> Migration<'a> {
         let mut new: HashSet<_> = self.added.into_iter().collect();
 
         // Readers are nodes too.
-        for (_parent, readers) in self.readers {
+        for (_parent, readers) in &self.readers {
             for reader in readers {
-                new.insert(reader);
+                new.insert(*reader);
             }
         }
 
@@ -494,19 +502,14 @@ impl<'a> Migration<'a> {
         let swapped = swapped0;
 
         // Assign local addresses to all new nodes, and initialize them.
-        let mut sorted_new = new.iter().collect::<Vec<_>>();
+        let mut sorted_new = new
+            .iter()
+            .filter(|&&ni| ni != mainline.source)
+            .filter(|&&ni| !mainline.ingredients[ni].is_dropped())
+            .collect::<Vec<_>>();
         sorted_new.sort();
 
-        let mut domain_new_nodes = sorted_new
-            .iter()
-            .filter(|&&&ni| ni != mainline.source)
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
-            .fold(HashMap::new(), |mut dns, (d, ni)| {
-                dns.entry(d).or_insert_with(Vec::new).push(ni);
-                dns
-            });
-        Self::assign_local_addresses(&mut mainline, &log, &mut domain_new_nodes, &swapped);
+        Self::assign_local_addresses(&mut mainline, &log, &sorted_new, &swapped);
         if let Some(shards) = mainline.sharding {
             sharding::validate(&log, &mainline.ingredients, mainline.source, &new, shards)
         };
@@ -542,45 +545,20 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        // Bucket reader replica nodes and the non-replica nodes separately.
-        let mut replica_map = HashMap::new();
-        let mut other_nodes = HashSet::new();
-        for &&ni in sorted_new
-                .iter()
-                .filter(|&&&ni| ni != mainline.source)
-                .filter(|&&&ni| !mainline.ingredients[ni].is_dropped()) {
-            // Check if the node is a reader, and then insert it in the replica map. The value
-            // is a list of readers that are for the same node, and the key is the node the
-            // readers are for. Later, we will also add the associated ingress node to the replica
-            // map, since readers are all located on their own domains.
-            if let Some(for_node) = mainline.ingredients[ni]
-                    .with_reader(|r| Some(r.is_for()))
-                    .unwrap_or(None) {
-                if mainline.ingredients[ni].replica_index().is_some() {
-                    replica_map.entry(for_node).or_insert(HashSet::new());
-                    replica_map.get_mut(&for_node).unwrap().insert(ni);
-                }
-            } else {
-                other_nodes.insert(ni);
-            }
-        }
-
-        // Obtain a vec of DomainIndexes in the order that we want to assign them to workers.
-        // For replicas, all replicas for the same reader should be consecutive. For non-replicas,
-        // it doesn't really matter unless we want the ordering to be deterministic.
+        // Since we're using a round robin iterator, obtain a vec of DomainIndexes in the order
+        // that we want to assign them to workers. For replicas, all replicas for the same view
+        // should end up on different workers. For non-replicas, it doesn't really matter.
         let mut changed_domains_replicas = Vec::new();
-        for (_, readers) in &mut replica_map {
-            let mut domains = readers
+        for (_, readers) in &self.readers {
+            changed_domains_replicas.extend(
+                readers
                 .iter()
-                .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
                 .map(|&ni| mainline.ingredients[ni].domain())
-                .collect::<Vec<_>>();
-            changed_domains_replicas.append(&mut domains);
+            );
         }
-        let changed_domains_other = other_nodes
+        let changed_domains_other = sorted_new
             .iter()
-            .filter(|&ni| !mainline.ingredients[*ni].is_dropped())
-            .map(|&ni| mainline.ingredients[ni].domain())
+            .map(|&&ni| mainline.ingredients[ni].domain())
             .collect::<HashSet<_>>()
             .into_iter()
             .filter(|&domain| !changed_domains_replicas.contains(&domain))
