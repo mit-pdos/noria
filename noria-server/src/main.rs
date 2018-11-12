@@ -116,7 +116,7 @@ fn main() {
                 .long("replicas")
                 .takes_value(true)
                 .default_value("1")
-                .help("Each reader has this many replicas (at least 1)."),
+                .help("The reader replication factor (at least 1)."),
         )
         .arg(
             Arg::with_name("verbose")

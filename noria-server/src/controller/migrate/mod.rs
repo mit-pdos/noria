@@ -209,16 +209,8 @@ impl<'a> Migration<'a> {
         if !self.readers.contains_key(&n) {
             let mut readers = Vec::with_capacity(num_replicas);
             for i in 0..num_replicas {
-                let replica_i = {
-                    if num_replicas == 0 {
-                        None
-                    } else {
-                        Some(i)
-                    }
-                };
-
                 // Make a reader node
-                let r = node::special::Reader::new(n, replica_i);
+                let r = node::special::Reader::new(n, i);
                 let r = if let Some(name) = name.clone() {
                     self.mainline.ingredients[n].named_mirror(r, format!("{}_{}", name, i))
                 } else {
@@ -228,12 +220,12 @@ impl<'a> Migration<'a> {
                 // Add it to the graph along with an edge to the node it reads for
                 let r = self.mainline.ingredients.add_node(r);
                 self.mainline.ingredients.add_edge(n, r, ());
-                self.mainline.ingredients[n].add_replica(r);
+                self.mainline.ingredients[n].add_reader(r);
                 info!(self.log,
                       "adding reader node";
                       "node" => r.index(),
                       "for_node" => n.index(),
-                      "replica_index" => replica_i
+                      "reader_index" => i
                 );
                 readers.push(r);
             }
@@ -351,11 +343,11 @@ impl<'a> Migration<'a> {
     }
 
     /// Places the domains and their nodes on workers according to the round robin iterator. This
-    /// is used to ensure, for example, that replicas of the same reader and shards of the same
+    /// is used to ensure, for example, that readers for the same view and shards of the same
     /// node end up on different workers. It is also currently used to approximately distribute
     /// domains across the remaining workers equally. In the future, we'd like to place the domain
     /// on the machine with the fewest domains already assigned. This does not take into account
-    /// replicas and shards that were NOT created for their very first time.
+    /// readers and shards that were NOT created for their very first time.
     ///
     /// Domains are placed round robin in the order that they are provided.
     fn place_round_robin(
@@ -542,11 +534,11 @@ impl<'a> Migration<'a> {
             });
 
         // Since we're using a round robin iterator, obtain a vec of DomainIndexes in the order
-        // that we want to assign them to workers. For replicas, all replicas for the same view
-        // should end up on different workers. For non-replicas, it doesn't really matter.
-        let mut changed_domains_replicas = Vec::new();
+        // that we want to assign them to workers. For readers, all readers for the same view
+        // should end up on different workers. For non-readers, it doesn't really matter.
+        let mut changed_domains_readers = Vec::new();
         for (_, readers) in &self.readers {
-            changed_domains_replicas.extend(
+            changed_domains_readers.extend(
                 readers
                 .iter()
                 .map(|&ni| mainline.ingredients[ni].domain())
@@ -557,23 +549,23 @@ impl<'a> Migration<'a> {
             .map(|&&ni| mainline.ingredients[ni].domain())
             .collect::<HashSet<_>>()
             .into_iter()
-            .filter(|&domain| !changed_domains_replicas.contains(&domain))
+            .filter(|&domain| !changed_domains_readers.contains(&domain))
             .collect::<Vec<_>>();
         debug!(
             log,
             "found changed domains";
-            "replica domains" => format!("{:?}", changed_domains_replicas),
+            "reader domains" => format!("{:?}", changed_domains_readers),
             "other domains" => format!("{:?}", changed_domains_other),
         );
 
-        // Check invariants on the (non)-replica data structures. Each changed replica domain
-        // should be just created. The domain should contain the reader node and its ingress node,
+        // Check invariants on the changed reader domains. Each changed reader domain should be
+        // just created. The domain should contain the reader node and its ingress node,
         // and no other nodes. Also, each new reader node should be in a unique domain.
         assert_eq!(
-            changed_domains_replicas.len(),
-            changed_domains_replicas.iter().collect::<HashSet<_>>().len()
+            changed_domains_readers.len(),
+            changed_domains_readers.iter().collect::<HashSet<_>>().len()
         );
-        for domain in &changed_domains_replicas {
+        for domain in &changed_domains_readers {
             assert!(!mainline.domains.contains_key(&domain));
             let nodes: &Vec<_> = uninformed_domain_nodes.get(&domain).unwrap();
             assert_eq!(nodes.len(), 2);
@@ -593,7 +585,7 @@ impl<'a> Migration<'a> {
             mainline,
             &log,
             &mut uninformed_domain_nodes,
-            &changed_domains_replicas,
+            &changed_domains_readers,
         );
         Self::place_round_robin(
             mainline,

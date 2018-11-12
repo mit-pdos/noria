@@ -57,7 +57,7 @@ impl ControllerBuilder {
         self.config.sharding = shards;
     }
 
-    /// Set number of reader replicas
+    /// Set reader replication factor
     pub fn set_replicas(&mut self, replicas: usize) {
         self.config.replicas = replicas;
     }

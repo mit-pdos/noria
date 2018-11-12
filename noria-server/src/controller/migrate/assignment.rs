@@ -110,8 +110,8 @@ pub fn assign(
                 };
             }
 
-            // replicas are always in their own domain to distribute the load.
-            if let Some(_) = n.replica_index() {
+            // readers are always in their own domain to distribute the load.
+            if n.is_reader() {
                 return next_domain();
             }
 

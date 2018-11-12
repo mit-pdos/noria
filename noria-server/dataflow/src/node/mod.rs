@@ -28,8 +28,8 @@ pub struct Node {
     taken: bool,
 
     sharded_by: Sharding,
-    replica_index: usize,
-    replicas: Vec<NodeIndex>,
+    next_reader: usize,
+    readers: Vec<NodeIndex>,
 }
 
 // constructors
@@ -52,8 +52,8 @@ impl Node {
             taken: false,
 
             sharded_by: Sharding::None,
-            replica_index: 0,
-            replicas: Vec::new(),
+            next_reader: 0,
+            readers: Vec::new(),
         }
     }
 
@@ -110,9 +110,9 @@ impl Node {
         self.sharded_by = s;
     }
 
-    /// Add a reader replica to this node.
-    pub fn add_replica(&mut self, ni: NodeIndex) {
-        self.replicas.push(ni)
+    /// The node being added is a reader for this node.
+    pub fn add_reader(&mut self, ni: NodeIndex) {
+        self.readers.push(ni)
     }
 
     pub fn on_commit(&mut self, remap: &HashMap<NodeIndex, IndexPair>) {
@@ -342,31 +342,27 @@ impl Node {
 
 // reader replication
 impl Node {
-    pub fn has_replicas(&self) -> bool {
-        !self.replicas.is_empty()
+    pub fn has_readers(&self) -> bool {
+        !self.readers.is_empty()
     }
 
-    pub fn num_replicas(&self) -> usize {
-        self.replicas.len()
+    pub fn num_readers(&self) -> usize {
+        self.readers.len()
     }
 
-    pub fn get_replicas(&self) -> &[NodeIndex] {
-        &self.replicas[..]
+    pub fn get_readers(&self) -> &[NodeIndex] {
+        &self.readers[..]
     }
 
-    /// Returns replicas in round robin order each time the method is called.
-    pub fn next_replica(&mut self) -> Option<NodeIndex> {
-        if self.num_replicas() > 0 {
-            self.replica_index += 1;
-            self.replica_index %= self.num_replicas();
-            Some(*self.replicas.get(self.replica_index).unwrap())
+    /// Returns reader replicas in round robin order each time the method is called.
+    pub fn next_reader(&mut self) -> Option<NodeIndex> {
+        if self.num_readers() > 0 {
+            self.next_reader += 1;
+            self.next_reader %= self.num_readers();
+            Some(*self.readers.get(self.next_reader).unwrap())
         } else {
             None
         }
-    }
-
-    pub fn replica_index(&self) -> Option<usize> {
-        self.with_reader(|r| r.replica_index()).unwrap_or(None)
     }
 }
 

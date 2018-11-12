@@ -720,8 +720,8 @@ impl ControllerInner {
     }
 
     /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
-    /// (already maintained) reader node. If the reader has multiple replicas, a `ViewBuilder`
-    /// is returned for each replica in round robin order.
+    /// (already maintained) reader node. If there are multiple readers for any given query,
+    /// a `ViewBuilder` is returned for each reader in round robin order.
     ///
     /// `name` is the name of the query.
     pub fn view_builder(&mut self, name: &str) -> Option<ViewBuilder> {
@@ -736,14 +736,14 @@ impl ControllerInner {
                     *ni
                 } else {
                     // depending on how the graph was constructed, the outputs may be suffixed
-                    // with the replica index.
+                    // with the reader index.
                     let reader_name = format!("{}_0", name);
                     *self.outputs().get(&reader_name)?
                 }
             }
         };
 
-        self.ingredients[node].next_replica().map(|ni| {
+        self.ingredients[node].next_reader().map(|ni| {
             let name = self.ingredients[ni].name().to_string();
             let domain = self.ingredients[ni].domain();
             let columns = self.ingredients[ni].fields().to_vec();
@@ -755,7 +755,7 @@ impl ControllerInner {
                 "creating view builder";
                 "name" => &name,
                 "node_index" => ni.index(),
-                "replica_index" => self.ingredients[ni].replica_index().unwrap(),
+                "reader_index" => self.ingredients[ni].with_reader(|r| r.reader_index()).unwrap(),
             );
 
             ViewBuilder {
@@ -1124,10 +1124,11 @@ impl ControllerInner {
             .count()
             > 0
         {
-            // This query leaf node has children -- typically, these are readers, but they can
-            // also be egress nodes or other, dependent queries. If the reader has replicas, we
-            // are looking for a single egress node that connects the leaf to replicas in other
-            // domains.
+            // This query leaf node has children -- egress nodes or other, dependent queries.
+            // Typically, we are looking for a single egress node that connects the leaf to
+            // readers in other domains.
+            // TODO: if each reader (including the 1st) definitely gets its own domain, this
+            // code can be a lot simpler.
             let mut has_other_children = false;
             let readers: Vec<_> = self
                 .ingredients
@@ -1172,13 +1173,13 @@ impl ControllerInner {
                     );
                 }
             } else {
-                // The reader had replicas, which will all be removed along with the egress node.
+                // The remaining readers will all be removed along with the egress node.
             }
         }
 
         match egress_node {
             Some(ni) => {
-                // If there's an egress node, that means the reader replicas are on different
+                // If there's an egress node, that means the remaining readers are on different
                 // domains. Remove all those leaf nodes as well.
                 let mut bfs = Bfs::new(&self.ingredients, ni);
                 while let Some(child) = bfs.next(&self.ingredients) {

@@ -2045,7 +2045,7 @@ fn recipe_activates_and_migrates() {
     g.extend_recipe(r1_txt).unwrap();
     // still one base node
     assert_eq!(g.inputs().unwrap().len(), 1);
-    // two leaf nodes * number of replicas
+    // two leaf nodes * replication factor
     assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 }
 
@@ -2065,7 +2065,7 @@ fn recipe_activates_and_migrates_with_join() {
 
     // still two base nodes
     assert_eq!(g.inputs().unwrap().len(), 2);
-    // one leaf node * number of replicas
+    // one leaf node * replication factor
     assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
 }
 
@@ -2294,7 +2294,7 @@ fn remove_query() {
 }
 
 #[test]
-fn replica_writes() {
+fn reader_replica_writes() {
     let txt = "CREATE TABLE x (a int);\n
                QUERY q: SELECT a from x;\n";
 
@@ -2309,7 +2309,7 @@ fn replica_writes() {
     let mut q2 = g.view("q").unwrap().into_exclusive().unwrap();
     let mut q3 = g.view("q").unwrap().into_exclusive().unwrap();
 
-    // These are actually views to different replicas
+    // These are actually views to different readers
     assert_eq!(q1.name(), "q_1");
     assert_eq!(q2.name(), "q_2");
     assert_eq!(q3.name(), "q_0");
@@ -2323,7 +2323,7 @@ fn replica_writes() {
     mutx.insert(vec![34.into()]).unwrap();
     sleep();
 
-    // Writes are reflected in all replicas
+    // Writes are reflected in all readers
     assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 3);
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
     assert_eq!(q3.lookup(&[0.into()], true).unwrap().len(), 3);
