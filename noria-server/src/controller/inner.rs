@@ -1117,94 +1117,47 @@ impl ControllerInner {
             leaf.index()
         );
 
+        // We're looking for a single egress node that connects the query node to readers in
+        // other domains.
         let mut nodes = vec![];
-        let mut egress_node = None;
-        if self
-            .ingredients
-            .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-            .count()
-            > 0
-        {
-            // This query leaf node has children -- egress nodes or other, dependent queries.
-            // Typically, we are looking for a single egress node that connects the leaf to
-            // readers in other domains.
-            // TODO: if each reader (including the 1st) definitely gets its own domain, this
-            // code can be a lot simpler.
-            let mut has_other_children = false;
-            let readers: Vec<_> = self
+        let egress_node = {
+            let num_children = self
                 .ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .filter(|&ni| {
-                    if self.ingredients[ni].is_reader() {
-                        true
-                    } else {
-                        if egress_node.is_some() || !self.ingredients[ni].is_egress() {
-                            has_other_children = true;
-                        } else {
-                            egress_node = Some(ni);
-                        }
-                        false
-                    }
-                })
-                .collect();
-            if has_other_children {
-                // should never happen, since we remove nodes in reverse topological order
+                .count();
+            if num_children == 1 {
+                self.ingredients
+                    .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
+                    .next()
+                    .unwrap()
+            } else {
+                // should not happen, since we remove nodes in reverse topological order
                 crit!(
                     self.log,
-                    "not removing node {} yet, as it still has non-reader-related children",
-                    leaf.index()
+                    "not removing node {} yet, as it has unexpected children or none at all",
+                    leaf.index();
+                    "num_children" => num_children,
                 );
                 unreachable!();
             }
-            // nodes can have only one reader attached
-            assert!(readers.len() <= 1);
-            debug!(
-                        self.log,
-                        "Removing query leaf \"{}\"", self.ingredients[leaf].name();
-                        "node" => leaf.index(),
-                    );
-            if !readers.is_empty() {
-                for reader in readers {
-                    removals.push(reader);
-                    nodes.push(reader);
-                    debug!(
-                        self.log, "Removing reader";
-                        "node" => reader.index(),
-                        "leaf" => leaf.index(),
-                    );
-                }
-            } else {
-                // The remaining readers will all be removed along with the egress node.
+        };
+
+        // Remove the egress node and its children
+        let mut bfs = Bfs::new(&self.ingredients, egress_node);
+        while let Some(child) = bfs.next(&self.ingredients) {
+            if self.ingredients
+                .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
+                .count() == 0
+            {
+                removals.push(child);
+                nodes.push(child);
             }
         }
-
-        match egress_node {
-            Some(ni) => {
-                // If there's an egress node, that means the remaining readers are on different
-                // domains. Remove all those leaf nodes as well.
-                let mut bfs = Bfs::new(&self.ingredients, ni);
-                while let Some(child) = bfs.next(&self.ingredients) {
-                    if self.ingredients
-                        .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
-                        .count() == 0
-                    {
-                        removals.push(child);
-                        nodes.push(child);
-                    }
-                }
-                debug!(
-                    self.log, "Removing egress node and its children";
-                    "node" => ni.index(),
-                    "leaf" => leaf.index(),
-                );
-            },
-            None => {
-                // If the start node didn't have any children, it can be removed immediately
-                if nodes.is_empty() {
-                    nodes.push(leaf);
-                }
-            },
-        }
+        debug!(
+            self.log, "Removing egress node and its children";
+            "node" => egress_node.index(),
+            "leaf" => leaf.index(),
+        );
 
         // The nodes we remove first do not have children any more
         for node in &nodes {
