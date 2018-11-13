@@ -2310,9 +2310,9 @@ fn reader_replica_writes() {
     let mut q3 = g.view("q").unwrap().into_exclusive().unwrap();
 
     // These are actually views to different readers
-    assert_eq!(q1.name(), "q_1");
-    assert_eq!(q2.name(), "q_2");
-    assert_eq!(q3.name(), "q_0");
+    assert_eq!(q1.reader_index(), 1);
+    assert_eq!(q2.reader_index(), 2);
+    assert_eq!(q3.reader_index(), 0);
 
     assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 0);
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 0);

@@ -59,7 +59,7 @@ pub enum ReadReply {
 #[doc(hidden)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewBuilder {
-    pub name: String,
+    pub reader_index: usize,
     pub node: NodeIndex,
     pub columns: Vec<String>,
     pub shards: Vec<SocketAddr>,
@@ -77,7 +77,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
-            name: self.name,
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
             shard_addrs: self.shards,
@@ -126,7 +126,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
-            name: self.name,
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
             shard_addrs: self.shards,
@@ -143,7 +143,7 @@ impl ViewBuilder {
 /// get a handle that can be sent to a different thread (i.e., one with its own dedicated
 /// connections), call `View::into_exclusive`.
 pub struct View<E = SharedConnection> {
-    name: String,
+    reader_index: usize,
     node: NodeIndex,
     columns: Vec<String>,
     shards: Vec<ViewRpc>,
@@ -156,7 +156,7 @@ pub struct View<E = SharedConnection> {
 impl Clone for View<SharedConnection> {
     fn clone(&self) -> Self {
         View {
-            name: self.name.clone(),
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns.clone(),
             shards: self.shards.clone(),
@@ -173,7 +173,7 @@ impl View<SharedConnection> {
     /// threads.
     pub fn into_exclusive(self) -> io::Result<View<ExclusiveConnection>> {
         ViewBuilder {
-            name: self.name,
+            reader_index: self.reader_index,
             node: self.node,
             local_ports: vec![],
             columns: self.columns,
@@ -188,9 +188,9 @@ impl View<SharedConnection> {
     allow(clippy::len_without_is_empty)
 )]
 impl<E> View<E> {
-    /// Get the name of the corresponding reader node.
-    pub fn name(&self) -> &str {
-        &self.name
+    /// Get the index of the corresponding Reader in the list of Readers for this view
+    pub fn reader_index(&self) -> usize {
+        self.reader_index
     }
 
     /// Get the list of columns in this view.

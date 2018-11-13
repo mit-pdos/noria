@@ -750,16 +750,17 @@ impl ControllerInner {
             let shards = (0..self.domains[&domain].shards())
                 .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
                 .collect();
+            let reader_index = self.ingredients[ni].with_reader(|r| r.reader_index()).unwrap();
             info!(
                 self.log,
                 "creating view builder";
                 "name" => &name,
                 "node_index" => ni.index(),
-                "reader_index" => self.ingredients[ni].with_reader(|r| r.reader_index()).unwrap(),
+                "reader_index" => reader_index,
             );
 
             ViewBuilder {
-                name,
+                reader_index,
                 local_ports: vec![],
                 node: ni,
                 columns,
