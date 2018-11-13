@@ -110,7 +110,7 @@ impl Node {
         self.sharded_by = s;
     }
 
-    /// The node being added is a reader for this node.
+    /// The node index `ni` being added is the index of a reader for this node.
     pub fn add_reader(&mut self, ni: NodeIndex) {
         self.readers.push(ni)
     }

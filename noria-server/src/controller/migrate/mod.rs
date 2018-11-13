@@ -205,13 +205,13 @@ impl<'a> Migration<'a> {
         self.mainline.graph()
     }
 
-    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>, num_replicas: usize) {
+    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>, replication_factor: usize) {
         if !self.readers.contains_key(&n) {
-            let mut readers = Vec::with_capacity(num_replicas);
-            for i in 0..num_replicas {
+            let mut readers = Vec::with_capacity(replication_factor);
+            for i in 0..replication_factor {
                 // Make a reader node
                 let r = node::special::Reader::new(n, i);
-                let r = if let Some(name) = name.clone() {
+                let r = if let Some(name) = &name {
                     self.mainline.ingredients[n].named_mirror(r, format!("{}_{}", name, i))
                 } else {
                     self.mainline.ingredients[n].mirror(r)
@@ -239,7 +239,7 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> Vec<NodeIndex> {
-        self.ensure_reader_for(n, None, self.mainline.replicas);
+        self.ensure_reader_for(n, None, self.mainline.replication_factor);
         let ris = &self.readers[&n];
 
         for ri in ris {
@@ -255,7 +255,7 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        self.ensure_reader_for(n, Some(name), self.mainline.replicas);
+        self.ensure_reader_for(n, Some(name), self.mainline.replication_factor);
 
         let ris = &self.readers[&n];
 
@@ -269,11 +269,11 @@ impl<'a> Migration<'a> {
     fn assign_local_addresses(
             mainline: &'a mut ControllerInner,
             log: &slog::Logger,
-            sorted_new: &Vec<&NodeIndex>,
+            sorted_new: &Vec<NodeIndex>,
             swapped: &HashMap<(NodeIndex, NodeIndex), NodeIndex>) {
         let domain_new_nodes = sorted_new
             .iter()
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
+            .map(|&ni| (mainline.ingredients[ni].domain(), ni))
             .fold(HashMap::new(), |mut dns, (d, ni)| {
                 dns.entry(d).or_insert_with(Vec::new).push(ni);
                 dns
@@ -490,10 +490,11 @@ impl<'a> Migration<'a> {
         let swapped = swapped0;
 
         // Assign local addresses to all new nodes, and initialize them.
-        let mut sorted_new = new
+        let mut sorted_new: Vec<NodeIndex> = new
             .iter()
-            .filter(|&&ni| ni != mainline.source)
-            .filter(|&&ni| !mainline.ingredients[ni].is_dropped())
+            .map(|&ni| ni)
+            .filter(|&ni| ni != mainline.source)
+            .filter(|&ni| !mainline.ingredients[ni].is_dropped())
             .collect::<Vec<_>>();
         sorted_new.sort();
 
@@ -546,7 +547,7 @@ impl<'a> Migration<'a> {
         }
         let changed_domains_other = sorted_new
             .iter()
-            .map(|&&ni| mainline.ingredients[ni].domain())
+            .map(|&ni| mainline.ingredients[ni].domain())
             .collect::<HashSet<_>>()
             .into_iter()
             .filter(|&domain| !changed_domains_readers.contains(&domain))

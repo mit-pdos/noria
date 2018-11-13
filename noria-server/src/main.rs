@@ -112,8 +112,8 @@ fn main() {
                 .help("Number of pool threads to use (0 = #cores)"),
         )
         .arg(
-            Arg::with_name("replicas")
-                .long("replicas")
+            Arg::with_name("replication_factor")
+                .long("replication_factor")
                 .takes_value(true)
                 .default_value("1")
                 .help("The reader replication factor (at least 1)."),
@@ -145,7 +145,7 @@ fn main() {
         0 => None,
         x => Some(x),
     };
-    let replicas = value_t_or_exit!(matches, "replicas", usize);
+    let replication_factor = value_t_or_exit!(matches, "replication_factor", usize);
     let verbose = matches.is_present("verbose");
     let deployment_name = matches.value_of("deployment").unwrap();
 
@@ -160,7 +160,7 @@ fn main() {
     if let Some(threads) = threads {
       builder.set_threads(threads);
     }
-    builder.set_replicas(replicas);
+    builder.set_replication_factor(replication_factor);
     builder.set_quorum(quorum);
     if matches.is_present("nopartial") {
         builder.disable_partial();

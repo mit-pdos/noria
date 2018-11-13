@@ -58,8 +58,8 @@ impl ControllerBuilder {
     }
 
     /// Set reader replication factor
-    pub fn set_replicas(&mut self, replicas: usize) {
-        self.config.replicas = replicas;
+    pub fn set_replication_factor(&mut self, replication_factor: usize) {
+        self.config.replication_factor = replication_factor;
     }
 
     /// Set how many workers the controller should wait for before starting. More workers can join

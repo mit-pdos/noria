@@ -49,7 +49,7 @@ pub fn build_local_logging(prefix: &str) -> LocalControllerHandle<LocalAuthority
 fn build(
     prefix: &str,
     sharding: Option<usize>,
-    replicas: usize,
+    replication_factor: usize,
     log: bool,
 ) -> LocalControllerHandle<LocalAuthority> {
     use crate::logger_pls;
@@ -59,7 +59,7 @@ fn build(
     }
     builder.set_sharding(sharding);
     builder.set_persistence(get_persistence_params(prefix));
-    builder.set_replicas(replicas);
+    builder.set_replication_factor(replication_factor);
     builder.build_local().unwrap()
 }
 

@@ -104,7 +104,7 @@ where
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub(crate) struct ControllerConfig {
     pub sharding: Option<usize>,
-    pub replicas: usize,
+    pub replication_factor: usize,
     pub partial_enabled: bool,
     pub domain_config: DomainConfig,
     pub persistence: PersistenceParameters,
@@ -122,9 +122,9 @@ impl Default for ControllerConfig {
             #[cfg(not(test))]
             sharding: None,
             #[cfg(test)]
-            replicas: 3,
+            replication_factor: 3,
             #[cfg(not(test))]
-            replicas: 1,
+            replication_factor: 1,
             partial_enabled: true,
             domain_config: DomainConfig {
                 concurrent_replays: 512,

@@ -35,6 +35,7 @@ pub struct Reader {
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
+    /// The index of this Reader in the list of Readers for its ancestor
     reader_index: usize,
     state: Option<Vec<usize>>,
 }
