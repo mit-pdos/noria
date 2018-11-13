@@ -535,8 +535,9 @@ impl<'a> Migration<'a> {
             });
 
         // Since we're using a round robin iterator, obtain a vec of DomainIndexes in the order
-        // that we want to assign them to workers. For readers, all readers for the same view
-        // should end up on different workers. For non-readers, it doesn't really matter.
+        // that we want to assign them to workers. For readers, we have to specifically list
+        // readers for the same node in consecutive order to ensure their respective domains end
+        // up on different workers. For non-readers, the order doesn't actually matter.
         let mut changed_domains_readers = Vec::new();
         for (_, readers) in &self.readers {
             changed_domains_readers.extend(
@@ -580,7 +581,9 @@ impl<'a> Migration<'a> {
             );
         }
 
-        // Boot up new domains (they'll ignore all updates for now)
+        // Boot up new domains (they'll ignore all updates for now).
+        // We call `place_round_robin` twice to distinguish the changed domains for which the order
+        // matters (readers) from the changed domains for which it doesn't, as stated above.
         debug!(log, "booting new domains");
         Self::place_round_robin(
             mainline,

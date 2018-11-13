@@ -354,7 +354,8 @@ impl Node {
         &self.readers[..]
     }
 
-    /// Returns reader replicas in round robin order each time the method is called.
+    /// Returns reader replicas in round robin order each time the method is called,
+    /// with the primary reader (reader index = 0) being returned last.
     pub fn next_reader(&mut self) -> Option<NodeIndex> {
         if self.num_readers() > 0 {
             self.next_reader += 1;

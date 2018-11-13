@@ -723,7 +723,7 @@ impl ControllerInner {
     /// (already maintained) reader node. If there are multiple readers for any given query,
     /// a `ViewBuilder` is returned for each reader in round robin order.
     ///
-    /// `name` is the name of the query.
+    /// `name` is the name of the view the reader is for.
     pub fn view_builder(&mut self, name: &str) -> Option<ViewBuilder> {
         // first try to resolve the node via the recipe, which handles aliasing between identical
         // queries.
