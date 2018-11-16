@@ -119,7 +119,7 @@ impl Populate {
             let pid = i.into();
             let author = self.uid();
             let cid = self.cid_for(&author);
-            let content = "".into();
+            let content = "asdkfjadsfj;ksdjfkajsdf;jadsfkja;dsfkjakl;dsfj;asd23r2839fasdflkjasdfk".into();
             let private = self.private();
             let anon = 1.into();
             records.push(vec![pid, cid, author, content, private, anon]);
