@@ -198,7 +198,6 @@ impl Handle {
                     match r {
                         Record::Positive(r) => {
                             memory_delta += r.deep_size_of() as isize;
-                            println!("*** MULTIW: insert: KEY: {:?}, R: {:?}, UID: {:?}", r[key[0]].clone(), r.clone(), uid.clone());
                             h.insert(r[key[0]].clone(), r, uid.clone());
                         }
                         Record::Negative(r) => {

@@ -52,7 +52,6 @@ pub(crate) fn handle_message(
                 let found = keys
                     .iter_mut()
                     .map(|key| {
-                        println!("Attempting to find key: {:?}", key.clone());
                         let rs = reader.try_find_and(key, dup).map(|r| r.0);
                         (key, rs)
                     }).enumerate();

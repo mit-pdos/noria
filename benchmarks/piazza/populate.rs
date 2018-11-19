@@ -113,7 +113,7 @@ impl Populate {
     }
 
     pub fn get_posts(&mut self) -> Vec<Vec<DataType>> {
-        println!("Populating posts...");
+        println!("Populating posts... with {:?}", self.nposts);
         let mut records = Vec::new();
         for i in 0..self.nposts {
             let pid = i.into();
@@ -124,6 +124,7 @@ impl Populate {
             let anon = 1.into();
             records.push(vec![pid, cid, author, content, private, anon]);
         }
+        println!("finished populating...");
 
         records
     }
