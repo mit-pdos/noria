@@ -997,7 +997,7 @@ impl ControllerInner {
                 topo_removals.reverse();
 
                 for leaf in topo_removals {
-                    self.remove_query_node(leaf)?;
+                    self.remove_leaf(leaf)?;
                 }
 
                 // now remove bases
@@ -1106,7 +1106,7 @@ impl ControllerInner {
         graphviz(&self.ingredients, detailed, &self.materializations)
     }
 
-    fn remove_query_node(&mut self, leaf: NodeIndex) -> Result<(), String> {
+    fn remove_leaf(&mut self, leaf: NodeIndex) -> Result<(), String> {
         let mut removals = vec![];
         let start = leaf;
         assert!(!self.ingredients[leaf].is_source());
@@ -1125,16 +1125,20 @@ impl ControllerInner {
                 .ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
                 .count();
-            if num_children == 1 {
-                self.ingredients
+            if num_children == 0 {
+                None
+            } else if num_children == 1 {
+                let child = self.ingredients
                     .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
                     .next()
-                    .unwrap()
+                    .unwrap();
+                assert!(self.ingredients[child].is_egress());
+                Some(child)
             } else {
                 // should not happen, since we remove nodes in reverse topological order
                 crit!(
                     self.log,
-                    "not removing node {} yet, as it has unexpected children or none at all",
+                    "not removing node {} yet, as it still has non-reader-related children",
                     leaf.index();
                     "num_children" => num_children,
                 );
@@ -1143,21 +1147,23 @@ impl ControllerInner {
         };
 
         // Remove the egress node and its children
-        let mut bfs = Bfs::new(&self.ingredients, egress_node);
-        while let Some(child) = bfs.next(&self.ingredients) {
-            if self.ingredients
-                .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
-                .count() == 0
-            {
-                removals.push(child);
-                nodes.push(child);
+        if let Some(egress_node) = egress_node {
+            let mut bfs = Bfs::new(&self.ingredients, egress_node);
+            while let Some(child) = bfs.next(&self.ingredients) {
+                if self.ingredients
+                    .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
+                    .count() == 0
+                {
+                    removals.push(child);
+                    nodes.push(child);
+                }
             }
+            debug!(
+                self.log, "Removing egress node and its children";
+                "node" => egress_node.index(),
+                "leaf" => leaf.index(),
+            );
         }
-        debug!(
-            self.log, "Removing egress node and its children";
-            "node" => egress_node.index(),
-            "leaf" => leaf.index(),
-        );
 
         // The nodes we remove first do not have children any more
         for node in &nodes {
