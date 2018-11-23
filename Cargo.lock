@@ -458,7 +458,7 @@ dependencies = [
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "noria 0.1.2",
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "rahashmap 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rahashmap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rocksdb 0.10.0 (git+https://github.com/ekmartin/rust-rocksdb.git?branch=custom)",
@@ -588,7 +588,7 @@ name = "evmap"
 version = "4.0.0"
 source = "git+https://github.com/ms705/rust-evmap#bdd67f2d4c8aa6e1129335db9efde5171b2195ef"
 dependencies = [
- "rahashmap 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rahashmap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1604,7 +1604,7 @@ dependencies = [
 
 [[package]]
 name = "rahashmap"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2924,7 +2924,7 @@ dependencies = [
 "checksum quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9274b940887ce9addde99c4eee6b5c44cc494b182b97e73dc8ffdcb3397fd3f0"
 "checksum quote 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9949cfe66888ffe1d53e6ec9d9f3b70714083854be20fd5e271b232a017401e8"
 "checksum quote 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)" = "53fa22a1994bd0f9372d7a816207d8a2677ad0325b073f5c5332760f0fb62b5c"
-"checksum rahashmap 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)" = "f48af954463b96dc3de8220896932fb0923e11fbf48d91fe8a7ac31f42f43c2a"
+"checksum rahashmap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)" = "0986686670be062d851d22b1b1d6b112086af083c43361c0b9a3959855e2b1c0"
 "checksum rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "15a732abf9d20f0ad8eeb6f909bf6868722d9a06e1e50802b6a70351f40b4eb1"
 "checksum rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8356f47b32624fef5b3301c1be97e5944ecdd595409cc5da11d05f211db6cfbd"
 "checksum rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e464cd887e869cddcae8792a4ee31d23c7edd516700695608f5b98c67ee0131c"
