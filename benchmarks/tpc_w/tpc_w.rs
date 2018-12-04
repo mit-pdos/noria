@@ -107,7 +107,7 @@ fn make(
             Err(e) => panic!(e),
         }*/
 
-    // println!("{}", g);
+    // // println!("{}", g);
 
     Backend {
         r: recipe,
@@ -130,7 +130,7 @@ impl Backend {
         self.g.install_recipe(&new_recipe).unwrap();
 
         let dur = dur_to_fsec!(start.elapsed());
-        println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
+        // println!("Migrate query {}: ({:.2} sec)", query_name, dur,);
 
         self.r = new_recipe;
         self
@@ -156,7 +156,7 @@ impl Backend {
         read_scale: f32,
         parallel: bool,
     ) -> Option<JoinHandle<()>> {
-        println!("reading {}", query_name);
+        // println!("reading {}", query_name);
         let mut g = self
             .g
             .view(query_name)
@@ -181,7 +181,7 @@ impl Backend {
                 }
             }
             let dur = dur_to_fsec!(start.elapsed());
-            println!(
+            // println!(
                 "{}: ({:.2} GETs/sec) (ok: {})!",
                 query_name,
                 f64::from(num as i32) / dur,
@@ -291,10 +291,10 @@ fn main() {
         panic!("can't read scale must be less or equal than write scale");
     }
 
-    println!("Loading TPC-W recipe from {}", rloc);
+    // println!("Loading TPC-W recipe from {}", rloc);
     let mut backend = make(&rloc, parallel_prepop, single_query, disable_partial);
 
-    println!("Prepopulating from data files in {}", ploc);
+    // println!("Prepopulating from data files in {}", ploc);
     let (item_write, author_write, order_line_write) = match write_to.as_ref() {
         "item" => (write, 1.0, 1.0),
         "author" => (1.0, write, 1.0),
@@ -332,16 +332,16 @@ fn main() {
         backend.barrier.wait();
     }
 
-    //println!("{}", backend.g);
+    //// println!("{}", backend.g);
 
-    println!("Finished writing! Sleeping for 1 second...");
+    // println!("Finished writing! Sleeping for 1 second...");
     thread::sleep(time::Duration::from_millis(1000));
 
     if single_query {
         use std::fs::File;
         use std::io::Write;
 
-        println!("Migrating individual queries...");
+        // println!("Migrating individual queries...");
         let queries = get_queries(&rloc, random);
 
         for (i, q) in queries.iter().enumerate() {
@@ -356,7 +356,7 @@ fn main() {
     }
 
     if read_scale > 0.0 {
-        println!("Reading...");
+        // println!("Reading...");
         let mut keys = SampleKeys::new(&ploc, item_write, order_line_write);
         let item_queries = [
             "getBestSellers",
@@ -380,13 +380,13 @@ fn main() {
             }
         }
 
-        /*println!("Checking size of leaf views...");
+        /*// println!("Checking size of leaf views...");
         for nq in backend.r.aliases() {
             let populated = backend.size(nq);
             let total = keys.key_space(nq);
             let ratio = (populated as f32) / (total as f32);
 
-            println!(
+            // println!(
                 "{}: {} of {} keys populated ({})",
                 nq,
                 populated,

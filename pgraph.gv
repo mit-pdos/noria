@@ -1,0 +1,33 @@
+digraph {{
+    node [shape=record, fontsize=10]
+    0 [style="filled", fillcolor=white, label="(source)"]
+    1 [style="filled", fillcolor="/set312/1", label="{ { 1 / l0 / Post | B | █ } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    2 [style="filled", fillcolor="/set312/2", label="{ { 2 / l0 / User | B | █ } | u_id | unsharded }"]
+    3 [style="filled", fillcolor="/set312/3", label="{ { 3 / l0 / Class | B | █ } | c_id | unsharded }"]
+    4 [style="filled", fillcolor="/set312/4", label="{ { 4 / l0 / Role | B | █ } | r_uid, \nr_cid, \nr_role | unsharded }"]
+    5 [style="filled", fillcolor="/set312/1", label="{{ 5 / l1 / q_3ac8c7be6ad751ec_n0 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    6 [style="filled", fillcolor="/set312/1", label="{ { 6 / l2 / post_count | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    7 [style="filled", fillcolor="/set312/5", label="{ { 7 / l0 / UserContext_0 | B | █ } | id | unsharded }"]
+    8 [style="filled,rounded", fillcolor="/set312/1", label="{{ 8 / l3 / sp_5082b1619ed59d13_n0_f0 | σ[f4 = 0]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    9 [style="filled,rounded", fillcolor="/set312/1", label="{{ 9 / l4 / sp_f57527980b248578_n0_f0 | σ[f4 = 1]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    10 [style="filled", fillcolor="/set312/1", label="{{ 10 / l5 / q_3ac8c7be6ad751ec_u0_n0 | 8:[0, 1, 2, 3, 4, 5] ⋃ 9:[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    11 [style="filled", fillcolor="/set312/1", label="{{ 11 / l6 / q_3ac8c7be6ad751ec_n1_u0 | π[0, 1, 2, 3, 4, 5]  } | p_id, \np_cid, \np_author, \np_content, \np_private, \np_anonymous | unsharded }"]
+    12 [style="filled", fillcolor="/set312/1", label="{ { 12 / l7 / post_count_u0 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    13 [style="filled", fillcolor="/set312/6", label="{ { 13 / l0 / UserContext_1 | B | █ } | id | unsharded }"]
+    14 [style="filled", fillcolor="/set312/1", label="{ { 14 / l8 / post_count_u1 | █ } | (reader / ⚷: [1]) | unsharded | None }"]
+    0 -> 1
+    0 -> 2
+    0 -> 3
+    0 -> 4
+    1 -> 5
+    5 -> 6
+    0 -> 7
+    1 -> 8
+    1 -> 9
+    9 -> 10
+    8 -> 10
+    10 -> 11
+    11 -> 12
+    0 -> 13
+    11 -> 14
+}}

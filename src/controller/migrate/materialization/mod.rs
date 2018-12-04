@@ -16,6 +16,7 @@ use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::controller::inner::ControllerInner;
 use crate::controller::inner::MapMeta;
+use crate::controller::recipe::Recipe;
 
 mod plan;
 
@@ -436,6 +437,7 @@ impl Materializations {
     /// populating new materializations.
     pub(super) fn commit(
        &mut self,
+       recipe: &Recipe,
        graph: &Graph,
        new: &HashSet<NodeIndex>,
        domains: &mut HashMap<DomainIndex, DomainHandle>,
@@ -468,7 +470,7 @@ impl Materializations {
                 }
 
                 if let Some(pi) = any_partial(self, graph, ni) {
-                    // println!("{}", graphviz(graph, &self));
+                    // // println!("{}", graphviz(graph, &self));
                     crit!(self.log, "partial materializations above full materialization";
                               "full" => ni.index(),
                               "partial" => pi.index());
@@ -516,7 +518,7 @@ impl Materializations {
                                                 .find(|c| !index.contains(&c))
                                         });
                                     if let Some(not_shared) = unshared {
-                                        // println!("{}", graphviz(graph, &self));
+                                        // // println!("{}", graphviz(graph, &self));
                                         crit!(self.log, "partially overlapping partial indices";
                                                   "parent" => pni.index(),
                                                   "pcols" => ?index,
@@ -584,7 +586,7 @@ impl Materializations {
                             .find(|&(c, res)| c != col && res == &src)
                         {
                             // another column in the merger's parent resolved to the source column!
-                            //// println!("{}", graphviz(graph, &self));
+                            //// // println!("{}", graphviz(graph, &self));
                             crit!(self.log, "attempting to merge sharding by aliased column";
                                       "parent" => mat_anc.index(),
                                       "aliased" => res,
@@ -643,7 +645,7 @@ impl Materializations {
                             != self.have.get(&child).map(|i| i.len()).unwrap_or(0)
                         {
                             // node was previously materialized!
-                            // println!("{}", graphviz(graph, &self));
+                            // // println!("{}", graphviz(graph, &self));
                             crit!(
                                 self.log,
                                 "attempting to make old non-materialized node with children partial";
@@ -674,14 +676,14 @@ impl Materializations {
                 index_on.clear();
             } else if !n.sharded_by().is_none() {
                 // what do we even do here?!
-                // println!("{}", graphviz(graph, &self));
+                // // println!("{}", graphviz(graph, &self));
                 crit!(self.log, "asked to add index to sharded node";
                            "node" => node.index(),
                            "cols" => ?index_on);
             // unimplemented!();
             } else {
                 use dataflow::payload::InitialState;
-                println!("Preparing node... {:?}", node.clone());
+                // println!("Preparing node... {:?}", node.clone());
                 domains
                     .get_mut(&n.domain())
                     .unwrap()
@@ -711,8 +713,10 @@ impl Materializations {
             let mut srmap_node = false;
             let mut materialization_info : Option<(usize, usize)> = None;
             let mut uid = None;
-
             // Check if this node should share an SRMap
+            // println!("considering node index: {:?}", ni);
+            // println!("reader_to_q: {:?}", reader_to_q);
+            // println!("recipe: leaf addr {:?}", recipe.clone().inc.unwrap().leaf_addresses);
             match reader_to_q.get(&ni) {
                 Some(query) => {
                     srmap_node = true;
@@ -739,7 +743,7 @@ impl Materializations {
                                     map_meta.domain_to_offset.insert(domain.clone(), new_offset);
                                     match materialization_info {
                                         Some(info) => {
-                                            println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
+                                            // println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
                                             map_meta.query_to_materialization.insert(query.clone().to_string(), info.clone());
                                         },
                                         None => {}
@@ -752,7 +756,10 @@ impl Materializations {
                         }
                     }
                 },
-                None => {}
+                None => {
+                    let n = &graph[ni];
+                    // println!("DECIDING: n: {:?}", n);
+                }
             }
 
             match map_meta.reader_to_uid.get(&ni) {

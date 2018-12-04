@@ -56,7 +56,7 @@ fn new_inner(
     macro_rules! make_srmap {
     ($variant:tt) => {{
             use srmap;
-            println!("actually making srmap nice");
+            // println!("actually making srmap nice");
             let (r, w) = srmap::srmap::construct(-1);
             (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
@@ -401,9 +401,9 @@ impl SingleReadHandle {
     /// Count the number of rows in the reader.
     /// This is a potentially very costly operation, since it will
     /// hold up writers until all rows are iterated through.
-    pub fn count_rows(&self) -> usize {
+    pub fn count_rows(&self, uid: usize) -> usize {
         let mut nrows = 0;
-        self.handle.for_each(|v| nrows += v.len());
+        self.handle.for_each(|v| nrows += v.len(), uid);
         nrows
     }
 }
@@ -435,7 +435,7 @@ impl ReadHandle {
                     .unwrap()
                     .try_find_and(key, then)
             }
-            ReadHandle::Singleton(ref srh) => srh.as_ref().unwrap().try_find_and(key, then),
+            ReadHandle::Singleton(ref srh) => { let res = srh.as_ref().unwrap().try_find_and(key, then); res}
         }
     }
 
@@ -505,10 +505,10 @@ mod tests {
 
         //
         // w.insert(k.clone(), v.clone(), uid2.clone());
-        // println!("After second insert: {:?}", lock.read().unwrap());
+        // // println!("After second insert: {:?}", lock.read().unwrap());
         //
         // w.insert(k.clone(), v2.clone(), uid2.clone());
-        // println!("After overlapping insert: {:?}", lock.read().unwrap());
+        // // println!("After overlapping insert: {:?}", lock.read().unwrap());
         //
         // let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
         // assert_eq!(v, true);
@@ -517,23 +517,23 @@ mod tests {
         // assert_eq!(v, true);
         //
         // w.remove(k.clone(), uid1.clone());
-        // println!("After remove: {:?}", lock.read().unwrap());
+        // // println!("After remove: {:?}", lock.read().unwrap());
         //
         // let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
-        // println!("V: {:?}", v);
+        // // println!("V: {:?}", v);
         // match v {
         //     Some(val) => assert_eq!(val, false),
         //     None => {}
         // };
         //
         // w.remove(k.clone(), uid2.clone());
-        // println!("After user specific remove {:?}", lock.read().unwrap());
+        // // println!("After user specific remove {:?}", lock.read().unwrap());
         //
         // w.remove_user(uid1);
-        // println!("After removing u1 {:?}", lock.read().unwrap());
+        // // println!("After removing u1 {:?}", lock.read().unwrap());
         //
         // w.remove_user(uid2);
-        // println!("After removing u2 {:?}", lock.read().unwrap());
+        // // println!("After removing u2 {:?}", lock.read().unwrap());
     }
 
     // #[test]
@@ -681,13 +681,13 @@ mod tests {
     // //
     // //     w.insert(k.clone(), v.clone(), uid1.clone());
     // //     let lock = r.get_lock();
-    // //     println!("After first insert: {:?}", lock.read().unwrap());
+    // //     // println!("After first insert: {:?}", lock.read().unwrap());
     // //
     // //     w.insert(k.clone(), v.clone(), uid2.clone());
-    // //     println!("After second insert: {:?}", lock.read().unwrap());
+    // //     // println!("After second insert: {:?}", lock.read().unwrap());
     // //
     // //     w.insert(k.clone(), v2.clone(), uid2.clone());
-    // //     println!("After overlapping insert: {:?}", lock.read().unwrap());
+    // //     // println!("After overlapping insert: {:?}", lock.read().unwrap());
     // //
     // //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
     // //     assert_eq!(v, true);
@@ -696,23 +696,23 @@ mod tests {
     // //     assert_eq!(v, true);
     // //
     // //     w.remove(k.clone(), uid1.clone());
-    // //     println!("After remove: {:?}", lock.read().unwrap());
+    // //     // println!("After remove: {:?}", lock.read().unwrap());
     // //
     // //     let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
-    // //     println!("V: {:?}", v);
+    // //     // println!("V: {:?}", v);
     // //     match v {
     // //         Some(val) => assert_eq!(val, false),
     // //         None => {}
     // //     };
     // //
     // //     w.remove(k.clone(), uid2.clone());
-    // //     println!("After user specific remove {:?}", lock.read().unwrap());
+    // //     // println!("After user specific remove {:?}", lock.read().unwrap());
     // //
     // //     w.remove_user(uid1);
-    // //     println!("After removing u1 {:?}", lock.read().unwrap());
+    // //     // println!("After removing u1 {:?}", lock.read().unwrap());
     // //
     // //     w.remove_user(uid2);
-    // //     println!("After removing u2 {:?}", lock.read().unwrap());
+    // //     // println!("After removing u2 {:?}", lock.read().unwrap());
     // // }
     //
     // #[test]

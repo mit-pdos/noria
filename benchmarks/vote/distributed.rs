@@ -116,7 +116,7 @@ fn main() {
     if let Err(e) = ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
     }) {
-        eprintln!("==> failed to set ^C handler: {}", e);
+        e// println!("==> failed to set ^C handler: {}", e);
     }
 
     // init lots of machines in parallel
@@ -132,7 +132,7 @@ fn main() {
     for scale in args.values_of("scales").unwrap() {
         match scale.parse::<u32>() {
             Ok(scale) => {
-                eprintln!(
+                e// println!(
                     "==> {} servers and {} clients",
                     nservers * scale,
                     nclients * scale
@@ -140,7 +140,7 @@ fn main() {
 
                 run_one(&args, first, nservers * scale, nclients * scale)
             }
-            Err(e) => eprintln!("Ignoring malformed scale factor {}", e),
+            Err(e) => e// println!("Ignoring malformed scale factor {}", e),
         }
         first = false;
 
@@ -161,8 +161,8 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
     let target_per_client = value_t_or_exit!(args, "target", usize);
 
     let nshards = format!("{}", nservers * shards as u32);
-    eprintln!("--> running with {} shards total", nshards);
-    eprintln!(
+    e// println!("--> running with {} shards total", nshards);
+    e// println!(
         "--> generating an aggregate {} ops/s",
         target_per_client * nclients as usize
     );
@@ -199,7 +199,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |_host| {
             // ensure we don't have stale soup (yuck)
             /* We don't want to do a rebuild given that we have to re-do it for every scale
-            eprintln!(" -> building souplet on server");
+            e// println!(" -> building souplet on server");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])
                 .context("git pull souplet")?
                 .map_err(failure::err_msg)?;
@@ -223,7 +223,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         nclients,
         tsunami::MachineSetup::new(args.value_of("ctype").unwrap(), SOUP_AMI, |_host| {
             /* same as above
-            eprintln!(" -> building vote client on client");
+            e// println!(" -> building vote client on client");
             host.just_exec(&["git", "-C", "distributary", "pull", "2>&1"])
                 .context("git pull distributary")?
                 .map_err(failure::err_msg)?;
@@ -271,7 +271,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 .just_exec(&["git", "-C", "distributary", "rev-parse", "HEAD"])
                 .context("git rev-parse HEAD")?
                 .map_err(failure::err_msg)?;
-            eprintln!("==> revision: {}", rev.trim_right());
+            e// println!("==> revision: {}", rev.trim_right());
             servers[0]
                 .ssh
                 .as_ref()
@@ -293,7 +293,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 ]).context("git log --online ..origin/master")?
                 .map_err(failure::err_msg)?;
             if !missing.is_empty() {
-                eprintln!("==> missing commits from origin:");
+                e// println!("==> missing commits from origin:");
                 eprint!("{}", missing);
             }
         }
@@ -402,7 +402,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         // --------------------------------------------------------------------------------
 
         // prime
-        eprintln!(
+        e// println!(
             " -> priming from {} @ {}",
             clients[0].public_dns,
             chrono::Local::now().time()
@@ -451,7 +451,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         let voters: Result<Vec<_>, _> = clients
             .iter()
             .map(|c| {
-                eprintln!(" -> starting client on {}", c.public_dns);
+                e// println!(" -> starting client on {}", c.public_dns);
                 vote!(
                     c.ssh.as_ref().unwrap(),
                     vec![
@@ -484,7 +484,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             nservers,
         ))?;
 
-        eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
+        e// println!(" .. benchmark running @ {}", chrono::Local::now().time());
         for (i, mut chan) in voters.into_iter().enumerate() {
             let mut stdout = String::new();
             chan.read_to_string(&mut stdout)?;
@@ -494,12 +494,12 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             chan.wait_eof()?;
 
             if chan.exit_status()? != 0 {
-                eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
-                eprintln!("{}", stderr);
+                e// println!("{} failed to run benchmark client:", clients[i].public_dns);
+                e// println!("{}", stderr);
             } else if !stderr.is_empty() {
-                eprintln!("{} reported:", clients[i].public_dns);
+                e// println!("{} reported:", clients[i].public_dns);
                 let stderr = stderr.trim_right().replace('\n', "\n > ");
-                eprintln!(" > {}", stderr);
+                e// println!(" > {}", stderr);
             }
 
             // TODO: should we get histogram files here instead and merge them?
@@ -516,7 +516,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             ])?;
 
             if !killed.is_ok() {
-                println!("souplet died");
+                // println!("souplet died");
             }
 
             let mut stdout = String::new();
@@ -525,11 +525,11 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
             souplet.read_to_string(&mut stdout)?;
             let stdout = stdout.trim_right();
             if !stdout.is_empty() {
-                println!("{}", stdout.replace('\n', "\n >> "));
+                // println!("{}", stdout.replace('\n', "\n >> "));
             }
             let stderr = stderr.trim_right();
             if !stderr.is_empty() {
-                println!("{}", stderr.replace('\n', "\n !> "));
+                // println!("{}", stderr.replace('\n', "\n !> "));
             }
 
             souplet.wait_eof()?;
@@ -569,7 +569,7 @@ impl ConvenientSession for tsunami::Session {
                 _ => shellwords::escape(arg),
             }).collect();
         let cmd = cmd.join(" ");
-        eprintln!("    :> {}", cmd);
+        e// println!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
         let cmd = format!("bash -c {}", shellwords::escape(&cmd));

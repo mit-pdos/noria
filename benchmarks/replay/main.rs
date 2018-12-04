@@ -97,7 +97,7 @@ fn perform_reads(
     verbose: bool,
 ) {
     if verbose {
-        eprintln!("Done populating state, now reading articles...");
+        e// println!("Done populating state, now reading articles...");
     }
 
     let mut hist = Histogram::<u64>::new(4).unwrap();
@@ -114,11 +114,11 @@ fn perform_reads(
         perform_primary_reads(g, &mut hist, row_ids);
     }
 
-    println!("# read {} of {} rows", reads, rows);
-    println!("read\t50\t{:.2}\t(all µs)", hist.value_at_quantile(0.5));
-    println!("read\t95\t{:.2}\t(all µs)", hist.value_at_quantile(0.95));
-    println!("read\t99\t{:.2}\t(all µs)", hist.value_at_quantile(0.99));
-    println!("read\t100\t{:.2}\t(all µs)", hist.max());
+    // println!("# read {} of {} rows", reads, rows);
+    // println!("read\t50\t{:.2}\t(all µs)", hist.value_at_quantile(0.5));
+    // println!("read\t95\t{:.2}\t(all µs)", hist.value_at_quantile(0.95));
+    // println!("read\t99\t{:.2}\t(all µs)", hist.value_at_quantile(0.99));
+    // println!("read\t100\t{:.2}\t(all µs)", hist.max());
 }
 
 // Reads every row with the primary key index.
@@ -320,7 +320,7 @@ fn main() {
         }
 
         if verbose {
-            eprintln!("Populating with {} rows", rows);
+            e// println!("Populating with {} rows", rows);
         }
 
         // Prepopulate with n rows:

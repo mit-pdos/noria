@@ -44,7 +44,7 @@ enum QueryGraphReuse {
 pub struct SqlIncorporator {
     log: slog::Logger,
     mir_converter: SqlToMirConverter,
-    leaf_addresses: HashMap<String, NodeIndex>,
+    pub leaf_addresses: HashMap<String, NodeIndex>,
 
     named_queries: HashMap<String, u64>,
     query_graphs: HashMap<u64, QueryGraph>,
@@ -192,6 +192,7 @@ impl SqlIncorporator {
             Ok(qg) => qg,
             Err(e) => panic!(e),
         };
+
 
         trace!(self.log, "QG for \"{}\": {:#?}", query_name, qg);
 
@@ -408,7 +409,7 @@ impl SqlIncorporator {
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`.
         // Note that we don't need to optimize the MIR here, because the query is trivial.
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
-
+        // println!("in leaf existing");
         self.register_query(query_name, None, &mir, mig.universe());
 
         qfp
@@ -557,6 +558,7 @@ impl SqlIncorporator {
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, table_mapping.clone(), None);
 
+        // println!("in add query via mir");
         // register local state
         self.register_query(query_name, Some(qg), &mir, universe);
 
@@ -650,7 +652,7 @@ impl SqlIncorporator {
         // TODO(malte): get rid of duplication and figure out where to track this state
         debug!(self.log, "registering query \"{}\"", query_name);
         self.view_schemas.insert(String::from(query_name), fields);
-
+        // println!("REGISTER: QUERY GRAPH: {:?}", qg);
         // We made a new query, so store the query graph and the corresponding leaf MIR node.
         // TODO(malte): we currently store nothing if there is no QG (e.g., for compound queries).
         // This means we cannot reuse these queries.

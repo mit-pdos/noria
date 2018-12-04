@@ -114,7 +114,7 @@ impl Ingredient for Distinct {
             match db.lookup(group_by, &KeyType::from(&group[..])) {
                 LookupResult::Some(rr) => {
                     if positive {
-                        //println!("record {:?}", rr);
+                        //// println!("record {:?}", rr);
                         if rr.len() == 0 {
                             output.push(rec.clone());
                         }
@@ -211,21 +211,21 @@ mod tests {
         let r3: Vec<DataType> = vec![3.into(), "c".into(), 2.into()];
 
         let a = g.narrow_one_row(r1.clone(), true);
-        println!("{:?}", a);
+        // println!("{:?}", a);
         assert_eq!(a, vec![r1.clone()].into());
 
         let a = g.narrow_one_row(r2.clone(), true);
-        println!("{:?}", a);
+        // println!("{:?}", a);
         assert_eq!(a, vec![r2.clone()].into());
 
         let a = g.narrow_one_row(r3.clone(), true);
         assert_eq!(a, vec![r3.clone()].into());
 
         let a = g.narrow_one_row((r1.clone(), false), true);
-        println!("{:?}", a);
+        // println!("{:?}", a);
 
         let a = g.narrow_one_row((r1.clone(), true), true);
-        println!("{:?}", a);
+        // println!("{:?}", a);
         assert_eq!(a, vec![r1.clone()].into());
     }
 

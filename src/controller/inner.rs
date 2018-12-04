@@ -84,7 +84,7 @@ pub struct ControllerInner {
     pub(super) materializations: Materializations,
 
     /// Current recipe
-    recipe: Recipe,
+    pub(super) recipe: Recipe,
 
     pub(super) map_meta: MapMeta,
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
@@ -749,7 +749,7 @@ impl ControllerInner {
         let mut universe_groups = HashMap::new();
 
 
-        println!("groups: {:?}", groups.clone());
+        // println!("groups: {:?}", groups.clone());
         let uid = context
             .get("id")
             .expect("Universe context must have id")
@@ -769,7 +769,7 @@ impl ControllerInner {
             }
         }
 
-        println!("Universe groups: {:?}", universe_groups.clone());
+        // println!("Universe groups: {:?}", universe_groups.clone());
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
@@ -793,7 +793,7 @@ impl ControllerInner {
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;
         let url = config.1;
-        println!("Setting security config: p {:?}, url {:?}", p.clone(), url.clone());
+        // println!("Setting security config: p {:?}, url {:?}", p.clone(), url.clone());
         self.recipe.set_security_config(&p, url);
         Ok(())
     }

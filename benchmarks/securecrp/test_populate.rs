@@ -103,11 +103,11 @@ pub fn create_papers(backend: &mut Backend) {
 pub fn dump_papers(backend: &mut Backend, user: &str) {
     let mut get = backend.g.view(&format!("PaperList_u{}", user)).unwrap();
 
-    println!("{:?}", get.lookup(&[0.into()], true));
+    // println!("{:?}", get.lookup(&[0.into()], true));
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
     let mut get = backend.g.view("PaperList").unwrap();
 
-    println!("{:?}", get.lookup(&[0.into()], true));
+    // println!("{:?}", get.lookup(&[0.into()], true));
 }

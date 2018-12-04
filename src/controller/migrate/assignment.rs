@@ -21,7 +21,6 @@ pub fn assign(
     //  - the child of a Sharder is always in a different domain from the sharder
     //  - shard merge nodes are never in the same domain as their sharded ancestors
 
-    println!("Assigning nodes to domains. Query to readers map: {:?}", mainline.map_meta.query_to_readers.clone());
     let mut reader_to_query = HashMap::new();
     for (query_n, node_list) in mainline.map_meta.query_to_readers.iter() {
         for node in node_list.clone() {

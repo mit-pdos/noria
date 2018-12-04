@@ -169,6 +169,7 @@ impl Handle {
     where
         I: IntoIterator<Item = Record>,
     {
+        // println!("working yay: key: {:?} ", key.clone());
         let mut memory_delta = 0isize;
         match *self {
             // Handle::Single(ref mut h) => {

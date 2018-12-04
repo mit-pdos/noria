@@ -32,7 +32,7 @@ fn populate(backend: &mut Backend, name: &'static str, mut records: Vec<Vec<Data
         }
 
         let dur = dur_to_fsec!(start.elapsed());
-        println!(
+        // println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             i,
             name,
@@ -66,7 +66,7 @@ pub fn populate_addresses(backend: &mut Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/addresses.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating addresses...");
+    // println!("Prepopulating addresses...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -107,7 +107,7 @@ pub fn populate_authors(
     let f = File::open(format!("{}/authors.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating authors...");
+    // println!("Prepopulating authors...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -141,7 +141,7 @@ pub fn populate_cc_xacts(backend: &mut Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/cc_xacts.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating cc_xacts...");
+    // println!("Prepopulating cc_xacts...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -180,7 +180,7 @@ pub fn populate_countries(backend: &mut Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/countries.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating countries...");
+    // println!("Prepopulating countries...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -210,7 +210,7 @@ pub fn populate_customers(backend: &mut Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/customers.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating customers...");
+    // println!("Prepopulating customers...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -269,7 +269,7 @@ pub fn populate_items(
     let f = File::open(format!("{}/items.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating items...");
+    // println!("Prepopulating items...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -335,7 +335,7 @@ pub fn populate_orders(backend: &mut Backend, data_location: &str) -> usize {
     let f = File::open(format!("{}/orders.tsv", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating orders...");
+    // println!("Prepopulating orders...");
 
     let mut s = String::new();
     let mut records = Vec::new();
@@ -387,7 +387,7 @@ pub fn populate_order_line(
     let f = File::open(format!("{}/order_line.data", data_location)).unwrap();
     let mut reader = BufReader::new(f);
 
-    println!("Prepopulating order_line...");
+    // println!("Prepopulating order_line...");
 
     let mut s = String::new();
     let mut records = Vec::new();

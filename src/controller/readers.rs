@@ -48,6 +48,7 @@ pub(crate) fn handle_message(
                 let uid = reader.universe();
                 let mut ret = Vec::with_capacity(keys.len());
                 ret.resize(keys.len(), Vec::new());
+                // println!("searching for keys: {:?}", keys.clone());
                 // first do non-blocking reads for all keys to see if we can return immediately
                 let found = keys
                     .iter_mut()
@@ -58,6 +59,7 @@ pub(crate) fn handle_message(
 
                 let mut ready = true;
                 for (i, (key, v)) in found {
+                    // println!("found: {:?}", v.clone().unwrap().unwrap().len().clone());
                     match v {
                         Ok(Some(rs)) => {
                             // immediate hit!

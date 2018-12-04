@@ -200,7 +200,7 @@ impl Base {
             let update = match op {
                 TableOperation::Insert(row) => {
                     if let Some(ref was) = was {
-                        eprintln!("base ignoring {:?} since it already has {:?}", row, was);
+                        // println!("base ignoring {:?} since it already has {:?}", row, was);
                     } else {
                         //assert!(was.is_none());
                         current = Some(Cow::Owned(row));

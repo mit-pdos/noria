@@ -103,7 +103,7 @@ impl Backend {
             }
         }
         let dur = dur_to_fsec!(start.elapsed());
-        println!(
+        // println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             records.len(),
             name,
@@ -239,7 +239,7 @@ fn main() {
     }
 
     let dur = dur_to_fsec!(start.elapsed());
-    println!(
+    // println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,
         dur,
@@ -252,7 +252,7 @@ fn main() {
         backend.secure_read(uid, 0);
     }
     let dur = dur_to_fsec!(start.elapsed());
-    println!(
+    // println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,
         dur,

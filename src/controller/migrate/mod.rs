@@ -211,14 +211,84 @@ impl<'a> Migration<'a> {
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
             let r = node::special::Reader::new(n);
+            // println!("CREATING READER NODE: name: {:?}", name);
             // make a reader
-            let r = if let Some(name) = name {
-                self.mainline.ingredients[n].named_mirror(r, name)
+
+            let r = if let Some(name) = name.clone() {
+                self.mainline.ingredients[n].named_mirror(r, name.clone())
             } else {
                 self.mainline.ingredients[n].mirror(r)
             };
             let r = self.mainline.ingredients.add_node(r);
             self.mainline.ingredients.add_edge(n, r, ());
+
+            let mut query_hash = HashSet::new();
+            for (k, v) in self.mainline.map_meta.query_to_readers.clone(){
+                query_hash.insert(k.clone());
+            }
+
+            // println!("QUERIES HASHED: {:?}", query_hash);
+
+            let mut general_query = None;
+            match name.clone() {
+                Some(n) => {
+                    for k in query_hash {
+                        // println!("comparing k {:?} with qn {:?}", k.clone(), n.clone());
+                        if n.contains(k.as_str()) {
+                            // println!("roughly same!");
+                            general_query = Some(k);
+                        }
+                    }
+                },
+                None => {}
+            }
+
+            // println!("GEN QUERY: {:?}", general_query);
+
+            let mut matched = false;
+            match general_query {
+                Some(name_) => {
+                    let mut add = false;
+                    let mut added_set = None;
+                    match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
+                        Some(set) => set.insert(r),
+                        None => {
+                            let mut new_set = HashSet::new();
+                            new_set.insert(r);
+                            add = true;
+                            added_set = Some(new_set); true }
+                    };
+                    if add {
+                        self.mainline.map_meta.query_to_readers.insert(name_.clone(), added_set.unwrap());
+                    }
+                    matched = true;
+                },
+                None => {}
+            }
+
+            if !matched {
+                match name {
+                    Some(name_) => {
+                        let mut add = false;
+                        let mut added_set = None;
+                        match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
+                            Some(set) => set.insert(r),
+                            None => {
+                                let mut new_set = HashSet::new();
+                                new_set.insert(r);
+                                add = true;
+                                added_set = Some(new_set); true }
+                        };
+                        if add {
+                            self.mainline.map_meta.query_to_readers.insert(name_.clone(), added_set.unwrap());
+                        }
+                    },
+                    None => {}
+                }
+            }
+
+            // println!("QUERY TO READ {:?}", self.mainline.map_meta.query_to_readers);
+
             self.readers.insert(n, r);
         }
     }
@@ -263,23 +333,23 @@ impl<'a> Migration<'a> {
            }
         }
 
-        match leaf_to_query.get(&n.clone()) {
-            Some(query) => {
-                match self.mainline.map_meta.query_to_readers.get_mut(query.clone()) {
-                   Some(reader_set) => {
-                       reader_set.insert(ri.clone());
-                   },
-                   None => {
-                       let mut reader_set = HashSet::new();
-                       reader_set.insert(ri.clone());
-                       self.mainline.map_meta.query_to_readers.insert(query.clone().to_string(), reader_set);
-                   }
-               };
-            },
-            None => {
-                println!("In maintain: node {:?} is not in query_to_leaves...", n.clone());
-            }
-        }
+        // match leaf_to_query.get(&n.clone()) {
+        //     Some(query) => {
+        //         match self.mainline.map_meta.query_to_readers.get_mut(query.clone()) {
+        //            Some(reader_set) => {
+        //                reader_set.insert(ri.clone());
+        //            },
+        //            None => {
+        //                let mut reader_set = HashSet::new();
+        //                reader_set.insert(ri.clone());
+        //                self.mainline.map_meta.query_to_readers.insert(query.clone().to_string(), reader_set);
+        //            }
+        //        };
+        //     },
+        //     None => {
+        //         println!("In maintain: node {:?} is not in query_to_leaves...", n.clone());
+        //     }
+        // }
 
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
@@ -293,7 +363,7 @@ impl<'a> Migration<'a> {
     /// new updates should be sent to introduce them into the Soup.
     pub fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
-        println!("in migration::commit. query_to_readers: {:?}", self.mainline.map_meta.query_to_readers.clone());
+        // println!("in migration::commit. query_to_readers: {:?}", self.mainline.map_meta.query_to_readers.clone());
 
         let log = self.log;
         let start = self.start;
@@ -598,6 +668,7 @@ impl<'a> Migration<'a> {
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
         mainline.materializations.commit(
+            &mainline.recipe,
             &mainline.ingredients,
             &new,
             &mut mainline.domains,

@@ -144,7 +144,7 @@ fn main() {
         ).arg(Arg::with_name("user").long("user").default_value("malte"))
         .get_matches();
 
-    println!("Starting SecureCRP...");
+    // println!("Starting SecureCRP...");
 
     // Read arguments
     let sloc = args.value_of("schema").unwrap();

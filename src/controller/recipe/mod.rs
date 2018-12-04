@@ -37,7 +37,7 @@ pub struct Recipe {
     prior: Option<Box<Recipe>>,
 
     /// Maintains lower-level state, but not the graph itself. Lazily initialized.
-    inc: Option<SqlIncorporator>,
+    pub inc: Option<SqlIncorporator>,
 
     log: slog::Logger,
 }
@@ -272,7 +272,7 @@ impl Recipe {
         };
 
         if self.security_config.is_some() {
-            println!("setting security config! in recipe::create_universe");
+            // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
                 universe_groups,
@@ -325,7 +325,7 @@ impl Recipe {
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
 
-        println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
+        // println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
 
         Ok(result)
     }

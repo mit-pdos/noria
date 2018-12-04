@@ -59,8 +59,8 @@ impl Setup {
         let outputs = graph.outputs().unwrap();
 
         if self.logging {
-            println!("inputs {:?}", inputs);
-            println!("outputs {:?}", outputs);
+            // println!("inputs {:?}", inputs);
+            // println!("outputs {:?}", outputs);
         }
 
         Graph {

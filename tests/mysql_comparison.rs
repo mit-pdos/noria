@@ -181,11 +181,11 @@ fn generate_target_results(schemas: &BTreeMap<String, Schema>) {
             let mut insert = pool.prepare(query).unwrap();
             for row in table.data.as_ref().unwrap().iter() {
                 if let Err(msg) = insert.execute(row.clone()) {
-                    println!(
+                    // println!(
                         "MySQL insert query failed for table: {}, values: {:?}",
                         table_name, row
                     );
-                    println!("{:?}", msg);
+                    // println!("{:?}", msg);
                     panic!();
                 }
             }
@@ -330,7 +330,7 @@ fn check_query(
 #[test]
 #[ignore]
 fn mysql_comparison() {
-    println!("");
+    // println!("");
 
     let mut schemas: BTreeMap<String, Schema> = BTreeMap::new();
     run_for_all_in_directory("schemas", |file_name, contents| {
@@ -389,12 +389,12 @@ fn mysql_comparison() {
             io::stdout().flush().ok().expect("Could not flush stdout");
 
             if let Some(true) = query.ignore {
-                println!("\x1B[33mIGNORED\x1B[m");
+                // println!("\x1B[33mIGNORED\x1B[m");
                 continue;
             }
 
             if query.values.len() == 0 {
-                println!("\x1B[33mPASS\x1B[m");
+                // println!("\x1B[33mPASS\x1B[m");
                 continue;
             }
 
@@ -405,7 +405,7 @@ fn mysql_comparison() {
             });
             panic::take_hook();
             match result {
-                Ok(Ok(())) => println!("\x1B[32;1mPASS\x1B[m"),
+                Ok(Ok(())) => // println!("\x1B[32;1mPASS\x1B[m"),
                 Ok(Err(e)) => {
                     // No panic, but test didn't pass
                     fail = true;
@@ -415,7 +415,7 @@ fn mysql_comparison() {
                     // Panicked
                     fail = true;
                     let panic_state = panic_state.lock().unwrap().take().unwrap();
-                    println!(
+                    // println!(
                         "\x1B[31;1mFAIL\x1B[m: \"{}\" at {}:{}\n{:?}",
                         panic_state.message,
                         panic_state.file,

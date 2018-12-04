@@ -37,7 +37,7 @@ fn main() {
     blender.extend_recipe(sql2).unwrap();
     blender.extend_recipe(sql3).unwrap();
     blender.extend_recipe(sql4).unwrap();
-    println!("{}", blender.graphviz().unwrap());
+    // println!("{}", blender.graphviz().unwrap());
 
     let get_view = |b: &mut ControllerHandle<ZookeeperAuthority>, n| loop {
         match b.view(n) {
@@ -68,11 +68,11 @@ fn main() {
     let mut article = get_table(&mut blender, "Article");
     let mut awvc = get_view(&mut blender, "ArticleWithVoteCount");
 
-    println!("Creating article...");
+    // println!("Creating article...");
     let aid = 1;
     // Make sure the article exists:
     if awvc.lookup(&[aid.into()], true).unwrap().is_empty() {
-        println!("Creating new article...");
+        // println!("Creating new article...");
         let title = "test title";
         let url = "http://pdos.csail.mit.edu";
         article
@@ -97,9 +97,9 @@ fn main() {
             }
 
             for (k, c) in counts {
-                println!("{}: {}", k, c);
+                // println!("{}: {}", k, c);
             }
-            println!("---------")
+            // println!("---------")
         }
 
         let uid = SystemTime::now()
@@ -116,6 +116,6 @@ fn main() {
         // while let Err(_) = awvc.lookup(&[1.into()], false) {
         //     awvc = get_view(&mut blender, "ArticleWithVoteCount");
         // }
-        // println!(" Done");
+        // // println!(" Done");
     }
 }

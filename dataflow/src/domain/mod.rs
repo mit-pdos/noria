@@ -834,7 +834,7 @@ impl Domain {
                         use payload::InitialState;
                         match state {
                             InitialState::PartialLocal(index) => {
-                                println!("unrelated creation 1");
+                                // println!("unrelated creation 1");
                                 if !self.state.contains_key(&node) {
                                     self.state.insert(node, box MemoryState::default());
                                 }
@@ -847,7 +847,7 @@ impl Domain {
                                 }
                             }
                             InitialState::IndexedLocal(index) => {
-                                println!("unrelated creation 1");
+                                // println!("unrelated creation 1");
                                 if !self.state.contains_key(&node) {
                                     self.state.insert(node, box MemoryState::default());
                                 }
@@ -904,7 +904,7 @@ impl Domain {
                                                 }).fold(sender, move |sender, m| {
                                                     sender.send(m).map_err(|e| {
                                                         // domain went away?
-                                                        // println!(
+                                                        // // println!(
                                                         //     "replay source went away: {:?}",
                                                         //     e
                                                         // );
@@ -945,12 +945,12 @@ impl Domain {
                                         let handle_vector_size = self.srmap_handles.len();
 
                                         if offset >= handle_vector_size {
-                                            println!("Got mat info {:?}, creating new SRMap", info.clone());
+                                            // println!("Got mat info {:?}, creating new SRMap", info.clone());
 
                                             // SRMap not created --> plan to create one.
                                             append_to_handles = true;
                                         } else {
-                                            println!("Got mat info {:?}, planning to create new SRMap", info.clone());
+                                            // println!("Got mat info {:?}, planning to create new SRMap", info.clone());
 
                                             // SRMap created --> get set of handles.
                                             create_new_srmap = false;
@@ -986,7 +986,7 @@ impl Domain {
                                 let srmap = true;
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
-                                    println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
+                                    // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
                                     let (tr_part, tw_part) = backlog::new_partial(srmap, cols, &k[..], move |miss| {
                                         let n = txs.len();
                                         let tx = if n == 1 {
@@ -999,7 +999,7 @@ impl Domain {
                                         tx.unbounded_send(Vec::from(miss)).unwrap();
                                     }, ids.clone());
 
-                                    println!("CREATING NEW SRMAP. ids: {:?}", ids.clone());
+                                    // println!("CREATING NEW SRMAP. ids: {:?}", ids.clone());
 
                                     r_part = tr_part;
                                     w_part = tw_part;
@@ -1057,7 +1057,7 @@ impl Domain {
                                 match materialization_info {
                                     // This is a reader node that shares an SRMap.
                                     Some(info) => {
-                                        println!("Got mat info {:?}", info.clone());
+                                        // println!("Got mat info {:?}", info.clone());
                                         let domain_index = info.0;
                                         assert_eq!(domain_index, self.index.index());
 
@@ -1066,11 +1066,11 @@ impl Domain {
 
                                         if offset >= handle_vector_size {
                                             // SRMap not created --> plan to create one.
-                                            println!("Got mat info {:?}, planning to create new SRMap", info.clone());
+                                            // println!("Got mat info {:?}, planning to create new SRMap", info.clone());
                                             append_to_handles = true;
                                         } else {
                                             // SRMap created --> get set of handles.
-                                            println!("Got mat info {:?}, not creating new SRMap", info.clone());
+                                            // println!("Got mat info {:?}, not creating new SRMap", info.clone());
                                             create_new_srmap = false;
                                             let (tr_part, tw_part) = self.srmap_handles[offset].clone();
                                             let tr_part = tr_part.clone_with_uid(ids.clone());
@@ -1103,7 +1103,7 @@ impl Domain {
 
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
-                                    println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
+                                    // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
                                     let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids.clone());
                                     r_part = tr_part;
                                     w_part = tw_part;
@@ -1127,7 +1127,7 @@ impl Domain {
 
                                         w_part.add_user(ids.clone());
 
-                                        println!("Here");
+                                        // println!("Here");
                                         r.set_materialization_info(materialization_info.clone());
 
                                         // make sure Reader is actually prepared to receive state
@@ -1145,7 +1145,7 @@ impl Domain {
                         trigger,
                     } => {
                         // let coordinator know that we've registered the tagged path
-                        // println!("HERE5");
+                        // // println!("HERE5");
 
                         self.control_reply_tx
                             .send(ControlReplyPacket::ack())
@@ -1213,7 +1213,7 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
-                        // println!("HERE6");
+                        // // println!("HERE6");
                         let still_miss = self.nodes[&node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
@@ -1241,7 +1241,6 @@ impl Domain {
                         }
                     }
                     Packet::RequestPartialReplay { tag, key } => {
-                        // println!("HERE7");
                         trace!(
                             self.log,
                            "got replay request";
@@ -1251,7 +1250,6 @@ impl Domain {
                         self.seed_replay(tag, &key[..], sends);
                     }
                     Packet::StartReplay { tag, from } => {
-                        // println!("HERE8");
                         use std::thread;
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
@@ -1802,6 +1800,7 @@ impl Domain {
                     mut data,
                     mut context,
                 } => {
+                    // println!("data in replay: {:?}", data.clone());
                     if let ReplayPieceContext::Partial { ref for_keys, .. } = context {
                         trace!(
                             self.log,
@@ -1924,7 +1923,7 @@ impl Domain {
                                 }).unwrap();
                             }
                         }
-
+                        // // println!("m data: {:?}", m.as_ref().unwrap().data());
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
                             &mut m,
@@ -1936,6 +1935,8 @@ impl Domain {
                             sends,
                             None,
                         );
+
+                        // // println!("m data 2: {:?}", m.as_ref().unwrap().data());
 
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {

@@ -61,7 +61,7 @@ impl VoteClientConstructor for Constructor {
 
         // prepopulate
         if verbose {
-            println!("Prepopulating with {} articles", params.articles);
+            // println!("Prepopulating with {} articles", params.articles);
         }
         let mut a = g.graph.table("Article").unwrap();
         a.batch_insert((0..params.articles).map(|i| {
@@ -71,7 +71,7 @@ impl VoteClientConstructor for Constructor {
             ]
         })).unwrap();
         if verbose {
-            println!("Done with prepopulation");
+            // println!("Done with prepopulation");
         }
 
         // allow writes to propagate

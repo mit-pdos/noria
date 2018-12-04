@@ -363,7 +363,7 @@ fn start_instance<A: Authority + 'static>(
 
                             if let Err(e) = ctrl {
                                 error!(log, "failed to connect to controller");
-                                eprintln!("{:?}", e);
+                                // println!("{:?}", e);
                             } else {
                                 // now we can start accepting dataflow messages
                                 worker_state = InstanceState::Active {
@@ -484,7 +484,7 @@ fn start_instance<A: Authority + 'static>(
                     if controller.is_some() {
                         if let Err(e) = authority2.surrender_leadership() {
                             error!(log2, "failed to surrender leadership");
-                            eprintln!("{:?}", e);
+                            // println!("{:?}", e);
                         }
                     }
                     Ok(())
@@ -542,7 +542,7 @@ fn listen_reads(
                 let r = AsyncBincodeReader::from(r);
                 r.and_then(move |req| readers::handle_message(req, &mut readers))
                     .map_err(|_| -> () {
-                        eprintln!("!!! reader client protocol error");
+                        // println!("!!! reader client protocol error");
                     }).forward(w.sink_map_err(|_| ()))
                     .then(|_| {
                         // we're probably just shutting down
@@ -550,10 +550,10 @@ fn listen_reads(
                     })
             }),
     ).map_err(|e: tokio_io_pool::StreamSpawnError<()>| {
-        eprintln!(
-            "io pool is shutting down, so can't handle more reads: {:?}",
-            e
-        );
+        // println!(
+        //     "io pool is shutting down, so can't handle more reads: {:?}",
+        //     e
+        // );
     })
 }
 
@@ -607,7 +607,7 @@ fn listen_df(
             .forward(ctrl.sink_map_err(|e| {
                 // if the controller goes away, another will be elected, and the worker will be
                 // restarted, so there's no reason to do anything too drastic here.
-                eprintln!("controller went away: {:?}", e);
+                // println!("controller went away: {:?}", e);
             })).map(|_| ()),
     );
 

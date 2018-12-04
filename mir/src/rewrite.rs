@@ -71,7 +71,7 @@ pub fn pull_required_base_columns(q: &mut MirQuery, table_mapping: Option<HashMa
     if sec {
         match table_mapping.clone() {
             Some(x) => {for (k,v) in &x {
-                        println!("{} -> {}", k, v);
+                        // println!("{} -> {}", k, v);
                     }},
             None => {panic!("no table mapping computed, but in secure universe.");}
         }
@@ -96,7 +96,7 @@ pub fn pull_required_base_columns(q: &mut MirQuery, table_mapping: Option<HashMa
         match table_mapping.clone() {
             Some(x) => {
                         for (k, v) in &x {
-                            println!("alias: real table name {} -> universe table name {}", k, v);
+                            // println!("alias: real table name {} -> universe table name {}", k, v);
                         }
                     },
             None => {

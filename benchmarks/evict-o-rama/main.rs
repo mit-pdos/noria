@@ -48,7 +48,7 @@ fn main() {
     let mut vote = blender.table("Vote").unwrap();
     let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
 
-    println!("Creating articles...");
+    // println!("Creating articles...");
     for aid in 1..NUM_ARTICLES {
         // Make sure the article exists:
         let title = format!("Article {}", aid);
@@ -59,12 +59,12 @@ fn main() {
         vote.insert(vec![aid.into(), 1.into()]).unwrap();
     }
 
-    println!("Reading articles...");
+    // println!("Reading articles...");
     for aid in 1..NUM_ARTICLES {
         awvc.lookup(&[aid.into()], true).unwrap();
     }
 
-    println!("Casting votes...");
+    // println!("Casting votes...");
     let mut aid = 0;
     loop {
         let uid = SystemTime::now()

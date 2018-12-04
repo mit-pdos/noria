@@ -5,9 +5,9 @@ use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub(super) enum Handle {
-    SingleSR(srmap::srmap::ReadHandle<DataType, Vec<DataType>, i64>),
-    DoubleSR(srmap::srmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64>),
-    ManySR(srmap::srmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64>),
+    SingleSR(srmap::srmap::WriteHandle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::srmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::srmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64>),
     // Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     // Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
@@ -25,7 +25,7 @@ impl Handle {
         }
     }
 
-    pub fn for_each<F>(&self, mut f: F)
+    pub fn for_each<F>(&self, mut f: F, uid: usize)
     where
         F: FnMut(&[Vec<DataType>]),
     {
@@ -33,9 +33,9 @@ impl Handle {
             // Handle::Single(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Double(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Many(ref h) => h.for_each(|_, v| f(v)),
-            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v)),
-            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v)),
-            Handle::ManySR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v), uid),
+            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v), uid),
+            Handle::ManySR(ref h) => h.for_each(|_, v| f(v), uid),
         }
     }
 
@@ -50,6 +50,7 @@ impl Handle {
             // },
             Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
+                // println!("call to meta get and");
                 h.meta_get_and(&key[0], then, uid)
             },
             // Handle::Double(ref h) => {

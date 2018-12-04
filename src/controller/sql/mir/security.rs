@@ -40,7 +40,7 @@ impl SecurityBoundary for SqlToMirConverter {
 
         // If query DOESN'T have any computed columns, we are done.
         // if qg.relations.get("computed_columns").is_none() {
-        //     println!("returning early from reconcile");
+        //     // println!("returning early from reconcile");
         //     return (nodes_added, None, "".to_string());
         // }
 
@@ -49,10 +49,10 @@ impl SecurityBoundary for SqlToMirConverter {
 
         // First, union the results from all ancestors
         if !sec {
-            println!("nope");
+            // println!("nope");
             union = Some(self.make_union_node(&format!("{}_n{}", name, node_count), &ancestors));
         } else {
-            println!("yep");
+            // println!("yep");
             let (_union, _mapping) = self.make_union_node_sec(&format!("{}_n{}", name, node_count), &ancestors);
             union = Some(_union);
             mapping = _mapping;
@@ -78,7 +78,7 @@ impl SecurityBoundary for SqlToMirConverter {
                 );
 
                 nodes_added.extend(grouped);
-                println!("returning from reconcile: nodes added: {:?}, mapping: {:?}, n: {:?}", nodes_added.clone(), mapping.clone(), n.clone());
+                // println!("returning from reconcile: nodes added: {:?}, mapping: {:?}, n: {:?}", nodes_added.clone(), mapping.clone(), n.clone());
                 return (nodes_added, mapping, n);
 
             },

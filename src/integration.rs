@@ -2125,7 +2125,7 @@ fn tpc_w() {
 
         // Add them one by one
         for (_i, q) in lines.iter().enumerate() {
-            //println!("{}: {}", i, q);
+            //// println!("{}: {}", i, q);
             let or = r.clone();
             r = match r.extend(q) {
                 Ok(mut nr) => {
@@ -2133,7 +2133,7 @@ fn tpc_w() {
                     nr
                 }
                 Err(e) => {
-                    println!("{:?}", e);
+                    // println!("{:?}", e);
                     or
                 }
             }
@@ -2168,7 +2168,7 @@ fn lobsters() {
 
         // Add them one by one
         for (_i, q) in lines.iter().enumerate() {
-            //println!("{}: {}", i, q);
+            //// println!("{}: {}", i, q);
             r = match r.extend(q) {
                 Ok(mut nr) => {
                     assert!(nr.activate(mig).is_ok());

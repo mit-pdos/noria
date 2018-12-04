@@ -1445,7 +1445,6 @@ fn make_nodes_for_selection(
     universe: UniverseId,
 ) -> (bool, Vec<MirNodeRef>, Option<HashMap<String, String>>, String) {
 
-    println!("IN MAKE NODES FOR SELECTION!");
     use crate::controller::sql::mir::grouped::make_grouped;
     use crate::controller::sql::mir::grouped::make_predicates_above_grouped;
     use crate::controller::sql::mir::join::make_joins;
@@ -1554,9 +1553,6 @@ fn make_nodes_for_selection(
         let (last_policy_nodes, policy_nodes) =
             self.make_security_boundary(universe.clone(), &mut node_for_rel, prev_node.clone());
 
-        println!("Made security boundary...");
-
-        println!("UNIVERSE IS A MEMBER OF: {:?}", self.universe.member_of);
         let mut ancestors =
             self.universe
                 .member_of
@@ -1763,17 +1759,12 @@ fn make_nodes_for_selection(
             ancestors.push(final_node);
         }
 
-        println!("ANCESTORS: {:?}", ancestors.clone());
-
         let final_node = if ancestors.len() > 1 {
-            println!("heree");
             // If we have multiple queries, reconcile them.
             sec_round = true;
             if uid != "global".into() {
                 sec_round = true;
             }
-
-            println!("QUERY GRAPH : {:?}", qg.clone());
 
             let (nodes, tables, union_base_node_name) = self.reconcile(
                 &format!("q_{:x}{}", qg.signature().hash, uformat),
@@ -1791,12 +1782,10 @@ fn make_nodes_for_selection(
             new_node_count += nodes.len();
             nodes_added.extend(nodes.clone());
 
-            println!("NODES: {:?}", nodes.clone());
-            println!("ANCESTORS: {:?}", ancestors.clone());
+
             nodes.last().unwrap().clone()
 
         } else {
-            println!("Attempt..");
             ancestors.last().unwrap().clone()
         };
 

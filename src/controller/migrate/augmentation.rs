@@ -23,7 +23,6 @@ pub fn inform(
 ) {
     let source = controller.source;
     for (domain, nodes) in nodes {
-        println!("DOMAIN TO NODE MAPPINGS: {:?} ->  {:?}", domain.clone(), nodes.clone()); 
         let log = log.new(o!("domain" => domain.index()));
         let ctx = controller.domains.get_mut(&domain).unwrap();
 

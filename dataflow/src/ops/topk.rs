@@ -182,7 +182,7 @@ impl Ingredient for TopK {
                                 $order.cmp(r, &$current[start].0) == Ordering::Equal
                             }).all(|&(_, is_new)| is_new);
                         if all_new_bottom {
-                            eprintln!("topk is guesstimating bottom row");
+                            // println!("topk is guesstimating bottom row");
                         }
                     }
                 }

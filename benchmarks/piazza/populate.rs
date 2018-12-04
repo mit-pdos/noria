@@ -11,8 +11,8 @@ macro_rules! dur_to_fsec {
     }};
 }
 
-const CLASSES_PER_STUDENT: usize = 5;
-pub const TAS_PER_CLASS: usize = 5;
+const CLASSES_PER_STUDENT: usize = 1;
+pub const TAS_PER_CLASS: usize = 1;
 
 pub struct Populate {
     nposts: i32,
@@ -38,7 +38,7 @@ impl Populate {
     }
 
     pub fn enroll_students(&mut self) {
-        println!("Enrolling students...");
+        // println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();
             while classes.len() < CLASSES_PER_STUDENT && (classes.len() as i32 != self.nclasses) {
@@ -51,7 +51,7 @@ impl Populate {
             self.students.insert(i.into(), classes);
         }
 
-        println!("Enrolling TAs...");
+        // println!("Enrolling TAs...");
         for i in 0..self.nclasses {
             let mut tas: Vec<DataType> = Vec::new();
 
@@ -64,13 +64,10 @@ impl Populate {
 
             self.tas.insert(i.into(), tas);
         }
-
-        println!("PIAZZA STUDENTS: {:?} TAS: {:?}", self.students, self.tas);
-
     }
 
     pub fn get_roles(&mut self) -> Vec<Vec<DataType>> {
-        println!("Populating roles...");
+        // println!("Populating roles...");
         let mut records = Vec::new();
         // add tas
         // we populate in this order so that each batch of writes
@@ -102,9 +99,9 @@ impl Populate {
     }
 
     pub fn get_users(&mut self) -> Vec<Vec<DataType>> {
-        println!("Populating users...");
+        // println!("Populating users...");
         let mut records = Vec::new();
-        for i in 0..self.nusers {
+        for i in 1..self.nusers + 1 {
             let uid = i.into();
             records.push(vec![uid]);
         }
@@ -113,7 +110,7 @@ impl Populate {
     }
 
     pub fn get_posts(&mut self) -> Vec<Vec<DataType>> {
-        println!("Populating posts... with {:?}", self.nposts);
+        // // println!("Populating posts... with {:?}", self.nposts);
         let mut records = Vec::new();
         for i in 0..self.nposts {
             let pid = i.into();
@@ -124,13 +121,13 @@ impl Populate {
             let anon = 1.into();
             records.push(vec![pid, cid, author, content, private, anon]);
         }
-        println!("finished populating...");
+        // // println!("finished populating...");
 
         records
     }
 
     pub fn get_classes(&mut self) -> Vec<Vec<DataType>> {
-        println!("Populating classes...");
+        // // println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
             let cid = i.into();
