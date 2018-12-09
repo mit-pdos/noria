@@ -37,5 +37,5 @@ pub trait Executor {
 }
 
 // time
-pub use timestamp::Time;
+pub use timestamp::TimeComponent;
 pub use timestamp::VectorTime;

@@ -5,12 +5,21 @@ use prelude::*;
 #[derive(Copy, Clone, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Time(u64);
 
-#[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TimestampAssigner(u64);
 impl TimestampAssigner {
-    pub fn assign(&mut self) -> Time {
+    pub fn assign(&mut self) -> TimeComponent {
         self.0 += 1;
-        Time(self.0 - 1)
+        TimeComponent {
+            time: Time(self.0 - 1),
+            path: Path(0),
+        }
+    }
+}
+impl Clone for TimestampAssigner {
+    fn clone(&self) -> TimestampAssigner {
+        assert_eq!(self.0, 0);
+        TimestampAssigner(0)
     }
 }
 
@@ -25,7 +34,7 @@ pub struct TimeComponent {
 
 /// Maps incoming paths at a node to outgoing paths at a node.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PathMap(Option<Vec<Vec<Path>>>);
+struct PathMap(Option<Vec<Vec<Path>>>);
 impl PathMap {
     pub fn lookup(&self, ancestor: usize, incoming: Path) -> Path {
         match self.0 {
@@ -45,6 +54,10 @@ impl VectorTime {
         Self { components: Vec::new() }
     }
 
+    fn with_length(len: usize) -> Self {
+        Self { components: vec![Time(0); len] }
+    }
+
     /// Add an additional component to the `VectorTime`.
     pub fn extend(&mut self, component: TimeComponent) {
         let index = component.path.0 as usize;
@@ -60,14 +73,15 @@ impl VectorTime {
     }
 }
 
-/// Encapsulates all time related state for a view.
-pub struct ViewTimeState {
+/// Encapsulates all time related state for a node.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NodeTimeState {
     time: VectorTime,
     paths: PathMap,
     base_paths: Vec<((NodeIndex, usize), Vec<Path>)>
 }
-impl ViewTimeState {
-    /// Checks whether this view may contain split updates.
+impl NodeTimeState {
+    /// Checks whether this node may contain split updates.
     pub fn is_consistent(&self) -> bool {
         for (_, ref paths) in &self.base_paths {
             let time = self.time.components[paths[0].0 as usize];
@@ -81,7 +95,7 @@ impl ViewTimeState {
     }
 
     /// Updates the internal state, and returns a new time component that should be emitted by this
-    /// view.
+    /// node.
     pub fn process_update(&mut self, ancestor: usize, time_component: TimeComponent) -> TimeComponent {
         self.time.advance(time_component);
         TimeComponent {
@@ -101,7 +115,12 @@ impl PathAssignments {
         unimplemented!()
     }
 
-    pub fn node_assignment(&self, node: NodeIndex, shard: usize) -> &PathMap {
-        &self.assignments[&node][shard]
+    pub fn make_node_state(&self, node: NodeIndex, shard: usize) -> NodeTimeState {
+        let paths = self.assignments[&node][shard].clone();
+        NodeTimeState {
+            time: VectorTime::with_length(paths.0.iter().map(|a|a.len()).sum()),
+            paths,
+            base_paths: unimplemented!(),
+        }
     }
 }

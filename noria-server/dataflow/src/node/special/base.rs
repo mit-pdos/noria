@@ -86,7 +86,7 @@ impl Base {
         }
     }
 
-    pub fn assign_timestamp(&mut self) -> Time {
+    pub fn assign_timestamp(&mut self) -> TimeComponent {
         self.timestamp_assigner.assign()
     }
 }
@@ -102,6 +102,7 @@ impl Clone for Base {
             defaults: self.defaults.clone(),
             dropped: self.dropped.clone(),
             unmodified: self.unmodified,
+            timestamp_assigner: self.timestamp_assigner.clone(),
         }
     }
 }

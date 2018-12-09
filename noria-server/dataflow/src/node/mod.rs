@@ -4,6 +4,7 @@ use petgraph;
 use prelude::*;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use timestamp::NodeTimeState;
 
 mod process;
 pub use self::process::materialize;
@@ -21,6 +22,7 @@ pub struct Node {
     name: String,
     index: Option<IndexPair>,
     domain: Option<domain::Index>,
+    time_state: Option<NodeTimeState>,
 
     fields: Vec<String>,
     children: Vec<LocalNodeIndex>,
@@ -43,6 +45,7 @@ impl Node {
             name: name.to_string(),
             index: None,
             domain: None,
+            time_state: None,
 
             fields: fields.into_iter().map(|s| s.to_string()).collect(),
             children: Vec::new(),

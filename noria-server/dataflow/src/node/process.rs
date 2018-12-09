@@ -197,6 +197,11 @@ impl Node {
                     *t = tracer.take();
                 }
 
+                if let box Packet::Message { ref mut time, .. } = m {
+                    let ancestor = unimplemented!();
+                    *time = self.time_state.as_ref().unwrap().process_update(ancestor, *time);
+                }
+
                 let tag = match **m {
                     Packet::ReplayPiece {
                         tag,

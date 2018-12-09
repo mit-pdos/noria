@@ -93,7 +93,7 @@ pub enum Packet {
         data: Records,
         tracer: Tracer,
         senders: Vec<SourceChannelIdentifier>,
-        time: Time,
+        time: TimeComponent,
     },
 
     /// Update that is part of a tagged data-flow replay path.
