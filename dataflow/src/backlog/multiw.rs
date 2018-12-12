@@ -8,9 +8,9 @@ use evmap;
 
 #[derive(Clone)]
 pub(super) enum Handle {
-    SingleSR(srmap::srmap::WriteHandle<DataType, Vec<DataType>, i64>),
-    DoubleSR(srmap::srmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64>),
-    ManySR(srmap::srmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64>),
+    SingleSR(srmap::srmap::Handle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::srmap::Handle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::srmap::Handle<Vec<DataType>, Vec<DataType>, i64>),
     // Single(evmap::WriteHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     // Double(evmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),

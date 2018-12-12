@@ -287,7 +287,7 @@ impl<E> Table<E> {
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
     {
-        println!("in table batch insert");
+        // println!("in table batch insert");
         let mut dih = self.domain_input_handle.borrow_mut();
         let mut batch_putter = dih.sender();
 
@@ -318,7 +318,7 @@ impl<E> Table<E> {
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
     {
-        println!("in table insert then wait");
+        // println!("in table insert then wait");
         let mut dih = self.domain_input_handle.borrow_mut();
         let mut batch_putter = dih.sender();
 
@@ -346,9 +346,9 @@ impl<E> Table<E> {
     where
         V: Into<Vec<DataType>>,
     {
-        println!("in table insert");
+        // println!("in table insert");
         let data = vec![TableOperation::Insert(u.into())];
-        println!("inserting data: {:?}", data.clone());
+        // println!("inserting data: {:?}", data.clone());
         if data[0].row().unwrap().len() != self.columns.len() {
             return Err(TableError::WrongColumnCount(
                 self.columns.len(),
@@ -366,7 +366,7 @@ impl<E> Table<E> {
         I: IntoIterator<Item = V>,
         V: Into<Vec<DataType>>,
     {
-        println!("in table insert all");
+        // println!("in table insert all");
         i.into_iter()
             .map(|r| {
                 let row = r.into();
@@ -432,7 +432,7 @@ impl<E> Table<E> {
         V: IntoIterator<Item = (usize, Modification)>,
     {
 
-        println!("in table insert or update");
+        // println!("in table insert or update");
         assert!(
             !self.key.is_empty() && self.key_is_primary,
             "update operations can only be applied to base nodes with key columns"

@@ -5,9 +5,9 @@ use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub(super) enum Handle {
-    SingleSR(srmap::srmap::WriteHandle<DataType, Vec<DataType>, i64>),
-    DoubleSR(srmap::srmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64>),
-    ManySR(srmap::srmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64>),
+    SingleSR(srmap::srmap::Handle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::srmap::Handle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::srmap::Handle<Vec<DataType>, Vec<DataType>, i64>),
     // Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     // Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
