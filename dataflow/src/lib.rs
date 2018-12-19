@@ -9,6 +9,7 @@
 #![feature(use_extern_macros)]
 #![feature(duration_from_micros)]
 #![feature(proc_macro_path_invoc)]
+#![feature(type_ascription)]
 #![deny(unused_extern_crates)]
 
 extern crate api;
@@ -29,6 +30,7 @@ extern crate rand;
 extern crate regex;
 extern crate rocksdb;
 extern crate serde;
+extern crate randomkit;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;

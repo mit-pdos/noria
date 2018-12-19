@@ -8,6 +8,7 @@ run.sh
 *.folded
 *.host
 *.db
+*~
 plotting/*.png
 
 callgrind.out.*

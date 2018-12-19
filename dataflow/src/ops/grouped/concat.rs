@@ -150,7 +150,7 @@ impl GroupedOperation for GroupConcat {
     }
 
     fn apply(
-        &self,
+        &mut self,
         current: Option<&DataType>,
         diffs: &mut Iterator<Item = Self::Diff>,
     ) -> DataType {
@@ -226,6 +226,12 @@ impl GroupedOperation for GroupConcat {
             "||([{}], \"{}\") γ[{}]",
             fields, self.separator, group_cols
         )
+    }
+
+
+    // Temporary                                                                                 
+    fn requires_full_materialization(&self) -> bool {
+	false
     }
 }
 
