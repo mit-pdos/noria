@@ -9,6 +9,7 @@ run.sh
 *.strace
 *.host
 *.db
+*~
 plotting/*.png
 
 callgrind.out.*

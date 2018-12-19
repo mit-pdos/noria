@@ -45,6 +45,8 @@ pub fn make_joins(
     let mut node_count = node_count;
 
     for jref in qg.join_order.iter() {
+        // for debug -- remove
+        println!("going through join order.");
         let (join_type, jp) = from_join_ref(jref, &qg);
         let (left_chain, right_chain) =
             pick_join_chains(&jref.src, &jref.dst, &mut join_chains, node_for_rel);

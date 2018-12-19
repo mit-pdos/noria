@@ -1391,7 +1391,8 @@ impl SqlToMirConverter {
             );
 
             new_node_count += join_nodes.len();
-
+            // local debug -- remove
+            println!("num join nodes: {}", join_nodes.len());
             let mut prev_node = match join_nodes.last() {
                 Some(n) => Some(n.clone()),
                 None => {

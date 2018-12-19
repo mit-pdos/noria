@@ -65,6 +65,8 @@ impl Ingredient for Filter {
         let srcn = &g[self.src.as_global()];
         // N.B.: <= because the adjacent node might be a base with a suffix of removed columns.
         // It's okay to just ignore those.
+        // debug print -- remove
+        println!("filter.len: {},fields.len: {}", self.filter.len(), srcn.fields().len());
         assert!(self.filter.len() <= srcn.fields().len());
     }
 

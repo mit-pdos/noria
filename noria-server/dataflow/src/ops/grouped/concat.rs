@@ -150,7 +150,7 @@ impl GroupedOperation for GroupConcat {
     }
 
     fn apply(
-        &self,
+        &mut self,
         current: Option<&DataType>,
         diffs: &mut Iterator<Item = Self::Diff>,
     ) -> DataType {
@@ -240,6 +240,10 @@ impl GroupedOperation for GroupConcat {
                 _ => None,
             })
             .collect::<Vec<_>>()
+
+    // Temporary                                                                                 
+    fn requires_full_materialization(&self) -> bool {
+	false
     }
 }
 

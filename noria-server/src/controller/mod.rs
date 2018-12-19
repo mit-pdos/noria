@@ -221,9 +221,8 @@ fn start_instance<A: Authority + 'static>(
     let waddr = wport.local_addr()?;
     rt.spawn(listen_internal(&valve, log.clone(), tx.clone(), wport));
 
-    // second, messages from the "real world"
-    let xport = tokio::net::TcpListener::bind(&SocketAddr::new(listen_addr, 6033))
-        .or_else(|_| tokio::net::TcpListener::bind(&SocketAddr::new(listen_addr, 0)))?;
+    // and second, messages from the "real world"
+    let xport = tokio::net::TcpListener::bind(&SocketAddr::new(listen_addr, 9000))?;
     let xaddr = xport.local_addr()?;
     let ext_log = log.clone();
     rt.spawn(

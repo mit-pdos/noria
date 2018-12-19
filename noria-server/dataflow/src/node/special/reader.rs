@@ -33,7 +33,6 @@ pub struct Reader {
 
     #[serde(skip)]
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
-
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
 }

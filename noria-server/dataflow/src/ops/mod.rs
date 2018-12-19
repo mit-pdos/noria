@@ -18,6 +18,7 @@ pub mod union;
 #[derive(Clone, Serialize, Deserialize)]
 pub enum NodeOperator {
     Sum(grouped::GroupedOperator<grouped::aggregate::Aggregator>),
+    Count(grouped::GroupedOperator<grouped::dp_aggregate_unbounded::DpAggregator>),
     Extremum(grouped::GroupedOperator<grouped::extremum::ExtremumOperator>),
     Concat(grouped::GroupedOperator<grouped::concat::GroupConcat>),
     Join(join::Join),
@@ -47,6 +48,10 @@ nodeop_from_impl!(
     grouped::GroupedOperator<grouped::aggregate::Aggregator>
 );
 nodeop_from_impl!(
+    NodeOperator::Count,
+    grouped::GroupedOperator<grouped::dp_aggregate_unbounded::DpAggregator>
+);
+nodeop_from_impl!(
     NodeOperator::Extremum,
     grouped::GroupedOperator<grouped::extremum::ExtremumOperator>
 );
@@ -69,6 +74,7 @@ macro_rules! impl_ingredient_fn_mut {
     ($self:ident, $fn:ident, $( $arg:ident ),* ) => {
         match *$self {
             NodeOperator::Sum(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::Count(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Extremum(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Concat(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Join(ref mut i) => i.$fn($($arg),*),
@@ -89,6 +95,7 @@ macro_rules! impl_ingredient_fn_ref {
     ($self:ident, $fn:ident, $( $arg:ident ),* ) => {
         match *$self {
             NodeOperator::Sum(ref i) => i.$fn($($arg),*),
+            NodeOperator::Count(ref i) => i.$fn($($arg),*),
             NodeOperator::Extremum(ref i) => i.$fn($($arg),*),
             NodeOperator::Concat(ref i) => i.$fn($($arg),*),
             NodeOperator::Join(ref i) => i.$fn($($arg),*),

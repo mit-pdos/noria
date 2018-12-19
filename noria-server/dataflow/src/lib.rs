@@ -22,6 +22,7 @@ extern crate rand;
 extern crate regex;
 extern crate rocksdb;
 extern crate serde;
+extern crate randomkit;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;

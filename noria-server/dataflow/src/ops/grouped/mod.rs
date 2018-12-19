@@ -9,6 +9,8 @@ use prelude::*;
 pub mod aggregate;
 pub mod concat;
 pub mod extremum;
+//pub mod dp_aggregate;
+pub mod dp_aggregate_unbounded;
 
 /// Trait for implementing operations that collapse a group of records into a single record.
 ///
@@ -52,14 +54,17 @@ pub trait GroupedOperation: fmt::Debug + Clone {
 
     /// Given the given `current` value, and a number of changes for a group (`diffs`), compute the
     /// updated group value.
+    // TEMPORARILY MADE &MUT SELF FOR DP_AGGREGATE; MAY NEED DIFFERENT GROUPEDOPERATION IN FUTURE
     fn apply(
-        &self,
+        &mut self,
         current: Option<&DataType>,
         diffs: &mut Iterator<Item = Self::Diff>,
     ) -> DataType;
 
+
     fn description(&self, detailed: bool) -> String;
     fn over_columns(&self) -> Vec<usize>;
+    fn requires_full_materialization(&self) -> bool;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -305,4 +310,5 @@ where
     fn is_selective(&self) -> bool {
         true
     }
+
 }
