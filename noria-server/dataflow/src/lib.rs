@@ -3,6 +3,10 @@
 #![feature(box_patterns)]
 #![feature(duration_as_u128)]
 #![feature(if_while_or_patterns)]
+#![feature(use_extern_macros)]
+#![feature(duration_from_micros)]
+#![feature(proc_macro_path_invoc)]
+#![feature(type_ascription)]
 #![deny(unused_extern_crates)]
 
 #[cfg(debug_assertions)]

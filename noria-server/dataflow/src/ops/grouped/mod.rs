@@ -61,10 +61,10 @@ pub trait GroupedOperation: fmt::Debug + Clone {
         diffs: &mut Iterator<Item = Self::Diff>,
     ) -> DataType;
 
-
     fn description(&self, detailed: bool) -> String;
     fn over_columns(&self) -> Vec<usize>;
     fn requires_full_materialization(&self) -> bool;
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
