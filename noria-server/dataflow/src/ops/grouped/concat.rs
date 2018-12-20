@@ -240,7 +240,8 @@ impl GroupedOperation for GroupConcat {
                 _ => None,
             })
             .collect::<Vec<_>>()
-
+    }
+    
     // Temporary                                                                                 
     fn requires_full_materialization(&self) -> bool {
 	false

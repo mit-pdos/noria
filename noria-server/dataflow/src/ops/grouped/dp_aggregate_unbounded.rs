@@ -326,7 +326,10 @@ impl GroupedOperation for DpAggregator {
         diffs.into_iter().map(|d| self.counter.step_forward(d as i64)).last().unwrap().into()
     }
 
-    fn description(&self) -> String {
+    fn description(&self, detailed: bool) -> String {
+        if !detailed {
+            return String::from("DP_COUNT");
+        }
         let op_string : String = match self.op {
             DpAggregation::COUNT => "|*|".into(),
         };
@@ -337,6 +340,10 @@ impl GroupedOperation for DpAggregator {
             .collect::<Vec<_>>()
             .join(", ");
         format!("{} γ[{}]", op_string, group_cols)
+    }
+
+    fn over_columns(&self) -> Vec<usize> {
+        vec![self.over]
     }
 
     // Temporary: for now, disable backwards queries
@@ -381,7 +388,7 @@ mod tests {
         let s = 0.into();
 
         let c = DpAggregation::COUNT.over(s, 1, &[0, 2], 0.1); // epsilon = 0.1
-        assert_eq!(c.description(), "|*| γ[0, 2]");
+        assert_eq!(c.description(true), "|*| γ[0, 2]");
     }
 
     #[test]
@@ -422,7 +429,7 @@ mod tests {
             }
             _ => unreachable!(),
         }
-
+        
         let u: Record = vec![1.into(), 2.into()].into();
 
         // second row for a group should emit -1 and +2

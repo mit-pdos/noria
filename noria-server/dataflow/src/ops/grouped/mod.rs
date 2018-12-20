@@ -106,6 +106,7 @@ where
     Self: Into<NodeOperator>,
 {
     fn take(&mut self) -> NodeOperator {
+        println!("take() invoked");
         Clone::clone(self).into()
     }
 
@@ -118,7 +119,7 @@ where
 
         // give our inner operation a chance to initialize
         self.inner.setup(srcn);
-
+        
         // group by all columns
         self.cols = srcn.fields().len();
         self.group_by.extend(self.inner.group_by().iter().cloned());
@@ -160,6 +161,7 @@ where
         _: &DomainNodes,
         state: &StateMap,
     ) -> ProcessingResult {
+        println!("on_input: beginning execution");
         debug_assert_eq!(from, *self.src);
 
         if rs.is_empty() {
@@ -188,7 +190,6 @@ where
         let db = state
             .get(*us)
             .expect("grouped operators must have their own state materialized");
-
         let mut misses = Vec::new();
         let mut out = Vec::new();
         {
@@ -261,7 +262,6 @@ where
                         }
                     }
                 };
-
             let mut diffs = Vec::new();
             let mut group_rs = Vec::new();
             for r in rs {

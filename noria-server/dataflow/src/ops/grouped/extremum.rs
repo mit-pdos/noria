@@ -182,7 +182,8 @@ impl GroupedOperation for ExtremumOperator {
 
     fn over_columns(&self) -> Vec<usize> {
         vec![self.over]
-
+    }
+    
     // Temporary                                                                                 
     fn requires_full_materialization(&self) -> bool {
 	false
