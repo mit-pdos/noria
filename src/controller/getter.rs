@@ -26,6 +26,7 @@ impl Getter {
                     None => return None,
                 }
             }
+            getters.what;
             ReadHandle::Sharded(getters)
         } else {
             let vr = readers.lock().unwrap();

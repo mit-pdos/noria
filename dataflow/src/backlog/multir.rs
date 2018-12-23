@@ -5,9 +5,9 @@ use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub(super) enum Handle {
-    SingleSR(srmap::srmap::Handle<DataType, Vec<DataType>, i64>),
-    DoubleSR(srmap::srmap::Handle<(DataType, DataType), Vec<DataType>, i64>),
-    ManySR(srmap::srmap::Handle<Vec<DataType>, Vec<DataType>, i64>),
+    SingleSR(srmap::handle::handle::Handle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::handle::handle::Handle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::handle::handle::Handle<Vec<DataType>, Vec<DataType>, i64>),
     // Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     // Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
@@ -25,7 +25,15 @@ impl Handle {
         }
     }
 
-    pub fn for_each<F>(&self, mut f: F, uid: usize)
+    pub fn clone_new_user(&mut self) -> Handle {
+         match *self {
+             Handle::SingleSR(ref mut h) => Handle::SingleSR(h.clone_new_user()),
+             Handle::DoubleSR(ref mut h) => Handle::DoubleSR(h.clone_new_user()),
+             Handle::ManySR(ref mut h) => Handle::ManySR(h.clone_new_user()),
+         }
+    }
+
+    pub fn for_each<F>(&self, mut f: F)
     where
         F: FnMut(&[Vec<DataType>]),
     {
@@ -33,13 +41,13 @@ impl Handle {
             // Handle::Single(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Double(ref h) => h.for_each(|_, v| f(v)),
             // Handle::Many(ref h) => h.for_each(|_, v| f(v)),
-            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v), uid),
-            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v), uid),
-            Handle::ManySR(ref h) => h.for_each(|_, v| f(v), uid),
+            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::ManySR(ref h) => h.for_each(|_, v| f(v)),
         }
     }
 
-    pub fn meta_get_and<F, T>(&self, key: &[DataType], then: F, uid: usize) -> Option<(Option<T>, i64)>
+    pub fn meta_get_and<F, T>(&self, key: &[DataType], then: F) -> Option<(Option<T>, i64)>
     where
         F: FnOnce(&[Vec<DataType>]) -> T,
     {
@@ -51,7 +59,7 @@ impl Handle {
             Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
                 // println!("call to meta get and");
-                h.meta_get_and(&key[0], then, uid)
+                h.meta_get_and(&key[0], then)
             },
             // Handle::Double(ref h) => {
             //     assert_eq!(key.len(), 2);
@@ -104,7 +112,7 @@ impl Handle {
                         1,
                     );
 
-                    let v = h.meta_get_and(&stack_key, then, uid);
+                    let v = h.meta_get_and(&stack_key, then);
                     mem::forget(stack_key);
                     v
                 }
@@ -113,7 +121,7 @@ impl Handle {
             //     h.meta_get_and(&key.to_vec(), then)
             //  },
              Handle::ManySR(ref h) => {
-                 h.meta_get_and(&key.to_vec(), then, uid)
+                 h.meta_get_and(&key.to_vec(), then)
               },
         }
     }

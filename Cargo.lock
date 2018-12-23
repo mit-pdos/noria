@@ -678,7 +678,8 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "4.0.0"
+version = "4.0.1"
+source = "git+https://github.com/jonhoo/rust-evmap.git#d307999c1ad78d10ecb6ea911b6e94d36bc841ca"
 
 [[package]]
 name = "failure"
@@ -1868,7 +1869,7 @@ version = "0.1.15"
 dependencies = [
  "arccstr 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "evmap 4.0.0",
+ "evmap 4.0.1 (git+https://github.com/jonhoo/rust-evmap.git)",
  "nom-sql 0.0.3 (git+https://github.com/ms705/nom-sql.git?rev=791c0f5117b6e02c1e3f146cc4a2689ef7da7a54)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.78 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2592,6 +2593,7 @@ dependencies = [
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 "checksum env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)" = "15b0a4d2e39f8420210be8b27eeda28029729e2fd4291019455016c348240c38"
 "checksum evmap 4.0.0 (git+https://github.com/ms705/rust-evmap)" = "<none>"
+"checksum evmap 4.0.1 (git+https://github.com/jonhoo/rust-evmap.git)" = "<none>"
 "checksum failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7efb22686e4a466b1ec1a15c2898f91fa9cb340452496dca654032de20ff95b9"
 "checksum failure_derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "946d0e98a50d9831f5d589038d2ca7f8f455b1c21028c0db0e84116a12696426"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"

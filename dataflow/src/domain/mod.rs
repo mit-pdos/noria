@@ -920,6 +920,14 @@ impl Domain {
                                 let mut create_new_srmap = true;
                                 let mut append_to_handles = false;
 
+                                let mut ids = 0 as usize;
+                                match uid {
+                                   Some(id) => {
+                                       ids = id;
+                                   },
+                                   None => {}
+                                }
+
                                 // If materialization info isn't None, then we're dealing with a
                                 // reader node that is supposed to share an SRMap. Compare the
                                 // offset information with the current length of the handle vector.
@@ -927,13 +935,6 @@ impl Domain {
                                 // materialized, and we must do so here and append it to the
                                 // handle vector. If the offset is a valid index, that means the
                                 // map was already materialized and we can just clone the handle.
-                                let mut ids = 0 as usize;
-                                match uid {
-                                    Some(id) => {
-                                        ids = id;
-                                    },
-                                    None => {}
-                                }
 
                                 match materialization_info {
                                     // This is a reader node that shares an SRMap.
@@ -950,13 +951,11 @@ impl Domain {
                                             // SRMap not created --> plan to create one.
                                             append_to_handles = true;
                                         } else {
-                                            // println!("Got mat info {:?}, planning to create new SRMap", info.clone());
-
                                             // SRMap created --> get set of handles.
                                             create_new_srmap = false;
-                                            let (tr_part, tw_part) = self.srmap_handles[offset].clone();
-                                            let tr_part = tr_part.clone_with_uid(ids.clone());
-                                            let tw_part = tw_part.clone_with_uid(ids.clone());
+                                            let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
+                                            let mut tr_part = tr_part.clone_new_user();
+                                            let mut tw_part = tw_part.clone_new_user();
                                             r_part = tr_part;
                                             w_part = tw_part;
 
@@ -972,7 +971,6 @@ impl Domain {
                                                         ).is_none()
                                                 );
 
-                                                w_part.add_user(ids.clone());
                                                 r.set_materialization_info(materialization_info.clone());
 
                                                 // make sure Reader is actually prepared to receive state
@@ -997,9 +995,7 @@ impl Domain {
                                             &txs[::shard_by(&miss[0], n)]
                                         };
                                         tx.unbounded_send(Vec::from(miss)).unwrap();
-                                    }, ids.clone());
-
-                                    // println!("CREATING NEW SRMAP. ids: {:?}", ids.clone());
+                                    }, ids);
 
                                     r_part = tr_part;
                                     w_part = tw_part;
@@ -1021,7 +1017,6 @@ impl Domain {
                                                 ).is_none()
                                         );
 
-                                        w_part.add_user(ids.clone());
                                         r.set_materialization_info(materialization_info.clone());
 
                                         // make sure Reader is actually prepared to receive state
@@ -1041,10 +1036,10 @@ impl Domain {
 
                                 let mut ids = 0 as usize;
                                 match uid {
-                                    Some(id) => {
-                                        ids = id;
-                                    },
-                                    None => {}
+                                   Some(id) => {
+                                       ids = id;
+                                   },
+                                   None => {}
                                 }
 
                                 // If materialization info isn't None, then we're dealing with a
@@ -1072,9 +1067,9 @@ impl Domain {
                                             // SRMap created --> get set of handles.
                                             // println!("Got mat info {:?}, not creating new SRMap", info.clone());
                                             create_new_srmap = false;
-                                            let (tr_part, tw_part) = self.srmap_handles[offset].clone();
-                                            let tr_part = tr_part.clone_with_uid(ids.clone());
-                                            let tw_part = tw_part.clone_with_uid(ids.clone());
+                                            let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
+                                            let mut tr_part = tr_part.clone_new_user();
+                                            let mut tw_part = tw_part.clone_new_user();
                                             r_part = tr_part;
                                             w_part = tw_part;
 
@@ -1091,7 +1086,6 @@ impl Domain {
                                                 );
 
                                                 r.set_materialization_info(materialization_info.clone());
-                                                w_part.add_user(ids.clone());
 
                                                 // make sure Reader is actually prepared to receive state
                                                 r.set_write_handle(w_part)
@@ -1104,7 +1098,7 @@ impl Domain {
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
                                     // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
-                                    let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids.clone());
+                                    let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids);
                                     r_part = tr_part;
                                     w_part = tw_part;
 
@@ -1124,8 +1118,6 @@ impl Domain {
                                                     r_part
                                                 ).is_none()
                                         );
-
-                                        w_part.add_user(ids.clone());
 
                                         // println!("Here");
                                         r.set_materialization_info(materialization_info.clone());

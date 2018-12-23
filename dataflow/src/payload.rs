@@ -123,7 +123,7 @@ pub enum InitialState {
         trigger_domain: (domain::Index, usize),
         srmap_node: bool,
         materialization_info: Option<(usize, usize)>,
-        uid: Option<usize>
+        uid: Option<usize>,
     },
     Global {
         gid: petgraph::graph::NodeIndex,
@@ -131,7 +131,7 @@ pub enum InitialState {
         key: Vec<usize>,
         srmap_node: bool,
         materialization_info: Option<(usize, usize)>,
-        uid: Option<usize>
+        uid: Option<usize>,
     },
 }
 

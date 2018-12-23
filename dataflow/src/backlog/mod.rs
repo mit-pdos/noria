@@ -57,7 +57,7 @@ fn new_inner(
     ($variant:tt) => {{
             use srmap;
             // println!("actually making srmap nice");
-            let (r, w) = srmap::srmap::construct(-1);
+            let (r, w) = srmap::construct(-1);
             (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
     }
@@ -91,13 +91,13 @@ fn new_inner(
         cols: cols,
         contiguous,
         mem_size: 0,
-        uid: uid.clone()
+        uid: uid,
     };
     let r = SingleReadHandle {
         handle: r,
         trigger: trigger,
         key: Vec::from(key),
-        uid: uid.clone()
+        uid: uid
     };
 
     (r, w)
@@ -135,7 +135,7 @@ pub(crate) struct WriteHandle {
     key: Vec<usize>,
     contiguous: bool,
     mem_size: usize,
-    uid: usize,
+    uid: usize
 }
 
 type Key<'a> = Cow<'a, [DataType]>;
@@ -153,9 +153,9 @@ impl<'a> MutWriteHandleEntry<'a> {
         if let Some((None, _)) = self
             .handle
             .handle
-            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty(), self.handle.uid.clone())
+            .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
         {
-            self.handle.handle.clear(self.key, self.handle.uid.clone())
+            self.handle.handle.clear(self.key)
         } else {
             unreachable!("attempted to fill already-filled key");
         }
@@ -167,10 +167,10 @@ impl<'a> MutWriteHandleEntry<'a> {
             .handle
             .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
                 rs.iter().map(|r| r.deep_size_of()).sum()
-            }, self.handle.uid.clone()).map(|r| r.0.unwrap_or(0))
+            }).map(|r| r.0.unwrap_or(0))
             .unwrap_or(0);
         self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
-        self.handle.handle.empty(self.key, self.handle.uid.clone())
+        self.handle.handle.empty(self.key)
     }
 }
 
@@ -181,7 +181,7 @@ impl<'a> WriteHandleEntry<'a> {
     {
         self.handle
             .handle
-            .meta_get_and(self.key, &mut then, self.handle.uid.clone())
+            .meta_get_and(self.key, &mut then)
             .ok_or(())
     }
 }
@@ -216,22 +216,6 @@ where
 
 impl WriteHandle {
 
-    pub fn clone_with_uid (&self, uid: usize) -> WriteHandle {
-        WriteHandle {
-            handle: self.handle.clone(),
-            partial: self.partial.clone(),
-            cols: self.cols.clone(),
-            key: self.key.clone(),
-            contiguous: self.contiguous.clone(),
-            mem_size: self.mem_size.clone(),
-            uid: uid,
-        }
-    }
-
-    pub(crate) fn universe(&self) -> usize{
-        self.uid.clone()
-    }
-
     pub(crate) fn mut_with_key<'a, K>(&'a mut self, key: K) -> MutWriteHandleEntry<'a>
     where
         K: Into<Key<'a>>,
@@ -242,10 +226,6 @@ impl WriteHandle {
         }
     }
 
-    pub(crate) fn add_user(&mut self, uid: usize) {
-        self.handle.add_user(uid)
-    }
-
     pub(crate) fn with_key<'a, K>(&'a self, key: K) -> WriteHandleEntry<'a>
     where
         K: Into<Key<'a>>,
@@ -253,6 +233,18 @@ impl WriteHandle {
         WriteHandleEntry {
             handle: self,
             key: key.into(),
+        }
+    }
+
+    pub fn clone_new_user (&mut self) -> WriteHandle {
+        WriteHandle {
+            handle: self.handle.clone_new_user(),
+            partial: self.partial.clone(),
+            cols: self.cols.clone(),
+            key: self.key.clone(),
+            contiguous: self.contiguous.clone(),
+            mem_size: self.mem_size.clone(),
+            uid: self.uid.clone(),
         }
     }
 
@@ -284,7 +276,7 @@ impl WriteHandle {
     where
         I: IntoIterator<Item = Record>,
     {
-        let mem_delta = self.handle.add(&self.key[..], self.cols, rs, self.uid.clone());
+        let mem_delta = self.handle.add(&self.key[..], self.cols, rs);
         if mem_delta > 0 {
             self.mem_size += mem_delta as usize;
         } else if mem_delta < 0 {
@@ -342,21 +334,13 @@ pub struct SingleReadHandle {
     handle: multir::Handle,
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
     key: Vec<usize>,
-    uid: usize
+    uid: usize,
 }
 
 impl SingleReadHandle {
-    pub fn clone_with_uid (&self, uid: usize) -> SingleReadHandle {
-        SingleReadHandle {
-            handle: self.handle.clone(),
-            trigger: self.trigger.clone(),
-            key: self.key.clone(),
-            uid: uid
-        }
-    }
 
     pub fn universe(&self) -> usize{
-        self.uid.clone()
+       self.uid.clone()
     }
 
     /// Trigger a replay of a missing key from a partially materialized view.
@@ -383,7 +367,7 @@ impl SingleReadHandle {
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         self.handle
-            .meta_get_and(key, &mut then, self.uid.clone())
+            .meta_get_and(key, &mut then)
             .ok_or(())
             .map(|(mut records, meta)| {
                 if records.is_none() && self.trigger.is_none() {
@@ -401,10 +385,19 @@ impl SingleReadHandle {
     /// Count the number of rows in the reader.
     /// This is a potentially very costly operation, since it will
     /// hold up writers until all rows are iterated through.
-    pub fn count_rows(&self, uid: usize) -> usize {
+    pub fn count_rows(&self) -> usize {
         let mut nrows = 0;
-        self.handle.for_each(|v| nrows += v.len(), uid);
+        self.handle.for_each(|v| nrows += v.len());
         nrows
+    }
+
+    pub fn clone_new_user(&mut self) -> SingleReadHandle {
+        SingleReadHandle {
+            handle: self.handle.clone_new_user(),
+            trigger: self.trigger.clone(),
+            key: self.key.clone(),
+            uid: self.uid.clone(),
+        }
     }
 }
 
@@ -436,6 +429,33 @@ impl ReadHandle {
                     .try_find_and(key, then)
             }
             ReadHandle::Singleton(ref srh) => { let res = srh.as_ref().unwrap().try_find_and(key, then); res}
+        }
+    }
+
+    pub fn clone_new_user(&mut self) -> ReadHandle {
+        match *self {
+            ReadHandle::Sharded(ref shards) => {
+                let mut inner = Vec::new();
+                let mut shards = shards.clone();
+                for mut shard in shards {
+                    match shard {
+                        Some(ref mut s) => {
+                            inner.push(Some(s.clone_new_user()));
+                        },
+                        None => {
+                            inner.push(None);
+                        }
+                    };
+                }
+                ReadHandle::Sharded(inner)
+
+            }
+            ReadHandle::Singleton(ref mut srh) => {
+                match *srh {
+                    Some(ref mut s) => ReadHandle::Singleton(Some(s.clone_new_user())),
+                    None => ReadHandle::Singleton(None),
+                }
+            }
         }
     }
 
@@ -473,68 +493,6 @@ impl ReadHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn srmap_works() {
-        let global: usize = 0 as usize;
-        let u1: usize = 1 as usize;
-        let u2: usize = 2 as usize;
-
-        let rec1 = vec![1.into(), "a".into()];
-        let rec2 = vec![2.into(), "b".into()];
-        let rec1_ = vec![1.into(), "b".into()];
-
-        // create new map
-        let (r, mut w) = new(true, 2, &[0], global.clone());
-
-
-        let r1 = r.clone_with_uid(u1.clone());
-        let r2 = r.clone_with_uid(u2.clone());
-
-        let mut w1 = w.clone_with_uid(u1.clone());
-        let mut w2 = w.clone_with_uid(u2.clone());
-
-        // Register SRMap users
-        w.add_user(global.clone());
-        w.add_user(u1.clone());
-        w.add_user(u2.clone());
-
-        w.add(vec![Record::Positive(rec1.clone())]);
-        w1.add(vec![Record::Positive(rec2.clone())]);
-        w2.add(vec![Record::Positive(rec1_.clone())]);
-
-        //
-        // w.insert(k.clone(), v.clone(), uid2.clone());
-        // // println!("After second insert: {:?}", lock.read().unwrap());
-        //
-        // w.insert(k.clone(), v2.clone(), uid2.clone());
-        // // println!("After overlapping insert: {:?}", lock.read().unwrap());
-        //
-        // let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
-        // assert_eq!(v, true);
-        //
-        // let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
-        // assert_eq!(v, true);
-        //
-        // w.remove(k.clone(), uid1.clone());
-        // // println!("After remove: {:?}", lock.read().unwrap());
-        //
-        // let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
-        // // println!("V: {:?}", v);
-        // match v {
-        //     Some(val) => assert_eq!(val, false),
-        //     None => {}
-        // };
-        //
-        // w.remove(k.clone(), uid2.clone());
-        // // println!("After user specific remove {:?}", lock.read().unwrap());
-        //
-        // w.remove_user(uid1);
-        // // println!("After removing u1 {:?}", lock.read().unwrap());
-        //
-        // w.remove_user(uid2);
-        // // println!("After removing u2 {:?}", lock.read().unwrap());
-    }
 
     // #[test]
     // fn store_works() {
