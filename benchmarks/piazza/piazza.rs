@@ -263,18 +263,43 @@ fn main() {
         // println!("Waiting for posts to propagate...");
         thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
     }
-    // let partial = false;
-    // println!("Finished writing! Sleeping for 2 seconds...");
+
+    println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
 
     // Login a user
-    // println!("Login in users...");
+    println!("Login in users...");
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
-        // println!("Migration {} took {:.2}s!", i, dur,);
+        println!("Migration {} took {:.2}s!", i, dur,);
     }
+
+    let mut dur = time::Duration::from_millis(0);
+    let mut num_rows = 0;
+    for uid in 0..nlogged {
+      let leaf = format!("post_count_u{}", uid);
+      let mut getter = backend.g.view(&leaf).unwrap();
+      let start = time::Instant::now();
+      for i in 0..nusers {
+          let res = getter.lookup(&[0.into()], true).unwrap();
+          println!("res: {:?}", res);
+          num_rows += res.len();
+      }
+      dur += start.elapsed();
+    }
+
+    let dur = dur_to_fsec!(dur);
+
+    println!(
+      "Read {:?} rows in {:.2}s ({:.2} GETs/sec)!",
+      num_rows,
+      dur,
+      (num_rows) as f64 / dur,
+    );
+
+    let mut dur2 = std::time::Duration::from_millis(0);
 
     // println!("Done with benchmark.");
 
