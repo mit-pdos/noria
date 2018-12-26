@@ -1041,6 +1041,8 @@ impl Domain {
                                    None => {}
                                 }
 
+                                println!("SRMAP DECISION: ids: {}", ids);
+
                                 // If materialization info isn't None, then we're dealing with a
                                 // reader node that is supposed to share an SRMap. Compare the
                                 // offset information with the current length of the handle vector.
@@ -1068,6 +1070,7 @@ impl Domain {
                                             create_new_srmap = false;
                                             let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
                                             let (mut tr_part, mut tw_part) = tw_part.clone_new_user(tr_part);
+                                            println!("passing out new handle with id: {:?}", tr_part.uid); 
                                             r_part = tr_part;
                                             w_part = tw_part;
 
@@ -1095,6 +1098,7 @@ impl Domain {
 
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
+                                    println!("creating new srmap!");
                                     // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
                                     let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids);
                                     r_part = tr_part;

@@ -145,7 +145,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/complex-policies.json")
+                .default_value("benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         ).arg(
             Arg::with_name("graph")
@@ -202,7 +202,7 @@ fn main() {
         ).arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.1")
+                .default_value("0.0")
                 .help("Percentage of private posts"),
         ).get_matches();
 
@@ -286,6 +286,7 @@ fn main() {
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
+        println!("LOGGING IN USER!");
         let dur = dur_to_fsec!(start.elapsed());
         // println!("Migration {} took {:.2}s!", i, dur,);
 
@@ -309,7 +310,7 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    println!("here3");
+    // println!("here3");
 
     let mut num_keys = 0;
     if !partial {

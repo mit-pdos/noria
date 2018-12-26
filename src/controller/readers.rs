@@ -45,7 +45,7 @@ pub(crate) fn handle_message(
                     let readers = s.lock().unwrap();
                     readers.get(&target).unwrap().clone()
                 });
-                let uid = reader.universe();
+                let uid = reader.universe() + 1;
                 let mut ret = Vec::with_capacity(keys.len());
                 ret.resize(keys.len(), Vec::new());
                 // println!("searching for keys: {:?}", keys.clone());

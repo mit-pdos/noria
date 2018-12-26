@@ -215,9 +215,9 @@ where
 }
 
 impl WriteHandle {
-    pub (crate) fn clone_new_user(&mut self, mut r: SingleReadHandle) -> (SingleReadHandle, WriteHandle) {
-        let (r_handle, w_handle) = self.handle.clone_new_user();
-        let r = r.clone_new_user(r_handle);
+    pub(crate) fn clone_new_user(&mut self, mut r: SingleReadHandle) -> (SingleReadHandle, WriteHandle) {
+        let (uid, r_handle, w_handle) = self.handle.clone_new_user();
+        let r = r.clone_new_user(r_handle, uid.clone());
         let w =  WriteHandle {
             handle: w_handle,
             partial: self.partial.clone(),
@@ -225,7 +225,7 @@ impl WriteHandle {
             key: self.key.clone(),
             contiguous: self.contiguous.clone(),
             mem_size: self.mem_size.clone(),
-            uid: self.uid.clone(),}
+            uid: uid.clone(),}
         ;
         (r, w)
     }
@@ -336,17 +336,17 @@ pub struct SingleReadHandle {
     handle: multir::Handle,
     trigger: Option<Arc<Fn(&[DataType]) + Send + Sync>>,
     key: Vec<usize>,
-    uid: usize,
+    pub uid: usize,
 }
 
 impl SingleReadHandle {
 
-    pub fn clone_new_user(&mut self, r: multir::Handle) -> SingleReadHandle {
+    pub fn clone_new_user(&mut self, r: multir::Handle, uid: usize) -> SingleReadHandle {
         SingleReadHandle {
            handle: r,
            trigger: self.trigger.clone(),
            key: self.key.clone(),
-           uid: self.uid.clone(),
+           uid: uid.clone(),
        }
     }
 
