@@ -215,6 +215,20 @@ where
 }
 
 impl WriteHandle {
+    pub (crate) fn clone_new_user(&mut self, mut r: SingleReadHandle) -> (SingleReadHandle, WriteHandle) {
+        let (r_handle, w_handle) = self.handle.clone_new_user();
+        let r = r.clone_new_user(r_handle);
+        let w =  WriteHandle {
+            handle: w_handle,
+            partial: self.partial.clone(),
+            cols: self.cols.clone(),
+            key: self.key.clone(),
+            contiguous: self.contiguous.clone(),
+            mem_size: self.mem_size.clone(),
+            uid: self.uid.clone(),}
+        ;
+        (r, w)
+    }
 
     pub(crate) fn mut_with_key<'a, K>(&'a mut self, key: K) -> MutWriteHandleEntry<'a>
     where
@@ -233,18 +247,6 @@ impl WriteHandle {
         WriteHandleEntry {
             handle: self,
             key: key.into(),
-        }
-    }
-
-    pub fn clone_new_user (&mut self) -> WriteHandle {
-        WriteHandle {
-            handle: self.handle.clone_new_user(),
-            partial: self.partial.clone(),
-            cols: self.cols.clone(),
-            key: self.key.clone(),
-            contiguous: self.contiguous.clone(),
-            mem_size: self.mem_size.clone(),
-            uid: self.uid.clone(),
         }
     }
 
@@ -339,6 +341,15 @@ pub struct SingleReadHandle {
 
 impl SingleReadHandle {
 
+    pub fn clone_new_user(&mut self, r: multir::Handle) -> SingleReadHandle {
+        SingleReadHandle {
+           handle: r,
+           trigger: self.trigger.clone(),
+           key: self.key.clone(),
+           uid: self.uid.clone(),
+       }
+    }
+
     pub fn universe(&self) -> usize{
        self.uid.clone()
     }
@@ -390,15 +401,6 @@ impl SingleReadHandle {
         self.handle.for_each(|v| nrows += v.len());
         nrows
     }
-
-    pub fn clone_new_user(&mut self) -> SingleReadHandle {
-        SingleReadHandle {
-            handle: self.handle.clone_new_user(),
-            trigger: self.trigger.clone(),
-            key: self.key.clone(),
-            uid: self.uid.clone(),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -429,33 +431,6 @@ impl ReadHandle {
                     .try_find_and(key, then)
             }
             ReadHandle::Singleton(ref srh) => { let res = srh.as_ref().unwrap().try_find_and(key, then); res}
-        }
-    }
-
-    pub fn clone_new_user(&mut self) -> ReadHandle {
-        match *self {
-            ReadHandle::Sharded(ref shards) => {
-                let mut inner = Vec::new();
-                let mut shards = shards.clone();
-                for mut shard in shards {
-                    match shard {
-                        Some(ref mut s) => {
-                            inner.push(Some(s.clone_new_user()));
-                        },
-                        None => {
-                            inner.push(None);
-                        }
-                    };
-                }
-                ReadHandle::Sharded(inner)
-
-            }
-            ReadHandle::Singleton(ref mut srh) => {
-                match *srh {
-                    Some(ref mut s) => ReadHandle::Singleton(Some(s.clone_new_user())),
-                    None => ReadHandle::Singleton(None),
-                }
-            }
         }
     }
 
@@ -622,57 +597,36 @@ mod tests {
     //     );
     // }
     //
-    // // #[test]
-    // // fn srmap_works() {
-    // //     let k = "x".to_string();
-    // //     let v = "x".to_string();
-    // //     let v2 = "x2".to_string();
-    // //     let uid1: usize = 0 as usize;
-    // //     let uid2: usize = 1 as usize;
-    // //
-    // //     let (r1, mut w1) = new(true, cols: 2, key: &[0], uid1.clone());
-    // //
-    // //
-    // //     // create two users
-    // //     w.add_user(uid1);
-    // //     w.add_user(uid2);
-    // //
-    // //     w.insert(k.clone(), v.clone(), uid1.clone());
-    // //     let lock = r.get_lock();
-    // //     // println!("After first insert: {:?}", lock.read().unwrap());
-    // //
-    // //     w.insert(k.clone(), v.clone(), uid2.clone());
-    // //     // println!("After second insert: {:?}", lock.read().unwrap());
-    // //
-    // //     w.insert(k.clone(), v2.clone(), uid2.clone());
-    // //     // println!("After overlapping insert: {:?}", lock.read().unwrap());
-    // //
-    // //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x".to_string()) }, uid1.clone()).unwrap();
-    // //     assert_eq!(v, true);
-    // //
-    // //     let v = r.get_and(&k.clone(), |rs| { rs.iter().any(|r| *r == "x2".to_string()) }, uid2.clone()).unwrap();
-    // //     assert_eq!(v, true);
-    // //
-    // //     w.remove(k.clone(), uid1.clone());
-    // //     // println!("After remove: {:?}", lock.read().unwrap());
-    // //
-    // //     let v = r.get_and(&k.clone(), |rs| { false }, uid1.clone());
-    // //     // println!("V: {:?}", v);
-    // //     match v {
-    // //         Some(val) => assert_eq!(val, false),
-    // //         None => {}
-    // //     };
-    // //
-    // //     w.remove(k.clone(), uid2.clone());
-    // //     // println!("After user specific remove {:?}", lock.read().unwrap());
-    // //
-    // //     w.remove_user(uid1);
-    // //     // println!("After removing u1 {:?}", lock.read().unwrap());
-    // //
-    // //     w.remove_user(uid2);
-    // //     // println!("After removing u2 {:?}", lock.read().unwrap());
-    // // }
-    //
+    #[test]
+    fn srmap_works() {
+        let a = vec![1.into(), "a".into()];
+        let b = vec![1.into(), "b".into()];
+        let a_rec = vec![Record::Positive(a.clone())];
+        let b_rec = vec![Record::Positive(b.clone())];
+
+        let (mut r1, mut w1) = new(true, 2, &[0], 0);
+        let (mut r2, mut w2) = w1.clone_new_user(r1.clone());
+        let (mut r3, mut w3) = w1.clone_new_user(r1.clone());
+
+        w1.add(a_rec.clone());
+        w2.add(a_rec.clone());
+        w2.add(b_rec.clone());
+        w3.add(a_rec.clone());
+
+
+        r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+        r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+        r3.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+        r3.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+        r2.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+
+        // assert_eq!(r3.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+        // assert_eq!(r2.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+        // assert_eq!(r2.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(1));
+        // assert_eq!(r3.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(0));
+
+    }
+
     // #[test]
     // fn absorb_negative_later() {
     //     let a = vec![1.into(), "a".into()];

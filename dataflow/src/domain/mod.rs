@@ -954,8 +954,7 @@ impl Domain {
                                             // SRMap created --> get set of handles.
                                             create_new_srmap = false;
                                             let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
-                                            let mut tr_part = tr_part.clone_new_user();
-                                            let mut tw_part = tw_part.clone_new_user();
+                                            let (mut tr_part, mut tw_part) = tw_part.clone_new_user(tr_part);
                                             r_part = tr_part;
                                             w_part = tw_part;
 
@@ -1068,8 +1067,7 @@ impl Domain {
                                             // println!("Got mat info {:?}, not creating new SRMap", info.clone());
                                             create_new_srmap = false;
                                             let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
-                                            let mut tr_part = tr_part.clone_new_user();
-                                            let mut tw_part = tw_part.clone_new_user();
+                                            let (mut tr_part, mut tw_part) = tw_part.clone_new_user(tr_part);
                                             r_part = tr_part;
                                             w_part = tw_part;
 

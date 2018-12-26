@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
-pub(super) enum Handle {
+pub enum Handle {
     SingleSR(srmap::handle::handle::Handle<DataType, Vec<DataType>, i64>),
     DoubleSR(srmap::handle::handle::Handle<(DataType, DataType), Vec<DataType>, i64>),
     ManySR(srmap::handle::handle::Handle<Vec<DataType>, Vec<DataType>, i64>),
@@ -23,14 +23,6 @@ impl Handle {
             // Handle::Many(ref h) => h.len(),
             Handle::ManySR(ref h) => h.len(),
         }
-    }
-
-    pub fn clone_new_user(&mut self) -> Handle {
-         match *self {
-             Handle::SingleSR(ref mut h) => Handle::SingleSR(h.clone_new_user()),
-             Handle::DoubleSR(ref mut h) => Handle::DoubleSR(h.clone_new_user()),
-             Handle::ManySR(ref mut h) => Handle::ManySR(h.clone_new_user()),
-         }
     }
 
     pub fn for_each<F>(&self, mut f: F)

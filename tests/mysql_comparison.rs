@@ -181,11 +181,11 @@ fn generate_target_results(schemas: &BTreeMap<String, Schema>) {
             let mut insert = pool.prepare(query).unwrap();
             for row in table.data.as_ref().unwrap().iter() {
                 if let Err(msg) = insert.execute(row.clone()) {
-                    // println!(
+                    println!(
                         "MySQL insert query failed for table: {}, values: {:?}",
                         table_name, row
                     );
-                    // println!("{:?}", msg);
+                    println!("{:?}", msg);
                     panic!();
                 }
             }
@@ -405,7 +405,7 @@ fn mysql_comparison() {
             });
             panic::take_hook();
             match result {
-                Ok(Ok(())) => // println!("\x1B[32;1mPASS\x1B[m"),
+                Ok(Ok(())) => println!("\x1B[32;1mPASS\x1B[m"),
                 Ok(Err(e)) => {
                     // No panic, but test didn't pass
                     fail = true;
@@ -415,7 +415,7 @@ fn mysql_comparison() {
                     // Panicked
                     fail = true;
                     let panic_state = panic_state.lock().unwrap().take().unwrap();
-                    // println!(
+                    println!(
                         "\x1B[31;1mFAIL\x1B[m: \"{}\" at {}:{}\n{:?}",
                         panic_state.message,
                         panic_state.file,

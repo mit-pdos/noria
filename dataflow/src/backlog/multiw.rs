@@ -7,7 +7,7 @@ use fnv::FnvBuildHasher;
 use evmap;
 
 #[derive(Clone)]
-pub(super) enum Handle {
+pub enum Handle {
     SingleSR(srmap::handle::handle::Handle<DataType, Vec<DataType>, i64>),
     DoubleSR(srmap::handle::handle::Handle<(DataType, DataType), Vec<DataType>, i64>),
     ManySR(srmap::handle::handle::Handle<Vec<DataType>, Vec<DataType>, i64>),
@@ -15,6 +15,7 @@ pub(super) enum Handle {
     // Double(evmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     // Many(evmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
 }
+
 
 impl Handle {
 
@@ -29,14 +30,22 @@ impl Handle {
         }
     }
 
-    pub fn clone_new_user(&mut self) -> Handle {
+    pub fn clone_new_user(&mut self) -> (super::multir::Handle, Handle) {
          match *self {
-             Handle::SingleSR(ref mut h) => Handle::SingleSR(h.clone_new_user()),
-             Handle::DoubleSR(ref mut h) => Handle::DoubleSR(h.clone_new_user()),
-             Handle::ManySR(ref mut h) => Handle::ManySR(h.clone_new_user()),
+             Handle::SingleSR(ref mut h) => {
+                                            let (mut inr, mut inw) = h.clone_new_user();
+                                            (super::multir::Handle::SingleSR(inr), Handle::SingleSR(inw))
+                                             },
+             Handle::DoubleSR(ref mut h) => {
+                                             let (mut inr, mut inw) = h.clone_new_user();
+                                             (super::multir::Handle::DoubleSR(inr), Handle::DoubleSR(inw))
+                                             },
+             Handle::ManySR(ref mut h) => {
+                                             let (mut inr, mut inw) = h.clone_new_user();
+                                             (super::multir::Handle::ManySR(inr), Handle::ManySR(inw))
+                                           },
          }
     }
-
 
     pub fn clear(&mut self, k: Key) {
         match *self {

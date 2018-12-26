@@ -54,6 +54,7 @@ impl Backend {
         let mut mutator = self.g.table(name).unwrap();
 
         let start = time::Instant::now();
+
         let i = records.len();
         for r in records.drain(..) {
             mutator.insert(r).unwrap();
@@ -144,7 +145,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/basic-policies.json")
+                .default_value("benchmarks/piazza/complex-policies.json")
                 .help("Security policies file for Piazza application"),
         ).arg(
             Arg::with_name("graph")
@@ -205,7 +206,7 @@ fn main() {
                 .help("Percentage of private posts"),
         ).get_matches();
 
-    // println!("Starting benchmark...");
+    println!("Starting benchmark...");
 
     // Read arguments
     let sloc = args.value_of("schema").unwrap();
@@ -223,7 +224,6 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
-
     assert!(
         nlogged <= nusers,
         "nusers must be greater or equal to nlogged"
@@ -234,7 +234,8 @@ fn main() {
     );
 
     // Initiliaze backend application with some queries and policies
-    // println!("Initiliazing database schema...");
+    println!("Initiliazing database schema...");
+    let partial = false;
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
 
@@ -250,22 +251,35 @@ fn main() {
     let mut p = Populate::new(nposts, nusers, nclasses, private);
 
     p.enroll_students();
-    // let roles = p.get_roles();
+    let roles = p.get_roles();
     let users = p.get_users();
     let posts = p.get_posts();
     let classes = p.get_classes();
+
+    backend.populate("Role", roles);
+    println!("Waiting for groups to be constructed...");
+    thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
 
     backend.populate("User", users);
     backend.populate("Class", classes);
 
     if populate == PopulateType::Before {
         backend.populate("Post", posts.clone());
-        // println!("Waiting for posts to propagate...");
+        println!("Waiting for posts to propagate...");
         thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
     }
 
     println!("Finished writing! Sleeping for 2 seconds...");
     thread::sleep(time::Duration::from_millis(2000));
+
+    // if partial, read 25% of the keys
+    // if partial {
+    //     let leaf = format!("post_count");
+    //     let mut getter = backend.g.view(&leaf).unwrap();
+    //     for author in 0..nusers / 4 {
+    //         getter.lookup(&[author.into()], false).unwrap();
+    //     }
+    // }
 
     // Login a user
     println!("Login in users...");
@@ -273,40 +287,58 @@ fn main() {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
-        println!("Migration {} took {:.2}s!", i, dur,);
+        // println!("Migration {} took {:.2}s!", i, dur,);
+
+        // if partial, read 25% of the keys
+        // if partial {
+        //     let leaf = format!("post_count_u{}", i);
+        //     let mut getter = backend.g.view(&leaf).unwrap();
+        //     for author in 0..nusers / 4 {
+        //         getter.lookup(&[author.into()], false).unwrap();
+        //     }
+        // }
+
+        if iloc.is_some() && i % 50 == 0 {
+            use std::fs;
+            let fname = format!("{}-{}", iloc.unwrap(), i);
+            fs::copy("/proc/self/status", fname).unwrap();
+        }
     }
 
-    let mut dur = time::Duration::from_millis(0);
-    let mut num_rows = 0;
-    for uid in 0..nlogged {
-      let leaf = format!("post_count_u{}", uid);
-      let mut getter = backend.g.view(&leaf).unwrap();
-      let start = time::Instant::now();
-      for i in 0..nusers {
-          let res = getter.lookup(&[0.into()], true).unwrap();
-          println!("res: {:?}", res);
-          num_rows += res.len();
-      }
-      dur += start.elapsed();
+    if populate == PopulateType::After {
+        backend.populate("Post", posts);
     }
 
-    let dur = dur_to_fsec!(dur);
+    println!("here3");
 
-    println!(
-      "Read {:?} rows in {:.2}s ({:.2} GETs/sec)!",
-      num_rows,
-      dur,
-      (num_rows) as f64 / dur,
-    );
+    let mut num_keys = 0;
+    if !partial {
+        let mut dur = time::Duration::from_millis(0);
+        for uid in 0..nlogged {
+            let leaf = format!("post_count_u{}", uid);
+            let mut getter = backend.g.view(&leaf).unwrap();
+            let start = time::Instant::now();
+            let author = 0;
+            let res = getter.lookup(&[author.into()], true).unwrap();
+            num_keys += res.len();
+            dur += start.elapsed();
+        }
 
-    let mut dur2 = std::time::Duration::from_millis(0);
+        let dur = dur_to_fsec!(dur);
 
-    // println!("Done with benchmark.");
+        println!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            num_keys,
+            dur,
+            (num_keys) as f64 / dur,
+        );
+    }
+
+    println!("Done with benchmark.");
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
         let mut gf = File::create(graph_fname).unwrap();
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
-
 }
