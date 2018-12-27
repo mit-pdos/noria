@@ -1,345 +1,273 @@
+#![feature(type_ascription)]
 #[macro_use]
 extern crate clap;
+extern crate distributary;
+#[macro_use]
+extern crate mysql;
+extern crate rand;
 
-use distributary::{
-    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
-};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
-use std::{thread, time};
+use mysql as my;
+use distributary::DataType;
 
 #[macro_use]
 mod populate;
 
 use crate::populate::{Populate, NANOS_PER_SEC};
 
-pub struct Backend {
-    g: LocalControllerHandle<LocalAuthority>,
-}
+use std::time;
 
-#[derive(PartialEq)]
-enum PopulateType {
-    Before,
-    After,
-    NoPopulate,
+struct Backend {
+    pool: mysql::Pool,
 }
 
 impl Backend {
-    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
-        let mut cb = ControllerBuilder::default();
-        let log = distributary::logger_pls();
-        let blender_log = log.clone();
-
-        if !partial {
-            cb.disable_partial();
+    fn new(addr: &str) -> Backend {
+        Backend {
+            pool: my::Pool::new_manual(1, 1, addr).unwrap(),
         }
-
-        match reuse.as_ref() {
-            "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
-            "full" => cb.set_reuse(ReuseConfigType::Full),
-            "noreuse" => cb.set_reuse(ReuseConfigType::NoReuse),
-            "relaxed" => cb.set_reuse(ReuseConfigType::Relaxed),
-            _ => panic!("reuse configuration not supported"),
-        }
-
-        cb.log_with(blender_log);
-
-        let g = cb.build_local().unwrap();
-
-        Backend { g: g }
     }
 
-    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self.g.table(name).unwrap();
+    pub fn read(&self, uid: i32) -> mysql::QueryResult {
+        let uid = uid.clone().into() : i32;
+         let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
+        self.pool.prep_exec(qstring, ()).unwrap()
+    }
+
+    pub fn secure_read(&self, uid: i32, logged_uid: i32) -> mysql::QueryResult {
+        let qstring = format!(
+            "SELECT * FROM Post \
+               WHERE \
+               p_author = {} AND \
+               Post.p_private = 1 AND Post.p_author = {}\
+              ",
+           uid,
+           logged_uid,
+        );
+
+        self.pool.prep_exec(qstring, ()).unwrap()
+    }
+
+    pub fn populate_tables(&self, pop: &mut Populate) {
+        pop.enroll_students();
+        let roles = pop.get_roles();
+        let users = pop.get_users();
+        let posts = pop.get_posts();
+        let classes = pop.get_classes();
+
+        self.populate("Role", roles);
+        self.populate("User", users);
+        self.populate("Post", posts);
+        self.populate("Class", classes);
+    }
+
+    fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
+        let params_arr: Vec<_> = records.iter().map(|ref r| {
+            match name.as_ref() {
+                "Role" => params!{
+                    "r_uid" => r[0].clone().into() : i32,
+                    "r_cid" => r[1].clone().into() : i32,
+                    "r_role" => r[2].clone().into() : i32,
+                },
+                "User" => params!{
+                    "u_id" => r[0].clone().into() : i32,
+                },
+                "Post" => params!{
+                    "p_id" => r[0].clone().into() : i32,
+                    "p_cid" => r[1].clone().into() : i32,
+                    "p_author" => r[2].clone().into() : i32,
+                    "p_content" => r[3].clone().into() : String,
+                    "p_private" => r[4].clone().into() : i32,
+                },
+                "Class" => params!{
+                    "c_id" => r[0].clone().into() : i32,
+                },
+                _ => panic!("unspecified table"),
+            }
+        }).collect();
+
+        let qstring = match name.as_ref() {
+            "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
+            "User" => "INSERT INTO User (u_id) VALUES (:u_id)",
+            "Post" => "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES (:p_id, :p_cid, :p_author, :p_content, :p_private)",
+            "Class" => "INSERT INTO Class (c_id) VALUES (:c_id)",
+            _ => panic!("unspecified table"),
+        };
 
         let start = time::Instant::now();
-
-        let i = records.len();
-        for r in records.drain(..) {
-            mutator.insert(r).unwrap();
+        for mut stmt in self.pool.prepare(qstring).into_iter() {
+            for params in params_arr.iter() {
+                // println!("params: {:?}", params);
+                stmt.execute(params).unwrap();
+            }
         }
-
         let dur = dur_to_fsec!(start.elapsed());
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
+            records.len(),
             name,
             dur,
-            i as f64 / dur
+            records.len() as f64 / dur
         );
-
-        i
     }
 
-    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-        self.g.create_universe(user_context.clone());
-
-        Ok(())
-    }
-
-    fn set_security_config(&mut self, config_file: &str) {
-        use std::io::Read;
-        let mut config = String::new();
-        let mut cf = File::open(config_file).unwrap();
-        cf.read_to_string(&mut config).unwrap();
-
-        // Install recipe with policies
-        self.g.set_security_config(config);
-    }
-
-    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
-        use std::io::Read;
-
-        // Read schema file
-        let mut sf = File::open(schema_file).unwrap();
-        let mut s = String::new();
-        sf.read_to_string(&mut s).unwrap();
-
-        let mut rs = s.clone();
-        s.clear();
-
-        // Read query file
-        match query_file {
-            None => (),
-            Some(qf) => {
-                let mut qf = File::open(qf).unwrap();
-                qf.read_to_string(&mut s).unwrap();
-                rs.push_str("\n");
-                rs.push_str(&s);
-            }
+    fn create_connection(&self, db: &str) {
+        let mut conn = self.pool.get_conn().unwrap();
+        if conn.query(format!("USE {}", db)).is_ok() {
+            conn.query(format!("DROP DATABASE {}", &db).as_str())
+                .unwrap();
         }
 
-        // Install recipe
-        self.g.install_recipe(&rs).unwrap();
+        conn.query(format!("CREATE DATABASE {}", &db).as_str())
+            .unwrap();
+        conn.query(format!("USE {}", db)).unwrap();
 
-        Ok(())
+        drop(conn);
     }
-}
 
-fn make_user(id: i32) -> HashMap<String, DataType> {
-    let mut user = HashMap::new();
-    user.insert(String::from("id"), id.into());
+    fn create_tables(&self) {
+        self.pool.prep_exec(
+            "CREATE TABLE Post ( \
+              p_id int(11) NOT NULL, \
+              p_cid int(11) NOT NULL, \
+              p_author int(11) NOT NULL, \
+              p_content varchar(258) NOT NULL, \
+              p_private tinyint(1) NOT NULL default '0', \
+              PRIMARY KEY (p_id), \
+              UNIQUE KEY p_id (p_id), \
+              KEY p_cid (p_cid), \
+              KEY p_author (p_author) \
+            );",
+            (),
+        ).unwrap();
 
-    user
+        self.pool.prep_exec(
+            "CREATE TABLE User ( \
+              u_id int(11) NOT NULL, \
+              PRIMARY KEY  (u_id), \
+              UNIQUE KEY u_id (u_id) \
+            );",
+            (),
+        ).unwrap();
+
+        self.pool.prep_exec(
+            "CREATE TABLE Class ( \
+              c_id int(11) NOT NULL, \
+              PRIMARY KEY  (c_id), \
+              UNIQUE KEY c_id (c_id) \
+            );",
+            (),
+        ).unwrap();
+
+        self.pool.prep_exec(
+            "CREATE TABLE Role ( \
+              r_uid int(11) NOT NULL, \
+              r_cid int(11) NOT NULL, \
+              r_role tinyint(1) NOT NULL default '0', \
+              KEY r_uid (r_uid), \
+              KEY r_cid (r_cid) \
+            );",
+            (),
+        ).unwrap();
+
+    }
 }
 
 fn main() {
     use clap::{App, Arg};
-    let args = App::new("piazza")
+
+    let args = App::new("piazza-mysql")
         .version("0.1")
-        .about("Benchmarks Piazza-like application with security policies.")
+        .about("Benchmarks a forum like application with security policies using MySql")
         .arg(
-            Arg::with_name("schema")
-                .short("s")
-                .required(true)
-                .default_value("benchmarks/piazza/schema.sql")
-                .help("Schema file for Piazza application"),
-        ).arg(
-            Arg::with_name("queries")
-                .short("q")
-                .required(true)
-                .default_value("benchmarks/piazza/post-queries.sql")
-                .help("Query file for Piazza application"),
-        ).arg(
-            Arg::with_name("policies")
-                .long("policies")
-                .required(true)
-                .default_value("benchmarks/piazza/basic-policies.json")
-                .help("Security policies file for Piazza application"),
-        ).arg(
-            Arg::with_name("graph")
-                .short("g")
-                .default_value("pgraph.gv")
-                .help("File to dump application's soup graph, if set"),
-        ).arg(
-            Arg::with_name("info")
-                .short("i")
-                .takes_value(true)
-                .help("Directory to dump runtime process info (doesn't work on OSX)"),
-        ).arg(
-            Arg::with_name("reuse")
-                .long("reuse")
-                .default_value("full")
-                .possible_values(&["noreuse", "finkelstein", "relaxed", "full"])
-                .help("Query reuse algorithm"),
-        ).arg(
-            Arg::with_name("shard")
-                .long("shard")
-                .help("Enable sharding"),
-        ).arg(
-            Arg::with_name("partial")
-                .long("partial")
-                .help("Enable partial materialization"),
-        ).arg(
-            Arg::with_name("populate")
-                .long("populate")
-                .default_value("nopopulate")
-                .possible_values(&["after", "before", "nopopulate"])
-                .help("Populate app with randomly generated data"),
-        ).arg(
+            Arg::with_name("dbname")
+                .required(true),
+        )
+        .arg(
             Arg::with_name("nusers")
                 .short("u")
                 .default_value("1000")
                 .help("Number of users in the db"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("nlogged")
                 .short("l")
                 .default_value("1000")
-                .help(
-                "Number of logged users. Must be less or equal than the number of users in the db",
-            ),
-        ).arg(
+                .help("Number of logged users"),
+        )
+        .arg(
             Arg::with_name("nclasses")
                 .short("c")
                 .default_value("100")
                 .help("Number of classes in the db"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("nposts")
                 .short("p")
                 .default_value("100000")
                 .help("Number of posts in the db"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.0")
+                .default_value("0.1")
                 .help("Percentage of private posts"),
-        ).get_matches();
+        )
+        .get_matches();
 
-    println!("Starting benchmark...");
-
-    // Read arguments
-    let sloc = args.value_of("schema").unwrap();
-    let qloc = args.value_of("queries").unwrap();
-    let ploc = args.value_of("policies").unwrap();
-    let gloc = args.value_of("graph");
-    let iloc = args.value_of("info");
-    let partial = args.is_present("partial");
-    let shard = args.is_present("shard");
-    let reuse = args.value_of("reuse").unwrap();
-    let populate = args.value_of("populate").unwrap_or("nopopulate");
+    let dbn = args.value_of("dbname").unwrap();
     let nusers = value_t_or_exit!(args, "nusers", i32);
     let nlogged = value_t_or_exit!(args, "nlogged", i32);
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
-    assert!(
-        nlogged <= nusers,
-        "nusers must be greater or equal to nlogged"
-    );
-    assert!(
-        nusers >= populate::TAS_PER_CLASS as i32,
-        "nusers must be greater or equal to TAS_PER_CLASS"
-    );
+    let backend = Backend::new(dbn);
 
-    // Initiliaze backend application with some queries and policies
-    println!("Initiliazing database schema...");
-    let partial = false;
-    let mut backend = Backend::new(partial, shard, reuse);
-    backend.migrate(sloc, None).unwrap();
-
-    backend.set_security_config(ploc);
-    backend.migrate(sloc, Some(qloc)).unwrap();
-
-    let populate = match populate.as_ref() {
-        "before" => PopulateType::Before,
-        "after" => PopulateType::After,
-        _ => PopulateType::NoPopulate,
-    };
+    let db = &dbn[dbn.rfind("/").unwrap() + 1..];
+    backend.create_connection(db);
+    backend.create_tables();
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
+    backend.populate_tables(&mut p);
 
-    p.enroll_students();
-    let roles = p.get_roles();
-    let users = p.get_users();
-    let posts = p.get_posts();
-    let classes = p.get_classes();
+    // Do some reads without security
+    let start = time::Instant::now();
+    let author = 0;
+    let mut num_rows = 0;
 
-    backend.populate("Role", roles);
-    println!("Waiting for groups to be constructed...");
-    thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
-
-    backend.populate("User", users);
-    backend.populate("Class", classes);
-
-    if populate == PopulateType::Before {
-        backend.populate("Post", posts.clone());
-        println!("Waiting for posts to propagate...");
-        thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
-    }
-
-    println!("Finished writing! Sleeping for 2 seconds...");
-    thread::sleep(time::Duration::from_millis(2000));
-
-    // if partial, read 25% of the keys
-    // if partial {
-    //     let leaf = format!("post_count");
-    //     let mut getter = backend.g.view(&leaf).unwrap();
-    //     for author in 0..nusers / 4 {
-    //         getter.lookup(&[author.into()], false).unwrap();
-    //     }
-    // }
-
-    // Login a user
-    println!("Login in users...");
-    for i in 0..nlogged {
-        let start = time::Instant::now();
-        backend.login(make_user(i)).is_ok();
-        println!("LOGGING IN USER!");
-        let dur = dur_to_fsec!(start.elapsed());
-        // println!("Migration {} took {:.2}s!", i, dur,);
-
-        // if partial, read 25% of the keys
-        // if partial {
-        //     let leaf = format!("post_count_u{}", i);
-        //     let mut getter = backend.g.view(&leaf).unwrap();
-        //     for author in 0..nusers / 4 {
-        //         getter.lookup(&[author.into()], false).unwrap();
-        //     }
-        // }
-
-        if iloc.is_some() && i % 50 == 0 {
-            use std::fs;
-            let fname = format!("{}-{}", iloc.unwrap(), i);
-            fs::copy("/proc/self/status", fname).unwrap();
+    for uid in 0..nusers {
+        let res = backend.read(uid);
+        for row in res {
+            // println!("row: {:?}", row);
+            num_rows += 1;
         }
     }
 
-    if populate == PopulateType::After {
-        backend.populate("Post", posts);
-    }
+    let dur = dur_to_fsec!(start.elapsed());
+    println!(
+        "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
+        num_rows,
+        dur,
+        (num_rows) as f64 / dur
+    );
 
-    // println!("here3");
+    // Do some reads WITH security
+    let start2 = time::Instant::now();
 
-    let mut num_keys = 0;
-    if !partial {
-        let mut dur = time::Duration::from_millis(0);
-        for uid in 0..nlogged {
-            let leaf = format!("post_count_u{}", uid);
-            let mut getter = backend.g.view(&leaf).unwrap();
-            let start = time::Instant::now();
-            let author = 0;
-            let res = getter.lookup(&[author.into()], true).unwrap();
-            num_keys += res.len();
-            dur += start.elapsed();
+    for uid in 0..nusers {
+        let res = backend.secure_read(uid, 0);
+        for row in res {
+            // println!("row: {:?}", row);
+            num_rows += 1;
         }
-
-        let dur = dur_to_fsec!(dur);
-
-        println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            num_keys,
-            dur,
-            (num_keys) as f64 / dur,
-        );
     }
 
-    println!("Done with benchmark.");
+    let dur2 = dur_to_fsec!(start2.elapsed());
+    println!(
+        "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
+        num_rows,
+        dur2,
+        num_rows as f64 / dur2
+    );
 
-    if gloc.is_some() {
-        let graph_fname = gloc.unwrap();
-        let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-    }
 }
