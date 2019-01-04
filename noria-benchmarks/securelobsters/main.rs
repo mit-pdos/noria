@@ -171,7 +171,7 @@ fn main() {
     println!("Starting benchmark...");
 
     // Read arguments
-    let rloc = args.value_of("schema").unwrap();
+    let sloc = args.value_of("schema").unwrap();
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
     let gloc = args.value_of("graph");
