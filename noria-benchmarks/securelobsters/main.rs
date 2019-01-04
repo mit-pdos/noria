@@ -160,7 +160,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("sessions")
-                .short("s")
+                .short("S")
                 .default_value("1000")
                 .help(
                 "Number of logged users. Must be less or equal than the number of users in the db",
