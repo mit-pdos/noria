@@ -133,7 +133,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/securelobsters/policies.json")
+                .default_value("policies.json")
                 .help("Security policies file for Lobsters application"),
         )
         .arg(
