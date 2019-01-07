@@ -176,11 +176,25 @@ fn make_security_nodes(
                 .relations
                 .get(*rel)
                 .expect("relation should have a query graph node.");
-            assert!(*rel != "computed_collumns");
+            assert!(*rel != "computed_columns");
+            let mut any_added = false;
+            for pred in &qgn.predicates {
+                let new_nodes = mir_converter.make_predicate_nodes(
+                    &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
+                    prev_node.expect("empty previous node"),
+                    pred,
+                    0,
+                );
 
-            // Skip empty predicates
-            if qgn.predicates.is_empty() {
-                continue;
+                prev_node = Some(
+                    new_nodes
+                        .iter()
+                        .last()
+                        .expect("no new nodes were created")
+                        .clone(),
+                );
+                filter_nodes.extend(new_nodes);
+                any_added = true;
             }
 
             for pred in &qgn.predicates {
@@ -199,10 +213,13 @@ fn make_security_nodes(
                         .clone(),
                 );
                 filter_nodes.extend(new_nodes);
+                any_added = true;
             }
 
             // update local node relations so joins know which views to join
-            local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
+            if any_added {
+                local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
+            }
         }
 
         let join_nodes = make_joins(

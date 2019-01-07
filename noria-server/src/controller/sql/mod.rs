@@ -818,7 +818,7 @@ impl SqlIncorporator {
             | ref q @ SqlQuery::DropTable(_)
             | ref q @ SqlQuery::Insert(_) => {
                 for t in &q.referred_tables() {
-                    if !self.view_schemas.contains_key(&t.name) {
+                    if !self.view_schemas.contains_key(&t.name) && t.name != "UserContext" {
                         return Err(format!("query refers to unknown table \"{}\"", t.name));
                     }
                 }

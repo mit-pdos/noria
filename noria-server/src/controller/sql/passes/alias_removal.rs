@@ -125,6 +125,16 @@ impl AliasRemoval for SqlQuery {
                         }
                     }
                 }
+
+                sq.tables = sq.tables.into_iter().map(|table|
+                    if table_aliases.contains_key(&table.name) {
+                        nom_sql::Table::from(table_aliases[&table.name].as_ref())
+                    } else {
+                        table
+                    }
+                ).collect();
+
+
                 // Remove them from fields
                 sq.fields = sq
                     .fields
