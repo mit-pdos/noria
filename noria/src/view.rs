@@ -2,6 +2,7 @@ use crate::channel::rpc::RpcClient;
 use crate::data::*;
 use crate::error::TransportError;
 use crate::{ExclusiveConnection, SharedConnection};
+use nom_sql::ColumnSpecification;
 use petgraph::graph::NodeIndex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -62,6 +63,7 @@ pub struct ViewBuilder {
     pub reader_index: usize,
     pub node: NodeIndex,
     pub columns: Vec<String>,
+    pub schema: Option<Vec<ColumnSpecification>>,
     pub shards: Vec<SocketAddr>,
     // one per shard
     pub local_ports: Vec<u16>,
@@ -80,6 +82,7 @@ impl ViewBuilder {
             reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
+            schema: self.schema,
             shard_addrs: self.shards,
             shards: conns,
             exclusivity: ExclusiveConnection,
@@ -129,6 +132,7 @@ impl ViewBuilder {
             reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
+            schema: self.schema,
             shard_addrs: self.shards,
             shards: conns,
             exclusivity: SharedConnection,
@@ -146,6 +150,8 @@ pub struct View<E = SharedConnection> {
     reader_index: usize,
     node: NodeIndex,
     columns: Vec<String>,
+    schema: Option<Vec<ColumnSpecification>>,
+
     shards: Vec<ViewRpc>,
     shard_addrs: Vec<SocketAddr>,
 
@@ -159,6 +165,7 @@ impl Clone for View<SharedConnection> {
             reader_index: self.reader_index,
             node: self.node,
             columns: self.columns.clone(),
+            schema: self.schema.clone(),
             shards: self.shards.clone(),
             shard_addrs: self.shard_addrs.clone(),
             exclusivity: SharedConnection,
@@ -177,6 +184,7 @@ impl View<SharedConnection> {
             node: self.node,
             local_ports: vec![],
             columns: self.columns,
+            schema: self.schema,
             shards: self.shard_addrs,
         }
         .build_exclusive()
@@ -196,6 +204,11 @@ impl<E> View<E> {
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
         self.columns.as_slice()
+    }
+
+    /// Get the schema definition of this view.
+    pub fn schema(&self) -> Option<&[ColumnSpecification]> {
+        self.schema.as_ref().map(|s| s.as_slice())
     }
 
     /// Get the local address this `View` is bound to.

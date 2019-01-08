@@ -267,7 +267,7 @@ impl<'a> Migration<'a> {
     }
 
     fn assign_local_addresses(
-            mainline: &'a mut ControllerInner,
+            mainline: &mut ControllerInner,
             log: &slog::Logger,
             sorted_new: &Vec<NodeIndex>,
             swapped: &HashMap<(NodeIndex, NodeIndex), NodeIndex>) {
@@ -351,7 +351,7 @@ impl<'a> Migration<'a> {
     ///
     /// Domains are placed round robin in the order that they are provided.
     fn place_round_robin(
-            mainline: &'a mut ControllerInner,
+            mainline: &mut ControllerInner,
             log: &slog::Logger,
             uninformed_domain_nodes: &mut HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
             changed_domains: &Vec<DomainIndex>) {
