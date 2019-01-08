@@ -1145,35 +1145,19 @@ impl ControllerInner {
         // We're looking for a single egress node that connects the query node to readers in
         // other domains.
         let mut nodes = vec![];
-        let egress_node = {
-            let num_children = self
-                .ingredients
+        let num_children = self
+            .ingredients
+            .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
+            .count();
+        if num_children == 1 {
+            let child = self.ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .count();
-            if num_children == 0 {
-                None
-            } else if num_children == 1 {
-                let child = self.ingredients
-                    .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                    .next()
-                    .unwrap();
-                assert!(self.ingredients[child].is_egress());
-                Some(child)
-            } else {
-                // should not happen, since we remove nodes in reverse topological order
-                crit!(
-                    self.log,
-                    "not removing node {} yet, as it still has non-reader-related children",
-                    leaf.index();
-                    "num_children" => num_children,
-                );
-                unreachable!();
-            }
-        };
+                .next()
+                .unwrap();
+            assert!(self.ingredients[child].is_egress());
 
-        // Remove the egress node and its children
-        if let Some(egress_node) = egress_node {
-            let mut bfs = Bfs::new(&self.ingredients, egress_node);
+            // Remove the egress node and its children
+            let mut bfs = Bfs::new(&self.ingredients, child);
             while let Some(child) = bfs.next(&self.ingredients) {
                 if self.ingredients
                     .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
@@ -1185,19 +1169,18 @@ impl ControllerInner {
             }
             debug!(
                 self.log, "Removing egress node and its children";
-                "node" => egress_node.index(),
+                "node" => child.index(),
                 "leaf" => leaf.index(),
             );
-        }
-
-        // The nodes we remove first do not have children any more
-        for node in &nodes {
-            assert_eq!(
-                self.ingredients
-                    .neighbors_directed(*node, petgraph::EdgeDirection::Outgoing)
-                    .count(),
-                0
+        } else if num_children > 1 {
+            // should not happen, since we remove nodes in reverse topological order
+            crit!(
+                self.log,
+                "not removing node {} yet, as it still has non-reader-related children",
+                leaf.index();
+                "num_children" => num_children,
             );
+            unreachable!();
         }
 
         while let Some(node) = nodes.pop() {
