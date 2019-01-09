@@ -14,6 +14,7 @@ pub mod rewrite;
 pub mod topk;
 pub mod trigger;
 pub mod union;
+pub mod dp_counter;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum NodeOperator {
@@ -31,6 +32,7 @@ pub enum NodeOperator {
     Trigger(trigger::Trigger),
     Rewrite(rewrite::Rewrite),
     Distinct(distinct::Distinct),
+    Dp_Aggregator(dp_counter::Dp_Aggregator),
 }
 
 macro_rules! nodeop_from_impl {
@@ -69,6 +71,7 @@ nodeop_from_impl!(NodeOperator::TopK, topk::TopK);
 nodeop_from_impl!(NodeOperator::Trigger, trigger::Trigger);
 nodeop_from_impl!(NodeOperator::Rewrite, rewrite::Rewrite);
 nodeop_from_impl!(NodeOperator::Distinct, distinct::Distinct);
+nodeop_from_impl!(NodeOperator::Dp_Aggregator, dp_counter::Dp_Aggregator);
 
 macro_rules! impl_ingredient_fn_mut {
     ($self:ident, $fn:ident, $( $arg:ident ),* ) => {
@@ -87,6 +90,7 @@ macro_rules! impl_ingredient_fn_mut {
             NodeOperator::Trigger(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Distinct(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::Dp_Aggregator(ref mut i) => i.$fn($($arg),*),
         }
     }
 }
@@ -108,6 +112,7 @@ macro_rules! impl_ingredient_fn_ref {
             NodeOperator::Trigger(ref i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref i) => i.$fn($($arg),*),
             NodeOperator::Distinct(ref i) => i.$fn($($arg),*),
+            NodeOperator::Dp_Aggregator(ref mut i) => i.$fn($($arg),*),
         }
     }
 }
