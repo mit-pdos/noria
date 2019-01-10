@@ -19,7 +19,6 @@ pub mod dp_counter;
 #[derive(Clone, Serialize, Deserialize)]
 pub enum NodeOperator {
     Sum(grouped::GroupedOperator<grouped::aggregate::Aggregator>),
-    Count(grouped::GroupedOperator<grouped::dp_aggregate_unbounded::DpAggregator>),
     Extremum(grouped::GroupedOperator<grouped::extremum::ExtremumOperator>),
     Concat(grouped::GroupedOperator<grouped::concat::GroupConcat>),
     Join(join::Join),
@@ -32,7 +31,7 @@ pub enum NodeOperator {
     Trigger(trigger::Trigger),
     Rewrite(rewrite::Rewrite),
     Distinct(distinct::Distinct),
-    Dp_Aggregator(dp_counter::Dp_Aggregator),
+    DpAggregator(dp_counter::DpAggregator),
 }
 
 macro_rules! nodeop_from_impl {
@@ -48,10 +47,6 @@ macro_rules! nodeop_from_impl {
 nodeop_from_impl!(
     NodeOperator::Sum,
     grouped::GroupedOperator<grouped::aggregate::Aggregator>
-);
-nodeop_from_impl!(
-    NodeOperator::Count,
-    grouped::GroupedOperator<grouped::dp_aggregate_unbounded::DpAggregator>
 );
 nodeop_from_impl!(
     NodeOperator::Extremum,
@@ -71,13 +66,12 @@ nodeop_from_impl!(NodeOperator::TopK, topk::TopK);
 nodeop_from_impl!(NodeOperator::Trigger, trigger::Trigger);
 nodeop_from_impl!(NodeOperator::Rewrite, rewrite::Rewrite);
 nodeop_from_impl!(NodeOperator::Distinct, distinct::Distinct);
-nodeop_from_impl!(NodeOperator::Dp_Aggregator, dp_counter::Dp_Aggregator);
+nodeop_from_impl!(NodeOperator::DpAggregator, dp_counter::DpAggregator);
 
 macro_rules! impl_ingredient_fn_mut {
     ($self:ident, $fn:ident, $( $arg:ident ),* ) => {
         match *$self {
             NodeOperator::Sum(ref mut i) => i.$fn($($arg),*),
-            NodeOperator::Count(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Extremum(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Concat(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Join(ref mut i) => i.$fn($($arg),*),
@@ -90,7 +84,7 @@ macro_rules! impl_ingredient_fn_mut {
             NodeOperator::Trigger(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Distinct(ref mut i) => i.$fn($($arg),*),
-            NodeOperator::Dp_Aggregator(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::DpAggregator(ref mut i) => i.$fn($($arg),*),
         }
     }
 }
@@ -99,7 +93,6 @@ macro_rules! impl_ingredient_fn_ref {
     ($self:ident, $fn:ident, $( $arg:ident ),* ) => {
         match *$self {
             NodeOperator::Sum(ref i) => i.$fn($($arg),*),
-            NodeOperator::Count(ref i) => i.$fn($($arg),*),
             NodeOperator::Extremum(ref i) => i.$fn($($arg),*),
             NodeOperator::Concat(ref i) => i.$fn($($arg),*),
             NodeOperator::Join(ref i) => i.$fn($($arg),*),
@@ -112,7 +105,7 @@ macro_rules! impl_ingredient_fn_ref {
             NodeOperator::Trigger(ref i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref i) => i.$fn($($arg),*),
             NodeOperator::Distinct(ref i) => i.$fn($($arg),*),
-            NodeOperator::Dp_Aggregator(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::DpAggregator(ref i) => i.$fn($($arg),*),
         }
     }
 }

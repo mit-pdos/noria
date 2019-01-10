@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use ops::grouped::GroupedOperation;
-use ops::grouped::GroupedOperator;
 use randomkit::dist::Laplace;
 use randomkit::{Rng, Sample};
 use std::f64;
@@ -298,49 +296,15 @@ impl DpAggregator {
             counter: HybridMechanism::new(eps),
         }
     }
-}
 
-impl Ingredient for DpAggregator {
-    fn take(&mut self) -> NodeOperator {
-        // Necessary because cmp_rows can't be cloned.
-        Self {
-            src: self.src,
-
-            us: self.us,
-            cols: self.cols,
-
-            group_by: self.group_by.clone(),
-
-            over: self.over,
-            counter: self.counter.clone(),
+    // Helper fns for on_*
+    // TODO: fold into on_*?
+    fn to_diff(&self, _r: &[DataType], pos: bool) -> i32 {
+        if pos {
+            return 1;
         }
-        .into()
-    }
-
-    fn ancestors(&self) -> Vec<NodeIndex> {
-        vec![self.src.as_global()]
-    }
-
-    fn to_diff(&self, _r: &[DataType], pos: bool) -> Self::Diff {
-        match self.op {
-            DpAggregation::COUNT if pos => 1,
-            DpAggregation::COUNT => -1,
-        }
-    }
-
-    fn apply(
-        &mut self,
-        _current: Option<&DataType>,
-        diffs: &mut Iterator<Item = Self::Diff>,
-    ) -> DataType {
-        // "current" is superfluous, already tracked in counter state.
-        // LATER: for increment and decrement counters
-        // TODO: should both pos and neg take the 0's as well? How is clocking affected by the split?
-        // Should -1's be treated as zeros in pos counter and vice versa (if so, below code won't work)?
-        // pos = diffs.into_iter().filter(|d| d > 0).map(|d| self.pos_counter.step_forward(d)).last().into()
-        // neg = diffs.into_iter().filter(|d| d < 0).map(|d| self.neg_counter.step_forward(-1*d)).last().into()
-        // pos - neg
-        diffs.into_iter().map(|d| self.counter.step_forward(d as i64)).last().unwrap().into()
+        // TODO: have an option to return 0?
+        return -1;
     }
 
     // Called at the beginning of on_connect()
@@ -355,7 +319,31 @@ impl Ingredient for DpAggregator {
         self.counter.b.set_noise_distr();
         self.counter.b.initialize_psums();
     }
-    
+}
+
+impl Ingredient for DpAggregator {
+    fn take(&mut self) -> NodeOperator {
+        // Necessary because cmp_rows can't be cloned.
+        Self {
+            src: self.src,
+
+            us: self.us,
+            cols: self.cols,
+
+            group_by: self.group_by.clone(),
+            out_key: self.out_key.clone(),
+            colfix: self.colfix.clone(),
+
+            over: self.over,
+            counter: self.counter.clone(),
+        }
+        .into()
+    }
+
+    fn ancestors(&self) -> Vec<NodeIndex> {
+        vec![self.src.as_global()]
+    }
+
     // IMPL is copied from grouped/mod.rs
     fn on_connected(&mut self, g: &Graph) {
         let srcn = &g[self.src.as_global()];
@@ -365,7 +353,7 @@ impl Ingredient for DpAggregator {
 
         // group by all columns
         self.cols = srcn.fields().len();
-        self.group_by.extend(self.inner.group_by().iter().cloned());
+//        self.group_by.extend(&self.group_by[..].iter().cloned()); // TODO: should this line even stay?
         self.group_by.sort();
         // cache the range of our output keys 
         // TODO: does dp counter need this?
@@ -417,7 +405,7 @@ impl Ingredient for DpAggregator {
         }
 
         let group_by = &self.group_by;
-        let group_cmp = |a: &Record, b: &Record| {
+        let cmp = |a: &Record, b: &Record| {
             group_by
                 .iter()
                 .map(|&col| &a[col])
@@ -428,7 +416,7 @@ impl Ingredient for DpAggregator {
         // For example, if we get a -, then a +, for the same group, we don't want to
         // execute two queries. We'll do this by sorting the batch by our group by.
         // TODO: reinstate sort? after figuring out if batching is the right thing to do
-        let mut rs: Vec<_> = rs.into();
+        let rs: Vec<_> = rs.into();
 //        rs.sort_by(&cmp);
 
         // find the current value for this group                  
@@ -441,9 +429,9 @@ impl Ingredient for DpAggregator {
         {
             let out_key = &self.out_key;
             let mut handle_group =
-                |inner: &mut T, // TODO: rename to op
+                |counter: &mut HybridMechanism,
                  group_rs: ::std::vec::Drain<Record>,
-                 mut diffs: ::std::vec::Drain<_>| {
+                 diffs: ::std::vec::Drain<_>| {
                     let mut group_rs = group_rs.peekable();
 
                     let mut group = Vec::with_capacity(group_by.len() + 1);
@@ -489,7 +477,13 @@ impl Ingredient for DpAggregator {
                     });
 
                     // new is the result of applying all diffs for the group to the current value
-                    let new = self.apply(current.as_ref().map(|v| &**v), &mut diffs as &mut _);
+                    let new = diffs.into_iter().map(|d| counter.step_forward(d as i64)).last().unwrap().into();
+                    // LATER: for increment and decrement counters
+                    // TODO: should both pos and neg take the 0's as well? How is clocking affected by the split?
+                    // Should -1's be treated as zeros in pos counter and vice versa (if so, below code won't work)?
+                    // pos = diffs.into_iter().filter(|d| d > 0).map(|d| self.pos_counter.step_forward(d)).last().into()
+                    // neg = diffs.into_iter().filter(|d| d < 0).map(|d| self.neg_counter.step_forward(-1*d)).last().into()
+                    // pos - neg 
                     match current {
                         Some(ref current) if new == **current => {
                             // no change
@@ -512,13 +506,13 @@ impl Ingredient for DpAggregator {
             let mut group_rs = Vec::new();
             for r in rs {
                 if !group_rs.is_empty() && cmp(&group_rs[0], &r) != Ordering::Equal {
-                    handle_group(&mut self, group_rs.drain(..), diffs.drain(..));
+                    handle_group(&mut self.counter, group_rs.drain(..), diffs.drain(..));
                 }
                 diffs.push(self.to_diff(&r[..], r.is_positive()));
                 group_rs.push(r);
             }
             assert!(!diffs.is_empty());
-            handle_group(&mut self, group_rs.drain(..), diffs.drain(..));
+            handle_group(&mut self.counter, group_rs.drain(..), diffs.drain(..));
         }
 
         ProcessingResult {
@@ -550,11 +544,9 @@ impl Ingredient for DpAggregator {
         if !detailed {
             return String::from("DP_COUNT");
         }
-        let op_string : String = match self.op {
-            DpAggregation::COUNT => "|*|".into(),
-        };
+        let op_string : String =  "|*|".into();
         let group_cols = self
-            .group
+            .group_by
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<_>>()
