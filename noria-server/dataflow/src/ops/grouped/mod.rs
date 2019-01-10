@@ -10,7 +10,7 @@ pub mod aggregate;
 pub mod concat;
 pub mod extremum;
 //pub mod dp_aggregate;
-pub mod dp_aggregate_unbounded;
+//pub mod dp_aggregate_unbounded;
 
 /// Trait for implementing operations that collapse a group of records into a single record.
 ///
