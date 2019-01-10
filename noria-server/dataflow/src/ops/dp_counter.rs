@@ -569,53 +569,146 @@ mod tests {
     use super::*;
 
     use ops;
-
+    
     fn setup(reversed: bool) -> (ops::test::MockGraph, IndexPair) {
-        let cmp_rows = if reversed {
-            vec![(2, OrderType::OrderDescending)]
-        } else {
-            vec![(2, OrderType::OrderAscending)]
-        };
-
         let mut g = ops::test::MockGraph::new();
-        let s = g.add_base("source", &["x", "y", "z"]);
+        let s = g.add_base("source", &["x", "y"]);
         g.set_op(
-            "topk",
-            &["x", "y", "z"],
-            TopK::new(s.as_global(), cmp_rows, vec![1], 3),
-            true,
+            "identity",
+            &["x", "ys"],
+            DpAggregation::COUNT.over(s.as_global(), 1, &[0], 0.1), // epsilon = 0.1
+            mat,
         );
-        (g, s)
+        g
     }
 
     #[test]
     fn it_forwards() {
-        let (mut g, _) = setup(false);
+        let mut c = setup(true);
 
-        let r12: Vec<DataType> = vec![1.into(), "z".into(), 12.into()];
-        let r10: Vec<DataType> = vec![2.into(), "z".into(), 10.into()];
-        let r11: Vec<DataType> = vec![3.into(), "z".into(), 11.into()];
-        let r5: Vec<DataType> = vec![4.into(), "z".into(), 5.into()];
-        let r15: Vec<DataType> = vec![5.into(), "z".into(), 15.into()];
+        let u: Record = vec![1.into(), 1.into()].into();
 
-        let a = g.narrow_one_row(r12.clone(), true);
-        assert_eq!(a, vec![r12.clone()].into());
+        // first row for a group should emit +1 for that group
+        let rs = c.narrow_one(u, true);
+        assert_eq!(rs.len(), 1);
+        let mut rs = rs.into_iter();
 
-        let a = g.narrow_one_row(r10.clone(), true);
-        assert_eq!(a, vec![r10.clone()].into());
+        match rs.next().unwrap() {
+            Record::Positive(r) => {
+                assert_eq!(r[0], 1.into());
+                // Should be within 50 of true count w/ Pr >= 99.3%
+                println!("r[1]: {}", r[1]);
+                assert!(r[1] <= DataType::from(51.0));
+                assert!(r[1] >= DataType::from(-49.0));
+            }
+            _ => unreachable!(),
+        }
 
-        let a = g.narrow_one_row(r11.clone(), true);
-        assert_eq!(a, vec![r11.clone()].into());
+        let u: Record = vec![2.into(), 2.into()].into();
 
-        let a = g.narrow_one_row(r5.clone(), true);
-        assert_eq!(a.len(), 0);
+        // first row for a second group should emit +1 for that new group
+        let rs = c.narrow_one(u, true);
+        assert_eq!(rs.len(), 1);
+        let mut rs = rs.into_iter();
 
-        let a = g.narrow_one_row(r15.clone(), true);
-        assert_eq!(a.len(), 2);
-        assert!(a.iter().any(|r| r == &(r10.clone(), false).into()));
-        assert!(a.iter().any(|r| r == &(r15.clone(), true).into()));
+        match rs.next().unwrap() {
+            Record::Positive(r) => {
+                assert_eq!(r[0], 2.into());
+                // Should be within 50 of true count w/ Pr >= 99.3%
+                assert!(r[1] <= DataType::from(51.0));
+                assert!(r[1] >= DataType::from(-49.0));
+            }
+            _ => unreachable!(),
+        }
+        
+        let u: Record = vec![1.into(), 2.into()].into();
+
+        // second row for a group should emit -1 and +2
+        let rs = c.narrow_one(u, true);
+        assert_eq!(rs.len(), 2); // Why is rs.len = 2 for this record?
+        let mut rs = rs.into_iter();
+
+        match rs.next().unwrap() {
+            Record::Negative(r) => {
+                assert_eq!(r[0], 1.into());
+                assert_eq!(r[1], 1.into());
+            }
+            _ => unreachable!(),
+        }
+        match rs.next().unwrap() {
+            Record::Positive(r) => {
+                assert_eq!(r[0], 1.into());
+                assert_eq!(r[1], 2.into());
+            }
+            _ => unreachable!(),
+        }
+
+        let u = (vec![1.into(), 1.into()], false); // false indicates a negative record
+
+        // negative row for a group should emit -2 and +1
+        let rs = c.narrow_one_row(u, true);
+        assert_eq!(rs.len(), 2);
+        let mut rs = rs.into_iter();
+
+        match rs.next().unwrap() {
+            Record::Negative(r) => {
+                assert_eq!(r[0], 1.into());
+                assert_eq!(r[1], 2.into());
+            }
+            _ => unreachable!(),
+        }
+        match rs.next().unwrap() {
+            Record::Positive(r) => {
+                assert_eq!(r[0], 1.into());
+                assert_eq!(r[1], 1.into());
+            }
+            _ => unreachable!(),
+        }
+
+        let u = vec![
+            (vec![1.into(), 1.into()], false),
+            (vec![1.into(), 1.into()], true),
+            (vec![1.into(), 2.into()], true),
+            (vec![2.into(), 2.into()], false),
+            (vec![2.into(), 2.into()], true),
+            (vec![2.into(), 3.into()], true),
+            (vec![2.into(), 1.into()], true),
+            (vec![3.into(), 3.into()], true),
+        ];
+
+        // multiple positives and negatives should update aggregation value by appropriate amount
+        let rs = c.narrow_one(u, true);
+        assert_eq!(rs.len(), 5); // one - and one + for each group, except 3 which is new
+                                 // group 1 lost 1 and gained 2
+        assert!(rs.iter().any(|r| if let Record::Negative(ref r) = *r {
+            r[0] == 1.into() && r[1] == 1.into()
+        } else {
+            false
+        }));
+        assert!(rs.iter().any(|r| if let Record::Positive(ref r) = *r {
+            r[0] == 1.into() && r[1] == 2.into()
+        } else {
+            false
+        }));
+        // group 2 lost 1 and gained 3
+        assert!(rs.iter().any(|r| if let Record::Negative(ref r) = *r {
+            r[0] == 2.into() && r[1] == 1.into()
+        } else {
+            false
+        }));
+        assert!(rs.iter().any(|r| if let Record::Positive(ref r) = *r {
+            r[0] == 2.into() && r[1] == 3.into()
+        } else {
+            false
+        }));
+        // group 3 lost 0 and gained 1
+        assert!(rs.iter().any(|r| if let Record::Positive(ref r) = *r {
+            r[0] == 3.into() && r[1] == 1.into()
+        } else {
+            false
+        }));
     }
-
+    
     #[test]
     #[ignore]
     fn it_must_query() {
