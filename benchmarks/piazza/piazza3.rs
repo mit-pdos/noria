@@ -1,17 +1,19 @@
 #![feature(type_ascription)]
 #[macro_use]
 extern crate clap;
+extern crate distributary;
 #[macro_use]
 extern crate mysql;
 extern crate rand;
-use distributary::{
-    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
-};
+
 use mysql as my;
+use distributary::DataType;
 
 #[macro_use]
 mod populate;
+
 use crate::populate::{Populate, NANOS_PER_SEC};
+
 use std::time;
 
 struct Backend {
@@ -25,29 +27,24 @@ impl Backend {
         }
     }
 
-    pub fn read(&self, uid: i32) {
-        let qstring = format!("SELECT p_author FROM Post WHERE p_author={} GROUP BY p_author", uid);
-        self.pool.prep_exec(qstring, ()).unwrap();
+    pub fn read(&self, uid: i32) -> mysql::QueryResult {
+        let uid = uid.clone().into() : i32;
+         let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
+        self.pool.prep_exec(qstring, ()).unwrap()
     }
 
-    pub fn secure_read(&self, uid: i32, logged_uid: i32) {
+    pub fn secure_read(&self, uid: i32, logged_uid: i32) -> mysql::QueryResult {
         let qstring = format!(
-            "SELECT p_author, count(pid) FROM Post \
-                WHERE \
-                p_author = {} AND \
-                (
-                    (Post.p_private = 1 AND Post.p_author = {}) OR \
-                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
-                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
-                )  \
-                GROUP BY p_author",
-            uid,
-            logged_uid,
-            logged_uid,
-            logged_uid
+            "SELECT * FROM Post \
+               WHERE \
+               p_author = {} AND \
+               Post.p_private = 1 AND Post.p_author = {}\
+              ",
+           uid,
+           logged_uid,
         );
 
-        self.pool.prep_exec(qstring, ()).unwrap();
+        self.pool.prep_exec(qstring, ()).unwrap()
     }
 
     pub fn populate_tables(&self, pop: &mut Populate) {
@@ -99,6 +96,7 @@ impl Backend {
         let start = time::Instant::now();
         for mut stmt in self.pool.prepare(qstring).into_iter() {
             for params in params_arr.iter() {
+                // println!("params: {:?}", params);
                 stmt.execute(params).unwrap();
             }
         }
@@ -234,29 +232,45 @@ fn main() {
 
     // Do some reads without security
     let start = time::Instant::now();
+    let author = 0;
+    let mut num_rows = 0;
+
     for uid in 0..nusers {
-        backend.read(uid);
+        let res = backend.read(uid);
+        num_rows += 1;
+        // for row in res {
+        //     // println!("row: {:?}", row);
+        //     num_rows += 1;
+        // }
     }
 
     let dur = dur_to_fsec!(start.elapsed());
     println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers,
+        num_rows,
         dur,
-        (nusers) as f64 / dur
+        (num_rows) as f64 / dur
     );
 
     // Do some reads WITH security
-    let start = time::Instant::now();
+    let start2 = time::Instant::now();
+    let mut num_rows = 0;
+
     for uid in 0..nusers {
-        backend.secure_read(uid, 0);
+        let res = backend.secure_read(uid, 0);
+        num_rows += 1;
+        // for row in res {
+        //     // println!("row: {:?}", row);
+        //     num_rows += 1;
+        // }
     }
-    let dur = dur_to_fsec!(start.elapsed());
+
+    let dur2 = dur_to_fsec!(start2.elapsed());
     println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers,
-        dur,
-        (nusers) as f64 / dur
+        num_rows,
+        dur2,
+        num_rows as f64 / dur2
     );
 
 }

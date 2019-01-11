@@ -174,7 +174,7 @@ fn main() {
         ).arg(
             Arg::with_name("populate")
                 .long("populate")
-                .default_value("nopopulate")
+                .default_value("before")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         ).arg(
@@ -310,19 +310,18 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    // println!("here3");
-
     let mut num_keys = 0;
     if !partial {
         let mut dur = time::Duration::from_millis(0);
-        for uid in 0..nlogged {
-            let leaf = format!("post_count_u{}", uid);
-            let mut getter = backend.g.view(&leaf).unwrap();
-            let start = time::Instant::now();
-            let author = 0;
-            let res = getter.lookup(&[author.into()], true).unwrap();
-            num_keys += res.len();
-            dur += start.elapsed();
+        for _i in 0..10 {
+            for uid in 0..nlogged {
+                let leaf = format!("post_count_u{}", uid);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                let start = time::Instant::now();
+                let res = getter.lookup(&[uid.into()], true).unwrap();
+                dur += start.elapsed();
+                num_keys += 1;
+            }
         }
 
         let dur = dur_to_fsec!(dur);

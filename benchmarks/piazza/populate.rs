@@ -110,7 +110,7 @@ impl Populate {
     }
 
     pub fn get_posts(&mut self) -> Vec<Vec<DataType>> {
-        // // println!("Populating posts... with {:?}", self.nposts);
+        println!("Populating posts... with {:?}", self.nposts);
         let mut records = Vec::new();
         for i in 0..self.nposts {
             let pid = i.into();
@@ -119,7 +119,7 @@ impl Populate {
             let content = format!("post #{}", i).into();
             let private = self.private();
             let anon = 1.into();
-            records.push(vec![pid, cid, author, content, private, anon]);
+            records.push(vec![pid, author, cid, content, private, anon]);
         }
         // // println!("finished populating...");
 
@@ -127,13 +127,12 @@ impl Populate {
     }
 
     pub fn get_classes(&mut self) -> Vec<Vec<DataType>> {
-        // // println!("Populating classes...");
+        println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
             let cid = i.into();
             records.push(vec![cid]);
         }
-
         records
     }
 
