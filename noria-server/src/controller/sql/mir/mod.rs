@@ -735,7 +735,7 @@ impl SqlToMirConverter {
         // union. Unfortunately, we have to do it by name here because the nested queries in
         // compound SELECT rewrite the table name on their output columns.
         let mut selected_cols = HashSet::new();
-        for c in ucols {
+        for c in ucols.clone() {
             if ancestors
                 .iter()
                 .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name))
@@ -749,6 +749,8 @@ impl SqlToMirConverter {
                 );
             }
         }
+
+        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_cols);
         assert_eq!(
             num_ucols,
             selected_cols.len(),
@@ -804,17 +806,23 @@ impl SqlToMirConverter {
             .iter()
             .cloned()
             .collect();
+
         let num_ucols = ucols.len();
 
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
-        for c in ucols {
+
+        println!("ANCESTORS: {:#?}", ancestors);
+
+        for c in ucols.clone() {
             if ancestors
                 .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name))
+                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext")))
             {
-                selected_cols.insert(c.name.clone());
-                selected_col_objects.insert(c.clone());
+                if !c.clone().table.unwrap().contains("UserContext"){
+                    selected_cols.insert(c.name.clone());
+                    selected_col_objects.insert(c.clone());
+                }
             }
         }
 
@@ -838,9 +846,10 @@ impl SqlToMirConverter {
             }
         }
 
+        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_col_objects);
         assert_eq!(
             num_ucols,
-            selected_cols.len(),
+            selected_col_objects.len(),
             "union drops ancestor columns"
         );
 
@@ -1090,6 +1099,9 @@ impl SqlToMirConverter {
         right_node: MirNodeRef,
         kind: JoinType,
     ) -> MirNodeRef {
+
+        println!("Creating join node! left = {:#?}, right = {:#?}, kind: {:?}", left_node, right_node, kind);
+
         // TODO(malte): this is where we overproject join columns in order to increase reuse
         // opportunities. Technically, we need to only project those columns here that the query
         // actually needs; at a minimum, we could start with just the join colums, relying on the
@@ -1110,6 +1122,8 @@ impl SqlToMirConverter {
             .into_iter()
             .chain(projected_cols_right.into_iter())
             .collect::<Vec<Column>>();
+
+        println!("FIELDS: {:#?}", fields);
 
         // join columns need us to generate join group configs for the operator
         // TODO(malte): no multi-level joins yet
@@ -1136,6 +1150,7 @@ impl SqlToMirConverter {
             .into_iter()
             .filter_map(|mut f| {
                 if f == r_col {
+                    println!("DROPPING COL: {:#?}", f); 
                     // drop instances of right-side column
                     None
                 } else if f == l_col {

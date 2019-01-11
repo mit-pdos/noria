@@ -362,7 +362,7 @@ impl SqlIncorporator {
                 "Identified {} candidate QGs for reuse",
                 reuse_candidates.len()
             );
-            trace!(
+            info!(
                 self.log,
                 "This QG: {:#?}\nReuse candidates:\n{:#?}",
                 qg,
@@ -563,6 +563,7 @@ impl SqlIncorporator {
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
 
         // register local state
+        println!("add_query_via_mir");
         self.register_query(query_name, Some(qg), &mir, universe);
 
         Ok((qfp, mir))
@@ -714,7 +715,7 @@ impl SqlIncorporator {
             }
             let mq = self.mir_queries.get(&m).unwrap();
             let res = merge_mir_for_queries(&self.log, &reused_mir, &mq);
-            reused_mir = res.0;
+            reused_mir = res.clone().0;
             if res.1 > num_reused_nodes {
                 num_reused_nodes = res.1;
             }
@@ -742,6 +743,7 @@ impl SqlIncorporator {
             post_reuse_opt_mir.to_graphviz().unwrap()
         );
 
+        println!("table mappings: {:#?}", table_mapping);
         let qfp =
             mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig, table_mapping.as_ref());
 
@@ -751,6 +753,7 @@ impl SqlIncorporator {
         );
 
         // register local state
+        println!("extend existing query");
         self.register_query(query_name, Some(qg), &post_reuse_opt_mir, universe);
 
         Ok(qfp)

@@ -2,7 +2,12 @@
 	"policies": [
 		{
 			"table": "messages",
-			"predicate": "SELECT * FROM messages, UserContext WHERE UserContext.id = messages.author_user_id",
+			"predicate": "SELECT * FROM messages, UserContext WHERE messages.author_user_id = UserContext.id",
+			"description": "users can only view private messages which they either authored or received"
+		},
+		{
+			"table": "messages",
+			"predicate": "SELECT * FROM messages, UserContext WHERE messages.recipient_user_id = UserContext.id",
 			"description": "users can only view private messages which they either authored or received"
 		}
 	]
