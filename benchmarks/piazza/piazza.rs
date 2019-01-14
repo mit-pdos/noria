@@ -318,7 +318,7 @@ fn main() {
                 let leaf = format!("post_count_u{}", uid);
                 let mut getter = backend.g.view(&leaf).unwrap();
                 let start = time::Instant::now();
-                let res = getter.lookup(&[uid.into()], true).unwrap();
+                let res = getter.lookup(&[0.into()], true).unwrap();
                 dur += start.elapsed();
                 num_keys += 1;
             }
