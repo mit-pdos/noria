@@ -59,11 +59,9 @@ fn main() {
     //let mut awvc = blender.view("ArticleWithVoteCount").unwrap();
     let mut awtc = blender.view("ArticleWithTotalCount").unwrap();
 
-    println!("Creating article...");
     let aid = 1;
     // Make sure the article exists:
     if awtc.lookup(&[aid.into()], true).unwrap().is_empty() {
-        println!("Creating new article...");
         let title = "test title";
         let url = "http://pdos.csail.mit.edu";
         article
@@ -77,12 +75,10 @@ fn main() {
     vote.insert(vec![aid.into(), uid.into()]).unwrap();
 
     let uid2 = generate_time();
-    rating.insert(vec![aid.into(), uid2.into(), 2.into()]).unwrap();
+    rating.insert(vec![2.into(), uid2.into(), 2.into()]).unwrap();
 
-    println!("Finished writing! Let's wait for things to propagate...");
     thread::sleep(Duration::from_millis(1000));
 
-    println!("Reading...");
     println!("{:#?}", awtc.lookup(&[aid.into()], true))
 }
 
