@@ -91,6 +91,7 @@ impl Multiverse for SqlIncorporator {
                 group_name.to_string(),
                 universe.id.to_string()
             );
+            println!("group name: {:?}, uc name: {}", group_name, uc_name); 
 
             (uc_name, config.get_group_policies(group_name.to_string()))
         };
