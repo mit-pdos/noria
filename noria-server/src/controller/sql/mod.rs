@@ -540,12 +540,13 @@ impl SqlIncorporator {
             is_leaf,
             universe.clone(),
         )?;
-
+        println!("Here 1");
         trace!(self.log, "Unoptimized MIR:\n{}", og_mir.to_graphviz().unwrap());
 
         // run MIR-level optimizations
         let mut mir = og_mir.optimize(table_mapping.as_ref(), sec);
 
+        println!("Here 2");
         trace!(self.log, "Optimized MIR:\n{}", mir.to_graphviz().unwrap());
 
         if sec {
@@ -803,7 +804,7 @@ impl SqlIncorporator {
             match sq {
                 Subquery::InComparison(cond_base) => {
                     let (sq, column) = query_from_condition_base(&cond_base);
-
+                    println!("here 9");
                     let qfp = self
                         .add_parsed_query(sq, None, false, mig)
                         .expect("failed to add subquery");
@@ -812,6 +813,7 @@ impl SqlIncorporator {
                 Subquery::InJoin(join_right_side) => {
                     *join_right_side = match *join_right_side {
                         JoinRightSide::NestedSelect(box ref ns, ref alias) => {
+                            println!("here 10");
                             let qfp = self
                                 .add_parsed_query(
                                     SqlQuery::Select(ns.clone()),

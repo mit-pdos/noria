@@ -483,6 +483,7 @@ impl SqlToMirConverter {
         ),
         String,
     > {
+        println!("HERE");
         let (sec, nodes, table_mapping, base_name) =
             self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe)?;
         let mut roots = Vec::new();
@@ -505,6 +506,8 @@ impl SqlToMirConverter {
                 leaves.push(mn);
             }
         }
+
+        println!("after node iter");
         assert_eq!(
             leaves.len(),
             1,
@@ -1150,7 +1153,7 @@ impl SqlToMirConverter {
             .into_iter()
             .filter_map(|mut f| {
                 if f == r_col {
-                    println!("DROPPING COL: {:#?}", f); 
+                    println!("DROPPING COL: {:#?}", f);
                     // drop instances of right-side column
                     None
                 } else if f == l_col {
@@ -1380,6 +1383,7 @@ impl SqlToMirConverter {
             ComparisonOp(ref ct) => {
                 // currently, we only support filter-like
                 // comparison operations, no nested-selections
+                println!("comp op");
                 let f = self.make_filter_node(&format!("{}_f{}", name, nc), parent, ct);
 
                 pred_nodes.push(f);
@@ -1520,6 +1524,7 @@ impl SqlToMirConverter {
         // Canonical operator order: B-J-G-F-P-R
         // (Base, Join, GroupBy, Filter, Project, Reader)
         {
+            println!("making canonical");
             let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
 
             // 0. Base nodes (always reused)
@@ -1601,6 +1606,7 @@ impl SqlToMirConverter {
             new_node_count += predicates_above_group_by_nodes.len();
 
             // 3. Create security boundary
+            println!("making sec bound");
             use crate::controller::sql::mir::security::SecurityBoundary;
             let (last_policy_nodes, policy_nodes) = self.make_security_boundary(
                 universe.clone(),
@@ -1977,6 +1983,7 @@ impl SqlToMirConverter {
                 "Added final MIR node for query named \"{}\"", name
             );
         }
+        println!("MADE NEW NODES: {:#?}", nodes_added);
         // finally, we output all the nodes we generated
         Ok((sec_round, nodes_added, table_mapping, union_base_name))
     }

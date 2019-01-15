@@ -37,6 +37,8 @@ impl Handle {
             Handle::Single(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
+
+                 // h.meta_get_and(key, then)
             }
             Handle::Double(ref h) => {
                 assert_eq!(key.len(), 2);

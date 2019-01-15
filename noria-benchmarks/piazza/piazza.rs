@@ -131,21 +131,21 @@ fn main() {
             Arg::with_name("schema")
                 .short("s")
                 .required(true)
-                .default_value("benchmarks/piazza/schema.sql")
+                .default_value("noria-benchmarks/piazza/schema.sql")
                 .help("Schema file for Piazza application"),
         )
         .arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("benchmarks/piazza/post-queries.sql")
+                .default_value("noria-benchmarks/piazza/post-queries.sql")
                 .help("Query file for Piazza application"),
         )
         .arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/piazza/complex-policies.json")
+                .default_value("noria-benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
@@ -180,7 +180,7 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
-                .default_value("nopopulate")
+                .default_value("before")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         )
@@ -322,12 +322,18 @@ fn main() {
 
     if !partial {
         let mut dur = time::Duration::from_millis(0);
+        let mut uids = Vec::new();
+        let num_at_once = 1000;
+        for uid in 0..num_at_once {
+            uids.push(DataType::Int(uid));
+        }
+
         for uid in 0..nlogged {
             let leaf = format!("posts_u{}", uid);
             let mut getter = backend.g.view(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
-                getter.lookup(&[author.into()], true).unwrap();
+                let res = getter.multi_lookup([uids.clone()].to_vec(), true);
             }
             dur += start.elapsed();
         }
@@ -336,9 +342,9 @@ fn main() {
 
         println!(
             "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            nlogged * nusers,
+            num_at_once * nlogged * nusers,
             dur,
-            (nlogged * nusers) as f64 / dur,
+            (num_at_once * nlogged * nusers) as f64 / dur,
         );
     }
 

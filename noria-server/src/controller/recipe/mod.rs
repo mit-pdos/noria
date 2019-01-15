@@ -329,7 +329,7 @@ impl Recipe {
             };
 
             let is_leaf = if group.is_some() { false } else { is_leaf };
-
+            println!("here 5");
             let qfp = self
                 .inc
                 .as_mut()
@@ -392,6 +392,7 @@ impl Recipe {
                     "Creating membership view for group {}",
                     group.name()
                 );
+                println!("here 6");
                 let qfp = self.inc.as_mut().unwrap().add_parsed_query(
                     group.membership(),
                     Some(group.name()),
@@ -424,6 +425,7 @@ impl Recipe {
             let (n, q, is_leaf) = self.expressions[&qid].clone();
 
             // add the query
+            println!("here 7");
             let qfp = self
                 .inc
                 .as_mut()

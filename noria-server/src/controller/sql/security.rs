@@ -106,6 +106,7 @@ impl Multiverse for SqlIncorporator {
         let mut row_policies_qg: HashMap<String, Vec<QueryGraph>> = HashMap::new();
         for policy in universe_policies {
             if !policy.is_row_policy() {
+                println!("here 3");
                 let qfp = self
                     .add_parsed_query(policy.predicate(), None, false, mig)
                     .unwrap();
@@ -180,7 +181,7 @@ impl Multiverse for SqlIncorporator {
         s.push_str(") ENGINE=MyISAM DEFAULT CHARSET=utf8;");
 
         let parsed_query = sql_parser::parse_query(&s).unwrap();
-
+        println!("here 8");
         self.add_parsed_query(parsed_query, Some(name), false, mig)
             .unwrap()
     }

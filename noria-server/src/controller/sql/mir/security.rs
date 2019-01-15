@@ -212,6 +212,7 @@ fn make_security_nodes(
             assert!(*rel != "computed_columns");
             let mut any_added = false;
             for pred in &qgn.predicates {
+                println!("h1");
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
                     prev_node.expect("empty previous node"),
@@ -230,24 +231,25 @@ fn make_security_nodes(
                 any_added = true;
             }
 
-            for pred in &qgn.predicates {
-                let new_nodes = mir_converter.make_predicate_nodes(
-                    &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
-                    prev_node.expect("empty previous node"),
-                    pred,
-                    0,
-                );
-
-                prev_node = Some(
-                    new_nodes
-                        .iter()
-                        .last()
-                        .expect("no new nodes were created")
-                        .clone(),
-                );
-                filter_nodes.extend(new_nodes);
-                any_added = true;
-            }
+            // for pred in &qgn.predicates {
+            //     println!("h2");
+            //     let new_nodes = mir_converter.make_predicate_nodes(
+            //         &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
+            //         prev_node.expect("empty previous node"),
+            //         pred,
+            //         0,
+            //     );
+            //
+            //     prev_node = Some(
+            //         new_nodes
+            //             .iter()
+            //             .last()
+            //             .expect("no new nodes were created")
+            //             .clone(),
+            //     );
+            //     filter_nodes.extend(new_nodes);
+            //     any_added = true;
+            // }
 
             // update local node relations so joins know which views to join
             if any_added {
