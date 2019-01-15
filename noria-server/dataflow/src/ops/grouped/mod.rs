@@ -199,7 +199,7 @@ where
                  group_rs: ::std::vec::Drain<Record>,
                  mut diffs: ::std::vec::Drain<_>| {
                     let mut group_rs = group_rs.peekable();
-
+                    
                     let mut group = Vec::with_capacity(group_by.len() + 1);
                     {
                         let group_r = group_rs.peek().unwrap();
@@ -214,7 +214,7 @@ where
                             }
                         }
                     }
-
+                    
                     let rs = {
                         match db.lookup(&out_key[..], &KeyType::from(&group[..])) {
                             LookupResult::Some(rs) => {
