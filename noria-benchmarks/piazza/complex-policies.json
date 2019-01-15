@@ -6,7 +6,7 @@
             "policies": [
                 {
                     "table": "Post",
-                    "predicate": "WHERE Post.p_private = 1 and GroupContext.id = p_cid",
+                    "predicate": "SELECT * FROM Post, GroupContext WHERE Post.p_private = 1 and GroupContext.id = p_cid",
                     "description": "tas are allowed to see private posts from classes they ta"
                 }
             ]
@@ -17,7 +17,7 @@
             "policies": [
                 {
                     "table": "Post",
-                    "predicate": "WHERE Post.p_private = 0 and GroupContext.id = p_cid",
+                    "predicate": "SELECT * FROM Post, GroupContext WHERE Post.p_private = 0 and GroupContext.id = p_cid",
                     "description": "students are allowed to see public posts from classes they are enrolled in"
                 }
             ]
@@ -26,7 +26,7 @@
     "policies": [
         {
             "table": "Post",
-            "predicate": "WHERE Post.p_private = 1 AND UserContext.id = Post.p_author",
+            "predicate": "SELECT * FROM Post, UserContext WHERE Post.p_private = 1 AND UserContext.id = Post.p_author",
             "description": "users are allowed to see their private posts they authored"
         }
     ]

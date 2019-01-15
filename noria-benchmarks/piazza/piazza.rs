@@ -145,7 +145,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/basic-policies.json")
+                .default_value("noria-benchmarks/piazza/complex-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(

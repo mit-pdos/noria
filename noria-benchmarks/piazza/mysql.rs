@@ -11,7 +11,7 @@ use noria::DataType;
 
 #[macro_use]
 mod populate;
-use populate::{Populate, NANOS_PER_SEC};
+use crate::populate::{Populate, NANOS_PER_SEC};
 use std::time;
 
 struct Backend {
@@ -25,26 +25,47 @@ impl Backend {
         }
     }
 
+    // pub fn read(&self, uid: i32) {
+    //     let qstring = format!("SELECT p_author, COUNT(p_id) FROM Post WHERE p_author={} GROUP BY p_author", uid);
+    //     self.pool.prep_exec(qstring, ()).unwrap();
+    // }
+    //
+    // pub fn secure_read(&self, uid: i32, logged_uid: i32) {
+    //     let qstring = format!(
+    //         "SELECT p_author, count(p_id) FROM Post \
+    //             WHERE \
+    //             p_author = {} AND \
+    //             (
+    //                 (Post.p_private = 1 AND Post.p_author = {}) OR \
+    //                 (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
+    //                 (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+    //             ) \
+    //             GROUP BY p_author",
+    //         uid,
+    //         logged_uid,
+    //         logged_uid,
+    //         logged_uid
+    //     );
+    //
+    //     self.pool.prep_exec(qstring, ()).unwrap();
+    // }
+
     pub fn read(&self, uid: i32) {
-        let qstring = format!("SELECT p_author, COUNT(p_id) FROM Post WHERE p_author={} GROUP BY p_author", uid);
+        let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
         self.pool.prep_exec(qstring, ()).unwrap();
     }
 
     pub fn secure_read(&self, uid: i32, logged_uid: i32) {
         let qstring = format!(
-            "SELECT p_author, count(p_id) FROM Post \
+            "SELECT * FROM Post \
                 WHERE \
                 p_author = {} AND \
                 (
                     (Post.p_private = 1 AND Post.p_author = {}) OR \
-                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
-                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
-                ) \
-                GROUP BY p_author",
+                    (Post.p_private = 0) \
+                )",
             uid,
             logged_uid,
-            logged_uid,
-            logged_uid
         );
 
         self.pool.prep_exec(qstring, ()).unwrap();
@@ -234,29 +255,33 @@ fn main() {
 
     // Do some reads without security
     let start = time::Instant::now();
-    for uid in 0..nusers {
-        backend.read(uid);
+    for i in 0..1000 {
+        for uid in 0..nusers {
+            backend.read(uid);
+        }
     }
 
     let dur = dur_to_fsec!(start.elapsed());
     println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers,
+        nusers * 1000,
         dur,
-        (nusers) as f64 / dur
+        (nusers * 1000) as f64 / dur
     );
 
     // Do some reads WITH security
     let start = time::Instant::now();
-    for uid in 0..nusers {
-        backend.secure_read(uid, 0);
+    for i in 0..1000 {
+        for uid in 0..nusers {
+            backend.secure_read(uid, 0);
+        }
     }
     let dur = dur_to_fsec!(start.elapsed());
     println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers,
+        nusers * 1000,
         dur,
-        (nusers) as f64 / dur
+        (nusers * 1000) as f64 / dur
     );
 
 }
