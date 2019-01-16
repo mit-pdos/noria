@@ -133,6 +133,7 @@ impl SqlToMirConverter {
     /// security policies and therefore different nodes that are not
     /// represent in the the query graph
     pub fn set_universe(&mut self, universe: Universe) {
+        println!("SETTING UNIVERSE TO : {:#?}", universe);
         self.universe = universe;
     }
 
@@ -741,9 +742,11 @@ impl SqlToMirConverter {
         for c in ucols.clone() {
             if ancestors
                 .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name))
+                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext") && !ac.clone().table.unwrap().contains("GroupContext")))
             {
-                selected_cols.insert(c.name.clone());
+                if !c.clone().table.unwrap().contains("UserContext") || !c.clone().table.unwrap().contains("GroupContext") {
+                    selected_cols.insert(c.name.clone());
+                }
             } else {
                 panic!(
                     "column with name '{}' not found all union ancestors: all ancestors' \
@@ -820,11 +823,13 @@ impl SqlToMirConverter {
         for c in ucols.clone() {
             if ancestors
                 .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext")))
+                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext") && !ac.clone().table.unwrap().contains("GroupContext")))
             {
-                if !c.clone().table.unwrap().contains("UserContext"){
+                if !c.clone().table.unwrap().contains("UserContext") || !c.clone().table.unwrap().contains("GroupContext") {
                     selected_cols.insert(c.name.clone());
                     selected_col_objects.insert(c.clone());
+                } else {
+                    println!("forgoing {:#?}", c.clone());
                 }
             }
         }
@@ -1614,6 +1619,8 @@ impl SqlToMirConverter {
                 prev_node.clone(),
             )?;
 
+            println!("Member of: {:#?}", self.universe.member_of);
+
             let mut ancestors = self.universe.member_of.iter().fold(
                 Ok(vec![]),
                 |acc: Result<_, String>, (gname, gids)| {
@@ -1637,13 +1644,15 @@ impl SqlToMirConverter {
                                 }
                             })
                             .collect();
-
+                        println!("Group views: {:#?}", group_views);
                         trace!(&self.log, "group views {:?}", group_views);
                         acc.extend(group_views?);
                         Ok(acc)
                     })
                 },
             )?;
+
+            println!("ancestors after creation: {:#?}", ancestors);
 
             nodes_added = base_nodes
                 .into_iter()
@@ -1851,7 +1860,7 @@ impl SqlToMirConverter {
             let final_node_cols: Vec<Column> =
                 final_node.borrow().columns().iter().cloned().collect();
             // 8. Generate leaf views that expose the query result
-            let mut projected_columns: Vec<Column> = if universe.1.is_none() {
+            let mut projected_columns: Vec<Column> =
                 qg.columns
                     .iter()
                     .filter_map(|oc| match *oc {
@@ -1859,14 +1868,14 @@ impl SqlToMirConverter {
                         OutputColumn::Data(ref c) => Some(Column::from(c)),
                         OutputColumn::Literal(_) => None,
                     })
-                    .collect()
-            } else {
-                // If we are creating a query for a group universe, we project
-                // all columns in the final node. When a user universe that
-                // belongs to this group, the proper projection and leaf node
-                // will be added.
-                final_node_cols.iter().cloned().collect()
-            };
+                    .collect();
+            // } else {
+            //     // If we are creating a query for a group universe, we project
+            //     // all columns in the final node. When a user universe that
+            //     // belongs to this group, the proper projection and leaf node
+            //     // will be added.
+            //     final_node_cols.iter().cloned().collect()
+            // };
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);

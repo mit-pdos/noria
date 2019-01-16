@@ -628,6 +628,8 @@ pub(crate) fn make_join_node(
         rest
     );
 
+    println!("PROJECTING COLS: L {:#?}  R {:#?}", projected_cols_left, projected_cols_right); 
+
     assert_eq!(
         projected_cols_left.len() + projected_cols_right.len(),
         proj_cols.len()

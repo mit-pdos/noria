@@ -143,6 +143,7 @@ impl SqlIncorporator {
         is_leaf: bool,
         mig: &mut Migration,
     ) -> Result<QueryFlowParts, String> {
+        println!("closer");
         match name {
             None => self.nodes_for_query(query, is_leaf, mig),
             Some(n) => self.nodes_for_named_query(query, n, is_leaf, mig),
@@ -412,7 +413,7 @@ impl SqlIncorporator {
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`.
         // Note that we don't need to optimize the MIR here, because the query is trivial.
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
-
+        println!("hi1");
         self.register_query(query_name, None, &mir, mig.universe());
 
         qfp
@@ -444,6 +445,7 @@ impl SqlIncorporator {
             unimplemented!();
         }
 
+        println!("hi2");
         self.register_query(query_name, None, &mir, mig.universe());
 
         qfp
@@ -477,6 +479,7 @@ impl SqlIncorporator {
             is_leaf,
         );
 
+        println!("hi3");
         let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig, None);
 
         self.register_query(query_name, None, &combined_mir_query, mig.universe());
@@ -560,6 +563,7 @@ impl SqlIncorporator {
             }
         }
 
+        println!("hi4");
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
 
@@ -656,7 +660,7 @@ impl SqlIncorporator {
         // TODO(malte): get rid of duplication and figure out where to track this state
         debug!(self.log, "registering query \"{}\"", query_name);
         self.view_schemas.insert(String::from(query_name), fields);
-
+        println!("after view schemas");
         // We made a new query, so store the query graph and the corresponding leaf MIR node.
         // TODO(malte): we currently store nothing if there is no QG (e.g., for compound queries).
         // This means we cannot reuse these queries.
@@ -778,7 +782,7 @@ impl SqlIncorporator {
     /// Runs some standard rewrite passes on the query.
     fn rewrite_query(&mut self, q: SqlQuery, mig: &mut Migration) -> Result<SqlQuery, String> {
         // TODO: make this not take &mut self
-
+        println!("Q: {:?}", q);
         use crate::controller::sql::passes::alias_removal::AliasRemoval;
         use crate::controller::sql::passes::count_star_rewrite::CountStarRewrite;
         use crate::controller::sql::passes::implied_tables::ImpliedTableExpansion;
@@ -849,8 +853,9 @@ impl SqlIncorporator {
             | ref q @ SqlQuery::Delete(_)
             | ref q @ SqlQuery::DropTable(_)
             | ref q @ SqlQuery::Insert(_) => {
+                println!("q.ref tabl {:#?}, view schemas {:#?}", q.referred_tables(), self.view_schemas);
                 for t in &q.referred_tables() {
-                    if !self.view_schemas.contains_key(&t.name) && t.name != "UserContext" {
+                    if !self.view_schemas.contains_key(&t.name) && t.name != "UserContext" && t.name != "GroupContext" {
                         return Err(format!("query refers to unknown table \"{}\"", t.name));
                     }
                 }
@@ -913,6 +918,7 @@ impl SqlIncorporator {
             ref q @ _ => panic!("unhandled query type in recipe: {:?}", q),
         };
 
+        println!("made it");
         // record info about query
         self.leaf_addresses
             .insert(String::from(query_name.as_str()), qfp.query_leaf);

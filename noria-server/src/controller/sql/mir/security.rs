@@ -190,7 +190,7 @@ fn make_security_nodes(
                 println!("COMPUTED COl");
                 continue;
             }
-            if local_node_for_rel.contains_key(*rel) && !rel.contains("UserContext") {
+            if local_node_for_rel.contains_key(*rel) && !rel.contains("UserContext") && !rel.contains("GroupContext") {
                 local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
                 continue;
             }

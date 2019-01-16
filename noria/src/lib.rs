@@ -101,7 +101,6 @@
 #![feature(try_from)]
 #![feature(allow_fail)]
 #![feature(bufreader_buffer)]
-#![deny(missing_docs)]
 #![deny(unused_extern_crates)]
 
 #[macro_use]

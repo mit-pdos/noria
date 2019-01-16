@@ -294,6 +294,11 @@ fn main() {
 
     // Login a user
     println!("Login in users...");
+
+    let graph_fname = gloc.unwrap();
+    let mut gf = File::create(graph_fname).unwrap();
+    assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
+    
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();

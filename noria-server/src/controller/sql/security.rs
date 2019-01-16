@@ -63,9 +63,8 @@ impl Multiverse for SqlIncorporator {
         mig: &mut Migration,
     ) -> Result<Vec<QueryFlowParts>, String> {
         let mut qfps = Vec::new();
-
+        println!("Universe groups: {:#?}", universe_groups); 
         self.mir_converter.clear_universe();
-        println!("config: {:#?}, universe_groups: {:#?}", config, universe_groups); 
         let (id, group) = mig.universe();
         let mut universe = Universe {
             id: id.clone(),
@@ -104,6 +103,7 @@ impl Multiverse for SqlIncorporator {
         // because predicates can have nested subqueries, which will trigger
         // a view creation and these views might be unique to each universe
         // e.g. if they reference UserContext.
+        println!("BACK ");
         let mut row_policies_qg: HashMap<String, Vec<QueryGraph>> = HashMap::new();
         for policy in universe_policies {
             if !policy.is_row_policy() {
@@ -127,7 +127,6 @@ impl Multiverse for SqlIncorporator {
                 qfps.push(qfp);
                 continue;
             }
-
             trace!(self.log, "Adding row policy {:?}", policy.name());
             let predicate = self.rewrite_query(policy.predicate(), mig)?;
             let st = match predicate {
@@ -144,6 +143,7 @@ impl Multiverse for SqlIncorporator {
                 Err(e) => panic!(e),
             };
 
+            println!("hereeeeee3");
             let e = row_policies_qg
                 .entry(policy.table().clone())
                 .or_insert_with(Vec::new);
@@ -155,6 +155,7 @@ impl Multiverse for SqlIncorporator {
         let e = self.universes.entry(group.clone()).or_insert_with(Vec::new);
         e.push((id, group));
 
+        println!("back 2");
         self.mir_converter.set_universe(universe);
 
         Ok(qfps)

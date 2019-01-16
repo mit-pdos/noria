@@ -20,13 +20,15 @@ use petgraph;
 use petgraph::visit::Bfs;
 use slog;
 use slog::Logger;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{cell, io, thread, time};
 use tokio::prelude::*;
+use std::iter::FromIterator;
+
 
 /// `Controller` is the core component of the alternate Soup implementation.
 ///
@@ -955,6 +957,8 @@ impl ControllerInner {
 
         let mut universe_groups = HashMap::new();
 
+        println!("UNIV GROUPS: {:#?}", groups);
+
         let uid = context
             .get("id")
             .expect("Universe context must have id")
@@ -962,17 +966,28 @@ impl ControllerInner {
         let uid = &[uid];
         if context.get("group").is_none() {
             for g in groups {
+                println!("G: {:?}", g);
                 let rgb: Option<ViewBuilder> = self.view_builder(&g);
                 let mut view = rgb.map(|rgb| rgb.build_exclusive().unwrap()).unwrap();
-                let my_groups: Vec<DataType> = view
+                let mygroups: Vec<Vec<DataType>> = view
+                    .lookup(uid, true)
+                    .unwrap();
+
+                println!("PRIOR: {:#?}", mygroups);
+
+                let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
                     .iter()
                     .map(|v| v[1].clone())
                     .collect();
+
+
+                println!("my groups: {:#?}", my_groups);
                 universe_groups.insert(g, my_groups);
             }
         }
+        println!("Universe gorups 2 : {:#?}", universe_groups);
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
