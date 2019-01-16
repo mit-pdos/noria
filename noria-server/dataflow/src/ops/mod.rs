@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-
 use prelude::*;
 
 pub mod distinct;

@@ -273,6 +273,7 @@ pub struct DpAggregator {
 
     // precomputed datastructures
     group_by: Vec<usize>,
+//    group: Vec<usize>,
     // TODO: need out_key & colfix? (from GroupedOperator)
     out_key: Vec<usize>,
     colfix: Vec<usize>,
@@ -301,6 +302,7 @@ impl DpAggregator {
             us: None,
             cols: 0,
             group_by: group_by.into(),
+//            group: group_by.into(),
             out_key: Vec::new(),
             colfix: Vec::new(),
             over: over,
@@ -342,6 +344,7 @@ impl Ingredient for DpAggregator {
             us: self.us,
             cols: self.cols,
 
+//            group: self.group.clone(),
             group_by: self.group_by.clone(),
             out_key: self.out_key.clone(),
             colfix: self.colfix.clone(),
@@ -365,9 +368,13 @@ impl Ingredient for DpAggregator {
         self.setup(srcn);
 
         // group by all columns
+        println!("fields: {:?}", srcn.fields());
         self.cols = srcn.fields().len();
-//        self.group_by.extend(&self.group_by[..].iter().cloned()); // TODO: should this line even stay?
+//        println!("group_by before extending: {:?}", self.group_by);
+//        let tmp: &[usize] = &self.group[..];
+//        self.group_by.extend(tmp.iter().cloned()); // TODO: should this line even stay?
         self.group_by.sort();
+//        println!("group_by after extending: {:?}", self.group_by);
         // cache the range of our output keys 
         // TODO: does dp counter need this?
         self.out_key = (0..self.group_by.len()).collect();
@@ -393,9 +400,9 @@ impl Ingredient for DpAggregator {
     fn on_commit(&mut self, us: NodeIndex, remap: &HashMap<NodeIndex, IndexPair>) {
         // who's our parent really?
         self.src.remap(remap);
-
         // who are we?
         self.us = Some(remap[&us]);
+        println!("on_commit over");
     }
 
     // IMPL is copied from grouped/mod.rs
@@ -437,6 +444,7 @@ impl Ingredient for DpAggregator {
         let db = state
             .get(*us)
             .expect("grouped operators must have their own state materialized");
+        println!("cols: {:?}", self.cols);
         let mut misses = Vec::new();
         let mut out = Vec::new();
         {
@@ -500,7 +508,7 @@ impl Ingredient for DpAggregator {
                             }
                         }
                     }
-                    println!("group_rs: {:?}; group: {:?}; batch size: {}", group_rs, group, group_rs.len());
+                    println!("group_rs: {:?}; group: {:?}; batch size: {}; out_key: {:?}", group_rs, group, group_rs.len(), out_key);
                     let rs = {
                         match db.lookup(&out_key[..], &KeyType::from(&group[..])) {
                             LookupResult::Some(rs) => {
@@ -544,6 +552,7 @@ impl Ingredient for DpAggregator {
                             // emit positive, which is group + new.
                             let mut rec = group;
                             rec.push(new);
+                            println!("Output record: {:?}", rec);
                             out.push(Record::Positive(rec));
                         }
                     }
@@ -669,7 +678,7 @@ mod tests {
         g.set_op(
             "dp_aggregator",
             &["x", "ys"],
-            DpAggregator::new(s.as_global(), 1, &[0], 10000000.0), // epsilon = 1e7
+            DpAggregator::new(s.as_global(), 0, &[1], 10000000.0), // epsilon = 1e7
                                                                    // close to 0 noise.
             true, // requires materialization
         );
@@ -680,7 +689,7 @@ mod tests {
     fn it_forwards_monotonic() {
         let (mut c, _) = setup(true);
         
-        let u: Record = vec![1.into(), 1.into()].into();
+        let u: Record = vec![2.into(), 1.into()].into();
 
         // first row for a group should emit +1 for that group
         let rs = c.narrow_one(u, true);

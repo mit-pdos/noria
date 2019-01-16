@@ -528,7 +528,8 @@ pub(crate) fn make_grouped_node(
         GroupedNodeType::Aggregation(agg) => mig.add_ingredient(
             String::from(name),
             column_names.as_slice(),
-            agg.over(parent_na, over_col_indx, group_col_indx.as_slice()),
+            ops::dp_counter::DpAggregator::new(parent_na, over_col_indx, group_col_indx.as_slice(), 1000000.0),
+//            agg.over(parent_na, over_col_indx, group_col_indx.as_slice()),
         ),
         GroupedNodeType::Extremum(extr) => mig.add_ingredient(
             String::from(name),

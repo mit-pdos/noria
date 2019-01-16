@@ -21,7 +21,8 @@ fn main() {
                             WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
     let persistence_params = noria_server::PersistenceParameters::new(
-        noria_server::DurabilityMode::Permanent,
+        //        noria_server::DurabilityMode::Permanent,
+        noria_server::DurabilityMode::DeleteOnExit,
         Duration::from_millis(1),
         Some(String::from("example")),
         1,
@@ -66,7 +67,7 @@ fn main() {
     vote.insert(vec![aid.into(), uid.into()]).unwrap();
 
     println!("Finished writing! Let's wait for things to propagate...");
-    thread::sleep(Duration::from_millis(1000000));
+//    thread::sleep(Duration::from_millis(1000000));
 
     println!("Reading...");
     println!("{:#?}", awvc.lookup(&[aid.into()], true))

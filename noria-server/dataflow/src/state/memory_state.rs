@@ -28,14 +28,17 @@ impl SizeOf for MemoryState {
 
 impl State for MemoryState {
     fn add_key(&mut self, columns: &[usize], partial: Option<Vec<Tag>>) {
+        println!("add_key calling state_for");
         let (i, exists) = if let Some(i) = self.state_for(columns) {
             // already keyed by this key; just adding tags
+            println!("already keyed by this key: {}", i);
             (i, true)
         } else {
             // will eventually be assigned
+            println!("will eventually be assigned: {}", self.state.len());
             (self.state.len(), false)
         };
-
+        
         if let Some(ref p) = partial {
             for &tag in p {
                 self.by_tag.insert(tag, i);
@@ -129,6 +132,7 @@ impl State for MemoryState {
 
     fn lookup<'a>(&'a self, columns: &[usize], key: &KeyType) -> LookupResult<'a> {
         debug_assert!(!self.state.is_empty(), "lookup on uninitialized index");
+        println!("lookup calling state_for");
         let index = self
             .state_for(columns)
             .expect("lookup on non-indexed column set");
@@ -172,6 +176,8 @@ impl MemoryState {
     /// Returns the index in `self.state` of the index keyed on `cols`, or None if no such index
     /// exists.
     fn state_for(&self, cols: &[usize]) -> Option<usize> {
+        println!("State: {:#?}", self.state.iter().map(|s| s.key()).collect::<Vec<_>>());
+        println!("Cols: {:#?}", cols);
         self.state.iter().position(|s| s.key() == cols)
     }
 

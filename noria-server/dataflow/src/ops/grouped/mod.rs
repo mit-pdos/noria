@@ -122,11 +122,13 @@ where
         
         // group by all columns
         self.cols = srcn.fields().len();
+        println!("group_by before extending: {:?}", self.group_by);
         self.group_by.extend(self.inner.group_by().iter().cloned());
         self.group_by.sort();
+        println!("group_by after extending: {:?}", self.group_by);
         // cache the range of our output keys
         self.out_key = (0..self.group_by.len()).collect();
-
+        
         // build a translation mechanism for going from output columns to input columns
         let colfix: Vec<_> = (0..self.cols)
             .into_iter()
@@ -150,6 +152,7 @@ where
 
         // who are we?
         self.us = Some(remap[&us]);
+        println!("on_commit over");
     }
 
     fn on_input(
@@ -178,7 +181,7 @@ where
                 .map(|&col| &a[col])
                 .cmp(group_by.iter().map(|&col| &b[col]))
         };
-
+        println!("cols: {:?}", self.cols);
         // First, we want to be smart about multiple added/removed rows with same group.
         // For example, if we get a -, then a +, for the same group, we don't want to
         // execute two queries. We'll do this by sorting the batch by our group by.
@@ -194,6 +197,7 @@ where
         let mut out = Vec::new();
         {
             let out_key = &self.out_key;
+            println!("out_key: {:?}", out_key);
             let mut handle_group =
                 |inner: &mut T,
                  group_rs: ::std::vec::Drain<Record>,
@@ -214,7 +218,7 @@ where
                             }
                         }
                     }
-                    
+                    println!("group_rs: {:?}; group: {:?}", group_rs, group);
                     let rs = {
                         match db.lookup(&out_key[..], &KeyType::from(&group[..])) {
                             LookupResult::Some(rs) => {

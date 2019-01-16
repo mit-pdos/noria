@@ -150,7 +150,7 @@ mod tests {
         g.set_op(
             "identity",
             &["x", "ys"],
-            Aggregation::COUNT.over(s.as_global(), 1, &[0]),
+            Aggregation::COUNT.over(s.as_global(), 0, &[1]),
             mat,
         );
         g
