@@ -25,31 +25,6 @@ impl Backend {
         }
     }
 
-    // pub fn read(&self, uid: i32) {
-    //     let qstring = format!("SELECT p_author, COUNT(p_id) FROM Post WHERE p_author={} GROUP BY p_author", uid);
-    //     self.pool.prep_exec(qstring, ()).unwrap();
-    // }
-    //
-    // pub fn secure_read(&self, uid: i32, logged_uid: i32) {
-    //     let qstring = format!(
-    //         "SELECT p_author, count(p_id) FROM Post \
-    //             WHERE \
-    //             p_author = {} AND \
-    //             (
-    //                 (Post.p_private = 1 AND Post.p_author = {}) OR \
-    //                 (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
-    //                 (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
-    //             ) \
-    //             GROUP BY p_author",
-    //         uid,
-    //         logged_uid,
-    //         logged_uid,
-    //         logged_uid
-    //     );
-    //
-    //     self.pool.prep_exec(qstring, ()).unwrap();
-    // }
-
     pub fn read(&self, uid: i32) {
         let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
         self.pool.prep_exec(qstring, ()).unwrap();
@@ -62,14 +37,38 @@ impl Backend {
                 p_author = {} AND \
                 (
                     (Post.p_private = 1 AND Post.p_author = {}) OR \
-                    (Post.p_private = 0) \
-                )",
+                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
+                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+                ) ",
             uid,
             logged_uid,
+            logged_uid,
+            logged_uid
         );
 
         self.pool.prep_exec(qstring, ()).unwrap();
     }
+
+    // pub fn read(&self, uid: i32) {
+    //     let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
+    //     self.pool.prep_exec(qstring, ()).unwrap();
+    // }
+    //
+    // pub fn secure_read(&self, uid: i32, logged_uid: i32) {
+    //     let qstring = format!(
+    //         "SELECT * FROM Post \
+    //             WHERE \
+    //             p_author = {} AND \
+    //             (
+    //                 (Post.p_private = 1 AND Post.p_author = {}) OR \
+    //                 (Post.p_private = 0) \
+    //             )",
+    //         uid,
+    //         logged_uid,
+    //     );
+    //
+    //     self.pool.prep_exec(qstring, ()).unwrap();
+    // }
 
     pub fn populate_tables(&self, pop: &mut Populate) {
         pop.enroll_students();

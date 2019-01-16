@@ -29,7 +29,7 @@ pub fn mir_query_to_flow_parts(
     let mut node_queue = VecDeque::new();
     node_queue.extend(mir_query.roots.iter().cloned());
 
-    println!("mir query to flow parts. mir query: {:#?}, node queue: {:#?}", mir_query, node_queue);
+    // println!("mir query to flow parts. mir query: {:#?}, node queue: {:#?}", mir_query, node_queue);
 
     let mut in_edge_counts = HashMap::new();
     for n in &node_queue {
@@ -40,7 +40,7 @@ pub fn mir_query_to_flow_parts(
         assert_eq!(in_edge_counts[&n.borrow().versioned_name()], 0);
         let flow_node = mir_node_to_flow_parts(&mut n.borrow_mut(), mig, table_mapping);
 
-        println!("converting node {:#?} to flow node {:#?}", n, flow_node);
+        // println!("converting node {:#?} to flow node {:#?}", n, flow_node);
 
         match flow_node {
             FlowNode::New(na) => new_nodes.push(na),
@@ -62,7 +62,7 @@ pub fn mir_query_to_flow_parts(
         }
     }
 
-    println!("new nodes: {:#?} reused nodes: {:#?}", new_nodes, reused_nodes);
+    // println!("new nodes: {:#?} reused nodes: {:#?}", new_nodes, reused_nodes);
 
     let leaf_na = mir_query
         .leaf
@@ -94,7 +94,7 @@ pub fn mir_node_to_flow_parts(
                     ref group_by,
                     ref kind,
                 } => {
-                    println!("making grouped");
+                    // println!("making grouped");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_grouped_node(
@@ -127,7 +127,7 @@ pub fn mir_node_to_flow_parts(
                     ref group_by,
                     ref kind,
                 } => {
-                    println!("making extremum");
+                    // println!("making extremum");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_grouped_node(
@@ -142,7 +142,7 @@ pub fn mir_node_to_flow_parts(
                     )
                 }
                 MirNodeType::Filter { ref conditions } => {
-                    println!("making filter");
+                    // println!("making filter");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_filter_node(&name, parent, mir_node.columns.as_slice(), conditions, mig)
@@ -151,7 +151,7 @@ pub fn mir_node_to_flow_parts(
                     ref on,
                     ref separator,
                 } => {
-                    println!("making group concat");
+                    // println!("making group concat");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     let group_cols = parent.borrow().columns().iter().cloned().collect();
@@ -167,7 +167,7 @@ pub fn mir_node_to_flow_parts(
                     )
                 }
                 MirNodeType::Identity => {
-                    println!("making identity");
+                    // println!("making identity");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)
@@ -177,7 +177,7 @@ pub fn mir_node_to_flow_parts(
                     ref on_right,
                     ref project,
                 } => {
-                    println!("making join");
+                    // println!("making join");
                     assert_eq!(mir_node.ancestors.len(), 2);
                     let left = mir_node.ancestors[0].clone();
                     let right = mir_node.ancestors[1].clone();
@@ -194,13 +194,13 @@ pub fn mir_node_to_flow_parts(
                     )
                 }
                 MirNodeType::Latest { ref group_by } => {
-                    println!("making latest");
+                    // println!("making latest");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_latest_node(&name, parent, mir_node.columns.as_slice(), group_by, mig)
                 }
                 MirNodeType::Leaf { ref keys, .. } => {
-                    println!("making leaf");
+                    // println!("making leaf");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     materialize_leaf_node(&parent, name, keys, mig);
@@ -218,7 +218,7 @@ pub fn mir_node_to_flow_parts(
                     ref on_right,
                     ref project,
                 } => {
-                    println!("making left join");
+                    // println!("making left join");
                     assert_eq!(mir_node.ancestors.len(), 2);
                     let left = mir_node.ancestors[0].clone();
                     let right = mir_node.ancestors[1].clone();
@@ -239,7 +239,7 @@ pub fn mir_node_to_flow_parts(
                     ref literals,
                     ref arithmetic,
                 } => {
-                    println!("making project");
+                    // println!("making project");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_project_node(
@@ -254,7 +254,7 @@ pub fn mir_node_to_flow_parts(
                     )
                 }
                 MirNodeType::Reuse { ref node } => {
-                    println!("making reuse node. reusing node: {:#?}", node);
+                    // println!("making reuse node. reusing node: {:#?}", node);
 
                     match *node.borrow()
                            .flow_node
@@ -628,7 +628,7 @@ pub(crate) fn make_join_node(
         rest
     );
 
-    println!("PROJECTING COLS: L {:#?}  R {:#?}", projected_cols_left, projected_cols_right); 
+    // println!("PROJECTING COLS: L {:#?}  R {:#?}", projected_cols_left, projected_cols_right);
 
     assert_eq!(
         projected_cols_left.len() + projected_cols_right.len(),

@@ -957,7 +957,7 @@ impl ControllerInner {
 
         let mut universe_groups = HashMap::new();
 
-        println!("UNIV GROUPS: {:#?}", groups);
+        // println!("UNIV GROUPS: {:#?}", groups);
 
         let uid = context
             .get("id")
@@ -966,14 +966,14 @@ impl ControllerInner {
         let uid = &[uid];
         if context.get("group").is_none() {
             for g in groups {
-                println!("G: {:?}", g);
+                // println!("G: {:?}", g);
                 let rgb: Option<ViewBuilder> = self.view_builder(&g);
                 let mut view = rgb.map(|rgb| rgb.build_exclusive().unwrap()).unwrap();
                 let mygroups: Vec<Vec<DataType>> = view
                     .lookup(uid, true)
                     .unwrap();
 
-                println!("PRIOR: {:#?}", mygroups);
+                // println!("PRIOR: {:#?}", mygroups);
 
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
@@ -983,11 +983,11 @@ impl ControllerInner {
                     .collect();
 
 
-                println!("my groups: {:#?}", my_groups);
+                // println!("my groups: {:#?}", my_groups);
                 universe_groups.insert(g, my_groups);
             }
         }
-        println!("Universe gorups 2 : {:#?}", universe_groups);
+        // println!("Universe gorups 2 : {:#?}", universe_groups);
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();

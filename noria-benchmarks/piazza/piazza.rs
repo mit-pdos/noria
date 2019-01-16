@@ -41,7 +41,7 @@ impl Backend {
             _ => panic!("reuse configuration not supported"),
         }
 
-        cb.log_with(blender_log);
+        // cb.log_with(blender_log);
 
         let g = cb.build_local().unwrap();
 
@@ -236,6 +236,7 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
+    let partial = true;
     assert!(
         nlogged <= nusers,
         "nusers must be greater or equal to nlogged"
@@ -298,7 +299,7 @@ fn main() {
     let graph_fname = gloc.unwrap();
     let mut gf = File::create(graph_fname).unwrap();
     assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-    
+
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
@@ -325,33 +326,33 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    if !partial {
-        let mut dur = time::Duration::from_millis(0);
-        let mut uids = Vec::new();
-        let num_at_once = 1000;
-        for uid in 0..num_at_once {
-            uids.push(DataType::Int(uid));
-        }
 
-        for uid in 0..nlogged {
-            let leaf = format!("posts_u{}", uid);
-            let mut getter = backend.g.view(&leaf).unwrap();
-            let start = time::Instant::now();
-            for author in 0..nusers {
-                let res = getter.multi_lookup([uids.clone()].to_vec(), true);
-            }
-            dur += start.elapsed();
-        }
-
-        let dur = dur_to_fsec!(dur);
-
-        println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            num_at_once * nlogged * nusers,
-            dur,
-            (num_at_once * nlogged * nusers) as f64 / dur,
-        );
+    let mut dur = time::Duration::from_millis(0);
+    let mut uids = Vec::new();
+    let num_at_once = 1000;
+    for uid in 0..num_at_once {
+        uids.push(DataType::Int(uid));
     }
+
+    for uid in 0..nlogged {
+        let leaf = format!("posts_u{}", uid);
+        let mut getter = backend.g.view(&leaf).unwrap();
+        let start = time::Instant::now();
+        for author in 0..nusers {
+            let res = getter.multi_lookup([uids.clone()].to_vec(), true);
+        }
+        dur += start.elapsed();
+    }
+
+    let dur = dur_to_fsec!(dur);
+
+    println!(
+        "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+        num_at_once * nlogged * nusers,
+        dur,
+        (num_at_once * nlogged * nusers) as f64 / dur,
+    );
+
 
     println!("Done with benchmark.");
 

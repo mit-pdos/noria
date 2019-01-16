@@ -133,7 +133,7 @@ impl SqlToMirConverter {
     /// security policies and therefore different nodes that are not
     /// represent in the the query graph
     pub fn set_universe(&mut self, universe: Universe) {
-        println!("SETTING UNIVERSE TO : {:#?}", universe);
+        // println!("SETTING UNIVERSE TO : {:#?}", universe);
         self.universe = universe;
     }
 
@@ -484,7 +484,7 @@ impl SqlToMirConverter {
         ),
         String,
     > {
-        println!("HERE");
+        // println!("HERE");
         let (sec, nodes, table_mapping, base_name) =
             self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe)?;
         let mut roots = Vec::new();
@@ -508,7 +508,7 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("after node iter");
+        // println!("after node iter");
         assert_eq!(
             leaves.len(),
             1,
@@ -1108,7 +1108,7 @@ impl SqlToMirConverter {
         kind: JoinType,
     ) -> MirNodeRef {
 
-        println!("Creating join node! left = {:#?}, right = {:#?}, kind: {:?}", left_node, right_node, kind);
+        // println!("Creating join node! left = {:#?}, right = {:#?}, kind: {:?}", left_node, right_node, kind);
 
         // TODO(malte): this is where we overproject join columns in order to increase reuse
         // opportunities. Technically, we need to only project those columns here that the query
@@ -1131,7 +1131,7 @@ impl SqlToMirConverter {
             .chain(projected_cols_right.into_iter())
             .collect::<Vec<Column>>();
 
-        println!("FIELDS: {:#?}", fields);
+        // println!("FIELDS: {:#?}", fields);
 
         // join columns need us to generate join group configs for the operator
         // TODO(malte): no multi-level joins yet
@@ -1158,7 +1158,7 @@ impl SqlToMirConverter {
             .into_iter()
             .filter_map(|mut f| {
                 if f == r_col {
-                    println!("DROPPING COL: {:#?}", f);
+                    // println!("DROPPING COL: {:#?}", f);
                     // drop instances of right-side column
                     None
                 } else if f == l_col {
@@ -1388,7 +1388,7 @@ impl SqlToMirConverter {
             ComparisonOp(ref ct) => {
                 // currently, we only support filter-like
                 // comparison operations, no nested-selections
-                println!("comp op");
+                // println!("comp op");
                 let f = self.make_filter_node(&format!("{}_f{}", name, nc), parent, ct);
 
                 pred_nodes.push(f);
@@ -1529,7 +1529,7 @@ impl SqlToMirConverter {
         // Canonical operator order: B-J-G-F-P-R
         // (Base, Join, GroupBy, Filter, Project, Reader)
         {
-            println!("making canonical");
+            // println!("making canonical");
             let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
 
             // 0. Base nodes (always reused)
@@ -1611,7 +1611,7 @@ impl SqlToMirConverter {
             new_node_count += predicates_above_group_by_nodes.len();
 
             // 3. Create security boundary
-            println!("making sec bound");
+            // println!("making sec bound");
             use crate::controller::sql::mir::security::SecurityBoundary;
             let (last_policy_nodes, policy_nodes) = self.make_security_boundary(
                 universe.clone(),
@@ -1619,7 +1619,7 @@ impl SqlToMirConverter {
                 prev_node.clone(),
             )?;
 
-            println!("Member of: {:#?}", self.universe.member_of);
+            // println!("Member of: {:#?}", self.universe.member_of);
 
             let mut ancestors = self.universe.member_of.iter().fold(
                 Ok(vec![]),
@@ -1644,7 +1644,7 @@ impl SqlToMirConverter {
                                 }
                             })
                             .collect();
-                        println!("Group views: {:#?}", group_views);
+                        // println!("Group views: {:#?}", group_views);
                         trace!(&self.log, "group views {:?}", group_views);
                         acc.extend(group_views?);
                         Ok(acc)
@@ -1652,7 +1652,7 @@ impl SqlToMirConverter {
                 },
             )?;
 
-            println!("ancestors after creation: {:#?}", ancestors);
+            // println!("ancestors after creation: {:#?}", ancestors);
 
             nodes_added = base_nodes
                 .into_iter()
@@ -1992,7 +1992,7 @@ impl SqlToMirConverter {
                 "Added final MIR node for query named \"{}\"", name
             );
         }
-        println!("MADE NEW NODES: {:#?}", nodes_added);
+        // println!("MADE NEW NODES: {:#?}", nodes_added);
         // finally, we output all the nodes we generated
         Ok((sec_round, nodes_added, table_mapping, union_base_name))
     }

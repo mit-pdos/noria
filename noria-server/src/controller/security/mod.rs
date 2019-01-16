@@ -43,7 +43,7 @@ impl SecurityConfig {
     }
 
     pub fn get_group_policies(&self, group_name: String) -> &[Policy] {
-        println!("attempting to get: {:?} from groups: {:#?}", group_name, self.groups);
+        // println!("attempting to get: {:?} from groups: {:#?}", group_name, self.groups);
         self.groups[&group_name].policies()
     }
 }

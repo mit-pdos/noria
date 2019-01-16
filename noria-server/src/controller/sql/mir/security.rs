@@ -117,7 +117,7 @@ impl SecurityBoundary for SqlToMirConverter {
                 *rel
             );
 
-            println!("Created security nodes: {:#?}", nodes);
+            // println!("Created security nodes: {:#?}", nodes);
 
             security_nodes.extend(nodes.clone());
             last_security_nodes.extend(last_nodes.clone());
@@ -196,7 +196,7 @@ fn make_security_nodes(
             }
 
             let view_for_rel = mir_converter.get_view(rel)?;
-            println!("UPDATING LOCAL REL: {:#?} => {:#?}", *rel, view_for_rel);
+            // println!("UPDATING LOCAL REL: {:#?} => {:#?}", *rel, view_for_rel);
             local_node_for_rel.insert(*rel, view_for_rel.clone());
             base_nodes.push(view_for_rel.clone());
         }
@@ -212,7 +212,7 @@ fn make_security_nodes(
             assert!(*rel != "computed_columns");
             let mut any_added = false;
             for pred in &qgn.predicates {
-                println!("h1");
+                // println!("h1");
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
                     prev_node.expect("empty previous node"),
@@ -253,12 +253,12 @@ fn make_security_nodes(
 
             // update local node relations so joins know which views to join
             if any_added {
-                println!("ADDING LOCAL NODE REL: {:#?} -> {:#?}", *rel, prev_node);
+                // println!("ADDING LOCAL NODE REL: {:#?} -> {:#?}", *rel, prev_node);
                 local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
             }
         }
 
-        println!("LOCAL NODE REL: {:#?}", local_node_for_rel);
+        // println!("LOCAL NODE REL: {:#?}", local_node_for_rel);
 
         let join_nodes = make_joins(
             mir_converter,

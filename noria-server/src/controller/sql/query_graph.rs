@@ -512,8 +512,8 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
     }
 
 
-    println!("QG RELATIONS: {:#?}", qg.relations);
-    
+    // println!("QG RELATIONS: {:#?}", qg.relations);
+
     for jc in &st.join {
         match jc.right {
             JoinRightSide::Table(ref table) => {
