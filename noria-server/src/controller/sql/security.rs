@@ -65,7 +65,7 @@ impl Multiverse for SqlIncorporator {
         let mut qfps = Vec::new();
 
         self.mir_converter.clear_universe();
-
+        println!("config: {:#?}, universe_groups: {:#?}", config, universe_groups); 
         let (id, group) = mig.universe();
         let mut universe = Universe {
             id: id.clone(),
@@ -91,7 +91,7 @@ impl Multiverse for SqlIncorporator {
                 group_name.to_string(),
                 universe.id.to_string()
             );
-            println!("group name: {:?}, uc name: {}", group_name, uc_name); 
+            println!("group name: {:?}, uc name: {}", group_name, uc_name);
 
             (uc_name, config.get_group_policies(group_name.to_string()))
         };
