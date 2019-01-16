@@ -235,8 +235,8 @@ fn main() {
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
-
-    let partial = true;
+    //
+    // let partial = true;
     assert!(
         nlogged <= nusers,
         "nusers must be greater or equal to nlogged"

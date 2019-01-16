@@ -756,7 +756,7 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_cols);
+        //println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_cols);
         assert_eq!(
             num_ucols,
             selected_cols.len(),
@@ -818,7 +818,7 @@ impl SqlToMirConverter {
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
 
-        println!("ANCESTORS: {:#?}", ancestors);
+        // println!("ANCESTORS: {:#?}", ancestors);
 
         for c in ucols.clone() {
             if ancestors
@@ -829,7 +829,7 @@ impl SqlToMirConverter {
                     selected_cols.insert(c.name.clone());
                     selected_col_objects.insert(c.clone());
                 } else {
-                    println!("forgoing {:#?}", c.clone());
+                //    println!("forgoing {:#?}", c.clone());
                 }
             }
         }
@@ -854,7 +854,7 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_col_objects);
+    //    println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_col_objects);
         assert_eq!(
             num_ucols,
             selected_col_objects.len(),
