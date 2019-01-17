@@ -21,7 +21,7 @@ struct Backend {
 impl Backend {
     fn new(addr: &str) -> Backend {
         Backend {
-            pool: my::Pool::new_manual(1, 1, addr).unwrap(),
+            pool: my::Pool::new_manual(1, 1,addr).unwrap(),
         }
     }
 

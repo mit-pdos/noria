@@ -48,27 +48,27 @@ impl Backend {
         Backend { g: g }
     }
 
-    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) {
         let mut mutator = self.g.table(name).unwrap();
 
-        let start = time::Instant::now();
+        // let start = time::Instant::now();
 
-        let i = records.len();
+        // let i = records.len();
         for r in records.drain(..) {
             // println!("inserting: {:?}", r);
             mutator.insert(r).unwrap();
         }
 
-        let dur = dur_to_fsec!(start.elapsed());
-        println!(
-            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
-            name,
-            dur,
-            i as f64 / dur
-        );
+        // let dur = dur_to_fsec!(start.elapsed());
+        // println!(
+        //     "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+        //     i,
+        //     name,
+        //     dur,
+        //     i as f64 / dur
+        // );
 
-        i
+
     }
 
     fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
@@ -181,7 +181,7 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
-                .default_value("before")
+                .default_value("nopopulate")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         )
@@ -328,28 +328,61 @@ fn main() {
     }
 
 
+    // let mut dur = time::Duration::from_millis(0);
+    // let mut uids = Vec::new();
+    // let num_at_once = 1000;
+    // for uid in 0..num_at_once {
+    //     uids.push([uid.into()].to_vec());
+    // }
+
+    // for uid in 0..nlogged {
+    //     let leaf = format!("posts_u{}", uid);
+    //     let mut getter = backend.g.view(&leaf).unwrap();
+    //     let start = time::Instant::now();
+    //     let res = getter.multi_lookup(uids.clone(), false);
+    //     // println!("res: {:?}", res);
+    //     dur += start.elapsed();
+    // }
+    //
+    // let dur = dur_to_fsec!(dur);
+    //
+    // println!(
+    //     "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+    //     num_at_once * nlogged,
+    //     dur,
+    //     (num_at_once * nlogged) as f64 / dur,
+    // );
+    //
     let mut dur = time::Duration::from_millis(0);
-    let mut uids = Vec::new();
-    let num_at_once = 1000;
-    for uid in 0..num_at_once {
-        uids.push([uid.into()].to_vec());
+
+    let mut records_per_uid = Vec::new();
+    for i in 0..nusers {
+        let mut records = Vec::new();
+        for j in 0..nposts / nusers {
+            let pid = 0.into();
+            let author = i.into();
+            let cid = 0.into();
+            let content = "".into();
+            let private = 1.into();
+            let anon = 1.into();
+            records.push(vec![pid, cid, author, content, private, anon]);
+        }
+        records_per_uid.push(records);
     }
 
     for uid in 0..nlogged {
-        let leaf = format!("posts_u{}", uid);
-        let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
-        let res = getter.multi_lookup(uids.clone(), false);
+        backend.populate("Post", records_per_uid[uid as usize].clone());
         dur += start.elapsed();
     }
 
     let dur = dur_to_fsec!(dur);
 
     println!(
-        "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-        num_at_once * nlogged,
+        "Wrote {} records in {:.2}s ({:.2} GETs/sec)!",
+        nposts,
         dur,
-        (num_at_once * nlogged) as f64 / dur,
+        (nposts) as f64 / dur,
     );
 
 
