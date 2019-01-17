@@ -330,7 +330,7 @@ fn main() {
 
     let mut dur = time::Duration::from_millis(0);
     let mut uids = Vec::new();
-    let num_at_once = nposts;
+    let num_at_once = 1000;
     for uid in 0..num_at_once {
         uids.push([uid.into()].to_vec());
     }
@@ -342,7 +342,7 @@ fn main() {
         for author in 0..nusers {
             // println!("Looking up: {:?}", pids);
             let res = getter.multi_lookup(uids.clone(), false);
-            println!("res: {:?}", res.unwrap());
+            // println!("res: {:?}", res.unwrap());
         }
         dur += start.elapsed();
     }

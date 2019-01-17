@@ -61,7 +61,7 @@ impl Populate {
                     tas.push(uid.clone());
                 }
             }
-            // println!("TA IDS: {:#?}", tas);
+            println!("TA user ids: {:?}", tas);
             self.tas.insert(i.into(), tas);
         }
     }
