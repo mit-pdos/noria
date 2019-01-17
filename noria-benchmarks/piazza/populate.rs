@@ -113,11 +113,9 @@ impl Populate {
         println!("Populating posts...");
         let mut records = Vec::new();
         for i in 0..self.nposts {
-            let pid = 12.into();
-        //    let author = self.uid();
-            let author = 5.into();
-        //    let cid = self.cid_for(&author);
-            let cid = 11.into();
+            let pid = i.into();
+            let author = self.uid();
+            let cid = self.cid_for(&author);
             let content = "".into();
             let private = self.private();
             let anon = 1.into();
