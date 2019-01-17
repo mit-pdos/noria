@@ -37,13 +37,10 @@ impl Backend {
                 p_author = {} AND \
                 (
                     (Post.p_private = 1 AND Post.p_author = {}) OR \
-                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
-                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+                    (Post.p_private = 0) \
                 ) ",
             uid,
             logged_uid,
-            logged_uid,
-            logged_uid
         );
 
         self.pool.prep_exec(qstring, ()).unwrap();

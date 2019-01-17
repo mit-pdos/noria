@@ -339,11 +339,7 @@ fn main() {
         let leaf = format!("posts_u{}", uid);
         let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
-
-        // println!("Looking up: {:?}", pids);
         let res = getter.multi_lookup(uids.clone(), false);
-        //println!("res: {:?}", res.unwrap());
-
         dur += start.elapsed();
     }
 
