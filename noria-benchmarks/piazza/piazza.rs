@@ -55,7 +55,7 @@ impl Backend {
 
         let i = records.len();
         for r in records.drain(..) {
-        //    println!("inserting: {:?}", r);
+            // println!("inserting: {:?}", r);
             mutator.insert(r).unwrap();
         }
 
@@ -330,7 +330,7 @@ fn main() {
 
     let mut dur = time::Duration::from_millis(0);
     let mut uids = Vec::new();
-    let num_at_once = 1000;
+    let num_at_once = 2000;
     for uid in 0..num_at_once {
         uids.push([uid.into()].to_vec());
     }
@@ -339,11 +339,11 @@ fn main() {
         let leaf = format!("posts_u{}", uid);
         let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
-        for author in 0..nusers {
-            // println!("Looking up: {:?}", pids);
-            let res = getter.multi_lookup(uids.clone(), false);
-            // println!("res: {:?}", res.unwrap());
-        }
+
+        // println!("Looking up: {:?}", pids);
+        let res = getter.multi_lookup(uids.clone(), false);
+    // println!("res: {:?}", res.unwrap());
+
         dur += start.elapsed();
     }
 
@@ -351,9 +351,9 @@ fn main() {
 
     println!(
         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-        num_at_once * nlogged * nusers,
+        num_at_once * nlogged,
         dur,
-        (num_at_once * nlogged * nusers) as f64 / dur,
+        (num_at_once * nlogged) as f64 / dur,
     );
 
 

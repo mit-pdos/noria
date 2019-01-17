@@ -257,7 +257,6 @@ impl MirNode {
                         Some(map) => match c.table {
                             Some(ref table) => {
                                 let key = (c.name.clone(), Some(table.clone()));
-                                // println!("KEY: {:#?} MAP: {:#?}", key, map);
                                 match map.get(&key) {
                                     Some(ref t_name) => get_column_index(c, t_name),
                                     None => match map.get(&(c.name.clone(), None)) {
