@@ -55,6 +55,7 @@ impl Backend {
 
         let i = records.len();
         for r in records.drain(..) {
+        //    println!("inserting: {:?}", r);
             mutator.insert(r).unwrap();
         }
 
@@ -145,7 +146,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/complex-policies.json")
+                .default_value("noria-benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
@@ -331,7 +332,7 @@ fn main() {
     let mut uids = Vec::new();
     let num_at_once = 1000;
     for uid in 0..num_at_once {
-        uids.push(DataType::Int(uid));
+        uids.push([5.into()].to_vec());
     }
 
     for uid in 0..nlogged {
@@ -339,7 +340,9 @@ fn main() {
         let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
         for author in 0..nusers {
-            let res = getter.multi_lookup([uids.clone()].to_vec(), true);
+            // println!("Looking up: {:?}", pids);
+            let res = getter.multi_lookup(uids.clone(), false);
+        //    println!("res: {:?}", res.unwrap());
         }
         dur += start.elapsed();
     }

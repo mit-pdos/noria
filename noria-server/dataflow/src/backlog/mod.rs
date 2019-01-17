@@ -60,9 +60,9 @@ fn new_inner(
     // println!("CREATING WITH KEY : {:?}", key);
 
     let (r, w) = match key.len() {
-        // 0 => unreachable!(),
-        // 1 => make!(Single),
-        // 2 => make!(Double),
+        0 => unreachable!(),
+        1 => make!(Single),
+        2 => make!(Double),
         _ => make!(Many),
     };
 

@@ -36,6 +36,7 @@ impl Handle {
         match *self {
             Handle::Single(ref h) => {
                 assert_eq!(key.len(), 1);
+                // println!("querying for key: {:?}", key[0]);
                 h.meta_get_and(&key[0], then)
 
                  // h.meta_get_and(key, then)

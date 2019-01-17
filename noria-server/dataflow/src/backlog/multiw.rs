@@ -104,6 +104,7 @@ impl Handle {
                     debug_assert!(r.len() >= cols);
                     match r {
                         Record::Positive(r) => {
+                        //    println!("adding rec with key {:?}", r[key[0]]);
                             memory_delta += r.deep_size_of() as isize;
                             h.insert(r[key[0]].clone(), r);
                         }
@@ -141,6 +142,7 @@ impl Handle {
                     match r {
                         Record::Positive(r) => {
                             memory_delta += r.deep_size_of() as isize;
+                            println!("keying on : {:?}", key);
                             h.insert(key, r);
                         }
                         Record::Negative(r) => {

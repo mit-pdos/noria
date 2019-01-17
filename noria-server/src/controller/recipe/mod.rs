@@ -425,7 +425,6 @@ impl Recipe {
             let (n, q, is_leaf) = self.expressions[&qid].clone();
 
             // add the query
-            // println!("here 7");
             let qfp = self
                 .inc
                 .as_mut()
