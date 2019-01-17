@@ -1421,11 +1421,11 @@ dependencies = [
  "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tower 0.1.0 (git+https://github.com/tower-rs/tokio-tower.git)",
- "tower-balance 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-balance 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zookeeper 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1461,7 +1461,7 @@ dependencies = [
  "timeout-readwrite 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-mock-task 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
  "tsunami 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 4.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1509,7 +1509,7 @@ dependencies = [
  "tokio-threadpool 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tower 0.1.0 (git+https://github.com/tower-rs/tokio-tower.git)",
  "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zookeeper 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2583,9 +2583,9 @@ source = "git+https://github.com/tower-rs/tokio-tower.git#baaec007f0d808bb4b15cc
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
 ]
 
 [[package]]
@@ -2630,35 +2630,35 @@ dependencies = [
 [[package]]
 name = "tower-balance"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
 ]
 
 [[package]]
 name = "tower-buffer"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
 ]
 
 [[package]]
 name = "tower-direct-service"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2666,16 +2666,16 @@ dependencies = [
 [[package]]
 name = "tower-discover"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
 ]
 
 [[package]]
 name = "tower-service"
 version = "0.2.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2683,11 +2683,11 @@ dependencies = [
 [[package]]
 name = "tower-util"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=all#aefa9c12694868115091130ddce122718a1d53ce"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#3cee8ac3b8768c35d7cb3c05aa83e948893505e1"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
- "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)",
+ "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
+ "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
 ]
 
 [[package]]
@@ -3291,12 +3291,12 @@ dependencies = [
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
 "checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
-"checksum tower-balance 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
-"checksum tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
-"checksum tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
-"checksum tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
-"checksum tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
-"checksum tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=all)" = "<none>"
+"checksum tower-balance 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
+"checksum tower-buffer 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
+"checksum tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
+"checksum tower-discover 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
+"checksum tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
+"checksum tower-util 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)" = "<none>"
 "checksum trawler 0.5.12 (registry+https://github.com/rust-lang/crates.io-index)" = "e6eae409ce9bba898af1445dcf353acadf1df730a6c9fb8e4f2d4a20213683dc"
 "checksum try-lock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ee2aa4715743892880f70885373966c83d73ef1b0838a664ef0c76fffd35e7c2"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
