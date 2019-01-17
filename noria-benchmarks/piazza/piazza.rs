@@ -54,10 +54,10 @@ impl Backend {
         // let start = time::Instant::now();
 
         // let i = records.len();
-        for r in records.drain(..) {
+        // for r in records.drain(..) {
             // println!("inserting: {:?}", r);
-            mutator.insert(r).unwrap();
-        }
+        mutator.insert_all(records);
+        // }
 
         // let dur = dur_to_fsec!(start.elapsed());
         // println!(

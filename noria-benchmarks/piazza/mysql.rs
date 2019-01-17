@@ -74,36 +74,60 @@ impl Backend {
         let posts = pop.get_posts();
         let classes = pop.get_classes();
 
-        self.populate("Role", roles);
-        self.populate("User", users);
+        // self.populate("Role", roles);
+        // self.populate("User", users);
         self.populate("Post", posts);
-        self.populate("Class", classes);
+        // self.populate("Class", classes);
     }
 
     fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
-        let params_arr: Vec<_> = records.iter().map(|ref r| {
-            match name.as_ref() {
-                "Role" => params!{
-                    "r_uid" => r[0].clone().into() : i32,
-                    "r_cid" => r[1].clone().into() : i32,
-                    "r_role" => r[2].clone().into() : i32,
-                },
-                "User" => params!{
-                    "u_id" => r[0].clone().into() : i32,
-                },
-                "Post" => params!{
-                    "p_id" => r[0].clone().into() : i32,
-                    "p_cid" => r[1].clone().into() : i32,
-                    "p_author" => r[2].clone().into() : i32,
-                    "p_content" => r[3].clone().into() : String,
-                    "p_private" => r[4].clone().into() : i32,
-                },
-                "Class" => params!{
-                    "c_id" => r[0].clone().into() : i32,
-                },
-                _ => panic!("unspecified table"),
-            }
-        }).collect();
+        // let params_arr: Vec<_> = records.iter().map(|ref r| {
+        //     match name.as_ref() {
+        //         "Role" => params!{
+        //             "r_uid" => r[0].clone().into() : i32,
+        //             "r_cid" => r[1].clone().into() : i32,
+        //             "r_role" => r[2].clone().into() : i32,
+        //         },
+        //         "User" => params!{
+        //             "u_id" => r[0].clone().into() : i32,
+        //         },
+        //         "Post" => params!{
+        //             "p_id" => r[0].clone().into() : i32,
+        //             "p_cid" => r[1].clone().into() : i32,
+        //             "p_author" => r[2].clone().into() : i32,
+        //             "p_content" => r[3].clone().into() : String,
+        //             "p_private" => r[4].clone().into() : i32,
+        //         },
+        //         "Class" => params!{
+        //             "c_id" => r[0].clone().into() : i32,
+        //         },
+        //         _ => panic!("unspecified table"),
+        //     }
+        // }).collect();
+
+        let mut params_arr = Vec::new();
+        let mut i = 0;
+        for r in records.iter() {
+            params_arr.push(
+                params!{
+                format!("p_id{}", i).as_str() => r[0].clone().into() : i32,
+                format!("p_cid{}", i).as_str() => r[1].clone().into() : i32,
+                format!("p_author{}", i).as_str() => r[2].clone().into() : i32,
+                format!("p_content{}", i).as_str() => r[3].clone().into() : String,
+                format!("p_private{}", i).as_str() => r[4].clone().into() : i32,
+                }
+            );
+            i += 1; 
+        }
+
+        let mut qstring = "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES ".to_string();
+        for i in 0..records.len() - 1 {
+            qstring.push_str(format!("(:p_id{}, :p_cid{}, :p_author{}, :p_content{}, :p_private{}), ",
+                                        i, i, i, i, i).as_str());
+        }
+        let one_prior = records.len() - 1;
+        qstring.push_str(format!("(:p_id{}, :p_cid{}, :p_author{}, :p_content{}, :p_private{});",
+                                one_prior, one_prior, one_prior, one_prior, one_prior).as_str());
 
         let qstring = match name.as_ref() {
             "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
@@ -113,11 +137,18 @@ impl Backend {
             _ => panic!("unspecified table"),
         };
 
+        let mut final_param_arr = Vec::new();
+        for params in params_arr.iter() {
+            for param in params {
+                final_param_arr.push(param.clone());
+            }
+        }
+    //    final_param_arr.what;
         let start = time::Instant::now();
         for mut stmt in self.pool.prepare(qstring).into_iter() {
-            for params in params_arr.iter() {
-                stmt.execute(params).unwrap();
-            }
+            // for params in params_arr.iter() {
+            stmt.execute(final_param_arr.clone()).unwrap();
+            // }
         }
         let dur = dur_to_fsec!(start.elapsed());
         println!(
