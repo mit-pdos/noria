@@ -67,7 +67,7 @@ impl Backend {
     //     self.pool.prep_exec(qstring, ()).unwrap();
     // }
 
-    pub fn populate_tables(&self, pop: &mut Populate) {
+    pub fn populate_tables(&self, pop: &mut Populate, nposts: i32, nusers: i32) {
         pop.enroll_students();
         let roles = pop.get_roles();
         let users = pop.get_users();
@@ -76,87 +76,60 @@ impl Backend {
 
         // self.populate("Role", roles);
         // self.populate("User", users);
-        self.populate("Post", posts);
+        self.populate("Post", posts, nposts, nusers);
         // self.populate("Class", classes);
     }
 
-    fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
-        // let params_arr: Vec<_> = records.iter().map(|ref r| {
-        //     match name.as_ref() {
-        //         "Role" => params!{
-        //             "r_uid" => r[0].clone().into() : i32,
-        //             "r_cid" => r[1].clone().into() : i32,
-        //             "r_role" => r[2].clone().into() : i32,
-        //         },
-        //         "User" => params!{
-        //             "u_id" => r[0].clone().into() : i32,
-        //         },
-        //         "Post" => params!{
-        //             "p_id" => r[0].clone().into() : i32,
-        //             "p_cid" => r[1].clone().into() : i32,
-        //             "p_author" => r[2].clone().into() : i32,
-        //             "p_content" => r[3].clone().into() : String,
-        //             "p_private" => r[4].clone().into() : i32,
-        //         },
-        //         "Class" => params!{
-        //             "c_id" => r[0].clone().into() : i32,
-        //         },
-        //         _ => panic!("unspecified table"),
-        //     }
-        // }).collect();
+    fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>, nposts: i32, nusers: i32) {
+        let mut records_ = records.clone();
+        println!("nposts: {} nusers: {}", nposts, nusers);
+        let batch_size = nposts as f64 / nusers as f64;
+        println!("batch size: {}", batch_size);
+        let batch_size = batch_size as i32;
+        let mut ind = 0;
 
-        let mut params_arr = Vec::new();
-        let mut i = 0;
-        for r in records.iter() {
-            params_arr.push(
-                params!{
-                format!("p_id{}", i).as_str() => r[0].clone().into() : i32,
-                format!("p_cid{}", i).as_str() => r[1].clone().into() : i32,
-                format!("p_author{}", i).as_str() => r[2].clone().into() : i32,
-                format!("p_content{}", i).as_str() => r[3].clone().into() : String,
-                format!("p_private{}", i).as_str() => r[4].clone().into() : i32,
-                }
-            );
-            i += 1; 
+        let mut dur = time::Duration::from_millis(0);
+
+        while ind < nposts {
+            // println!("inserting records {}", ind);
+            let mut qstring = "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES ".to_string();
+            let first_class_seen = &records[0][1];
+            // println!("ranging from {} -> {}", ind, ind + batch_size - 1);
+            for j in ind.. ind + batch_size - 1 {
+                // println!("inserting rec j: {}", j);
+                let j = j as usize;
+                qstring.push_str(format!("({}, {}, {}, \"{}\", {}), ",
+                                records[j][0].clone().into() : i32,
+                                first_class_seen.clone(),
+                                records[j][2].clone().into() : i32,
+                                records[j][3].clone().into() : String,
+                                records[j][4].clone().into() : i32).as_str());
+            };
+            // println!("2 inserting rec j: {}", ind as usize + batch_size as usize);
+            qstring.push_str(format!("({}, {}, {}, \"{}\", {}); ",
+                            records[ind as usize + batch_size as usize - 1][0].clone().into() : i32,
+                            records[ind as usize + batch_size as usize - 1][1].clone().into() : i32,
+                            records[ind as usize + batch_size as usize - 1][2].clone().into() : i32,
+                            records[ind as usize + batch_size as usize - 1][3].clone().into() : String,
+                            records[ind as usize + batch_size as usize - 1][4].clone().into() : i32).as_str());
+
+            let mut conn = self.pool.get_conn().unwrap();
+
+            let start = time::Instant::now();
+
+            let res = conn.query(qstring);
+            res.unwrap();
+            dur += start.elapsed();
+            ind += batch_size;
+
         }
 
-        let mut qstring = "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES ".to_string();
-        for i in 0..records.len() - 1 {
-            qstring.push_str(format!("(:p_id{}, :p_cid{}, :p_author{}, :p_content{}, :p_private{}), ",
-                                        i, i, i, i, i).as_str());
-        }
-        let one_prior = records.len() - 1;
-        qstring.push_str(format!("(:p_id{}, :p_cid{}, :p_author{}, :p_content{}, :p_private{});",
-                                one_prior, one_prior, one_prior, one_prior, one_prior).as_str());
-
-        let qstring = match name.as_ref() {
-            "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
-            "User" => "INSERT INTO User (u_id) VALUES (:u_id)",
-            "Post" => "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES (:p_id, :p_cid, :p_author, :p_content, :p_private)",
-            "Class" => "INSERT INTO Class (c_id) VALUES (:c_id)",
-            _ => panic!("unspecified table"),
-        };
-
-        let mut final_param_arr = Vec::new();
-        for params in params_arr.iter() {
-            for param in params {
-                final_param_arr.push(param.clone());
-            }
-        }
-    //    final_param_arr.what;
-        let start = time::Instant::now();
-        for mut stmt in self.pool.prepare(qstring).into_iter() {
-            // for params in params_arr.iter() {
-            stmt.execute(final_param_arr.clone()).unwrap();
-            // }
-        }
-        let dur = dur_to_fsec!(start.elapsed());
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             records.len(),
             name,
-            dur,
-            records.len() as f64 / dur
+            dur_to_fsec!(dur),
+            records.len() as f64 / dur_to_fsec!(dur)
         );
     }
 
@@ -278,37 +251,37 @@ fn main() {
     backend.create_tables();
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    backend.populate_tables(&mut p);
-
-    // Do some reads without security
-    let start = time::Instant::now();
-    for i in 0..1000 {
-        for uid in 0..nusers {
-            backend.read(uid);
-        }
-    }
-
-    let dur = dur_to_fsec!(start.elapsed());
-    println!(
-        "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * 1000,
-        dur,
-        (nusers * 1000) as f64 / dur
-    );
-
-    // Do some reads WITH security
-    let start = time::Instant::now();
-    for i in 0..1000 {
-        for uid in 0..nusers {
-            backend.secure_read(uid, 0);
-        }
-    }
-    let dur = dur_to_fsec!(start.elapsed());
-    println!(
-        "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * 1000,
-        dur,
-        (nusers * 1000) as f64 / dur
-    );
+    backend.populate_tables(&mut p, nposts, nusers);
+    //
+    // // Do some reads without security
+    // let start = time::Instant::now();
+    // for i in 0..1000 {
+    //     for uid in 0..nusers {
+    //         backend.read(uid);
+    //     }
+    // }
+    //
+    // let dur = dur_to_fsec!(start.elapsed());
+    // println!(
+    //     "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
+    //     nusers * 1000,
+    //     dur,
+    //     (nusers * 1000) as f64 / dur
+    // );
+    //
+    // // Do some reads WITH security
+    // let start = time::Instant::now();
+    // for i in 0..1000 {
+    //     for uid in 0..nusers {
+    //         backend.secure_read(uid, 0);
+    //     }
+    // }
+    // let dur = dur_to_fsec!(start.elapsed());
+    // println!(
+    //     "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
+    //     nusers * 1000,
+    //     dur,
+    //     (nusers * 1000) as f64 / dur
+    // );
 
 }
