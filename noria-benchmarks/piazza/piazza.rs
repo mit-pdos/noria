@@ -352,7 +352,6 @@ fn main() {
         (num_at_once * nlogged) as f64 / dur,
     );
 
-
     println!("Done with benchmark.");
 
     if gloc.is_some() {
