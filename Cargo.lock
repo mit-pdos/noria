@@ -1740,7 +1740,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "autocfg 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1761,7 +1761,7 @@ name = "rand_hc"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1799,7 +1799,7 @@ name = "rand_xorshift"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2630,7 +2630,7 @@ dependencies = [
 [[package]]
 name = "tower-balance"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2646,7 +2646,7 @@ dependencies = [
 [[package]]
 name = "tower-buffer"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2658,7 +2658,7 @@ dependencies = [
 [[package]]
 name = "tower-direct-service"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2666,7 +2666,7 @@ dependencies = [
 [[package]]
 name = "tower-discover"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
@@ -2675,7 +2675,7 @@ dependencies = [
 [[package]]
 name = "tower-service"
 version = "0.2.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2683,7 +2683,7 @@ dependencies = [
 [[package]]
 name = "tower-util"
 version = "0.1.0"
-source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#14f61a3f3d6cad77becc968f56700393b3a91d72"
+source = "git+https://github.com/jonhoo/tower.git?branch=dynamic-balance#54bec64e7726ec391f9806092938e380d8c6e993"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-direct-service 0.1.0 (git+https://github.com/jonhoo/tower.git?branch=dynamic-balance)",
