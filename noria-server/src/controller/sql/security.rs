@@ -107,9 +107,8 @@ impl Multiverse for SqlIncorporator {
         let mut row_policies_qg: HashMap<String, Vec<QueryGraph>> = HashMap::new();
         for policy in universe_policies {
             if !policy.is_row_policy() {
-                // println!("here 3");
                 let qfp = self
-                    .add_parsed_query(policy.predicate(), None, false, mig)
+                    .add_parsed_query(policy.predicate(), None, false, mig, None)
                     .unwrap();
                 let rewrite_view = qfp.name.clone();
                 let rw_pol = RewritePolicy {
@@ -155,7 +154,6 @@ impl Multiverse for SqlIncorporator {
         let e = self.universes.entry(group.clone()).or_insert_with(Vec::new);
         e.push((id, group));
 
-        // println!("back 2");
         self.mir_converter.set_universe(universe);
 
         Ok(qfps)
@@ -184,7 +182,7 @@ impl Multiverse for SqlIncorporator {
 
         let parsed_query = sql_parser::parse_query(&s).unwrap();
         // println!("here 8");
-        self.add_parsed_query(parsed_query, Some(name), false, mig)
+        self.add_parsed_query(parsed_query, Some(name), false, mig, None)
             .unwrap()
     }
 }

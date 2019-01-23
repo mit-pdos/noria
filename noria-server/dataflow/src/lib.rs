@@ -10,6 +10,7 @@ extern crate backtrace;
 extern crate bincode;
 extern crate common;
 extern crate evmap;
+extern crate srmap;
 extern crate fnv;
 extern crate futures;
 extern crate hyper;

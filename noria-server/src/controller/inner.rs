@@ -30,6 +30,30 @@ use tokio::prelude::*;
 use std::iter::FromIterator;
 
 
+#[derive(Clone)]
+pub(crate) struct MapMeta {
+    pub(super) query_to_leaves: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_readers: HashMap<String, HashSet<NodeIndex>>,
+    pub(super) query_to_domain: HashMap<String, usize>,
+    pub(super) query_to_materialization: HashMap<String, (usize, usize)>, // Query -> (DomainIndex, Offset)
+    pub(super) domain_to_offset: HashMap<usize, usize>,
+    pub(super) reader_to_uid: HashMap<NodeIndex, usize>,
+
+}
+
+impl MapMeta {
+    pub fn new() -> Self {
+        MapMeta {
+            query_to_leaves: HashMap::default(),
+            query_to_readers: HashMap::default(),
+            query_to_domain: HashMap::default(),
+            query_to_materialization: HashMap::default(),
+            domain_to_offset: HashMap::default(),
+            reader_to_uid: HashMap::default(),
+        }
+    }
+}
+
 /// `Controller` is the core component of the alternate Soup implementation.
 ///
 /// It keeps track of the structure of the underlying data flow graph and its domains. `Controller`
@@ -49,7 +73,7 @@ pub struct ControllerInner {
     pub(super) materializations: Materializations,
 
     /// Current recipe
-    recipe: Recipe,
+    pub recipe: Recipe,
 
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
@@ -74,6 +98,8 @@ pub struct ControllerInner {
     log: slog::Logger,
 
     pub(crate) replies: DomainReplies,
+
+    pub(super) map_meta: MapMeta,
 }
 
 pub(crate) struct DomainReplies(futures::sync::mpsc::UnboundedReceiver<ControlReplyPacket>);
@@ -464,6 +490,8 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
 
             replies: DomainReplies(drx),
+            map_meta: MapMeta::new(),
+
         }
     }
 

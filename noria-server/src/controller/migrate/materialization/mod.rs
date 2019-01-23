@@ -17,6 +17,8 @@ use slog::Logger;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::controller::recipe::Recipe;
+use crate::controller::inner::MapMeta;
 
 mod plan;
 
@@ -191,10 +193,8 @@ impl Materializations {
                                     col
                                 )
                             })
-                        })
-                        .collect()
-                })
-                .collect()
+                        }).collect()
+                }).collect()
         }
 
         // lookup obligations are fairly rigid, in that they require a materialization, and can
@@ -254,7 +254,6 @@ impl Materializations {
                 }
             }
         }
-
         // we need to compute which views can be partial, and which can not.
         // in addition, we need to figure out what indexes each view should have.
         // this is surprisingly difficult to get right.
@@ -416,6 +415,8 @@ impl Materializations {
         assert!(replay_obligations.is_empty());
     }
 
+
+
     /// Retrieves the materialization status of a given node, or None
     /// if the node isn't materialized.
     pub fn get_status(&self, index: &NodeIndex, node: &Node) -> MaterializationStatus {
@@ -431,20 +432,22 @@ impl Materializations {
         }
     }
 
+
     /// Commit to all materialization decisions since the last time `commit` was called.
     ///
     /// This includes setting up replay paths, adding new indices to existing materializations, and
     /// populating new materializations.
     pub(super) fn commit(
-        &mut self,
-        graph: &Graph,
-        new: &HashSet<NodeIndex>,
-        domains: &mut HashMap<DomainIndex, DomainHandle>,
-        workers: &HashMap<WorkerIdentifier, Worker>,
-        replies: &mut DomainReplies,
+       &mut self,
+       recipe: &Recipe,
+       graph: &Graph,
+       new: &HashSet<NodeIndex>,
+       domains: &mut HashMap<DomainIndex, DomainHandle>,
+       workers: &HashMap<WorkerIdentifier, Worker>,
+       replies: &mut DomainReplies,
+       map_meta: &mut MapMeta,
     ) {
         self.extend(graph, new);
-
         // check that we don't have fully materialized nodes downstream of partially materialized
         // nodes.
         {
@@ -470,7 +473,6 @@ impl Materializations {
                 }
 
                 if let Some(pi) = any_partial(self, graph, ni) {
-                    println!("{}", graphviz(graph, true, &self));
                     crit!(self.log, "partial materializations above full materialization";
                               "full" => ni.index(),
                               "partial" => pi.index());
@@ -518,7 +520,6 @@ impl Materializations {
                                                 .find(|c| !index.contains(&c))
                                         });
                                     if let Some(not_shared) = unshared {
-                                        println!("{}", graphviz(graph, true, &self));
                                         crit!(self.log, "partially overlapping partial indices";
                                                   "parent" => pni.index(),
                                                   "pcols" => ?index,
@@ -586,7 +587,6 @@ impl Materializations {
                             .find(|&(c, res)| c != col && res == &src)
                         {
                             // another column in the merger's parent resolved to the source column!
-                            //println!("{}", graphviz(graph, &self));
                             crit!(self.log, "attempting to merge sharding by aliased column";
                                       "parent" => mat_anc.index(),
                                       "aliased" => res,
@@ -645,7 +645,6 @@ impl Materializations {
                             != self.have.get(&child).map(|i| i.len()).unwrap_or(0)
                         {
                             // node was previously materialized!
-                            println!("{}", graphviz(graph, true, &self));
                             crit!(
                                 self.log,
                                 "attempting to make old non-materialized node with children partial";
@@ -671,18 +670,18 @@ impl Materializations {
                 info!(self.log, "adding partial index to existing {:?}", n);
                 let log = self.log.new(o!("node" => node.index()));
                 let log = mem::replace(&mut self.log, log);
-                self.setup(node, &mut index_on, graph, domains, workers, replies);
+                self.setup(node, &mut index_on, graph, domains, workers, replies, true, None, None);
                 mem::replace(&mut self.log, log);
                 index_on.clear();
             } else if !n.sharded_by().is_none() {
                 // what do we even do here?!
-                println!("{}", graphviz(graph, true, &self));
                 crit!(self.log, "asked to add index to sharded node";
                            "node" => node.index(),
                            "cols" => ?index_on);
             // unimplemented!();
             } else {
                 use dataflow::payload::InitialState;
+                // println!("Preparing node... {:?}", node.clone());
                 domains
                     .get_mut(&n.domain())
                     .unwrap()
@@ -692,25 +691,92 @@ impl Materializations {
                             state: InitialState::IndexedLocal(index_on),
                         },
                         workers,
-                    )
-                    .unwrap();
+                    ).unwrap();
+            }
+        }
+
+        let mut reader_to_q = HashMap::new();
+        for (q, readers) in map_meta.query_to_readers.iter() {
+            for reader in readers {
+                reader_to_q.insert(reader, q);
             }
         }
 
         // then, we start prepping new nodes
         for ni in make {
+            // We're checking to see if this node will share an SRMap. If it's an SRMap node,
+            // we'll figure out the materialization information and set a flag as such.
+            // If it's not, then we still need to materialize a map for it (whether it be an SRMAP
+            // or other), but we won't add it to the Vec of SRMap handles stored in the domain.
+            let mut srmap_node = false;
+            let mut materialization_info : Option<(usize, usize)> = None;
+            let mut uid = None;
+            // Check if this node should share an SRMap
+            // println!("considering node index: {:?}", ni);
+            // println!("reader_to_q: {:?}", reader_to_q);
+            // println!("recipe: leaf addr {:?}", recipe.clone().inc.unwrap().leaf_addresses);
+            match reader_to_q.get(&ni) {
+                Some(query) => {
+                    srmap_node = true;
+                    // Check to see if SRMap was already materialized
+                    match map_meta.query_to_materialization.get(query.clone()) {
+                        // If it was materialized, figure out where it's located (domain and offset)
+                        Some(info) => {
+                            materialization_info = Some(info.clone());
+                        },
+                        // If it wasn't materialized, materialize it!
+                        None => {
+                            match map_meta.query_to_domain.get(query.clone()) {
+                                Some(domain) => {
+                                    let mut new_offset = 0;
+                                    match map_meta.domain_to_offset.get_mut(&domain) {
+                                        Some(offset) => {
+                                            new_offset = *offset + 1;
+                                            materialization_info = Some((domain.clone(), new_offset.clone()));
+                                        },
+                                        None => {
+                                            materialization_info = Some((domain.clone(), 0));
+                                        }
+                                    };
+                                    map_meta.domain_to_offset.insert(domain.clone(), new_offset);
+                                    match materialization_info {
+                                        Some(info) => {
+                                            // println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
+                                            map_meta.query_to_materialization.insert(query.clone().to_string(), info.clone());
+                                        },
+                                        None => {}
+                                    }
+                                },
+                                None => {
+                                    panic!("SRMap node should be assigned to a domain!");
+                                }
+                            }
+                        }
+                    }
+                },
+                None => {
+                    let n = &graph[ni];
+                    // println!("DECIDING: n: {:?}", n);
+                }
+            }
+
+            match map_meta.reader_to_uid.get(&ni) {
+                Some(id) => { uid = Some(id.clone()); },
+                None => {}
+            };
+
             let n = &graph[ni];
+
             let mut index_on = self
                 .added
                 .remove(&ni)
                 .map(|idxs| {
                     assert!(!idxs.is_empty());
                     idxs
-                })
-                .unwrap_or_else(HashSet::new);
+                }).unwrap_or_else(HashSet::new);
 
             let start = ::std::time::Instant::now();
-            self.ready_one(ni, &mut index_on, graph, domains, workers, replies);
+            self.ready_one(ni, &mut index_on, graph, domains, workers, replies, srmap_node, materialization_info, uid);
             let reconstructed = index_on.is_empty();
 
             // communicate to the domain in charge of a particular node that it should start
@@ -718,6 +784,7 @@ impl Materializations {
             // acknowledge the change. this is important so that we don't ready a child in a
             // different domain before the parent has been readied. it's also important to avoid us
             // returning before the graph is actually fully operational.
+
             trace!(self.log, "readying node"; "node" => ni.index());
             let domain = domains.get_mut(&n.domain()).unwrap();
             domain
@@ -727,8 +794,7 @@ impl Materializations {
                         index: index_on,
                     },
                     workers,
-                )
-                .unwrap();
+                ).unwrap();
             replies.wait_for_acks(&domain);
             trace!(self.log, "node ready"; "node" => ni.index());
 
@@ -739,7 +805,6 @@ impl Materializations {
                       );
             }
         }
-
         self.added.clear();
     }
 
@@ -753,6 +818,9 @@ impl Materializations {
         domains: &mut HashMap<DomainIndex, DomainHandle>,
         workers: &HashMap<WorkerIdentifier, Worker>,
         replies: &mut DomainReplies,
+        srmap_node: bool,
+        materialization_info: Option<(usize, usize)>,
+        uid: Option<usize>,
     ) {
         let n = &graph[ni];
         let mut has_state = !index_on.is_empty();
@@ -780,8 +848,7 @@ impl Materializations {
             if r.is_materialized() {
                 has_state = true;
             }
-        })
-        .unwrap_or(());
+        }).unwrap_or(());
 
         if !has_state {
             debug!(self.log, "no need to replay non-materialized view"; "node" => ni.index());
@@ -792,7 +859,7 @@ impl Materializations {
         info!(self.log, "beginning reconstruction of {:?}", n);
         let log = self.log.new(o!("node" => ni.index()));
         let log = mem::replace(&mut self.log, log);
-        self.setup(ni, index_on, graph, domains, workers, replies);
+        self.setup(ni, index_on, graph, domains, workers, replies, srmap_node, materialization_info, uid);
         mem::replace(&mut self.log, log);
 
         // NOTE: the state has already been marked ready by the replay completing, but we want to
@@ -811,6 +878,9 @@ impl Materializations {
         domains: &mut HashMap<DomainIndex, DomainHandle>,
         workers: &HashMap<WorkerIdentifier, Worker>,
         replies: &mut DomainReplies,
+        srmap_node: bool,
+        materialization_info: Option<(usize, usize)>,
+        uid: Option<usize>,
     ) {
         if index_on.is_empty() {
             // we must be reconstructing a Reader.
@@ -821,8 +891,7 @@ impl Materializations {
                     if let Some(rh) = r.key() {
                         index_on.insert(Vec::from(rh));
                     }
-                })
-                .unwrap();
+                }).unwrap();
         }
 
         // construct and disseminate a plan for each index
@@ -831,7 +900,7 @@ impl Materializations {
             for index in index_on.drain() {
                 plan.add(index, replies);
             }
-            plan.finalize()
+            plan.finalize(srmap_node, materialization_info, uid)
         };
 
         if !pending.is_empty() {
@@ -852,8 +921,7 @@ impl Materializations {
                             from: pending.source,
                         },
                         workers,
-                    )
-                    .unwrap();
+                    ).unwrap();
             }
 
             // and then wait for the last domain to receive all the records
@@ -864,6 +932,7 @@ impl Materializations {
             );
 
             replies.wait_for_acks(&domains[&target]);
+
         }
     }
 }

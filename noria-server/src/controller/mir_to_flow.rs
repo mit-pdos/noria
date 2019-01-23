@@ -14,11 +14,13 @@ use mir::node::{GroupedNodeType, MirNode, MirNodeType};
 use mir::query::{MirQuery, QueryFlowParts};
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
+use std::collections::HashSet;
 
 pub fn mir_query_to_flow_parts(
     mir_query: &mut MirQuery,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+    global_name: Option<String>
 ) -> QueryFlowParts {
     use std::collections::VecDeque;
 
@@ -38,7 +40,7 @@ pub fn mir_query_to_flow_parts(
     while !node_queue.is_empty() {
         let n = node_queue.pop_front().unwrap();
         assert_eq!(in_edge_counts[&n.borrow().versioned_name()], 0);
-        let flow_node = mir_node_to_flow_parts(&mut n.borrow_mut(), mig, table_mapping);
+        let flow_node = mir_node_to_flow_parts(&mut n.borrow_mut(), mig, table_mapping.clone(), global_name.clone());
 
         // println!("converting node {:#?} to flow node {:#?}", n, flow_node);
 
@@ -84,6 +86,7 @@ pub fn mir_node_to_flow_parts(
     mir_node: &mut MirNode,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+    global_name: Option<String>,
 ) -> FlowNode {
     let name = mir_node.name.clone();
     match mir_node.flow_node {
@@ -203,6 +206,30 @@ pub fn mir_node_to_flow_parts(
                     // println!("making leaf");
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
+                    let na = parent.borrow().flow_node_addr().unwrap();
+
+                    let mut g_name = "".to_string();
+                    match global_name {
+                        Some(gn) => {
+                            g_name = gn;
+                        },
+                        None => {}
+                    }
+
+                    if g_name != "".to_string() {
+                        // println!("global name not empty");
+                        if !mig.mainline.map_meta.query_to_leaves.contains_key(&g_name.clone()) {
+                            let mut associated_nodes = HashSet::new();
+                            associated_nodes.insert(na.clone());
+                            mig.mainline.map_meta.query_to_leaves.insert(g_name.clone(), associated_nodes);
+                        } else {
+                            match mig.mainline.map_meta.query_to_leaves.get_mut(&g_name.clone()) {
+                                Some(list) => list.insert(na.clone()),
+                                None => false
+                            };
+                        }
+                    }
+
                     materialize_leaf_node(&parent, name, keys, mig);
                     // TODO(malte): below is yucky, but required to satisfy the type system:
                     // each match arm must return a `FlowNode`, so we use the parent's one

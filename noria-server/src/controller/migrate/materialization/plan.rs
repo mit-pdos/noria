@@ -59,38 +59,37 @@ impl<'a> Plan<'a> {
 
         // cut paths so they only reach to the the closest materialized node
         let mut paths: Vec<_> = paths
-            .into_iter()
-            .map(|path| -> Vec<_> {
-                let mut found = false;
-                let mut path: Vec<_> = path
-                    .into_iter()
-                    .enumerate()
-                    .take_while(|&(i, (node, _))| {
-                        // remember, the paths are "backwards", so the first node is target node
-                        if i == 0 {
-                            return true;
-                        }
+                .into_iter()
+                .map(|path| -> Vec<_> {
+                    let mut found = false;
+                    let mut path: Vec<_> = path
+                        .into_iter()
+                        .enumerate()
+                        .take_while(|&(i, (node, _))| {
+                            // remember, the paths are "backwards", so the first node is target node
+                            if i == 0 {
+                                return true;
+                            }
 
-                        // keep taking until we get our first materialized node
-                        // (`found` helps us emulate `take_while_inclusive`)
-                        if found {
-                            // we've already found a materialized node
-                            return false;
-                        }
+                            // keep taking until we get our first materialized node
+                            // (`found` helps us emulate `take_while_inclusive`)
+                            if found {
+                                // we've already found a materialized node
+                                return false;
+                            }
 
-                        if self.m.have.contains_key(&node) {
-                            // we want to take this node, but not any later ones
-                            found = true;
-                        }
-                        true
-                    })
-                    .map(|(_, segment)| segment)
-                    .collect();
-                path.reverse();
-                path
-            })
-            .collect();
-
+                            if self.m.have.contains_key(&node) {
+                                // we want to take this node, but not any later ones
+                                found = true;
+                            }
+                            true
+                        })
+                        .map(|(_, segment)| segment)
+                        .collect();
+                    path.reverse();
+                    path
+                })
+                .collect();
         // since we cut off part of each path, we *may* now have multiple paths that are the same
         // (i.e., if there was a union above the nearest materialization). this would be bad, as it
         // would cause a domain to request replays *twice* for a key from one view!
@@ -163,7 +162,7 @@ impl<'a> Plan<'a> {
                 //  a domain may appear multiple times in this list if a path crosses into the same
                 //  domain more than once. currently, that will cause a deadlock.
                 if seen.contains(&domain) {
-                    println!("{}", graphviz(&self.graph, true, &self.m));
+                    // println!("{}", graphviz(&self.graph, &self.m));
                     crit!(self.m.log, "detected a-b-a domain replay path");
                     unimplemented!();
                 }
@@ -182,8 +181,7 @@ impl<'a> Plan<'a> {
                     .map(|&(ni, ref key)| ReplayPathSegment {
                         node: self.graph[ni].local_addr(),
                         partial_key: key.clone(),
-                    })
-                    .collect();
+                    }).collect();
 
                 // the first domain in the chain may *only* have the source node
                 // in which case it doesn't need to know about the path
@@ -326,8 +324,7 @@ impl<'a> Plan<'a> {
                                     new_tag: Some((tag, segments[i + 1].1[0].0.into())),
                                 },
                                 workers,
-                            )
-                            .unwrap();
+                            ).unwrap();
                     } else {
                         assert!(n.is_sharder());
                     }
@@ -356,7 +353,7 @@ impl<'a> Plan<'a> {
     /// instantaneous.
     ///
     /// Returns a list of backfill replays that need to happen before the migration is complete.
-    pub fn finalize(mut self) -> Vec<PendingReplay> {
+    pub fn finalize(mut self, srmap_node: bool, materialization_info: Option<(usize, usize)>, uid: Option<usize>) -> Vec<PendingReplay> {
         use dataflow::payload::InitialState;
 
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
@@ -376,16 +373,21 @@ impl<'a> Plan<'a> {
                         cols: self.graph[self.node].fields().len(),
                         key: Vec::from(r.key().unwrap()),
                         trigger_domain: (last_domain, num_shards),
+                        srmap_node: srmap_node,
+                        materialization_info: materialization_info,
+                        uid: uid,
                     }
                 } else {
                     InitialState::Global {
                         cols: self.graph[self.node].fields().len(),
                         key: Vec::from(r.key().unwrap()),
                         gid: self.node,
+                        srmap_node: srmap_node,
+                        materialization_info: materialization_info,
+                        uid: uid
                     }
                 }
-            })
-            .ok()
+            }).ok()
             .unwrap_or_else(|| {
                 // not a reader
                 if self.partial {
@@ -410,8 +412,7 @@ impl<'a> Plan<'a> {
                     state: s,
                 },
                 self.workers,
-            )
-            .unwrap();
+            ).unwrap();
 
         if !self.partial {
             // we know that this must be a *new* fully materialized node:

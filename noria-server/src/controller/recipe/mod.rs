@@ -37,7 +37,7 @@ pub struct Recipe {
     prior: Option<Box<Recipe>>,
 
     /// Maintains lower-level state, but not the graph itself. Lazily initialized.
-    inc: Option<SqlIncorporator>,
+    pub inc: Option<SqlIncorporator>,
 
     log: slog::Logger,
 }
@@ -288,7 +288,7 @@ impl Recipe {
         universe_groups: HashMap<String, Vec<DataType>>,
     ) -> Result<ActivationResult, String> {
         use crate::controller::sql::security::Multiverse;
-        // println!("HERE!");
+
         let mut result = ActivationResult {
             new_nodes: HashMap::default(),
             removed_leaves: Vec::default(),
@@ -301,9 +301,9 @@ impl Recipe {
                 &self.security_config.clone().unwrap(),
                 universe_groups,
                 mig,
-            )?;
+            );
 
-            for qfp in qfps {
+            for qfp in qfps.unwrap() {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }
         }
@@ -314,14 +314,17 @@ impl Recipe {
             // add the universe-specific query
             // don't use query name to avoid conflict with global queries
             let (id, group) = mig.universe();
+            let mut in_group = false;
             let new_name = if n.is_some() {
                 match group {
-                    Some(ref g) => Some(format!(
+                    Some(ref g) => {
+                        let in_group = true;
+                        Some(format!(
                         "{}_{}{}",
                         n.clone().unwrap(),
                         g.to_string(),
                         id.to_string()
-                    )),
+                    ))},
                     None => Some(format!("{}_u{}", n.clone().unwrap(), id.to_string())),
                 }
             } else {
@@ -329,16 +332,16 @@ impl Recipe {
             };
 
             let is_leaf = if group.is_some() { false } else { is_leaf };
-            // println!("here 5");
+
             let qfp = self
                 .inc
                 .as_mut()
                 .unwrap()
-                .add_parsed_query(q, new_name, is_leaf, mig)?;
+                .add_parsed_query(q, new_name.clone(), is_leaf, mig, n.clone())?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
-            let query_name = match n {
+            let query_name = match n.clone() {
                 Some(name) => name,
                 None => qfp.name.clone(),
             };
@@ -346,8 +349,11 @@ impl Recipe {
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
 
+        // println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
+
         Ok(result)
     }
+
 
     /// Activate the recipe by migrating the Soup data-flow graph wrapped in `mig` to the recipe.
     /// This causes all necessary changes to said graph to be applied; however, it is the caller's
@@ -392,12 +398,12 @@ impl Recipe {
                     "Creating membership view for group {}",
                     group.name()
                 );
-                // println!("here 6");
                 let qfp = self.inc.as_mut().unwrap().add_parsed_query(
                     group.membership(),
                     Some(group.name()),
                     true,
                     mig,
+                    None
                 )?;
 
                 /// Add trigger node below group membership views
@@ -429,7 +435,7 @@ impl Recipe {
                 .inc
                 .as_mut()
                 .unwrap()
-                .add_parsed_query(q, n.clone(), is_leaf, mig)?;
+                .add_parsed_query(q, n.clone(), is_leaf, mig, n.clone())?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.

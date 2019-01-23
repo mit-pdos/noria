@@ -243,6 +243,23 @@ impl<'a> Migration<'a> {
 
         let ri = self.readers[&n];
 
+        let uid = self.universe().0.to_string();
+
+        let mut uint = 0;
+        if uid != "global".to_string() {
+            uint = uid.parse().unwrap();
+        }
+        let uid : usize = uint as usize;
+
+        self.mainline.map_meta.reader_to_uid.insert(ri.clone(), uid.clone());
+
+        let mut leaf_to_query = HashMap::new();
+        for (query_n, node_list) in self.mainline.map_meta.query_to_leaves.iter() {
+           for node in node_list.clone() {
+               leaf_to_query.insert(node, query_n);
+           }
+        }
+
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
@@ -531,13 +548,14 @@ impl<'a> Migration<'a> {
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
         mainline.materializations.commit(
+            &mainline.recipe,
             &mainline.ingredients,
             &new,
             &mut mainline.domains,
             &mainline.workers,
             &mut mainline.replies,
+            &mut mainline.map_meta,
         );
-
         warn!(log, "migration completed"; "ms" => start.elapsed().as_millis());
     }
 }

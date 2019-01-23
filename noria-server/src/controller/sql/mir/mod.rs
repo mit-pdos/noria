@@ -484,7 +484,6 @@ impl SqlToMirConverter {
         ),
         String,
     > {
-        // println!("HERE");
         let (sec, nodes, table_mapping, base_name) =
             self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe)?;
         let mut roots = Vec::new();

@@ -305,7 +305,7 @@ fn main() {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
         let dur = dur_to_fsec!(start.elapsed());
-        println!("Migration {} took {:.2}s!", i, dur,);
+        // println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
         if partial {
