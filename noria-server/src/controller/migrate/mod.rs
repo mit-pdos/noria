@@ -23,6 +23,7 @@
 use crate::controller::ControllerInner;
 use dataflow::prelude::*;
 use dataflow::{node, payload};
+use dataflow::ops::identity::Identity;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -56,9 +57,28 @@ pub struct Migration<'a> {
 
     /// Additional migration information provided by the client
     pub(super) context: HashMap<String, DataType>,
+    /// Mapping from nodes to their bottom replicas
+    pub(super) replicas: HashMap<NodeIndex, NodeIndex>,
 }
 
 impl<'a> Migration<'a> {
+    // Correct the parents by replacing top replicas with their corresponding bottom replicas.
+    // Ensures that new ingredients or readers are children of the bottom replica. Also, none
+    // of the inputs should be bottom replicas since users should be unaware of their existence.
+    // TODO(ygina): probably doesn't work if the parent was added in a separate migration.
+    fn correct_parents(&self, mut nodes: Vec<NodeIndex>) -> Vec<NodeIndex> {
+        let bottoms = self.replicas.values().collect::<HashSet<&NodeIndex>>();
+        for i in 0..nodes.len() {
+            let t = nodes.get(i).unwrap();
+            assert!(!bottoms.contains(&t));
+            if let Some(bottom) = self.replicas.get(&t) {
+                nodes.push(*bottom);
+                nodes.swap_remove(i);
+            }
+        }
+        nodes
+    }
+
     /// Add the given `Ingredient` to the Soup.
     ///
     /// The returned identifier can later be used to refer to the added ingredient.
@@ -68,18 +88,18 @@ impl<'a> Migration<'a> {
     where
         S1: ToString,
         S2: ToString,
-        FS: IntoIterator<Item = S2>,
+        FS: IntoIterator<Item = S2> + Clone,
         I: Ingredient + Into<NodeOperator>,
     {
         i.on_connected(&self.mainline.ingredients);
-        let parents = i.ancestors();
+        let parents = self.correct_parents(i.ancestors());
         assert!(!parents.is_empty());
 
         // add to the graph
         let ni =
             self.mainline
                 .ingredients
-                .add_node(node::Node::new(name.to_string(), fields, i.into()));
+                .add_node(node::Node::new(name.to_string(), fields.clone(), i.into()));
         info!(self.log,
               "adding new node";
               "node" => ni.index(),
@@ -92,6 +112,13 @@ impl<'a> Migration<'a> {
         for parent in parents {
             self.mainline.ingredients.add_edge(parent, ni, ());
         }
+
+        // if the node is an aggregator, we also need a bottom replica
+        if self.mainline.ingredients[ni].is_aggregator() {
+            let bottom_ni = self.add_ingredient(name, fields, Identity::new(ni));
+            assert!(self.replicas.insert(ni, bottom_ni).is_none());
+        }
+
         // and tell the caller its id
         ni.into()
     }
@@ -225,6 +252,7 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
+        let n = self.correct_parents(vec![n])[0];
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
@@ -239,8 +267,8 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
+        let n = self.correct_parents(vec![n])[0];
         self.ensure_reader_for(n, Some(name));
-
         let ri = self.readers[&n];
 
         self.mainline.ingredients[ri]
