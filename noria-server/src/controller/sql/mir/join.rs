@@ -84,7 +84,6 @@ fn pick_join_chains(
     join_chains: &mut Vec<JoinChain>,
     node_for_rel: &HashMap<&str, MirNodeRef>,
 ) -> (JoinChain, JoinChain) {
-    println!("JOIN SRC: {:#?} JOIN DST: {:#?}, NODE FOR REL: {:#?}", src, dst, node_for_rel); 
     let left_chain = match join_chains.iter().position(|chain| chain.has_table(src)) {
         Some(idx) => join_chains.swap_remove(idx),
         None => JoinChain {

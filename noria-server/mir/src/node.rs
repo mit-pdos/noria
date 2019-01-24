@@ -519,8 +519,6 @@ impl MirNodeType {
     }
 
     fn can_reuse_as(&self, other: &MirNodeType) -> bool {
-
-        println!("CHECKING REUSABILITY");
         match *self {
             MirNodeType::Reuse { .. } => (), // handled below
             _ => {
@@ -624,9 +622,6 @@ impl MirNodeType {
                     } => {
                         // TODO(malte): column order does not actually need to match, but this only
                         // succeeds if it does.
-                        println!("OUR ON LEFT: {:#?} ON LEFT {:#?}", our_on_left, on_left);
-                        println!("OUR ON RIGHT: {:#?} ON RIGHT {:#?}", our_on_right, on_right);
-                        println!("OUR PROJECT: {:#?} PROJECT {:#?}", our_on_right, on_right);
                         let mut ret_val = false;
                         for col in our_on_left {
                             match col.clone().table {

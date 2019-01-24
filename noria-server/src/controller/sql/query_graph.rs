@@ -510,9 +510,6 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
             new_node(table.name.clone(), Vec::new(), st),
         );
     }
-
-
-    println!("QG RELATIONS: {:#?}", qg.relations);
     
     for jc in &st.join {
         match jc.right {

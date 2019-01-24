@@ -1031,8 +1031,6 @@ impl Domain {
                                    None => {}
                                 }
 
-                                println!("SRMAP DECISION: ids: {}", ids);
-
                                 // If materialization info isn't None, then we're dealing with a
                                 // reader node that is supposed to share an SRMap. Compare the
                                 // offset information with the current length of the handle vector.

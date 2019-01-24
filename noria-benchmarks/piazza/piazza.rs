@@ -145,7 +145,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/complex-policies.json")
+                .default_value("noria-benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .arg(
@@ -180,7 +180,7 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
-                .default_value("nopopulate")
+                .default_value("before")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         )
@@ -320,27 +320,53 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    if !partial {
-        let mut dur = time::Duration::from_millis(0);
-        for uid in 0..nlogged {
-            let leaf = format!("posts_u{}", uid);
-            let mut getter = backend.g.view(&leaf).unwrap();
-            let start = time::Instant::now();
-            for author in 0..nusers {
-                getter.lookup(&[author.into()], true).unwrap();
-            }
-            dur += start.elapsed();
-        }
-
-        let dur = dur_to_fsec!(dur);
-
-        println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            nlogged * nusers,
-            dur,
-            (nlogged * nusers) as f64 / dur,
-        );
+    let mut dur = time::Duration::from_millis(0);
+    let mut uids = Vec::new();
+    let num_at_once = 10;
+    for uid in 0..num_at_once {
+        uids.push([0.into()].to_vec());
     }
+
+    for uid in 0..nlogged {
+        let leaf = format!("posts_u{}", uid);
+        let mut getter = backend.g.view(&leaf).unwrap();
+        let start = time::Instant::now();
+        let res = getter.multi_lookup(uids.clone(), false);
+        println!("res: {:?}", res);
+        dur += start.elapsed();
+    }
+
+    let dur = dur_to_fsec!(dur);
+
+    println!(
+        "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+        num_at_once * nlogged,
+        dur,
+        (num_at_once * nlogged) as f64 / dur,
+    );
+
+
+    // if !partial {
+    //     let mut dur = time::Duration::from_millis(0);
+    //     for uid in 0..nlogged {
+    //         let leaf = format!("posts_u{}", uid);
+    //         let mut getter = backend.g.view(&leaf).unwrap();
+    //         let start = time::Instant::now();
+    //         for author in 0..nusers {
+    //             getter.lookup(&[author.into()], true).unwrap();
+    //         }
+    //         dur += start.elapsed();
+    //     }
+    //
+    //     let dur = dur_to_fsec!(dur);
+    //
+    //     println!(
+    //         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+    //         nlogged * nusers,
+    //         dur,
+    //         (nlogged * nusers) as f64 / dur,
+    //     );
+    // }
 
     println!("Done with benchmark.");
 

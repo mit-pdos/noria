@@ -133,7 +133,6 @@ impl SqlToMirConverter {
     /// security policies and therefore different nodes that are not
     /// represent in the the query graph
     pub fn set_universe(&mut self, universe: Universe) {
-        println!("SETTING UNIVERSE TO : {:#?}", universe);
         self.universe = universe;
     }
 
@@ -484,7 +483,6 @@ impl SqlToMirConverter {
         ),
         String,
     > {
-        println!("HERE");
         let (sec, nodes, table_mapping, base_name) =
             self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe);
         let mut roots = Vec::new();
@@ -508,7 +506,6 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("after node iter");
         assert_eq!(
             leaves.len(),
             1,
@@ -756,7 +753,6 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_cols);
         assert_eq!(
             num_ucols,
             selected_cols.len(),
@@ -818,8 +814,6 @@ impl SqlToMirConverter {
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
 
-        println!("ANCESTORS: {:#?}", ancestors);
-
         for c in ucols.clone() {
             if ancestors
                 .iter()
@@ -854,7 +848,6 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("UCOLS: {:#?} SELECTED COLS: {:#?}", ucols, selected_col_objects);
         assert_eq!(
             num_ucols,
             selected_col_objects.len(),
@@ -1108,8 +1101,6 @@ impl SqlToMirConverter {
         kind: JoinType,
     ) -> MirNodeRef {
 
-        println!("Creating join node! left = {:#?}, right = {:#?}, kind: {:?}", left_node, right_node, kind);
-
         // TODO(malte): this is where we overproject join columns in order to increase reuse
         // opportunities. Technically, we need to only project those columns here that the query
         // actually needs; at a minimum, we could start with just the join colums, relying on the
@@ -1130,8 +1121,6 @@ impl SqlToMirConverter {
             .into_iter()
             .chain(projected_cols_right.into_iter())
             .collect::<Vec<Column>>();
-
-        println!("FIELDS: {:#?}", fields);
 
         // join columns need us to generate join group configs for the operator
         // TODO(malte): no multi-level joins yet
@@ -1158,7 +1147,6 @@ impl SqlToMirConverter {
             .into_iter()
             .filter_map(|mut f| {
                 if f == r_col {
-                    println!("DROPPING COL: {:#?}", f);
                     // drop instances of right-side column
                     None
                 } else if f == l_col {
@@ -1389,7 +1377,6 @@ impl SqlToMirConverter {
             ComparisonOp(ref ct) => {
                 // currently, we only support filter-like
                 // comparison operations, no nested-selections
-                println!("comp op");
                 let f = self.make_filter_node(&format!("{}_f{}", name, nc), parent, ct);
 
                 pred_nodes.push(f);

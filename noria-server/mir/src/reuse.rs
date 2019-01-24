@@ -57,7 +57,7 @@ pub fn merge_mir_for_queries(
         }
     }
 
-    println!("old query {:#?} new query {:#?}", old_query, new_query);
+    // println!("old query {:#?} new query {:#?}", old_query, new_query);
 
     // trace forwards from all matching bases in `old_query`, until no reuseable children are
     // found.

@@ -382,7 +382,7 @@ impl<E> Table<E> {
     {
         // println!("in table insert");
         let data = vec![TableOperation::Insert(u.into())];
-        // println!("inserting data: {:?}", data.clone());
+        println!("inserting data into table: {:?}", data.clone());
         if data[0].row().unwrap().len() != self.columns.len() {
             return Err(TableError::WrongColumnCount(
                 self.columns.len(),

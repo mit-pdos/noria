@@ -144,7 +144,6 @@ impl SqlIncorporator {
         mig: &mut Migration,
         global_name: Option<String>
     ) -> Result<QueryFlowParts, String> {
-        println!("closer");
         match name {
             None => self.nodes_for_query(query, is_leaf, mig),
             Some(n) => self.nodes_for_named_query(query, n, is_leaf, mig, global_name),
@@ -415,7 +414,6 @@ impl SqlIncorporator {
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`.
         // Note that we don't need to optimize the MIR here, because the query is trivial.
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None, None);
-        // println!("in leaf existing");
         self.register_query(query_name, None, &mir, mig.universe());
 
         qfp
@@ -447,7 +445,6 @@ impl SqlIncorporator {
             unimplemented!();
         }
 
-        println!("hi2");
         self.register_query(query_name, None, &mir, mig.universe());
 
         qfp
@@ -545,13 +542,11 @@ impl SqlIncorporator {
             is_leaf,
             universe.clone(),
         )?;
-        println!("Here 1");
         trace!(self.log, "Unoptimized MIR:\n{}", og_mir.to_graphviz().unwrap());
 
         // run MIR-level optimizations
         let mut mir = og_mir.optimize(table_mapping.as_ref(), sec);
 
-        println!("Here 2");
         trace!(self.log, "Optimized MIR:\n{}", mir.to_graphviz().unwrap());
 
         if sec {
@@ -565,13 +560,9 @@ impl SqlIncorporator {
             }
         }
 
-        println!("hi4");
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
         let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, table_mapping.as_ref(), None);
-
-        // println!("in add query via mir");
         // register local state
-        println!("add_query_via_mir");
         self.register_query(query_name, Some(qg), &mir, universe);
 
         Ok((qfp, mir))
@@ -760,7 +751,6 @@ impl SqlIncorporator {
         );
 
         // register local state
-        println!("extend existing query");
         self.register_query(query_name, Some(qg), &post_reuse_opt_mir, universe);
 
         Ok(qfp)
@@ -784,7 +774,6 @@ impl SqlIncorporator {
     /// Runs some standard rewrite passes on the query.
     fn rewrite_query(&mut self, q: SqlQuery, mig: &mut Migration) -> Result<SqlQuery, String> {
         // TODO: make this not take &mut self
-        println!("Q: {:?}", q);
         use crate::controller::sql::passes::alias_removal::AliasRemoval;
         use crate::controller::sql::passes::count_star_rewrite::CountStarRewrite;
         use crate::controller::sql::passes::implied_tables::ImpliedTableExpansion;
@@ -810,7 +799,6 @@ impl SqlIncorporator {
             match sq {
                 Subquery::InComparison(cond_base) => {
                     let (sq, column) = query_from_condition_base(&cond_base);
-                    println!("here 9");
                     let qfp = self
                         .add_parsed_query(sq, None, false, mig, None)
                         .expect("failed to add subquery");
@@ -819,7 +807,6 @@ impl SqlIncorporator {
                 Subquery::InJoin(join_right_side) => {
                     *join_right_side = match *join_right_side {
                         JoinRightSide::NestedSelect(box ref ns, ref alias) => {
-                            println!("here 10");
                             let qfp = self
                                 .add_parsed_query(
                                     SqlQuery::Select(ns.clone()),
@@ -856,7 +843,6 @@ impl SqlIncorporator {
             | ref q @ SqlQuery::Delete(_)
             | ref q @ SqlQuery::DropTable(_)
             | ref q @ SqlQuery::Insert(_) => {
-                println!("q.ref tabl {:#?}, view schemas {:#?}", q.referred_tables(), self.view_schemas);
                 for t in &q.referred_tables() {
                     if !self.view_schemas.contains_key(&t.name) && t.name != "UserContext" && t.name != "GroupContext" {
                         return Err(format!("query refers to unknown table \"{}\"", t.name));
