@@ -197,22 +197,18 @@ pub fn assign(
 
             let mut assignment = None;
             for &(_, ref p) in &parents {
-                println!("here1");
                 if p.is_sharder() {
                     // we're a child of a sharder (which currently has to be unsharded). we
                     // can't be in the same domain as the sharder (because we're starting a new
                     // sharding)
                     assert!(p.sharded_by().is_none());
                 } else if p.is_source() {
-                    println!("here2");
                     // the source isn't a useful source of truth
                 } else if assignment.is_none() {
-                    println!("here3");
                     // the key may move to a different column, so we can't actually check for
                     // ByColumn equality. this'll do for now.
                     assert_eq!(p.sharded_by().is_none(), n.sharded_by().is_none());
                     if p.has_domain() {
-                        println!("here 3 ' ");
                         assignment = Some(p.domain().index());
 
                         if srmap_reader_node {
@@ -222,13 +218,11 @@ pub fn assign(
                 }
 
                 if let Some(candidate) = assignment {
-                    println!("here4");
                     // let's make sure we don't construct a-b-a path
                     if any_parents(
                         &|p| p.has_domain() && p.domain().index() != candidate,
                         &|pp| pp.domain().index() == candidate,
                     ) {
-                        println!("here 5");
                         assignment = None;
                         continue;
                     }
@@ -266,7 +260,6 @@ pub fn assign(
             match assignment {
                 Some(domain_assignment) => {
                     if srmap_reader_node {
-                        println!("5 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     return domain_assignment;
@@ -274,7 +267,6 @@ pub fn assign(
                 None => {
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
-                        println!("6 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     return domain_assignment;
