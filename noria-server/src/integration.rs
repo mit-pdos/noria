@@ -2307,3 +2307,30 @@ fn remove_query() {
     assert_eq!(qa.lookup(&[0.into()], true).unwrap().len(), 3);
     assert_eq!(qb.lookup(&[0.into()], true).unwrap().len(), 1);
 }
+
+#[test]
+fn aggregations_work_with_replicas() {
+    let mut g = build("worker-1", None, false);
+
+    g.migrate(|mig| {
+        let vote = mig.add_base("vote", &["user", "id"], Base::default());
+        let vc = mig.add_ingredient(
+            "votecount",
+            &["id", "votes"],
+            Aggregation::COUNT.over(vote, 0, &[1]),
+        );
+        mig.maintain_anonymous(vc, &[0]);
+    });
+
+    let mut mutx = g.table("vote").unwrap().into_sync();
+    let mut q = g.view("votecount").unwrap().into_sync();
+
+    // identity node does not affect results
+    let id = 0;
+    let votes = 7;
+    for _ in 0..votes {
+        mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    }
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), votes.into()]]);
+}
