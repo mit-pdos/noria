@@ -254,9 +254,12 @@ impl<A: Authority + 'static> Drop for SyncWorkerHandle<A> {
 #[cfg(test)]
 mod tests {
     use crate::controller::WorkerBuilder;
+    use crate::controller::migrate::Migration;
     use dataflow::node::special::Base;
     use dataflow::node::ReplicaType;
     use dataflow::ops::grouped::aggregate::Aggregation;
+    use petgraph::graph::NodeIndex;
+    use std::{time, thread};
 
     #[test]
     #[should_panic]
@@ -307,5 +310,56 @@ mod tests {
                 Some(ReplicaType::Bottom { top_prev_nodes: vec![vote] }),
             );
         });
+    }
+
+    #[test]
+    fn packet_send_receive_sequence_numbers() {
+        let mut g = WorkerBuilder::default().start_simple().unwrap();
+
+        let (a, b, c, d) = g.migrate(|mig| {
+            let vote = mig.add_base("vote", &["user", "id"], Base::default());
+            let vc = mig.add_ingredient(
+                "votecount",
+                &["id", "votes"],
+                Aggregation::COUNT.over(vote, 0, &[1]),
+            );
+
+            let identity = mig
+                .mainline
+                .ingredients
+                .neighbors_directed(vc, petgraph::EdgeDirection::Outgoing)
+                .next()
+                .unwrap();
+
+            let reader = mig.maintain_anonymous(vc, &[0]);
+            (vote, vc, identity, reader)
+        });
+
+        let mut mutx = g.table("vote").unwrap().into_sync();
+
+        // insert a value and observe packet ids increase
+        let id = 0;
+        mutx.insert(vec![1337.into(), id.into()]).unwrap();
+        thread::sleep(time::Duration::from_millis(2000));
+
+        fn print_packet_info(mig: &Migration, ni: NodeIndex) {
+            println!(
+                "Node {} | {} | {} | {:?}",
+                ni.index(),
+                mig.mainline.ingredients[ni].last_packet_received,
+                mig.mainline.ingredients[ni].next_packet_to_send,
+                mig.mainline.ingredients[ni],
+            );
+        }
+
+        g.migrate(move |mig| {
+            println!("NodeIndex | last_packet_received | next_packet_to_send | debug");
+            print_packet_info(mig, a);
+            print_packet_info(mig, b);
+            print_packet_info(mig, c);
+            print_packet_info(mig, d);
+        });
+
+        // send read requests
     }
 }

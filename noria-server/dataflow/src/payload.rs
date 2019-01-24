@@ -77,6 +77,8 @@ pub struct SourceChannelIdentifier {
     pub tag: u32,
 }
 
+pub type PacketId = u32;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Packet {
     // Data messages

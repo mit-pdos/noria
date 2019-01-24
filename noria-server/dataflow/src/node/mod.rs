@@ -1,5 +1,6 @@
 use domain;
 use ops;
+use payload::PacketId;
 use petgraph;
 use prelude::*;
 use std::collections::HashMap;
@@ -32,6 +33,10 @@ pub struct Node {
 
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
+    /// The last packet received and processed from each parent
+    pub last_packet_received: PacketId,
+    /// The next packet to send to each child, starts at 1
+    pub next_packet_to_send: PacketId,
 }
 
 // constructors
@@ -55,6 +60,8 @@ impl Node {
 
             sharded_by: Sharding::None,
             replica: None,
+            last_packet_received: 0,
+            next_packet_to_send: 1,
         }
     }
 
@@ -344,6 +351,15 @@ impl Node {
 
     pub fn set_replica_type(&mut self, rt: ReplicaType) {
         self.replica = Some(rt);
+    }
+
+    pub fn receive_packet(&mut self) {
+        self.last_packet_received += 1;
+    }
+
+    pub fn send_packet(&mut self) -> PacketId {
+        self.next_packet_to_send += 1;
+        self.next_packet_to_send - 1
     }
 }
 
