@@ -51,6 +51,12 @@ pub fn assign(
                 return next_domain();
             }
 
+            if n.is_aggregator() || n.is_reader() {
+                // aggregators and readers are temporarily in their own domain to make it easier
+                // to reason about hot spares for these nodes.
+                return next_domain();
+            }
+
             if n.is_base() {
                 // bases are in a little bit of an awkward position becuase they can't just blindly
                 // join in domains of other bases in the face of sharding. consider the case of two
