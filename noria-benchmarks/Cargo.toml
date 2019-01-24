@@ -14,13 +14,8 @@ noria = { path = "../noria-server", package = "noria-server" }
 nom-sql = "0.0.4"
 regex = "1.0.0"
 itertools = "0.7.2"
-<<<<<<< HEAD:benchmarks/Cargo.toml
-slog = "2.2.2"
-# slog = { version = "2.2.2", features = ["max_level_trace", "release_max_level_trace"] }
-=======
 slog = "2.4.0"
 #slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_debug"] }
->>>>>>> 3272b3b37ba75c1730e6095c9090e8cc121bd776:noria-benchmarks/Cargo.toml
 slog-term = "2.4.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"

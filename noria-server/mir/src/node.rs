@@ -209,139 +209,87 @@ impl MirNode {
     }
 
     pub fn column_id_for_column(
-        &self,
-        c: &Column,
-        table_mapping: Option<&HashMap<(String, Option<String>), String>>,
-    ) -> usize {
-        match self.inner {
-            // if we're a base, translate to absolute column ID (taking into account deleted
-            // columns). We use the column specifications here, which track a tuple of (column
-            // spec, absolute column ID).
-            // Note that `rposition` is required because multiple columns of the same name might
-            // exist if a column has been removed and re-added. We always use the latest column,
-            // and assume that only one column of the same name ever exists at the same time.
-            MirNodeType::Base {
-                ref column_specs, ..
-            } => match column_specs
-                .iter()
-                .rposition(|cs| Column::from(&cs.0.column) == *c)
-            {
-                None => panic!(
-                    "tried to look up non-existent column {:?} in {}",
-                    c, self.name
-                ),
-                Some(id) => column_specs[id]
-                    .1
-                    .expect("must have an absolute column ID on base"),
-            },
-            MirNodeType::Reuse { ref node } => node.borrow().column_id_for_column(c, table_mapping),
-            // otherwise, just look up in the column set
-            _ => match self.columns.iter().position(|cc| cc == c) {
-                None => {
-                    let get_column_index = |c: &Column, t_name: &str| -> usize {
-                        let mut ac = c.clone();
-                        ac.table = Some(t_name.to_owned());
-                        self.columns
-                            .iter()
-                            .position(|cc| *cc == ac)
-                            .expect(&format!(
-                                "tried to look up non-existent column {:?} on node \
-                                 \"{}\" (columns: {:?})",
-                                c, self.name, self.columns
-                            ))
-                    };
-                    // See if table mapping was passed in
-                    match table_mapping {
-                        // if mapping was passed in, then see if c has an associated table, and check
-                        // the mapping for a key based on this
-                        Some(map) => {
-                            match c.table.clone() {
-                                Some(table) => {
-                                    let keyed = format!("{}:{}", c.clone().name, table);
-                                    match map.get(&keyed) {
-                                        Some(ref mut t_name) => {
-
-                                            let mut ind = 0;
-                                            for self_column in &self.columns {
-                                                if self_column.name == c.name && self_column.table == Some(t_name.clone()) {
-                                                    return ind;
-                                                }
-
-                                                ind = ind + 1;
-                                            }
-                                            // println!("*here2");
-
-                                            panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
-                                                   c, self.name, self.columns);
-                                        },
-                                        None => {
-                                            let mut cn = c.clone().name;
-                                            match map.get(&cn) {
-                                                Some(ref mut res) => {
-                                                    let mut ind = 0;
-                                                    for self_column in &self.columns {
-                                                        if self_column.name == c.name && self_column.table == Some(res.clone()) {
-                                                            return ind;
-                                                        }
-                                                        ind = ind + 1;
-                                                    }
-                                                    // println!("*here3");
-
-                                                    panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
-                                                           c, self.name, self.columns);
-                                                },
-                                                None => {
-                                                    panic!("alias is not in mapping table!");
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                None => {
-                                    let keyed = c.clone().name;
-                                    match map.get(&keyed) {
-                                        Some(ref mut t_n) => {
-                                            let mut ind = 0;
-                                            for self_column in &self.columns {
-                                                if self_column.name == c.name && self_column.table == Some(t_n.clone()) {
-                                                    return ind;
-                                                }
-                                                ind = ind + 1;
-                                            }
-                                            // println!("*here4");
-
-                                            panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
-                                                   c, self.name, self.columns);
-                                        },
-                                        None => {
-                                            // println!("*here5");
-
-                                            panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
-                                                   c, self.name, self.columns);
-                                        }
-                                    }
-                                }
-                            }
-                            None => match map.get(&(c.name.clone(), None)) {
-                                Some(ref t_name) => get_column_index(c, t_name),
-                                None => panic!(
-                                    "tried to look up non-existent column {:?} on node \
-                                     \"{}\" (columns: {:?})",
-                                    c, self.name, self.columns
-                                ),
-                            },
-                        },
-                        // panic if no mapping was passed in
-                        None => {
-                            panic!("tried to look up non-existent column {:?} on node \"{}\" (columns: {:?})",
-                                   c, self.name, self.columns);
-                        }
-                    }
-                }
-                Some(id) => id,
-            },
-        }
-    }
+          &self,
+          c: &Column,
+          table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+      ) -> usize {
+          match self.inner {
+              // if we're a base, translate to absolute column ID (taking into account deleted
+              // columns). We use the column specifications here, which track a tuple of (column
+              // spec, absolute column ID).
+              // Note that `rposition` is required because multiple columns of the same name might
+              // exist if a column has been removed and re-added. We always use the latest column,
+              // and assume that only one column of the same name ever exists at the same time.
+              MirNodeType::Base {
+                  ref column_specs, ..
+              } => match column_specs
+                  .iter()
+                  .rposition(|cs| Column::from(&cs.0.column) == *c)
+              {
+                  None => panic!(
+                      "tried to look up non-existent column {:?} in {}",
+                      c, self.name
+                  ),
+                  Some(id) => column_specs[id]
+                      .1
+                      .expect("must have an absolute column ID on base"),
+              },
+              MirNodeType::Reuse { ref node } => node.borrow().column_id_for_column(c, table_mapping),
+              // otherwise, just look up in the column set
+              _ => match self.columns.iter().position(|cc| cc == c) {
+                  None => {
+                      let get_column_index = |c: &Column, t_name: &str| -> usize {
+                          let mut ac = c.clone();
+                          ac.table = Some(t_name.to_owned());
+                          self.columns
+                              .iter()
+                              .position(|cc| *cc == ac)
+                              .expect(&format!(
+                                  "tried to look up non-existent column {:?} on node \
+                                   \"{}\" (columns: {:?})",
+                                  c, self.name, self.columns
+                              ))
+                      };
+                      // See if table mapping was passed in
+                      match table_mapping {
+                          // if mapping was passed in, then see if c has an associated table, and check
+                          // the mapping for a key based on this
+                          Some(map) => match c.table {
+                              Some(ref table) => {
+                                  let key = (c.name.clone(), Some(table.clone()));
+                                  match map.get(&key) {
+                                      Some(ref t_name) => get_column_index(c, t_name),
+                                      None => match map.get(&(c.name.clone(), None)) {
+                                          Some(ref t_name) => get_column_index(c, t_name),
+                                          None => {
+                                              panic!("alias is not in mapping table!");
+                                          }
+                                      },
+                                  }
+                              }
+                              None => match map.get(&(c.name.clone(), None)) {
+                                  Some(ref t_name) => get_column_index(c, t_name),
+                                  None => panic!(
+                                      "tried to look up non-existent column {:?} on node \
+                                       \"{}\" (columns: {:?})",
+                                      c, self.name, self.columns
+                                  ),
+                              },
+                          },
+                          // panic if no mapping was passed in
+                          None => {
+                              panic!(
+                                  "tried to look up non-existent column {:?} on node \"{}\" \
+                                   (columns: {:?})",
+                                  c, self.name, self.columns
+                              );
+                          }
+                      }
+                  }
+                  Some(id) => id,
+              },
+          }
+      }
 
     pub fn column_specifications(&self) -> &[(ColumnSpecification, Option<usize>)] {
         match self.inner {

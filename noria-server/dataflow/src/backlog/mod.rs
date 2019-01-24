@@ -2,12 +2,10 @@ use common::SizeOf;
 use fnv::FnvBuildHasher;
 use prelude::*;
 use std::borrow::Cow;
-
 use rand::{Rng, ThreadRng};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::collections::HashMap;
-use fnv::FnvBuildHasher;
 
 /// Allocate a new end-user facing result table.
 pub(crate) fn new(srmap: bool, cols: usize, key: &[usize], uid: usize) -> (SingleReadHandle, WriteHandle) {

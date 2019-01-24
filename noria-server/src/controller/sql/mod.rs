@@ -465,11 +465,12 @@ impl SqlIncorporator {
             .iter()
             .enumerate()
             .map(|(i, sq)| {
-                Ok(self.add_select_query(&format!("{}_csq_{}", query_name, i), &sq.1, false, mig, None)
-                    .1
-                    .unwrap()))?
-            })
-            .collect();
+               Ok(self
+                   .add_select_query(&format!("{}_csq_{}", query_name, i), &sq.1, false, mig, None)?
+                   .1
+                   .unwrap())
+           })
+           .collect();
 
         let mut combined_mir_query = self.mir_converter.compound_query_to_mir(
             query_name,
@@ -496,7 +497,7 @@ impl SqlIncorporator {
         is_leaf: bool,
         mig: &mut Migration,
         global_name: Option<String>
-    ) -> Result<(QueryFlowParts, Option<MirQuery>)> {
+    ) -> Result<(QueryFlowParts, Option<MirQuery>), String> {
         let (qg, reuse) = self.consider_query_graph(&query_name, mig.universe(), sq);
         Ok(match reuse {
             QueryGraphReuse::ExactMatch(mn) => {
@@ -511,7 +512,7 @@ impl SqlIncorporator {
             }
             QueryGraphReuse::ExtendExisting(mqs) => {
                 let qfp = self.extend_existing_query(&query_name, sq, qg, mqs, is_leaf, mig, global_name);
-                (qfp, None)
+                (qfp.unwrap(), None)
             }
             QueryGraphReuse::ReaderOntoExisting(mn, project_columns, params) => {
                 let qfp =
@@ -566,7 +567,7 @@ impl SqlIncorporator {
 
         println!("hi4");
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, table_mapping.clone(), None);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, table_mapping.as_ref(), None);
 
         // println!("in add query via mir");
         // register local state
@@ -825,6 +826,7 @@ impl SqlIncorporator {
                                     alias.clone(),
                                     false,
                                     mig,
+                                    None,
                                 )
                                 .expect("failed to add subquery in join");
                             JoinRightSide::Table(Table {
@@ -894,10 +896,11 @@ impl SqlIncorporator {
                         name,
                         is_leaf,
                         mig,
+                        global_name,
                     )
                 }
                 SelectSpecification::Simple(sq) => {
-                    return self.nodes_for_named_query(SqlQuery::Select(sq), name, is_leaf, mig)
+                    return self.nodes_for_named_query(SqlQuery::Select(sq), name, is_leaf, mig, global_name)
                 }
             }
         };

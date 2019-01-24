@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 pub trait SecurityBoundary {
     fn reconcile(
-        &mut self,
-        name: &str,
-        qg: &QueryGraph,
-        ancestors: &Vec<MirNodeRef>,
-        node_count: usize,
-        sec: bool,
+    &mut self,
+    name: &str,
+    qg: &QueryGraph,
+    ancestors: &Vec<MirNodeRef>,
+    node_count: usize,
+    sec: bool,
     ) -> (
         Vec<MirNodeRef>,
         Option<HashMap<(String, Option<String>), String>>,
@@ -56,7 +56,6 @@ impl SecurityBoundary for SqlToMirConverter {
 
         // First, union the results from all ancestors
         if !sec {
-            // println!("nope");
             union = Some(self.make_union_node(&format!("{}_n{}", name, node_count), &ancestors));
             mapping = None;
         } else {
@@ -85,7 +84,6 @@ impl SecurityBoundary for SqlToMirConverter {
                 );
 
                 nodes_added.extend(grouped);
-                // println!("returning from reconcile: nodes added: {:?}, mapping: {:?}, n: {:?}", nodes_added.clone(), mapping.clone(), n.clone());
                 return (nodes_added, mapping, n);
             }
             None => {

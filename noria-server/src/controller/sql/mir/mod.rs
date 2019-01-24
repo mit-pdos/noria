@@ -486,7 +486,7 @@ impl SqlToMirConverter {
     > {
         println!("HERE");
         let (sec, nodes, table_mapping, base_name) =
-            self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe)?;
+            self.make_nodes_for_selection(&name, sq, qg, has_leaf, universe);
         let mut roots = Vec::new();
         let mut leaves = Vec::new();
         for mn in nodes.into_iter() {
@@ -1292,6 +1292,7 @@ impl SqlToMirConverter {
             vec![],
         )
     }
+
     fn make_topk_node(
         &self,
         name: &str,
@@ -1488,73 +1489,29 @@ impl SqlToMirConverter {
         }
     }
 
-    /// Returns list of nodes added
-    /// Returns list of nodes added
-fn make_nodes_for_selection(
-    &mut self,
-    name: &str,
-    st: &SelectStatement,
-    qg: &QueryGraph,
-    has_leaf: bool,
-    universe: UniverseId,
-) -> Result<(bool, Vec<MirNodeRef>, Option<HashMap<String, String>>, String)> {
+    fn make_nodes_for_selection(
+        &mut self,
+        name: &str,
+        st: &SelectStatement,
+        qg: &QueryGraph,
+        has_leaf: bool,
+        universe: UniverseId,
+    ) -> (bool, Vec<MirNodeRef>, Option<HashMap<(String, Option<String>), String>>, String) {
 
-    use crate::controller::sql::mir::grouped::make_grouped;
-    use crate::controller::sql::mir::grouped::make_predicates_above_grouped;
-    use crate::controller::sql::mir::join::make_joins;
-    use std::collections::HashMap;
+        use crate::controller::sql::mir::grouped::make_grouped;
+        use crate::controller::sql::mir::grouped::make_predicates_above_grouped;
+        use crate::controller::sql::mir::join::make_joins;
+        use std::collections::HashMap;
 
-    let mut nodes_added: Vec<MirNodeRef>;
-    let mut new_node_count = 0;
+        let mut nodes_added: Vec<MirNodeRef>;
+        let mut new_node_count = 0;
 
-    let (uid, _) = universe.clone();
+        let (uid, _) = universe.clone();
 
-    let uformat = if uid == "global".into() {
-        String::from("")
-    } else {
-        format!("_u{}", uid.to_string())
-    };
-
-    let mut table_mapping = None;
-    let mut sec_round = false;
-    let mut union_base_name = " ".to_string();
-
-    // Canonical operator order: B-J-G-F-P-R
-    // (Base, Join, GroupBy, Filter, Project, Reader)
-    {
-        let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
-
-        // 0. Base nodes (always reused)
-        let mut base_nodes: Vec<MirNodeRef> = Vec::new();
-        let mut sorted_rels: Vec<&str> = qg.relations.keys().map(String::as_str).collect();
-        sorted_rels.sort();
-        for rel in &sorted_rels {
-            if *rel == "computed_columns" {
-                continue;
-            }
-
-            let base_for_rel = self.get_view(rel);
-
-            base_nodes.push(base_for_rel.clone());
-            node_for_rel.insert(*rel, base_for_rel);
-        }
-
-        let join_nodes = make_joins(
-            self,
-            &format!("q_{:x}{}", qg.signature().hash, uformat),
-            qg,
-            &node_for_rel,
-            new_node_count,
-        );
-
-        new_node_count += join_nodes.len();
-
-        let mut prev_node = match join_nodes.last() {
-            Some(n) => Some(n.clone()),
-            None => {
-                assert_eq!(base_nodes.len(), 1);
-                Some(base_nodes.last().unwrap().clone())
-            }
+        let uformat = if uid == "global".into() {
+            String::from("")
+        } else {
+            format!("_u{}", uid.to_string())
         };
 
         let mut table_mapping = None;
@@ -1564,7 +1521,6 @@ fn make_nodes_for_selection(
         // Canonical operator order: B-J-G-F-P-R
         // (Base, Join, GroupBy, Filter, Project, Reader)
         {
-            println!("making canonical");
             let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
 
             // 0. Base nodes (always reused)
@@ -1576,7 +1532,7 @@ fn make_nodes_for_selection(
                     continue;
                 }
 
-                let base_for_rel = self.get_view(rel)?;
+                let base_for_rel = self.get_view(rel).unwrap();
 
                 base_nodes.push(base_for_rel.clone());
                 node_for_rel.insert(*rel, base_for_rel);
@@ -1592,64 +1548,13 @@ fn make_nodes_for_selection(
 
             new_node_count += join_nodes.len();
 
-        // 3. Create security boundary
-        use crate::controller::sql::mir::security::SecurityBoundary;
-        let (last_policy_nodes, policy_nodes) =
-            self.make_security_boundary(universe.clone(), &mut node_for_rel, prev_node.clone());
-
-        let mut ancestors =
-            self.universe
-                .member_of
-                .iter()
-                .fold(vec![], |mut acc, (gname, gids)| {
-                    let group_views: Vec<MirNodeRef> = gids
-                        .iter()
-                        .filter_map(|gid| {
-                            // This is a little annoying, but because of the way we name universe queries,
-                            // we need to strip the view name of the _u{uid} suffix
-                            let root = name.trim_right_matches(&uformat);
-                            if root == name {
-                                None
-                            } else {
-                                let view_name = format!(
-                                    "{}_{}{}",
-                                    root,
-                                    gname.to_string(),
-                                    gid.to_string()
-                                );
-                                Some(self.get_view(&view_name))
-                            }
-                        }).collect();
-
-                    trace!(self.log, "group views {:?}", group_views);
-                    acc.extend(group_views);
-                    acc
-                });
-
-        nodes_added = base_nodes
-            .into_iter()
-            .chain(join_nodes.into_iter())
-            .chain(predicates_above_group_by_nodes.into_iter())
-            .chain(policy_nodes.into_iter())
-            .chain(ancestors.clone().into_iter())
-            .collect();
-
-
-        // For each policy chain, create a version of the query
-        // All query versions, including group queries will be reconciled at the end
-        for n in last_policy_nodes.iter() {
-            prev_node = Some(n.clone());
-
-            // 3. Add function and grouped nodes
-            let mut func_nodes: Vec<MirNodeRef> = make_grouped(
-                self,
-                &format!("q_{:x}{}", qg.signature().hash, uformat),
-                &qg,
-                &node_for_rel,
-                new_node_count,
-                &mut prev_node,
-                false,
-            );
+            let mut prev_node = match join_nodes.last() {
+                Some(n) => Some(n.clone()),
+                None => {
+                    assert_eq!(base_nodes.len(), 1);
+                    Some(base_nodes.last().unwrap().clone())
+                }
+            };
 
             // 2. Get columns used by each predicate. This will be used to check
             // if we need to reorder predicates before group_by nodes.
@@ -1697,21 +1602,16 @@ fn make_nodes_for_selection(
             new_node_count += predicates_above_group_by_nodes.len();
 
             // 3. Create security boundary
-            println!("making sec bound");
             use crate::controller::sql::mir::security::SecurityBoundary;
-            let (last_policy_nodes, policy_nodes) = self.make_security_boundary(
-                universe.clone(),
-                &mut node_for_rel,
-                prev_node.clone(),
-            )?;
+            let (last_policy_nodes, policy_nodes) =
+                self.make_security_boundary(universe.clone(), &mut node_for_rel, prev_node.clone()).unwrap();
 
-            println!("Member of: {:#?}", self.universe.member_of);
-
-            let mut ancestors = self.universe.member_of.iter().fold(
-                Ok(vec![]),
-                |acc: Result<_, String>, (gname, gids)| {
-                    acc.and_then(|mut acc| {
-                        let group_views: Result<Vec<_>, String> = gids
+            let mut ancestors =
+                self.universe
+                    .member_of
+                    .iter()
+                    .fold(vec![], |mut acc, (gname, gids)| {
+                        let group_views: Vec<MirNodeRef> = gids
                             .iter()
                             .filter_map(|gid| {
                                 // This is a little annoying, but because of the way we name universe queries,
@@ -1726,19 +1626,14 @@ fn make_nodes_for_selection(
                                         gname.to_string(),
                                         gid.to_string()
                                     );
-                                    Some(self.get_view(&view_name))
+                                    Some(self.get_view(&view_name).unwrap())
                                 }
-                            })
-                            .collect();
-                        println!("Group views: {:#?}", group_views);
-                        trace!(&self.log, "group views {:?}", group_views);
-                        acc.extend(group_views?);
-                        Ok(acc)
-                    })
-                },
-            )?;
+                            }).collect();
 
-            println!("ancestors after creation: {:#?}", ancestors);
+                        trace!(self.log, "group views {:?}", group_views);
+                        acc.extend(group_views);
+                        acc
+                    });
 
             nodes_added = base_nodes
                 .into_iter()
@@ -1747,6 +1642,7 @@ fn make_nodes_for_selection(
                 .chain(policy_nodes.into_iter())
                 .chain(ancestors.clone().into_iter())
                 .collect();
+
 
             // For each policy chain, create a version of the query
             // All query versions, including group queries will be reconciled at the end
@@ -1928,7 +1824,7 @@ fn make_nodes_for_selection(
                     &qg,
                     &ancestors,
                     new_node_count,
-                    sec_round,
+                    sec_round
                 );
 
                 if sec_round {
@@ -1938,7 +1834,10 @@ fn make_nodes_for_selection(
 
                 new_node_count += nodes.len();
                 nodes_added.extend(nodes.clone());
+
+
                 nodes.last().unwrap().clone()
+
             } else {
                 ancestors.last().unwrap().clone()
             };
@@ -1946,22 +1845,21 @@ fn make_nodes_for_selection(
             let final_node_cols: Vec<Column> =
                 final_node.borrow().columns().iter().cloned().collect();
             // 8. Generate leaf views that expose the query result
-            let mut projected_columns: Vec<Column> =
+            let mut projected_columns: Vec<Column> = if universe.1.is_none() {
                 qg.columns
                     .iter()
                     .filter_map(|oc| match *oc {
                         OutputColumn::Arithmetic(_) => None,
                         OutputColumn::Data(ref c) => Some(Column::from(c)),
                         OutputColumn::Literal(_) => None,
-                    })
-                    .collect();
-            // } else {
-            //     // If we are creating a query for a group universe, we project
-            //     // all columns in the final node. When a user universe that
-            //     // belongs to this group, the proper projection and leaf node
-            //     // will be added.
-            //     final_node_cols.iter().cloned().collect()
-            // };
+                    }).collect()
+            } else {
+                // If we are creating a query for a group universe, we project
+                // all columns in the final node. When a user universe that
+                // belongs to this group, the proper projection and leaf node
+                // will be added.
+                final_node_cols.iter().cloned().collect()
+            };
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);
@@ -1989,8 +1887,7 @@ fn make_nodes_for_selection(
                     }
                     OutputColumn::Data(_) => None,
                     OutputColumn::Literal(_) => None,
-                })
-                .collect();
+                }).collect();
             let mut projected_literals: Vec<(String, DataType)> = qg
                 .columns
                 .iter()
@@ -2005,8 +1902,7 @@ fn make_nodes_for_selection(
                             None
                         }
                     }
-                })
-                .collect();
+                }).collect();
 
             // if this query does not have any parameters, we must add a bogokey
             let has_bogokey = if has_leaf && qg.parameters().is_empty() {
@@ -2047,8 +1943,7 @@ fn make_nodes_for_selection(
                     .map(|mut c| {
                         sanitize_leaf_column(&mut c, name);
                         c
-                    })
-                    .collect();
+                    }).collect();
 
                 let query_params = if has_bogokey {
                     vec![Column::new(None, "bogokey")]
@@ -2078,8 +1973,7 @@ fn make_nodes_for_selection(
                 "Added final MIR node for query named \"{}\"", name
             );
         }
-        println!("MADE NEW NODES: {:#?}", nodes_added);
         // finally, we output all the nodes we generated
-        Ok((sec_round, nodes_added, table_mapping, union_base_name))
+        (sec_round, nodes_added, table_mapping, union_base_name)
     }
-}
+    }

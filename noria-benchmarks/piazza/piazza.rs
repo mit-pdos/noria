@@ -180,7 +180,7 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
-                .default_value("before")
+                .default_value("nopopulate")
                 .possible_values(&["after", "before", "nopopulate"])
                 .help("Populate app with randomly generated data"),
         )
@@ -247,7 +247,6 @@ fn main() {
 
     // Initiliaze backend application with some queries and policies
     println!("Initiliazing database schema...");
-    let partial = false;
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
 
@@ -295,26 +294,20 @@ fn main() {
 
     // Login a user
     println!("Login in users...");
-
-    let graph_fname = gloc.unwrap();
-    let mut gf = File::create(graph_fname).unwrap();
-    assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
-        println!("LOGGING IN USER!");
         let dur = dur_to_fsec!(start.elapsed());
-        // println!("Migration {} took {:.2}s!", i, dur,);
+        println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
-        // if partial {
-        //     let leaf = format!("post_count_u{}", i);
-        //     let mut getter = backend.g.view(&leaf).unwrap();
-        //     for author in 0..nusers / 4 {
-        //         getter.lookup(&[author.into()], false).unwrap();
-        //     }
-        // }
+        if partial {
+            let leaf = format!("posts_u{}", i);
+            let mut getter = backend.g.view(&leaf).unwrap();
+            for author in 0..nusers / 4 {
+                getter.lookup(&[author.into()], false).unwrap();
+            }
+        }
 
         if iloc.is_some() && i % 50 == 0 {
             use std::fs;
@@ -327,31 +320,25 @@ fn main() {
         backend.populate("Post", posts);
     }
 
-    let mut num_keys = 0;
     if !partial {
         let mut dur = time::Duration::from_millis(0);
-        let mut uids = Vec::new();
-        let num_at_once = 1000;
-        for uid in 0..num_at_once {
-            uids.push(DataType::Int(uid));
-        }
-
         for uid in 0..nlogged {
             let leaf = format!("posts_u{}", uid);
             let mut getter = backend.g.view(&leaf).unwrap();
             let start = time::Instant::now();
             for author in 0..nusers {
-                let res = getter.multi_lookup([uids.clone()].to_vec(), true);
+                getter.lookup(&[author.into()], true).unwrap();
             }
+            dur += start.elapsed();
         }
 
         let dur = dur_to_fsec!(dur);
 
         println!(
             "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            num_at_once * nlogged * nusers,
+            nlogged * nusers,
             dur,
-            (num_at_once * nlogged * nusers) as f64 / dur,
+            (nlogged * nusers) as f64 / dur,
         );
     }
 

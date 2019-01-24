@@ -948,7 +948,7 @@ impl Domain {
                                             r_part = tr_part;
                                             w_part = tw_part;
 
-                                            let mut n = self.nodes[&node].borrow_mut();
+                                            let mut n = self.nodes[node].borrow_mut();
                                             n.with_reader_mut(|r| {
                                                 assert!(
                                                     self.readers
@@ -994,7 +994,7 @@ impl Domain {
                                         self.srmap_handles.push((r_part.clone(), w_part.clone()));
                                     }
 
-                                    let mut n = self.nodes[&node].borrow_mut();
+                                    let mut n = self.nodes[node].borrow_mut();
                                     n.with_reader_mut(|r| {
                                         assert!(
                                             self.readers
@@ -1064,7 +1064,7 @@ impl Domain {
                                             r_part = tr_part;
                                             w_part = tw_part;
 
-                                            let mut n = self.nodes[&node].borrow_mut();
+                                            let mut n = self.nodes[node].borrow_mut();
                                             n.with_reader_mut(|r| {
                                                 assert!(
                                                     self.readers
@@ -1099,7 +1099,7 @@ impl Domain {
                                        self.srmap_handles.push((r_part.clone(), w_part.clone()));
                                     }
 
-                                    let mut n = self.nodes[&node].borrow_mut();
+                                    let mut n = self.nodes[node].borrow_mut();
                                     n.with_reader_mut(|r| {
                                         assert!(
                                             self.readers

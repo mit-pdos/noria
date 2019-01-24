@@ -96,17 +96,6 @@ pub fn pull_required_base_columns(
                     .any(|a| a.borrow().columns().iter().any(|ac| ac == c))
             }).collect();
 
-        match table_mapping.clone() {
-            Some(x) => {
-                        for (k, v) in &x {
-                            // println!("alias: real table name {} -> universe table name {}", k, v);
-                        }
-                    },
-            None => {
-
-            }
-        }
-
         let mut found: Vec<&Column> = Vec::new();
         match table_mapping {
             Some(ref map) => {
