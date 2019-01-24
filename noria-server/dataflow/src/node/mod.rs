@@ -14,6 +14,9 @@ pub use self::special::StreamUpdate;
 mod ntype;
 pub use self::ntype::NodeType;
 
+mod replica;
+pub use self::replica::ReplicaType;
+
 mod debug;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -28,6 +31,7 @@ pub struct Node {
     taken: bool,
 
     sharded_by: Sharding,
+    replica: Option<ReplicaType>,
 }
 
 // constructors
@@ -50,6 +54,7 @@ impl Node {
             taken: false,
 
             sharded_by: Sharding::None,
+            replica: None,
         }
     }
 
@@ -328,6 +333,17 @@ impl Node {
 
     pub fn set_finalized_addr(&mut self, addr: IndexPair) {
         self.index = Some(addr);
+    }
+}
+
+// replication
+impl Node {
+    pub fn replica_type(&self) -> Option<ReplicaType> {
+        self.replica.clone()
+    }
+
+    pub fn set_replica_type(&mut self, rt: ReplicaType) {
+        self.replica = Some(rt);
     }
 }
 

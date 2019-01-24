@@ -253,11 +253,15 @@ impl<A: Authority + 'static> Drop for SyncWorkerHandle<A> {
 
 #[cfg(test)]
 mod tests {
+    use crate::controller::WorkerBuilder;
+    use dataflow::node::special::Base;
+    use dataflow::node::ReplicaType;
+    use dataflow::ops::grouped::aggregate::Aggregation;
+
     #[test]
     #[should_panic]
     #[cfg_attr(not(debug_assertions), allow_fail)]
     fn limit_mutator_creation() {
-        use crate::controller::WorkerBuilder;
         let r_txt = "CREATE TABLE a (x int, y int, z int);\n
                      CREATE TABLE b (r int, s int);\n";
 
@@ -266,5 +270,42 @@ mod tests {
         for _ in 0..2500 {
             let _ = c.table("a").unwrap();
         }
+    }
+
+    #[test]
+    fn aggregations_have_a_replica() {
+        let mut g = WorkerBuilder::default().start_simple().unwrap();
+
+        g.migrate(|mig| {
+            let vote = mig.add_base("vote", &["user", "id"], Base::default());
+            let vc = mig.add_ingredient(
+                "votecount",
+                &["id", "votes"],
+                Aggregation::COUNT.over(vote, 0, &[1]),
+            );
+
+            // identity node exists
+            let identity = mig
+                .mainline
+                .ingredients
+                .neighbors_directed(vc, petgraph::EdgeDirection::Outgoing)
+                .next()
+                .expect("view has one child");
+            assert!(mig.mainline.ingredients[identity].is_internal());
+
+            // create a reader
+            let readers = vec![mig.maintain_anonymous(vc, &[0])];
+
+            // the replica types are marked correctly
+            assert!(mig.mainline.ingredients[vote].replica_type().is_none());
+            assert_eq!(
+                mig.mainline.ingredients[vc].replica_type(),
+                Some(ReplicaType::Top { bottom_next_nodes: readers }),
+            );
+            assert_eq!(
+                mig.mainline.ingredients[identity].replica_type(),
+                Some(ReplicaType::Bottom { top_prev_nodes: vec![vote] }),
+            );
+        });
     }
 }
