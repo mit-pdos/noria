@@ -35,6 +35,7 @@ fn type_for_internal_column(
 ) -> Option<SqlType> {
     // column originates at internal view: literal, aggregation output
     // FIXME(malte): return correct type depending on what column does
+    println!("node: {:#?}", *node);
     match *(*node) {
         ops::NodeOperator::Project(ref o) => {
             let emits = o.emits();
@@ -79,6 +80,12 @@ fn type_for_internal_column(
             }
         }
         ops::NodeOperator::Join(_) => {
+            // join doesn't "generate" columns, but they may come from one of the other
+            // ancestors; so keep iterating to try the other paths
+            None
+        },
+        ops::NodeOperator::Rewrite(_) => {
+            println!("in RW branch");
             // join doesn't "generate" columns, but they may come from one of the other
             // ancestors; so keep iterating to try the other paths
             None
