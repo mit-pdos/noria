@@ -51,11 +51,12 @@ pub fn assign(
     let mut domain_map = &mut mainline.map_meta.query_to_domain;
 
     for node in topo_list {
+        println!("Looking at node: {:?}", node);
         let assignment = (|| {
             let graph = &*graph;
             let n = &graph[node];
 
-            let mut srmap_assignment : usize = 0;
+            let mut srmap_assignment : usize;
             let mut assigned = false;
             let mut srmap_reader_node = false;
             let mut srmap_query = "".to_string();
@@ -71,6 +72,7 @@ pub fn assign(
                             srmap_query = query.to_string();
                             srmap_assignment = *domain;
                             assigned = true;
+                            return srmap_assignment
                         },
                         None => {
                             srmap_query = query.to_string();
@@ -80,12 +82,6 @@ pub fn assign(
                 None => {}
             };
 
-            // this is a reader node that accesses an SRMap that was already placed in a domain.
-            // assign this reader node to that same domain.
-            if assigned {
-                return srmap_assignment;
-            }
-
             if n.is_shard_merger() {
                 // shard mergers are always in their own domain.
                 // we *could* use the same domain for multiple separate shard mergers
@@ -93,6 +89,7 @@ pub fn assign(
 
                 let domain_assignment = next_domain();
                 if srmap_reader_node {
+                    println!("1 assigned to domain: {:?}", domain_assignment);
                     domain_map.insert(srmap_query.clone(), domain_assignment);
                 }
                 return domain_assignment;
@@ -150,7 +147,9 @@ pub fn assign(
 
                 return if let Some(friendly_base) = friendly_base {
                     let domain_assignment = friendly_base.domain().index();
+                    println!("potentially a problem");
                     if srmap_reader_node {
+                        println!("2 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     domain_assignment
@@ -158,6 +157,7 @@ pub fn assign(
                     // there are no bases like us, so we need a new domain :'(
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
+                        println!("3 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     domain_assignment
@@ -167,6 +167,7 @@ pub fn assign(
             if graph[node].name().starts_with("BOUNDARY_") {
                 let domain_assignment = next_domain();
                 if srmap_reader_node {
+                    println!("4 assigned to domain: {:?}", domain_assignment);
                     domain_map.insert(srmap_query.clone(), domain_assignment);
                 }
                 return domain_assignment;
@@ -196,28 +197,38 @@ pub fn assign(
 
             let mut assignment = None;
             for &(_, ref p) in &parents {
+                println!("here1");
                 if p.is_sharder() {
                     // we're a child of a sharder (which currently has to be unsharded). we
                     // can't be in the same domain as the sharder (because we're starting a new
                     // sharding)
                     assert!(p.sharded_by().is_none());
                 } else if p.is_source() {
+                    println!("here2");
                     // the source isn't a useful source of truth
                 } else if assignment.is_none() {
+                    println!("here3");
                     // the key may move to a different column, so we can't actually check for
                     // ByColumn equality. this'll do for now.
                     assert_eq!(p.sharded_by().is_none(), n.sharded_by().is_none());
                     if p.has_domain() {
-                        assignment = Some(p.domain().index())
+                        println!("here 3 ' ");
+                        assignment = Some(p.domain().index());
+
+                        if srmap_reader_node {
+                            assignment = Some(next_domain());
+                        }
                     }
                 }
 
                 if let Some(candidate) = assignment {
+                    println!("here4");
                     // let's make sure we don't construct a-b-a path
                     if any_parents(
                         &|p| p.has_domain() && p.domain().index() != candidate,
                         &|pp| pp.domain().index() == candidate,
                     ) {
+                        println!("here 5");
                         assignment = None;
                         continue;
                     }
@@ -255,6 +266,7 @@ pub fn assign(
             match assignment {
                 Some(domain_assignment) => {
                     if srmap_reader_node {
+                        println!("5 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     return domain_assignment;
@@ -262,6 +274,7 @@ pub fn assign(
                 None => {
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
+                        println!("6 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     return domain_assignment;

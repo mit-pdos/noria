@@ -848,9 +848,10 @@ impl SqlToMirConverter {
             }
         }
 
+        println!("selected cols: {:#?} ucols: {:#?}", selected_col_objects, ucols); 
         assert_eq!(
             num_ucols,
-            selected_col_objects.len(),
+            selected_cols.len(),
             "union drops ancestor columns"
         );
 
