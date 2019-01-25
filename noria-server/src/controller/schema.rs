@@ -85,9 +85,7 @@ fn type_for_internal_column(
             None
         },
         ops::NodeOperator::Rewrite(_) => {
-            println!("in RW branch");
-            // join doesn't "generate" columns, but they may come from one of the other
-            // ancestors; so keep iterating to try the other paths
+            // rewrites doesn't "generate" columns, they write over them
             None
         }
         // no other operators should every generate columns
