@@ -1,6 +1,5 @@
 use domain;
 use ops;
-use payload::PacketId;
 use petgraph;
 use prelude::*;
 use std::collections::HashMap;
@@ -353,11 +352,13 @@ impl Node {
         self.replica = Some(rt);
     }
 
-    pub fn receive_packet(&mut self) {
+    pub fn receive_packet(&mut self, pid: PacketId) {
+        println!("{} RECEIVE #{}", self.get_index().as_global().index(), pid);
         self.last_packet_received += 1;
     }
 
     pub fn send_packet(&mut self) -> PacketId {
+        println!("{} SEND #{}", self.get_index().as_global().index(), self.next_packet_to_send);
         self.next_packet_to_send += 1;
         self.next_packet_to_send - 1
     }

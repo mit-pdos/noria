@@ -18,7 +18,7 @@ pub type Graph = petgraph::Graph<Node, Edge>;
 // dataflow types
 pub use noria::debug::trace::{Event, PacketEvent, Tracer};
 pub use noria::Input;
-pub use payload::{Packet, ReplayPathSegment, SourceChannelIdentifier};
+pub use payload::{Packet, PacketId, ReplayPathSegment, SourceChannelIdentifier};
 pub use Sharding;
 
 // domain local state

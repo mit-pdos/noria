@@ -8,6 +8,7 @@ use std::mem;
 impl Node {
     pub(crate) fn process(
         &mut self,
+        pid: Option<PacketId>,
         m: &mut Option<Box<Packet>>,
         keyed_by: Option<&Vec<usize>>,
         state: &mut StateMap,
@@ -18,6 +19,20 @@ impl Node {
         ex: &mut Executor,
     ) -> (Vec<Miss>, HashSet<Vec<DataType>>) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
+
+        if let Some(pid) = pid {
+            self.receive_packet(pid);
+        } else {
+            // TODO(ygina): packet might not be numbered if it's to the source?
+            // also if i forgot to generate a packet id somewhere a packet was sent
+            self.receive_packet(1337);
+        }
+
+        // Egress and sharder nodes will forward the packet, so we need to generate a packet id.
+        let pid = match self.inner {
+            NodeType::Egress(_) | NodeType::Sharder(_) => Some(self.send_packet()),
+            _ => None,
+        };
 
         let addr = self.local_addr();
         match self.inner {

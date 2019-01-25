@@ -480,7 +480,13 @@ impl Domain {
         }
     }
 
-    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut Executor) {
+    fn dispatch(
+        &mut self,
+        pid: Option<PacketId>,
+        m: Box<Packet>,
+        sends: &mut EnqueuedSends,
+        executor: &mut Executor,
+    ) {
         let src = m.src();
         let me = m.dst();
 
@@ -507,6 +513,7 @@ impl Domain {
             self.process_ptimes.start(me);
             let mut m = Some(m);
             let (misses, captured) = n.process(
+                pid,
                 &mut m,
                 None,
                 &mut self.state,
@@ -666,12 +673,14 @@ impl Domain {
             }
             m.link_mut().dst = childi;
 
-            self.dispatch(m, sends, executor);
+            let pid = self.nodes[m.src()].borrow_mut().send_packet();
+            self.dispatch(Some(pid), m, sends, executor);
         }
     }
 
     fn handle(
         &mut self,
+        pid: Option<PacketId>,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
         executor: &mut Executor,
@@ -683,10 +692,10 @@ impl Domain {
         match *m {
             Packet::Message { .. } | Packet::Input { .. } => {
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
-                self.dispatch(m, sends, executor);
+                self.dispatch(pid, m, sends, executor);
             }
             Packet::ReplayPiece { .. } => {
-                self.handle_replay(m, sends, executor);
+                self.handle_replay(pid, m, sends, executor);
             }
             Packet::Evict { .. } | Packet::EvictKeys { .. } => {
                 self.handle_eviction(m, sends);
@@ -1140,7 +1149,8 @@ impl Domain {
                                 .unwrap();
                         }
 
-                        self.handle_replay(p, sends, executor);
+                        let pid = self.nodes[p.src()].borrow_mut().send_packet();
+                        self.handle_replay(Some(pid), p, sends, executor);
                     }
                     Packet::Finish(tag, ni) => {
                         self.finish_replay(tag, ni, sends, executor);
@@ -1318,7 +1328,7 @@ impl Domain {
                 // instead, we ensure that only the topmost call to handle() walks delayed_for_self
 
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
-                self.handle(m, sends, executor, false);
+                self.handle(None, m, sends, executor, false);
             }
         }
         self.wait_time.start();
@@ -1425,7 +1435,8 @@ impl Domain {
                 unreachable!();
             }
 
-            self.handle_replay(m, sends, ex);
+            let pid = self.nodes[m.src()].borrow_mut().send_packet();
+            self.handle_replay(Some(pid), m, sends, ex);
         }
     }
 
@@ -1525,11 +1536,18 @@ impl Domain {
         }
 
         if let Some(m) = m {
-            self.handle_replay(m, sends, ex);
+            let pid = self.nodes[m.src()].borrow_mut().send_packet();
+            self.handle_replay(Some(pid), m, sends, ex);
         }
     }
 
-    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
+    fn handle_replay(
+        &mut self,
+        pid: Option<PacketId>,
+        m: Box<Packet>,
+        sends: &mut EnqueuedSends,
+        ex: &mut Executor,
+    ) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
             .borrow()
@@ -1653,9 +1671,15 @@ impl Domain {
                     };
                     let mut m = Some(m);
 
+                    let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
                         let mut n = self.nodes[segment.node].borrow_mut();
                         let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
+
+                        if let Some(ni) = sender {
+                            self.nodes[ni].borrow_mut().send_packet();
+                        }
+                        sender = Some(segment.node);
 
                         // keep track of whether we're filling any partial holes
                         let partial_key_cols = segment.partial_key.as_ref();
@@ -1708,6 +1732,7 @@ impl Domain {
 
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
+                            pid,
                             &mut m,
                             segment.partial_key.as_ref(),
                             &mut self.state,
@@ -2111,7 +2136,8 @@ impl Domain {
                     // NOTE: we specifically need to override the buffering behavior that our
                     // self.replaying_to = Some above would initiate.
                     self.mode = DomainMode::Forwarding;
-                    self.dispatch(m, sends, ex);
+                    let pid = self.nodes[node].borrow_mut().send_packet();
+                    self.dispatch(Some(pid), m, sends, ex);
                 } else {
                     unreachable!();
                 }
@@ -2466,25 +2492,25 @@ impl Domain {
                 if self.group_commit_queues.should_append(&packet, &self.nodes) {
                     packet.trace(PacketEvent::ExitInputChannel);
                     if let Some(packet) = self.group_commit_queues.append(packet) {
-                        self.handle(packet, sends, executor, true);
+                        self.handle(None, packet, sends, executor, true);
                     }
                 } else {
-                    self.handle(packet, sends, executor, true);
+                    self.handle(None, packet, sends, executor, true);
                 }
 
                 while let Some(m) = self.group_commit_queues.flush_if_necessary() {
-                    self.handle(m, sends, executor, true);
+                    self.handle(None, m, sends, executor, true);
                 }
 
                 ProcessResult::Processed
             }
             PollEvent::Timeout => {
                 while let Some(m) = self.group_commit_queues.flush_if_necessary() {
-                    self.handle(m, sends, executor, true);
+                    self.handle(None, m, sends, executor, true);
                 }
 
                 if self.has_buffered_replay_requests {
-                    self.handle(box Packet::Spin, sends, executor, true);
+                    self.handle(None, box Packet::Spin, sends, executor, true);
                 }
 
                 ProcessResult::Processed

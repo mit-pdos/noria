@@ -335,7 +335,11 @@ mod tests {
             (vote, vc, identity, reader)
         });
 
+        println!("{}", g.graphviz().unwrap());
+
+        println!("\ncreating mutx");
         let mut mutx = g.table("vote").unwrap().into_sync();
+        println!("\ninserting a value");
 
         // insert a value and observe packet ids increase
         let id = 0;
@@ -353,7 +357,7 @@ mod tests {
         }
 
         g.migrate(move |mig| {
-            println!("NodeIndex | last_packet_received | next_packet_to_send | debug");
+            println!("\nNodeIndex | last_packet_received | next_packet_to_send | debug");
             print_packet_info(mig, a);
             print_packet_info(mig, b);
             print_packet_info(mig, c);
@@ -361,5 +365,17 @@ mod tests {
         });
 
         // send read requests
+        println!("\ncreating a view");
+        let mut q = g.view("votecount").unwrap().into_sync();
+        println!("\nperforming a lookup");
+        q.lookup(&[id.into()], true).unwrap();
+
+        g.migrate(move |mig| {
+            println!("\nNodeIndex | last_packet_received | next_packet_to_send | debug");
+            print_packet_info(mig, a);
+            print_packet_info(mig, b);
+            print_packet_info(mig, c);
+            print_packet_info(mig, d);
+        });
     }
 }
