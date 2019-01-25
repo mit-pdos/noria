@@ -17,6 +17,7 @@ use dataflow::{
 };
 use failure::{self, ResultExt};
 use fnv::{FnvHashMap, FnvHashSet};
+use futures::stream::futures_unordered::FuturesUnordered;
 use futures::sync::mpsc::UnboundedSender;
 use futures::{self, Future, Sink, Stream};
 use hyper::header::CONTENT_TYPE;
@@ -31,7 +32,7 @@ use serde_json;
 use slog;
 use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::io::{self, ErrorKind};
+use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -63,6 +64,7 @@ mod handle;
 mod inner;
 mod mir_to_flow;
 mod readers;
+mod schema;
 
 pub use crate::controller::builder::ControllerBuilder;
 pub use crate::controller::handle::LocalControllerHandle;
@@ -866,13 +868,6 @@ fn listen_external<A: Authority + 'static>(
                         let res = res.body(hyper::Body::from(include_str!("graph.html")));
                         return Box::new(futures::future::ok(res.unwrap()));
                     }
-                    "/js/layout-worker.js" => {
-                        let res = res.body(hyper::Body::from(
-                            "importScripts('https://cdn.rawgit.com/mstefaniuk/graph-viz-d3-js/\
-                             cf2160ee3ca39b843b081d5231d5d51f1a901617/dist/layout-worker.js');",
-                        ));
-                        return Box::new(futures::future::ok(res.unwrap()));
-                    }
                     path if path.starts_with("/zookeeper/") => {
                         let res = match self.1.try_read(&format!("/{}", &path[11..])) {
                             Ok(Some(data)) => {
@@ -943,16 +938,6 @@ fn listen_external<A: Authority + 'static>(
 
     let service = ExternalServer(event_tx, authority);
     server::Server::builder(on).serve(service)
-}
-
-// NOTE: tokio::net::TcpStream doesn't expose underlying stream :(
-fn set_nonblocking(s: &tokio::net::TcpStream, on: bool) {
-    use std::net::TcpStream;
-    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-    let t = unsafe { TcpStream::from_raw_fd(s.as_raw_fd()) };
-    t.set_nonblocking(on).unwrap();
-    // avoid closing on Drop
-    t.into_raw_fd();
 }
 
 fn instance_campaign<A: Authority + 'static>(
@@ -1114,6 +1099,7 @@ struct Replica {
     coord: Arc<ChannelCoordinator>,
 
     incoming: Valved<tokio::net::tcp::Incoming>,
+    first_byte: FuturesUnordered<tokio::io::ReadExact<tokio::net::tcp::TcpStream, Vec<u8>>>,
     locals: futures::sync::mpsc::UnboundedReceiver<Box<Packet>>,
     inputs: StreamUnordered<
         DualTcpStream<
@@ -1152,6 +1138,7 @@ impl Replica {
             coord: cc,
             domain,
             incoming: valve.wrap(on.incoming()),
+            first_byte: FuturesUnordered::new(),
             locals,
             log: log.new(o!{"id" => id}),
             inputs: Default::default(),
@@ -1300,64 +1287,56 @@ impl Replica {
     }
 
     fn try_new(&mut self) -> io::Result<bool> {
-        'more: while let Async::Ready(stream) = self.incoming.poll()? {
+        while let Async::Ready(stream) = self.incoming.poll()? {
             match stream {
-                Some(mut stream) => {
+                Some(stream) => {
                     // we know that any new connection to a domain will first send a one-byte
                     // token to indicate whether the connection is from a base or not.
-                    set_nonblocking(&stream, false);
-                    let mut tag = [0];
-                    use std::io::Read;
-                    while let Err(e) = stream.read_exact(&mut tag[..]) {
-                        if e.kind() == ErrorKind::WouldBlock {
-                            // TODO: async
-                            continue;
-                        }
-
-                        // well.. that failed quickly..
-                        info!(self.log, "worker discarded new connection: {:?}", e);
-                        continue 'more;
-                    }
-
-                    let is_base = tag[0] == CONNECTION_FROM_BASE;
-                    set_nonblocking(&stream, true);
-
-                    debug!(self.log, "accepted new connection"; "base" => ?is_base);
-                    let slot = self.inputs.stream_slot();
-                    let token = slot.token();
-                    let tcp = if is_base {
-                        DualTcpStream::upgrade(BufStream::new(stream), move |input| {
-                            Box::new(Packet::Input {
-                                inner: input,
-                                src: Some(SourceChannelIdentifier { token }),
-                                senders: Vec::new(),
-                            })
-                        })
-                    } else {
-                        BufStream::with_capacities(2 * 1024 * 1024, 4 * 1024, stream).into()
-                    };
-                    slot.insert(tcp);
+                    debug!(self.log, "accepted new connection");
+                    self.first_byte
+                        .push(tokio::io::read_exact(stream, vec![0; 1]));
                 }
                 None => {
                     return Ok(false);
                 }
             }
         }
+
+        while let Async::Ready(Some((stream, tag))) = self.first_byte.poll()? {
+            let is_base = tag[0] == CONNECTION_FROM_BASE;
+
+            debug!(self.log, "established new connection"; "base" => ?is_base);
+            let slot = self.inputs.stream_slot();
+            let token = slot.token();
+            let tcp = if is_base {
+                DualTcpStream::upgrade(BufStream::new(stream), move |input| {
+                    Box::new(Packet::Input {
+                        inner: input,
+                        src: Some(SourceChannelIdentifier { token }),
+                        senders: Vec::new(),
+                    })
+                })
+            } else {
+                BufStream::with_capacities(2 * 1024 * 1024, 4 * 1024, stream).into()
+            };
+            slot.insert(tcp);
+        }
         Ok(true)
     }
 
-    fn try_timeout(&mut self) -> Result<(), tokio::timer::Error> {
+    fn try_timeout(&mut self) -> Poll<(), tokio::timer::Error> {
         if let Some(mut to) = self.timeout.take() {
             if let Async::Ready(()) = to.poll()? {
                 block_on(|| {
                     self.domain
                         .on_event(&mut self.sendback, PollEvent::Timeout, &mut self.outbox)
                 });
+                return Ok(Async::Ready(()));
             } else {
                 self.timeout = Some(to);
             }
         }
-        Ok(())
+        Ok(Async::NotReady)
     }
 }
 
@@ -1380,157 +1359,168 @@ impl Future for Replica {
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         let r: Result<Async<Self::Item>, failure::Error> = try {
-            // FIXME: check if we should call update_state_sizes (every evict_every)
+            loop {
+                // FIXME: check if we should call update_state_sizes (every evict_every)
 
-            // are there are any new connections?
-            if !self.try_new().context("check for new connections")? {
-                // incoming socket closed -- no more clients will arrive
-                return Ok(Async::Ready(()));
-            }
+                // are there are any new connections?
+                if !self.try_new().context("check for new connections")? {
+                    // incoming socket closed -- no more clients will arrive
+                    return Ok(Async::Ready(()));
+                }
 
-            // have any of our timers expired?
-            self.try_timeout().context("check timeout")?;
+                // have any of our timers expired?
+                self.try_timeout().context("check timeout")?;
 
-            // we have three logical input sources: receives from local domains, receives from
-            // remote domains, and remote mutators. we want to achieve some kind of fairness among
-            // these, but bias the data-flow towards finishing work it has accepted (i.e., domain
-            // operations) to accepting new work. however, this is complicated by two facts:
-            //
-            //  - we cannot (currently) differentiate between receives from remote domains and
-            //    receives from mutators. they are all remote tcp channels. we *could*
-            //    differentiate them using `is_base` in `try_new` to store them separately, but
-            //    it's also unclear how that would change the receive heuristic.
-            //  - domain operations are not all "completing starting work". in many cases, traffic
-            //    from domains will be replay-related, in which case favoring domains would favor
-            //    writes over reads. while we do in general want reads to be fast, we don't want
-            //    them to fully starve writes.
-            //
-            // the current stategy is therefore that we alternate reading once from the local
-            // channel and once from the set of remote channels. this biases slightly in favor of
-            // local sends, without starving either. we also stop alternating once either source is
-            // depleted.
-            let mut local_done = false;
-            let mut remote_done = false;
-            let mut check_local = true;
-            let readiness = loop {
-                let mut interrupted = false;
-                for i in 0..FORCE_INPUT_YIELD_EVERY {
-                    if !local_done && (check_local || remote_done) {
-                        match self.locals.poll() {
-                            Ok(Async::Ready(Some(packet))) => {
-                                let d = &mut self.domain;
-                                let sb = &mut self.sendback;
-                                let ob = &mut self.outbox;
+                // we have three logical input sources: receives from local domains, receives from
+                // remote domains, and remote mutators. we want to achieve some kind of fairness among
+                // these, but bias the data-flow towards finishing work it has accepted (i.e., domain
+                // operations) to accepting new work. however, this is complicated by two facts:
+                //
+                //  - we cannot (currently) differentiate between receives from remote domains and
+                //    receives from mutators. they are all remote tcp channels. we *could*
+                //    differentiate them using `is_base` in `try_new` to store them separately, but
+                //    it's also unclear how that would change the receive heuristic.
+                //  - domain operations are not all "completing starting work". in many cases, traffic
+                //    from domains will be replay-related, in which case favoring domains would favor
+                //    writes over reads. while we do in general want reads to be fast, we don't want
+                //    them to fully starve writes.
+                //
+                // the current stategy is therefore that we alternate reading once from the local
+                // channel and once from the set of remote channels. this biases slightly in favor of
+                // local sends, without starving either. we also stop alternating once either source is
+                // depleted.
+                let mut local_done = false;
+                let mut remote_done = false;
+                let mut check_local = true;
+                let readiness = loop {
+                    let mut interrupted = false;
+                    for i in 0..FORCE_INPUT_YIELD_EVERY {
+                        if !local_done && (check_local || remote_done) {
+                            match self.locals.poll() {
+                                Ok(Async::Ready(Some(packet))) => {
+                                    let d = &mut self.domain;
+                                    let sb = &mut self.sendback;
+                                    let ob = &mut self.outbox;
 
-                                if let ProcessResult::StopPolling =
-                                    block_on(|| d.on_event(sb, PollEvent::Process(packet), ob))
-                                {
-                                    // domain got a message to quit
+                                    if let ProcessResult::StopPolling =
+                                        block_on(|| d.on_event(sb, PollEvent::Process(packet), ob))
+                                    {
+                                        // domain got a message to quit
+                                        // TODO: should we finish up remaining work?
+                                        return Ok(Async::Ready(()));
+                                    }
+                                }
+                                Ok(Async::Ready(None)) => {
+                                    // local input stream finished?
                                     // TODO: should we finish up remaining work?
                                     return Ok(Async::Ready(()));
                                 }
-                            }
-                            Ok(Async::Ready(None)) => {
-                                // local input stream finished?
-                                // TODO: should we finish up remaining work?
-                                return Ok(Async::Ready(()));
-                            }
-                            Ok(Async::NotReady) => {
-                                local_done = true;
-                            }
-                            Err(e) => {
-                                error!(self.log, "local input stream failed: {:?}", e);
-                                local_done = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if !remote_done && (!check_local || local_done) {
-                        match self.inputs.poll() {
-                            Ok(Async::Ready(Some((StreamYield::Item(packet), _)))) => {
-                                let d = &mut self.domain;
-                                let sb = &mut self.sendback;
-                                let ob = &mut self.outbox;
-
-                                if let ProcessResult::StopPolling =
-                                    block_on(|| d.on_event(sb, PollEvent::Process(packet), ob))
-                                {
-                                    // domain got a message to quit
-                                    // TODO: should we finish up remaining work?
-                                    return Ok(Async::Ready(()));
+                                Ok(Async::NotReady) => {
+                                    local_done = true;
+                                }
+                                Err(e) => {
+                                    error!(self.log, "local input stream failed: {:?}", e);
+                                    local_done = true;
+                                    break;
                                 }
                             }
-                            Ok(Async::Ready(Some((StreamYield::Finished(_stream), streami)))) => {
-                                self.sendback.back.remove(&streami);
-                                self.sendback.pending.remove(&streami);
-                                // FIXME: what about if a later flush flushes to this stream?
+                        }
+
+                        if !remote_done && (!check_local || local_done) {
+                            match self.inputs.poll() {
+                                Ok(Async::Ready(Some((StreamYield::Item(packet), _)))) => {
+                                    let d = &mut self.domain;
+                                    let sb = &mut self.sendback;
+                                    let ob = &mut self.outbox;
+
+                                    if let ProcessResult::StopPolling =
+                                        block_on(|| d.on_event(sb, PollEvent::Process(packet), ob))
+                                    {
+                                        // domain got a message to quit
+                                        // TODO: should we finish up remaining work?
+                                        return Ok(Async::Ready(()));
+                                    }
+                                }
+                                Ok(Async::Ready(Some((
+                                    StreamYield::Finished(_stream),
+                                    streami,
+                                )))) => {
+                                    self.sendback.back.remove(&streami);
+                                    self.sendback.pending.remove(&streami);
+                                    // FIXME: what about if a later flush flushes to this stream?
+                                }
+                                Ok(Async::Ready(None)) => {
+                                    // we probably haven't booted yet
+                                    remote_done = true;
+                                }
+                                Ok(Async::NotReady) => {
+                                    remote_done = true;
+                                }
+                                Err(e) => {
+                                    error!(self.log, "input stream failed: {:?}", e);
+                                    remote_done = true;
+                                    break;
+                                }
                             }
-                            Ok(Async::Ready(None)) => {
-                                // we probably haven't booted yet
-                                remote_done = true;
-                            }
-                            Ok(Async::NotReady) => {
-                                remote_done = true;
-                            }
-                            Err(e) => {
-                                error!(self.log, "input stream failed: {:?}", e);
-                                remote_done = true;
-                                break;
-                            }
+                        }
+
+                        // alternate between input sources
+                        check_local = !check_local;
+
+                        // nothing more to do -- wait to be polled again
+                        if local_done && remote_done {
+                            break;
+                        }
+
+                        if i == FORCE_INPUT_YIELD_EVERY - 1 {
+                            // we could keep processing inputs, but make sure we send some ACKs too!
+                            interrupted = true;
                         }
                     }
 
-                    // alternate between input sources
-                    check_local = !check_local;
+                    // send to downstream
+                    // TODO: send fail == exiting?
+                    self.try_flush().context("downstream flush (after)")?;
 
-                    // nothing more to do -- wait to be polled again
-                    if local_done && remote_done {
-                        break;
+                    // send acks
+                    self.try_ack()?;
+
+                    if interrupted {
+                        // resume reading from our non-depleted inputs
+                        continue;
                     }
+                    break Async::NotReady;
+                };
 
-                    if i == FORCE_INPUT_YIELD_EVERY - 1 {
-                        // we could keep processing inputs, but make sure we send some ACKs too!
-                        interrupted = true;
+                // check if we now need to set a timeout
+                match self.domain.on_event(
+                    &mut self.sendback,
+                    PollEvent::ResumePolling,
+                    &mut self.outbox,
+                ) {
+                    ProcessResult::KeepPolling(timeout) => {
+                        if let Some(timeout) = timeout {
+                            self.timeout =
+                                Some(tokio::timer::Delay::new(time::Instant::now() + timeout));
+
+                            // we need to poll the delay to ensure we'll get woken up
+                            if let Async::Ready(()) =
+                                self.try_timeout().context("check timeout after setting")?
+                            {
+                                // the timer expired and we did some stuff
+                                // make sure we don't return while there's more work to do
+                                continue;
+                            }
+                        }
                     }
-                }
-
-                // send to downstream
-                // TODO: send fail == exiting?
-                self.try_flush().context("downstream flush (after)")?;
-
-                // send acks
-                self.try_ack()?;
-
-                if interrupted {
-                    // resume reading from our non-depleted inputs
-                    continue;
-                }
-                break Async::NotReady;
-            };
-
-            // check if we now need to set a timeout
-            match self.domain.on_event(
-                &mut self.sendback,
-                PollEvent::ResumePolling,
-                &mut self.outbox,
-            ) {
-                ProcessResult::KeepPolling(timeout) => {
-                    if let Some(timeout) = timeout {
-                        self.timeout =
-                            Some(tokio::timer::Delay::new(time::Instant::now() + timeout));
-
-                        // we need to poll the delay to ensure we'll get woken up
-                        self.try_timeout().context("check timeout after setting")?;
+                    pr => {
+                        // TODO: just have resume_polling be a method...
+                        unreachable!("unexpected ResumePolling result {:?}", pr)
                     }
                 }
-                pr => {
-                    // TODO: just have resume_polling be a method...
-                    unreachable!("unexpected ResumePolling result {:?}", pr)
-                }
+
+                break readiness;
             }
-
-            readiness
         };
 
         match r {

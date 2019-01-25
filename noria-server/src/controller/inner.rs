@@ -2,6 +2,8 @@ use crate::controller::migrate::materialization::Materializations;
 use crate::controller::{
     ControllerState, DomainHandle, DomainShardHandle, Migration, Recipe, Worker, WorkerIdentifier,
 };
+use crate::controller::recipe::Schema;
+use crate::controller::schema;
 use crate::coordination::{CoordinationMessage, CoordinationPayload, DomainDescriptor};
 use dataflow::payload::ControlReplyPacket;
 use dataflow::prelude::*;
@@ -13,6 +15,7 @@ use noria::channel::tcp::{SendError, TcpSender};
 use noria::consensus::{Authority, Epoch, STATE_KEY};
 use noria::debug::stats::{DomainStats, GraphStats, NodeStats};
 use noria::ActivationResult;
+use nom_sql::ColumnSpecification;
 use petgraph;
 use petgraph::visit::Bfs;
 use slog;
@@ -237,6 +240,10 @@ impl ControllerInner {
                             let n = &self.ingredients[ni];
                             if n.is_internal() {
                                 Some((ni, n.name(), n.description(true)))
+                            } else if n.is_base() {
+                                Some((ni, n.name(), "Base table".to_owned()))
+                            } else if n.is_reader() {
+                                Some((ni, n.name(), "Leaf view".to_owned()))
                             } else {
                                 None
                             }
@@ -759,6 +766,7 @@ impl ControllerInner {
         self.find_view_for(node).map(|r| {
             let domain = self.ingredients[r].domain();
             let columns = self.ingredients[r].fields().to_vec();
+            let schema = self.view_schema(r);
             let shards = (0..self.domains[&domain].shards())
                 .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
                 .collect();
@@ -767,9 +775,24 @@ impl ControllerInner {
                 local_ports: vec![],
                 node: r,
                 columns,
+                schema: schema,
                 shards,
             }
         })
+    }
+
+    fn view_schema(&self, view_ni: NodeIndex) -> Option<Vec<ColumnSpecification>> {
+        let n = &self.ingredients[view_ni];
+        let schema: Vec<_> = (0..n.fields().len())
+            .into_iter()
+            .map(|i| schema::column_schema(&self.ingredients, view_ni, &self.recipe, i, &self.log))
+            .collect();
+
+        if schema.iter().any(|cs| cs.is_none()) {
+            None
+        } else {
+            Some(schema.into_iter().map(|cs| cs.unwrap()).collect())
+        }
     }
 
     /// Obtain a TableBuild that can be used to construct a Table to perform writes and deletes
@@ -819,7 +842,10 @@ impl ControllerInner {
             columns.len(),
             node.fields().len() - base_operator.get_dropped().len()
         );
-        let schema = self.recipe.get_base_schema(base);
+        let schema = self.recipe.schema_for(base).map(|s| match s {
+            Schema::Table(s) => s,
+            _ => panic!("non-base schema {:?} returned for table '{}'", s, base),
+        });
 
         Some(TableBuilder {
             local_port: None,
@@ -1273,7 +1299,7 @@ impl ControllerInner {
     fn nodes_on_worker(&self, worker: Option<&WorkerIdentifier>) -> Vec<NodeIndex> {
         // NOTE(malte): this traverses all graph vertices in order to find those assigned to a
         // domain. We do this to avoid keeping separate state that may get out of sync, but it
-        // could become a performance bottleneck in the future (e.g., when recovergin large
+        // could become a performance bottleneck in the future (e.g., when recovering large
         // graphs).
         let domain_nodes = |i: DomainIndex| -> Vec<NodeIndex> {
             self.ingredients
