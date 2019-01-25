@@ -800,8 +800,6 @@ impl SqlToMirConverter {
         let mut emit: Vec<Vec<Column>> = Vec::new();
         assert!(ancestors.len() > 1, "union must have more than 1 ancestors");
 
-        println!("ancestors: {:?}", ancestors);
-
         let ucols: Vec<Column> = ancestors
             .first()
             .unwrap()
@@ -850,7 +848,6 @@ impl SqlToMirConverter {
             }
         }
 
-        println!("selected cols: {:#?} ucols: {:#?}", selected_col_objects, ucols);
         assert_eq!(
             num_ucols,
             selected_cols.len(),
@@ -1147,8 +1144,6 @@ impl SqlToMirConverter {
         // add the alias to all instances of `l_col` in `fields` (there might be more than one
         // if `l_col` is explicitly projected multiple times)
 
-        println!("left join columns: {:#?} right join columns: {:#?}", left_join_columns, right_join_columns);
-
         let fields: Vec<Column> = fields
             .into_iter()
             .filter_map(|mut f| {
@@ -1169,7 +1164,6 @@ impl SqlToMirConverter {
             })
             .collect();
 
-        println!("fields: {:#?}", fields);
         left_join_columns.push(l_col);
         right_join_columns.push(r_col);
 
@@ -1848,25 +1842,6 @@ impl SqlToMirConverter {
                       OutputColumn::Literal(_) => None,
                   })
                   .collect();
-
-            // let mut projected_columns : Vec<Column> = final_node_cols.iter().cloned().collect();
-            // let mut projected_columns: Vec<Column> = if universe.1.is_none() {
-            //     qg.columns
-            //         .iter()
-            //         .filter_map(|oc| match *oc {
-            //             OutputColumn::Arithmetic(_) => None,
-            //             OutputColumn::Data(ref c) => Some(Column::from(c)),
-            //             OutputColumn::Literal(_) => None,
-            //         }).collect()
-            // }
-
-            // else {
-            //     // If we are creating a query for a group universe, we project
-            //     // all columns in the final node. When a user universe that
-            //     // belongs to this group, the proper projection and leaf node
-            //     // will be added.
-                // final_node_cols.iter().cloned().collect()
-            // };
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);

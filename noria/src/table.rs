@@ -380,9 +380,7 @@ impl<E> Table<E> {
     where
         V: Into<Vec<DataType>>,
     {
-        // println!("in table insert");
         let data = vec![TableOperation::Insert(u.into())];
-        println!("inserting data into table: {:?}", data.clone());
         if data[0].row().unwrap().len() != self.columns.len() {
             return Err(TableError::WrongColumnCount(
                 self.columns.len(),
@@ -434,7 +432,6 @@ impl<E> Table<E> {
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
-        println!("in table update");
         assert!(
             !self.key.is_empty() && self.key_is_primary,
             "update operations can only be applied to base nodes with key columns"

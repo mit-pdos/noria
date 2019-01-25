@@ -204,7 +204,6 @@ impl Handle {
                     debug_assert!(r.len() >= cols);
                     match r {
                         Record::Positive(r) => {
-                            println!("inserting record {:?}", r);
                             memory_delta += r.deep_size_of() as isize;
                             h.insert(r[key[0]].clone(), r);
                         }

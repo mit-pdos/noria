@@ -51,7 +51,6 @@ pub fn assign(
     let mut domain_map = &mut mainline.map_meta.query_to_domain;
 
     for node in topo_list {
-        println!("Looking at node: {:?}", node);
         let assignment = (|| {
             let graph = &*graph;
             let n = &graph[node];
@@ -89,7 +88,6 @@ pub fn assign(
 
                 let domain_assignment = next_domain();
                 if srmap_reader_node {
-                    println!("1 assigned to domain: {:?}", domain_assignment);
                     domain_map.insert(srmap_query.clone(), domain_assignment);
                 }
                 return domain_assignment;
@@ -147,9 +145,7 @@ pub fn assign(
 
                 return if let Some(friendly_base) = friendly_base {
                     let domain_assignment = friendly_base.domain().index();
-                    println!("potentially a problem");
                     if srmap_reader_node {
-                        println!("2 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     domain_assignment
@@ -157,7 +153,6 @@ pub fn assign(
                     // there are no bases like us, so we need a new domain :'(
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
-                        println!("3 assigned to domain: {:?}", domain_assignment);
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     domain_assignment
@@ -167,7 +162,6 @@ pub fn assign(
             if graph[node].name().starts_with("BOUNDARY_") {
                 let domain_assignment = next_domain();
                 if srmap_reader_node {
-                    println!("4 assigned to domain: {:?}", domain_assignment);
                     domain_map.insert(srmap_query.clone(), domain_assignment);
                 }
                 return domain_assignment;

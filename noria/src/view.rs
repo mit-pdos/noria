@@ -248,7 +248,6 @@ impl<E> View<E> {
         keys: Vec<Vec<DataType>>,
         block: bool,
     ) -> Result<Vec<Datas>, ViewError> {
-        println!("in multilookup");
         if self.shards.len() == 1 {
             let mut shard = self.shards[0].borrow_mut();
             let reply = shard

@@ -278,7 +278,6 @@ impl WriteHandle {
     where
         I: IntoIterator<Item = Record>,
     {
-        println!("in add in backlog");
         let mem_delta = self.handle.add(&self.key[..], self.cols, rs);
         if mem_delta > 0 {
             self.mem_size += mem_delta as usize;

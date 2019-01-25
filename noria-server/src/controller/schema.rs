@@ -35,7 +35,6 @@ fn type_for_internal_column(
 ) -> Option<SqlType> {
     // column originates at internal view: literal, aggregation output
     // FIXME(malte): return correct type depending on what column does
-    println!("node: {:#?}", *node);
     match *(*node) {
         ops::NodeOperator::Project(ref o) => {
             let emits = o.emits();

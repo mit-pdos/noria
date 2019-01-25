@@ -973,7 +973,6 @@ impl Domain {
                                 let srmap = true;
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
-                                    // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
                                     let (tr_part, tw_part) = backlog::new_partial(srmap, cols, &k[..], move |miss| {
                                         let n = txs.len();
                                         let tx = if n == 1 {
@@ -1050,15 +1049,12 @@ impl Domain {
 
                                         if offset >= handle_vector_size {
                                             // SRMap not created --> plan to create one.
-                                            // println!("Got mat info {:?}, planning to create new SRMap", info.clone());
                                             append_to_handles = true;
                                         } else {
                                             // SRMap created --> get set of handles.
-                                            // println!("Got mat info {:?}, not creating new SRMap", info.clone());
                                             create_new_srmap = false;
                                             let (mut tr_part, mut tw_part) = self.srmap_handles[offset].clone();
                                             let (mut tr_part, mut tw_part) = tw_part.clone_new_user(tr_part);
-                                            println!("passing out new handle with id: {:?}", tr_part.uid);
                                             r_part = tr_part;
                                             w_part = tw_part;
 
@@ -1086,8 +1082,6 @@ impl Domain {
 
                                 // Create new SRMap if one doesn't already exist.
                                 if create_new_srmap {
-                                    println!("creating new srmap!");
-                                    // println!("Got mat info {:?}, creating new SRMap", materialization_info.clone());
                                     let (tr_part, tw_part) = backlog::new(srmap, cols, &key[..], ids);
                                     r_part = tr_part;
                                     w_part = tw_part;

@@ -338,7 +338,6 @@ fn main() {
         let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
         let res = getter.multi_lookup(uids.clone(), false);
-        println!("res: {:?}", res);
         dur += start.elapsed();
     }
 

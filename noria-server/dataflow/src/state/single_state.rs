@@ -39,7 +39,6 @@ impl SingleState {
                     // trying to insert a record into partial materialization hole!
                     return false;
                 }
-                println!("single state: insert_row");
                 map.insert(r[self.key[0]].clone(), vec![r]);
             }
             KeyedState::Double(ref mut map) => {
