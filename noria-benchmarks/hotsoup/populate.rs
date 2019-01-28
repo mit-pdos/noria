@@ -32,7 +32,7 @@ fn populate_table(backend: &mut Backend, data: &Path, use_txn: bool) -> usize {
     let mut reader = BufReader::new(f);
 
     let mut s = String::new();
-    // println!("Populating {}...", table_name);
+    println!("Populating {}...", table_name);
     let start = time::Instant::now();
     let mut i = 0;
     while reader.read_line(&mut s).unwrap() > 0 {
@@ -51,7 +51,7 @@ fn populate_table(backend: &mut Backend, data: &Path, use_txn: bool) -> usize {
         s.clear();
     }
     let dur = dur_to_fsec!(start.elapsed());
-    // println!(
+    println!(
         "Inserted {} {} records in {:.2}s ({:.2} PUTs/sec)!",
         i,
         table_name,

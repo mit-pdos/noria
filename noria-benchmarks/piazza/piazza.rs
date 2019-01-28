@@ -41,7 +41,7 @@ impl Backend {
             _ => panic!("reuse configuration not supported"),
         }
 
-        cb.log_with(blender_log);
+        // cb.log_with(blender_log);
 
         let g = cb.build_local().unwrap();
 
@@ -88,7 +88,6 @@ impl Backend {
 
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
-
         // Read schema file
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
@@ -245,14 +244,15 @@ fn main() {
         "nusers must be greater or equal to TAS_PER_CLASS"
     );
 
-    // Initiliaze backend application with some queries and policies
-    println!("Initiliazing database schema...");
+    println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
+    println!("here 1");
     backend.migrate(sloc, None).unwrap();
-
+    println!("here 2");
     backend.set_security_config(ploc);
+    println!("here 3");
     backend.migrate(sloc, Some(qloc)).unwrap();
-
+    println!("here 4");
     let populate = match populate.as_ref() {
         "before" => PopulateType::Before,
         "after" => PopulateType::After,

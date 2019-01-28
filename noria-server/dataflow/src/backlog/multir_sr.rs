@@ -1,20 +1,19 @@
 use common::DataType;
-use evmap;
 use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub enum Handle {
-    Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
-    Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
-    Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
+    SingleSR(srmap::handle::handle::Handle<DataType, Vec<DataType>, i64>),
+    DoubleSR(srmap::handle::handle::Handle<(DataType, DataType), Vec<DataType>, i64>),
+    ManySR(srmap::handle::handle::Handle<Vec<DataType>, Vec<DataType>, i64>),
 }
 
 impl Handle {
     pub fn len(&self) -> usize {
         match *self {
-            Handle::Single(ref h) => h.len(),
-            Handle::Double(ref h) => h.len(),
-            Handle::Many(ref h) => h.len(),
+            Handle::SingleSR(ref h) => h.len(),
+            Handle::DoubleSR(ref h) => h.len(),
+            Handle::ManySR(ref h) => h.len(),
         }
     }
 
@@ -23,9 +22,9 @@ impl Handle {
         F: FnMut(&[Vec<DataType>]),
     {
         match *self {
-            Handle::Single(ref h) => h.for_each(|_, v| f(v)),
-            Handle::Double(ref h) => h.for_each(|_, v| f(v)),
-            Handle::Many(ref h) => h.for_each(|_, v| f(v)),
+            Handle::SingleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::DoubleSR(ref h) => h.for_each(|_, v| f(v)),
+            Handle::ManySR(ref h) => h.for_each(|_, v| f(v)),
         }
     }
 
@@ -34,11 +33,11 @@ impl Handle {
         F: FnOnce(&[Vec<DataType>]) -> T,
     {
         match *self {
-            Handle::Single(ref h) => {
+            Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
             },
-            Handle::Double(ref h) => {
+            Handle::DoubleSR(ref h) => {
                 assert_eq!(key.len(), 2);
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
                 // we're not guaranteed that they have the same memory layout
@@ -66,9 +65,9 @@ impl Handle {
                     v
                 }
             },
-            Handle::Many(ref h) => {
-                h.meta_get_and(&key.to_vec(), then)
-            },
+             Handle::ManySR(ref h) => {
+                 h.meta_get_and(&key.to_vec(), then)
+              },
         }
     }
 }

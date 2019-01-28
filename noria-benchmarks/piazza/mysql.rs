@@ -5,9 +5,7 @@ extern crate noria;
 #[macro_use]
 extern crate mysql;
 extern crate rand;
-use distributary::{
-    ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType,
-};
+
 use mysql as my;
 use noria::DataType;
 

@@ -1,1 +1,0 @@
-VIEW q_1: SELECT messages.id from messages;

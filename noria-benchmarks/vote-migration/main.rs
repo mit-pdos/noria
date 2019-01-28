@@ -67,9 +67,9 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     persistence_params.mode = noria::DurabilityMode::MemoryOnly;
 
     // make the graph!
-    e// println!("Setting up soup");
+    println!("Setting up soup");
     let mut g = s.make(persistence_params);
-    e// println!("Getting accessors");
+    println!("Getting accessors");
     let mut articles = g.graph.table("Article").unwrap().into_exclusive().unwrap();
     let mut votes = g.graph.table("Vote").unwrap().into_exclusive().unwrap();
     let mut read_old = g
@@ -80,7 +80,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         .unwrap();
 
     // prepopulate
-    eprintln!("Prepopulating with {} articles", narticles);
+    println!("Prepopulating with {} articles", narticles);
     articles
         .insert_then_wait(
             (0..narticles).map(|i| vec![(i as i32).into(), format!("Article #{}", i + 1).into()]),
@@ -91,7 +91,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     let barrier = Arc::new(Barrier::new(3));
 
     // start writer that just does a bunch of old writes
-    e// println!("Starting old writer");
+    println!("Starting old writer");
     let w1 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -123,7 +123,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     };
 
     // start a read that just reads old forever
-    e// println!("Starting old reader");
+    println!("Starting old reader");
     let r1 = {
         let barrier = barrier.clone();
         thread::spawn(move || {
@@ -149,7 +149,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         let mut w = w;
         for (stat, val) in stat_rx {
             let line = format!("{} {} {:.2}", start.elapsed().as_nanos(), stat, val);
-            // println!("{}", line);
+            println!("{}", line);
             if let Some(ref mut w) = w {
                 writeln!(w, "{}", line).unwrap();
             }
@@ -157,11 +157,11 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     });
 
     // we now need to wait for migrate_after
-    e// println!("Waiting for migration time...");
+    println!("Waiting for migration time...");
     thread::sleep(migrate_after);
 
     // all right, migration time
-    e// println!("Starting migration");
+    println!("Starting migration");
     stat.send(("MIG START", 0.0)).unwrap();
     g.transition();
     stat.send(("MIG FINISHED", 0.0)).unwrap();
@@ -174,7 +174,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
         .unwrap();
 
     // start writer that just does a bunch of new writes
-    e// println!("Starting new writer");
+    println!("Starting new writer");
     let w2 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -204,7 +204,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     };
 
     // start reader that keeps probing new read view
-    e// println!("Starting new read probe");
+    println!("Starting new read probe");
     let r2 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -245,7 +245,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     barrier.wait();
 
     // everything finishes!
-    e// println!("Waiting for experiment to end...");
+    println!("Waiting for experiment to end...");
     w1.join().unwrap();
     w2.join().unwrap();
     r1.join().unwrap();
@@ -348,7 +348,7 @@ fn main() {
         let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
 
         // do the ones we need for the paper first
-        e// println!("==> full no reuse (zipf)");
+        println!("==> full no reuse (zipf)");
         s.partial = false;
         s.stupid = true;
         one(
@@ -360,7 +360,7 @@ fn main() {
                     .unwrap(),
             ),
         );
-        e// println!("==> partial with reuse (uniform)");
+        println!("==> partial with reuse (uniform)");
         s.partial = true;
         s.stupid = false;
         one(
@@ -369,7 +369,7 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
         );
-        e// println!("==> partial with reuse (zipf)");
+        println!("==> partial with reuse (zipf)");
         s.partial = true;
         s.stupid = false;
         one(
@@ -384,7 +384,7 @@ fn main() {
         }
 
         // then the rest
-        e// println!("==> full no reuse (uniform)");
+        println!("==> full no reuse (uniform)");
         s.partial = false;
         s.stupid = true;
         one(
@@ -395,7 +395,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-stupid-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        e// println!("==> full with reuse (uniform)");
+        println!("==> full with reuse (uniform)");
         s.partial = false;
         s.stupid = false;
         one(
@@ -406,7 +406,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        e// println!("==> full with reuse (zipf)");
+        println!("==> full with reuse (zipf)");
         s.partial = false;
         s.stupid = false;
         one(
@@ -417,7 +417,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.zipf1.08.log", mills)).unwrap(),
             ),
         );
-        e// println!("==> partial no reuse (uniform)");
+        println!("==> partial no reuse (uniform)");
         s.partial = true;
         s.stupid = true;
         one(
@@ -426,7 +426,7 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-stupid-{}M.uniform.log", mills)).unwrap()),
         );
-        e// println!("==> partial no reuse (zipf)");
+        println!("==> partial no reuse (zipf)");
         s.partial = true;
         s.stupid = true;
         one(

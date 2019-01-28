@@ -169,9 +169,9 @@ where
     drop(cc);
 
     // all done!
-    // println!("# generated ops/s: {:.2}", ops);
-    // println!("# actual ops/s: {:.2}", wops);
-    // println!("# op\tpct\tsojourn\tremote");
+    println!("# generated ops/s: {:.2}", ops);
+    println!("# actual ops/s: {:.2}", wops);
+    println!("# op\tpct\tsojourn\tremote");
 
     let sjrn_w_t = sjrn_w_t.lock().unwrap();
     let sjrn_r_t = sjrn_r_t.lock().unwrap();
@@ -190,47 +190,47 @@ where
                 s.serialize(&rmt_r_t, &mut f).unwrap();
             }
             Err(e) => {
-                e// println!("failed to open histogram file for writing: {:?}", e);
+                println!("failed to open histogram file for writing: {:?}", e);
             }
         }
     }
 
-    // println!(
+    println!(
         "write\t50\t{:.2}\t{:.2}\t(all µs)",
         sjrn_w_t.value_at_quantile(0.5),
         rmt_w_t.value_at_quantile(0.5)
     );
-    // println!(
+    println!(
         "read\t50\t{:.2}\t{:.2}\t(all µs)",
         sjrn_r_t.value_at_quantile(0.5),
         rmt_r_t.value_at_quantile(0.5)
     );
-    // println!(
+    println!(
         "write\t95\t{:.2}\t{:.2}\t(all µs)",
         sjrn_w_t.value_at_quantile(0.95),
         rmt_w_t.value_at_quantile(0.95)
     );
-    // println!(
+    println!(
         "read\t95\t{:.2}\t{:.2}\t(all µs)",
         sjrn_r_t.value_at_quantile(0.95),
         rmt_r_t.value_at_quantile(0.95)
     );
-    // println!(
+    println!(
         "write\t99\t{:.2}\t{:.2}\t(all µs)",
         sjrn_w_t.value_at_quantile(0.99),
         rmt_w_t.value_at_quantile(0.99)
     );
-    // println!(
+    println!(
         "read\t99\t{:.2}\t{:.2}\t(all µs)",
         sjrn_r_t.value_at_quantile(0.99),
         rmt_r_t.value_at_quantile(0.99)
     );
-    // println!(
+    println!(
         "write\t100\t{:.2}\t{:.2}\t(all µs)",
         sjrn_w_t.max(),
         rmt_w_t.max()
     );
-    // println!(
+    println!(
         "read\t100\t{:.2}\t{:.2}\t(all µs)",
         sjrn_r_t.max(),
         rmt_r_t.max()
@@ -424,7 +424,7 @@ where
                                 if client_work_left > (end - now).as_secs() + 1 {
                                     // no point in continuing to feed work to the clients
                                     // they have enough work to keep them busy until the end
-                                    e// println!(
+                                    println!(
                                     "load generator quitting early as clients are falling behind"
                                 );
                                     break;
@@ -706,6 +706,6 @@ fn main() {
         ("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
         ("hybrid", Some(largs)) => run::<clients::hybrid::Conf>(&args, largs),
         ("null", Some(largs)) => run::<()>(&args, largs),
-        (name, _) => e// println!("unrecognized backend type '{}'", name),
+        (name, _) => println!("unrecognized backend type '{}'", name),
     }
 }
