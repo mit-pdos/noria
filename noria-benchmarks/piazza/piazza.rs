@@ -328,7 +328,7 @@ fn main() {
 
     let mut dur = time::Duration::from_millis(0);
     let mut uids = Vec::new();
-    let num_at_once = 10;
+    let num_at_once = 1000;
     for uid in 0..num_at_once {
         uids.push([0.into()].to_vec());
     }
