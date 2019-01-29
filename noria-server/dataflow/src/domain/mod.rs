@@ -237,11 +237,11 @@ pub struct Domain {
 }
 
 impl Domain {
-    fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> ExternalId {
+    fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> PacketId {
         let from_ni = self.nodes[from].borrow().get_index().as_global();
         let to_ni = self.nodes[to].borrow().get_index().as_global();
-        let pid = self.nodes[from].borrow_mut().send_packet(to_ni);
-        ExternalId::new(pid, from_ni)
+        let label = self.nodes[from].borrow_mut().send_packet(to_ni);
+        PacketId::new(label, from_ni)
     }
 
     fn find_tags_and_replay(
@@ -678,8 +678,8 @@ impl Domain {
             }
             m.link_mut().dst = childi;
 
-            let eid = self.send_internal_packet(m.src(), m.dst());
-            m.set_id(eid);
+            let pid = self.send_internal_packet(m.src(), m.dst());
+            m.set_id(pid);
             self.dispatch(m, sends, executor);
         }
     }
@@ -1060,9 +1060,9 @@ impl Domain {
                         // do that inside the thread, because by the time that thread is scheduled,
                         // we may already have processed some other messages that are not yet a
                         // part of state.
-                        let eid = self.send_internal_packet(link.src, link.dst);
+                        let pid = self.send_internal_packet(link.src, link.dst);
                         let p = box Packet::ReplayPiece {
-                            id: eid,
+                            id: pid,
                             tag: tag,
                             link: link.clone(),
                             context: ReplayPieceContext::Regular {
@@ -1134,7 +1134,7 @@ impl Domain {
                                         let len = chunk.len();
                                         let last = iter.peek().is_none();
                                         let p = box Packet::ReplayPiece {
-                                            id: ExternalId::default(),
+                                            id: PacketId::default(),
                                             tag: tag,
                                             link: link.clone(), // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
@@ -1390,9 +1390,9 @@ impl Domain {
                 });
 
                 let m = if !keys.is_empty() {
-                    let eid = self.send_internal_packet(source, path[0].node);
+                    let pid = self.send_internal_packet(source, path[0].node);
                     Some(box Packet::ReplayPiece {
-                        id: eid,
+                        id: pid,
                         link: Link::new(source, path[0].node),
                         tag: tag,
                         context: ReplayPieceContext::Partial {
@@ -1509,9 +1509,9 @@ impl Domain {
                     use std::iter::FromIterator;
                     let data = Records::from_iter(rs.into_iter().map(|r| self.seed_row(source, r)));
 
-                    let eid = self.send_internal_packet(source, path[0].node);
+                    let pid = self.send_internal_packet(source, path[0].node);
                     let m = Some(box Packet::ReplayPiece {
-                        id: eid,
+                        id: pid,
                         link: Link::new(source, path[0].node),
                         tag: tag,
                         context: ReplayPieceContext::Partial {
@@ -1686,9 +1686,9 @@ impl Domain {
                         if let Some(ni) = sender {
                             let from_ni = self.nodes[ni].borrow().get_index().as_global();
                             let to_ni = self.nodes[segment.node].borrow().get_index().as_global();
-                            let pid = self.nodes[ni].borrow_mut().send_packet(to_ni);
-                            let eid = ExternalId::new(pid, from_ni);
-                            m.as_mut().unwrap().set_id(eid);
+                            let label = self.nodes[ni].borrow_mut().send_packet(to_ni);
+                            let pid = PacketId::new(label, from_ni);
+                            m.as_mut().unwrap().set_id(pid);
                         }
                         sender = Some(segment.node);
 
@@ -2145,8 +2145,8 @@ impl Domain {
                 // completely block the domain data channel, so we only process a few backlogged
                 // updates before yielding to the main loop (which might buffer more things).
 
-                let eid = self.send_internal_packet(node, m.dst());
-                m.set_id(eid);
+                let pid = self.send_internal_packet(node, m.dst());
+                m.set_id(pid);
 
                 if let m @ box Packet::Message { .. } = m {
                     // NOTE: we specifically need to override the buffering behavior that our

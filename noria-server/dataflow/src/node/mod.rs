@@ -33,9 +33,9 @@ pub struct Node {
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
     /// The last packet received and processed from each parent
-    pub last_packet_received: PacketId,
+    pub last_packet_received: u32,
     /// The next packet to send to each child, starts at 1
-    pub next_packet_to_send: PacketId,
+    pub next_packet_to_send: u32,
 }
 
 // constructors
@@ -352,17 +352,17 @@ impl Node {
         self.replica = Some(rt);
     }
 
-    pub fn receive_packet(&mut self, from: NodeIndex, pid: PacketId) {
+    pub fn receive_packet(&mut self, from: NodeIndex, label: u32) {
         println!(
             "{} RECEIVE #{} from {:?}",
             self.get_index().as_global().index(),
-            pid,
+            label,
             from,
         );
         self.last_packet_received += 1;
     }
 
-    pub fn send_packet(&mut self, to: NodeIndex) -> PacketId {
+    pub fn send_packet(&mut self, to: NodeIndex) -> u32 {
         println!(
             "{} SEND #{} to {:?}",
             self.get_index().as_global().index(),

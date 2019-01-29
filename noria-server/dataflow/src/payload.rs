@@ -77,25 +77,24 @@ pub struct SourceChannelIdentifier {
     pub tag: u32,
 }
 
-pub type PacketId = u32;
-
 /// External ids are used the first time the packet appears in a domain.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct ExternalId {
-    pid: PacketId,
+pub struct PacketId {
+    label: u32,
     from: NodeIndex,
 }
 
-impl ExternalId {
-    pub fn default() -> ExternalId {
-        ExternalId { pid: 54321, from: NodeIndex::new(54321) }
-    }
-    pub fn new(pid: PacketId, from: NodeIndex) -> ExternalId {
-        ExternalId { pid, from }
+impl PacketId {
+    pub fn default() -> PacketId {
+        PacketId { label: 54321, from: NodeIndex::new(54321) }
     }
 
-    pub fn pid(&self) -> PacketId {
-        self.pid
+    pub fn new(label: u32, from: NodeIndex) -> PacketId {
+        PacketId { label, from }
+    }
+
+    pub fn label(&self) -> u32 {
+        self.label
     }
 
     pub fn from(&self) -> NodeIndex {
@@ -115,7 +114,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
-        id: ExternalId,
+        id: PacketId,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -123,7 +122,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
-        id: ExternalId,
+        id: PacketId,
         link: Link,
         tag: Tag,
         data: Records,
@@ -259,7 +258,7 @@ pub enum Packet {
 }
 
 impl Packet {
-    pub fn set_id(&mut self, new_id: ExternalId) {
+    pub fn set_id(&mut self, new_id: PacketId) {
         match *self {
             Packet::Message { ref mut id, .. } => *id = new_id,
             Packet::ReplayPiece { ref mut id, .. } => *id = new_id,

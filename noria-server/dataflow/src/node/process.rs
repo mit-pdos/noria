@@ -22,10 +22,10 @@ impl Node {
         match m {
             Some(box Packet::Input { .. }) => {},  // ignore inputs from clients
             Some(box Packet::Message { id, .. }) => {
-                self.receive_packet(id.from(), id.pid());
+                self.receive_packet(id.from(), id.label());
             },
             Some(box Packet::ReplayPiece { id, .. }) => {
-                self.receive_packet(id.from(), id.pid());
+                self.receive_packet(id.from(), id.label());
             },
             _ => unreachable!(),
         };
@@ -34,9 +34,9 @@ impl Node {
         // TODO(ygina): multiple children, sharders
         match self.inner {
             NodeType::Egress(Some(ref e)) => {
-                let pid = self.send_packet(e.get_tx_nodes()[0]);
-                let eid = ExternalId::new(pid, self.get_index().as_global());
-                m.as_mut().unwrap().set_id(eid);
+                let label = self.send_packet(e.get_tx_nodes()[0]);
+                let pid = PacketId::new(label, self.get_index().as_global());
+                m.as_mut().unwrap().set_id(pid);
             },
             _ => {},
         }
@@ -77,7 +77,7 @@ impl Node {
 
                         // TODO(ygina): what happens with this packet?
                         *m = Some(Box::new(Packet::Message {
-                            id: ExternalId::default(),
+                            id: PacketId::default(),
                             link: Link::new(dst, dst),
                             data: rs,
                             tracer,
