@@ -33,9 +33,9 @@ pub struct Node {
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
     /// The last packet received and processed from each parent
-    pub last_packet_received: u32,
+    pub last_packet_received: HashMap<NodeIndex, u32>,
     /// The next packet to send to each child, starts at 1
-    pub next_packet_to_send: u32,
+    pub next_packet_to_send: HashMap<NodeIndex, u32>,
 }
 
 // constructors
@@ -59,8 +59,8 @@ impl Node {
 
             sharded_by: Sharding::None,
             replica: None,
-            last_packet_received: 0,
-            next_packet_to_send: 1,
+            last_packet_received: HashMap::new(),
+            next_packet_to_send: HashMap::new(),
         }
     }
 
@@ -353,24 +353,19 @@ impl Node {
     }
 
     pub fn receive_packet(&mut self, from: NodeIndex, label: u32) {
-        println!(
-            "{} RECEIVE #{} from {:?}",
-            self.get_index().as_global().index(),
-            label,
-            from,
-        );
-        self.last_packet_received += 1;
+        let me = self.get_index().as_global().index();
+        println!( "{} RECEIVE #{} from {:?}", me, label, from);
+        let current_label = self.last_packet_received.entry(from).or_insert(0);
+        assert!(label > *current_label);
+        *current_label = label;
     }
 
     pub fn send_packet(&mut self, to: NodeIndex) -> u32 {
-        println!(
-            "{} SEND #{} to {:?}",
-            self.get_index().as_global().index(),
-            self.next_packet_to_send,
-            to,
-        );
-        self.next_packet_to_send += 1;
-        self.next_packet_to_send - 1
+        let me = self.get_index().as_global().index();
+        let current_label = self.next_packet_to_send.entry(to).or_insert(1);
+        println!("{} SEND #{} to {:?}", me, *current_label, to);
+        *current_label += 1;
+        *current_label - 1
     }
 }
 

@@ -348,7 +348,7 @@ mod tests {
 
         fn print_packet_info(mig: &Migration, ni: NodeIndex) {
             println!(
-                "Node {} | {} | {} | {:?}",
+                "Node {} | {:?} | {:?} | {:?}",
                 ni.index(),
                 mig.mainline.ingredients[ni].last_packet_received,
                 mig.mainline.ingredients[ni].next_packet_to_send,
