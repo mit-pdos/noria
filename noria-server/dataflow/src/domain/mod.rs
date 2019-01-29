@@ -237,6 +237,13 @@ pub struct Domain {
 }
 
 impl Domain {
+    fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> ExternalId {
+        let from_ni = self.nodes[from].borrow().get_index().as_global();
+        let to_ni = self.nodes[to].borrow().get_index().as_global();
+        let pid = self.nodes[from].borrow_mut().send_packet(to_ni);
+        ExternalId::new(pid, from_ni)
+    }
+
     fn find_tags_and_replay(
         &mut self,
         miss_key: Vec<DataType>,
@@ -482,7 +489,6 @@ impl Domain {
 
     fn dispatch(
         &mut self,
-        pid: Option<PacketId>,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
         executor: &mut Executor,
@@ -513,7 +519,6 @@ impl Domain {
             self.process_ptimes.start(me);
             let mut m = Some(m);
             let (misses, captured) = n.process(
-                pid,
                 &mut m,
                 None,
                 &mut self.state,
@@ -673,14 +678,14 @@ impl Domain {
             }
             m.link_mut().dst = childi;
 
-            let pid = self.nodes[m.src()].borrow_mut().send_packet();
-            self.dispatch(Some(pid), m, sends, executor);
+            let eid = self.send_internal_packet(m.src(), m.dst());
+            m.set_id(eid);
+            self.dispatch(m, sends, executor);
         }
     }
 
     fn handle(
         &mut self,
-        pid: Option<PacketId>,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
         executor: &mut Executor,
@@ -692,10 +697,10 @@ impl Domain {
         match *m {
             Packet::Message { .. } | Packet::Input { .. } => {
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
-                self.dispatch(pid, m, sends, executor);
+                self.dispatch(m, sends, executor);
             }
             Packet::ReplayPiece { .. } => {
-                self.handle_replay(pid, m, sends, executor);
+                self.handle_replay(m, sends, executor);
             }
             Packet::Evict { .. } | Packet::EvictKeys { .. } => {
                 self.handle_eviction(m, sends);
@@ -1055,7 +1060,9 @@ impl Domain {
                         // do that inside the thread, because by the time that thread is scheduled,
                         // we may already have processed some other messages that are not yet a
                         // part of state.
+                        let eid = self.send_internal_packet(link.src, link.dst);
                         let p = box Packet::ReplayPiece {
+                            id: eid,
                             tag: tag,
                             link: link.clone(),
                             context: ReplayPieceContext::Regular {
@@ -1127,6 +1134,7 @@ impl Domain {
                                         let len = chunk.len();
                                         let last = iter.peek().is_none();
                                         let p = box Packet::ReplayPiece {
+                                            id: ExternalId::default(),
                                             tag: tag,
                                             link: link.clone(), // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
@@ -1149,8 +1157,7 @@ impl Domain {
                                 .unwrap();
                         }
 
-                        let pid = self.nodes[p.src()].borrow_mut().send_packet();
-                        self.handle_replay(Some(pid), p, sends, executor);
+                        self.handle_replay(p, sends, executor);
                     }
                     Packet::Finish(tag, ni) => {
                         self.finish_replay(tag, ni, sends, executor);
@@ -1328,7 +1335,7 @@ impl Domain {
                 // instead, we ensure that only the topmost call to handle() walks delayed_for_self
 
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
-                self.handle(None, m, sends, executor, false);
+                self.handle(m, sends, executor, false);
             }
         }
         self.wait_time.start();
@@ -1383,7 +1390,9 @@ impl Domain {
                 });
 
                 let m = if !keys.is_empty() {
+                    let eid = self.send_internal_packet(source, path[0].node);
                     Some(box Packet::ReplayPiece {
+                        id: eid,
                         link: Link::new(source, path[0].node),
                         tag: tag,
                         context: ReplayPieceContext::Partial {
@@ -1435,8 +1444,7 @@ impl Domain {
                 unreachable!();
             }
 
-            let pid = self.nodes[m.src()].borrow_mut().send_packet();
-            self.handle_replay(Some(pid), m, sends, ex);
+            self.handle_replay(m, sends, ex);
         }
     }
 
@@ -1501,7 +1509,9 @@ impl Domain {
                     use std::iter::FromIterator;
                     let data = Records::from_iter(rs.into_iter().map(|r| self.seed_row(source, r)));
 
+                    let eid = self.send_internal_packet(source, path[0].node);
                     let m = Some(box Packet::ReplayPiece {
+                        id: eid,
                         link: Link::new(source, path[0].node),
                         tag: tag,
                         context: ReplayPieceContext::Partial {
@@ -1536,14 +1546,12 @@ impl Domain {
         }
 
         if let Some(m) = m {
-            let pid = self.nodes[m.src()].borrow_mut().send_packet();
-            self.handle_replay(Some(pid), m, sends, ex);
+            self.handle_replay(m, sends, ex);
         }
     }
 
     fn handle_replay(
         &mut self,
-        pid: Option<PacketId>,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
         ex: &mut Executor,
@@ -1596,6 +1604,7 @@ impl Domain {
             let m = *m; // workaround for #16223
             match m {
                 Packet::ReplayPiece {
+                    id,
                     tag,
                     link,
                     mut data,
@@ -1664,6 +1673,7 @@ impl Domain {
 
                     // forward the current message through all local nodes.
                     let m = box Packet::ReplayPiece {
+                        id: id.clone(),
                         link: link.clone(),
                         tag,
                         data,
@@ -1673,13 +1683,17 @@ impl Domain {
 
                     let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
-                        let mut n = self.nodes[segment.node].borrow_mut();
-                        let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
-
                         if let Some(ni) = sender {
-                            self.nodes[ni].borrow_mut().send_packet();
+                            let from_ni = self.nodes[ni].borrow().get_index().as_global();
+                            let to_ni = self.nodes[segment.node].borrow().get_index().as_global();
+                            let pid = self.nodes[ni].borrow_mut().send_packet(to_ni);
+                            let eid = ExternalId::new(pid, from_ni);
+                            m.as_mut().unwrap().set_id(eid);
                         }
                         sender = Some(segment.node);
+
+                        let mut n = self.nodes[segment.node].borrow_mut();
+                        let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
 
                         // keep track of whether we're filling any partial holes
                         let partial_key_cols = segment.partial_key.as_ref();
@@ -1732,7 +1746,6 @@ impl Domain {
 
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
-                            pid,
                             &mut m,
                             segment.partial_key.as_ref(),
                             &mut self.state,
@@ -2126,18 +2139,20 @@ impl Domain {
             }
 
             let mut handled = 0;
-            while let Some(m) = buffered.pop_front() {
+            while let Some(mut m) = buffered.pop_front() {
                 // some updates were propagated to this node during the migration. we need to
                 // replay them before we take even newer updates. however, we don't want to
                 // completely block the domain data channel, so we only process a few backlogged
                 // updates before yielding to the main loop (which might buffer more things).
 
+                let eid = self.send_internal_packet(node, m.dst());
+                m.set_id(eid);
+
                 if let m @ box Packet::Message { .. } = m {
                     // NOTE: we specifically need to override the buffering behavior that our
                     // self.replaying_to = Some above would initiate.
                     self.mode = DomainMode::Forwarding;
-                    let pid = self.nodes[node].borrow_mut().send_packet();
-                    self.dispatch(Some(pid), m, sends, ex);
+                    self.dispatch(m, sends, ex);
                 } else {
                     unreachable!();
                 }
@@ -2492,25 +2507,25 @@ impl Domain {
                 if self.group_commit_queues.should_append(&packet, &self.nodes) {
                     packet.trace(PacketEvent::ExitInputChannel);
                     if let Some(packet) = self.group_commit_queues.append(packet) {
-                        self.handle(None, packet, sends, executor, true);
+                        self.handle(packet, sends, executor, true);
                     }
                 } else {
-                    self.handle(None, packet, sends, executor, true);
+                    self.handle(packet, sends, executor, true);
                 }
 
                 while let Some(m) = self.group_commit_queues.flush_if_necessary() {
-                    self.handle(None, m, sends, executor, true);
+                    self.handle(m, sends, executor, true);
                 }
 
                 ProcessResult::Processed
             }
             PollEvent::Timeout => {
                 while let Some(m) = self.group_commit_queues.flush_if_necessary() {
-                    self.handle(None, m, sends, executor, true);
+                    self.handle(m, sends, executor, true);
                 }
 
                 if self.has_buffered_replay_requests {
-                    self.handle(None, box Packet::Spin, sends, executor, true);
+                    self.handle(box Packet::Spin, sends, executor, true);
                 }
 
                 ProcessResult::Processed

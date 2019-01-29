@@ -8,7 +8,6 @@ use std::mem;
 impl Node {
     pub(crate) fn process(
         &mut self,
-        pid: Option<PacketId>,
         m: &mut Option<Box<Packet>>,
         keyed_by: Option<&Vec<usize>>,
         state: &mut StateMap,
@@ -20,19 +19,27 @@ impl Node {
     ) -> (Vec<Miss>, HashSet<Vec<DataType>>) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
 
-        if let Some(pid) = pid {
-            self.receive_packet(pid);
-        } else {
-            // TODO(ygina): packet might not be numbered if it's to the source?
-            // also if i forgot to generate a packet id somewhere a packet was sent
-            self.receive_packet(1337);
-        }
+        match m {
+            Some(box Packet::Input { .. }) => {},  // ignore inputs from clients
+            Some(box Packet::Message { id, .. }) => {
+                self.receive_packet(id.from(), id.pid());
+            },
+            Some(box Packet::ReplayPiece { id, .. }) => {
+                self.receive_packet(id.from(), id.pid());
+            },
+            _ => unreachable!(),
+        };
 
         // Egress and sharder nodes will forward the packet, so we need to generate a packet id.
-        let pid = match self.inner {
-            NodeType::Egress(_) | NodeType::Sharder(_) => Some(self.send_packet()),
-            _ => None,
-        };
+        // TODO(ygina): multiple children, sharders
+        match self.inner {
+            NodeType::Egress(Some(ref e)) => {
+                let pid = self.send_packet(e.get_tx_nodes()[0]);
+                let eid = ExternalId::new(pid, self.get_index().as_global());
+                m.as_mut().unwrap().set_id(eid);
+            },
+            _ => {},
+        }
 
         let addr = self.local_addr();
         match self.inner {
@@ -68,7 +75,9 @@ impl Node {
                         // it into this merged packet:
                         senders.drain(..).for_each(|src| ex.ack(src));
 
+                        // TODO(ygina): what happens with this packet?
                         *m = Some(Box::new(Packet::Message {
+                            id: ExternalId::default(),
                             link: Link::new(dst, dst),
                             data: rs,
                             tracer,

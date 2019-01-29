@@ -352,13 +352,23 @@ impl Node {
         self.replica = Some(rt);
     }
 
-    pub fn receive_packet(&mut self, pid: PacketId) {
-        println!("{} RECEIVE #{}", self.get_index().as_global().index(), pid);
+    pub fn receive_packet(&mut self, from: NodeIndex, pid: PacketId) {
+        println!(
+            "{} RECEIVE #{} from {:?}",
+            self.get_index().as_global().index(),
+            pid,
+            from,
+        );
         self.last_packet_received += 1;
     }
 
-    pub fn send_packet(&mut self) -> PacketId {
-        println!("{} SEND #{}", self.get_index().as_global().index(), self.next_packet_to_send);
+    pub fn send_packet(&mut self, to: NodeIndex) -> PacketId {
+        println!(
+            "{} SEND #{} to {:?}",
+            self.get_index().as_global().index(),
+            self.next_packet_to_send,
+            to,
+        );
         self.next_packet_to_send += 1;
         self.next_packet_to_send - 1
     }

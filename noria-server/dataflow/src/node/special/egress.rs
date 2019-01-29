@@ -36,6 +36,10 @@ impl Default for Egress {
 }
 
 impl Egress {
+    pub fn get_tx_nodes(&self) -> Vec<NodeIndex> {
+        self.txs.iter().map(|tx| tx.node).collect()
+    }
+
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
         self.txs.push(EgressTx {
             node: dst_g,

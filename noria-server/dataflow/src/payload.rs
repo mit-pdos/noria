@@ -79,6 +79,30 @@ pub struct SourceChannelIdentifier {
 
 pub type PacketId = u32;
 
+/// External ids are used the first time the packet appears in a domain.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct ExternalId {
+    pid: PacketId,
+    from: NodeIndex,
+}
+
+impl ExternalId {
+    pub fn default() -> ExternalId {
+        ExternalId { pid: 54321, from: NodeIndex::new(54321) }
+    }
+    pub fn new(pid: PacketId, from: NodeIndex) -> ExternalId {
+        ExternalId { pid, from }
+    }
+
+    pub fn pid(&self) -> PacketId {
+        self.pid
+    }
+
+    pub fn from(&self) -> NodeIndex {
+        self.from
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Packet {
     // Data messages
@@ -91,6 +115,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
+        id: ExternalId,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -98,6 +123,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
+        id: ExternalId,
         link: Link,
         tag: Tag,
         data: Records,
@@ -233,6 +259,14 @@ pub enum Packet {
 }
 
 impl Packet {
+    pub fn set_id(&mut self, new_id: ExternalId) {
+        match *self {
+            Packet::Message { ref mut id, .. } => *id = new_id,
+            Packet::ReplayPiece { ref mut id, .. } => *id = new_id,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn src(&self) -> LocalNodeIndex {
         match *self {
             Packet::Input { ref inner, .. } => {
@@ -331,20 +365,24 @@ impl Packet {
     pub fn clone_data(&self) -> Self {
         match *self {
             Packet::Message {
+                ref id,
                 ref link,
                 ref data,
                 ref tracer,
             } => Packet::Message {
+                id: id.clone(),
                 link: link.clone(),
                 data: data.clone(),
                 tracer: tracer.clone(),
             },
             Packet::ReplayPiece {
+                ref id,
                 ref link,
                 ref tag,
                 ref data,
                 ref context,
             } => Packet::ReplayPiece {
+                id: id.clone(),
                 link: link.clone(),
                 tag: tag.clone(),
                 data: data.clone(),
