@@ -243,7 +243,7 @@ impl MirNode {
                           ac.table = Some(t_name.to_owned());
                           self.columns
                               .iter()
-                              .position(|cc| *cc == ac)
+                              .position(|cc| *cc.name == ac.name)
                               .expect(&format!(
                                   "tried to look up non-existent column {:?} on node \
                                    \"{}\" (columns: {:?})",

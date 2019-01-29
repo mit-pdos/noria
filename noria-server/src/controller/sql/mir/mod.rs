@@ -815,15 +815,20 @@ impl SqlToMirConverter {
         let mut selected_col_objects = HashSet::new();
 
         for c in ucols.clone() {
-            if ancestors
-                .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext") && !ac.clone().table.unwrap().contains("GroupContext")))
-            {
-                if !c.clone().table.unwrap().contains("UserContext") || !c.clone().table.unwrap().contains("GroupContext") {
-                    selected_cols.insert(c.name.clone());
-                    selected_col_objects.insert(c.clone());
-                } else {
-                    println!("forgoing {:#?}", c.clone());
+            for ancestor in ancestors.iter() {
+                if ancestor.borrow().columns().iter().any(|ac| *ac.name == c.name) {
+                    match &c.table {
+                        Some(table) => {
+                            if !table.contains("UserContext") && !table.contains("GroupContext") {
+                                selected_cols.insert(c.name.clone());
+                                selected_col_objects.insert(c.clone());
+                            }
+                        },
+                        None => {
+                            selected_cols.insert(c.name.clone());
+                            selected_col_objects.insert(c.clone());
+                        }
+                    }
                 }
             }
         }
@@ -1485,7 +1490,6 @@ impl SqlToMirConverter {
         has_leaf: bool,
         universe: UniverseId,
     ) -> (bool, Vec<MirNodeRef>, Option<HashMap<(String, Option<String>), String>>, String) {
-
         use crate::controller::sql::mir::grouped::make_grouped;
         use crate::controller::sql::mir::grouped::make_predicates_above_grouped;
         use crate::controller::sql::mir::join::make_joins;
@@ -1630,7 +1634,6 @@ impl SqlToMirConverter {
                 .chain(policy_nodes.into_iter())
                 .chain(ancestors.clone().into_iter())
                 .collect();
-
 
             // For each policy chain, create a version of the query
             // All query versions, including group queries will be reconciled at the end

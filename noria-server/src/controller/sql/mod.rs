@@ -904,7 +904,9 @@ impl SqlIncorporator {
                 self.add_compound_query(&query_name, &csq, is_leaf, mig)
                     .unwrap()
             }
-            SqlQuery::Select(sq) => self.add_select_query(&query_name, &sq, is_leaf, mig, global_name)?.0,
+            SqlQuery::Select(sq) => {
+                self.add_select_query(&query_name, &sq, is_leaf, mig, global_name)?.0
+            },
             // SqlQuery::CreateView(ref cvq) => {
             //     use nom_sql::SelectSpecification;
             //     match *cvq.definition {

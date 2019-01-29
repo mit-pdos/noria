@@ -156,7 +156,6 @@ fn make_security_nodes(
     let mut node_count = 0;
     let mut local_node_for_rel = node_for_rel.clone();
 
-    // println!("Policies: {:#?}", policies);
     debug!(
         mir_converter.log,
         "Found {} row policies for table {}",

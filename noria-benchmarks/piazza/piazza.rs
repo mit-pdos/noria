@@ -246,13 +246,9 @@ fn main() {
 
     println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
-    println!("here 1");
     backend.migrate(sloc, None).unwrap();
-    println!("here 2");
     backend.set_security_config(ploc);
-    println!("here 3");
     backend.migrate(sloc, Some(qloc)).unwrap();
-    println!("here 4");
     let populate = match populate.as_ref() {
         "before" => PopulateType::Before,
         "after" => PopulateType::After,
@@ -299,7 +295,7 @@ fn main() {
     }
 
     // Login a user
-    println!("Login in users...");
+    println!("Login users...");
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
