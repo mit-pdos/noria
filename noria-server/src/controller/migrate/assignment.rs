@@ -51,9 +51,9 @@ pub fn assign(
                 return next_domain();
             }
 
-            if n.is_aggregator() || n.is_reader() {
-                // aggregators and readers are temporarily in their own domain to make it easier
-                // to reason about hot spares for these nodes.
+            if true {
+                // all nodes are temporarily in their own domain to make it easier
+                // to reason about hot spares.
                 return next_domain();
             }
 
