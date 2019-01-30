@@ -339,6 +339,7 @@ pub enum MirNodeType {
         on: Column,
         group_by: Vec<Column>,
         kind: AggregationKind,
+        replica: bool,
     },
     /// column specifications, keys (non-compound), tx flag, adapted base
     Base {
@@ -351,6 +352,7 @@ pub enum MirNodeType {
         on: Column,
         group_by: Vec<Column>,
         kind: ExtremumKind,
+        replica: bool,
     },
     /// filter conditions (one for each parent column)
     Filter {
@@ -360,9 +362,12 @@ pub enum MirNodeType {
     GroupConcat {
         on: Column,
         separator: String,
+        replica: bool,
     },
-    /// no extra info required
-    Identity,
+    /// whether the identity is a bottom replica
+    Identity {
+        replica: bool,
+    },
     /// left node, right node, on left columns, on right columns, emit columns
     Join {
         on_left: Vec<Column>,
@@ -500,16 +505,21 @@ impl MirNodeType {
                 on: ref our_on,
                 group_by: ref our_group_by,
                 kind: ref our_kind,
+                replica: ref our_replica,
             } => {
                 match *other {
                     MirNodeType::Aggregation {
                         ref on,
                         ref group_by,
                         ref kind,
+                        ref replica,
                     } => {
                         // TODO(malte): this is stricter than it needs to be, as it could cover
                         // COUNT-as-SUM-style relationships.
-                        our_on == on && our_group_by == group_by && our_kind == kind
+                        our_on == on
+                            && our_group_by == group_by
+                            && our_kind == kind
+                            && our_replica == replica
                     }
                     _ => false,
                 }
@@ -547,12 +557,17 @@ impl MirNodeType {
                 on: ref our_on,
                 group_by: ref our_group_by,
                 kind: ref our_kind,
+                replica: ref our_replica,
             } => match *other {
                 MirNodeType::Extremum {
                     ref on,
                     ref group_by,
                     ref kind,
-                } => our_on == on && our_group_by == group_by && our_kind == kind,
+                    ref replica,
+                } => our_on == on
+                    && our_group_by == group_by
+                    && our_kind == kind
+                    && our_replica == replica,
                 _ => false,
             },
             MirNodeType::Filter {
@@ -690,6 +705,7 @@ impl Debug for MirNodeType {
                 ref on,
                 ref group_by,
                 ref kind,
+                ..
             } => {
                 let op_string = match *kind {
                     AggregationKind::COUNT => format!("|*|({})", on.name.as_str()),
@@ -723,6 +739,7 @@ impl Debug for MirNodeType {
                 ref on,
                 ref group_by,
                 ref kind,
+                ..
             } => {
                 let op_string = match *kind {
                     ExtremumKind::MIN => format!("min({})", on.name.as_str()),
@@ -774,8 +791,9 @@ impl Debug for MirNodeType {
             MirNodeType::GroupConcat {
                 ref on,
                 ref separator,
+                ..
             } => write!(f, "||([{}], \"{}\")", on.name, separator),
-            MirNodeType::Identity => write!(f, "≡"),
+            MirNodeType::Identity { .. } => write!(f, "≡"),
             MirNodeType::Join {
                 ref on_left,
                 ref on_right,

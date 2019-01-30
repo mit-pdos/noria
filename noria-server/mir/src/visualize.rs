@@ -102,6 +102,7 @@ impl GraphViz for MirNodeType {
                 ref on,
                 ref group_by,
                 ref kind,
+                ..
             } => {
                 let op_string = match *kind {
                     AggregationKind::COUNT => format!("\\|*\\|({})", print_col(on)),
@@ -137,6 +138,7 @@ impl GraphViz for MirNodeType {
                 ref on,
                 ref group_by,
                 ref kind,
+                ..
             } => {
                 let op_string = match *kind {
                     ExtremumKind::MIN => format!("min({})", print_col(on)),
@@ -188,10 +190,11 @@ impl GraphViz for MirNodeType {
             MirNodeType::GroupConcat {
                 ref on,
                 ref separator,
+                ..
             } => {
                 write!(out, "||({}, \"{}\")", print_col(on), separator)?;
             }
-            MirNodeType::Identity => {
+            MirNodeType::Identity { .. } => {
                 write!(out, "≡")?;
             }
             MirNodeType::Join {

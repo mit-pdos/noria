@@ -79,6 +79,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration) -> Fl
                     ref on,
                     ref group_by,
                     ref kind,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -110,6 +111,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration) -> Fl
                     ref on,
                     ref group_by,
                     ref kind,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -131,6 +133,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration) -> Fl
                 MirNodeType::GroupConcat {
                     ref on,
                     ref separator,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -145,7 +148,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration) -> Fl
                         mig,
                     )
                 }
-                MirNodeType::Identity => {
+                MirNodeType::Identity { .. } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)

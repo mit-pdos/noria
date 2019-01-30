@@ -263,7 +263,7 @@ impl SqlToMirConverter {
                 &format!("{}_id", name),
                 self.schema_version,
                 columns.clone(),
-                MirNodeType::Identity,
+                MirNodeType::Identity { replica: false },
                 vec![parent.clone()],
                 vec![],
             )
@@ -839,6 +839,7 @@ impl SqlToMirConverter {
                     (node, &over),
                     group_cols,
                     t,
+                    true,
                 )
             } else {
                 self.make_grouped_node(
@@ -847,6 +848,7 @@ impl SqlToMirConverter {
                     (parent, &over),
                     group_cols,
                     t,
+                    true,
                 )
             };
             let columns = node.borrow().columns.clone();
@@ -855,7 +857,7 @@ impl SqlToMirConverter {
                 &(name.clone().to_owned() + "_identity"),
                 self.schema_version,
                 columns,
-                MirNodeType::Identity,
+                MirNodeType::Identity { replica: true },
                 vec![out_nodes[0].clone()],
                 vec![],
             ));
@@ -909,6 +911,7 @@ impl SqlToMirConverter {
         over: (MirNodeRef, &Column),
         group_by: Vec<&Column>,
         node_type: GroupedNodeType,
+        replica: bool,
     ) -> MirNodeRef {
         let parent_node = over.0;
 
@@ -933,6 +936,7 @@ impl SqlToMirConverter {
                     on: over_col.clone(),
                     group_by: group_by.into_iter().cloned().collect(),
                     kind: agg,
+                    replica,
                 },
                 vec![parent_node.clone()],
                 vec![],
@@ -945,6 +949,7 @@ impl SqlToMirConverter {
                     on: over_col.clone(),
                     group_by: group_by.into_iter().cloned().collect(),
                     kind: extr,
+                    replica,
                 },
                 vec![parent_node.clone()],
                 vec![],
@@ -956,6 +961,7 @@ impl SqlToMirConverter {
                 MirNodeType::GroupConcat {
                     on: over_col.clone(),
                     separator: sep,
+                    replica
                 },
                 vec![parent_node.clone()],
                 vec![],
