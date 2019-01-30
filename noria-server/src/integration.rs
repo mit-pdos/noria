@@ -2348,24 +2348,18 @@ fn aggregations_work_with_replicas() {
 
 #[test]
 fn recover_from_losing_bottom_replica() {
+    let txt = "CREATE TABLE vote (user int, id int);\n
+               QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
+
     // start a worker for each domain in the graph
     let authority = Arc::new(LocalAuthority::new());
     let mut g = build_authority("worker-0", authority.clone(), true);
     let g1 = build_authority("worker-1", authority.clone(), false);
     let g2 = build_authority("worker-2", authority.clone(), false);
-    let g3 = build_authority("worker-3", authority.clone(), false);
     sleep();
 
-    // initialize the graph
-    g.migrate(|mig| {
-        let vote = mig.add_base("vote", &["user", "id"], Base::default());
-        let vc = mig.add_ingredient(
-            "votecount",
-            &["id", "votes"],
-            Aggregation::COUNT.over(vote, 0, &[1]),
-        );
-        mig.maintain_anonymous(vc, &[0]);
-    });
+    g.install_recipe(txt).unwrap();
+    sleep();
 
     // shutdown the bottom replica and wait for recovery
     drop(g2);
@@ -2382,8 +2376,5 @@ fn recover_from_losing_bottom_replica() {
 
     // TODO(ygina): more edge cases especially with losing packets in the network
 
-    // clean up
-    drop(g);
-    drop(g1);
-    drop(g3);
+    loop {}
 }

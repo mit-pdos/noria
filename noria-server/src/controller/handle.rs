@@ -273,6 +273,15 @@ mod tests {
         builder.start_simple().unwrap()
     }
 
+    fn build_vote_controller(log: bool) -> SyncWorkerHandle<LocalAuthority> {
+        let txt = "CREATE TABLE vote (user int, id int);\n
+                   QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
+
+        let mut g = build(None, log);
+        g.install_recipe(txt).unwrap();
+        g
+    }
+
     #[test]
     #[should_panic]
     #[cfg_attr(not(debug_assertions), allow_fail)]
@@ -289,11 +298,7 @@ mod tests {
 
     #[test]
     fn aggregations_have_a_replica() {
-        let txt = "CREATE TABLE vote (user int, id int);\n
-                   QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
-
-        let mut g = build(None, false);
-        g.install_recipe(txt).unwrap();
+        let mut g = build_vote_controller(false);
 
         g.migrate(|mig| {
             assert_eq!(mig.mainline.ingredients.node_count(), 14);
@@ -335,26 +340,7 @@ mod tests {
 
     #[test]
     fn packet_send_receive_sequence_numbers() {
-        let mut g = WorkerBuilder::default().start_simple().unwrap();
-
-        let (a, b, c, d) = g.migrate(|mig| {
-            let vote = mig.add_base("vote", &["user", "id"], Base::default());
-            let vc = mig.add_ingredient(
-                "votecount",
-                &["id", "votes"],
-                Aggregation::COUNT.over(vote, 0, &[1]),
-            );
-
-            let identity = mig
-                .mainline
-                .ingredients
-                .neighbors_directed(vc, petgraph::EdgeDirection::Outgoing)
-                .next()
-                .unwrap();
-
-            let reader = mig.maintain_anonymous(vc, &[0]);
-            (vote, vc, identity, reader)
-        });
+        let mut g = build_vote_controller(false);
 
         println!("{}", g.graphviz().unwrap());
 
@@ -379,10 +365,7 @@ mod tests {
 
         g.migrate(move |mig| {
             println!("\nNodeIndex | last_packet_received | next_packet_to_send | debug");
-            print_packet_info(mig, a);
-            print_packet_info(mig, b);
-            print_packet_info(mig, c);
-            print_packet_info(mig, d);
+            print_packet_info(mig, NodeIndex::new(1));
         });
 
         // send read requests
@@ -393,10 +376,7 @@ mod tests {
 
         g.migrate(move |mig| {
             println!("\nNodeIndex | last_packet_received | next_packet_to_send | debug");
-            print_packet_info(mig, a);
-            print_packet_info(mig, b);
-            print_packet_info(mig, c);
-            print_packet_info(mig, d);
+            print_packet_info(mig, NodeIndex::new(1));
         });
     }
 }
