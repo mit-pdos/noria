@@ -94,6 +94,18 @@ impl WorkerBuilder {
     }
 
     /// Start a worker and return a handle to it.
+    ///
+    /// The returned handle executes all operations synchronously on a tokio runtime.
+    pub fn start_simple_authority<A: Authority + 'static>(
+        &self,
+        authority: Arc<A>,
+    ) -> Result<SyncWorkerHandle<A>, failure::Error> {
+        let mut rt = tokio::runtime::Runtime::new()?;
+        let wh = rt.block_on(self.start(authority))?;
+        Ok(SyncWorkerHandle::from_existing(rt, wh))
+    }
+
+    /// Start a worker and return a handle to it.
     #[must_use]
     pub fn start<A: Authority + 'static>(
         &self,

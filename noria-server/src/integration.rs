@@ -68,6 +68,21 @@ fn build(prefix: &str, sharding: Option<usize>, log: bool) -> SyncWorkerHandle<L
     builder.start_simple().unwrap()
 }
 
+fn build_authority(
+    prefix: &str,
+    authority: Arc<LocalAuthority>,
+    log: bool,
+) -> SyncWorkerHandle<LocalAuthority> {
+    use crate::logger_pls;
+    let mut builder = WorkerBuilder::default();
+    if log {
+        builder.log_with(logger_pls());
+    }
+    builder.set_sharding(None);
+    builder.set_persistence(get_persistence_params(prefix));
+    builder.start_simple_authority(authority).unwrap()
+}
+
 fn get_settle_time() -> Duration {
     let settle_time: u64 = match env::var("SETTLE_TIME") {
         Ok(value) => value.parse().unwrap(),
@@ -2333,4 +2348,46 @@ fn aggregations_work_with_replicas() {
     }
     sleep();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), votes.into()]]);
+}
+
+#[test]
+fn recover_from_losing_bottom_replica() {
+    // start a worker for each domain in the graph
+    let authority = Arc::new(LocalAuthority::new());
+    let mut g = build_authority("worker-0", authority.clone(), true);
+    let g1 = build_authority("worker-1", authority.clone(), false);
+    let g2 = build_authority("worker-2", authority.clone(), false);
+    let g3 = build_authority("worker-3", authority.clone(), false);
+    sleep();
+
+    // initialize the graph
+    g.migrate(|mig| {
+        let vote = mig.add_base("vote", &["user", "id"], Base::default());
+        let vc = mig.add_ingredient(
+            "votecount",
+            &["id", "votes"],
+            Aggregation::COUNT.over(vote, 0, &[1]),
+        );
+        mig.maintain_anonymous(vc, &[0]);
+    });
+
+    // shutdown the bottom replica and wait for recovery
+    drop(g2);
+    thread::sleep(Duration::from_secs(10));
+
+    // reads and writes should be correct
+    let mut mutx = g.table("vote").unwrap().into_sync();
+    let mut q = g.view("votecount").unwrap().into_sync();
+    let id = 0;
+    println!("{}", g.graphviz().unwrap());
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 0.into()]]);
+    mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // TODO(ygina): more edge cases especially with losing packets in the network
+
+    // clean up
+    drop(g);
+    drop(g1);
+    drop(g3);
 }

@@ -246,7 +246,8 @@ impl<A: Authority + 'static> Drop for SyncWorkerHandle<A> {
         drop(self.sh.take());
         self.wh.shutdown();
         if let Some(rt) = self.rt.take() {
-            rt.shutdown_on_idle().wait().unwrap();
+            rt.shutdown_now().wait().unwrap();
+            // rt.shutdown_on_idle().wait().unwrap();
         }
     }
 }
