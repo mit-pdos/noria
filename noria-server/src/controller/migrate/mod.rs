@@ -20,7 +20,7 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
+use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use dataflow::node::ReplicaType;
@@ -521,6 +521,18 @@ impl<'a> Migration<'a> {
                 dns
             });
 
+        fn reset_wis(mainline: &ControllerInner) -> std::vec::IntoIter<WorkerIdentifier> {
+            let mut wis_sorted = mainline
+                .workers
+                .keys()
+                .map(|wi| wi.clone())
+                .collect::<Vec<WorkerIdentifier>>();
+            wis_sorted.sort_by(|x, y| x.to_string().cmp(&y.to_string()));
+            wis_sorted.into_iter()
+        }
+
+        let mut wis = reset_wis(mainline);
+
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
         for domain in changed_domains {
@@ -529,10 +541,29 @@ impl<'a> Migration<'a> {
                 continue;
             }
 
+            // find a worker identifier for each shard
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let shards = mainline.ingredients[nodes[0].0].sharded_by().shards();
+            let mut identifiers = Vec::new();
+            for _ in 0..shards.unwrap_or(1) {
+                let wi = loop {
+                    if let Some(wi) = wis.next() {
+                        let w = mainline.workers.get(&wi).unwrap();
+                        if w.healthy {
+                            break wi;
+                        }
+                    } else {
+                        wis = reset_wis(mainline);
+                    }
+                };
+                identifiers.push(wi);
+            }
+
+            // TODO(malte): simple round-robin placement for the moment
             let d = mainline.place_domain(
                 domain,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
+                identifiers,
+                shards,
                 &log,
                 nodes,
             );

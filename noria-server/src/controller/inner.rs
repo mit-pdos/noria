@@ -496,9 +496,15 @@ impl ControllerInner {
         self.persistence = params;
     }
 
+    // Assigns nodes to this domain, and shards the domain across multiple workers.
+    //
+    // Each worker identifier in `identifiers` corresponds to a single shard in `num_shards`,
+    // thus the logic of which worker gets which shard is determined by the code that calls
+    // this method. That code must also ensure the workers are healthy.
     pub(crate) fn place_domain(
         &mut self,
         idx: DomainIndex,
+        identifiers: Vec<WorkerIdentifier>,
         num_shards: Option<usize>,
         log: &Logger,
         nodes: Vec<(NodeIndex, bool)>,
@@ -515,9 +521,6 @@ impl ControllerInner {
                 .map(|nd| (nd.local_addr(), cell::RefCell::new(nd)))
                 .collect(),
         );
-
-        // TODO(malte): simple round-robin placement for the moment
-        let mut wi = self.workers.iter_mut();
 
         // Send `AssignDomain` to each shard of the given domain
         for i in 0..num_shards.unwrap_or(1) {
@@ -536,17 +539,10 @@ impl ControllerInner {
                 persistence_parameters: self.persistence.clone(),
             };
 
-            let (identifier, w) = loop {
-                if let Some((i, w)) = wi.next() {
-                    if w.healthy {
-                        break (*i, w);
-                    }
-                } else {
-                    wi = self.workers.iter_mut();
-                }
-            };
-
             // send domain to worker
+            let identifier = identifiers.get(i)
+                .expect("number of identifiers should match number of shards");
+            let w = self.workers.get_mut(&identifier).unwrap();
             info!(
                 log,
                 "sending domain {}.{} to worker {:?}",
@@ -619,7 +615,7 @@ impl ControllerInner {
         let shards = assignments
             .into_iter()
             .enumerate()
-            .map(|(i, worker)| {
+            .map(|(i, &worker)| {
                 let tx = txs.remove(&i).unwrap();
                 DomainShardHandle { worker, tx }
             })
