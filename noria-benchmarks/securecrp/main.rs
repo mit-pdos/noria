@@ -80,7 +80,9 @@ impl Backend {
         }
 
         // Install recipe
+        println!("here installing");
         self.g.install_recipe(&rs).unwrap();
+        println!("after installing");
 
         Ok(())
     }
@@ -102,21 +104,21 @@ fn main() {
             Arg::with_name("schema")
                 .short("s")
                 .required(true)
-                .default_value("benchmarks/securecrp/jeeves_schema.sql")
+                .default_value("noria-benchmarks/securecrp/jeeves_schema.sql")
                 .help("SQL schema file"),
         )
         .arg(
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("benchmarks/securecrp/jeeves_queries.sql")
+                .default_value("noria-benchmarks/securecrp/jeeves_queries.sql")
                 .help("SQL query file"),
         )
         .arg(
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("benchmarks/securecrp/jeeves_policies.json")
+                .default_value("noria-benchmarks/securecrp/jeeves_policies.json")
                 .help("Security policies file"),
         )
         .arg(
@@ -145,12 +147,13 @@ fn main() {
         .arg(
             Arg::with_name("populate")
                 .long("populate")
+                .default_value("before")
                 .help("Populate app with randomly generated data"),
         )
-        .arg(Arg::with_name("user").long("user").default_value("malte"))
+        .arg(Arg::with_name("user").long("user").default_value("1"))
         .get_matches();
 
-    // println!("Starting SecureCRP...");
+    println!("Starting SecureCRP...");
 
     // Read arguments
     let sloc = args.value_of("schema").unwrap();
@@ -164,15 +167,24 @@ fn main() {
 
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
+    println!("first mig");
     backend.set_security_config(ploc);
+    println!("set sec config");
     backend.migrate(sloc, Some(qloc)).unwrap();
+    println!("second mig");
+    thread::sleep(time::Duration::from_millis(2000));
 
     if args.is_present("populate") {
+        println!("here");
         test_populate::create_users(&mut backend);
     }
 
+    println!("user2");
+
     thread::sleep(time::Duration::from_millis(2000));
     backend.login(make_user(user)).is_ok();
+
+    println!("user");
 
     if args.is_present("populate") {
         test_populate::create_papers(&mut backend);

@@ -326,6 +326,7 @@ impl ControllerInner {
         remote: &SocketAddr,
         read_listen_addr: SocketAddr,
     ) -> Result<(), io::Error> {
+        println!("handle reg");
         info!(
             self.log,
             "new worker registered from {:?}, which listens on {:?}", msg.source, remote
@@ -353,6 +354,8 @@ impl ControllerInner {
                 }
             }
         }
+
+        println!("handle reg");
 
         Ok(())
     }
@@ -387,6 +390,7 @@ impl ControllerInner {
     }
 
     fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
+        println!("handled failed worker");
         // first, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
         for wi in failed {
@@ -413,6 +417,8 @@ impl ControllerInner {
         // back to original recipe, which should add the query again
         self.apply_recipe(original)
             .expect("failed to activate original recipe");
+
+        println!("handled failed worker");
     }
 
     pub(crate) fn handle_heartbeat(&mut self, msg: &CoordinationMessage) -> Result<(), io::Error> {
@@ -692,6 +698,7 @@ impl ControllerInner {
         };
         let r = f(&mut m);
         m.commit();
+        println!("commited universe");
         r
     }
 
@@ -713,6 +720,7 @@ impl ControllerInner {
         };
         let r = f(&mut m);
         m.commit();
+        println!("migrated");
         r
     }
 
@@ -1042,6 +1050,8 @@ impl ControllerInner {
                 .map_err(|e| format!("failed to activate recipe: {}", e))
         });
 
+        println!("in apply recipe");
+
         match r {
             Ok(ref ra) => {
                 let (removed_bases, removed_other): (Vec<_>, Vec<_>) = ra
@@ -1093,7 +1103,7 @@ impl ControllerInner {
                 self.recipe = recipe.revert();
             }
         }
-
+        println!("at end of apply recipe");
         r
     }
 
@@ -1142,7 +1152,9 @@ impl ControllerInner {
             Ok(r) => {
                 let old = mem::replace(&mut self.recipe, Recipe::blank(None));
                 let new = old.replace(r).unwrap();
+                println!("installing recipe");
                 let activation_result = self.apply_recipe(new);
+                println!("after installing recipe");
                 if authority
                     .read_modify_write(STATE_KEY, |state: Option<ControllerState>| match state {
                         None => unreachable!(),
@@ -1157,6 +1169,8 @@ impl ControllerInner {
                 {
                     return Err("Failed to persist recipe installation".to_owned());
                 }
+
+                println!("end of install recipe");
                 activation_result
             }
             Err(e) => {

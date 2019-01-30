@@ -116,6 +116,7 @@ impl Policy {
             Some(n) => n.as_str().unwrap(),
             None => "",
         };
+
         let table = p["table"].as_str().unwrap();
         let pred = p["predicate"].as_str().unwrap();
 

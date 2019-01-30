@@ -614,7 +614,7 @@ pub(crate) fn make_join_node(
 ) -> FlowNode {
     use dataflow::ops::join::JoinSource;
 
-    assert_eq!(on_left.len(), on_right.len());
+    assert_eq!(on_left.len(), on_right.len()); 
 
     let column_names = column_names(columns);
 
@@ -630,7 +630,7 @@ pub(crate) fn make_join_node(
         "could not resolve output columns projected from join: {:?}",
         rest
     );
-    
+
     assert_eq!(
         projected_cols_left.len() + projected_cols_right.len(),
         proj_cols.len()
@@ -907,12 +907,14 @@ pub(crate) fn materialize_leaf_node(
     // TODO(malte): consider the case when the projected columns need reordering
 
     if !key_cols.is_empty() {
+        println!("first");
         let key_cols: Vec<_> = key_cols
             .iter()
             .map(|c| parent.borrow().column_id_for_column(c, None))
             .collect();
         mig.maintain(name, na, &key_cols[..]);
     } else {
+        println!("second");
         // if no key specified, default to the first column
         mig.maintain(name, na, &[0]);
     }
