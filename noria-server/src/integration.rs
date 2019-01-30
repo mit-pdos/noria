@@ -2325,17 +2325,13 @@ fn remove_query() {
 
 #[test]
 fn aggregations_work_with_replicas() {
-    let mut g = build("worker-1", None, false);
+    let txt = "CREATE TABLE vote (user int, id int);\n
+               QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
 
-    g.migrate(|mig| {
-        let vote = mig.add_base("vote", &["user", "id"], Base::default());
-        let vc = mig.add_ingredient(
-            "votecount",
-            &["id", "votes"],
-            Aggregation::COUNT.over(vote, 0, &[1]),
-        );
-        mig.maintain_anonymous(vc, &[0]);
-    });
+    let mut g = build("worker-1", None, false);
+    g.install_recipe(txt).unwrap();
+    assert_eq!(g.inputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), 1);
 
     let mut mutx = g.table("vote").unwrap().into_sync();
     let mut q = g.view("votecount").unwrap().into_sync();

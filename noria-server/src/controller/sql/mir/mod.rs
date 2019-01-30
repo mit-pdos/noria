@@ -826,31 +826,40 @@ impl SqlToMirConverter {
         let mut out_nodes = Vec::new();
 
         let mknode = |over: &Column, t: GroupedNodeType, distinct: bool| {
-            if distinct {
+            let node = if distinct {
                 let new_name = name.clone().to_owned() + "_distinct";
                 let mut dist_col = Vec::new();
                 dist_col.push(over);
                 dist_col.extend(group_cols.clone());
                 let node = self.make_distinct_node(&new_name, parent, dist_col.clone());
                 out_nodes.push(node.clone());
-                out_nodes.push(self.make_grouped_node(
+                self.make_grouped_node(
                     name,
                     &func_col,
                     (node, &over),
                     group_cols,
                     t,
-                ));
-                out_nodes
+                )
             } else {
-                out_nodes.push(self.make_grouped_node(
+                self.make_grouped_node(
                     name,
                     &func_col,
                     (parent, &over),
                     group_cols,
                     t,
-                ));
-                out_nodes
-            }
+                )
+            };
+            let columns = node.borrow().columns.clone();
+            out_nodes.push(node);
+            out_nodes.push(MirNode::new(
+                &(name.clone().to_owned() + "_identity"),
+                self.schema_version,
+                columns,
+                MirNodeType::Identity,
+                vec![out_nodes[0].clone()],
+                vec![],
+            ));
+            out_nodes
         };
 
         let func = func_col.function.as_ref().unwrap();

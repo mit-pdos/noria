@@ -68,17 +68,18 @@ impl<'a> Migration<'a> {
     // of the inputs should be bottom replicas since users should be unaware of their existence.
     // TODO(ygina): probably doesn't work if the parent was added in a separate migration.
     fn correct_parents(&self, nodes: &mut Vec<NodeIndex>) -> Vec<NodeIndex> {
-        let bottoms = self.replicas.values().collect::<HashSet<&NodeIndex>>();
-        let mut corrected = Vec::new();
-        for i in 0..nodes.len() {
-            let t = nodes.get(i).unwrap();
-            assert!(!bottoms.contains(&t));
-            if let Some(bottom) = self.replicas.get(&t) {
-                nodes.push(*bottom);
-                corrected.push(nodes.swap_remove(i));
-            }
-        }
-        corrected
+        // let bottoms = self.replicas.values().collect::<HashSet<&NodeIndex>>();
+        // let mut corrected = Vec::new();
+        // for i in 0..nodes.len() {
+        //     let t = nodes.get(i).unwrap();
+        //     assert!(!bottoms.contains(&t));
+        //     if let Some(bottom) = self.replicas.get(&t) {
+        //         nodes.push(*bottom);
+        //         corrected.push(nodes.swap_remove(i));
+        //     }
+        // }
+        // corrected
+        Vec::new()
     }
 
     /// Add the given `Ingredient` to the Soup.
@@ -129,14 +130,15 @@ impl<'a> Migration<'a> {
         // if the node is an aggregator, then it is a top replica.
         // we also need to create a bottom replica.
         if self.mainline.ingredients[ni].is_aggregator() {
-            let bottom_ni = self.add_ingredient(name, fields, Identity::new(ni));
-            assert!(self.replicas.insert(ni, bottom_ni).is_none());
-            assert_eq!(parents.len(), 1, "only handle top replicas with one parent, for now");
+            // let bottom_ni = self.add_ingredient(name, fields, Identity::new(ni));
+            // assert!(self.replicas.insert(ni, bottom_ni).is_none());
+            // assert_eq!(parents.len(), 1, "only handle top replicas with one parent, for now");
 
-            self.mainline.ingredients[ni]
-                .set_replica_type(ReplicaType::Top { bottom_next_nodes: Vec::new() });
-            self.mainline.ingredients[bottom_ni]
-                .set_replica_type(ReplicaType::Bottom { top_prev_nodes: parents });
+            // self.mainline.ingredients[ni]
+            //     .set_replica_type(ReplicaType::Top { bottom_next_nodes: Vec::new() });
+            // self.mainline.ingredients[bottom_ni]
+            //     .set_replica_type(ReplicaType::Bottom { top_prev_nodes: parents });
+            // panic!("i just wanna see the backtrace");
         }
 
         // and tell the caller its id

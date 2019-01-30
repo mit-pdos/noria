@@ -254,13 +254,24 @@ impl<A: Authority + 'static> Drop for SyncWorkerHandle<A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::WorkerBuilder;
+    use crate::controller::{SyncWorkerHandle, WorkerBuilder};
     use crate::controller::migrate::Migration;
     use dataflow::node::special::Base;
     use dataflow::node::ReplicaType;
     use dataflow::ops::grouped::aggregate::Aggregation;
+    use noria::consensus::LocalAuthority;
     use petgraph::graph::NodeIndex;
     use std::{time, thread};
+
+    fn build(sharding: Option<usize>, log: bool) -> SyncWorkerHandle<LocalAuthority> {
+        use crate::logger_pls;
+        let mut builder = WorkerBuilder::default();
+        if log {
+            builder.log_with(logger_pls());
+        }
+        builder.set_sharding(sharding);
+        builder.start_simple().unwrap()
+    }
 
     #[test]
     #[should_panic]
@@ -278,9 +289,17 @@ mod tests {
 
     #[test]
     fn aggregations_have_a_replica() {
-        let mut g = WorkerBuilder::default().start_simple().unwrap();
+        let txt = "CREATE TABLE vote (user int, id int);\n
+                   QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
+
+        let mut g = build(None, false);
+        g.install_recipe(txt).unwrap();
 
         g.migrate(|mig| {
+            assert_eq!(mig.mainline.ingredients.node_count(), 14);
+            assert_eq!(mig.mainline.ingredients.edge_count(), 13);
+
+            /*
             let vote = mig.add_base("vote", &["user", "id"], Base::default());
             let vc = mig.add_ingredient(
                 "votecount",
@@ -310,6 +329,7 @@ mod tests {
                 mig.mainline.ingredients[identity].replica_type(),
                 Some(ReplicaType::Bottom { top_prev_nodes: vec![vote] }),
             );
+            */
         });
     }
 
