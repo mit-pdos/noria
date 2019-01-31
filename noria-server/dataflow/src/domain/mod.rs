@@ -1294,7 +1294,44 @@ impl Domain {
                     Packet::Quit => unreachable!("Quit messages are handled by event loop"),
                     Packet::Spin => {
                         // spinning as instructed
-                    }
+                    },
+                    Packet::MakeRecovery { node } => {
+                        // sanity check:
+                        // the node should be a replica, and currently only a top replica.
+                        // it should also be the last node in the domain before an egress.
+                        //
+                        // update next_packet_to_send of the egress node to stop sending packets.
+                        // (needs to be a mechanism that checks next_packet_to_send in egress
+                        // to determine whether to send a packet, while not blocking all sends)
+                        // ack to controller
+                        //
+                        // the hard part i think:
+                        // on ack, a migration(?) concurrently fixes up the failed bottom replica
+                        // by linking this egress to the ingresses of bottom_next_nodes.
+                        // state must be consistent between mir, flow, and actual tcp connections.
+                        // do global node indexes change on rewiring?
+                        //
+                        // (may need another message here to notify NewIncoming ok to send)
+                        // send NewIncoming to bottom_next_nodes, which are the new egress txs.
+                        // from/replacing of the message are both the egress nodes.
+                        //
+                        // wait!
+                    },
+                    Packet::NewIncoming { to, old, new } => {
+                        // sanity check:
+                        // the node `to` should be the first node in the domain after the ingress.
+                        //
+                        // replace `old` in last_packet_received of the ingress with `new`.
+                        // use that to send ResumeAt to `new`.
+                        // `child` of the message is the ingress of this domain.
+                        // `label` of the message is the value of last_packet_received.
+                        //
+                        // wait!
+                    },
+                    Packet::ResumeAt { child, label } => {
+                        // update next_packet_to_send of the egress node to resume sending packets
+                        // to this child from label.
+                    },
                     _ => unreachable!(),
                 }
             }

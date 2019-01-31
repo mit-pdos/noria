@@ -262,6 +262,19 @@ pub enum Packet {
     MakeRecovery {
         node: LocalNodeIndex,
     },
+
+    /// Notify downstream nodes of an incoming connection to replace an existing one
+    NewIncoming {
+        to: LocalNodeIndex,
+        old: NodeIndex,
+        new: NodeIndex,
+    },
+
+    /// Notify the node to resume sending messages to this child from the given packet label
+    ResumeAt {
+        child: NodeIndex,
+        label: u32,
+    },
 }
 
 impl Packet {
