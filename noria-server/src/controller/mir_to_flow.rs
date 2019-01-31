@@ -571,9 +571,9 @@ pub(crate) fn make_identity_node(
             .neighbors_directed(parent_na, petgraph::EdgeDirection::Incoming)
             .collect::<Vec<NodeIndex>>();
         mig.mainline.ingredients[node].set_replica_type(
-            node::ReplicaType::Bottom { top_prev_nodes: nodes });
+            node::ReplicaType::Bottom { top: parent_na, top_prev_nodes: nodes });
         mig.mainline.ingredients[parent_na].set_replica_type(
-            node::ReplicaType::Top { bottom_next_nodes: vec![] });
+            node::ReplicaType::Top { bottom: node, bottom_next_nodes: vec![] });
     }
 
     FlowNode::New(node)

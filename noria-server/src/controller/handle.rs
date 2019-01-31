@@ -330,11 +330,11 @@ mod tests {
             assert!(mig.mainline.ingredients[d].replica_type().is_none());
             assert_eq!(
                 mig.mainline.ingredients[b].replica_type().unwrap(),
-                ReplicaType::Top { bottom_next_nodes: vec![d] },
+                ReplicaType::Top { bottom: c, bottom_next_nodes: vec![d] },
             );
             assert_eq!(
                 mig.mainline.ingredients[c].replica_type().unwrap(),
-                ReplicaType::Bottom { top_prev_nodes: vec![a] },
+                ReplicaType::Bottom { top: b, top_prev_nodes: vec![a] },
             );
         });
     }

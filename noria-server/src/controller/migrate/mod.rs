@@ -87,11 +87,11 @@ impl<'a> Migration<'a> {
 
         for t in tops {
             match self.mainline.ingredients[t].replica_type() {
-                Some(ReplicaType::Top{ mut bottom_next_nodes }) => {
+                Some(ReplicaType::Top{ bottom, mut bottom_next_nodes }) => {
                     bottom_next_nodes.push(ni);
                     self.mainline
                         .ingredients[t]
-                        .set_replica_type(ReplicaType::Top { bottom_next_nodes });
+                        .set_replica_type(ReplicaType::Top { bottom, bottom_next_nodes });
                 },
                 Some(ReplicaType::Bottom{ .. }) | None => panic!("expected top replica"),
             }
