@@ -148,10 +148,10 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration) -> Fl
                         mig,
                     )
                 }
-                MirNodeType::Identity { .. } => {
+                MirNodeType::Identity { replica } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
-                    make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)
+                    make_identity_node(&name, parent, mir_node.columns.as_slice(), mig, replica)
                 }
                 MirNodeType::Join {
                     ref on_left,
@@ -553,6 +553,7 @@ pub(crate) fn make_identity_node(
     parent: MirNodeRef,
     columns: &[Column],
     mig: &mut Migration,
+    replica: bool,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
@@ -562,6 +563,19 @@ pub(crate) fn make_identity_node(
         column_names.as_slice(),
         ops::identity::Identity::new(parent_na),
     );
+
+    if replica {
+        let nodes = mig
+            .mainline
+            .ingredients
+            .neighbors_directed(parent_na, petgraph::EdgeDirection::Incoming)
+            .collect::<Vec<NodeIndex>>();
+        mig.mainline.ingredients[node].set_replica_type(
+            node::ReplicaType::Bottom { top_prev_nodes: nodes });
+        mig.mainline.ingredients[parent_na].set_replica_type(
+            node::ReplicaType::Top { bottom_next_nodes: vec![] });
+    }
+
     FlowNode::New(node)
 }
 

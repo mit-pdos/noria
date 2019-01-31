@@ -304,14 +304,12 @@ mod tests {
             assert_eq!(mig.mainline.ingredients.node_count(), 14);
             assert_eq!(mig.mainline.ingredients.edge_count(), 13);
 
-            /*
-            let vote = mig.add_base("vote", &["user", "id"], Base::default());
-            let vc = mig.add_ingredient(
-                "votecount",
-                &["id", "votes"],
-                Aggregation::COUNT.over(vote, 0, &[1]),
-            );
+            let a: NodeIndex = NodeIndex::new(1);
+            let b: NodeIndex = NodeIndex::new(2);
+            let c: NodeIndex = NodeIndex::new(3);
+            let d: NodeIndex = NodeIndex::new(4);
 
+            /*
             // identity node exists
             let identity = mig
                 .mainline
@@ -323,18 +321,21 @@ mod tests {
 
             // create a reader
             let readers = vec![mig.maintain_anonymous(vc, &[0])];
+            */
 
             // the replica types are marked correctly
-            assert!(mig.mainline.ingredients[vote].replica_type().is_none());
+            assert!(mig.mainline.ingredients[a].replica_type().is_none());
+            assert!(mig.mainline.ingredients[b].replica_type().is_some());
+            assert!(mig.mainline.ingredients[c].replica_type().is_some());
+            assert!(mig.mainline.ingredients[d].replica_type().is_none());
             assert_eq!(
-                mig.mainline.ingredients[vc].replica_type(),
-                Some(ReplicaType::Top { bottom_next_nodes: readers }),
+                mig.mainline.ingredients[b].replica_type().unwrap(),
+                ReplicaType::Top { bottom_next_nodes: vec![d] },
             );
             assert_eq!(
-                mig.mainline.ingredients[identity].replica_type(),
-                Some(ReplicaType::Bottom { top_prev_nodes: vec![vote] }),
+                mig.mainline.ingredients[c].replica_type().unwrap(),
+                ReplicaType::Bottom { top_prev_nodes: vec![a] },
             );
-            */
         });
     }
 

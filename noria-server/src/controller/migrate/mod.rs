@@ -24,7 +24,6 @@ use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use dataflow::node::ReplicaType;
-use dataflow::ops::identity::Identity;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -58,28 +57,45 @@ pub struct Migration<'a> {
 
     /// Additional migration information provided by the client
     pub(super) context: HashMap<String, DataType>,
-    /// Mapping from nodes to their bottom replicas
-    pub(super) replicas: HashMap<NodeIndex, NodeIndex>,
 }
 
 impl<'a> Migration<'a> {
-    // Correct the parents by replacing top replicas with their corresponding bottom replicas.
-    // Ensures that new ingredients or readers are children of the bottom replica. Also, none
-    // of the inputs should be bottom replicas since users should be unaware of their existence.
-    // TODO(ygina): probably doesn't work if the parent was added in a separate migration.
-    fn correct_parents(&self, nodes: &mut Vec<NodeIndex>) -> Vec<NodeIndex> {
-        // let bottoms = self.replicas.values().collect::<HashSet<&NodeIndex>>();
-        // let mut corrected = Vec::new();
-        // for i in 0..nodes.len() {
-        //     let t = nodes.get(i).unwrap();
-        //     assert!(!bottoms.contains(&t));
-        //     if let Some(bottom) = self.replicas.get(&t) {
-        //         nodes.push(*bottom);
-        //         corrected.push(nodes.swap_remove(i));
-        //     }
-        // }
-        // corrected
-        Vec::new()
+    // If the grandparents of the given node are top replicas, we must update their
+    // bottom_next_nodes to include this node. The parent in between this node and the
+    // grandparent should be a bottom replica.
+    fn correct_grandparents(&mut self, ni: NodeIndex, parents: Vec<NodeIndex>) {
+        let tops: Vec<NodeIndex> = parents
+            .iter()
+            .filter(|&&n| {
+                // only keep the parents that are bottom replicas
+                match self.mainline.ingredients[n].replica_type() {
+                    Some(ReplicaType::Bottom{ .. }) => true,
+                    Some(ReplicaType::Top{ .. }) | None => false,
+                }
+            })
+            .map(|&n| {
+                // parents of bottom replicas must have one parent that is a top replica
+                let grandparents: Vec<NodeIndex> = self
+                    .mainline
+                    .ingredients
+                    .neighbors_directed(n, petgraph::EdgeDirection::Incoming)
+                    .collect();
+                assert_eq!(grandparents.len(), 1);
+                grandparents[0]
+            })
+            .collect();
+
+        for t in tops {
+            match self.mainline.ingredients[t].replica_type() {
+                Some(ReplicaType::Top{ mut bottom_next_nodes }) => {
+                    bottom_next_nodes.push(ni);
+                    self.mainline
+                        .ingredients[t]
+                        .set_replica_type(ReplicaType::Top { bottom_next_nodes });
+                },
+                Some(ReplicaType::Bottom{ .. }) | None => panic!("expected top replica"),
+            }
+        }
     }
 
     /// Add the given `Ingredient` to the Soup.
@@ -95,11 +111,7 @@ impl<'a> Migration<'a> {
         I: Ingredient + Into<NodeOperator>,
     {
         i.on_connected(&self.mainline.ingredients);
-        let (parents, corrected) = {
-            let mut parents = i.ancestors();
-            let corrected = self.correct_parents(&mut parents);
-            (parents, corrected)
-        };
+        let parents = i.ancestors();
         assert!(!parents.is_empty());
 
         // add to the graph
@@ -120,26 +132,8 @@ impl<'a> Migration<'a> {
             self.mainline.ingredients.add_edge(*parent, ni, ());
         }
 
-        // if any parents were corrected, update bottom_next_nodes for the corrected parent
-        if corrected.len() > 0 {
-            assert_eq!(corrected.len(), 1);
-            self.mainline.ingredients[corrected[0]]
-                .set_replica_type(ReplicaType::Top { bottom_next_nodes: vec![ni] });
-        }
-
-        // if the node is an aggregator, then it is a top replica.
-        // we also need to create a bottom replica.
-        if self.mainline.ingredients[ni].is_aggregator() {
-            // let bottom_ni = self.add_ingredient(name, fields, Identity::new(ni));
-            // assert!(self.replicas.insert(ni, bottom_ni).is_none());
-            // assert_eq!(parents.len(), 1, "only handle top replicas with one parent, for now");
-
-            // self.mainline.ingredients[ni]
-            //     .set_replica_type(ReplicaType::Top { bottom_next_nodes: Vec::new() });
-            // self.mainline.ingredients[bottom_ni]
-            //     .set_replica_type(ReplicaType::Bottom { top_prev_nodes: parents });
-            // panic!("i just wanna see the backtrace");
-        }
+        // if any ancestor is a replica, update bottom_next_nodes for the ancestor's parent
+        self.correct_grandparents(ni, parents);
 
         // and tell the caller its id
         ni.into()
@@ -274,11 +268,6 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
     pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
-        let (n, corrected) = {
-            let mut nodes = vec![n];
-            let corrected = self.correct_parents(&mut nodes);
-            (nodes[0], corrected)
-        };
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
@@ -286,12 +275,7 @@ impl<'a> Migration<'a> {
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
 
-        // if any parents were corrected, update bottom_next_nodes for the corrected parent
-        if corrected.len() > 0 {
-            assert_eq!(corrected.len(), 1);
-            self.mainline.ingredients[corrected[0]]
-                .set_replica_type(ReplicaType::Top { bottom_next_nodes: vec![ri] });
-        }
+        self.correct_grandparents(ri, vec![n]);
 
         ri
     }
@@ -300,11 +284,6 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        let (n, corrected) = {
-            let mut nodes = vec![n];
-            let corrected = self.correct_parents(&mut nodes);
-            (nodes[0], corrected)
-        };
         self.ensure_reader_for(n, Some(name));
         let ri = self.readers[&n];
 
@@ -312,12 +291,7 @@ impl<'a> Migration<'a> {
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
 
-        // if any parents were corrected, update bottom_next_nodes for the corrected parent
-        if corrected.len() > 0 {
-            assert_eq!(corrected.len(), 1);
-            self.mainline.ingredients[corrected[0]]
-                .set_replica_type(ReplicaType::Top { bottom_next_nodes: vec![ri] });
-        }
+        self.correct_grandparents(ri, vec![n]);
     }
 
     /// Commit the changes introduced by this `Migration` to the master `Soup`.
