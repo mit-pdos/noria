@@ -507,7 +507,10 @@ impl<'a> Migration<'a> {
             wis_sorted.into_iter()
         }
 
+        // Note: workers and domains are sorted for determinism
         let mut wis = reset_wis(mainline);
+        let mut changed_domains = changed_domains.into_iter().collect::<Vec<DomainIndex>>();
+        changed_domains.sort();
 
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
