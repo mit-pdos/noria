@@ -354,8 +354,46 @@ impl ControllerInner {
         }
     }
 
+    /// Initial dumb policy for replacing hot spares. Only use the hot spare if there is the worker
+    /// has exactly a bottom replica on it. Does not consider downstream nodes that may have been
+    /// affected by other failed workers, nor does it consider whether both replicas were affected.
+    fn replace_hot_spares(&self, failed: Vec<WorkerIdentifier>) -> Vec<WorkerIdentifier> {
+        let mut new_failed: Vec<WorkerIdentifier> = Vec::new();
+        let mut bottoms: Vec<NodeIndex> = Vec::new();
+        for worker in failed {
+            // detect which workers have exactly a bottom replica (and routing nodes)
+            let nodes: Vec<NodeIndex> = self
+                .nodes_on_worker(Some(&worker))
+                .into_iter()
+                .filter(|&ni| !self.ingredients[ni].is_ingress())
+                .filter(|&ni| !self.ingredients[ni].is_egress())
+                .collect();
+
+            // if there is more than one node, give up
+            if nodes.len() != 1 {
+                new_failed.push(worker);
+                continue;
+            }
+
+            // otherwise if that one node is a bottom replica, queue it to be replaced
+            let ni = nodes[0];
+            match self.ingredients[ni].replica_type() {
+                Some(node::ReplicaType::Bottom{ .. }) => bottoms.push(ni),
+                Some(node::ReplicaType::Top{ .. }) | None => new_failed.push(worker),
+            }
+        }
+
+        info!(self.log, "replacing failed bottom replicas: {:?}", bottoms);
+        // TODO(ygina): poke the top replica
+        new_failed
+    }
+
     fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
-        // first, translate from the affected workers to affected data-flow nodes
+        // first, detect which data-flow nodes can be saved by a hot spare and do the replacement.
+        // update the list of failed workers with the workers that we still need to handle.
+        let failed = self.replace_hot_spares(failed);
+
+        // next, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
         for wi in failed {
             info!(self.log, "handling failure of worker {:?}", wi);
