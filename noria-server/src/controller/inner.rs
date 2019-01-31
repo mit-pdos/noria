@@ -357,9 +357,9 @@ impl ControllerInner {
     /// Initial dumb policy for replacing hot spares. Only use the hot spare if there is the worker
     /// has exactly a bottom replica on it. Does not consider downstream nodes that may have been
     /// affected by other failed workers, nor does it consider whether both replicas were affected.
-    fn replace_hot_spares(&self, failed: Vec<WorkerIdentifier>) -> Vec<WorkerIdentifier> {
+    fn replace_hot_spares(&mut self, failed: Vec<WorkerIdentifier>) -> Vec<WorkerIdentifier> {
         let mut new_failed: Vec<WorkerIdentifier> = Vec::new();
-        let mut bottoms: Vec<NodeIndex> = Vec::new();
+        let mut to_replace: Vec<(NodeIndex, NodeIndex)> = Vec::new();
         for worker in failed {
             // detect which workers have exactly a bottom replica (and routing nodes)
             let nodes: Vec<NodeIndex> = self
@@ -378,13 +378,22 @@ impl ControllerInner {
             // otherwise if that one node is a bottom replica, queue it to be replaced
             let ni = nodes[0];
             match self.ingredients[ni].replica_type() {
-                Some(node::ReplicaType::Bottom{ .. }) => bottoms.push(ni),
+                Some(node::ReplicaType::Bottom{ top, .. }) => to_replace.push((ni, top)),
                 Some(node::ReplicaType::Top{ .. }) | None => new_failed.push(worker),
             }
         }
 
-        info!(self.log, "replacing failed bottom replicas: {:?}", bottoms);
-        // TODO(ygina): poke the top replica
+        info!(self.log, "replacing failed bottom replicas: {:?}", to_replace);
+
+        // contact the worker with the top replica to start recovery
+        for (_, replica) in to_replace {
+            // TODO(ygina): how does sharding work here?
+            let domain = self.ingredients[replica].domain();
+            let dh = self.domains.get_mut(&domain).unwrap();
+            let m = box Packet::MakeRecovery { node: self.ingredients[replica].local_addr() };
+            dh.send_to_healthy(m, &self.workers).unwrap();
+        }
+
         new_failed
     }
 

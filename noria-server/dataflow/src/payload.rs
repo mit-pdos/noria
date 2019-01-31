@@ -255,6 +255,13 @@ pub enum Packet {
 
     /// Ask domain to log its state size
     UpdateStateSize,
+
+    // Recovery messages
+    //
+    /// Initiate the recovery process for a top or bottom replica
+    MakeRecovery {
+        node: LocalNodeIndex,
+    },
 }
 
 impl Packet {
