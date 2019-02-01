@@ -49,6 +49,7 @@ pub(super) enum ColumnChange {
 pub struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
     pub(super) added: Vec<NodeIndex>,
+    pub(super) linked: Vec<(NodeIndex, NodeIndex)>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
     pub(super) readers: HashMap<NodeIndex, NodeIndex>,
 
@@ -96,6 +97,54 @@ impl<'a> Migration<'a> {
                 Some(ReplicaType::Bottom{ .. }) | None => panic!("expected top replica"),
             }
         }
+    }
+
+    /// Link the egress node to the ingress node, removing the linear path of nodes in between.
+    /// Used during recovery when it's not necessary to throw away all downstream nodes.
+    ///
+    /// Returns the nodes on the path.
+    pub(super) fn link_nodes(&mut self, egress: NodeIndex, ingress: NodeIndex) -> Vec<NodeIndex> {
+        assert!(self.mainline.ingredients[egress].is_egress());
+        assert!(self.mainline.ingredients[ingress].is_ingress());
+
+        fn child(mainline: &ControllerInner, ni: NodeIndex) -> NodeIndex {
+            let nodes: Vec<NodeIndex> = mainline
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
+                .collect();
+            assert_eq!(nodes.len(), 1);
+            nodes[0]
+        }
+
+        // check that there is a path from egress to ingress and that it is linear
+        let mut ni = child(&self.mainline, egress);
+        let mut path = Vec::new();
+        while ni != ingress {
+            path.push(ni);
+            ni = child(&self.mainline, ni);
+        }
+        assert!(path.len() > 0);
+
+        // remove old edges
+        let mut edges = Vec::new();
+        edges.push((egress, path[0]));
+        edges.push((path[path.len() - 1], ingress));
+        for (x, y) in edges {
+            let edge = self.mainline.ingredients.find_edge(x, y).unwrap();
+            self.mainline.ingredients.remove_edge(edge);
+        }
+
+        // link the nodes together
+        self.mainline.ingredients.add_edge(egress, ingress, ());
+        self.linked.push((egress, ingress));
+
+        debug!(self.log,
+            "linked egress --> ingress";
+            "egress" => egress.index(),
+            "ingress" => ingress.index(),
+        );
+
+        path
     }
 
     /// Add the given `Ingredient` to the Soup.
@@ -606,6 +655,7 @@ impl<'a> Migration<'a> {
             &mut mainline.domains,
             &mainline.workers,
             &new,
+            &self.linked,
         );
 
         // And now, the last piece of the puzzle -- set up materializations

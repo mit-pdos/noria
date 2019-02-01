@@ -268,7 +268,41 @@ pub(super) fn connect(
     domains: &mut HashMap<DomainIndex, DomainHandle>,
     workers: &HashMap<WorkerIdentifier, Worker>,
     new: &HashSet<NodeIndex>,
+    linked: &Vec<(NodeIndex, NodeIndex)>,
 ) {
+    // link the given nodes by replacing the old egress tx connection
+    for &(eni, ini) in linked {
+        let egress = &graph[eni];
+        let ingress = &graph[ini];
+
+        assert!(egress.is_egress());
+        assert!(ingress.is_ingress());
+
+        let shards = domains[&egress.domain()].shards();
+        let domain = domains.get_mut(&egress.domain()).unwrap();
+        if shards != 1 && !egress.sharded_by().is_none() {
+            for i in 0..shards {
+                domain.send_to_healthy_shard(
+                    i,
+                    box Packet::ReplaceEgress {
+                        node: egress.local_addr(),
+                        new_tx: (ini.into(), ingress.local_addr(), (ingress.domain(), i)),
+                    },
+                    workers,
+                ).unwrap();
+            }
+        } else {
+            assert_eq!(shards, 1);
+            domain.send_to_healthy(
+                box Packet::ReplaceEgress {
+                    node: egress.local_addr(),
+                    new_tx: (ini.into(), ingress.local_addr(), (ingress.domain(), 0)),
+                },
+                workers,
+            ).unwrap();
+        }
+    }
+
     // ensure all egress nodes contain the tx channel of the domains of their child ingress nodes
     for &node in new {
         let n = &graph[node];

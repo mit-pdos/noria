@@ -189,6 +189,12 @@ pub enum Packet {
         new_txs: (LocalNodeIndex, Vec<ReplicaAddr>),
     },
 
+    /// Replace the single tx in the Egress node with this tx.
+    ReplaceEgress {
+        node: LocalNodeIndex,
+        new_tx: (NodeIndex, LocalNodeIndex, ReplicaAddr),
+    },
+
     /// Add a streamer to an existing reader node.
     AddStreamer {
         node: LocalNodeIndex,

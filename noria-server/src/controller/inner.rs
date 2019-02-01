@@ -392,6 +392,31 @@ impl ControllerInner {
             let dh = self.domains.get_mut(&domain).unwrap();
             let m = box Packet::MakeRecovery { node: self.ingredients[replica].local_addr() };
             dh.send_to_healthy(m, &self.workers).unwrap();
+
+            // TODO(ygina): we should wait for an ack before starting the migration in case the
+            // node doesn't know it's in recovery mode yet and sends out-of-order messages to its
+            // new connections. for now, just want to check the connections actually work.
+            let bottom_next_node = match self.ingredients[replica].replica_type() {
+                Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
+                    assert_eq!(bottom_next_nodes.len(), 1);
+                    bottom_next_nodes[0]
+                },
+                Some(node::ReplicaType::Bottom{ .. }) | None => unimplemented!(),
+            };
+
+            let egress = self
+                .ingredients
+                .neighbors_directed(replica, petgraph::EdgeDirection::Outgoing)
+                .next()
+                .unwrap();
+            let ingress = self
+                .ingredients
+                .neighbors_directed(bottom_next_node, petgraph::EdgeDirection::Incoming)
+                .next()
+                .unwrap();
+
+            let path = self.migrate(|mig| mig.link_nodes(egress, ingress));
+            self.remove_nodes(&path[..]).unwrap();
         }
 
         new_failed
@@ -695,6 +720,7 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
             context: context,
@@ -716,6 +742,7 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
             context: Default::default(),

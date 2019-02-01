@@ -52,6 +52,22 @@ impl Egress {
         self.tags.insert(tag, dst);
     }
 
+    /// TODO(ygina): a hack
+    /// is there state about replay paths somewhere else? like in materialization/plan.rs?
+    ///
+    /// Replace the old single egress tx with this new tx, also replacing the replay path
+    /// the old tx was previously a part of. Makes a lot of assumptions here, like only having
+    /// one outgoing connection, or that the paths are the same.
+    pub fn replace_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
+        self.txs.clear();
+        self.add_tx(dst_g, dst_l, addr);
+        assert_eq!(self.tags.len(), 1);
+
+        // update the replay path
+        let tag = self.tags.keys().next().unwrap();
+        self.tags.insert(*tag, dst_g);
+    }
+
     pub fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
