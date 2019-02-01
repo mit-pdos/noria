@@ -1,6 +1,6 @@
 import subprocess
 
-
+# exp setup
 nusers = [100, 1000, 10000]
 nclasses = [100, 500, 1000]
 nposts = [1, 10, 100]
