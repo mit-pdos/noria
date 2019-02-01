@@ -6,12 +6,12 @@
             "policies": [
                 {
                     "table": "Paper",
-                    "predicate": "WHERE Paper.id < 999",
+                    "predicate": "SELECT * FROM Paper WHERE Paper.id < 999",
                     "description": "Chairs can see all papers."
                 },
 		{
 		   "table": "Review",
-		   "predicate": "WHERE Review.paper < 999",
+		   "predicate": "SELECT * FROM Review WHERE Review.paper < 999",
 		   "description": "Chairs can see all reviews."
 		}
             ]
@@ -22,7 +22,7 @@
             "policies": [
                 {
                     "table": "Paper",
-                    "predicate": "WHERE Paper.id = GroupContext.id",
+                    "predicate": "SELECT * FROM Paper WHERE Paper.id = GroupContext.id",
                     "description": "Reviewers can see papers they are assigned to."
                 },
 		{
@@ -51,12 +51,12 @@
             "policies": [
                 {
                     "table": "Paper",
-                    "predicate": "WHERE Paper.id = GroupContext.id",
+                    "predicate": "SELECT * FROM Paper WHERE Paper.id = GroupContext.id",
                     "description": "Authors can see their own papers."
 		},
 		{
                     "table": "Review",
-                    "predicate": "WHERE Review.paper = GroupContext.id",
+                    "predicate": "SELECT * FROM Review WHERE Review.paper = GroupContext.id",
                     "description": "Authors can see reviews for their own paper."
                 },
 		{
@@ -75,7 +75,7 @@
       {
         "description": "Everyone can see accepted papers",
         "table": "Paper",
-        "predicate": "WHERE Paper.accepted = 1;"
+        "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
       }
     ]
 }

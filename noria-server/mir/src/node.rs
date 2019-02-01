@@ -243,7 +243,7 @@ impl MirNode {
                           ac.table = Some(t_name.to_owned());
                           self.columns
                               .iter()
-                              .position(|cc| *cc == ac)
+                              .position(|cc| *cc.name == ac.name)
                               .expect(&format!(
                                   "tried to look up non-existent column {:?} on node \
                                    \"{}\" (columns: {:?})",
@@ -270,8 +270,8 @@ impl MirNode {
                               None => match map.get(&(c.name.clone(), None)) {
                                   Some(ref t_name) => get_column_index(c, t_name),
                                   None => panic!(
-                                      "tried to look up non-existent column {:?} on node \
-                                       \"{}\" (columns: {:?})",
+                                      "tried to look up non-existent column {:#?} on node \
+                                       \"{}\" (columns: {:#?})",
                                       c, self.name, self.columns
                                   ),
                               },
@@ -279,8 +279,8 @@ impl MirNode {
                           // panic if no mapping was passed in
                           None => {
                               panic!(
-                                  "tried to look up non-existent column {:?} on node \"{}\" \
-                                   (columns: {:?})",
+                                  "tried to look up non-existent column {:#?} on node \"{}\" \
+                                   (columns: {:#?})",
                                   c, self.name, self.columns
                               );
                           }

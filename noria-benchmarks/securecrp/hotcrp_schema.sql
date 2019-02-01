@@ -480,7 +480,6 @@ CREATE TABLE `TopicArea` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-
 --
 -- Table structure for table `TopicInterest`
 --

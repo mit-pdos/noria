@@ -387,6 +387,7 @@ impl ControllerInner {
     }
 
     fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
+        println!("handled failed worker");
         // first, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
         for wi in failed {
@@ -413,6 +414,8 @@ impl ControllerInner {
         // back to original recipe, which should add the query again
         self.apply_recipe(original)
             .expect("failed to activate original recipe");
+
+        println!("handled failed worker");
     }
 
     pub(crate) fn handle_heartbeat(&mut self, msg: &CoordinationMessage) -> Result<(), io::Error> {
@@ -1093,7 +1096,6 @@ impl ControllerInner {
                 self.recipe = recipe.revert();
             }
         }
-
         r
     }
 
@@ -1157,6 +1159,7 @@ impl ControllerInner {
                 {
                     return Err("Failed to persist recipe installation".to_owned());
                 }
+
                 activation_result
             }
             Err(e) => {

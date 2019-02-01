@@ -630,7 +630,7 @@ pub(crate) fn make_join_node(
         "could not resolve output columns projected from join: {:?}",
         rest
     );
-    
+
     assert_eq!(
         projected_cols_left.len() + projected_cols_right.len(),
         proj_cols.len()

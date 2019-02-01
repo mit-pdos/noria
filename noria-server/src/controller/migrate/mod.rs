@@ -316,6 +316,7 @@ impl<'a> Migration<'a> {
         let uid = self.universe().0.to_string();
 
         let mut uint = 0;
+
         if uid != "global".to_string() {
             uint = uid.parse().unwrap();
         }
@@ -329,7 +330,6 @@ impl<'a> Migration<'a> {
                leaf_to_query.insert(node, query_n);
            }
         }
-
         // match leaf_to_query.get(&n.clone()) {
         //     Some(query) => {
         //         match self.mainline.map_meta.query_to_readers.get_mut(query.clone()) {

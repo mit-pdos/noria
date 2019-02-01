@@ -2,6 +2,7 @@ use crate::Backend;
 use noria::DataType;
 
 pub fn create_users(backend: &mut Backend) {
+    println!("creating users");
     // username varchar(1024),
     // email varchar(1024),
     // name varchar(1024),
@@ -48,8 +49,9 @@ pub fn create_users(backend: &mut Backend) {
         .collect();
 
     let mut mutator = backend.g.table("UserProfile").unwrap();
-
+    println!("inserting users");
     mutator.insert_all(users).unwrap();
+    println!("inserting users2");
 }
 
 pub fn create_papers(backend: &mut Backend) {
