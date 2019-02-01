@@ -80,9 +80,7 @@ impl Backend {
         }
 
         // Install recipe
-        println!("here installing");
         self.g.install_recipe(&rs).unwrap();
-        println!("after installing");
 
         Ok(())
     }

@@ -250,7 +250,6 @@ impl MirNode {
                                   c, self.name, self.columns
                               ))
                       };
-                      println!("about to look at table mapping");
                       // See if table mapping was passed in
                       match table_mapping {
                           // if mapping was passed in, then see if c has an associated table, and check
