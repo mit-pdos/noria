@@ -1,0 +1,114 @@
+Starting benchmark...
+Initializing database schema...
+Populating posts... with 100000
+Populating classes...
+Inserted 1100 Role in 1.65s (668.68 PUTs/sec)!
+Waiting for groups to be constructed...
+Inserted 100 User in 0.15s (669.18 PUTs/sec)!
+Inserted 1000 Class in 1.44s (696.14 PUTs/sec)!
+Inserted 100000 Post in 130.27s (767.66 PUTs/sec)!
+Waiting for posts to propagate...
+Finished writing! Sleeping for 2 seconds...
+Login users...
+Migration 0 took 1416.53s!
+Migration 1 took 2.58s!
+Migration 2 took 2.57s!
+Migration 3 took 2.56s!
+Migration 4 took 2.57s!
+Migration 5 took 2.59s!
+Migration 6 took 2.60s!
+Migration 7 took 2.59s!
+Migration 8 took 2.65s!
+Migration 9 took 2.60s!
+Migration 10 took 2.60s!
+Migration 11 took 2.63s!
+Migration 12 took 2.60s!
+Migration 13 took 2.60s!
+Migration 14 took 2.66s!
+Migration 15 took 2.59s!
+Migration 16 took 2.61s!
+Migration 17 took 2.62s!
+Migration 18 took 2.61s!
+Migration 19 took 2.61s!
+Migration 20 took 2.60s!
+Migration 21 took 2.61s!
+Migration 22 took 2.63s!
+Migration 23 took 2.64s!
+Migration 24 took 2.59s!
+Migration 25 took 2.64s!
+Migration 26 took 2.62s!
+Migration 27 took 2.64s!
+Migration 28 took 2.65s!
+Migration 29 took 2.60s!
+Migration 30 took 2.60s!
+Migration 31 took 2.64s!
+Migration 32 took 2.64s!
+Migration 33 took 2.63s!
+Migration 34 took 2.64s!
+Migration 35 took 2.66s!
+Migration 36 took 2.63s!
+Migration 37 took 2.63s!
+Migration 38 took 2.67s!
+Migration 39 took 2.65s!
+Migration 40 took 2.49s!
+Migration 41 took 2.65s!
+Migration 42 took 2.65s!
+Migration 43 took 2.68s!
+Migration 44 took 2.70s!
+Migration 45 took 2.65s!
+Migration 46 took 2.65s!
+Migration 47 took 2.68s!
+Migration 48 took 2.68s!
+Migration 49 took 2.68s!
+Migration 50 took 2.68s!
+Migration 51 took 2.67s!
+Migration 52 took 2.67s!
+Migration 53 took 2.68s!
+Migration 54 took 2.67s!
+Migration 55 took 2.67s!
+Migration 56 took 2.69s!
+Migration 57 took 2.67s!
+Migration 58 took 2.70s!
+Migration 59 took 2.74s!
+Migration 60 took 2.70s!
+Migration 61 took 2.70s!
+Migration 62 took 2.69s!
+Migration 63 took 2.72s!
+Migration 64 took 2.71s!
+Migration 65 took 2.72s!
+Migration 66 took 2.72s!
+Migration 67 took 2.65s!
+Migration 68 took 2.74s!
+Migration 69 took 2.73s!
+Migration 70 took 2.74s!
+Migration 71 took 2.73s!
+Migration 72 took 2.74s!
+Migration 73 took 2.73s!
+Migration 74 took 2.76s!
+Migration 75 took 2.74s!
+Migration 76 took 2.76s!
+Migration 77 took 2.76s!
+Migration 78 took 2.80s!
+Migration 79 took 2.76s!
+Migration 80 took 2.73s!
+Migration 81 took 2.78s!
+Migration 82 took 2.76s!
+Migration 83 took 2.74s!
+Migration 84 took 2.77s!
+Migration 85 took 2.76s!
+Migration 86 took 2.76s!
+Migration 87 took 2.77s!
+Migration 88 took 2.76s!
+Migration 89 took 2.76s!
+Migration 90 took 2.78s!
+Migration 91 took 2.79s!
+Migration 92 took 2.81s!
+Migration 93 took 2.78s!
+Migration 94 took 2.76s!
+Migration 95 took 2.81s!
+Migration 96 took 2.82s!
+Migration 97 took 2.82s!
+Migration 98 took 2.80s!
+Migration 99 took 2.82s!
+Read 100000 keys in 115.62s (864.88 GETs/sec)!
+Done with benchmark.
