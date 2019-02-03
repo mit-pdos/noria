@@ -137,7 +137,7 @@ fn main() {
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/post-queries.sql")
+                .default_value("noria-benchmarks/piazza/queries.sql")
                 .help("Query file for Piazza application"),
         )
         .arg(
@@ -303,13 +303,13 @@ fn main() {
         println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
-        if partial {
-            let leaf = format!("posts_u{}", i);
-            let mut getter = backend.g.view(&leaf).unwrap();
-            for author in 0..nusers / 4 {
-                getter.lookup(&[author.into()], false).unwrap();
-            }
-        }
+        // if partial {
+        //     let leaf = format!("posts_u{}", i);
+        //     let mut getter = backend.g.view(&leaf).unwrap();
+        //     for author in 0..nusers / 4 {
+        //         getter.lookup(&[author.into()], false).unwrap();
+        //     }
+        // }
 
         if iloc.is_some() && i % 50 == 0 {
             use std::fs;
