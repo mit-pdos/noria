@@ -34,8 +34,8 @@ pub struct Node {
     replica: Option<ReplicaType>,
     /// The last packet received and processed from each parent
     pub last_packet_received: HashMap<NodeIndex, u32>,
-    /// The next packet to send to each child, starts at 1
-    pub next_packet_to_send: HashMap<NodeIndex, u32>,
+    /// The next packet to send to each child, or None if the child should wait for a ResumeAt
+    pub next_packet_to_send: HashMap<NodeIndex, Option<u32>>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
     buffer: Vec<HashSet<NodeIndex>>,
 }
@@ -379,19 +379,23 @@ impl Node {
     /// it is lost anyway on crash.
     pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: u32) -> HashSet<NodeIndex> {
         let me = self.global_addr().index();
+        let mut actual_to_nodes = HashSet::new();
         for ni in &to_nodes {
-            let current_label = self.next_packet_to_send.entry(*ni).or_insert(1);
-            println!("{} SEND #{} to {:?}", me, *current_label, ni);
-            // intermediate messages aren't send to this node
-            for i in *current_label..label {
-                assert!(!self.buffer[i as usize - 1].contains(ni));
+            let entry = self.next_packet_to_send.entry(*ni).or_insert(Some(1));
+            if let Some(ref mut current_label) = entry {
+                println!("{} SEND #{} to {:?}", me, *current_label, ni);
+                // intermediate messages aren't send to this node
+                for i in *current_label..label {
+                    assert!(!self.buffer[i as usize - 1].contains(ni));
+                }
+                assert_eq!(label, *current_label);
+                *current_label += 1;
+                actual_to_nodes.insert(*ni);
             }
-            assert_eq!(label, *current_label);
-            *current_label += 1;
         }
 
-        self.buffer.push(to_nodes.clone());
-        to_nodes
+        self.buffer.push(to_nodes);
+        actual_to_nodes
     }
 
     /// The id to be assigned to the next outgoing packet.

@@ -238,10 +238,13 @@ pub struct Domain {
 
 impl Domain {
     fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> PacketId {
+        let to_ni = self.nodes[to].borrow().global_addr();
         let mut to_nodes = HashSet::new();
-        to_nodes.insert(self.nodes[to].borrow().global_addr());
+        to_nodes.insert(to_ni);
         let pid = self.nodes[from].borrow().next_packet_id();
-        self.nodes[from].borrow_mut().send_packet(to_nodes, pid.label());
+        let actual_to_nodes = self.nodes[from].borrow_mut().send_packet(to_nodes, pid.label());
+        assert_eq!(actual_to_nodes.len(), 1);
+        assert_eq!(*actual_to_nodes.iter().next().unwrap(), to_ni);
         pid
     }
 
@@ -656,31 +659,52 @@ impl Domain {
             ref m => unreachable!("dispatch process got {:?}", m),
         }
 
-        let nchildren = self.nodes[me].borrow().nchildren();
-        for i in 0..nchildren {
+        // there is a chance that we do not want to send the packet to ALL child nodes.
+        // update the message buffer to decide which children to send the packet to.
+        let to_nodes = {
+            let mut to_nodes = HashSet::new();
+            let mut to_nodes_map = HashMap::new();
+            let nchildren = self.nodes[me].borrow().nchildren();
+            for i in 0..nchildren {
+                let childi = *self.nodes[me].borrow().child(i);
+                let ni = self.nodes[childi].borrow().global_addr();
+                to_nodes.insert(ni);
+                to_nodes_map.insert(ni, childi);
+            }
+
+            let pid = self.nodes[me].borrow().next_packet_id();
+            m.as_mut().unwrap().set_id(pid);
+            self.nodes[me]
+                .borrow_mut()
+                .send_packet(to_nodes, pid.label())
+                .iter()
+                .map(|ni| *to_nodes_map.get(ni).unwrap())
+                .collect::<Vec<LocalNodeIndex>>()
+        };
+
+        for childi in &to_nodes {
             // avoid cloning if we can
-            let mut m = if i == nchildren - 1 {
+            let mut m = if to_nodes.len() == 1 {
                 m.take().unwrap()
             } else {
                 m.as_ref().map(|m| box m.clone_data()).unwrap()
             };
 
-            let childi = *self.nodes[me].borrow().child(i);
             let child_is_merger = {
                 // XXX: shouldn't NLL make this unnecessary?
-                let c = self.nodes[childi].borrow();
+                let c = self.nodes[*childi].borrow();
                 c.is_shard_merger()
             };
 
             if child_is_merger {
                 // we need to preserve the egress src (which includes shard identifier)
+                // TODO(ygina): packet labels for mergers
+                unimplemented!();
             } else {
                 m.link_mut().src = me;
             }
-            m.link_mut().dst = childi;
+            m.link_mut().dst = *childi;
 
-            let pid = self.send_internal_packet(m.src(), m.dst());
-            m.set_id(pid);
             self.dispatch(m, sends, executor);
         }
     }
@@ -1732,10 +1756,15 @@ impl Domain {
                     let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
                         if let Some(ni) = sender {
+                            let to_ni = self.nodes[segment.node].borrow().global_addr();
                             let mut to_nodes = HashSet::new();
-                            to_nodes.insert(self.nodes[segment.node].borrow().global_addr());
+                            to_nodes.insert(to_ni);
                             let pid = self.nodes[ni].borrow().next_packet_id();
-                            self.nodes[ni].borrow_mut().send_packet(to_nodes, pid.label());
+                            let actual_to_nodes = self.nodes[ni]
+                                .borrow_mut()
+                                .send_packet(to_nodes, pid.label());
+                            assert_eq!(actual_to_nodes.len(), 1);
+                            assert_eq!(*actual_to_nodes.iter().next().unwrap(), to_ni);
                             m.as_mut().unwrap().set_id(pid);
                         }
                         sender = Some(segment.node);

@@ -73,6 +73,7 @@ impl Egress {
         m: &mut Option<Box<Packet>>,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+        to_nodes: HashSet<NodeIndex>,
     ) {
         let &mut Self {
             ref mut txs,
@@ -93,6 +94,10 @@ impl Egress {
         });
 
         for (txi, ref mut tx) in txs.iter_mut().enumerate() {
+            if !to_nodes.contains(&tx.node) {
+                continue;
+            }
+
             let mut take = txi == txn;
             if let Some(replay_to) = replay_to.as_ref() {
                 if *replay_to == tx.node {
