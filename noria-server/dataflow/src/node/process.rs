@@ -35,7 +35,7 @@ impl Node {
         match self.inner {
             NodeType::Egress(Some(ref e)) => {
                 let label = self.send_packet(e.get_tx_nodes()[0]);
-                let pid = PacketId::new(label, self.get_index().as_global());
+                let pid = PacketId::new(label, self.global_addr());
                 m.as_mut().unwrap().set_id(pid);
             },
             _ => {},

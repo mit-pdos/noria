@@ -238,8 +238,8 @@ pub struct Domain {
 
 impl Domain {
     fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> PacketId {
-        let from_ni = self.nodes[from].borrow().get_index().as_global();
-        let to_ni = self.nodes[to].borrow().get_index().as_global();
+        let from_ni = self.nodes[from].borrow().global_addr();
+        let to_ni = self.nodes[to].borrow().global_addr();
         let label = self.nodes[from].borrow_mut().send_packet(to_ni);
         PacketId::new(label, from_ni)
     }
@@ -1731,9 +1731,9 @@ impl Domain {
                     let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
                         if let Some(ni) = sender {
-                            let from_ni = self.nodes[ni].borrow().get_index().as_global();
-                            let to_ni = self.nodes[segment.node].borrow().get_index().as_global();
-                            let label = self.nodes[ni].borrow_mut().send_packet(to_ni);
+                            let from_ni = self.nodes[ni].borrow().global_addr();
+                            let to_ni = self.nodes[segment.node].borrow().global_addr();
+                            let label = self.nodes[ni].borrow().next_packet_id(to_ni);
                             let pid = PacketId::new(label, from_ni);
                             m.as_mut().unwrap().set_id(pid);
                         }

@@ -353,7 +353,7 @@ impl Node {
     }
 
     pub fn receive_packet(&mut self, from: NodeIndex, label: u32) {
-        let me = self.get_index().as_global().index();
+        let me = self.global_addr().index();
         println!( "{} RECEIVE #{} from {:?}", me, label, from);
         let current_label = self.last_packet_received.entry(from).or_insert(0);
         assert!(label > *current_label);
@@ -361,7 +361,7 @@ impl Node {
     }
 
     pub fn send_packet(&mut self, to: NodeIndex) -> u32 {
-        let me = self.get_index().as_global().index();
+        let me = self.global_addr().index();
         let current_label = self.next_packet_to_send.entry(to).or_insert(1);
         println!("{} SEND #{} to {:?}", me, *current_label, to);
         *current_label += 1;
