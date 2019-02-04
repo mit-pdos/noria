@@ -31,11 +31,11 @@ impl Node {
         };
 
         // Egress and sharder nodes will forward the packet, so we need to generate a packet id.
-        // TODO(ygina): multiple children, sharders
+        // TODO(ygina): sharders
         match self.inner {
             NodeType::Egress(Some(ref e)) => {
-                let label = self.send_packet(e.get_tx_nodes()[0]);
-                let pid = PacketId::new(label, self.global_addr());
+                let pid = self.next_packet_id();
+                self.send_packet(e.get_tx_nodes(), pid.label());
                 m.as_mut().unwrap().set_id(pid);
             },
             _ => {},

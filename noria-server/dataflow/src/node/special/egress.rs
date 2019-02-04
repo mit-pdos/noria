@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use prelude::*;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Serialize, Deserialize)]
 struct EgressTx {
@@ -36,7 +36,7 @@ impl Default for Egress {
 }
 
 impl Egress {
-    pub fn get_tx_nodes(&self) -> Vec<NodeIndex> {
+    pub fn get_tx_nodes(&self) -> HashSet<NodeIndex> {
         self.txs.iter().map(|tx| tx.node).collect()
     }
 

@@ -2,7 +2,7 @@ use domain;
 use ops;
 use petgraph;
 use prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 
 mod process;
@@ -36,6 +36,8 @@ pub struct Node {
     pub last_packet_received: HashMap<NodeIndex, u32>,
     /// The next packet to send to each child, starts at 1
     pub next_packet_to_send: HashMap<NodeIndex, u32>,
+    /// The packet buffer with the payload and list of to-nodes, starts at 1
+    buffer: Vec<HashSet<NodeIndex>>,
 }
 
 // constructors
@@ -61,6 +63,7 @@ impl Node {
             replica: None,
             last_packet_received: HashMap::new(),
             next_packet_to_send: HashMap::new(),
+            buffer: Vec::new(),
         }
     }
 
@@ -352,6 +355,10 @@ impl Node {
         self.replica = Some(rt);
     }
 
+    /// Receive a packet from the given node.
+    ///
+    /// This node keeps track of the latest packet received from each parent so that if the parent
+    /// were to crash, we can tell the parent's replacement where to resume sending messages.
     pub fn receive_packet(&mut self, from: NodeIndex, label: u32) {
         let me = self.global_addr().index();
         println!( "{} RECEIVE #{} from {:?}", me, label, from);
@@ -360,12 +367,38 @@ impl Node {
         *current_label = label;
     }
 
-    pub fn send_packet(&mut self, to: NodeIndex) -> u32 {
+    /// Stores the outgoing packet payload and target to-nodes in the buffer.
+    ///
+    /// We track this information in case we need to resend messages on recovery. To-nodes must be
+    /// children and labels must increase sequentially. Returns a subset of target to-nodes, which
+    /// is the list of nodes to actually send to. If a node is not listed, we must wait for a
+    /// ResumeAt message from that node to resume sending messages.
+    ///
+    /// Note that it's ok for next packet to send to be ahead of the packets that have actually
+    /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
+    /// it is lost anyway on crash.
+    pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: u32) -> HashSet<NodeIndex> {
         let me = self.global_addr().index();
-        let current_label = self.next_packet_to_send.entry(to).or_insert(1);
-        println!("{} SEND #{} to {:?}", me, *current_label, to);
-        *current_label += 1;
-        *current_label - 1
+        for ni in &to_nodes {
+            let current_label = self.next_packet_to_send.entry(*ni).or_insert(1);
+            println!("{} SEND #{} to {:?}", me, *current_label, ni);
+            // intermediate messages aren't send to this node
+            for i in *current_label..label {
+                assert!(!self.buffer[i as usize - 1].contains(ni));
+            }
+            assert_eq!(label, *current_label);
+            *current_label += 1;
+        }
+
+        self.buffer.push(to_nodes.clone());
+        to_nodes
+    }
+
+    /// The id to be assigned to the next outgoing packet.
+    pub fn next_packet_id(&self) -> PacketId {
+        let me = self.global_addr();
+        let label = (self.buffer.len() as u32) + 1;
+        PacketId::new(label, me)
     }
 }
 

@@ -238,10 +238,11 @@ pub struct Domain {
 
 impl Domain {
     fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> PacketId {
-        let from_ni = self.nodes[from].borrow().global_addr();
-        let to_ni = self.nodes[to].borrow().global_addr();
-        let label = self.nodes[from].borrow_mut().send_packet(to_ni);
-        PacketId::new(label, from_ni)
+        let mut to_nodes = HashSet::new();
+        to_nodes.insert(self.nodes[to].borrow().global_addr());
+        let pid = self.nodes[from].borrow().next_packet_id();
+        self.nodes[from].borrow_mut().send_packet(to_nodes, pid.label());
+        pid
     }
 
     fn find_tags_and_replay(
@@ -1731,10 +1732,10 @@ impl Domain {
                     let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
                         if let Some(ni) = sender {
-                            let from_ni = self.nodes[ni].borrow().global_addr();
-                            let to_ni = self.nodes[segment.node].borrow().global_addr();
-                            let label = self.nodes[ni].borrow().next_packet_id(to_ni);
-                            let pid = PacketId::new(label, from_ni);
+                            let mut to_nodes = HashSet::new();
+                            to_nodes.insert(self.nodes[segment.node].borrow().global_addr());
+                            let pid = self.nodes[ni].borrow().next_packet_id();
+                            self.nodes[ni].borrow_mut().send_packet(to_nodes, pid.label());
                             m.as_mut().unwrap().set_id(pid);
                         }
                         sender = Some(segment.node);
