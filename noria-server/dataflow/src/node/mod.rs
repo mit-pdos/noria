@@ -89,6 +89,14 @@ impl DanglingDomainNode {
             .filter(|&c| graph[c].domain() == dm)
             .map(|ni| graph[ni].local_addr())
             .collect();
+
+        let all_children = graph
+            .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
+            .map(|ni| graph[ni].local_addr());
+        for ni in all_children {
+            n.next_packet_to_send.insert(ni, Some(1));
+        }
+
         n
     }
 }
@@ -240,12 +248,14 @@ impl Node {
 
     pub fn add_child(&mut self, child: LocalNodeIndex) {
         self.children.push(child);
+        self.next_packet_to_send.insert(child, Some(1));
     }
 
     pub fn try_remove_child(&mut self, child: LocalNodeIndex) -> bool {
         for i in 0..self.children.len() {
             if self.children[i] == child {
                 self.children.swap_remove(i);
+                self.next_packet_to_send.remove(&child);
                 return true;
             }
         }
@@ -385,7 +395,7 @@ impl Node {
         let me = self.global_addr().index();
         let mut actual_to_nodes = HashSet::new();
         for ni in &to_nodes {
-            let entry = self.next_packet_to_send.entry(*ni).or_insert(Some(1));
+            let entry = self.next_packet_to_send.entry(*ni).or_insert(None);
             if let Some(ref mut current_label) = entry {
                 println!("{} SEND #{} to {:?}", me, *current_label, ni);
                 // intermediate messages aren't send to this node
