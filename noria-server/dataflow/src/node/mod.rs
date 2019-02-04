@@ -35,9 +35,9 @@ pub struct Node {
     /// The last packet received and processed from each parent
     pub last_packet_received: HashMap<NodeIndex, u32>,
     /// The next packet to send to each child, or None if the child should wait for a ResumeAt
-    pub next_packet_to_send: HashMap<NodeIndex, Option<u32>>,
+    pub next_packet_to_send: HashMap<LocalNodeIndex, Option<u32>>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
-    buffer: Vec<HashSet<NodeIndex>>,
+    buffer: Vec<HashSet<LocalNodeIndex>>,
 }
 
 // constructors
@@ -377,7 +377,11 @@ impl Node {
     /// Note that it's ok for next packet to send to be ahead of the packets that have actually
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
-    pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: u32) -> HashSet<NodeIndex> {
+    pub fn send_packet(
+        &mut self,
+        to_nodes: HashSet<LocalNodeIndex>,
+        label: u32,
+    ) -> HashSet<LocalNodeIndex> {
         let me = self.global_addr().index();
         let mut actual_to_nodes = HashSet::new();
         for ni in &to_nodes {
