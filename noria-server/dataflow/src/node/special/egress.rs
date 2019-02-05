@@ -36,8 +36,8 @@ impl Default for Egress {
 }
 
 impl Egress {
-    pub fn get_tx_locals(&self) -> HashSet<LocalNodeIndex> {
-        self.txs.iter().map(|tx| tx.local).collect()
+    pub fn get_tx_nodes(&self) -> HashSet<NodeIndex> {
+        self.txs.iter().map(|tx| tx.node).collect()
     }
 
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
@@ -73,7 +73,7 @@ impl Egress {
         m: &mut Option<Box<Packet>>,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-        to_nodes: HashSet<LocalNodeIndex>,
+        to_nodes: HashSet<NodeIndex>,
     ) {
         let &mut Self {
             ref mut txs,
@@ -94,7 +94,7 @@ impl Egress {
         });
 
         for (txi, ref mut tx) in txs.iter_mut().enumerate() {
-            if !to_nodes.contains(&tx.local) {
+            if !to_nodes.contains(&tx.node) {
                 continue;
             }
 

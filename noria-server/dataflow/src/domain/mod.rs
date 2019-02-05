@@ -238,12 +238,13 @@ pub struct Domain {
 
 impl Domain {
     fn send_internal_packet(&self, from: LocalNodeIndex, to: LocalNodeIndex) -> PacketId {
+        let to_ni = self.nodes[to].borrow().global_addr();
         let mut to_nodes = HashSet::new();
-        to_nodes.insert(to);
+        to_nodes.insert(to_ni);
         let pid = self.nodes[from].borrow().next_packet_id();
         let actual_to_nodes = self.nodes[from].borrow_mut().send_packet(to_nodes, pid.label());
         assert_eq!(actual_to_nodes.len(), 1);
-        assert_eq!(*actual_to_nodes.iter().next().unwrap(), to);
+        assert_eq!(*actual_to_nodes.iter().next().unwrap(), to_ni);
         pid
     }
 
@@ -662,10 +663,13 @@ impl Domain {
         // update the message buffer to decide which children to send the packet to.
         let to_nodes = {
             let mut to_nodes = HashSet::new();
+            let mut to_nodes_map = HashMap::new();
             let nchildren = self.nodes[me].borrow().nchildren();
             for i in 0..nchildren {
                 let childi = *self.nodes[me].borrow().child(i);
-                to_nodes.insert(childi);
+                let ni = self.nodes[childi].borrow().global_addr();
+                to_nodes.insert(ni);
+                to_nodes_map.insert(ni, childi);
             }
 
             let pid = self.nodes[me].borrow().next_packet_id();
@@ -673,6 +677,9 @@ impl Domain {
             self.nodes[me]
                 .borrow_mut()
                 .send_packet(to_nodes, pid.label())
+                .iter()
+                .map(|ni| *to_nodes_map.get(ni).unwrap())
+                .collect::<Vec<LocalNodeIndex>>()
         };
 
         for childi in &to_nodes {
@@ -1749,14 +1756,15 @@ impl Domain {
                     let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
                         if let Some(ni) = sender {
+                            let to_ni = self.nodes[segment.node].borrow().global_addr();
                             let mut to_nodes = HashSet::new();
-                            to_nodes.insert(segment.node);
+                            to_nodes.insert(to_ni);
                             let pid = self.nodes[ni].borrow().next_packet_id();
                             let actual_to_nodes = self.nodes[ni]
                                 .borrow_mut()
                                 .send_packet(to_nodes, pid.label());
                             assert_eq!(actual_to_nodes.len(), 1);
-                            assert_eq!(*actual_to_nodes.iter().next().unwrap(), segment.node);
+                            assert_eq!(*actual_to_nodes.iter().next().unwrap(), to_ni);
                             m.as_mut().unwrap().set_id(pid);
                         }
                         sender = Some(segment.node);
