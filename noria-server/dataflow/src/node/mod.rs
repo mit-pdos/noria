@@ -67,12 +67,29 @@ impl Node {
         }
     }
 
+    fn new_with_replica<S1, FS, S2, NT>(
+        name: S1,
+        fields: FS,
+        inner: NT,
+        replica: &Option<ReplicaType>,
+    ) -> Node
+    where
+        S1: ToString,
+        S2: ToString,
+        FS: IntoIterator<Item = S2>,
+        NT: Into<NodeType>,
+    {
+        let mut n = Self::new(name, fields, inner);
+        n.replica = replica.clone();
+        n
+    }
+
     pub fn mirror<NT: Into<NodeType>>(&self, n: NT) -> Node {
-        Self::new(&*self.name, &self.fields, n)
+        Self::new_with_replica(&*self.name, &self.fields, n, &self.replica)
     }
 
     pub fn named_mirror<NT: Into<NodeType>>(&self, n: NT, name: String) -> Node {
-        Self::new(name, &self.fields, n)
+        Self::new_with_replica(name, &self.fields, n, &self.replica)
     }
 }
 
