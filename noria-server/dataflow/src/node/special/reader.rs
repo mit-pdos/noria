@@ -35,6 +35,8 @@ pub struct Reader {
     streamers: Vec<channel::StreamSender<Vec<StreamUpdate>>>,
 
     for_node: NodeIndex,
+    /// The index of this Reader in the list of Readers for its ancestor
+    reader_index: usize,
     state: Option<Vec<usize>>,
 }
 
@@ -46,17 +48,19 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
+            reader_index: self.reader_index,
         }
     }
 }
 
 impl Reader {
-    pub fn new(for_node: NodeIndex) -> Self {
+    pub fn new(for_node: NodeIndex, reader_index: usize) -> Self {
         Reader {
             writer: None,
             streamers: Vec::new(),
             state: None,
             for_node,
+            reader_index,
         }
     }
 
@@ -64,6 +68,10 @@ impl Reader {
 
     pub fn is_for(&self) -> NodeIndex {
         self.for_node
+    }
+
+    pub fn reader_index(&self) -> usize {
+        self.reader_index
     }
 
     #[allow(dead_code)]
@@ -82,6 +90,7 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
+            reader_index: self.reader_index,
         }
     }
 

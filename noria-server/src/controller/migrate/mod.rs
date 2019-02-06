@@ -20,7 +20,7 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
+use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use std::collections::{HashMap, HashSet};
@@ -49,7 +49,7 @@ pub struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
     pub(super) added: Vec<NodeIndex>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
-    pub(super) readers: HashMap<NodeIndex, NodeIndex>,
+    pub(super) readers: HashMap<NodeIndex, Vec<NodeIndex>>,
 
     pub(super) start: Instant,
     pub(super) log: slog::Logger,
@@ -205,18 +205,32 @@ impl<'a> Migration<'a> {
         self.mainline.graph()
     }
 
-    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
+    fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>, replication_factor: usize) {
         if !self.readers.contains_key(&n) {
-            // make a reader
-            let r = node::special::Reader::new(n);
-            let r = if let Some(name) = name {
-                self.mainline.ingredients[n].named_mirror(r, name)
-            } else {
-                self.mainline.ingredients[n].mirror(r)
-            };
-            let r = self.mainline.ingredients.add_node(r);
-            self.mainline.ingredients.add_edge(n, r, ());
-            self.readers.insert(n, r);
+            let mut readers = Vec::with_capacity(replication_factor);
+            for i in 0..replication_factor {
+                // Make a reader node
+                let r = node::special::Reader::new(n, i);
+                let r = if let Some(name) = &name {
+                    self.mainline.ingredients[n].named_mirror(r, format!("{}_{}", name, i))
+                } else {
+                    self.mainline.ingredients[n].mirror(r)
+                };
+
+                // Add it to the graph along with an edge to the node it reads for
+                let r = self.mainline.ingredients.add_node(r);
+                self.mainline.ingredients.add_edge(n, r, ());
+                self.mainline.ingredients[n].add_reader(r);
+                info!(self.log,
+                      "adding reader node";
+                      "node" => r.index(),
+                      "for_node" => n.index(),
+                      "reader_index" => i
+                );
+                readers.push(r);
+            }
+
+            self.readers.insert(n, readers);
         }
     }
 
@@ -224,28 +238,167 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
-    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
-        self.ensure_reader_for(n, None);
-        let ri = self.readers[&n];
+    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> Vec<NodeIndex> {
+        self.ensure_reader_for(n, None, self.mainline.replication_factor);
+        let ris = &self.readers[&n];
 
-        self.mainline.ingredients[ri]
-            .with_reader_mut(|r| r.set_key(key))
-            .unwrap();
+        for ri in ris {
+            self.mainline.ingredients[*ri]
+                .with_reader_mut(|r| r.set_key(key))
+                .unwrap();
+        }
 
-        ri
+        ris.to_vec()
     }
 
     /// Set up the given node such that its output can be efficiently queried.
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        self.ensure_reader_for(n, Some(name));
+        self.ensure_reader_for(n, Some(name), self.mainline.replication_factor);
 
-        let ri = self.readers[&n];
+        let ris = &self.readers[&n];
 
-        self.mainline.ingredients[ri]
-            .with_reader_mut(|r| r.set_key(key))
-            .unwrap();
+        for ri in ris {
+            self.mainline.ingredients[*ri]
+                .with_reader_mut(|r| r.set_key(key))
+                .unwrap();
+        }
+    }
+
+    fn assign_local_addresses(
+            mainline: &mut ControllerInner,
+            log: &slog::Logger,
+            sorted_new: &Vec<NodeIndex>,
+            swapped: &HashMap<(NodeIndex, NodeIndex), NodeIndex>) {
+        let domain_new_nodes = sorted_new
+            .iter()
+            .map(|&ni| (mainline.ingredients[ni].domain(), ni))
+            .fold(HashMap::new(), |mut dns, (d, ni)| {
+                dns.entry(d).or_insert_with(Vec::new).push(ni);
+                dns
+            });
+
+        for (domain, nodes) in domain_new_nodes.iter() {
+            // Number of pre-existing nodes
+            let mut nnodes = mainline.remap.get(domain).map(HashMap::len).unwrap_or(0);
+
+            if nodes.is_empty() {
+                // Nothing to do here
+                continue;
+            }
+
+            let log = log.new(o!("domain" => domain.index()));
+
+            // Give local addresses to every (new) node
+            for &ni in nodes.iter() {
+                debug!(log,
+                       "assigning local index";
+                       "type" => format!("{:?}", mainline.ingredients[ni]),
+                       "node" => ni.index(),
+                       "local" => nnodes
+                );
+
+                let mut ip: IndexPair = ni.into();
+                ip.set_local(unsafe { LocalNodeIndex::make(nnodes as u32) });
+                mainline.ingredients[ni].set_finalized_addr(ip);
+                mainline
+                    .remap
+                    .entry(*domain)
+                    .or_insert_with(HashMap::new)
+                    .insert(ni, ip);
+                nnodes += 1;
+            }
+
+            // Initialize each new node
+            for &ni in nodes.iter() {
+                if mainline.ingredients[ni].is_internal() {
+                    // Figure out all the remappings that have happened
+                    // NOTE: this has to be *per node*, since a shared parent may be remapped
+                    // differently to different children (due to sharding for example). we just
+                    // allocate it once though.
+                    let mut remap = mainline.remap[domain].clone();
+
+                    // Parents in other domains have been swapped for ingress nodes.
+                    // Those ingress nodes' indices are now local.
+                    for (&(dst, src), &instead) in swapped.iter() {
+                        if dst != ni {
+                            // ignore mappings for other nodes
+                            continue;
+                        }
+
+                        let old = remap.insert(src, mainline.remap[domain][&instead]);
+                        assert_eq!(old, None);
+                    }
+
+                    trace!(log, "initializing new node"; "node" => ni.index());
+                    mainline
+                        .ingredients
+                        .node_weight_mut(ni)
+                        .unwrap()
+                        .on_commit(&remap);
+                }
+            }
+        }
+    }
+
+    /// Places the domains and their nodes on workers according to the round robin iterator. This
+    /// is used to ensure, for example, that readers for the same view and shards of the same
+    /// node end up on different workers. It is also currently used to approximately distribute
+    /// domains across the remaining workers equally. In the future, we'd like to place the domain
+    /// on the machine with the fewest domains already assigned. This does not take into account
+    /// readers and shards that were NOT created for their very first time.
+    ///
+    /// Domains are placed round robin in the order that they are provided.
+    fn place_round_robin(
+            mainline: &mut ControllerInner,
+            log: &slog::Logger,
+            uninformed_domain_nodes: &mut HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
+            changed_domains: &Vec<DomainIndex>) {
+        // TODO(malte): simple round-robin placement for the moment
+        let mut wis = mainline.workers
+            .keys()
+            .map(|wi| wi.clone())
+            .collect::<Vec<WorkerIdentifier>>()
+            .into_iter();
+        for domain in changed_domains {
+            if mainline.domains.contains_key(&domain) {
+                // this is not a new domain
+                continue;
+            }
+
+            // find a worker identifier for each shard
+            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let num_shards = mainline.ingredients[nodes[0].0].sharded_by().shards();
+            let mut identifiers = Vec::new();
+            for _ in 0..num_shards.unwrap_or(1) {
+                let wi = loop {
+                    if let Some(wi) = wis.next() {
+                        let w = mainline.workers.get(&wi).unwrap();
+                        if w.healthy {
+                            break wi;
+                        }
+                    } else {
+                        wis = mainline.workers
+                            .keys()
+                            .map(|wi| wi.clone())
+                            .collect::<Vec<WorkerIdentifier>>()
+                            .into_iter();
+                    }
+                };
+                identifiers.push(wi);
+            }
+
+            // place the domain on the worker
+            let d = mainline.place_domain(
+                *domain,
+                identifiers,
+                num_shards,
+                &log,
+                nodes,
+            );
+            mainline.domains.insert(*domain, d);
+        }
     }
 
     /// Commit the changes introduced by this `Migration` to the master `Soup`.
@@ -262,8 +415,10 @@ impl<'a> Migration<'a> {
         let mut new: HashSet<_> = self.added.into_iter().collect();
 
         // Readers are nodes too.
-        for (_parent, reader) in self.readers {
-            new.insert(reader);
+        for (_parent, readers) in &self.readers {
+            for reader in readers {
+                new.insert(*reader);
+            }
         }
 
         // Shard the graph as desired
@@ -333,89 +488,17 @@ impl<'a> Migration<'a> {
             }
         }
         let swapped = swapped0;
-        let mut sorted_new = new.iter().collect::<Vec<_>>();
+
+        // Assign local addresses to all new nodes, and initialize them.
+        let mut sorted_new: Vec<NodeIndex> = new
+            .iter()
+            .map(|&ni| ni)
+            .filter(|&ni| ni != mainline.source)
+            .filter(|&ni| !mainline.ingredients[ni].is_dropped())
+            .collect::<Vec<_>>();
         sorted_new.sort();
 
-        // Find all nodes for domains that have changed
-        let changed_domains: HashSet<DomainIndex> = sorted_new
-            .iter()
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| mainline.ingredients[ni].domain())
-            .collect();
-
-        let mut domain_new_nodes = sorted_new
-            .iter()
-            .filter(|&&&ni| ni != mainline.source)
-            .filter(|&&&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|&&ni| (mainline.ingredients[ni].domain(), ni))
-            .fold(HashMap::new(), |mut dns, (d, ni)| {
-                dns.entry(d).or_insert_with(Vec::new).push(ni);
-                dns
-            });
-
-        // Assign local addresses to all new nodes, and initialize them
-        for (domain, nodes) in &mut domain_new_nodes {
-            // Number of pre-existing nodes
-            let mut nnodes = mainline.remap.get(domain).map(HashMap::len).unwrap_or(0);
-
-            if nodes.is_empty() {
-                // Nothing to do here
-                continue;
-            }
-
-            let log = log.new(o!("domain" => domain.index()));
-
-            // Give local addresses to every (new) node
-            for &ni in nodes.iter() {
-                debug!(log,
-                       "assigning local index";
-                       "type" => format!("{:?}", mainline.ingredients[ni]),
-                       "node" => ni.index(),
-                       "local" => nnodes
-                );
-
-                let mut ip: IndexPair = ni.into();
-                ip.set_local(unsafe { LocalNodeIndex::make(nnodes as u32) });
-                mainline.ingredients[ni].set_finalized_addr(ip);
-                mainline
-                    .remap
-                    .entry(*domain)
-                    .or_insert_with(HashMap::new)
-                    .insert(ni, ip);
-                nnodes += 1;
-            }
-
-            // Initialize each new node
-            for &ni in nodes.iter() {
-                if mainline.ingredients[ni].is_internal() {
-                    // Figure out all the remappings that have happened
-                    // NOTE: this has to be *per node*, since a shared parent may be remapped
-                    // differently to different children (due to sharding for example). we just
-                    // allocate it once though.
-                    let mut remap = mainline.remap[domain].clone();
-
-                    // Parents in other domains have been swapped for ingress nodes.
-                    // Those ingress nodes' indices are now local.
-                    for (&(dst, src), &instead) in &swapped {
-                        if dst != ni {
-                            // ignore mappings for other nodes
-                            continue;
-                        }
-
-                        let old = remap.insert(src, mainline.remap[domain][&instead]);
-                        assert_eq!(old, None);
-                    }
-
-                    trace!(log, "initializing new node"; "node" => ni.index());
-                    mainline
-                        .ingredients
-                        .node_weight_mut(ni)
-                        .unwrap()
-                        .on_commit(&remap);
-                }
-            }
-        }
-
+        Self::assign_local_addresses(&mut mainline, &log, &sorted_new, &swapped);
         if let Some(shards) = mainline.sharding {
             sharding::validate(&log, &mainline.ingredients, mainline.source, &new, shards)
         };
@@ -451,23 +534,69 @@ impl<'a> Migration<'a> {
                 dns
             });
 
-        // Boot up new domains (they'll ignore all updates for now)
-        debug!(log, "booting new domains");
-        for domain in changed_domains {
-            if mainline.domains.contains_key(&domain) {
-                // this is not a new domain
-                continue;
-            }
-
-            let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
-            let d = mainline.place_domain(
-                domain,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
-                &log,
-                nodes,
+        // Since we're using a round robin iterator, obtain a vec of DomainIndexes in the order
+        // that we want to assign them to workers. For readers, we have to specifically list
+        // readers for the same node in consecutive order to ensure their respective domains end
+        // up on different workers. For non-readers, the order doesn't actually matter.
+        let mut changed_domains_readers = Vec::new();
+        for (_, readers) in &self.readers {
+            changed_domains_readers.extend(
+                readers
+                .iter()
+                .map(|&ni| mainline.ingredients[ni].domain())
             );
-            mainline.domains.insert(domain, d);
         }
+        let changed_domains_other = sorted_new
+            .iter()
+            .map(|&ni| mainline.ingredients[ni].domain())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .filter(|&domain| !changed_domains_readers.contains(&domain))
+            .collect::<Vec<_>>();
+        debug!(
+            log,
+            "found changed domains";
+            "reader domains" => format!("{:?}", changed_domains_readers),
+            "other domains" => format!("{:?}", changed_domains_other),
+        );
+
+        // Check invariants on the changed reader domains. Each changed reader domain should be
+        // just created. The domain should contain the reader node and its ingress node,
+        // and no other nodes. Also, each new reader node should be in a unique domain.
+        assert_eq!(
+            changed_domains_readers.len(),
+            changed_domains_readers.iter().collect::<HashSet<_>>().len()
+        );
+        for domain in &changed_domains_readers {
+            assert!(!mainline.domains.contains_key(&domain));
+            let nodes: &Vec<_> = uninformed_domain_nodes.get(&domain).unwrap();
+            assert_eq!(nodes.len(), 2);
+            let (ni_a, _) = nodes.get(0).unwrap();
+            let (ni_b, _) = nodes.get(1).unwrap();
+            assert!(
+                (mainline.ingredients[*ni_a].is_reader()
+                    && mainline.ingredients[*ni_b].is_ingress())
+                || (mainline.ingredients[*ni_a].is_ingress()
+                    && mainline.ingredients[*ni_b].is_reader())
+            );
+        }
+
+        // Boot up new domains (they'll ignore all updates for now).
+        // We call `place_round_robin` twice to distinguish the changed domains for which the order
+        // matters (readers) from the changed domains for which it doesn't, as stated above.
+        debug!(log, "booting new domains");
+        Self::place_round_robin(
+            mainline,
+            &log,
+            &mut uninformed_domain_nodes,
+            &changed_domains_readers,
+        );
+        Self::place_round_robin(
+            mainline,
+            &log,
+            &mut uninformed_domain_nodes,
+            &changed_domains_other,
+        );
 
         // Add any new nodes to existing domains (they'll also ignore all updates for now)
         debug!(log, "mutating existing domains");

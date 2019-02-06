@@ -60,6 +60,7 @@ pub enum ReadReply {
 #[doc(hidden)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewBuilder {
+    pub reader_index: usize,
     pub node: NodeIndex,
     pub columns: Vec<String>,
     pub schema: Option<Vec<ColumnSpecification>>,
@@ -78,6 +79,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
             schema: self.schema,
@@ -127,6 +129,7 @@ impl ViewBuilder {
             .collect::<io::Result<Vec<_>>>()?;
 
         Ok(View {
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns,
             schema: self.schema,
@@ -144,6 +147,7 @@ impl ViewBuilder {
 /// get a handle that can be sent to a different thread (i.e., one with its own dedicated
 /// connections), call `View::into_exclusive`.
 pub struct View<E = SharedConnection> {
+    reader_index: usize,
     node: NodeIndex,
     columns: Vec<String>,
     schema: Option<Vec<ColumnSpecification>>,
@@ -158,6 +162,7 @@ pub struct View<E = SharedConnection> {
 impl Clone for View<SharedConnection> {
     fn clone(&self) -> Self {
         View {
+            reader_index: self.reader_index,
             node: self.node,
             columns: self.columns.clone(),
             schema: self.schema.clone(),
@@ -175,6 +180,7 @@ impl View<SharedConnection> {
     /// threads.
     pub fn into_exclusive(self) -> io::Result<View<ExclusiveConnection>> {
         ViewBuilder {
+            reader_index: self.reader_index,
             node: self.node,
             local_ports: vec![],
             columns: self.columns,
@@ -190,6 +196,11 @@ impl View<SharedConnection> {
     allow(clippy::len_without_is_empty)
 )]
 impl<E> View<E> {
+    /// Get the index of the corresponding Reader in the list of Readers for this view
+    pub fn reader_index(&self) -> usize {
+        self.reader_index
+    }
+
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
         self.columns.as_slice()

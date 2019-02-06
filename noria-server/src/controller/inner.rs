@@ -39,6 +39,7 @@ pub struct ControllerInner {
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
+    pub(super) replication_factor: usize,
 
     pub(super) domain_config: DomainConfig,
 
@@ -440,6 +441,7 @@ impl ControllerInner {
 
             materializations,
             sharding: state.config.sharding,
+            replication_factor: state.config.replication_factor,
             domain_config: state.config.domain_config,
             persistence: state.config.persistence,
             heartbeat_every: state.config.heartbeat_every,
@@ -500,9 +502,15 @@ impl ControllerInner {
         self.persistence = params;
     }
 
+    // Assigns nodes to this domain, and shards the domain across multiple workers.
+    //
+    // Each worker identifier in `identifiers` corresponds to a single shard in `num_shards`,
+    // thus the logic of which worker gets which shard is determined by the code that calls
+    // this method. That code must also ensure the workers are healthy.
     pub(crate) fn place_domain(
         &mut self,
         idx: DomainIndex,
+        identifiers: Vec<WorkerIdentifier>,
         num_shards: Option<usize>,
         log: &Logger,
         nodes: Vec<(NodeIndex, bool)>,
@@ -519,9 +527,6 @@ impl ControllerInner {
                 .map(|nd| (nd.local_addr(), cell::RefCell::new(nd)))
                 .collect(),
         );
-
-        // TODO(malte): simple round-robin placement for the moment
-        let mut wi = self.workers.iter_mut();
 
         // Send `AssignDomain` to each shard of the given domain
         for i in 0..num_shards.unwrap_or(1) {
@@ -540,17 +545,10 @@ impl ControllerInner {
                 persistence_parameters: self.persistence.clone(),
             };
 
-            let (identifier, w) = loop {
-                if let Some((i, w)) = wi.next() {
-                    if w.healthy {
-                        break (*i, w);
-                    }
-                } else {
-                    wi = self.workers.iter_mut();
-                }
-            };
-
             // send domain to worker
+            let identifier = identifiers.get(i)
+                .expect("number of identifiers should match number of shards");
+            let w = self.workers.get_mut(&identifier).unwrap();
             info!(
                 log,
                 "sending domain {}.{} to worker {:?}",
@@ -625,7 +623,7 @@ impl ControllerInner {
             .enumerate()
             .map(|(i, worker)| {
                 let tx = txs.remove(&i).unwrap();
-                DomainShardHandle { worker, tx }
+                DomainShardHandle { worker: *worker, tx }
             })
             .collect();
 
@@ -728,30 +726,12 @@ impl ControllerInner {
             .collect()
     }
 
-    fn find_view_for(&self, node: NodeIndex) -> Option<NodeIndex> {
-        // reader should be a child of the given node. however, due to sharding, it may not be an
-        // *immediate* child. furthermore, once we go beyond depth 1, we may accidentally hit an
-        // *unrelated* reader node. to account for this, readers keep track of what node they are
-        // "for", and we simply search for the appropriate reader by that metric. since we know
-        // that the reader must be relatively close, a BFS search is the way to go.
-        let mut bfs = Bfs::new(&self.ingredients, node);
-        let mut reader = None;
-        while let Some(child) = bfs.next(&self.ingredients) {
-            if self.ingredients[child]
-                .with_reader(|r| r.is_for() == node)
-                .unwrap_or(false)
-            {
-                reader = Some(child);
-                break;
-            }
-        }
-
-        reader
-    }
-
     /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
-    /// (already maintained) reader node called `name`.
-    pub fn view_builder(&self, name: &str) -> Option<ViewBuilder> {
+    /// (already maintained) reader node. If there are multiple readers for any given query,
+    /// a `ViewBuilder` is returned for each reader in round robin order.
+    ///
+    /// `name` is the name of the view the reader is for.
+    pub fn view_builder(&mut self, name: &str) -> Option<ViewBuilder> {
         // first try to resolve the node via the recipe, which handles aliasing between identical
         // queries.
         let node = match self.recipe.node_addr_for(name) {
@@ -759,21 +739,37 @@ impl ControllerInner {
             Err(_) => {
                 // if the recipe doesn't know about this query, traverse the graph.
                 // we need this do deal with manually constructed graphs (e.g., in tests).
-                *self.outputs().get(name)?
+                if let Some(ni) = self.outputs().get(name) {
+                    *ni
+                } else {
+                    // depending on how the graph was constructed, the outputs may be suffixed
+                    // with the reader index.
+                    let reader_name = format!("{}_0", name);
+                    *self.outputs().get(&reader_name)?
+                }
             }
         };
 
-        self.find_view_for(node).map(|r| {
-            let domain = self.ingredients[r].domain();
-            let columns = self.ingredients[r].fields().to_vec();
-            let schema = self.view_schema(r);
+        self.ingredients[node].next_reader().map(|ni| {
+            let domain = self.ingredients[ni].domain();
+            let columns = self.ingredients[ni].fields().to_vec();
+            let schema = self.view_schema(ni);
             let shards = (0..self.domains[&domain].shards())
                 .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
                 .collect();
+            let reader_index = self.ingredients[ni].with_reader(|r| r.reader_index()).unwrap();
+            info!(
+                self.log,
+                "creating view builder";
+                "name" => &name,
+                "node_index" => ni.index(),
+                "reader_index" => reader_index,
+            );
 
             ViewBuilder {
+                reader_index,
                 local_ports: vec![],
-                node: r,
+                node: ni,
                 columns,
                 schema: schema,
                 shards,
@@ -1135,7 +1131,7 @@ impl ControllerInner {
         graphviz(&self.ingredients, detailed, &self.materializations)
     }
 
-    fn remove_leaf(&mut self, mut leaf: NodeIndex) -> Result<(), String> {
+    fn remove_leaf(&mut self, leaf: NodeIndex) -> Result<(), String> {
         let mut removals = vec![];
         let start = leaf;
         assert!(!self.ingredients[leaf].is_source());
@@ -1146,60 +1142,47 @@ impl ControllerInner {
             leaf.index()
         );
 
-        if self
+        // We're looking for a single egress node that connects the query node to readers in
+        // other domains.
+        let mut nodes = vec![];
+        let num_children = self
             .ingredients
             .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-            .count()
-            > 0
-        {
-            // This query leaf node has children -- typically, these are readers, but they can also
-            // include egress nodes or other, dependent queries.
-            let mut has_non_reader_children = false;
-            let readers: Vec<_> = self
-                .ingredients
+            .count();
+        if num_children == 1 {
+            let child = self.ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .filter(|ni| {
-                    if self.ingredients[*ni].is_reader() {
-                        true
-                    } else {
-                        has_non_reader_children = true;
-                        false
-                    }
-                })
-                .collect();
-            if has_non_reader_children {
-                // should never happen, since we remove nodes in reverse topological order
-                crit!(
-                    self.log,
-                    "not removing node {} yet, as it still has non-reader children",
-                    leaf.index()
-                );
-                unreachable!();
+                .next()
+                .unwrap();
+            assert!(self.ingredients[child].is_egress());
+
+            // Remove the egress node and its children
+            let mut bfs = Bfs::new(&self.ingredients, child);
+            while let Some(child) = bfs.next(&self.ingredients) {
+                if self.ingredients
+                    .neighbors_directed(child, petgraph::EdgeDirection::Outgoing)
+                    .count() == 0
+                {
+                    removals.push(child);
+                    nodes.push(child);
+                }
             }
-            // nodes can have only one reader attached
-            assert!(readers.len() <= 1);
             debug!(
-                        self.log,
-                        "Removing query leaf \"{}\"", self.ingredients[leaf].name();
-                        "node" => leaf.index(),
-                    );
-            if !readers.is_empty() {
-                removals.push(readers[0]);
-                leaf = readers[0];
-            } else {
-                unreachable!();
-            }
+                self.log, "Removing egress node and its children";
+                "node" => child.index(),
+                "leaf" => leaf.index(),
+            );
+        } else if num_children > 1 {
+            // should not happen, since we remove nodes in reverse topological order
+            crit!(
+                self.log,
+                "not removing node {} yet, as it still has non-reader-related children",
+                leaf.index();
+                "num_children" => num_children,
+            );
+            unreachable!();
         }
 
-        // `node` now does not have any children any more
-        assert_eq!(
-            self.ingredients
-                .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
-                .count(),
-            0
-        );
-
-        let mut nodes = vec![leaf];
         while let Some(node) = nodes.pop() {
             let mut parents = self
                 .ingredients

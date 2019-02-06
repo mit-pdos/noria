@@ -28,6 +28,8 @@ pub struct Node {
     taken: bool,
 
     sharded_by: Sharding,
+    next_reader: usize,
+    readers: Vec<NodeIndex>,
 }
 
 // constructors
@@ -50,6 +52,8 @@ impl Node {
             taken: false,
 
             sharded_by: Sharding::None,
+            next_reader: 0,
+            readers: Vec::new(),
         }
     }
 
@@ -104,6 +108,11 @@ impl Node {
     /// Set this node's sharding property.
     pub fn shard_by(&mut self, s: Sharding) {
         self.sharded_by = s;
+    }
+
+    /// The node index `ni` being added is the index of a reader for this node.
+    pub fn add_reader(&mut self, ni: NodeIndex) {
+        self.readers.push(ni)
     }
 
     pub fn on_commit(&mut self, remap: &HashMap<NodeIndex, IndexPair>) {
@@ -328,6 +337,33 @@ impl Node {
 
     pub fn set_finalized_addr(&mut self, addr: IndexPair) {
         self.index = Some(addr);
+    }
+}
+
+// reader replication
+impl Node {
+    pub fn has_readers(&self) -> bool {
+        !self.readers.is_empty()
+    }
+
+    pub fn num_readers(&self) -> usize {
+        self.readers.len()
+    }
+
+    pub fn get_readers(&self) -> &[NodeIndex] {
+        &self.readers[..]
+    }
+
+    /// Returns reader replicas in round robin order each time the method is called,
+    /// with the primary reader (reader index = 0) being returned last.
+    pub fn next_reader(&mut self) -> Option<NodeIndex> {
+        if self.num_readers() > 0 {
+            self.next_reader += 1;
+            self.next_reader %= self.num_readers();
+            Some(*self.readers.get(self.next_reader).unwrap())
+        } else {
+            None
+        }
     }
 }
 

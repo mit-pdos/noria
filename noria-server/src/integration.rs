@@ -19,6 +19,7 @@ use std::{env, thread};
 
 const DEFAULT_SETTLE_TIME_MS: u64 = 200;
 const DEFAULT_SHARDING: Option<usize> = Some(2);
+pub const DEFAULT_REPLICAS: usize = 3;
 
 // PersistenceParameters with a log_name on the form of `prefix` + timestamp,
 // avoiding collisions between separate test runs (in case an earlier panic causes clean-up to
@@ -32,22 +33,23 @@ fn get_persistence_params(prefix: &str) -> PersistenceParameters {
 
 // Builds a local controller with the given log prefix.
 pub fn build_local(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, DEFAULT_SHARDING, false)
+    build(prefix, DEFAULT_SHARDING, DEFAULT_REPLICAS, false)
 }
 
 #[allow(dead_code)]
 pub fn build_local_unsharded(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, None, false)
+    build(prefix, None, DEFAULT_REPLICAS, false)
 }
 
 #[allow(dead_code)]
 pub fn build_local_logging(prefix: &str) -> LocalControllerHandle<LocalAuthority> {
-    build(prefix, DEFAULT_SHARDING, true)
+    build(prefix, DEFAULT_SHARDING, DEFAULT_REPLICAS, true)
 }
 
 fn build(
     prefix: &str,
     sharding: Option<usize>,
+    replication_factor: usize,
     log: bool,
 ) -> LocalControllerHandle<LocalAuthority> {
     use crate::logger_pls;
@@ -57,6 +59,7 @@ fn build(
     }
     builder.set_sharding(sharding);
     builder.set_persistence(get_persistence_params(prefix));
+    builder.set_replication_factor(replication_factor);
     builder.build_local().unwrap()
 }
 
@@ -2042,8 +2045,8 @@ fn recipe_activates_and_migrates() {
     g.extend_recipe(r1_txt).unwrap();
     // still one base node
     assert_eq!(g.inputs().unwrap().len(), 1);
-    // two leaf nodes
-    assert_eq!(g.outputs().unwrap().len(), 2);
+    // two leaf nodes * replication factor
+    assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 }
 
 #[test]
@@ -2062,8 +2065,8 @@ fn recipe_activates_and_migrates_with_join() {
 
     // still two base nodes
     assert_eq!(g.inputs().unwrap().len(), 2);
-    // one leaf node
-    assert_eq!(g.outputs().unwrap().len(), 1);
+    // one leaf node * replication factor
+    assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
 }
 
 fn test_queries(test: &str, file: &'static str, shard: bool, reuse: bool, log: bool) {
@@ -2190,7 +2193,7 @@ fn node_removal() {
         1,
     ));
     let mut g = b.build_local().unwrap();
-    let cid = g.migrate(|mig| {
+    let cids = g.migrate(|mig| {
         let a = mig.add_base("a", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
         let b = mig.add_base("b", &["a", "b"], Base::new(vec![]).with_key(vec![0]));
 
@@ -2222,7 +2225,9 @@ fn node_removal() {
         vec![vec![1.into(), 2.into()]]
     );
 
-    g.remove_node(cid).unwrap();
+    for cid in cids {
+        g.remove_node(cid).unwrap();
+    }
 
     // update value again
     mutb.insert(vec![id.clone(), 4.into()]).unwrap();
@@ -2260,7 +2265,7 @@ fn remove_query() {
     let mut g = ControllerBuilder::default().build_local().unwrap();
     g.install_recipe(r_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 2);
+    assert_eq!(g.outputs().unwrap().len(), 2 * DEFAULT_REPLICAS);
 
     let mut mutb = g.table("b").unwrap();
     let mut qa = g.view("qa").unwrap();
@@ -2277,7 +2282,7 @@ fn remove_query() {
     // Remove qb and check that the graph still functions as expected.
     g.install_recipe(r2_txt).unwrap();
     assert_eq!(g.inputs().unwrap().len(), 1);
-    assert_eq!(g.outputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), 1 * DEFAULT_REPLICAS);
     assert!(g.view("qb").is_err());
 
     mutb.insert(vec![42.into(), "6".into(), "7".into()])
@@ -2286,6 +2291,42 @@ fn remove_query() {
 
     assert_eq!(qa.lookup(&[0.into()], true).unwrap().len(), 3);
     assert_eq!(qb.lookup(&[0.into()], true).unwrap().len(), 1);
+}
+
+#[test]
+fn reader_replica_writes() {
+    let txt = "CREATE TABLE x (a int);\n
+               QUERY q: SELECT a from x;\n";
+
+    let mut g = ControllerBuilder::default().build_local().unwrap();
+    g.install_recipe(txt).unwrap();
+    assert_eq!(g.inputs().unwrap().len(), 1);
+    assert_eq!(g.outputs().unwrap().len(), DEFAULT_REPLICAS);
+    assert!(DEFAULT_REPLICAS > 1);
+
+    let mut mutx = g.table("x").unwrap();
+    let mut q1 = g.view("q").unwrap().into_exclusive().unwrap();
+    let mut q2 = g.view("q").unwrap().into_exclusive().unwrap();
+    let mut q3 = g.view("q").unwrap().into_exclusive().unwrap();
+
+    // These are actually views to different readers
+    assert_eq!(q1.reader_index(), 1);
+    assert_eq!(q2.reader_index(), 2);
+    assert_eq!(q3.reader_index(), 0);
+
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 0);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 0);
+    assert_eq!(q3.lookup(&[0.into()], true).unwrap().len(), 0);
+
+    mutx.insert(vec![13.into()]).unwrap();
+    mutx.insert(vec![21.into()]).unwrap();
+    mutx.insert(vec![34.into()]).unwrap();
+    sleep();
+
+    // Writes are reflected in all readers
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 3);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
+    assert_eq!(q3.lookup(&[0.into()], true).unwrap().len(), 3);
 }
 
 #[test]
@@ -2309,9 +2350,9 @@ fn correct_nested_view_schema() {
     let q = g.view("swvc").unwrap();
 
     let expected_schema = vec![
-        ColumnSpecification::new("swvc.id".into(), SqlType::Int(32)),
-        ColumnSpecification::new("swvc.content".into(), SqlType::Text),
-        ColumnSpecification::new("swvc.vc".into(), SqlType::Bigint(64)),
+        ColumnSpecification::new("swvc_1.id".into(), SqlType::Int(32)),
+        ColumnSpecification::new("swvc_1.content".into(), SqlType::Text),
+        ColumnSpecification::new("swvc_1.vc".into(), SqlType::Bigint(64)),
     ];
     assert_eq!(q.schema(), Some(&expected_schema[..]));
 }

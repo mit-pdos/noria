@@ -71,7 +71,7 @@ impl Setup {
         Graph {
             vote: inputs["Vote"],
             article: inputs["Article"],
-            end: outputs["ArticleWithVoteCount"],
+            end: outputs["ArticleWithVoteCount_0"],
             stupid: self.stupid,
             graph,
         }
