@@ -1373,9 +1373,19 @@ impl Domain {
                             "new" => new.index(),
                         );
                     },
-                    Packet::ResumeAt { child, label } => {
+                    Packet::ResumeAt { node, child, label } => {
                         // update next_packet_to_send of the egress node to resume sending packets
                         // to this child from label.
+                        let node = &self.nodes[node];
+                        assert!(node.borrow().is_egress());
+                        node.borrow_mut().resume_at(child, label);
+                        debug!(
+                            self.log,
+                            "resuming messages from {}",
+                            node.borrow().global_addr().index();
+                            "child" => child.index(),
+                            "label" => label,
+                        );
                     },
                     _ => unreachable!(),
                 }

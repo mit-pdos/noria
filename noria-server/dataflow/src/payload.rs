@@ -278,6 +278,7 @@ pub enum Packet {
 
     /// Notify the node to resume sending messages to this child from the given packet label
     ResumeAt {
+        node: LocalNodeIndex,
         child: NodeIndex,
         label: u32,
     },

@@ -430,6 +430,11 @@ impl Node {
         PacketId::new(label, me)
     }
 
+    /// Resume sending messages to this node at the label.
+    pub fn resume_at(&mut self, node: NodeIndex, label: u32) {
+        self.next_packet_to_send.insert(node, Some(label));
+    }
+
     /// Replace an incoming connection from `old` with `new`.
     pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
         let label = self.last_packet_received.remove(&old).unwrap_or(1);
