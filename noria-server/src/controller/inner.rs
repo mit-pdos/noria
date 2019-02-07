@@ -386,25 +386,20 @@ impl ControllerInner {
         info!(self.log, "replacing failed bottom replicas: {:?}", to_replace);
 
         // contact the worker with the top replica to start recovery
-        for (_, replica) in to_replace {
-            // TODO(ygina): how does sharding work here?
-            let domain = self.ingredients[replica].domain();
-            let dh = self.domains.get_mut(&domain).unwrap();
-            let m = box Packet::MakeRecovery { node: self.ingredients[replica].local_addr() };
-            dh.send_to_healthy(m, &self.workers).unwrap();
-
-            // TODO(ygina): we should wait for an ack before starting the migration in case the
-            // node doesn't know it's in recovery mode yet and sends out-of-order messages to its
-            // new connections. for now, just want to check the connections actually work.
+        for (failed, replica) in to_replace {
+            // Create a connection between the top replica and the next nodes of the failed bottom
+            // replica. The top replica won't pre-emptively send messages to the next nodes even
+            // though there is a working connection until it receives a ResumeAt message.
             let bottom_next_node = match self.ingredients[replica].replica_type() {
                 Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
+                    // TODO(ygina): multiple next nodes
                     assert_eq!(bottom_next_nodes.len(), 1);
                     bottom_next_nodes[0]
                 },
                 Some(node::ReplicaType::Bottom{ .. }) | None => unimplemented!(),
             };
 
-            let egress = self
+            let new_egress = self
                 .ingredients
                 .neighbors_directed(replica, petgraph::EdgeDirection::Outgoing)
                 .next()
@@ -415,8 +410,25 @@ impl ControllerInner {
                 .next()
                 .unwrap();
 
-            let path = self.migrate(|mig| mig.link_nodes(egress, ingress));
+            let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
             self.remove_nodes(&path[..]).unwrap();
+
+            // Notify the next nodes of this new incoming connection, including which node the
+            // replica is "replacing". In this case, the top replica is replacing the bottom one.
+            let old_egress = self
+                .ingredients
+                .neighbors_directed(failed, petgraph::EdgeDirection::Outgoing)
+                .next()
+                .unwrap();
+
+            let domain = self.ingredients[ingress].domain();
+            let dh = self.domains.get_mut(&domain).unwrap();
+            let m = box Packet::NewIncoming {
+                to: self.ingredients[ingress].local_addr(),
+                old: self.ingredients[old_egress].global_addr(),
+                new: self.ingredients[new_egress].global_addr(),
+            };
+            dh.send_to_healthy(m, &self.workers).unwrap();
         }
 
         new_failed

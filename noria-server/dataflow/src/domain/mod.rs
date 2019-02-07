@@ -1362,6 +1362,16 @@ impl Domain {
                         // `label` of the message is the value of last_packet_received.
                         //
                         // wait!
+                        let node = &self.nodes[to];
+                        assert!(node.borrow().is_ingress());
+                        node.borrow_mut().new_incoming(old, new);
+                        debug!(
+                            self.log,
+                            "updated incoming connection to {}",
+                            node.borrow().global_addr().index();
+                            "old" => old.index(),
+                            "new" => new.index(),
+                        );
                     },
                     Packet::ResumeAt { child, label } => {
                         // update next_packet_to_send of the egress node to resume sending packets

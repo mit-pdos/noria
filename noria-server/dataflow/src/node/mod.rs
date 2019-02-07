@@ -429,6 +429,12 @@ impl Node {
         let label = (self.buffer.len() as u32) + 1;
         PacketId::new(label, me)
     }
+
+    /// Replace an incoming connection from `old` with `new`.
+    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
+        let label = self.last_packet_received.remove(&old).unwrap_or(1);
+        self.last_packet_received.insert(new, label);
+    }
 }
 
 // is this or that?
