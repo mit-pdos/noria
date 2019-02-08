@@ -2361,20 +2361,27 @@ fn recover_from_losing_bottom_replica() {
     g.install_recipe(txt).unwrap();
     sleep();
 
-    // shutdown the bottom replica and wait for recovery
-    drop(g2);
-    thread::sleep(Duration::from_secs(10));
-
-    // reads and writes should be correct
     let mut mutx = g.table("vote").unwrap().into_sync();
     let mut q = g.view("votecount").unwrap().into_sync();
     let id = 0;
-    println!("{}", g.graphviz().unwrap());
-    // assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 0.into()]]);
+
+    // prime the dataflow graph
     mutx.insert(vec![1337.into(), id.into()]).unwrap();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
 
-    // TODO(ygina): more edge cases especially with losing packets in the network
+    // shutdown the bottom replica and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    drop(g2);
+    thread::sleep(Duration::from_secs(3));
+    for _ in 0..7 {
+        mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    }
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // wait for recovery and observe the writes
+    thread::sleep(Duration::from_secs(10));
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 8.into()]]);
 
     loop {}
 }
