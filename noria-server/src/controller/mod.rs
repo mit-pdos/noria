@@ -25,6 +25,7 @@ use noria::channel::{self, DualTcpStream, TcpSender, CONNECTION_FROM_BASE};
 use noria::consensus::{Authority, Epoch, STATE_KEY};
 use noria::internal::{DomainIndex, LocalOrNot};
 use noria::{ControllerDescriptor, Input, Tagged};
+use petgraph::graph::NodeIndex;
 use rand;
 use serde_json;
 use slog;
@@ -287,6 +288,7 @@ fn start_instance<A: Authority + 'static>(
                         CoordinationPayload::Register { .. } => fw(e, true),
                         CoordinationPayload::Heartbeat => fw(e, true),
                         CoordinationPayload::CreateUniverse(..) => fw(e, true),
+                        CoordinationPayload::SendResumeAt { .. } => fw(e, true),
                     },
                     Event::ExternalRequest(..) => fw(e, true),
                     #[cfg(test)]
@@ -469,6 +471,11 @@ fn start_instance<A: Authority + 'static>(
                             CoordinationPayload::Heartbeat => {
                                 if let Some(ref mut ctrl) = controller {
                                     block_on(|| ctrl.handle_heartbeat(&msg).unwrap());
+                                }
+                            }
+                            CoordinationPayload::SendResumeAt { node, child, label } => {
+                                if let Some(ref mut ctrl) = controller {
+                                    block_on(|| ctrl.handle_resume_at(node, child, label));
                                 }
                             }
                             _ => unreachable!(),
@@ -1380,6 +1387,12 @@ impl OutOfBand {
 impl Executor for OutOfBand {
     fn ack(&mut self, id: SourceChannelIdentifier) {
         self.back.entry(id.token).or_default().push(id.tag);
+    }
+
+    fn send_resume_at(&mut self, node: NodeIndex, child: NodeIndex, label: u32) {
+        self.ctrl_tx
+            .unbounded_send(CoordinationPayload::SendResumeAt { node, child, label })
+            .expect("asked to send to controller, but controller has gone away");
     }
 
     fn create_universe(&mut self, universe: HashMap<String, DataType>) {

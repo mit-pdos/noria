@@ -1364,13 +1364,20 @@ impl Domain {
                         // wait!
                         let node = &self.nodes[to];
                         assert!(node.borrow().is_ingress());
-                        node.borrow_mut().new_incoming(old, new);
+                        let label = node.borrow_mut().new_incoming(old, new);
+
                         debug!(
                             self.log,
                             "updated incoming connection to {}",
                             node.borrow().global_addr().index();
                             "old" => old.index(),
                             "new" => new.index(),
+                        );
+
+                        executor.send_resume_at(
+                            new,
+                            node.borrow().global_addr(),
+                            label,
                         );
                     },
                     Packet::ResumeAt { node, child, label } => {

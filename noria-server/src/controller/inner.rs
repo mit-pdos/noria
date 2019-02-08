@@ -483,6 +483,25 @@ impl ControllerInner {
         Ok(())
     }
 
+    pub(crate) fn handle_resume_at( &mut self, node: NodeIndex, child: NodeIndex, label: u32) {
+        debug!(
+            self.log,
+            "controller received SendResumeAt coordination message to forward";
+            "node" => node.index(),
+            "child" => child.index(),
+            "label" => label,
+        );
+
+        let domain = self.ingredients[node].domain();
+        let dh = self.domains.get_mut(&domain).unwrap();
+        let m = box Packet::ResumeAt {
+            node: self.ingredients[node].local_addr(),
+            child,
+            label,
+        };
+        dh.send_to_healthy(m, &self.workers).unwrap();
+    }
+
     /// Construct `ControllerInner` with a specified listening interface
     pub(super) fn new(
         log: slog::Logger,

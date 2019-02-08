@@ -39,5 +39,6 @@ pub type EnqueuedSends = FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>;
 pub type ChannelCoordinator = noria::channel::ChannelCoordinator<(DomainIndex, usize), Box<Packet>>;
 pub trait Executor {
     fn ack(&mut self, tag: SourceChannelIdentifier);
+    fn send_resume_at(&mut self, node: NodeIndex, child: NodeIndex, label: u32);
     fn create_universe(&mut self, req: HashMap<String, DataType>);
 }

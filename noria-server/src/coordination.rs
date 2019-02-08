@@ -39,6 +39,15 @@ pub enum CoordinationPayload {
     DomainBooted(DomainDescriptor),
     /// Create a new security universe.
     CreateUniverse(HashMap<String, DataType>),
+    /// Send a ResumeAt message to the controller to forward.
+    SendResumeAt {
+        /// The node to resume sending messages from.
+        node: NodeIndex,
+        /// The child to resume sending messages to.
+        child: NodeIndex,
+        /// The label of the first message to resume at.
+        label: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

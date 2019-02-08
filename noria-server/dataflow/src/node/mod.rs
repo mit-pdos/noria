@@ -436,9 +436,11 @@ impl Node {
     }
 
     /// Replace an incoming connection from `old` with `new`.
-    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
+    /// Returns the label of the next message expected from the new connection.
+    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> u32 {
         let label = self.last_packet_received.remove(&old).unwrap_or(1);
         self.last_packet_received.insert(new, label);
+        label + 1
     }
 }
 

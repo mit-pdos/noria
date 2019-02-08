@@ -468,6 +468,7 @@ pub mod test {
 
             impl Executor for Ex {
                 fn ack(&mut self, _: SourceChannelIdentifier) {}
+                fn send_resume_at(&mut self, _: NodeIndex, _: NodeIndex, _: u32) {}
                 fn create_universe(&mut self, _: HashMap<String, DataType>) {}
             }
 
