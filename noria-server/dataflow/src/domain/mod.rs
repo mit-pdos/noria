@@ -1331,15 +1331,8 @@ impl Domain {
                         // spinning as instructed
                     },
                     Packet::NewIncoming { to, old, new } => {
-                        // sanity check:
-                        // the node `to` should be the first node in the domain after the ingress.
-                        //
-                        // replace `old` in last_packet_received of the ingress with `new`.
-                        // use that to send ResumeAt to `new`.
-                        // `child` of the message is the ingress of this domain.
-                        // `label` of the message is the value of last_packet_received.
-                        //
-                        // wait!
+                        // sanity check: the node "to" should be an ingress node
+                        // update its node state so it's aware about the new incoming connection
                         let node = &self.nodes[to];
                         assert!(node.borrow().is_ingress());
                         let label = node.borrow_mut().new_incoming(old, new);
@@ -1352,6 +1345,7 @@ impl Domain {
                             "new" => new.index(),
                         );
 
+                        // tell the new incoming connection where to resume sending messages
                         executor.send_resume_at(
                             new,
                             node.borrow().global_addr(),
@@ -1359,11 +1353,12 @@ impl Domain {
                         );
                     },
                     Packet::ResumeAt { node, child, label } => {
-                        // update next_packet_to_send of the egress node to resume sending packets
-                        // to this child from label.
+                        // sanity check: the node "node" should be an egress node
+                        // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
                         assert!(node.borrow().is_egress());
-                        node.borrow_mut().resume_at(child, label);
+                        let packets = node.borrow_mut().resume_at(child, label);
+
                         debug!(
                             self.log,
                             "resuming messages from {}",
@@ -1371,6 +1366,10 @@ impl Domain {
                             "child" => child.index(),
                             "label" => label,
                         );
+
+                        // TODO(ygina): catch up the child with any missed messages from the
+                        // given label up to the current label
+                        println!("catch up these packets: {:?}", packets);
                     },
                     _ => unreachable!(),
                 }

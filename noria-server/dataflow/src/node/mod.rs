@@ -34,8 +34,8 @@ pub struct Node {
     replica: Option<ReplicaType>,
     /// The last packet received and processed from each parent
     pub last_packet_received: HashMap<NodeIndex, usize>,
-    /// The next packet to send to each child, or None if the child should wait for a ResumeAt
-    pub next_packet_to_send: HashMap<NodeIndex, Option<usize>>,
+    /// The next packet to send to each child, where the key DNE if waiting for a ResumeAt
+    pub next_packet_to_send: HashMap<NodeIndex, usize>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
     buffer: Vec<HashSet<NodeIndex>>,
 }
@@ -111,7 +111,7 @@ impl DanglingDomainNode {
             .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
             .map(|ni| graph[ni].global_addr());
         for ni in all_children {
-            n.next_packet_to_send.insert(ni, Some(1));
+            n.next_packet_to_send.insert(ni, 1);
         }
 
         n
@@ -385,11 +385,11 @@ impl Node {
     /// This node keeps track of the latest packet received from each parent so that if the parent
     /// were to crash, we can tell the parent's replacement where to resume sending messages.
     pub fn receive_packet(&mut self, from: NodeIndex, label: usize) {
-        let me = self.global_addr().index();
-        println!( "{} RECEIVE #{} from {:?}", me, label, from);
-        let current_label = self.last_packet_received.entry(from).or_insert(0);
-        assert!(label > *current_label);
-        *current_label = label;
+        println!( "{} RECEIVE #{} from {:?}", self.global_addr().index(), label, from);
+        let old_label = self.last_packet_received.insert(from, label);
+
+        // labels are not necessarily sequential, but must be increasing
+        assert!(label > old_label.unwrap_or(0));
     }
 
     /// Stores the outgoing packet payload and target to-nodes in the buffer.
@@ -403,23 +403,28 @@ impl Node {
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
     pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: usize) -> HashSet<NodeIndex> {
-        let me = self.global_addr().index();
-        let mut actual_to_nodes = HashSet::new();
-        for ni in &to_nodes {
-            let entry = self.next_packet_to_send.entry(*ni).or_insert(None);
-            if let Some(ref mut current_label) = entry {
-                println!("{} SEND #{} to {:?}", me, *current_label, ni);
-                // intermediate messages aren't send to this node
-                for i in *current_label..label {
-                    assert!(!self.buffer[i as usize - 1].contains(ni));
-                }
-                assert_eq!(label, *current_label);
-                *current_label += 1;
-                actual_to_nodes.insert(*ni);
+        // the actual nodes to send to are any where the next packet to send label exists
+        let actual_to_nodes = to_nodes
+            .iter()
+            .filter(|ni| self.next_packet_to_send.get(ni).is_some())
+            .map(|&ni| ni)
+            .collect::<HashSet<NodeIndex>>();
+
+        // push the packet payload and target to-nodes to the buffer
+        assert_eq!(label, self.buffer.len() + 1, "outgoing labels increase sequentially");
+        self.buffer.push(to_nodes);
+
+        for ni in &actual_to_nodes {
+            // update next packet to send
+            println!("{} SEND #{} to {:?}", self.global_addr().index(), label, ni);
+            let old_label = self.next_packet_to_send.insert(*ni, label + 1).unwrap();
+
+            // any skipped packets from [old_label, label) shouldn't have been sent to ni anyway
+            for i in old_label..label {
+                assert!(!self.buffer[i - 1].contains(ni));
             }
         }
 
-        self.buffer.push(to_nodes);
         actual_to_nodes
     }
 
@@ -431,14 +436,26 @@ impl Node {
     }
 
     /// Resume sending messages to this node at the label.
-    pub fn resume_at(&mut self, node: NodeIndex, label: usize) {
-        self.next_packet_to_send.insert(node, Some(label));
+    /// Returns a list of packets to send to this node to get it up to date.
+    pub fn resume_at(&mut self, node: NodeIndex, label: usize) -> Vec<usize> {
+        let mut packets = Vec::new();
+        let max_label = self.buffer.len() + 1;
+
+        for i in label..max_label {
+            // TODO(ygina): actual payload
+            if self.buffer[label - 1].contains(&node) {
+                packets.push(i);
+            }
+        }
+
+        self.next_packet_to_send.insert(node, max_label);
+        packets
     }
 
     /// Replace an incoming connection from `old` with `new`.
     /// Returns the label of the next message expected from the new connection.
     pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> usize {
-        let label = self.last_packet_received.remove(&old).unwrap_or(1);
+        let label = self.last_packet_received.remove(&old).unwrap_or(0);
         self.last_packet_received.insert(new, label);
         label + 1
     }
