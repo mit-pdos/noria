@@ -46,7 +46,7 @@ pub enum CoordinationPayload {
         /// The child to resume sending messages to.
         child: NodeIndex,
         /// The label of the first message to resume at.
-        label: u32,
+        label: usize,
     },
 }
 

@@ -80,7 +80,7 @@ pub struct SourceChannelIdentifier {
 /// External ids are used the first time the packet appears in a domain.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PacketId {
-    label: u32,
+    label: usize,
     from: NodeIndex,
 }
 
@@ -89,11 +89,11 @@ impl PacketId {
         PacketId { label: 54321, from: NodeIndex::new(54321) }
     }
 
-    pub fn new(label: u32, from: NodeIndex) -> PacketId {
+    pub fn new(label: usize, from: NodeIndex) -> PacketId {
         PacketId { label, from }
     }
 
-    pub fn label(&self) -> u32 {
+    pub fn label(&self) -> usize {
         self.label
     }
 
@@ -275,7 +275,7 @@ pub enum Packet {
     ResumeAt {
         node: LocalNodeIndex,
         child: NodeIndex,
-        label: u32,
+        label: usize,
     },
 }
 

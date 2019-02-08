@@ -483,7 +483,7 @@ impl ControllerInner {
         Ok(())
     }
 
-    pub(crate) fn handle_resume_at( &mut self, node: NodeIndex, child: NodeIndex, label: u32) {
+    pub(crate) fn handle_resume_at( &mut self, node: NodeIndex, child: NodeIndex, label: usize) {
         debug!(
             self.log,
             "controller received SendResumeAt coordination message to forward";

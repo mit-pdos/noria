@@ -33,9 +33,9 @@ pub struct Node {
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
     /// The last packet received and processed from each parent
-    pub last_packet_received: HashMap<NodeIndex, u32>,
+    pub last_packet_received: HashMap<NodeIndex, usize>,
     /// The next packet to send to each child, or None if the child should wait for a ResumeAt
-    pub next_packet_to_send: HashMap<NodeIndex, Option<u32>>,
+    pub next_packet_to_send: HashMap<NodeIndex, Option<usize>>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
     buffer: Vec<HashSet<NodeIndex>>,
 }
@@ -384,7 +384,7 @@ impl Node {
     ///
     /// This node keeps track of the latest packet received from each parent so that if the parent
     /// were to crash, we can tell the parent's replacement where to resume sending messages.
-    pub fn receive_packet(&mut self, from: NodeIndex, label: u32) {
+    pub fn receive_packet(&mut self, from: NodeIndex, label: usize) {
         let me = self.global_addr().index();
         println!( "{} RECEIVE #{} from {:?}", me, label, from);
         let current_label = self.last_packet_received.entry(from).or_insert(0);
@@ -402,7 +402,7 @@ impl Node {
     /// Note that it's ok for next packet to send to be ahead of the packets that have actually
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
-    pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: u32) -> HashSet<NodeIndex> {
+    pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: usize) -> HashSet<NodeIndex> {
         let me = self.global_addr().index();
         let mut actual_to_nodes = HashSet::new();
         for ni in &to_nodes {
@@ -426,18 +426,18 @@ impl Node {
     /// The id to be assigned to the next outgoing packet.
     pub fn next_packet_id(&self) -> PacketId {
         let me = self.global_addr();
-        let label = (self.buffer.len() as u32) + 1;
+        let label = self.buffer.len() + 1;
         PacketId::new(label, me)
     }
 
     /// Resume sending messages to this node at the label.
-    pub fn resume_at(&mut self, node: NodeIndex, label: u32) {
+    pub fn resume_at(&mut self, node: NodeIndex, label: usize) {
         self.next_packet_to_send.insert(node, Some(label));
     }
 
     /// Replace an incoming connection from `old` with `new`.
     /// Returns the label of the next message expected from the new connection.
-    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> u32 {
+    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> usize {
         let label = self.last_packet_received.remove(&old).unwrap_or(1);
         self.last_packet_received.insert(new, label);
         label + 1

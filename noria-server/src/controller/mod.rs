@@ -1389,7 +1389,7 @@ impl Executor for OutOfBand {
         self.back.entry(id.token).or_default().push(id.tag);
     }
 
-    fn send_resume_at(&mut self, node: NodeIndex, child: NodeIndex, label: u32) {
+    fn send_resume_at(&mut self, node: NodeIndex, child: NodeIndex, label: usize) {
         self.ctrl_tx
             .unbounded_send(CoordinationPayload::SendResumeAt { node, child, label })
             .expect("asked to send to controller, but controller has gone away");
