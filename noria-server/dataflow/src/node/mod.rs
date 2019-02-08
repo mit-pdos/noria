@@ -37,7 +37,7 @@ pub struct Node {
     /// The next packet to send to each child, where the key DNE if waiting for a ResumeAt
     pub next_packet_to_send: HashMap<NodeIndex, usize>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
-    buffer: Vec<HashSet<NodeIndex>>,
+    buffer: Vec<(Box<Packet>, HashSet<NodeIndex>)>,
 }
 
 // constructors
@@ -402,7 +402,11 @@ impl Node {
     /// Note that it's ok for next packet to send to be ahead of the packets that have actually
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
-    pub fn send_packet(&mut self, to_nodes: HashSet<NodeIndex>, label: usize) -> HashSet<NodeIndex> {
+    pub fn send_packet(
+        &mut self,
+        to_nodes: HashSet<NodeIndex>,
+        m: Box<Packet>,
+    ) -> HashSet<NodeIndex> {
         // the actual nodes to send to are any where the next packet to send label exists
         let actual_to_nodes = to_nodes
             .iter()
@@ -411,8 +415,9 @@ impl Node {
             .collect::<HashSet<NodeIndex>>();
 
         // push the packet payload and target to-nodes to the buffer
+        let label = m.get_id().label();
         assert_eq!(label, self.buffer.len() + 1, "outgoing labels increase sequentially");
-        self.buffer.push(to_nodes);
+        self.buffer.push((m, to_nodes));
 
         for ni in &actual_to_nodes {
             // update next packet to send
@@ -421,7 +426,7 @@ impl Node {
 
             // any skipped packets from [old_label, label) shouldn't have been sent to ni anyway
             for i in old_label..label {
-                assert!(!self.buffer[i - 1].contains(ni));
+                assert!(!self.buffer[i - 1].1.contains(ni));
             }
         }
 
@@ -437,14 +442,14 @@ impl Node {
 
     /// Resume sending messages to this node at the label.
     /// Returns a list of packets to send to this node to get it up to date.
-    pub fn resume_at(&mut self, node: NodeIndex, label: usize) -> Vec<usize> {
+    pub fn resume_at(&mut self, node: NodeIndex, label: usize) -> Vec<Box<Packet>> {
         let mut packets = Vec::new();
         let max_label = self.buffer.len() + 1;
 
         for i in label..max_label {
-            // TODO(ygina): actual payload
-            if self.buffer[label - 1].contains(&node) {
-                packets.push(i);
+            let (m, to_nodes) = &self.buffer[i - 1];
+            if to_nodes.contains(&node) {
+                packets.push(box m.clone_data());
             }
         }
 

@@ -36,7 +36,10 @@ impl Node {
             NodeType::Egress(Some(ref e)) => {
                 let pid = self.next_packet_id();
                 m.as_mut().unwrap().set_id(pid);
-                Some(self.send_packet(e.get_tx_nodes(), pid.label()))
+                Some(self.send_packet(
+                    e.get_tx_nodes(),
+                    m.as_ref().map(|m| box m.clone_data()).unwrap()
+                ))
             },
             _ => None,
         };

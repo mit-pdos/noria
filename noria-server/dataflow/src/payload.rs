@@ -280,6 +280,14 @@ pub enum Packet {
 }
 
 impl Packet {
+    pub fn get_id(&self) -> PacketId {
+        match *self {
+            Packet::Message { id, .. } => id,
+            Packet::ReplayPiece { id, .. } => id,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn set_id(&mut self, new_id: PacketId) {
         match *self {
             Packet::Message { ref mut id, .. } => *id = new_id,
