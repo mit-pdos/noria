@@ -264,11 +264,6 @@ pub enum Packet {
 
     // Recovery messages
     //
-    /// Initiate the recovery process for a top or bottom replica
-    MakeRecovery {
-        node: LocalNodeIndex,
-    },
-
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
         to: LocalNodeIndex,
