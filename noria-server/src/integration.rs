@@ -2353,7 +2353,7 @@ fn recover_from_losing_bottom_replica() {
 
     // start a worker for each domain in the graph
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), true);
+    let mut g = build_authority("worker-0", authority.clone(), false);
     let g1 = build_authority("worker-1", authority.clone(), false);
     let g2 = build_authority("worker-2", authority.clone(), false);
     sleep();
@@ -2382,6 +2382,4 @@ fn recover_from_losing_bottom_replica() {
     // wait for recovery and observe the writes
     thread::sleep(Duration::from_secs(10));
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 8.into()]]);
-
-    loop {}
 }

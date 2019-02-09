@@ -1368,7 +1368,12 @@ impl Domain {
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
                         assert!(node.borrow().is_egress());
-                        let packets = node.borrow_mut().resume_at(child, label);
+                        node.borrow_mut().resume_at(
+                            child,
+                            label,
+                            self.shard,
+                            sends,
+                        );
 
                         debug!(
                             self.log,
@@ -1377,10 +1382,6 @@ impl Domain {
                             "child" => child.index(),
                             "label" => label,
                         );
-
-                        // TODO(ygina): catch up the child with any missed messages from the
-                        // given label up to the current label
-                        println!("catch up these packets: {:?}", packets);
                     },
                     _ => unreachable!(),
                 }

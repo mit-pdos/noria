@@ -101,7 +101,7 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref mut e)) => {
-                e.process(m, on_shard.unwrap_or(0), output, to_nodes.unwrap());
+                e.process(m, on_shard.unwrap_or(0), output, &to_nodes.unwrap());
                 (vec![], HashSet::new())
             }
             NodeType::Sharder(ref mut s) => {
@@ -277,7 +277,7 @@ impl Node {
                     })),
                     on_shard.unwrap_or(0),
                     output,
-                    HashSet::new(),  // TODO(ygina): evictions
+                    &HashSet::new(),  // TODO(ygina): evictions
                 );
             }
             NodeType::Sharder(ref mut s) => {

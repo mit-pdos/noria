@@ -73,7 +73,7 @@ impl Egress {
         m: &mut Option<Box<Packet>>,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-        to_nodes: HashSet<NodeIndex>,
+        to_nodes: &HashSet<NodeIndex>,
     ) {
         let &mut Self {
             ref mut txs,

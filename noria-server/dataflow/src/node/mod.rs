@@ -2,7 +2,8 @@ use domain;
 use ops;
 use petgraph;
 use prelude::*;
-use std::collections::{HashMap, HashSet};
+use fnv::FnvHashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 
 mod process;
@@ -440,21 +441,41 @@ impl Node {
         PacketId::new(label, me)
     }
 
-    /// Resume sending messages to this node at the label.
-    /// Returns a list of packets to send to this node to get it up to date.
-    pub fn resume_at(&mut self, node: NodeIndex, label: usize) -> Vec<Box<Packet>> {
-        let mut packets = Vec::new();
-        let max_label = self.buffer.len() + 1;
-
-        for i in label..max_label {
-            let (m, to_nodes) = &self.buffer[i - 1];
-            if to_nodes.contains(&node) {
-                packets.push(box m.clone_data());
-            }
-        }
-
-        self.next_packet_to_send.insert(node, max_label);
-        packets
+    /// Resume sending messages to this node at the label after getting that node up to date.
+    pub fn resume_at(
+        &mut self,
+        node: NodeIndex,
+        label: usize,
+        on_shard: Option<usize>,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        match self.inner {
+            NodeType::Egress(Some(ref mut e)) => {
+                let max_label = self.buffer.len() + 1;
+                let to_nodes = {
+                    let mut hs = HashSet::new();
+                    hs.insert(node);
+                    hs
+                };
+                for i in label..max_label {
+                    // TODO(ygina): ignore to nodes, which i think only matter when a packet is sent
+                    // as part of a replay from a node with multiple children
+                    // let (m, to_nodes) = &self.buffer[i - 1];
+                    // if to_nodes.contains(&node) {
+                    //     packets.push(box m.clone_data());
+                    // }
+                    let (m, _) = &self.buffer[i - 1];
+                    e.process(
+                        &mut Some(box m.clone_data()),
+                        on_shard.unwrap_or(0),
+                        output,
+                        &to_nodes,
+                    );
+                }
+                self.next_packet_to_send.insert(node, max_label);
+            },
+            _ => unreachable!(),
+        };
     }
 
     /// Replace an incoming connection from `old` with `new`.
