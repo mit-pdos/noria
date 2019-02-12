@@ -393,45 +393,51 @@ impl Node {
         assert!(label > old_label.unwrap_or(0));
     }
 
-    /// Stores the outgoing packet payload and target to-nodes in the buffer.
-    ///
-    /// We track this information in case we need to resend messages on recovery. To-nodes must be
-    /// children and labels must increase sequentially. Returns a subset of target to-nodes, which
-    /// is the list of nodes to actually send to. If a node is not listed, we must wait for a
-    /// ResumeAt message from that node to resume sending messages.
+    /// Stores the packet payload and who the packet is for in the buffer. We only send nodes to
+    /// our children. Returns whether we should actually send the packet -- if not a success, we
+    /// are probably waiting for a ResumeAt message from that node.
     ///
     /// Note that it's ok for next packet to send to be ahead of the packets that have actually
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
-    pub fn send_packet(
-        &mut self,
-        to_nodes: HashSet<NodeIndex>,
-        m: Box<Packet>,
-    ) -> HashSet<NodeIndex> {
-        // the actual nodes to send to are any where the next packet to send label exists
-        let actual_to_nodes = to_nodes
-            .iter()
-            .filter(|ni| self.next_packet_to_send.get(ni).is_some())
-            .map(|&ni| ni)
-            .collect::<HashSet<NodeIndex>>();
+    pub fn send_external_packet(&mut self, m: &Box<Packet>, to: NodeIndex) -> bool {
+        assert_eq!(m.get_id().from(), self.global_addr());
 
         // push the packet payload and target to-nodes to the buffer
         let label = m.get_id().label();
-        assert_eq!(label, self.buffer.len() + 1, "outgoing labels increase sequentially");
-        self.buffer.push((m, to_nodes));
-
-        for ni in &actual_to_nodes {
-            // update next packet to send
-            println!("{} SEND #{} to {:?}", self.global_addr().index(), label, ni);
-            let old_label = self.next_packet_to_send.insert(*ni, label + 1).unwrap();
-
-            // any skipped packets from [old_label, label) shouldn't have been sent to ni anyway
-            for i in old_label..label {
-                assert!(!self.buffer[i - 1].1.contains(ni));
-            }
+        if label > self.buffer.len() {
+            let mut to_nodes = HashSet::new();
+            to_nodes.insert(to);
+            assert_eq!(label, self.buffer.len() + 1, "outgoing labels increase sequentially");
+            self.buffer.push((box m.clone_data(), to_nodes));
+        } else {
+            self.buffer.get_mut(label - 1).unwrap().1.insert(to);
         }
 
-        actual_to_nodes
+        // update internal state if we should send the packet
+        if let Some(old_label) = self.next_packet_to_send.get(&to) {
+            // any skipped packets from [old_label, label) shouldn't have been sent to ni anyway
+            for i in *old_label..label {
+                assert!(!self.buffer.get(i - 1).unwrap().1.contains(&to));
+            }
+
+            println!("{} SEND #{} to {:?}", self.global_addr().index(), label, to);
+            self.next_packet_to_send.insert(to, label + 1);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Like send_external_packet, except the packet is to a node in the same domain, and is
+    /// always successful.
+    pub fn send_internal_packet(
+        &mut self,
+        m: &Box<Packet>,
+        to: LocalNodeIndex,
+        nodes: &DomainNodes,
+    ) {
+        assert!(self.send_external_packet(m, nodes[to].borrow().global_addr()));
     }
 
     /// The id to be assigned to the next outgoing packet.

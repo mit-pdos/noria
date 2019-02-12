@@ -30,20 +30,6 @@ impl Node {
             _ => unreachable!(),
         };
 
-        // Egress and sharder nodes will forward the packet, so we need to generate a packet id.
-        // TODO(ygina): sharders
-        let to_nodes = match self.inner {
-            NodeType::Egress(Some(ref e)) => {
-                let pid = self.next_packet_id();
-                m.as_mut().unwrap().set_id(pid);
-                Some(self.send_packet(
-                    e.get_tx_nodes(),
-                    m.as_ref().map(|m| box m.clone_data()).unwrap()
-                ))
-            },
-            _ => None,
-        };
-
         let addr = self.local_addr();
         match self.inner {
             NodeType::Ingress => {
@@ -100,8 +86,20 @@ impl Node {
                 (vec![], HashSet::new())
             }
             NodeType::Egress(None) => unreachable!(),
-            NodeType::Egress(Some(ref mut e)) => {
-                e.process(m, on_shard.unwrap_or(0), output, &to_nodes.unwrap());
+            NodeType::Egress(Some(ref e)) => {
+                let pid = self.next_packet_id();
+                m.as_mut().unwrap().set_id(pid);
+
+                let to_nodes = e
+                    .get_tx_nodes()
+                    .iter()
+                    .filter(|&&ni| {
+                        self.send_external_packet(m.as_ref().unwrap(), ni)
+                    })
+                    .map(|&ni| ni)
+                    .collect::<HashSet<NodeIndex>>();
+
+                self.with_egress_mut(|e| e.process(m, on_shard.unwrap_or(0), output, &to_nodes));
                 (vec![], HashSet::new())
             }
             NodeType::Sharder(ref mut s) => {
