@@ -556,14 +556,6 @@ impl Node {
         }
     }
 
-    pub fn is_aggregator(&self) -> bool {
-        if let NodeType::Internal(ops::NodeOperator::Sum(..)) = self.inner {
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn is_sender(&self) -> bool {
         match self.inner {
             NodeType::Egress { .. } | NodeType::Sharder(..) => true,

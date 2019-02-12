@@ -480,12 +480,7 @@ impl Domain {
         }
     }
 
-    fn dispatch(
-        &mut self,
-        m: Box<Packet>,
-        sends: &mut EnqueuedSends,
-        executor: &mut Executor,
-    ) {
+    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut Executor) {
         let src = m.src();
         let me = m.dst();
 
@@ -1611,12 +1606,7 @@ impl Domain {
         }
     }
 
-    fn handle_replay(
-        &mut self,
-        m: Box<Packet>,
-        sends: &mut EnqueuedSends,
-        ex: &mut Executor,
-    ) {
+    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
             .borrow()
