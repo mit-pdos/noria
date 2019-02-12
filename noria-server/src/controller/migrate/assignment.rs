@@ -133,7 +133,7 @@ pub fn assign(
                     }
                     stack.extend(graph.neighbors_directed(p, petgraph::EdgeDirection::Incoming));
                 }
-                return false;
+                false
             };
 
             let parents: Vec<_> = graph

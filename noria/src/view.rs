@@ -30,19 +30,25 @@ pub struct ViewEndpoint(SocketAddr);
 impl Service<()> for ViewEndpoint {
     type Response = multiplex::MultiplexTransport<Transport, Tagger>;
     type Error = tokio::io::Error;
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error> + Send>;
+    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
+    existential type Future: Future<
+        Item = multiplex::MultiplexTransport<Transport, Tagger>,
+        Error = tokio::io::Error,
+    >;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(Async::Ready(()))
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
-        Box::new(
-            tokio::net::TcpStream::connect(&self.0)
-                .map(AsyncBincodeStream::from)
-                .map(AsyncBincodeStream::for_async)
-                .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default())),
-        )
+        tokio::net::TcpStream::connect(&self.0)
+            .and_then(|s| {
+                s.set_nodelay(true)?;
+                Ok(s)
+            })
+            .map(AsyncBincodeStream::from)
+            .map(AsyncBincodeStream::for_async)
+            .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default()))
     }
 }
 
@@ -138,7 +144,7 @@ impl ViewBuilder {
         &self,
         rpcs: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
     ) -> impl Future<Item = View, Error = io::Error> + Send {
-        let node = self.node.clone();
+        let node = self.node;
         let columns = self.columns.clone();
         let shards = self.shards.clone();
         let schema = self.schema.clone();
@@ -210,8 +216,8 @@ impl fmt::Debug for View {
 impl Service<(Vec<Vec<DataType>>, bool)> for View {
     type Response = Vec<Datas>;
     type Error = ViewError;
-    // existential once https://github.com/rust-lang/rust/issues/53443 is fixed
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error> + Send>;
+    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
+    existential type Future: Future<Item = Vec<Datas>, Error = ViewError>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         for s in &mut self.shards {
@@ -230,37 +236,35 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
         }
 
         let node = self.node;
-        Box::new(
-            futures::stream::futures_ordered(
-                self.shards
-                    .iter_mut()
-                    .enumerate()
-                    .zip(shard_queries.into_iter())
-                    .filter(|&(_, ref shard_queries)| !shard_queries.is_empty())
-                    .map(move |((shardi, shard), shard_queries)| {
-                        shard
-                            .call(
-                                ReadQuery::Normal {
-                                    target: (node, shardi),
-                                    keys: shard_queries,
-                                    block,
-                                }
-                                .into(),
-                            )
-                            .map_err(ViewError::from)
-                            .and_then(|reply| match reply.v {
-                                ReadReply::Normal(Ok(rows)) => Ok(rows),
-                                ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
-                                _ => unreachable!(),
-                            })
-                    }),
-            )
-            .concat2(),
+        futures::stream::futures_ordered(
+            self.shards
+                .iter_mut()
+                .enumerate()
+                .zip(shard_queries.into_iter())
+                .filter(|&(_, ref shard_queries)| !shard_queries.is_empty())
+                .map(move |((shardi, shard), shard_queries)| {
+                    shard
+                        .call(
+                            ReadQuery::Normal {
+                                target: (node, shardi),
+                                keys: shard_queries,
+                                block,
+                            }
+                            .into(),
+                        )
+                        .map_err(ViewError::from)
+                        .and_then(|reply| match reply.v {
+                            ReadReply::Normal(Ok(rows)) => Ok(rows),
+                            ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
+                            _ => unreachable!(),
+                        })
+                }),
         )
+        .concat2()
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::len_without_is_empty))]
+#[allow(clippy::len_without_is_empty)]
 impl View {
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
@@ -374,6 +378,7 @@ macro_rules! sync {
     };
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl SyncView {
     /// See [`View::len`].
     pub fn len(&mut self) -> Result<usize, ViewError> {

@@ -34,24 +34,30 @@ pub struct TableEndpoint(SocketAddr);
 impl Service<()> for TableEndpoint {
     type Response = multiplex::MultiplexTransport<Transport, Tagger>;
     type Error = tokio::io::Error;
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error> + Send>;
+    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
+    existential type Future: Future<
+        Item = multiplex::MultiplexTransport<Transport, Tagger>,
+        Error = tokio::io::Error,
+    >;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(Async::Ready(()))
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
-        Box::new(
-            tokio::net::TcpStream::connect(&self.0)
-                .map(|mut s| {
-                    s.write_all(&[CONNECTION_FROM_BASE]).unwrap();
-                    s.flush().unwrap();
-                    s
-                })
-                .map(AsyncBincodeStream::from)
-                .map(AsyncBincodeStream::for_async)
-                .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default())),
-        )
+        tokio::net::TcpStream::connect(&self.0)
+            .and_then(|s| {
+                s.set_nodelay(true)?;
+                Ok(s)
+            })
+            .map(|mut s| {
+                s.write_all(&[CONNECTION_FROM_BASE]).unwrap();
+                s.flush().unwrap();
+                s
+            })
+            .map(AsyncBincodeStream::from)
+            .map(AsyncBincodeStream::for_async)
+            .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default()))
     }
 }
 
@@ -257,8 +263,8 @@ impl fmt::Debug for Table {
 impl Service<Input> for Table {
     type Error = TableError;
     type Response = <TableRpc as Service<Tagged<LocalOrNot<Input>>>>::Response;
-    // existential once https://github.com/rust-lang/rust/issues/53443 is fixed
-    type Future = Box<Future<Item = Tagged<()>, Error = Self::Error> + Send>;
+    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
+    existential type Future: Future<Item = Tagged<()>, Error = TableError>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         for s in &mut self.shards {
@@ -273,8 +279,7 @@ impl Service<Input> for Table {
         // TODO: check each row's .len() against self.columns.len() -> WrongColumnCount
 
         if self.shards.len() == 1 {
-            // when Box goes away, this becomes future::Either::A
-            Box::new(
+            future::Either::A(
                 self.shards[0]
                     .call(
                         if self.dst_is_local {
@@ -333,8 +338,7 @@ impl Service<Input> for Table {
                 }
             }
 
-            // when Box goes away, this becomes future::Either::B
-            Box::new(
+            future::Either::B(
                 wait_for
                     .fold((), |_, _| Ok(()))
                     .map_err(TableError::from)
@@ -354,7 +358,7 @@ impl Service<TableOperation> for Table {
     }
 
     fn call(&mut self, op: TableOperation) -> Self::Future {
-        let i = self.prep_records(vec![op.into()]);
+        let i = self.prep_records(vec![op]);
         <Table as Service<Input>>::call(self, i)
     }
 }
@@ -483,29 +487,26 @@ impl Table {
     fn quick_n_dirty<Request>(
         self,
         r: Request,
-    ) -> Box<Future<Item = Self, Error = AsyncTableError> + Send>
+    ) -> impl Future<Item = Table, Error = AsyncTableError> + Send
     where
         Request: Send + 'static,
         Self: Service<Request, Error = TableError>,
         <Self as Service<Request>>::Future: Send,
     {
-        // Box is needed for https://github.com/rust-lang/rust/issues/53984
-        Box::new(
-            self.ready()
-                .map_err(|e| match e {
-                    TableError::TransportError(e) => AsyncTableError::from(e),
-                    e => unreachable!("{:?}", e),
+        self.ready()
+            .map_err(|e| match e {
+                TableError::TransportError(e) => AsyncTableError::from(e),
+                e => unreachable!("{:?}", e),
+            })
+            .and_then(move |mut svc| {
+                svc.call(r).then(move |r| match r {
+                    Ok(_) => Ok(svc),
+                    Err(e) => Err(AsyncTableError {
+                        table: Some(svc),
+                        error: e,
+                    }),
                 })
-                .and_then(move |mut svc| {
-                    svc.call(r).then(move |r| match r {
-                        Ok(_) => Ok(svc),
-                        Err(e) => Err(AsyncTableError {
-                            table: Some(svc),
-                            error: e,
-                        }),
-                    })
-                }),
-        )
+            })
     }
 
     /// Insert a single row of data into this base table.
@@ -552,25 +553,25 @@ impl Table {
 
         if key.len() != self.key.len() {
             let error = TableError::WrongKeyColumnCount(self.key.len(), key.len());
-            return Box::new(future::err(AsyncTableError {
+            return future::Either::A(future::err(AsyncTableError {
                 table: Some(self),
                 error,
-            })) as Box<_>;
+            }));
         }
 
         let mut set = vec![Modification::None; self.columns.len()];
         for (coli, m) in u {
             if coli >= self.columns.len() {
                 let error = TableError::WrongColumnCount(self.columns.len(), coli + 1);
-                return Box::new(future::err(AsyncTableError {
+                return future::Either::A(future::err(AsyncTableError {
                     table: Some(self),
                     error,
-                })) as Box<_>;
+                }));
             }
             set[coli] = m;
         }
 
-        self.quick_n_dirty(TableOperation::Update { key, set })
+        future::Either::B(self.quick_n_dirty(TableOperation::Update { key, set }))
     }
 
     /// Perform a insert-or-update on this base table.
@@ -581,7 +582,7 @@ impl Table {
         self,
         insert: Vec<DataType>,
         update: V,
-    ) -> Box<Future<Item = Self, Error = AsyncTableError> + Send>
+    ) -> impl Future<Item = Table, Error = AsyncTableError> + Send
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
@@ -592,7 +593,7 @@ impl Table {
 
         if insert.len() != self.columns.len() {
             let error = TableError::WrongColumnCount(self.columns.len(), insert.len());
-            return Box::new(future::err(AsyncTableError {
+            return future::Either::A(future::err(AsyncTableError {
                 table: Some(self),
                 error,
             }));
@@ -602,7 +603,7 @@ impl Table {
         for (coli, m) in update {
             if coli >= self.columns.len() {
                 let error = TableError::WrongColumnCount(self.columns.len(), coli + 1);
-                return Box::new(future::err(AsyncTableError {
+                return future::Either::A(future::err(AsyncTableError {
                     table: Some(self),
                     error,
                 }));
@@ -610,10 +611,10 @@ impl Table {
             set[coli] = m;
         }
 
-        self.quick_n_dirty(TableOperation::InsertOrUpdate {
+        future::Either::B(self.quick_n_dirty(TableOperation::InsertOrUpdate {
             row: insert,
             update: set,
-        })
+        }))
     }
 
     /// Trace the next modification to this base table.

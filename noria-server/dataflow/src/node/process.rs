@@ -6,7 +6,8 @@ use std::collections::{HashSet, VecDeque};
 use std::mem;
 
 impl Node {
-    pub(crate) fn process(
+    #[allow(clippy::too_many_arguments)]
+    crate fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
         keyed_by: Option<&Vec<usize>>,
@@ -126,7 +127,7 @@ impl Node {
                         (&mut Packet::ReplayPiece {
                             context: payload::ReplayPieceContext::Regular { last },
                             ..
-                        },) => ReplayContext::Full { last: last },
+                        },) => ReplayContext::Full { last },
                         _ => ReplayContext::None,
                     };
 
@@ -242,7 +243,7 @@ impl Node {
         }
     }
 
-    pub fn process_eviction(
+    crate fn process_eviction(
         &mut self,
         from: LocalNodeIndex,
         key_columns: &[usize],
@@ -322,7 +323,9 @@ fn reroute_miss(nodes: &DomainNodes, miss: &mut Miss) {
     }
 }
 
-pub fn materialize(rs: &mut Records, partial: Option<Tag>, state: Option<&mut Box<State>>) {
+#[allow(clippy::borrowed_box)]
+// crate visibility due to use by tests
+crate fn materialize(rs: &mut Records, partial: Option<Tag>, state: Option<&mut Box<State>>) {
     // our output changed -- do we need to modify materialized state?
     if state.is_none() {
         // nope
