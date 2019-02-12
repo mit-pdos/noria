@@ -381,11 +381,16 @@ impl Node {
         self.replica = Some(rt);
     }
 
-    /// Receive a packet from the given node.
-    ///
-    /// This node keeps track of the latest packet received from each parent so that if the parent
-    /// were to crash, we can tell the parent's replacement where to resume sending messages.
-    pub fn receive_packet(&mut self, from: NodeIndex, label: usize) {
+    /// Receive a packet, keeping track of the latest packet received from each parent. If the
+    /// parent crashes, we can tell the parent's replacement where to resume sending messages.
+    pub fn receive_packet(&mut self, m: &Box<Packet>) {
+        let (from, label) = match m {
+            box Packet::Input { .. } => { return; },  // ignore inputs from clients
+            box Packet::Message { id, .. } => (id.from(), id.label()),
+            box Packet::ReplayPiece { id, .. } => (id.from(), id.label()),
+            _ => unreachable!(),
+        };
+
         println!( "{} RECEIVE #{} from {:?}", self.global_addr().index(), label, from);
         let old_label = self.last_packet_received.insert(from, label);
 

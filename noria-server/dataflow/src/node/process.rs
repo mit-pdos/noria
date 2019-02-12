@@ -19,16 +19,7 @@ impl Node {
     ) -> (Vec<Miss>, HashSet<Vec<DataType>>) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
 
-        match m {
-            Some(box Packet::Input { .. }) => {},  // ignore inputs from clients
-            Some(box Packet::Message { id, .. }) => {
-                self.receive_packet(id.from(), id.label());
-            },
-            Some(box Packet::ReplayPiece { id, .. }) => {
-                self.receive_packet(id.from(), id.label());
-            },
-            _ => unreachable!(),
-        };
+        self.receive_packet(m.as_ref().unwrap());
 
         let addr = self.local_addr();
         match self.inner {
