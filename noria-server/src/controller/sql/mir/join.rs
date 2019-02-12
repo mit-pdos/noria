@@ -5,6 +5,7 @@ use mir::MirNodeRef;
 use nom_sql::ConditionTree;
 use std::collections::{HashMap, HashSet};
 
+
 struct JoinChain {
     tables: HashSet<String>,
     last_node: MirNodeRef,
@@ -46,7 +47,7 @@ pub fn make_joins(
 
     for jref in qg.join_order.iter() {
         let (join_type, jp) = from_join_ref(jref, &qg);
-        let (left_chain, right_chain) =
+        let (left_chain, right_chain, needs_merge) =
             pick_join_chains(&jref.src, &jref.dst, &mut join_chains, node_for_rel);
 
         let jn = mir_converter.make_join_node(
@@ -83,7 +84,7 @@ fn pick_join_chains(
     dst: &String,
     join_chains: &mut Vec<JoinChain>,
     node_for_rel: &HashMap<&str, MirNodeRef>,
-) -> (JoinChain, JoinChain) {
+) -> (JoinChain, JoinChain, bool) {
     let left_chain = match join_chains.iter().position(|chain| chain.has_table(src)) {
         Some(idx) => join_chains.swap_remove(idx),
         None => JoinChain {
@@ -100,5 +101,89 @@ fn pick_join_chains(
         },
     };
 
-    (left_chain, right_chain)
+    let distinct_chains = true;
+
+    (left_chain, right_chain, distinct_chains)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mir::node::{MirNode, MirNodeType};
+    use nom_sql::{self, ColumnSpecification, SqlType};
+    use mir::MirNodeRef;
+    use mir::Column;
+
+    fn make_nodes() -> (MirNodeRef, MirNodeRef, MirNodeRef) {
+        let cspec = |n: &str| -> (ColumnSpecification, Option<usize>) {
+            (
+                ColumnSpecification::new(nom_sql::Column::from(n), SqlType::Text),
+                None,
+            )
+        };
+        let a = MirNode::new(
+            "a",
+            0,
+            vec![Column::from("aa"), Column::from("ab")],
+            MirNodeType::Base {
+                column_specs: vec![cspec("aa"), cspec("ab")],
+                keys: vec![Column::from("aa")],
+                adapted_over: None,
+            },
+            vec![],
+            vec![],
+        );
+        let b = MirNode::new(
+            "b",
+            0,
+            vec![Column::from("aa"), Column::from("bb")],
+            MirNodeType::Base {
+                column_specs: vec![cspec("ba"), cspec("bb")],
+                keys: vec![Column::from("ba")],
+                adapted_over: None,
+            },
+            vec![],
+            vec![],
+        );
+        let c = MirNode::new(
+            "c",
+            0,
+            vec![Column::from("aa"), Column::from("ba")],
+            MirNodeType::Join {
+                on_left: vec![Column::from("ab")],
+                on_right: vec![Column::from("bb")],
+                project: vec![Column::from("aa"), Column::from("ba")],
+            },
+            vec![],
+            vec![],
+        );
+        (a, b, c)
+    }
+
+    #[test] // with just two tables reused, do the right thing
+    fn pick_two_chains() {
+        let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
+        let (base_a, base_b, join_ab) = make_nodes();
+        node_for_rel.insert("A", base_a);
+        node_for_rel.insert("B", base_b);
+        let mut join_chains = Vec::new();
+
+        // no chain stuff if we're joining a table with itself
+        let (_, _, needs_merge) = pick_join_chains(&"A".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!needs_merge);
+
+        // we do need to do stuff with a newly joined table
+        let (left_chain, right_chain, needs_merge) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        assert!(needs_merge);
+        let new_chain = left_chain.merge_chain(right_chain, join_ab.clone());
+        join_chains.push(new_chain);
+
+        // we don't need to do anything more if we join those again
+        let (_, _, needs_merge) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!needs_merge);
+
+        // including if we join them in opposite order
+        let (_, _, needs_merge) = pick_join_chains(&"B".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!needs_merge);
+    }
 }
