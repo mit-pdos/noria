@@ -6,6 +6,7 @@ use nom_sql::ConditionTree;
 use std::collections::{HashMap, HashSet};
 
 
+#[derive(Debug)]
 struct JoinChain {
     tables: HashSet<String>,
     last_node: MirNodeRef,
@@ -47,24 +48,31 @@ pub fn make_joins(
 
     for jref in qg.join_order.iter() {
         let (join_type, jp) = from_join_ref(jref, &qg);
-        let (left_chain, right_chain, needs_merge) =
+        let (left_chain, second_chain) =
             pick_join_chains(&jref.src, &jref.dst, &mut join_chains, node_for_rel);
 
-        let jn = mir_converter.make_join_node(
-            &format!("{}_n{}", name, node_count),
-            jp,
-            left_chain.last_node.clone(),
-            right_chain.last_node.clone(),
-            join_type,
-        );
+        match second_chain {
+            Some(right_chain) => {
+                let jn = mir_converter.make_join_node(
+                    &format!("{}_n{}", name, node_count),
+                    jp,
+                    left_chain.last_node.clone(),
+                    right_chain.last_node.clone(),
+                    join_type,
+                );
 
-        // merge node chains
-        let new_chain = left_chain.merge_chain(right_chain, jn.clone());
-        join_chains.push(new_chain);
+                // merge node chains
+                let new_chain = left_chain.merge_chain(right_chain, jn.clone());
+                join_chains.push(new_chain);
 
-        node_count += 1;
+                node_count += 1;
 
-        join_nodes.push(jn);
+                join_nodes.push(jn);
+            },
+            None => {
+                join_chains.push(left_chain);
+            }
+        };
     }
 
     join_nodes
@@ -84,7 +92,7 @@ fn pick_join_chains(
     dst: &String,
     join_chains: &mut Vec<JoinChain>,
     node_for_rel: &HashMap<&str, MirNodeRef>,
-) -> (JoinChain, JoinChain, bool) {
+) -> (JoinChain, Option<JoinChain>) {
     let left_chain = match join_chains.iter().position(|chain| chain.has_table(src)) {
         Some(idx) => join_chains.swap_remove(idx),
         None => JoinChain {
@@ -92,6 +100,10 @@ fn pick_join_chains(
             last_node: node_for_rel[src.as_str()].clone(),
         },
     };
+
+    if left_chain.has_table(dst) {
+        return (left_chain, None);
+    }
 
     let right_chain = match join_chains.iter().position(|chain| chain.has_table(dst)) {
         Some(idx) => join_chains.swap_remove(idx),
@@ -101,9 +113,7 @@ fn pick_join_chains(
         },
     };
 
-    let distinct_chains = true;
-
-    (left_chain, right_chain, distinct_chains)
+    (left_chain, Some(right_chain))
 }
 
 #[cfg(test)]
@@ -169,21 +179,30 @@ mod tests {
         let mut join_chains = Vec::new();
 
         // no chain stuff if we're joining a table with itself
-        let (_, _, needs_merge) = pick_join_chains(&"A".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!needs_merge);
+        let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!second_chain.is_some());
+        join_chains.push(left_chain);
 
         // we do need to do stuff with a newly joined table
-        let (left_chain, right_chain, needs_merge) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
-        assert!(needs_merge);
-        let new_chain = left_chain.merge_chain(right_chain, join_ab.clone());
-        join_chains.push(new_chain);
+        let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        match second_chain {
+            Some(right_chain) => {
+                let new_chain = left_chain.merge_chain(right_chain, join_ab.clone());
+                join_chains.push(new_chain);
+            },
+            None => {
+                assert!(false);
+            },
+        };
 
         // we don't need to do anything more if we join those again
-        let (_, _, needs_merge) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!needs_merge);
+        let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!second_chain.is_some());
+        join_chains.push(left_chain);
 
         // including if we join them in opposite order
-        let (_, _, needs_merge) = pick_join_chains(&"B".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!needs_merge);
+        let (left_chain, second_chain) = pick_join_chains(&"B".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
+        assert!(!second_chain.is_some());
+        join_chains.push(left_chain);
     }
 }
