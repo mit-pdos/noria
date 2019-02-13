@@ -519,7 +519,6 @@ impl MirNodeType {
     }
 
     fn can_reuse_as(&self, other: &MirNodeType) -> bool {
-        panic!("called can_reuse_as");
         match *self {
             MirNodeType::Reuse { .. } => (), // handled below
             _ => {
@@ -621,7 +620,7 @@ impl MirNodeType {
                         ref on_right,
                         ref project,
                     } => {
-                        panic!("Attempting to match Join nodes:\n \
+                        println!("Attempting to match Join nodes:\n \
                                 {:?},{:?},{:?} and\n \
                                 {:?},{:?},{:?}",
                                 our_on_left, our_on_right, our_project,
