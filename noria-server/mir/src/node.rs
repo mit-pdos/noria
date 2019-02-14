@@ -362,10 +362,10 @@ pub enum MirNodeType {
         separator: String,
         replica: bool,
     },
-    /// whether the identity is a bottom replica
-    Identity {
-        replica: bool,
-    },
+    /// no extra info required
+    Identity,
+    /// TODO(ygina): potential future node type
+    Replica,
     /// left node, right node, on left columns, on right columns, emit columns
     Join {
         on_left: Vec<Column>,
@@ -790,7 +790,8 @@ impl Debug for MirNodeType {
                 ref separator,
                 ..
             } => write!(f, "||([{}], \"{}\")", on.name, separator),
-            MirNodeType::Identity { .. } => write!(f, "≡"),
+            MirNodeType::Identity => write!(f, "≡"),
+            MirNodeType::Replica => write!(f, "???"),
             MirNodeType::Join {
                 ref on_left,
                 ref on_right,
