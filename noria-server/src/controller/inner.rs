@@ -360,7 +360,7 @@ impl ControllerInner {
         let mut new_failed: Vec<WorkerIdentifier> = Vec::new();
         let mut to_replace: Vec<(NodeIndex, NodeIndex)> = Vec::new();
         for worker in failed {
-            // detect which workers have exactly a bottom replica (and routing nodes)
+            // detect which workers have exactly a replica (and routing nodes)
             let nodes: Vec<NodeIndex> = self
                 .nodes_on_worker(Some(&worker))
                 .into_iter()
@@ -378,47 +378,74 @@ impl ControllerInner {
             let ni = nodes[0];
             match self.ingredients[ni].replica_type() {
                 Some(node::ReplicaType::Bottom{ top, .. }) => to_replace.push((ni, top)),
-                Some(node::ReplicaType::Top{ .. }) | None => new_failed.push(worker),
+                Some(node::ReplicaType::Top{ bottom, .. }) => to_replace.push((ni, bottom)),
+                None => new_failed.push(worker),
             }
         }
 
-        info!(self.log, "replacing failed bottom replicas: {:?}", to_replace);
-
-        // contact the worker with the top replica to start recovery
+        // contact the remaining replica to start recovery
         for (failed, replica) in to_replace {
-            // Create a connection between the top replica and the next nodes of the failed bottom
-            // replica. The top replica won't pre-emptively send messages to the next nodes even
-            // though there is a working connection until it receives a ResumeAt message.
-            let bottom_next_node = match self.ingredients[replica].replica_type() {
+            let (top, bottom) = match self.ingredients[replica].replica_type() {
                 Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
+                    info!(
+                        self.log,
+                        "replacing failed bottom replica";
+                        "bottom" => failed.index(),
+                        "top" => replica.index(),
+                    );
+
                     // TODO(ygina): multiple next nodes
                     assert_eq!(bottom_next_nodes.len(), 1);
-                    bottom_next_nodes[0]
+                    (replica, bottom_next_nodes[0])
                 },
-                Some(node::ReplicaType::Bottom{ .. }) | None => unimplemented!(),
+                Some(node::ReplicaType::Bottom{ top_prev_nodes, .. }) => {
+                    info!(
+                        self.log,
+                        "replacing failed top replica";
+                        "bottom" => replica.index(),
+                        "top" => failed.index(),
+                    );
+
+                    // TODO(ygina): multiple previous nodes
+                    assert_eq!(top_prev_nodes.len(), 1);
+                    (top_prev_nodes[0], replica)
+                },
+                None => unreachable!(),
             };
 
+            // Create a connection between the top and bottom nodes previously linked by the failed
+            // replica. The top nodes won't pre-emptively send messages to the bottom nodes even
+            // though there is a working connection until it receives a ResumeAt message.
             let new_egress = self
                 .ingredients
-                .neighbors_directed(replica, petgraph::EdgeDirection::Outgoing)
+                .neighbors_directed(top, petgraph::EdgeDirection::Outgoing)
                 .next()
                 .unwrap();
             let ingress = self
                 .ingredients
-                .neighbors_directed(bottom_next_node, petgraph::EdgeDirection::Incoming)
+                .neighbors_directed(bottom, petgraph::EdgeDirection::Incoming)
                 .next()
                 .unwrap();
 
             let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
             self.remove_nodes(&path[..]).unwrap();
 
-            // Notify the next nodes of this new incoming connection, including which node the
-            // replica is "replacing". In this case, the top replica is replacing the bottom one.
+            // For each new incoming connection, notify the bottom nodes which node was replaced
+            // with which node. The bottom nodes are responsible for sending a ResumeAt to these
+            // new incoming connections to start receiving messages.
             let old_egress = self
                 .ingredients
                 .neighbors_directed(failed, petgraph::EdgeDirection::Outgoing)
                 .next()
                 .unwrap();
+
+            debug!(
+                self.log,
+                "notifying {} of new incoming connection",
+                ingress.index();
+                "old" => old_egress.index(),
+                "new" => new_egress.index(),
+            );
 
             let domain = self.ingredients[ingress].domain();
             let dh = self.domains.get_mut(&domain).unwrap();
