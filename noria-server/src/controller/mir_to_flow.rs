@@ -2,6 +2,7 @@ use nom_sql::{
     ArithmeticBase, ArithmeticExpression, ColumnConstraint, ColumnSpecification, OrderType,
 };
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use crate::controller::Migration;
 use common::DataType;
@@ -577,10 +578,11 @@ fn make_replica_node(
     let parent_na = parent.borrow().flow_node_addr().unwrap();
     let column_names = column_names(columns);
 
+    let op = mig.mainline.ingredients[parent_na].deref();
     let node = mig.add_ingredient(
         String::from(name),
         column_names.as_slice(),
-        ops::replica::Replica::new(parent_na),
+        ops::replica::Replica::new(parent_na, box op.clone()),
     );
 
     let nodes = mig

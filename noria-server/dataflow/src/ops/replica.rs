@@ -5,12 +5,13 @@ use prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Replica {
     src: IndexPair,
+    op: Box<NodeOperator>,
 }
 
 impl Replica {
     /// Construct a new replica operator.
-    pub fn new(src: NodeIndex) -> Replica {
-        Replica { src: src.into() }
+    pub fn new(src: NodeIndex, op: Box<NodeOperator>) -> Replica {
+        Replica { src: src.into(), op }
     }
 }
 
