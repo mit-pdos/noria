@@ -9,6 +9,7 @@ use crate::controller::domain_handle::DomainHandle;
 use crate::controller::{
     inner::{graphviz, DomainReplies},
     keys,
+    migrate::materialization::plan::{DomainSegments, SetupReplayPath},
 };
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::prelude::*;
@@ -32,6 +33,7 @@ pub(in crate::controller) struct Materializations {
     partial: HashSet<NodeIndex>,
     partial_enabled: bool,
 
+    segments: DomainSegments,
     tag_generator: AtomicUsize,
 }
 
@@ -47,7 +49,16 @@ impl Materializations {
             partial: HashSet::default(),
             partial_enabled: true,
 
+            segments: Default::default(),
             tag_generator: AtomicUsize::default(),
+        }
+    }
+
+    pub(in crate::controller) fn get_segments(&self, d: DomainIndex) -> Vec<Box<SetupReplayPath>> {
+        if let Some(segments) = self.segments.get(&d) {
+            segments.to_vec()
+        } else {
+            vec![]
         }
     }
 
@@ -826,7 +837,7 @@ impl Materializations {
         }
 
         // construct and disseminate a plan for each index
-        let pending = {
+        let (pending, segments) = {
             let mut plan = plan::Plan::new(self, graph, ni, domains, workers);
             for index in index_on.drain() {
                 plan.add(index, replies);
@@ -864,6 +875,10 @@ impl Materializations {
             );
 
             replies.wait_for_acks(&domains[&target]);
+        }
+
+        for (domain, mut paths) in segments {
+            self.segments.entry(domain).or_insert(Vec::new()).append(&mut paths);
         }
     }
 }

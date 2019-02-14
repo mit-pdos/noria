@@ -6,6 +6,49 @@ use dataflow::payload::{ReplayPathSegment, SourceSelection, TriggerEndpoint};
 use dataflow::prelude::*;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
+crate struct SetupReplayPath {
+    tag: Tag,
+    source: Option<LocalNodeIndex>,
+    path: Vec<ReplayPathSegment>,
+    notify_done: bool,
+    trigger: TriggerEndpoint,
+}
+
+crate type DomainSegments = HashMap<DomainIndex, Vec<Box<SetupReplayPath>>>;
+
+impl SetupReplayPath {
+    // TODO(ygina): trigger might not be right for sending to a replaced domain for a failed node
+    pub(crate) fn from_packet(m: &Box<Packet>) -> Box<SetupReplayPath> {
+        match **m {
+            Packet::SetupReplayPath {
+                tag,
+                source,
+                ref path,
+                notify_done,
+                ref trigger,
+            } => box SetupReplayPath {
+                tag,
+                source,
+                path: path.clone(),
+                notify_done,
+                trigger: trigger.clone(),
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn into_packet(self) -> Box<Packet> {
+        box Packet::SetupReplayPath {
+            tag: self.tag,
+            source: self.source,
+            path: self.path,
+            notify_done: self.notify_done,
+            trigger: self.trigger,
+        }
+    }
+}
+
 pub(super) struct Plan<'a> {
     m: &'a mut super::Materializations,
     graph: &'a Graph,
@@ -16,6 +59,7 @@ pub(super) struct Plan<'a> {
 
     tags: HashMap<Vec<usize>, Vec<(Tag, DomainIndex)>>,
     paths: HashMap<Tag, Vec<NodeIndex>>,
+    segments: DomainSegments,
     pending: Vec<PendingReplay>,
 }
 
@@ -48,6 +92,7 @@ impl<'a> Plan<'a> {
             pending: Vec::new(),
             tags: Default::default(),
             paths: Default::default(),
+            segments: Default::default(),
         }
     }
 
@@ -307,6 +352,11 @@ impl<'a> Plan<'a> {
                     }
                 }
 
+                self.segments
+                    .entry(domain)
+                    .or_insert(Vec::new())
+                    .push(SetupReplayPath::from_packet(&setup));
+
                 if i != segments.len() - 1 {
                     // since there is a later domain, the last node of any non-final domain
                     // must either be an egress or a Sharder. If it's an egress, we need
@@ -354,8 +404,9 @@ impl<'a> Plan<'a> {
     /// re-indexing has to happen), whereas for new indices to partial views it should be nearly
     /// instantaneous.
     ///
-    /// Returns a list of backfill replays that need to happen before the migration is complete.
-    pub(super) fn finalize(mut self) -> Vec<PendingReplay> {
+    /// Returns a list of backfill replays that need to happen before the migration is complete
+    /// and the new replay segments for each domain.
+    pub(super) fn finalize(mut self) -> (Vec<PendingReplay>, DomainSegments) {
         use dataflow::payload::InitialState;
 
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
@@ -433,7 +484,7 @@ impl<'a> Plan<'a> {
         } else {
             assert!(self.pending.is_empty());
         }
-        self.pending
+        (self.pending, self.segments)
     }
 
     pub(super) fn on_join<'b>(

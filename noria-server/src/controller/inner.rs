@@ -406,6 +406,20 @@ impl ControllerInner {
                         "top" => failed.index(),
                     );
 
+                    let domain = self.ingredients[replica].domain();
+                    let dh = self.domains.get_mut(&domain).unwrap();
+
+                    // update replay paths
+                    debug!(self.log, "updating replay paths for replica {}", replica.index());
+
+                    // TODO(ygina): super hacky...assumes the domain being replaced and this domain
+                    // are exact copies down to the # of nodes and local node index assignment
+                    let failed_domain = self.ingredients[failed].domain();
+                    for segment in self.materializations.get_segments(failed_domain) {
+                        dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
+                    }
+                    // TODO(ygina): should also _remove_ the failed domain from materializations
+                    // TODO(ygina): wait for ack before actually linking nodes
                     // TODO(ygina): multiple previous nodes
                     assert_eq!(top_prev_nodes.len(), 1);
                     (top_prev_nodes[0], replica)
