@@ -13,6 +13,7 @@ crate use processing::{Miss, ProcessingResult, RawProcessingResult, ReplayContex
 crate type Edge = ();
 
 // dataflow types
+crate use node::ReplicaType;
 crate use noria::debug::trace::{PacketEvent, Tracer};
 crate use noria::Input;
 crate use payload::{ReplayPathSegment, SourceChannelIdentifier};

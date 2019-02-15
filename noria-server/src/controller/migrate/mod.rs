@@ -25,6 +25,7 @@ use dataflow::prelude::*;
 use dataflow::{node, prelude::Packet};
 use dataflow::node::ReplicaType;
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 
 use petgraph;
@@ -53,6 +54,7 @@ crate struct Migration<'a> {
     pub(super) linked: Vec<(NodeIndex, NodeIndex)>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
     pub(super) readers: HashMap<NodeIndex, NodeIndex>,
+    pub(super) replicas: Vec<(NodeIndex, NodeIndex)>,
 
     pub(super) start: Instant,
     pub(super) log: slog::Logger,
@@ -179,6 +181,15 @@ impl<'a> Migration<'a> {
         // insert it into the graph
         for parent in &parents {
             self.mainline.ingredients.add_edge(*parent, ni, ());
+        }
+
+        // if the node itself is a replica, add it to the migration
+        match *self.mainline.ingredients[ni] {
+            NodeOperator::Replica(_) => {
+                assert_eq!(parents.len(), 1);
+                self.replicas.push((ni, parents[0]));
+            },
+            _ => {},
         }
 
         // if any ancestor is a replica, update bottom_next_nodes for the ancestor's parent
@@ -514,6 +525,16 @@ impl<'a> Migration<'a> {
                         .on_commit(&remap);
                 }
             }
+        }
+
+        // The replica might become the node operator of its parent one day.
+        // We do it here after its parent is assigned a local index.
+        for &(replica, parent) in &self.replicas {
+            let op = mainline.ingredients[parent].deref().clone();
+            match mainline.ingredients[replica].deref_mut() {
+                NodeOperator::Replica(ref mut r) => r.set_op(box op),
+                _ => unreachable!(),
+            };
         }
 
         if let Some(shards) = mainline.sharding {

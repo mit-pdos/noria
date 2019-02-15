@@ -265,6 +265,12 @@ pub enum Packet {
 
     // Recovery messages
     //
+    /// Tell the node to become a full node operator, if appropriate, and to get rid of its
+    /// replica status
+    MakeRecovery {
+        node: LocalNodeIndex,
+    },
+
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
         to: LocalNodeIndex,

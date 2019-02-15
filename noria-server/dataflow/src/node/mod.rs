@@ -427,6 +427,19 @@ impl Node {
         self.replica = Some(rt);
     }
 
+    pub fn remove_replica_type(&mut self) {
+        assert!(self.replica.is_some());
+        self.replica = None;
+    }
+
+    pub fn into_full(&mut self) {
+        let op = match **self {
+            NodeOperator::Replica(ref mut r) => r.take_op(),
+            _ => unreachable!(),
+        };
+        self.inner = NodeType::Internal(*op);
+    }
+
     /// Receive a packet, keeping track of the latest packet received from each parent. If the
     /// parent crashes, we can tell the parent's replacement where to resume sending messages.
     pub fn receive_packet(&mut self, m: &Box<Packet>) {

@@ -427,6 +427,16 @@ impl ControllerInner {
                 None => unreachable!(),
             };
 
+            // Tell the replica that its partner replica has died. The node will no longer mark
+            // itself as a replica, and if it was a bottom replica, it will take the necessary
+            // steps to become a full node operator.
+            let domain = self.ingredients[replica].domain();
+            let dh = self.domains.get_mut(&domain).unwrap();
+            let m = box Packet::MakeRecovery {
+                node: self.ingredients[replica].local_addr(),
+            };
+            dh.send_to_healthy(m, &self.workers).unwrap();
+
             // Create a connection between the top and bottom nodes previously linked by the failed
             // replica. The top nodes won't pre-emptively send messages to the bottom nodes even
             // though there is a working connection until it receives a ResumeAt message.
@@ -794,6 +804,7 @@ impl ControllerInner {
             linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
+            replicas: Default::default(),
             context,
             start: time::Instant::now(),
             log: miglog,
@@ -817,6 +828,7 @@ impl ControllerInner {
             linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
+            replicas: Default::default(),
             context: Default::default(),
             start: time::Instant::now(),
             log: miglog,

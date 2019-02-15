@@ -1300,6 +1300,22 @@ impl Domain {
                     Packet::Spin => {
                         // spinning as instructed
                     },
+                    Packet::MakeRecovery { node } => {
+                        let node = &self.nodes[node];
+
+                        // become a node operator if it is a bottom replica
+                        let replica_type = node.borrow().replica_type();
+                        match replica_type {
+                            Some(ReplicaType::Bottom{ .. }) => {
+                                node.borrow_mut().into_full();
+                            },
+                            Some(ReplicaType::Top{ .. }) => {},
+                            None => unreachable!(),
+                        }
+
+                        // update internal replica type
+                        node.borrow_mut().remove_replica_type();
+                    },
                     Packet::NewIncoming { to, old, new } => {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection

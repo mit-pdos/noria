@@ -5,13 +5,21 @@ use prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Replica {
     src: IndexPair,
-    op: Box<NodeOperator>,
+    op: Option<Box<NodeOperator>>,
 }
 
 impl Replica {
     /// Construct a new replica operator.
-    pub fn new(src: NodeIndex, op: Box<NodeOperator>) -> Replica {
-        Replica { src: src.into(), op }
+    pub fn new(src: NodeIndex) -> Replica {
+        Replica { src: src.into(), op: None }
+    }
+
+    pub fn set_op(&mut self, op: Box<NodeOperator>) {
+        self.op = Some(op);
+    }
+
+    pub fn take_op(&mut self) -> Box<NodeOperator> {
+        self.op.take().expect("replica op should be set in migration")
     }
 }
 
