@@ -137,7 +137,7 @@ fn main() {
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/queries.sql")
+                .default_value("noria-benchmarks/piazza/post-queries.sql")
                 .help("Query file for Piazza application"),
         )
         .arg(
@@ -281,7 +281,7 @@ fn main() {
 
     // if partial, read 25% of the keys
     if partial {
-        let leaf = format!("posts");
+        let leaf = format!("post_count");
         let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
@@ -303,13 +303,13 @@ fn main() {
         println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
-        // if partial {
-        //     let leaf = format!("posts_u{}", i);
-        //     let mut getter = backend.g.view(&leaf).unwrap();
-        //     for author in 0..nusers / 4 {
-        //         getter.lookup(&[author.into()], false).unwrap();
-        //     }
-        // }
+        if partial {
+            let leaf = format!("posts_u{}", i);
+            let mut getter = backend.g.view(&leaf).unwrap();
+            for author in 0..nusers / 4 {
+                getter.lookup(&[author.into()], false).unwrap();
+            }
+        }
 
         if iloc.is_some() && i % 50 == 0 {
             use std::fs;
@@ -345,29 +345,6 @@ fn main() {
         dur,
         (num_at_once * nlogged) as f64 / dur,
     );
-
-
-    // if !partial {
-    //     let mut dur = time::Duration::from_millis(0);
-    //     for uid in 0..nlogged {
-    //         let leaf = format!("posts_u{}", uid);
-    //         let mut getter = backend.g.view(&leaf).unwrap();
-    //         let start = time::Instant::now();
-    //         for author in 0..nusers {
-    //             getter.lookup(&[author.into()], true).unwrap();
-    //         }
-    //         dur += start.elapsed();
-    //     }
-    //
-    //     let dur = dur_to_fsec!(dur);
-    //
-    //     println!(
-    //         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-    //         nlogged * nusers,
-    //         dur,
-    //         (nlogged * nusers) as f64 / dur,
-    //     );
-    // }
 
     println!("Done with benchmark.");
 

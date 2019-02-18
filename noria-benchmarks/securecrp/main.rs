@@ -109,7 +109,7 @@ fn main() {
             Arg::with_name("queries")
                 .short("q")
                 .required(true)
-                .default_value("noria-benchmarks/securecrp/jeeves_queries.sql")
+                .default_value("noria-benchmarks/securecrp/scraped_queries.sql")
                 .help("SQL query file"),
         )
         .arg(
@@ -197,6 +197,7 @@ fn main() {
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
+    println!("DONE!");
     // sleep "forever"
     thread::sleep(time::Duration::from_millis(200000000));
 }
