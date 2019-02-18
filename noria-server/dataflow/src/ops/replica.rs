@@ -54,8 +54,9 @@ impl Ingredient for Replica {
         }
     }
 
-    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
-        HashMap::new()
+    /// Suggest indexes to reflect the materialized state of its internal operator
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+        self.op.as_ref().unwrap().suggest_indexes(this)
     }
 
     fn resolve(&self, col: usize) -> Option<Vec<(NodeIndex, usize)>> {

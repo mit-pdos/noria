@@ -2388,7 +2388,7 @@ fn recover_from_losing_top_replica() {
 
     // start enough workers for the top replica to be assigned its own worker
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), true);
+    let mut g = build_authority("worker-0", authority.clone(), false);
     let g1 = build_authority("worker-1", authority.clone(), false);
     let g2 = build_authority("worker-2", authority.clone(), false);
     let g3 = build_authority("worker-3", authority.clone(), false);
