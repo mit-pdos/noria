@@ -58,7 +58,7 @@ impl Node {
 
                         // TODO(ygina): what happens with this packet?
                         *m = Some(Box::new(Packet::Message {
-                            id: PacketId::default(),
+                            id: None,
                             link: Link::new(dst, dst),
                             data: rs,
                             tracer,
@@ -79,19 +79,13 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref e)) => {
-                let pid = self.next_packet_id();
+                let pid = PacketId::new(e.next_packet_label(), self.global_addr());
                 m.as_mut().unwrap().set_id(pid);
 
-                let to_nodes = e
-                    .get_tx_nodes()
-                    .iter()
-                    .filter(|&&ni| {
-                        self.send_external_packet(m.as_ref().unwrap(), ni)
-                    })
-                    .map(|&ni| ni)
-                    .collect::<HashSet<NodeIndex>>();
-
-                self.with_egress_mut(|e| e.process(m, on_shard.unwrap_or(0), output, &to_nodes));
+                self.with_egress_mut(|e| {
+                    let to_nodes = e.send_packet(m.as_ref().unwrap());
+                    e.process(m, on_shard.unwrap_or(0), output, &to_nodes)
+                });
                 (vec![], HashSet::new())
             }
             NodeType::Sharder(ref mut s) => {

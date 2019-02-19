@@ -15,10 +15,13 @@ impl Ingress {
     /// Receive a packet, keeping track of the latest packet received from each parent. If the
     /// parent crashes, we can tell the parent's replacement where to resume sending messages.
     pub fn receive_packet(&mut self, m: &Box<Packet>) {
-        let (from, label) = match m {
-            box Packet::Message { id, .. } => (id.from(), id.label()),
-            box Packet::ReplayPiece { id, .. } => (id.from(), id.label()),
-            _ => unreachable!(),
+        let (from, label) = {
+            let id = match m {
+                box Packet::Message { id, .. } => id.unwrap(),
+                box Packet::ReplayPiece { id, .. } => id.unwrap(),
+                _ => unreachable!(),
+            };
+            (id.from(), id.label())
         };
 
         // println!( "{} RECEIVE #{} from {:?}", self.global_addr().index(), label, from);

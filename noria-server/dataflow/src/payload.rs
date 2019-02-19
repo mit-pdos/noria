@@ -115,7 +115,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
-        id: PacketId,
+        id: Option<PacketId>,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -123,7 +123,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
-        id: PacketId,
+        id: Option<PacketId>,
         link: Link,
         tag: Tag,
         data: Records,
@@ -289,16 +289,16 @@ pub enum Packet {
 impl Packet {
     crate fn get_id(&self) -> PacketId {
         match *self {
-            Packet::Message { id, .. } => id,
-            Packet::ReplayPiece { id, .. } => id,
+            Packet::Message { id, .. } => id.unwrap(),
+            Packet::ReplayPiece { id, .. } => id.unwrap(),
             _ => unreachable!(),
         }
     }
 
     crate fn set_id(&mut self, new_id: PacketId) {
         match *self {
-            Packet::Message { ref mut id, .. } => *id = new_id,
-            Packet::ReplayPiece { ref mut id, .. } => *id = new_id,
+            Packet::Message { ref mut id, .. } => *id = Some(new_id),
+            Packet::ReplayPiece { ref mut id, .. } => *id = Some(new_id),
             _ => unreachable!(),
         }
     }

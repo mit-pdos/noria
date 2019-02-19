@@ -2,8 +2,7 @@ use domain;
 use ops;
 use petgraph;
 use prelude::*;
-use fnv::FnvHashMap;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 
 mod process;
@@ -37,10 +36,6 @@ pub struct Node {
 
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
-    /// The next packet to send to each child, where the key DNE if waiting for a ResumeAt
-    pub next_packet_to_send: HashMap<NodeIndex, usize>,
-    /// The packet buffer with the payload and list of to-nodes, starts at 1
-    buffer: Vec<(Box<Packet>, HashSet<NodeIndex>)>,
 }
 
 // constructors
@@ -64,8 +59,6 @@ impl Node {
 
             sharded_by: Sharding::None,
             replica: None,
-            next_packet_to_send: HashMap::new(),
-            buffer: Vec::new(),
         }
     }
 
@@ -108,13 +101,6 @@ impl DanglingDomainNode {
             .filter(|&c| graph[c].domain() == dm)
             .map(|ni| graph[ni].local_addr())
             .collect();
-
-        let all_children = graph
-            .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
-            .map(|ni| graph[ni].global_addr());
-        for ni in all_children {
-            n.next_packet_to_send.insert(ni, 1);
-        }
 
         n
     }
@@ -445,97 +431,6 @@ impl Node {
             _ => unreachable!(),
         };
         self.inner = NodeType::Internal(*op);
-    }
-
-    /// Stores the packet payload and who the packet is for in the buffer. We only send nodes to
-    /// our children. Returns whether we should actually send the packet -- if not a success, we
-    /// are probably waiting for a ResumeAt message from that node.
-    ///
-    /// Note that it's ok for next packet to send to be ahead of the packets that have actually
-    /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
-    /// it is lost anyway on crash.
-    pub fn send_external_packet(&mut self, m: &Box<Packet>, to: NodeIndex) -> bool {
-        assert_eq!(m.get_id().from(), self.global_addr());
-
-        // push the packet payload and target to-nodes to the buffer
-        let label = m.get_id().label();
-        if label > self.buffer.len() {
-            let mut to_nodes = HashSet::new();
-            to_nodes.insert(to);
-            assert_eq!(label, self.buffer.len() + 1, "outgoing labels increase sequentially");
-            self.buffer.push((box m.clone_data(), to_nodes));
-        } else {
-            self.buffer.get_mut(label - 1).unwrap().1.insert(to);
-        }
-
-        // update internal state if we should send the packet
-        if let Some(old_label) = self.next_packet_to_send.get(&to) {
-            // any skipped packets from [old_label, label) shouldn't have been sent to ni anyway
-            for i in *old_label..label {
-                assert!(!self.buffer.get(i - 1).unwrap().1.contains(&to));
-            }
-
-            println!("{} SEND #{} to {:?}", self.global_addr().index(), label, to);
-            self.next_packet_to_send.insert(to, label + 1);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Like send_external_packet, except the packet is to a node in the same domain, and is
-    /// always successful.
-    pub fn send_internal_packet(
-        &mut self,
-        m: &Box<Packet>,
-        to: LocalNodeIndex,
-        nodes: &DomainNodes,
-    ) {
-        assert!(self.send_external_packet(m, nodes[to].borrow().global_addr()));
-    }
-
-    /// The id to be assigned to the next outgoing packet.
-    pub fn next_packet_id(&self) -> PacketId {
-        let me = self.global_addr();
-        let label = self.buffer.len() + 1;
-        PacketId::new(label, me)
-    }
-
-    /// Resume sending messages to this node at the label after getting that node up to date.
-    pub fn resume_at(
-        &mut self,
-        node: NodeIndex,
-        label: usize,
-        on_shard: Option<usize>,
-        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) {
-        match self.inner {
-            NodeType::Egress(Some(ref mut e)) => {
-                let max_label = self.buffer.len() + 1;
-                let to_nodes = {
-                    let mut hs = HashSet::new();
-                    hs.insert(node);
-                    hs
-                };
-                for i in label..max_label {
-                    // TODO(ygina): ignore to nodes, which i think only matter when a packet is sent
-                    // as part of a replay from a node with multiple children
-                    // let (m, to_nodes) = &self.buffer[i - 1];
-                    // if to_nodes.contains(&node) {
-                    //     packets.push(box m.clone_data());
-                    // }
-                    let (m, _) = &self.buffer[i - 1];
-                    e.process(
-                        &mut Some(box m.clone_data()),
-                        on_shard.unwrap_or(0),
-                        output,
-                        &to_nodes,
-                    );
-                }
-                self.next_packet_to_send.insert(node, max_label);
-            },
-            _ => unreachable!(),
-        };
     }
 }
 

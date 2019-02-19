@@ -642,9 +642,7 @@ impl Domain {
             ref m => unreachable!("dispatch process got {:?}", m),
         }
 
-        let pid = self.nodes[me].borrow().next_packet_id();
-        m.as_mut().unwrap().set_id(pid);
-
+        // TODO(ygina): forks and merges here -- what will happen to packet id?
         let nchildren = self.nodes[me].borrow().nchildren();
         for i in 0..nchildren {
             // avoid cloning if we can
@@ -670,7 +668,6 @@ impl Domain {
             }
             m.link_mut().dst = childi;
 
-            self.nodes[me].borrow_mut().send_internal_packet(&m, childi, &self.nodes);
             self.dispatch(m, sends, executor);
         }
     }
@@ -1063,7 +1060,7 @@ impl Domain {
                         // we may already have processed some other messages that are not yet a
                         // part of state.
                         let p = box Packet::ReplayPiece {
-                            id: self.nodes[link.src].borrow().next_packet_id(),
+                            id: None,
                             tag,
                             link,
                             context: ReplayPieceContext::Regular {
@@ -1071,10 +1068,6 @@ impl Domain {
                             },
                             data: Vec::<Record>::new().into(),
                         };
-
-                        self.nodes[link.src]
-                            .borrow_mut()
-                            .send_internal_packet(&p, link.dst, &self.nodes);
 
                         if !state.is_empty() {
                             let log = self.log.new(o!());
@@ -1139,7 +1132,7 @@ impl Domain {
                                         let len = chunk.len();
                                         let last = iter.peek().is_none();
                                         let p = box Packet::ReplayPiece {
-                                            id: PacketId::default(),
+                                            id: None,
                                             tag,
                                             link, // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
@@ -1343,13 +1336,13 @@ impl Domain {
                         // sanity check: the node "node" should be an egress node
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
-                        assert!(node.borrow().is_egress());
-                        node.borrow_mut().resume_at(
-                            child,
-                            label,
-                            self.shard,
-                            sends,
-                        );
+                        node.borrow_mut()
+                            .with_egress_mut(|e| e.resume_at(
+                                child,
+                                label,
+                                self.shard,
+                                sends,
+                            ));
 
                         debug!(
                             self.log,
@@ -1455,7 +1448,7 @@ impl Domain {
 
                 let m = if !keys.is_empty() {
                     let p = box Packet::ReplayPiece {
-                        id: self.nodes[source].borrow().next_packet_id(),
+                        id: None,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1464,10 +1457,6 @@ impl Domain {
                         },
                         data: rs.into(),
                     };
-
-                    self.nodes[source]
-                        .borrow_mut()
-                        .send_internal_packet(&p, path[0].node, &self.nodes);
 
                     Some(p)
                 } else {
@@ -1579,7 +1568,7 @@ impl Domain {
                     let data = Records::from_iter(rs.into_iter().map(|r| self.seed_row(source, r)));
 
                     let m = box Packet::ReplayPiece {
-                        id: self.nodes[source].borrow().next_packet_id(),
+                        id: None,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1588,10 +1577,6 @@ impl Domain {
                         },
                         data,
                     };
-
-                    self.nodes[source]
-                        .borrow_mut()
-                        .send_internal_packet(&m, path[0].node, &self.nodes);
 
                     (Some(m), source, None)
                 } else {
@@ -1751,19 +1736,7 @@ impl Domain {
                     };
                     let mut m = Some(m);
 
-                    let mut sender: Option<LocalNodeIndex> = None;
                     for (i, segment) in path.iter().enumerate() {
-                        if let Some(ni) = sender {
-                            let pid = self.nodes[ni].borrow().next_packet_id();
-                            m.as_mut().unwrap().set_id(pid);
-                            self.nodes[ni].borrow_mut().send_internal_packet(
-                                m.as_ref().unwrap(),
-                                segment.node,
-                                &self.nodes,
-                            );
-                        }
-                        sender = Some(segment.node);
-
                         let mut n = self.nodes[segment.node].borrow_mut();
                         let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
 
@@ -2215,15 +2188,11 @@ impl Domain {
             }
 
             let mut handled = 0;
-            while let Some(mut m) = buffered.pop_front() {
+            while let Some(m) = buffered.pop_front() {
                 // some updates were propagated to this node during the migration. we need to
                 // replay them before we take even newer updates. however, we don't want to
                 // completely block the domain data channel, so we only process a few backlogged
                 // updates before yielding to the main loop (which might buffer more things).
-
-                let pid = self.nodes[node].borrow().next_packet_id();
-                m.set_id(pid);
-                self.nodes[node].borrow_mut().send_internal_packet(&m, m.dst(), &self.nodes);
 
                 if let m @ box Packet::Message { .. } = m {
                     // NOTE: we specifically need to override the buffering behavior that our
