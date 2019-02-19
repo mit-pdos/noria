@@ -37,8 +37,6 @@ pub struct Node {
 
     sharded_by: Sharding,
     replica: Option<ReplicaType>,
-    /// The last packet received and processed from each parent
-    pub last_packet_received: HashMap<NodeIndex, usize>,
     /// The next packet to send to each child, where the key DNE if waiting for a ResumeAt
     pub next_packet_to_send: HashMap<NodeIndex, usize>,
     /// The packet buffer with the payload and list of to-nodes, starts at 1
@@ -66,7 +64,6 @@ impl Node {
 
             sharded_by: Sharding::None,
             replica: None,
-            last_packet_received: HashMap::new(),
             next_packet_to_send: HashMap::new(),
             buffer: Vec::new(),
         }
@@ -274,6 +271,16 @@ impl Node {
         }
     }
 
+    crate fn with_ingress_mut<'a, F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut special::Ingress) -> R,
+    {
+        match self.inner {
+            NodeType::Ingress(ref mut i) => f(i),
+            _ => unreachable!(),
+        }
+    }
+
     pub fn with_reader_mut<'a, F, R>(&'a mut self, f: F) -> Result<R, ()>
     where
         F: FnOnce(&'a mut special::Reader) -> R,
@@ -440,23 +447,6 @@ impl Node {
         self.inner = NodeType::Internal(*op);
     }
 
-    /// Receive a packet, keeping track of the latest packet received from each parent. If the
-    /// parent crashes, we can tell the parent's replacement where to resume sending messages.
-    pub fn receive_packet(&mut self, m: &Box<Packet>) {
-        let (from, label) = match m {
-            box Packet::Input { .. } => { return; },  // ignore inputs from clients
-            box Packet::Message { id, .. } => (id.from(), id.label()),
-            box Packet::ReplayPiece { id, .. } => (id.from(), id.label()),
-            _ => unreachable!(),
-        };
-
-        println!( "{} RECEIVE #{} from {:?}", self.global_addr().index(), label, from);
-        let old_label = self.last_packet_received.insert(from, label);
-
-        // labels are not necessarily sequential, but must be increasing
-        assert!(label > old_label.unwrap_or(0));
-    }
-
     /// Stores the packet payload and who the packet is for in the buffer. We only send nodes to
     /// our children. Returns whether we should actually send the packet -- if not a success, we
     /// are probably waiting for a ResumeAt message from that node.
@@ -547,14 +537,6 @@ impl Node {
             _ => unreachable!(),
         };
     }
-
-    /// Replace an incoming connection from `old` with `new`.
-    /// Returns the label of the next message expected from the new connection.
-    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> usize {
-        let label = self.last_packet_received.remove(&old).unwrap_or(0);
-        self.last_packet_received.insert(new, label);
-        label + 1
-    }
 }
 
 // is this or that?
@@ -584,7 +566,7 @@ impl Node {
     }
 
     pub fn is_ingress(&self) -> bool {
-        if let NodeType::Ingress = self.inner {
+        if let NodeType::Ingress(..) = self.inner {
             true
         } else {
             false

@@ -114,7 +114,7 @@ pub fn add(
 
             let ingress = ingress.unwrap_or_else(|| {
                 // we need to make a new ingress
-                let mut i = graph[parent].mirror(node::special::Ingress);
+                let mut i = graph[parent].mirror(node::special::Ingress::new());
 
                 // it belongs to this domain, not that of the parent
                 i.add_to(domain);

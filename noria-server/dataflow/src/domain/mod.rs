@@ -1320,8 +1320,9 @@ impl Domain {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection
                         let node = &self.nodes[to];
-                        assert!(node.borrow().is_ingress());
-                        let label = node.borrow_mut().new_incoming(old, new);
+                        let label = node
+                            .borrow_mut()
+                            .with_ingress_mut(|i| i.new_incoming(old, new));
 
                         debug!(
                             self.log,

@@ -20,11 +20,11 @@ impl Node {
     ) -> (Vec<Miss>, HashSet<Vec<DataType>>) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
 
-        self.receive_packet(m.as_ref().unwrap());
-
         let addr = self.local_addr();
         match self.inner {
-            NodeType::Ingress => {
+            NodeType::Ingress(ref mut i) => {
+                i.receive_packet(m.as_ref().unwrap());
+
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs| {
@@ -279,7 +279,7 @@ impl Node {
             NodeType::Reader(ref mut r) => {
                 r.on_eviction(key_columns, &keys[..]);
             }
-            NodeType::Ingress => {}
+            NodeType::Ingress(..) => {}
             NodeType::Dropped => {}
             NodeType::Egress(None) | NodeType::Source => unreachable!(),
         }
