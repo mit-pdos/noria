@@ -2350,7 +2350,7 @@ fn recover_from_losing_bottom_replica() {
     // start a worker for each domain in the graph
     let authority = Arc::new(LocalAuthority::new());
     let mut g = build_authority("worker-0", authority.clone(), false);
-    let g1 = build_authority("worker-1", authority.clone(), false);
+    let _g1 = build_authority("worker-1", authority.clone(), false);
     let g2 = build_authority("worker-2", authority.clone(), false);
     sleep();
 
@@ -2390,8 +2390,8 @@ fn recover_from_losing_top_replica() {
     let authority = Arc::new(LocalAuthority::new());
     let mut g = build_authority("worker-0", authority.clone(), false);
     let g1 = build_authority("worker-1", authority.clone(), false);
-    let g2 = build_authority("worker-2", authority.clone(), false);
-    let g3 = build_authority("worker-3", authority.clone(), false);
+    let _g2 = build_authority("worker-2", authority.clone(), false);
+    let _g3 = build_authority("worker-3", authority.clone(), false);
     sleep();
 
     g.install_recipe(txt).unwrap();
@@ -2421,3 +2421,41 @@ fn recover_from_losing_top_replica() {
     println!("success! now clean shutdown...");
 }
 
+#[test]
+fn recover_from_losing_stateless_domain() {
+    let txt = "CREATE TABLE vote (user int, id int);\n
+               QUERY user: SELECT id, user FROM vote WHERE id = ?;";
+
+    // start a worker for each domain
+    let authority = Arc::new(LocalAuthority::new());
+    let mut g = build_authority("worker-0", authority.clone(), true);
+    let g1 = build_authority("worker-1", authority.clone(), false);
+    let _g2 = build_authority("worker-2", authority.clone(), false);
+    sleep();
+
+    g.install_recipe(txt).unwrap();
+    sleep();
+
+    let mut mutx = g.table("vote").unwrap().into_sync();
+    let mut q = g.view("user").unwrap().into_sync();
+    let id = 0;
+
+    // prime the dataflow graph
+    mutx.insert(vec![1.into(), id.into()]).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // shutdown the worker with the middle node and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    drop(g1);
+    thread::sleep(Duration::from_secs(3));
+    mutx.insert(vec![2.into(), id.into()]).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // wait for recovery and observe the write
+    thread::sleep(Duration::from_secs(10));
+    let expected = vec![vec![id.into(), 1.into()], vec![id.into(), 2.into()]];
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), expected);
+    loop {}
+}
