@@ -4,10 +4,8 @@ use petgraph::graph::NodeIndex;
 pub enum ReplicaType {
     Top {
         bottom: NodeIndex,
-        bottom_next_nodes: Vec<NodeIndex>,
     },
     Bottom {
         top: NodeIndex,
-        top_prev_nodes: Vec<NodeIndex>,
     },
 }

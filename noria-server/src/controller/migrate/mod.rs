@@ -64,44 +64,6 @@ crate struct Migration<'a> {
 }
 
 impl<'a> Migration<'a> {
-    // If the grandparents of the given node are top replicas, we must update their
-    // bottom_next_nodes to include this node. The parent in between this node and the
-    // grandparent should be a bottom replica.
-    fn correct_grandparents(&mut self, ni: NodeIndex, parents: Vec<NodeIndex>) {
-        let tops: Vec<NodeIndex> = parents
-            .iter()
-            .filter(|&&n| {
-                // only keep the parents that are bottom replicas
-                match self.mainline.ingredients[n].replica_type() {
-                    Some(ReplicaType::Bottom{ .. }) => true,
-                    Some(ReplicaType::Top{ .. }) | None => false,
-                }
-            })
-            .map(|&n| {
-                // parents of bottom replicas must have one parent that is a top replica
-                let grandparents: Vec<NodeIndex> = self
-                    .mainline
-                    .ingredients
-                    .neighbors_directed(n, petgraph::EdgeDirection::Incoming)
-                    .collect();
-                assert_eq!(grandparents.len(), 1);
-                grandparents[0]
-            })
-            .collect();
-
-        for t in tops {
-            match self.mainline.ingredients[t].replica_type() {
-                Some(ReplicaType::Top{ bottom, mut bottom_next_nodes }) => {
-                    bottom_next_nodes.push(ni);
-                    self.mainline
-                        .ingredients[t]
-                        .set_replica_type(ReplicaType::Top { bottom, bottom_next_nodes });
-                },
-                Some(ReplicaType::Bottom{ .. }) | None => panic!("expected top replica"),
-            }
-        }
-    }
-
     /// Link the egress node to the ingress node, removing the linear path of nodes in between.
     /// Used during recovery when it's not necessary to throw away all downstream nodes.
     ///
@@ -191,9 +153,6 @@ impl<'a> Migration<'a> {
             },
             _ => {},
         }
-
-        // if any ancestor is a replica, update bottom_next_nodes for the ancestor's parent
-        self.correct_grandparents(ni, parents);
 
         // and tell the caller its id
         ni
@@ -339,8 +298,6 @@ impl<'a> Migration<'a> {
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
 
-        self.correct_grandparents(ri, vec![n]);
-
         ri
     }
 
@@ -354,8 +311,6 @@ impl<'a> Migration<'a> {
         self.mainline.ingredients[ri]
             .with_reader_mut(|r| r.set_key(key))
             .unwrap();
-
-        self.correct_grandparents(ri, vec![n]);
     }
 
     /// Commit the changes introduced by this `Migration` to the master `Soup`.
