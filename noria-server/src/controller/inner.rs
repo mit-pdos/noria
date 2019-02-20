@@ -428,18 +428,23 @@ impl ControllerInner {
     }
 
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
-    fn recover_hot_spare(&mut self, ni: NodeIndex, ingress: NodeIndex, egress: NodeIndex) {
+    fn recover_hot_spare(
+        &mut self,
+        ni: NodeIndex,
+        failed_ingress: NodeIndex,
+        failed_egress: NodeIndex,
+    ) {
         let failed_domain = self.ingredients[ni].domain();
-        assert_eq!(failed_domain, self.ingredients[ingress].domain());
-        assert_eq!(failed_domain, self.ingredients[egress].domain());
+        assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
+        assert_eq!(failed_domain, self.ingredients[failed_egress].domain());
 
+        // contact the remaining replica to start recovery
         let r = match self.ingredients[ni].replica_type() {
             Some(node::ReplicaType::Bottom{ top, .. }) => top,
             Some(node::ReplicaType::Top{ bottom, .. }) => bottom,
             None => unreachable!(),
         };
 
-        // tell the working replica it should become a full node operator if necessary
         let domain = self.ingredients[r].domain();
         let dh = self.domains.get_mut(&domain).unwrap();
         let m = box Packet::MakeRecovery {
@@ -447,60 +452,36 @@ impl ControllerInner {
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
 
-        // contact the remaining replica to start recovery
-        let (top, bottom) = match self.ingredients[r].replica_type() {
-            Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
-                info!(
-                    self.log,
-                    "replacing failed bottom replica";
-                    "bottom" => ni.index(),
-                    "top" => r.index(),
-                );
+        info!(
+            self.log,
+            "replacing failed replica";
+            "old" => ni.index(),
+            "new" => r.index(),
+        );
 
-                // TODO(ygina): multiple next nodes
-                assert_eq!(bottom_next_nodes.len(), 1);
-                (r, bottom_next_nodes[0])
-            },
-            Some(node::ReplicaType::Bottom{ top_prev_nodes, .. }) => {
-                info!(
-                    self.log,
-                    "replacing failed top replica";
-                    "bottom" => r.index(),
-                    "top" => ni.index(),
-                );
+        // update replay paths
+        //
+        // harmless in the case of losing a bottom replica (doesn't do anything)
+        // TODO(ygina): should also _remove_ the failed domain from materializations
+        // TODO(ygina): super hacky...assumes the domain being replaced and this domain
+        // are exact copies down to the # of nodes and local node index assignment
+        for segment in self.materializations.get_segments(failed_domain) {
+            dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
+        }
 
-                // update replay paths
-                // TODO(ygina): super hacky...assumes the domain being replaced and this domain
-                // are exact copies down to the # of nodes and local node index assignment
-                debug!(self.log, "updating replay paths for replica {}", r.index());
-                for segment in self.materializations.get_segments(failed_domain) {
-                    dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
-                }
-                // TODO(ygina): should also _remove_ the failed domain from materializations
-                // TODO(ygina): multiple previous nodes
-                assert_eq!(top_prev_nodes.len(), 1);
-                (top_prev_nodes[0], r)
-            },
-            None => unreachable!(),
-        };
-
+        // TODO(ygina): multiple next nodes
         let new_egress = self
             .ingredients
-            .neighbors_directed(top, petgraph::EdgeDirection::Outgoing)
+            .neighbors_directed(failed_ingress, petgraph::EdgeDirection::Incoming)
             .next()
             .unwrap();
+        // TODO(ygina): multiple previous nodes
         let ingress = self
             .ingredients
-            .neighbors_directed(bottom, petgraph::EdgeDirection::Incoming)
+            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
             .next()
             .unwrap();
-        let old_egress = self
-            .ingredients
-            .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
-            .next()
-            .unwrap();
-
-        self.gen_connection(ingress, new_egress, Some(old_egress));
+        self.gen_connection(ingress, new_egress, Some(failed_egress));
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
