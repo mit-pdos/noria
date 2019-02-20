@@ -353,147 +353,213 @@ impl ControllerInner {
         }
     }
 
-    /// Initial dumb policy for replacing hot spares. Only use the hot spare if there is the worker
-    /// has exactly a bottom replica on it. Does not consider downstream nodes that may have been
-    /// affected by other failed workers, nor does it consider whether both replicas were affected.
-    fn replace_hot_spares(&mut self, failed: Vec<WorkerIdentifier>) -> Vec<WorkerIdentifier> {
-        let mut new_failed: Vec<WorkerIdentifier> = Vec::new();
-        let mut to_replace: Vec<(NodeIndex, NodeIndex)> = Vec::new();
-        for worker in failed {
-            // detect which workers have exactly a replica (and routing nodes)
-            let nodes: Vec<NodeIndex> = self
-                .nodes_on_worker(Some(&worker))
-                .into_iter()
-                .filter(|&ni| !self.ingredients[ni].is_ingress())
-                .filter(|&ni| !self.ingredients[ni].is_egress())
-                .collect();
+    /// Recovers a domain if its state can be reconstructed from the existing graph.
+    /// Returns whether the domain was recovered.
+    fn recover_domain(&mut self, domain: DomainIndex) -> bool {
+        let nodes = self.nodes_in_domain(domain);
 
-            // if there is more than one node, give up
-            if nodes.len() != 1 {
-                new_failed.push(worker);
-                continue;
+        // domains must be linear with one ingress and one egress
+        let mut ingress = None;
+        let mut egress = None;
+        let mut stateful = Vec::new();
+        for ni in &nodes {
+            let node = &self.ingredients[*ni];
+            if node.is_ingress() {
+                assert!(ingress.is_none());
+                ingress = Some(ni);
             }
-
-            // otherwise if that one node is a bottom replica, queue it to be replaced
-            let ni = nodes[0];
-            match self.ingredients[ni].replica_type() {
-                Some(node::ReplicaType::Bottom{ top, .. }) => to_replace.push((ni, top)),
-                Some(node::ReplicaType::Top{ bottom, .. }) => to_replace.push((ni, bottom)),
-                None => new_failed.push(worker),
+            if node.is_egress() {
+                assert!(egress.is_none());
+                egress = Some(ni);
+            }
+            if node.is_internal() {
+                let is_stateful = match **node {
+                    NodeOperator::Sum(..)
+                        | NodeOperator::Extremum(..)
+                        | NodeOperator::Concat(..)
+                        | NodeOperator::Replica(..)
+                        | NodeOperator::TopK(..) => true,
+                    NodeOperator::Join(..)
+                        | NodeOperator::Latest(..)
+                        | NodeOperator::Project(..)
+                        | NodeOperator::Union(..)
+                        | NodeOperator::Identity(..)
+                        | NodeOperator::Filter(..)
+                        | NodeOperator::Trigger(..)
+                        | NodeOperator::Rewrite(..)
+                        | NodeOperator::Distinct(..) => false,
+                };
+                if is_stateful {
+                    stateful.push(ni);
+                }
+            }
+            if node.is_source() || node.is_sharder() || node.is_base() || node.is_reader() {
+                unimplemented!();
+            }
+            if node.is_dropped() {
+                unreachable!();
             }
         }
 
-        // contact the remaining replica to start recovery
-        for (failed, replica) in to_replace {
-            let (top, bottom) = match self.ingredients[replica].replica_type() {
-                Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
-                    info!(
-                        self.log,
-                        "replacing failed bottom replica";
-                        "bottom" => failed.index(),
-                        "top" => replica.index(),
-                    );
-
-                    // TODO(ygina): multiple next nodes
-                    assert_eq!(bottom_next_nodes.len(), 1);
-                    (replica, bottom_next_nodes[0])
-                },
-                Some(node::ReplicaType::Bottom{ top_prev_nodes, .. }) => {
-                    info!(
-                        self.log,
-                        "replacing failed top replica";
-                        "bottom" => replica.index(),
-                        "top" => failed.index(),
-                    );
-
-                    let domain = self.ingredients[replica].domain();
-                    let dh = self.domains.get_mut(&domain).unwrap();
-
-                    // update replay paths
-                    debug!(self.log, "updating replay paths for replica {}", replica.index());
-
-                    // TODO(ygina): super hacky...assumes the domain being replaced and this domain
-                    // are exact copies down to the # of nodes and local node index assignment
-                    let failed_domain = self.ingredients[failed].domain();
-                    for segment in self.materializations.get_segments(failed_domain) {
-                        dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
-                    }
-                    // TODO(ygina): should also _remove_ the failed domain from materializations
-                    // TODO(ygina): wait for ack before actually linking nodes
-                    // TODO(ygina): multiple previous nodes
-                    assert_eq!(top_prev_nodes.len(), 1);
-                    (top_prev_nodes[0], replica)
-                },
-                None => unreachable!(),
-            };
-
-            // Tell the replica that its partner replica has died. The node will no longer mark
-            // itself as a replica, and if it was a bottom replica, it will take the necessary
-            // steps to become a full node operator.
-            let domain = self.ingredients[replica].domain();
-            let dh = self.domains.get_mut(&domain).unwrap();
-            let m = box Packet::MakeRecovery {
-                node: self.ingredients[replica].local_addr(),
-            };
-            dh.send_to_healthy(m, &self.workers).unwrap();
-
-            // Create a connection between the top and bottom nodes previously linked by the failed
-            // replica. The top nodes won't pre-emptively send messages to the bottom nodes even
-            // though there is a working connection until it receives a ResumeAt message.
-            let new_egress = self
-                .ingredients
-                .neighbors_directed(top, petgraph::EdgeDirection::Outgoing)
-                .next()
-                .unwrap();
-            let ingress = self
-                .ingredients
-                .neighbors_directed(bottom, petgraph::EdgeDirection::Incoming)
-                .next()
-                .unwrap();
-
-            let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
-            self.remove_nodes(&path[..]).unwrap();
-
-            // For each new incoming connection, notify the bottom nodes which node was replaced
-            // with which node. The bottom nodes are responsible for sending a ResumeAt to these
-            // new incoming connections to start receiving messages.
-            let old_egress = self
-                .ingredients
-                .neighbors_directed(failed, petgraph::EdgeDirection::Outgoing)
-                .next()
-                .unwrap();
-
-            debug!(
-                self.log,
-                "notifying {} of new incoming connection",
-                ingress.index();
-                "old" => old_egress.index(),
-                "new" => new_egress.index(),
-            );
-
-            let domain = self.ingredients[ingress].domain();
-            let dh = self.domains.get_mut(&domain).unwrap();
-            let m = box Packet::NewIncoming {
-                to: self.ingredients[ingress].local_addr(),
-                old: self.ingredients[old_egress].global_addr(),
-                new: self.ingredients[new_egress].global_addr(),
-            };
-            dh.send_to_healthy(m, &self.workers).unwrap();
+        let ingress = ingress.unwrap();
+        let egress = egress.unwrap();
+        if stateful.len() == 1 {
+            if self.ingredients[*stateful[0]].replica_type().is_some() && nodes.len() == 3 {
+                // exactly one ingress, one egress, and one stateful replica
+                self.recover_hot_spare(*stateful[0], *ingress, *egress);
+                true
+            } else {
+                // the stateful node does not have a replica
+                false
+            }
+        } else if stateful.len() == 0 {
+            self.recover_stateless_domain(domain);
+            true
+        } else {
+            // more than one stateful node
+            false
         }
-
-        new_failed
     }
 
-    fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
-        // first, detect which data-flow nodes can be saved by a hot spare and do the replacement.
-        // update the list of failed workers with the workers that we still need to handle.
-        let failed = self.replace_hot_spares(failed);
+    /// Recovers a domain with only stateless nodes.
+    /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
+    fn recover_stateless_domain(&mut self, _domain: DomainIndex) {
+        unimplemented!();
+    }
+
+    /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
+    fn recover_hot_spare(&mut self, ni: NodeIndex, ingress: NodeIndex, egress: NodeIndex) {
+        let failed_domain = self.ingredients[ni].domain();
+        assert_eq!(failed_domain, self.ingredients[ingress].domain());
+        assert_eq!(failed_domain, self.ingredients[egress].domain());
+
+        let r = match self.ingredients[ni].replica_type() {
+            Some(node::ReplicaType::Bottom{ top, .. }) => top,
+            Some(node::ReplicaType::Top{ bottom, .. }) => bottom,
+            None => unreachable!(),
+        };
+
+        // tell the working replica it should become a full node operator if necessary
+        let domain = self.ingredients[r].domain();
+        let dh = self.domains.get_mut(&domain).unwrap();
+        let m = box Packet::MakeRecovery {
+            node: self.ingredients[r].local_addr(),
+        };
+        dh.send_to_healthy(m, &self.workers).unwrap();
+
+        // contact the remaining replica to start recovery
+        let (top, bottom) = match self.ingredients[r].replica_type() {
+            Some(node::ReplicaType::Top{ bottom_next_nodes, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed bottom replica";
+                    "bottom" => ni.index(),
+                    "top" => r.index(),
+                );
+
+                // TODO(ygina): multiple next nodes
+                assert_eq!(bottom_next_nodes.len(), 1);
+                (r, bottom_next_nodes[0])
+            },
+            Some(node::ReplicaType::Bottom{ top_prev_nodes, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed top replica";
+                    "bottom" => r.index(),
+                    "top" => ni.index(),
+                );
+
+                // update replay paths
+                // TODO(ygina): super hacky...assumes the domain being replaced and this domain
+                // are exact copies down to the # of nodes and local node index assignment
+                debug!(self.log, "updating replay paths for replica {}", r.index());
+                for segment in self.materializations.get_segments(failed_domain) {
+                    dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
+                }
+                // TODO(ygina): should also _remove_ the failed domain from materializations
+                // TODO(ygina): multiple previous nodes
+                assert_eq!(top_prev_nodes.len(), 1);
+                (top_prev_nodes[0], r)
+            },
+            None => unreachable!(),
+        };
+
+        let new_egress = self
+            .ingredients
+            .neighbors_directed(top, petgraph::EdgeDirection::Outgoing)
+            .next()
+            .unwrap();
+        let ingress = self
+            .ingredients
+            .neighbors_directed(bottom, petgraph::EdgeDirection::Incoming)
+            .next()
+            .unwrap();
+        let old_egress = self
+            .ingredients
+            .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
+            .next()
+            .unwrap();
+
+        self.gen_connection(ingress, new_egress, Some(old_egress));
+    }
+
+    /// Generates a new connection between two domains via an egress and ingress node, sometimes
+    /// replacing an old connection from a dropped egress node.
+    ///
+    /// Notifies the bottom nodes which node was replaced with which node (if applicable). The
+    /// bottom nodes are responsible for sending a ResumeAt to these new incoming connections to
+    /// start receiving messages. This means the egress won't pre-emptively send messages to the
+    /// ingress even though there is a working connection until it receives a ResumeAt.
+    fn gen_connection(
+        &mut self,
+        ingress: NodeIndex,
+        new_egress: NodeIndex,
+        old_egress: Option<NodeIndex>,
+    ) {
+        let old_egress = old_egress.unwrap_or(new_egress);
+        let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
+        self.remove_nodes(&path[..]).unwrap();
+
+        debug!(
+            self.log,
+            "notifying {} of new incoming connection",
+            ingress.index();
+            "old" => old_egress.index(),
+            "new" => new_egress.index(),
+        );
+
+        let domain = self.ingredients[ingress].domain();
+        let dh = self.domains.get_mut(&domain).unwrap();
+        let m = box Packet::NewIncoming {
+            to: self.ingredients[ingress].local_addr(),
+            old: self.ingredients[old_egress].global_addr(),
+            new: self.ingredients[new_egress].global_addr(),
+        };
+        dh.send_to_healthy(m, &self.workers).unwrap();
+    }
+
+    fn handle_failed_workers(&mut self, wis: Vec<WorkerIdentifier>) {
+        let mut failed = Vec::new();
+        for wi in wis {
+            for (d, dh) in &self.domains {
+                if dh.assigned_to_worker(&wi) {
+                    failed.push(*d);
+                }
+            }
+        }
+
+        // first, detect which domains can be recovered without dropping downstream nodes.
+        // generate a list of failed domains we still need to handle.
+        let failed = failed
+            .into_iter()
+            .filter(|&d| !self.recover_domain(d))
+            .collect::<Vec<DomainIndex>>();
 
         // next, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
-        for wi in failed {
-            info!(self.log, "handling failure of worker {:?}", wi);
-            affected_nodes.extend(self.get_failed_nodes(&wi));
+        for domain in failed {
+            info!(self.log, "handling failure of domain {:?}", domain);
+            affected_nodes.extend(self.get_failed_nodes(domain));
         }
 
         // then, figure out which queries are affected (and thus must be removed and added again in
@@ -1430,9 +1496,9 @@ impl ControllerInner {
         Ok(())
     }
 
-    fn get_failed_nodes(&self, lost_worker: &WorkerIdentifier) -> Vec<NodeIndex> {
+    fn get_failed_nodes(&self, lost_domain: DomainIndex) -> Vec<NodeIndex> {
         // Find nodes directly impacted by worker failure.
-        let mut nodes: Vec<NodeIndex> = self.nodes_on_worker(Some(lost_worker));
+        let mut nodes: Vec<NodeIndex> = self.nodes_in_domain(lost_domain);
 
         // Add any other downstream nodes.
         let mut failed_nodes = Vec::new();
@@ -1450,32 +1516,32 @@ impl ControllerInner {
         failed_nodes
     }
 
+    /// NOTE(malte): this traverses all graph vertices in order to find those assigned to a
+    /// domain. We do this to avoid keeping separate state that may get out of sync, but it
+    /// could become a performance bottleneck in the future (e.g., when recovergin large
+    /// graphs).
+    fn nodes_in_domain(&self, i: DomainIndex) -> Vec<NodeIndex> {
+        self.ingredients
+            .node_indices()
+            .filter(|&ni| ni != self.source)
+            .filter(|&ni| !self.ingredients[ni].is_dropped())
+            .filter(|&ni| self.ingredients[ni].domain() == i)
+            .collect()
+    }
+
     /// List data-flow nodes, on a specific worker if `worker` specified.
     fn nodes_on_worker(&self, worker: Option<&WorkerIdentifier>) -> Vec<NodeIndex> {
-        // NOTE(malte): this traverses all graph vertices in order to find those assigned to a
-        // domain. We do this to avoid keeping separate state that may get out of sync, but it
-        // could become a performance bottleneck in the future (e.g., when recovergin large
-        // graphs).
-        let domain_nodes = |i: DomainIndex| -> Vec<NodeIndex> {
-            self.ingredients
-                .node_indices()
-                .filter(|&ni| ni != self.source)
-                .filter(|&ni| !self.ingredients[ni].is_dropped())
-                .filter(|&ni| self.ingredients[ni].domain() == i)
-                .collect()
-        };
-
         if worker.is_some() {
             self.domains
                 .values()
                 .filter(|dh| dh.assigned_to_worker(worker.unwrap()))
                 .fold(Vec::new(), |mut acc, dh| {
-                    acc.extend(domain_nodes(dh.index()));
+                    acc.extend(self.nodes_in_domain(dh.index()));
                     acc
                 })
         } else {
             self.domains.values().fold(Vec::new(), |mut acc, dh| {
-                acc.extend(domain_nodes(dh.index()));
+                acc.extend(self.nodes_in_domain(dh.index()));
                 acc
             })
         }
