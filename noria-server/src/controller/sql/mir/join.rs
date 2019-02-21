@@ -180,7 +180,9 @@ mod tests {
 
         // no chain stuff if we're joining a table with itself
         let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!second_chain.is_some());
+        assert!(second_chain.is_none());
+        assert!(left_chain.has_table(&"A".to_string()));
+        assert!(!left_chain.has_table(&"B".to_string()));
         join_chains.push(left_chain);
 
         // we do need to do stuff with a newly joined table
@@ -188,6 +190,8 @@ mod tests {
         match second_chain {
             Some(right_chain) => {
                 let new_chain = left_chain.merge_chain(right_chain, join_ab.clone());
+                assert!(new_chain.has_table(&"A".to_string()));
+                assert!(new_chain.has_table(&"B".to_string()));
                 join_chains.push(new_chain);
             },
             None => {
@@ -197,12 +201,96 @@ mod tests {
 
         // we don't need to do anything more if we join those again
         let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!second_chain.is_some());
+        assert!(second_chain.is_none());
+        assert!(left_chain.has_table(&"A".to_string()));
+        assert!(left_chain.has_table(&"B".to_string()));
         join_chains.push(left_chain);
 
         // including if we join them in opposite order
         let (left_chain, second_chain) = pick_join_chains(&"B".to_string(), &"A".to_string(), &mut join_chains, &node_for_rel);
-        assert!(!second_chain.is_some());
+        assert!(second_chain.is_none());
+        assert!(left_chain.has_table(&"A".to_string()));
+        assert!(left_chain.has_table(&"B".to_string()));
+        join_chains.push(left_chain);
+    }
+
+    #[test] // four tables in different combinations
+    fn pick_four_chains() {
+        let mut node_for_rel: HashMap<&str, MirNodeRef> = HashMap::default();
+        let (base_a, base_b, join_ab) = make_nodes();
+        let (base_c, base_d, join_cd) = make_nodes();
+        let join_abcd = MirNode::new(
+            "c",
+            0,
+            vec![Column::from("aa"), Column::from("ba")],
+            MirNodeType::Join {
+                on_left: vec![Column::from("ab")],
+                on_right: vec![Column::from("bb")],
+                project: vec![Column::from("aa"), Column::from("ba")],
+            },
+            vec![],
+            vec![],
+        );
+
+        node_for_rel.insert("A", base_a);
+        node_for_rel.insert("B", base_b);
+        node_for_rel.insert("C", base_c);
+        node_for_rel.insert("D", base_d);
+        let mut join_chains = Vec::new();
+
+        let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        match second_chain {
+            Some(right_chain) => {
+                let new_chain = left_chain.merge_chain(right_chain, join_ab.clone());
+                assert!(new_chain.has_table(&"A".to_string()));
+                assert!(new_chain.has_table(&"B".to_string()));
+                assert!(!new_chain.has_table(&"C".to_string()));
+                assert!(!new_chain.has_table(&"D".to_string()));
+                join_chains.push(new_chain);
+            },
+            None => {
+                assert!(false);
+            },
+        };
+
+        let (left_chain, second_chain) = pick_join_chains(&"C".to_string(), &"D".to_string(), &mut join_chains, &node_for_rel);
+        match second_chain {
+            Some(right_chain) => {
+                let new_chain = left_chain.merge_chain(right_chain, join_cd.clone());
+                assert!(new_chain.has_table(&"C".to_string()));
+                assert!(new_chain.has_table(&"D".to_string()));
+                assert!(!new_chain.has_table(&"A".to_string()));
+                assert!(!new_chain.has_table(&"B".to_string()));
+                join_chains.push(new_chain);
+            },
+            None => {
+                assert!(false);
+            },
+        };
+
+        // now join the two pairs together
+        let (left_chain, second_chain) = pick_join_chains(&"D".to_string(), &"B".to_string(), &mut join_chains, &node_for_rel);
+        match second_chain {
+            Some(right_chain) => {
+                let new_chain = left_chain.merge_chain(right_chain, join_abcd.clone());
+                assert!(new_chain.has_table(&"A".to_string()));
+                assert!(new_chain.has_table(&"B".to_string()));
+                assert!(new_chain.has_table(&"C".to_string()));
+                assert!(new_chain.has_table(&"D".to_string()));
+                join_chains.push(new_chain);
+            },
+            None => {
+                assert!(false);
+            },
+        };
+
+        // now query a different combination of them
+        let (left_chain, second_chain) = pick_join_chains(&"A".to_string(), &"C".to_string(), &mut join_chains, &node_for_rel);
+        assert!(second_chain.is_none());
+        assert!(left_chain.has_table(&"A".to_string()));
+        assert!(left_chain.has_table(&"B".to_string()));
+        assert!(left_chain.has_table(&"C".to_string()));
+        assert!(left_chain.has_table(&"D".to_string()));
         join_chains.push(left_chain);
     }
 }

@@ -620,11 +620,6 @@ impl MirNodeType {
                         ref on_right,
                         ref project,
                     } => {
-                        println!("Attempting to match Join nodes:\n \
-                                {:?},{:?},{:?} and\n \
-                                {:?},{:?},{:?}",
-                                our_on_left, our_on_right, our_project,
-                                on_left, on_right, project);
                         // TODO(malte): column order does not actually need to match, but this only
                         // succeeds if it does.
                         our_on_left == on_left && our_on_right == on_right && our_project == project ||
