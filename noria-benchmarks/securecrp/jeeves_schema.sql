@@ -76,3 +76,7 @@ CREATE TABLE Comment (
     contents text,
     KEY paper (paper)
 );
+
+CREATE TABLE ConferenceContext (
+  phase varchar(1024)
+);

@@ -1,0 +1,107 @@
+GET /register:
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.username  = 'alana'
+SELECT (1) AS  a  FROM  auth_user  WHERE  auth_user.username  = 'alana'  LIMIT 1
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.username  = 'alana'
+SELECT (1) AS  a  FROM  django_session  WHERE  django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  LIMIT 1
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE  django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'
+
+
+GET /index:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 01:18:11' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  papers.id,   papers.author_id,   papers.accepted  FROM  papers
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+GET /submit:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 01:18:17' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  conf_userpcconflict.id,   conf_userpcconflict.user_id,   conf_userpcconflict.pc_id  FROM  conf_userpcconflict  WHERE  conf_userpcconflict.user_id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.level  = 'pc'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+GET /:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:06:28' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  papers.id,   papers.author_id,   papers.accepted  FROM  papers
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+POST /submit:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:06:45' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+GET /paper:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:06:45' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  papers.id,   papers.author_id,   papers.accepted  FROM  papers  WHERE  papers.id  = 1
+SELECT  conf_paperversion.id,   conf_paperversion.paper_id,   conf_paperversion.title,   conf_paperversion.contents,   conf_paperversion.abstract,   conf_paperversion.time  FROM  conf_paperversion  WHERE  conf_paperversion.paper_id  = 1  ORDER BY  conf_paperversion.time  DESC
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  conf_papercoauthor.id,   conf_papercoauthor.paper_id,   conf_papercoauthor.author  FROM  conf_papercoauthor  WHERE  conf_papercoauthor.paper_id  = 1
+SELECT  reviews.id,   reviews.time,   reviews.paper_id,   reviews.reviewer_id,   reviews.contents,   reviews.score_novelty,   reviews.score_presentation,   reviews.score_technical,   reviews.score_confidence  FROM  reviews  WHERE  reviews.paper_id  = 1  ORDER BY  reviews.time  DESC
+SELECT  comments.id,   comments.time,   comments.paper_id,   comments.user_id,   comments.contents  FROM  comments  WHERE  comments.paper_id  = 1  ORDER BY  comments.time  DESC
+
+
+GET /accounts/profile/:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:07:15' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  conf_userpcconflict.id,   conf_userpcconflict.user_id,   conf_userpcconflict.pc_id  FROM  conf_userpcconflict  WHERE  conf_userpcconflict.user_id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.level  = 'pc'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+GET /about:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:07:16' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+POST /accounts/profile/:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-01-30 18:07:24' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.level  = 'pc'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alana'
+
+
+GET /accounts/logout:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'  AND  django_session.expire_date  > '2019-02-02 21:03:40' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE  django_session.session_key  = 'cndj7j0oknuy4ztpjyxa0kkipc452qs3'
+SELECT (1) AS  a  FROM  django_session  WHERE  django_session.session_key  = 'xbhevoxhv5wzu3daqzw9c75pgf8px9mf'  LIMIT 1
+
+
+GET /accounts/login/:
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.username  = 'alana'
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'xbhevoxhv5wzu3daqzw9c75pgf8px9mf'  AND  django_session.expire_date  > '2019-02-02 21:04:45' )
+SELECT (1) AS  a  FROM  django_session  WHERE  django_session.session_key  = '5gn0y7nvzlrefl4p3i51qvfu2nf99v41'  LIMIT 1
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE  django_session.session_key  = 'xbhevoxhv5wzu3daqzw9c75pgf8px9mf'
+
+
+GET /assign_reviews:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'iekn2g5jssq625muxe8hy4d4tyiufe3z'  AND  django_session.expire_date  > '2019-02-02 21:25:57' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = ''
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.level  = 'pc'  LIMIT 21
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  LIMIT 21
+
+
+GET /users:
+SELECT  django_session.session_key,   django_session.session_data,   django_session.expire_date  FROM  django_session  WHERE ( django_session.session_key  = 'chvttpjvh68nlfs3miw9cuehfe09dk67'  AND  django_session.expire_date  > '2019-02-02 22:13:56' )
+SELECT  auth_user.id,   auth_user.password,   auth_user.last_login,   auth_user.is_superuser,   auth_user.username,   auth_user.first_name,   auth_user.last_name,   auth_user.email,   auth_user.is_staff,   auth_user.is_active,   auth_user.date_joined  FROM  auth_user  WHERE  auth_user.id  = 1
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alanamarzoev'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles  WHERE  user_profiles.username  = 'alanamarzoev'
+SELECT  user_profiles.id,   user_profiles.username,   user_profiles.email,   user_profiles.name,   user_profiles.affiliation,   user_profiles.acm_number,   user_profiles.level  FROM  user_profiles
+SELECT `auth_user`.`id`,  `auth_user`.`password`,  `auth_user`.`last_login`,  `auth_user`.`is_superuser`,  `auth_user`.`username`,  `auth_user`.`first_name`,  `auth_user`.`last_name`,  `auth_user`.`email`,  `auth_user`.`is_staff`,  `auth_user`.`is_active`,  `auth_user`.`date_joined` FROM `auth_user` WHERE `auth_user`.`id` = 1
+SELECT `user_profiles`.`id`,  `user_profiles`.`username`,  `user_profiles`.`email`,  `user_profiles`.`name`,  `user_profiles`.`affiliation`,  `user_profiles`.`acm_number`,  `user_profiles`.`level` FROM `user_profiles` WHERE `user_profiles`.`username` = 'alanamarzoev'
+SELECT `papers`.`id`,  `papers`.`author_id`,  `papers`.`accepted` FROM `papers`
+SELECT `user_profiles`.`id`,  `user_profiles`.`username`,  `user_profiles`.`email`,  `user_profiles`.`name`,  `user_profiles`.`affiliation`,  `user_profiles`.`acm_number`,  `user_profiles`.`level` FROM `user_profiles` WHERE `user_profiles`.`username` = 'alanamarzoev' 
