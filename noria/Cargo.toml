@@ -53,6 +53,9 @@ path = "src/lib.rs"
 name = "noria"
 
 [[example]]
+name = "lobster-test"
+
+[[example]]
 name = "basic-recipe"
 
 [[example]]
