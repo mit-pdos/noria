@@ -35,7 +35,7 @@ impl Ingress {
             (id.from(), id.label())
         };
 
-        // println!( "{} RECEIVE #{} from {:?}", self.global_addr().index(), label, from);
+        // println!("RECEIVE PACKET #{} <- {:?}", m.get_id().label(), from);
 
         // labels are not necessarily sequential, but must be increasing
         let old_label = self.last_packet_received.insert(from, label);

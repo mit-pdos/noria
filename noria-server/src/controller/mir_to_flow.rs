@@ -583,11 +583,6 @@ fn make_replica_node(
         ops::replica::Replica::new(parent_na),
     );
 
-    let nodes = mig
-        .mainline
-        .ingredients
-        .neighbors_directed(parent_na, petgraph::EdgeDirection::Incoming)
-        .collect::<Vec<NodeIndex>>();
     mig.mainline.ingredients[node].set_replica_type(
         node::ReplicaType::Bottom { top: parent_na });
     mig.mainline.ingredients[parent_na].set_replica_type(

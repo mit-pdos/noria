@@ -23,7 +23,6 @@
 use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, prelude::Packet};
-use dataflow::node::ReplicaType;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
