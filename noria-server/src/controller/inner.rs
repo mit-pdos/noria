@@ -430,6 +430,15 @@ impl ControllerInner {
         ni
     }
 
+    fn parent(&self, ni: NodeIndex) -> NodeIndex {
+        let mut nodes = self
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Incoming);
+        let ni = nodes.next().unwrap();
+        assert_eq!(nodes.count(), 0);
+        ni
+    }
+
     /// Recovers a domain with only stateless nodes.
     /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
     fn recover_stateless_domain(
@@ -463,6 +472,30 @@ impl ControllerInner {
         self.migrate(|mig| {
             let new_egress = mig.replicate_nodes(&path);
             assert_eq!(new_egress, failed_egress);
+        });
+
+        // set replay paths in B2 to the same as those that were in B1. then form the network
+        // connections, even though the domains won't start sending messages to each other until
+        // they receive ResumeAts.
+        //
+        // dataflow graph: A ---> B2 ---> C
+        let ingress_b2 = failed_ingress;
+        let egress_b2 = failed_egress;
+        let domain_b2 = self.ingredients[ingress_b2].domain();
+        assert_eq!(domain_b2, self.ingredients[egress_b2].domain());
+        for segment in self.materializations.get_segments(domain_b1, true) {
+            self.domains
+                .get_mut(&domain_b2)
+                .unwrap()
+                .send_to_healthy(segment.into_packet(), &self.workers)
+                .unwrap();
+        }
+
+        let egress_a = self.parent(failed_ingress);
+        let ingress_c = self.child(failed_egress);
+        self.migrate(|mig| {
+            assert_eq!(mig.link_nodes(egress_a, ingress_b2).len(), 0);
+            assert_eq!(mig.link_nodes(egress_b2, ingress_c).len(), 0);
         });
     }
 
@@ -504,7 +537,7 @@ impl ControllerInner {
         // TODO(ygina): should also _remove_ the failed domain from materializations
         // TODO(ygina): super hacky...assumes the domain being replaced and this domain
         // are exact copies down to the # of nodes and local node index assignment
-        for segment in self.materializations.get_segments(failed_domain) {
+        for segment in self.materializations.get_segments(failed_domain, false) {
             dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
         }
 

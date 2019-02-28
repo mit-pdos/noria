@@ -15,11 +15,25 @@ crate struct SetupReplayPath {
     trigger: TriggerEndpoint,
 }
 
-crate type DomainSegments = HashMap<DomainIndex, Vec<Box<SetupReplayPath>>>;
+#[derive(Clone)]
+crate struct UpdateEgress {
+    node: LocalNodeIndex,
+    new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
+    new_tag: Option<(Tag, NodeIndex)>,
+}
 
-impl SetupReplayPath {
-    // TODO(ygina): trigger might not be right for sending to a replaced domain for a failed node
-    pub(crate) fn from_packet(m: &Box<Packet>) -> Box<SetupReplayPath> {
+#[derive(Clone)]
+crate enum SegmentPacket {
+    SetupReplayPath(SetupReplayPath),
+    UpdateEgress(UpdateEgress),
+}
+
+crate type DomainSegments = HashMap<DomainIndex, Vec<Box<SegmentPacket>>>;
+
+impl SegmentPacket {
+    pub(crate) fn from_packet(m: &Box<Packet>) -> Box<SegmentPacket> {
+        // TODO(ygina): trigger might not be right for sending to a replaced domain
+        // for a failed node
         match **m {
             Packet::SetupReplayPath {
                 tag,
@@ -27,24 +41,48 @@ impl SetupReplayPath {
                 ref path,
                 notify_done,
                 ref trigger,
-            } => box SetupReplayPath {
-                tag,
-                source,
-                path: path.clone(),
-                notify_done,
-                trigger: trigger.clone(),
-            },
+            } => box SegmentPacket::SetupReplayPath(
+                SetupReplayPath {
+                    tag,
+                    source,
+                    path: path.clone(),
+                    notify_done,
+                    trigger: trigger.clone(),
+                }
+            ),
+            Packet::UpdateEgress {
+                node,
+                new_tx,
+                new_tag,
+            } => box SegmentPacket::UpdateEgress(
+                UpdateEgress {
+                    node,
+                    new_tx,
+                    new_tag,
+                }
+            ),
             _ => unreachable!(),
         }
     }
 
     pub(crate) fn into_packet(self) -> Box<Packet> {
-        box Packet::SetupReplayPath {
-            tag: self.tag,
-            source: self.source,
-            path: self.path,
-            notify_done: self.notify_done,
-            trigger: self.trigger,
+        match self {
+            SegmentPacket::SetupReplayPath(m) => {
+                box Packet::SetupReplayPath {
+                    tag: m.tag,
+                    source: m.source,
+                    path: m.path,
+                    notify_done: m.notify_done,
+                    trigger: m.trigger,
+                }
+            },
+            SegmentPacket::UpdateEgress(m) => {
+                box Packet::UpdateEgress {
+                    node: m.node,
+                    new_tx: m.new_tx,
+                    new_tag: m.new_tag,
+                }
+            },
         }
     }
 }
@@ -355,7 +393,7 @@ impl<'a> Plan<'a> {
                 self.segments
                     .entry(domain)
                     .or_insert(Vec::new())
-                    .push(SetupReplayPath::from_packet(&setup));
+                    .push(SegmentPacket::from_packet(&setup));
 
                 if i != segments.len() - 1 {
                     // since there is a later domain, the last node of any non-final domain
@@ -365,17 +403,21 @@ impl<'a> Plan<'a> {
                     let n = &self.graph[nodes.last().unwrap().0];
                     let workers = &self.workers;
                     if n.is_egress() {
+                        let m = box Packet::UpdateEgress {
+                            node: n.local_addr(),
+                            new_tx: None,
+                            new_tag: Some((tag, segments[i + 1].1[0].0.into())),
+                        };
+
+                        self.segments
+                            .entry(domain)
+                            .or_insert(Vec::new())
+                            .push(SegmentPacket::from_packet(&m));
+
                         self.domains
                             .get_mut(&domain)
                             .unwrap()
-                            .send_to_healthy(
-                                box Packet::UpdateEgress {
-                                    node: n.local_addr(),
-                                    new_tx: None,
-                                    new_tag: Some((tag, segments[i + 1].1[0].0.into())),
-                                },
-                                workers,
-                            )
+                            .send_to_healthy(m, workers)
                             .unwrap();
                     } else {
                         assert!(n.is_sharder());

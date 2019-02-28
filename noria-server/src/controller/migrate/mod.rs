@@ -89,15 +89,16 @@ impl<'a> Migration<'a> {
             path.push(ni);
             ni = child(&self.mainline, ni);
         }
-        assert!(path.len() > 0);
 
         // remove old edges
-        let mut edges = Vec::new();
-        edges.push((egress, path[0]));
-        edges.push((path[path.len() - 1], ingress));
-        for (x, y) in edges {
-            let edge = self.mainline.ingredients.find_edge(x, y).unwrap();
-            self.mainline.ingredients.remove_edge(edge);
+        if path.len() > 0 {
+            let mut edges = Vec::new();
+            edges.push((egress, path[0]));
+            edges.push((path[path.len() - 1], ingress));
+            for (x, y) in edges {
+                let edge = self.mainline.ingredients.find_edge(x, y).unwrap();
+                self.mainline.ingredients.remove_edge(edge);
+            }
         }
 
         // link the nodes together
@@ -572,6 +573,7 @@ impl<'a> Migration<'a> {
         // Note: workers and domains are sorted for determinism
         let mut wis = reset_wis(mainline);
         let mut changed_domains = changed_domains.into_iter().collect::<Vec<DomainIndex>>();
+        let mut replicated_egress = HashSet::new();
 
         // These aren't really new nodes since they've already been assigned local indexes and
         // domains. All we want to do is place the new domain, and fix routing/materializations.
@@ -579,6 +581,9 @@ impl<'a> Migration<'a> {
             uninformed_domain_nodes.insert(*domain, nodes.iter().map(|&n| (n, true)).collect());
             changed_domains.push(*domain);
             for &ni in nodes {
+                if mainline.ingredients[ni].is_egress() {
+                    replicated_egress.insert(ni);
+                }
                 new.insert(ni);
             }
         }
@@ -678,6 +683,7 @@ impl<'a> Migration<'a> {
             &mut mainline.domains,
             &mainline.workers,
             &new,
+            &replicated_egress,
             &self.linked,
         );
 

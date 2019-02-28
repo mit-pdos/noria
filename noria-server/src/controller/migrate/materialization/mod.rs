@@ -9,7 +9,7 @@ use crate::controller::domain_handle::DomainHandle;
 use crate::controller::{
     inner::{graphviz, DomainReplies},
     keys,
-    migrate::materialization::plan::{DomainSegments, SetupReplayPath},
+    migrate::materialization::plan::{DomainSegments, SegmentPacket},
 };
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::prelude::*;
@@ -54,9 +54,24 @@ impl Materializations {
         }
     }
 
-    pub(in crate::controller) fn get_segments(&self, d: DomainIndex) -> Vec<Box<SetupReplayPath>> {
+    pub(in crate::controller) fn get_segments(
+        &self,
+        d: DomainIndex,
+        new_egress: bool,
+    ) -> Vec<Box<SegmentPacket>> {
         if let Some(segments) = self.segments.get(&d) {
-            segments.to_vec()
+            segments
+                .iter()
+                .filter_map(|m| {
+                    if let box SegmentPacket::SetupReplayPath(_) = *m {
+                        Some(m.clone())
+                    } else if new_egress {
+                        Some(m.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         } else {
             vec![]
         }
