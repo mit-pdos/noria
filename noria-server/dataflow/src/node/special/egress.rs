@@ -27,6 +27,14 @@ impl Default for PacketBuffer {
 }
 
 impl PacketBuffer {
+    fn set_min_label(&mut self, label: usize) {
+        // TODO(ygina): this is a horrible function that we use when a new stateless domain
+        // starts up and asks its singular parent to resume sending packets that will generate
+        // packets starting at this label
+        assert_eq!(self.arr.len(), 0);
+        self.min_label = label;
+    }
+
     fn max_label(&self) -> usize {
         self.next_label_to_add() - 1
     }
@@ -238,19 +246,28 @@ impl Egress {
     }
 
     /// Resume sending messages to this node at the label after getting that node up to date.
+    /// Returns the label of the message it needs to send next that is not in the buffer.
     pub fn resume_at(
         &mut self,
         node: NodeIndex,
         label: usize,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) {
+    ) -> usize {
         let next_label = self.buffer.next_label_to_add();
         let to_nodes = {
             let mut hs = HashSet::new();
             hs.insert(node);
             hs
         };
+
+        if label >= next_label {
+            // we don't have the messages we need to send
+            self.next_packet_to_send.insert(node, label);
+            self.buffer.set_min_label(label);
+            return label;
+        }
+
         for i in label..next_label {
             // println!("RESUME AT #[{}, {}) -> {:?}", label, next_label, to_nodes);
             // TODO(ygina): ignore to nodes, which i think only matter when a packet is sent
@@ -268,5 +285,6 @@ impl Egress {
             );
         }
         self.next_packet_to_send.insert(node, next_label);
+        next_label
     }
 }

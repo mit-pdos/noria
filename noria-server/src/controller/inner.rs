@@ -509,6 +509,14 @@ impl ControllerInner {
             assert_eq!(mig.link_nodes(egress_a, ingress_b2).len(), 0);
             assert_eq!(mig.link_nodes(egress_b2, ingress_c).len(), 0);
         });
+
+        // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
+        // sending messages. B2 is in charge of realizing from that message that it also needs to
+        // tell A where to resume sending messages.
+        //
+        // dataflow graph: A ---> B2 -o-> C
+        // TODO(ygina): multiple children
+        self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
     }
 
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
@@ -569,7 +577,10 @@ impl ControllerInner {
             .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
             .next()
             .unwrap();
-        self.gen_connection(ingress, new_egress, Some(failed_egress));
+
+        let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
+        self.remove_nodes(&path[..]).unwrap();
+        self.send_new_incoming(ingress, new_egress, Some(failed_egress), true);
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
@@ -579,15 +590,14 @@ impl ControllerInner {
     /// bottom nodes are responsible for sending a ResumeAt to these new incoming connections to
     /// start receiving messages. This means the egress won't pre-emptively send messages to the
     /// ingress even though there is a working connection until it receives a ResumeAt.
-    fn gen_connection(
+    fn send_new_incoming(
         &mut self,
         ingress: NodeIndex,
         new_egress: NodeIndex,
         old_egress: Option<NodeIndex>,
+        complete: bool,
     ) {
         let old_egress = old_egress.unwrap_or(new_egress);
-        let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
-        self.remove_nodes(&path[..]).unwrap();
 
         debug!(
             self.log,
@@ -603,6 +613,7 @@ impl ControllerInner {
             to: self.ingredients[ingress].local_addr(),
             old: self.ingredients[old_egress].global_addr(),
             new: self.ingredients[new_egress].global_addr(),
+            complete,
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
     }
@@ -668,13 +679,20 @@ impl ControllerInner {
         Ok(())
     }
 
-    pub(crate) fn handle_resume_at( &mut self, node: NodeIndex, child: NodeIndex, label: usize) {
+    pub(crate) fn handle_resume_at(
+        &mut self,
+        node: NodeIndex,
+        child: NodeIndex,
+        label: usize,
+        complete: bool,
+    ) {
         debug!(
             self.log,
             "controller received SendResumeAt coordination message to forward";
             "node" => node.index(),
             "child" => child.index(),
             "label" => label,
+            "complete" => complete,
         );
 
         let domain = self.ingredients[node].domain();
@@ -683,6 +701,7 @@ impl ControllerInner {
             node: self.ingredients[node].local_addr(),
             child,
             label,
+            complete,
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
     }

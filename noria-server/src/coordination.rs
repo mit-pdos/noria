@@ -47,6 +47,8 @@ pub enum CoordinationPayload {
         child: NodeIndex,
         /// The label of the first message to resume at.
         label: usize,
+        /// Whether resuming messages here would complete the dataflow graph.
+        complete: bool,
     },
 }
 

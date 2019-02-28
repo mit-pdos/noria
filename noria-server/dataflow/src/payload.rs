@@ -282,6 +282,7 @@ pub enum Packet {
         to: LocalNodeIndex,
         old: NodeIndex,
         new: NodeIndex,
+        complete: bool,
     },
 
     /// Notify the node to resume sending messages to this child from the given packet label
@@ -289,6 +290,7 @@ pub enum Packet {
         node: LocalNodeIndex,
         child: NodeIndex,
         label: usize,
+        complete: bool,
     },
 }
 

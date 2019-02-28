@@ -238,7 +238,6 @@ pub fn add(
                 egress.shard_by(graph[sender].sharded_by());
                 let egress = graph.add_node(egress);
                 graph.add_edge(sender, egress, ());
-                graph[ingress].with_ingress_mut(|i| i.set_src(sender));
 
                 // we also now need to deal with this egress node
                 new.insert(egress);
@@ -256,6 +255,7 @@ pub fn add(
             let old = graph.find_edge(sender, ingress).unwrap();
             let was_materialized = graph.remove_edge(old).unwrap();
             graph.add_edge(egress, ingress, was_materialized);
+            graph[ingress].with_ingress_mut(|i| i.set_src(egress));
 
             // NOTE: we *don't* need to update swaps here, because ingress doesn't care
         }

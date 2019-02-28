@@ -247,9 +247,10 @@ impl Node {
         }
     }
 
-    crate fn with_egress_mut<F>(&mut self, f: F)
+    crate fn with_egress_mut<'a, F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut special::Egress),
+        F: FnOnce(&mut special::Egress) -> R,
+        R: 'a,
     {
         match self.inner {
             NodeType::Egress(Some(ref mut e)) => f(e),
@@ -263,6 +264,16 @@ impl Node {
     {
         match self.inner {
             NodeType::Ingress(ref mut i) => f(i),
+            _ => unreachable!(),
+        }
+    }
+
+    crate fn with_ingress<'a, F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&special::Ingress) -> R,
+    {
+        match self.inner {
+            NodeType::Ingress(ref i) => f(i),
             _ => unreachable!(),
         }
     }

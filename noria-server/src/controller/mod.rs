@@ -99,9 +99,9 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.create_universe(universe).unwrap());
                         }
                     }
-                    CoordinationPayload::SendResumeAt { node, child, label } => {
+                    CoordinationPayload::SendResumeAt { node, child, label, complete } => {
                         if let Some(ref mut ctrl) = controller {
-                            crate::block_on(|| ctrl.handle_resume_at(node, child, label));
+                            crate::block_on(|| ctrl.handle_resume_at(node, child, label, complete));
                         }
                     }
                     CoordinationPayload::Register {

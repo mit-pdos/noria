@@ -1314,7 +1314,7 @@ impl Domain {
                             .borrow_mut()
                             .with_egress_mut(|e| e.remove_child(child));
                     },
-                    Packet::NewIncoming { to, old, new } => {
+                    Packet::NewIncoming { to, old, new, complete } => {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection
                         let node = &self.nodes[to];
@@ -1330,18 +1330,20 @@ impl Domain {
                             "new" => new.index(),
                         );
 
-                        // tell the new incoming connection where to resume sending messages
+                        // tell the new incoming connection where to resume sending messages,
+                        // and whether resuming messages in this connection completes the graph
                         executor.send_resume_at(
                             new,
                             node.borrow().global_addr(),
                             label,
+                            complete,
                         );
                     },
-                    Packet::ResumeAt { node, child, label } => {
+                    Packet::ResumeAt { node, child, label, complete } => {
                         // sanity check: the node "node" should be an egress node
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
-                        node.borrow_mut()
+                        let next_label = node.borrow_mut()
                             .with_egress_mut(|e| e.resume_at(
                                 child,
                                 label,
@@ -1356,6 +1358,32 @@ impl Domain {
                             "child" => child.index(),
                             "label" => label,
                         );
+
+                        // sometimes the graph isn't complete yet, meaning we also need to mend the
+                        // connection between this domain and its (assumed) single parent domain.
+                        // TODO(ygina): uphold this assumption somewhere
+                        //
+                        // in the case this egress doesn't have the right messages buffered to
+                        // resume sending messages, we ask the parent to resume at the same index
+                        if !complete {
+                            // TODO(ygina): assumes this domain is linear with one ingress
+                            let mut ingress = None;
+                            for n in self.nodes.iter() {
+                                if n.1.borrow().is_ingress() {
+                                    assert!(ingress.is_none());
+                                    ingress = Some(n.1);
+                                }
+                            }
+                            let ingress = ingress.unwrap();
+
+                            // this resume at will definitely complete the graph
+                            executor.send_resume_at(
+                                ingress.borrow().with_ingress(|i| i.src()),
+                                ingress.borrow().global_addr(),
+                                next_label,
+                                true,
+                            );
+                        }
                     },
                     _ => unreachable!(),
                 }
