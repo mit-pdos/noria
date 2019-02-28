@@ -257,7 +257,7 @@ impl Node {
         }
     }
 
-    crate fn with_ingress_mut<'a, F, R>(&mut self, f: F) -> R
+    pub fn with_ingress_mut<'a, F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut special::Ingress) -> R,
     {
