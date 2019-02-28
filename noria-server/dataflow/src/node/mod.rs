@@ -432,6 +432,18 @@ impl Node {
         };
         self.inner = NodeType::Internal(*op);
     }
+
+    pub fn recover(&mut self, new_domain: domain::Index) {
+        assert!(self.domain.is_some());
+        assert!(!self.is_dropped());
+        self.domain = Some(new_domain);
+        self.taken = false;
+
+        if let NodeType::Egress(None) = self.inner {
+            let e = self::special::Egress::default();
+            self.inner = NodeType::Egress(Some(e));
+        }
+    }
 }
 
 // is this or that?

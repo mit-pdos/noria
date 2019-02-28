@@ -51,6 +51,7 @@ pub(super) enum ColumnChange {
 crate struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
     pub(super) added: Vec<NodeIndex>,
+    pub(super) replicated: Vec<(DomainIndex, Vec<NodeIndex>)>,
     pub(super) linked: Vec<(NodeIndex, NodeIndex)>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
     pub(super) readers: HashMap<NodeIndex, NodeIndex>,
@@ -110,6 +111,37 @@ impl<'a> Migration<'a> {
         );
 
         path
+    }
+
+    /// Creates a replica of the domain, including ingress/egress nodes.
+    ///
+    /// Assumes the domain is a linear sequence of nodes starting with an ingress and ending with
+    /// an egress. Linking the new domain to other domains requires an additional step.
+    pub(super) fn replicate_nodes(&mut self, nodes: &Vec<NodeIndex>) -> NodeIndex {
+        let graph = &mut self.mainline.ingredients;
+
+        warn!(
+            self.log,
+            "replicating failed nodes {:?}",
+            nodes,
+        );
+
+        assert!(nodes.len() > 0);
+        let old_domain = graph[nodes[0]].domain();
+        for &ni in nodes {
+            assert_eq!(graph[ni].domain(), old_domain);
+        }
+
+        // TODO(ygina): we might want to clean up references to the old domain
+        let new_domain = self.mainline.ndomains.into();
+        self.mainline.ndomains += 1;
+        self.replicated.push((new_domain, nodes.clone()));
+        for &ni in nodes {
+            graph[ni].recover(new_domain);
+        }
+
+        let egress = nodes[nodes.len() - 1];
+        egress
     }
 
     /// Add the given `Ingredient` to the Soup.
@@ -540,6 +572,16 @@ impl<'a> Migration<'a> {
         // Note: workers and domains are sorted for determinism
         let mut wis = reset_wis(mainline);
         let mut changed_domains = changed_domains.into_iter().collect::<Vec<DomainIndex>>();
+
+        // These aren't really new nodes since they've already been assigned local indexes and
+        // domains. All we want to do is place the new domain, and fix routing/materializations.
+        for (domain, nodes) in &self.replicated {
+            uninformed_domain_nodes.insert(*domain, nodes.iter().map(|&n| (n, true)).collect());
+            changed_domains.push(*domain);
+            for &ni in nodes {
+                new.insert(ni);
+            }
+        }
         changed_domains.sort();
 
         // Boot up new domains (they'll ignore all updates for now)

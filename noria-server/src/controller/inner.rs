@@ -413,7 +413,7 @@ impl ControllerInner {
                 false
             }
         } else if stateful.len() == 0 {
-            self.recover_stateless_domain(domain);
+            self.recover_stateless_domain(*ingress, *egress);
             true
         } else {
             // more than one stateful node
@@ -421,10 +421,49 @@ impl ControllerInner {
         }
     }
 
+    fn child(&self, ni: NodeIndex) -> NodeIndex {
+        let mut nodes = self
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing);
+        let ni = nodes.next().unwrap();
+        assert_eq!(nodes.count(), 0);
+        ni
+    }
+
     /// Recovers a domain with only stateless nodes.
     /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
-    fn recover_stateless_domain(&mut self, _domain: DomainIndex) {
-        unimplemented!();
+    fn recover_stateless_domain(
+        &mut self,
+        failed_ingress: NodeIndex,
+        failed_egress: NodeIndex,
+    ) {
+        let domain_b1 = self.ingredients[failed_ingress].domain();
+        assert_eq!(domain_b1, self.ingredients[failed_egress].domain());
+        warn!(
+            self.log,
+            "recovering stateless domain {}",
+            domain_b1.index(),
+        );
+
+        // obtain the (assumed) linear path in the domain
+        let mut ni = failed_ingress;
+        let mut path = Vec::new();
+        while ni != failed_egress {
+            path.push(ni);
+            ni = self.child(ni);
+        }
+        path.push(failed_egress);
+        assert!(path.len() > 0);
+
+        // do a migration that regenerates the nodes in domain B2, which has a different index
+        // from domain B1. however, the nodes in B1 and B2 have the same indexes. the network
+        // connections between the domains cannot form until replay paths have been updated.
+        //
+        // dataflow graph: A -x-> B2 -x-> C
+        self.migrate(|mig| {
+            let new_egress = mig.replicate_nodes(&path);
+            assert_eq!(new_egress, failed_egress);
+        });
     }
 
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
@@ -848,6 +887,7 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            replicated: Default::default(),
             linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
@@ -872,6 +912,7 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            replicated: Default::default(),
             linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
