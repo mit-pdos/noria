@@ -2375,9 +2375,11 @@ fn recover_from_losing_bottom_replica() {
     sleep();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
 
-    // wait for recovery and observe the writes
+    // wait for recovery and observe both old and new writes
     thread::sleep(Duration::from_secs(10));
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 8.into()]]);
+    mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
     println!("success! now clean shutdown...");
 }
 
@@ -2415,9 +2417,11 @@ fn recover_from_losing_top_replica() {
     sleep();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
 
-    // wait for recovery and observe the writes
+    // wait for recovery and observe both old and new writes
     thread::sleep(Duration::from_secs(10));
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 8.into()]]);
+    mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
     println!("success! now clean shutdown...");
 }
 
@@ -2428,7 +2432,7 @@ fn recover_from_losing_stateless_domain() {
 
     // start a worker for each domain
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), true);
+    let mut g = build_authority("worker-0", authority.clone(), false);
     let g1 = build_authority("worker-1", authority.clone(), false);
     let _g2 = build_authority("worker-2", authority.clone(), false);
     sleep();
@@ -2453,9 +2457,15 @@ fn recover_from_losing_stateless_domain() {
     sleep();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
 
-    // wait for recovery and observe the write
+    // wait for recovery and observe both old and new writes
     thread::sleep(Duration::from_secs(10));
-    let expected = vec![vec![id.into(), 1.into()], vec![id.into(), 2.into()]];
+    mutx.insert(vec![3.into(), id.into()]).unwrap();
+    sleep();
+    let expected = vec![
+        vec![id.into(), 1.into()],
+        vec![id.into(), 2.into()],
+        vec![id.into(), 3.into()],
+    ];
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), expected);
-    loop {}
+    println!("success! now clean shutdown...");
 }
