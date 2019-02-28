@@ -79,7 +79,7 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref e)) => {
-                let pid = PacketId::new(e.next_packet_label(), self.global_addr());
+                let pid = PacketId::new(e.next_label_to_add(), self.global_addr());
                 m.as_mut().unwrap().set_id(pid);
 
                 self.with_egress_mut(|e| {
