@@ -271,6 +271,12 @@ pub enum Packet {
         node: LocalNodeIndex,
     },
 
+    /// Tell the node to stop sending messages to this child
+    RemoveChild {
+        node: LocalNodeIndex,
+        child: NodeIndex,
+    },
+
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
         to: LocalNodeIndex,

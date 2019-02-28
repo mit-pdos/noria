@@ -185,6 +185,11 @@ impl Egress {
         self.tags.insert(*tag, dst_g);
     }
 
+    /// Stop sending messages to this child.
+    pub fn remove_child(&mut self, child: NodeIndex) {
+        self.next_packet_to_send.remove(&child);
+    }
+
     /// The label to be assigned to the next outgoing packet.
     pub fn next_label_to_add(&self) -> usize {
         self.buffer.next_label_to_add()

@@ -464,6 +464,19 @@ impl ControllerInner {
         path.push(failed_egress);
         assert!(path.len() > 0);
 
+        // prevent A from sending messages to B2 even once the connection is regenerated.
+        // B2 won't send messages to C since it'll be a new domain.
+        let egress_a = self.parent(failed_ingress);
+        let m = box Packet::RemoveChild {
+            node: self.ingredients[egress_a].local_addr(),
+            child: failed_ingress,
+        };
+        self.domains
+            .get_mut(&self.ingredients[egress_a].domain())
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
         // do a migration that regenerates the nodes in domain B2, which has a different index
         // from domain B1. however, the nodes in B1 and B2 have the same indexes. the network
         // connections between the domains cannot form until replay paths have been updated.
@@ -491,7 +504,6 @@ impl ControllerInner {
                 .unwrap();
         }
 
-        let egress_a = self.parent(failed_ingress);
         let ingress_c = self.child(failed_egress);
         self.migrate(|mig| {
             assert_eq!(mig.link_nodes(egress_a, ingress_b2).len(), 0);
@@ -509,6 +521,10 @@ impl ControllerInner {
         let failed_domain = self.ingredients[ni].domain();
         assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
         assert_eq!(failed_domain, self.ingredients[failed_egress].domain());
+
+        // TODO(ygina): we could send a RemoveChild message to the top node in the new connection
+        // and clean up some state, but it isn't necessary because the new child will have a
+        // different node index
 
         // contact the remaining replica to start recovery
         let r = match self.ingredients[ni].replica_type() {

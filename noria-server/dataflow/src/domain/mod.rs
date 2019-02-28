@@ -1309,6 +1309,11 @@ impl Domain {
                         // update internal replica type
                         node.borrow_mut().remove_replica_type();
                     },
+                    Packet::RemoveChild { node, child } => {
+                        self.nodes[node]
+                            .borrow_mut()
+                            .with_egress_mut(|e| e.remove_child(child));
+                    },
                     Packet::NewIncoming { to, old, new } => {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection
