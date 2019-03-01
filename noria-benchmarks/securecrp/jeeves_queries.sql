@@ -2,6 +2,7 @@ QUERY PaperList: SELECT Paper.*, LatestPaperVersion.title AS latest_version_titl
            FROM Paper
            JOIN (SELECT *
                  FROM PaperVersion
+		 GROUP BY PaperVersion.paper
                  ORDER BY PaperVersion.time
                  LIMIT 1)
                 AS LatestPaperVersion

@@ -42,6 +42,14 @@ pub fn create_users(backend: &mut Backend) {
             "0",
             "normal",
         ],
+        vec![
+            "2",
+            "2@mit.edu",
+            "2",
+            "org",
+            "0",
+            "normal",
+            ],
     ];
     let users: Vec<Vec<DataType>> = data
         .into_iter()
@@ -63,6 +71,7 @@ pub fn create_papers(backend: &mut Backend) {
         vec![1.into(), "malte".into(), "0".into()],
         vec![2.into(), "lara".into(), "0".into()],
         vec![3.into(), "malte".into(), "0".into()],
+        vec![4.into(), "2".into(), "0".into()],
     ];
 
     // PaperVersion
@@ -93,6 +102,13 @@ pub fn create_papers(backend: &mut Backend) {
             "Make it tasty.".into(),
             "0".into(),
         ],
+        vec![
+            4.into(),
+            "title".into(),
+            "text".into(),
+            "abstract".into(),
+            "0".into(),
+        ],
     ];
 
     let mut mutator = backend.g.table("Paper").unwrap();
@@ -105,11 +121,16 @@ pub fn create_papers(backend: &mut Backend) {
 pub fn dump_papers(backend: &mut Backend, user: &str) {
     let mut get = backend.g.view(&format!("PaperList_u{}", user)).unwrap();
 
-    // println!("{:?}", get.lookup(&[0.into()], true));
+    println!("user's papers: {:?}", get.lookup(&[0.into()], true));
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
     let mut get = backend.g.view("PaperList").unwrap();
 
-    // println!("{:?}", get.lookup(&[0.into()], true));
+    println!("all papers: {:?}", get.lookup(&[0.into()], true));
+}
+
+pub fn dump_context(backend: &mut Backend, query: &str) {
+    let mut get = backend.g.view(query).unwrap();
+    println!("{}: {:?}", query, get.lookup(&["2".into()], true));
 }

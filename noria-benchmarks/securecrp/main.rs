@@ -9,6 +9,7 @@ use noria::{ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::io::Read;
 use std::{thread, time};
 
 pub struct Backend {
@@ -120,6 +121,12 @@ fn main() {
                 .help("Security policies file"),
         )
         .arg(
+            Arg::with_name("groupqueries")
+                .long("groupqueries")
+                .default_value("noria-benchmarks/securecrp/jeeves_groupqueries.sql")
+                .help("SQL query file with queries about group context"),
+        )
+        .arg(
             Arg::with_name("graph")
                 .short("g")
                 .default_value("graph.gv")
@@ -157,12 +164,15 @@ fn main() {
     let sloc = args.value_of("schema").unwrap();
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
+    let gqloc = args.value_of("groupqueries");
     let gloc = args.value_of("graph");
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
     let user = args.value_of("user").unwrap();
 
+    println!("user: {}", user);
+    
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
     println!("first mig");
@@ -171,7 +181,7 @@ fn main() {
     backend.migrate(sloc, Some(qloc)).unwrap();
     println!("second mig");
     thread::sleep(time::Duration::from_millis(2000));
-
+    
     if args.is_present("populate") {
         println!("here");
         test_populate::create_users(&mut backend);
@@ -183,7 +193,29 @@ fn main() {
     backend.login(make_user(user)).is_ok();
 
     println!("user");
-
+    
+    if args.is_present("groupqueries") {
+        println!("Extending recipe with group context queries");
+        let mut s = String::new();
+        let mut rs = s.clone();
+        // Read query file
+        println!("{:?}", gqloc);
+        match gqloc {
+            None => (),
+            Some(qf) => {
+                let mut qf = File::open(qf).unwrap();
+                qf.read_to_string(&mut s).unwrap();
+                rs.push_str("\n");
+                rs.push_str(&s);
+            }
+        }
+        println!("extend_recipe: {:?}", rs);
+        // Install recipe
+        backend.g.extend_recipe(&rs).unwrap();
+        println!("Added group recipe");
+        thread::sleep(time::Duration::from_millis(2000));
+    }
+    
     if args.is_present("populate") {
         test_populate::create_papers(&mut backend);
         test_populate::dump_papers(&mut backend, user);
@@ -197,6 +229,14 @@ fn main() {
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
+    let mut getter = backend.g.view("authors").unwrap();
+//    let query_param = query.types[0].make_datatype(&query_parameter[0]);
+    let query_results = getter.lookup(&["2".into()], true).unwrap();
+    println!("author membership view: {:?}", query_results);
+    
+    test_populate::dump_context(&mut backend, "ChairContext");
+    test_populate::dump_context(&mut backend, "UserContext");
+    
     println!("DONE!");
     // sleep "forever"
     thread::sleep(time::Duration::from_millis(200000000));
