@@ -1,13 +1,15 @@
 import subprocess
 
 # exp setup
-nusers = [100, 1000, 10000]
+nusers = [1000, 10000]
 nclasses = [100, 500, 1000]
-nposts = [1, 10, 100]
+nposts = [10, 100]
 
 
 for users in nusers:
     for classes in nclasses:
         for posts in nposts:
             postcount = posts * classes
-            subprocess.call("/usr/bin/time cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p {} -u {} -c {} --policies noria-benchmarks/piazza/basic-policies.json > exp-{}-{}-{}.txt".format(users, postcount, users, classes, users, postcount, classes), shell=True)
+            cmd = "cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p {} -u {} -c {} --policies noria-benchmarks/piazza/basic-policies.json > exp-{}u-{}ppc-{}c.txt".format(users, postcount, users, classes, users, posts, classes)
+            print("CMD: {}".format(cmd))
+            subprocess.call(cmd, shell=True)
