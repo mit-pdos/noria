@@ -3,3 +3,9 @@ QUERY ChairContext: SELECT * FROM GroupContext_chairs_chair
 
 QUERY UserContext: SELECT * FROM UserContext_2
            WHERE UserContext_2.id = ?;
+
+QUERY Coauthors: SELECT * FROM PaperCoauthor
+           WHERE author = ?;
+
+QUERY Reviews: SELECT * FROM Review
+           WHERE paper = ?;

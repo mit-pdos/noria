@@ -1,0 +1,24 @@
+{
+    "groups":
+    [
+        {
+            "name": "chairs",
+            "membership": "SELECT username AS uid, level AS gid FROM UserProfile WHERE level = 'chair' AND username = ?",
+            "policies": [
+                {
+                    "table": "Paper",
+                    "predicate": "SELECT * FROM Paper WHERE Paper.id < 999",
+                    "description": "Chairs can see all papers."
+                }
+            ]
+        }
+    ],
+    "policies":
+    [
+      {
+        "description": "Everyone can see accepted papers",
+        "table": "Paper",
+        "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
+      }
+    ]
+}
