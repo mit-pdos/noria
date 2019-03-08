@@ -218,10 +218,10 @@ fn main() {
     
     if args.is_present("populate") {
         test_populate::create_papers(&mut backend);
-        test_populate::dump_papers(&mut backend, user);
+//        test_populate::dump_papers(&mut backend, user);
     }
 
-    test_populate::dump_all_papers(&mut backend);
+//    test_populate::dump_all_papers(&mut backend);
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
