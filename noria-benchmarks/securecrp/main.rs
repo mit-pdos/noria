@@ -123,7 +123,7 @@ fn main() {
         .arg(
             Arg::with_name("groupqueries")
                 .long("groupqueries")
-                .default_value("noria-benchmarks/securecrp/jeeves_groupqueries.sql")
+//                .default_value("noria-benchmarks/securecrp/jeeves_groupqueries.sql")
                 .help("SQL query file with queries about group context"),
         )
         .arg(
@@ -218,10 +218,10 @@ fn main() {
     
     if args.is_present("populate") {
         test_populate::create_papers(&mut backend);
-        test_populate::dump_papers(&mut backend, user);
+//        test_populate::dump_papers(&mut backend, user);
     }
 
-    test_populate::dump_all_papers(&mut backend);
+//    test_populate::dump_all_papers(&mut backend);
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
@@ -229,13 +229,46 @@ fn main() {
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
+    // TODO: are the lookups in the views restricted by security policy or not? If not,
+    // how does enforcement work? How do I do a "lookup as user x"?
+    // Is it in view name? However, even though PaperList_u2 exists, Reviews_u2 doesn't.
+/*    
+    // Check author membership view
     let mut getter = backend.g.view("authors").unwrap();
-//    let query_param = query.types[0].make_datatype(&query_parameter[0]);
-    let query_results = getter.lookup(&["2".into()], true).unwrap();
+    let mut query_results = Vec::new();
+    query_results.push(getter.lookup(&["2".into()], true).unwrap());
+    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
+    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
     println!("author membership view: {:?}", query_results);
-    
-    test_populate::dump_context(&mut backend, "ChairContext");
-    test_populate::dump_context(&mut backend, "UserContext");
+
+    // Check reviewer membership view
+    let mut getter = backend.g.view("reviewers").unwrap();
+    let mut query_results = Vec::new();
+    query_results.push(getter.lookup(&["2".into()], true).unwrap());
+    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
+    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
+    println!("reviewer membership view: {:?}", query_results);
+
+    // Check contents of Coauthors
+    let mut coauthor_getter = backend.g.view("Coauthors").unwrap();
+    let mut review_getter = backend.g.view("Reviews_authors4").unwrap(); // says view DNE, but it does...
+//    let mut review_getter = backend.g.view("Reviews").unwrap();
+    let mut coauthor_results = Vec::new();
+    let mut review_results = Vec::new();
+    for i in 1..6 {
+        coauthor_results.push(coauthor_getter.lookup(&[i.into()], true).unwrap());
+        review_results.push(review_getter.lookup(&[i.into()], true).unwrap());
+    }
+    println!("Coauthors view: {:?}", coauthor_results);
+    println!("Reviews view: {:?}", review_results);
+
+    test_populate::dump_context(&mut backend, "UserContext", "2", 1, true); // should see own id.
+    test_populate::dump_context(&mut backend, "Coauthors", "2", 1, true); // should see self, at minimum.
+                                                                 // should "2" also see other authors?
+    test_populate::dump_context(&mut backend, "Reviews", "5", 5, false); // own paper. should see review, not reviewer
+    test_populate::dump_context(&mut backend, "Reviews", "2", 2, false); // reviewed paper. should see all info.
+*/
+//    println!("{}", backend.g.graphviz().unwrap());
     
     println!("DONE!");
     // sleep "forever"
