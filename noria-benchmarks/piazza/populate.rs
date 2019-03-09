@@ -11,7 +11,7 @@ macro_rules! dur_to_fsec {
     }};
 }
 
-const CLASSES_PER_STUDENT: usize = 1;
+const CLASSES_PER_STUDENT: usize = 10;
 pub const TAS_PER_CLASS: usize = 1;
 
 pub struct Populate {
@@ -22,6 +22,7 @@ pub struct Populate {
     rng: rand::ThreadRng,
     students: HashMap<DataType, Vec<DataType>>,
     tas: HashMap<DataType, Vec<DataType>>,
+    classes: HashMap<DataType, i32> // class ID to num posts in class mapping
 }
 
 impl Populate {
@@ -34,6 +35,7 @@ impl Populate {
             rng: rand::thread_rng(),
             students: HashMap::new(),
             tas: HashMap::new(),
+            classes: HashMap::new(),
         }
     }
 
@@ -115,6 +117,10 @@ impl Populate {
             let pid = i.into();
             let author = self.uid();
             let cid = self.cid_for(&author);
+            match self.classes.get_mut(&cid.clone()) {
+                Some(count) => *count += 1,
+                None => println!("cid {:?} nonexistent?!", cid),
+            }
             let content = format!("post #{}", i).into();
             let private = self.private();
             let anon = 1.into();
@@ -125,14 +131,24 @@ impl Populate {
         records
     }
 
+    pub fn classes_for_student(&mut self, uid: usize) -> Vec<DataType> {
+        let res : DataType = uid.clone().into();
+        self.students[&res].clone()
+    }
+
     pub fn get_classes(&mut self) -> Vec<Vec<DataType>> {
         println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
-            let cid = i.into();
+            let cid : DataType = i.into();
+            self.classes.insert(cid.clone(), 0);
             records.push(vec![cid]);
         }
         records
+    }
+
+    pub fn get_posts_per_class(&mut self, cid: DataType) -> i32 {
+        self.classes[&cid].clone()
     }
 
     /// Generate random uid within bounds
