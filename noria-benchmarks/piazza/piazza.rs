@@ -323,7 +323,7 @@ fn main() {
 
     let mut dur = time::Duration::from_millis(0);
     let mut lookup_vectors = Vec::new();
-    let num_at_once = 5000;
+    let num_at_once = 1000;
     // for each user, find the list of classes that user belongs to, and construct a vector
     // of keys to look up that ranges over the list of the cids repeatedly up until it's of len 1000.
     for uid in 0..nlogged {
@@ -356,7 +356,7 @@ fn main() {
 
     let dur = dur_to_fsec!(dur);
 
-    let num_at_once : i32 = 5000;
+    let num_at_once : i32 = 1000;
     println!(
         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
         num_at_once * nlogged,
