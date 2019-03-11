@@ -2451,7 +2451,7 @@ dependencies = [
  "tokio-fs 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-reactor 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-sync 0.1.3 (git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease)",
+ "tokio-sync 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tcp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2576,7 +2576,7 @@ dependencies = [
  "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-sync 0.1.3 (git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease)",
+ "tokio-sync 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2590,7 +2590,7 @@ dependencies = [
 [[package]]
 name = "tokio-sync"
 version = "0.1.3"
-source = "git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease#a33e0c912a1d80e11a3d19220f1f3913f6e2e38e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2654,7 +2654,7 @@ dependencies = [
  "crossbeam 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-sync 0.1.3 (git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease)",
+ "tokio-sync 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (git+https://github.com/tower-rs/tower.git)",
 ]
 
@@ -2719,7 +2719,7 @@ source = "git+https://github.com/tower-rs/tower.git#ac9488f5f280a64f191c2ffa9bdd
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-sync 0.1.3 (git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease)",
+ "tokio-sync 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower.git)",
  "tower-service 0.2.0 (git+https://github.com/tower-rs/tower.git)",
 ]
@@ -3355,7 +3355,7 @@ dependencies = [
 "checksum tokio-proto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8fbb47ae81353c63c487030659494b295f6cb6576242f907f203473b191b0389"
 "checksum tokio-reactor 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "6af16bfac7e112bea8b0442542161bfc41cbfa4466b580bdda7d18cb88b911ce"
 "checksum tokio-service 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "24da22d077e0f15f55162bdbdc661228c1581892f52074fb242678d015b45162"
-"checksum tokio-sync 0.1.3 (git+https://github.com/jonhoo/tokio.git?branch=tokio-sync-lease)" = "<none>"
+"checksum tokio-sync 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1bf2b9dac2a0509b5cfd1df5aa25eafacb616a42a491a13604d6bbeab4486363"
 "checksum tokio-tcp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1d14b10654be682ac43efee27401d792507e30fd8d26389e1da3b185de2e4119"
 "checksum tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "742e511f6ce2298aeb86fc9ea0d8df81c2388c6ebae3dc8a7316e8c9df0df801"
 "checksum tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "2910970404ba6fa78c5539126a9ae2045d62e3713041e447f695f41405a120c6"
