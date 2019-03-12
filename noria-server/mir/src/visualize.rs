@@ -198,7 +198,7 @@ impl GraphViz for MirNodeType {
                 write!(out, "≡")?;
             }
             MirNodeType::Replica => {
-                write!(out, "???")?;
+                write!(out, "replica")?;
             }
             MirNodeType::Join {
                 ref on_left,

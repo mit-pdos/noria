@@ -662,6 +662,8 @@ impl MirNodeType {
                 } => (value == our_value && our_key == key && our_col == column),
                 _ => false,
             },
+            // valid because above replicas must already be reused
+            MirNodeType::Replica => true,
             _ => unimplemented!(),
         }
     }
@@ -791,7 +793,7 @@ impl Debug for MirNodeType {
                 ..
             } => write!(f, "||([{}], \"{}\")", on.name, separator),
             MirNodeType::Identity => write!(f, "≡"),
-            MirNodeType::Replica => write!(f, "???"),
+            MirNodeType::Replica => write!(f, "replica"),
             MirNodeType::Join {
                 ref on_left,
                 ref on_right,

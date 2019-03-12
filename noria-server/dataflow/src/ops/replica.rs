@@ -64,7 +64,7 @@ impl Ingredient for Replica {
     }
 
     fn description(&self, _: bool) -> String {
-        "[???]".into()
+        "[replica]".into()
     }
 
     fn parent_columns(&self, column: usize) -> Vec<(NodeIndex, Option<usize>)> {
