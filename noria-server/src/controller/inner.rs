@@ -506,8 +506,8 @@ impl ControllerInner {
 
         let ingress_c = self.child(failed_egress);
         self.migrate(|mig| {
-            assert_eq!(mig.link_nodes(egress_a, ingress_b2).len(), 0);
-            assert_eq!(mig.link_nodes(egress_b2, ingress_c).len(), 0);
+            assert_eq!(mig.link_nodes(egress_a, &vec![ingress_b2]).len(), 0);
+            assert_eq!(mig.link_nodes(egress_b2, &vec![ingress_c]).len(), 0);
         });
 
         // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
@@ -565,22 +565,23 @@ impl ControllerInner {
             dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
         }
 
-        // TODO(ygina): multiple next nodes
+        // TODO(ygina): multiple previous nodes
         let new_egress = self
             .ingredients
             .neighbors_directed(failed_ingress, petgraph::EdgeDirection::Incoming)
             .next()
             .unwrap();
-        // TODO(ygina): multiple previous nodes
         let ingress = self
             .ingredients
             .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
-            .next()
-            .unwrap();
+            .collect::<Vec<NodeIndex>>();
 
-        let path = self.migrate(|mig| mig.link_nodes(new_egress, ingress));
+        let path = self.migrate(|mig| mig.link_nodes(new_egress, &ingress));
         self.remove_nodes(&path[..]).unwrap();
-        self.send_new_incoming(ingress, new_egress, Some(failed_egress), true);
+
+        for &ingress_ni in &ingress {
+            self.send_new_incoming(ingress_ni, new_egress, Some(failed_egress), true);
+        }
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes

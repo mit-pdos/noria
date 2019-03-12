@@ -64,13 +64,20 @@ crate struct Migration<'a> {
 }
 
 impl<'a> Migration<'a> {
-    /// Link the egress node to the ingress node, removing the linear path of nodes in between.
+    /// Link the egress node to the ingress nodes, removing the linear path of nodes in between.
     /// Used during recovery when it's not necessary to throw away all downstream nodes.
     ///
     /// Returns the nodes on the path.
-    pub(super) fn link_nodes(&mut self, egress: NodeIndex, ingress: NodeIndex) -> Vec<NodeIndex> {
+    pub(super) fn link_nodes(
+        &mut self,
+        egress: NodeIndex,
+        ingress: &Vec<NodeIndex>,
+    ) -> Vec<NodeIndex> {
         assert!(self.mainline.ingredients[egress].is_egress());
-        assert!(self.mainline.ingredients[ingress].is_ingress());
+        assert!(ingress.len() > 0);
+        for &ingress_ni in ingress {
+            assert!(self.mainline.ingredients[ingress_ni].is_ingress());
+        }
 
         fn children(mainline: &ControllerInner, ni: NodeIndex) -> Vec<NodeIndex> {
             mainline
@@ -82,17 +89,24 @@ impl<'a> Migration<'a> {
         // check that there is a path from egress to ingress and that it is linear
         let mut ni = children(&self.mainline, egress);
         let mut path = Vec::new();
-        while !ni.contains(&ingress) {
+        while !ni.contains(&ingress[0]) {
             assert_eq!(ni.len(), 1);
             path.push(ni[0]);
             ni = children(&self.mainline, ni[0]);
+        }
+
+        assert_eq!(ni.len(), ingress.len());
+        for ingress_ni in ingress {
+            assert!(ni.contains(&ingress_ni));
         }
 
         // remove old edges
         if path.len() > 0 {
             let mut edges = Vec::new();
             edges.push((egress, path[0]));
-            edges.push((path[path.len() - 1], ingress));
+            for &ingress_ni in ingress {
+                edges.push((path[path.len() - 1], ingress_ni));
+            }
             for (x, y) in edges {
                 let edge = self.mainline.ingredients.find_edge(x, y).unwrap();
                 self.mainline.ingredients.remove_edge(edge);
@@ -100,14 +114,16 @@ impl<'a> Migration<'a> {
         }
 
         // link the nodes together
-        self.mainline.ingredients.add_edge(egress, ingress, ());
-        self.linked.push((egress, ingress));
+        for &ingress_ni in ingress {
+            self.mainline.ingredients.add_edge(egress, ingress_ni, ());
+            self.linked.push((egress, ingress_ni));
 
-        debug!(self.log,
-            "linked egress --> ingress";
-            "egress" => egress.index(),
-            "ingress" => ingress.index(),
-        );
+            debug!(self.log,
+                "linked egress -> ingress";
+                "egress" => egress.index(),
+                "ingress" => ingress_ni.index(),
+            );
+        }
 
         path
     }
