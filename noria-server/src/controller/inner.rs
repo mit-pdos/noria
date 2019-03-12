@@ -530,10 +530,6 @@ impl ControllerInner {
         assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
         assert_eq!(failed_domain, self.ingredients[failed_egress].domain());
 
-        // TODO(ygina): we could send a RemoveChild message to the top node in the new connection
-        // and clean up some state, but it isn't necessary because the new child will have a
-        // different node index
-
         // contact the remaining replica to start recovery
         let r = match self.ingredients[ni].replica_type() {
             Some(node::ReplicaType::Bottom{ top, .. }) => top,
@@ -575,6 +571,17 @@ impl ControllerInner {
             .ingredients
             .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
             .collect::<Vec<NodeIndex>>();
+
+        // clean up state in egress
+        let m = box Packet::RemoveChild {
+            node: self.ingredients[new_egress].local_addr(),
+            child: failed_ingress,
+        };
+        self.domains
+            .get_mut(&self.ingredients[new_egress].domain())
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
 
         let path = self.migrate(|mig| mig.link_nodes(new_egress, &ingress));
         self.remove_nodes(&path[..]).unwrap();

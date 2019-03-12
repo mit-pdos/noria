@@ -776,16 +776,6 @@ impl Domain {
                             s.add_sharded_child(new_txs.0, new_txs.1);
                         });
                     }
-                    Packet::ReplaceEgress {
-                        node,
-                        new_tx,
-                    } => {
-                        let mut n = self.nodes[node].borrow_mut();
-                        n.with_egress_mut(move |e| {
-                            let (node, local, addr) = new_tx;
-                            e.replace_tx(node, local, addr);
-                        });
-                    }
                     Packet::AddStreamer { node, new_streamer } => {
                         let mut n = self.nodes[node].borrow_mut();
                         n.with_reader_mut(|r| r.add_streamer(new_streamer).unwrap())
