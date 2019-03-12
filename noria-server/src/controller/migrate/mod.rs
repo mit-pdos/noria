@@ -72,21 +72,20 @@ impl<'a> Migration<'a> {
         assert!(self.mainline.ingredients[egress].is_egress());
         assert!(self.mainline.ingredients[ingress].is_ingress());
 
-        fn child(mainline: &ControllerInner, ni: NodeIndex) -> NodeIndex {
-            let nodes: Vec<NodeIndex> = mainline
+        fn children(mainline: &ControllerInner, ni: NodeIndex) -> Vec<NodeIndex> {
+            mainline
                 .ingredients
                 .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
-                .collect();
-            assert_eq!(nodes.len(), 1);
-            nodes[0]
+                .collect()
         }
 
         // check that there is a path from egress to ingress and that it is linear
-        let mut ni = child(&self.mainline, egress);
+        let mut ni = children(&self.mainline, egress);
         let mut path = Vec::new();
-        while ni != ingress {
-            path.push(ni);
-            ni = child(&self.mainline, ni);
+        while !ni.contains(&ingress) {
+            assert_eq!(ni.len(), 1);
+            path.push(ni[0]);
+            ni = children(&self.mainline, ni[0]);
         }
 
         // remove old edges
