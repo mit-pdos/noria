@@ -54,9 +54,10 @@ impl Backend {
         let start = time::Instant::now();
 
         let i = records.len();
-        for r in records.drain(..) {
-            mutator.insert(r).unwrap();
-        }
+        mutator.insert_all(records);
+        // for r in records.drain(..) {
+        //     mutator.insert(r).unwrap();
+        // }
 
         let dur = dur_to_fsec!(start.elapsed());
         println!(
@@ -92,7 +93,6 @@ impl Backend {
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
         sf.read_to_string(&mut s).unwrap();
-
         let mut rs = s.clone();
         s.clear();
 
@@ -108,7 +108,7 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(&rs).unwrap();
+        let x = self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -256,12 +256,11 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-
     p.enroll_students();
-    let roles = p.get_roles();
-    let users = p.get_users();
-    let posts = p.get_posts();
     let classes = p.get_classes();
+    let users = p.get_users();
+    let roles = p.get_roles();
+    let posts = p.get_posts();
 
     backend.populate("Role", roles);
     println!("Waiting for groups to be constructed...");
@@ -323,22 +322,41 @@ fn main() {
     }
 
     let mut dur = time::Duration::from_millis(0);
-    let mut uids = Vec::new();
-    let num_at_once = 1000;
-    for uid in 0..num_at_once {
-        uids.push([0.into()].to_vec());
+    let mut lookup_vectors = Vec::new();
+    let num_at_once = 5000;
+    // for each user, find the list of classes that user belongs to, and construct a vector
+    // of keys to look up that ranges over the list of the cids repeatedly up until it's of len 1000.
+    for uid in 0..nlogged {
+        let mut lookup_vec = Vec::new();
+
+        let classes_for_student = p.classes_for_student(uid as usize);
+
+        let mut posts_per_class = Vec::new();
+        for class in classes_for_student.clone() {
+            posts_per_class.push(p.get_posts_per_class(class.clone()));
+        }
+
+        println!("Student: {:?}, Enrolled in classes: {:?}, # Posts per class: {:?}", uid, classes_for_student, posts_per_class);
+
+        for i in 0..(num_at_once/classes_for_student.len()) {
+            for class in classes_for_student.clone() {
+                lookup_vec.push([class.clone()].to_vec());
+            }
+        }
+        lookup_vectors.push(lookup_vec);
     }
 
     for uid in 0..nlogged {
         let leaf = format!("posts_u{}", uid);
         let mut getter = backend.g.view(&leaf).unwrap();
         let start = time::Instant::now();
-        let res = getter.multi_lookup(uids.clone(), false);
+        let res = getter.multi_lookup(lookup_vectors[uid as usize].clone(), false);
         dur += start.elapsed();
     }
 
     let dur = dur_to_fsec!(dur);
 
+    let num_at_once : i32 = 5000;
     println!(
         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
         num_at_once * nlogged,

@@ -87,6 +87,8 @@ impl TableBuilder {
             }
         };
 
+        // self.columns.push("internal_id".to_string()); 
+
         Ok(Table {
             domain_input_handle: dih,
             shard_addrs: self.txs,

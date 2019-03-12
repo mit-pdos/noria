@@ -1,9 +1,9 @@
 import subprocess
 
 # exp setup
-nusers = [1000, 10000]
-nclasses = [100, 500, 1000]
-nposts = [10, 100]
+nusers = [10000]
+nposts = [10]
+nclasses = [100]
 
 
 for users in nusers:
