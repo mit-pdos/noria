@@ -10,7 +10,7 @@ pub fn create_users(backend: &mut Backend) {
     // acm_number varchar(1024),
     // level varchar(12): one of "chair", "pc", "normal"
     let data: Vec<Vec<&str>> = vec![
-/*        vec![
+        vec![
             "kohler",
             "kohler@seas.harvard.edu",
             "Eddie Kohler",
@@ -42,7 +42,7 @@ pub fn create_users(backend: &mut Backend) {
             "0",
             "normal",
         ],
-*/
+
         vec![
             "2",
             "2@mit.edu",
@@ -77,9 +77,9 @@ pub fn create_papers(backend: &mut Backend) {
     // author varchar(1024),
     // accepted tinyint(1),
     let papers: Vec<Vec<DataType>> = vec![
-//        vec![1.into(), "malte".into(), "0".into()],
-//        vec![2.into(), "lara".into(), "0".into()],
-//        vec![3.into(), "malte".into(), "0".into()],
+        vec![1.into(), "malte".into(), "0".into()],
+        vec![2.into(), "lara".into(), "0".into()],
+        vec![3.into(), "malte".into(), "0".into()],
         vec![4.into(), "2".into(), "0".into()],
         vec![5.into(), "2".into(), "0".into()],
     ];
@@ -91,7 +91,7 @@ pub fn create_papers(backend: &mut Backend) {
     // abstract text,
     // time datetime DEFAULT CURRENT_TIMESTAMP,
     let paper_versions: Vec<Vec<DataType>> = vec![
-/*        vec![
+        vec![
             1.into(),
             "Why Soup is Awesome".into(),
             "Text".into(),
@@ -112,7 +112,7 @@ pub fn create_papers(backend: &mut Backend) {
             "Make it tasty.".into(),
             "0".into(),
         ],
-*/        vec![
+        vec![
             4.into(),
             "title".into(),
             "text".into(),
@@ -127,7 +127,7 @@ pub fn create_papers(backend: &mut Backend) {
             "0".into(),
         ],
     ];
-    /*
+    
     // PaperCoauthor
     // paper int,
     // author varchar(1024),
@@ -252,13 +252,13 @@ pub fn create_papers(backend: &mut Backend) {
             "blahblah".into(),
         ],
     ];
-    */
+    
     let mut mutator = backend.g.table("Paper").unwrap();
     mutator.insert_all(papers).unwrap();
 
     let mut mutator = backend.g.table("PaperVersion").unwrap();
     mutator.insert_all(paper_versions).unwrap();
-/*
+
     let mut mutator = backend.g.table("PaperCoauthor").unwrap();
     mutator.insert_all(paper_coauthors).unwrap();
 
@@ -267,13 +267,19 @@ pub fn create_papers(backend: &mut Backend) {
 
     let mut mutator = backend.g.table("ReviewAssignment").unwrap();
     mutator.insert_all(review_assignments).unwrap();
-*/
+
 }
 
 pub fn dump_papers(backend: &mut Backend, user: &str) {
     let mut get = backend.g.view(&format!("PaperList_u{}", user)).unwrap();
 
     println!("user's papers: {:?}", get.lookup(&[0.into()], true)); // 0 is bogo key for id
+}
+
+pub fn dump_reviews(backend: &mut Backend, user: &str) {
+    let mut get = backend.g.view(&format!("ReviewList_u{}", user)).unwrap();
+
+    println!("user's reviews: {:?}", get.lookup(&[0.into()], true)); // 0 is bogo key for id
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
