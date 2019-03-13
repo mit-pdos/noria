@@ -478,10 +478,11 @@ impl ControllerInner {
             .unwrap();
 
         // do a migration that regenerates the nodes in domain B2, which has a different index
-        // from domain B1. however, the nodes in B1 and B2 have the same indexes. the network
-        // connections between the domains cannot form until replay paths have been updated.
+        // from domain B1. however, the nodes in B1 and B2 have the same indexes. the domains
+        // can't start sending messages until replay paths have been updated. the network
+        // connection between A and B2 initially exists due to how migrations work.
         //
-        // dataflow graph: A -x-> B2 -x-> C
+        // dataflow graph: A ---> B2 -x-> C
         self.migrate(|mig| {
             let new_egress = mig.replicate_nodes(&path);
             assert_eq!(new_egress, failed_egress);
@@ -505,10 +506,7 @@ impl ControllerInner {
         }
 
         let ingress_c = self.child(failed_egress);
-        self.migrate(|mig| {
-            assert_eq!(mig.link_nodes(egress_a, &vec![ingress_b2]).len(), 0);
-            assert_eq!(mig.link_nodes(egress_b2, &vec![ingress_c]).len(), 0);
-        });
+        self.migrate(|mig| assert_eq!(mig.link_nodes(egress_b2, &vec![ingress_c]).len(), 0));
 
         // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
         // sending messages. B2 is in charge of realizing from that message that it also needs to
