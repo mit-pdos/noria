@@ -795,6 +795,11 @@ impl Materializations {
             return;
         }
 
+        // don't replay to bottom replicas
+        if let Some(ReplicaType::Bottom{ .. }) = graph[ni].replica_type() {
+            return;
+        }
+
         // we have a parent that has data, so we need to replay and reconstruct
         info!(self.log, "beginning reconstruction of {:?}", n);
         let log = self.log.new(o!("node" => ni.index()));

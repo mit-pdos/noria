@@ -229,7 +229,7 @@ fn lose_multi_child_bottom_replica() {
 
     // start enough workers for the bottom replica to be in its own domain
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), true);
+    let mut g = build_authority("worker-0", authority.clone(), false);
     let _g1 = build_authority("worker-1", authority.clone(), false);
     let g2 = build_authority("worker-2", authority.clone(), false);
     let _g3 = build_authority("worker-3", authority.clone(), false);

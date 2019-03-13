@@ -134,6 +134,11 @@ impl<'a> Plan<'a> {
                             return false;
                         }
 
+                        // exception: replica egress should never be split into separate paths
+                        if let Some(ReplicaType::Bottom{ .. }) = self.graph[node].replica_type() {
+                            return true;
+                        }
+
                         if self.m.have.contains_key(&node) {
                             // we want to take this node, but not any later ones
                             found = true;
