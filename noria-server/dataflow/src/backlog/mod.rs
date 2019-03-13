@@ -226,13 +226,19 @@ impl<'a> WriteHandleEntry<'a> {
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
-        let handle = &mut self.handle.handle;
-        match handle {
-            Some(hand) => {
-            hand
-            .meta_get_and(Cow::Borrowed(&*self.key), &mut then)
-            .ok_or(())},
-            None => { Err(())}
+        match &self.handle.handle {
+            Some(handle) => {
+                handle.meta_get_and(self.key.clone(), &mut then).ok_or(())
+            },
+            None => {
+                match &self.handle.handleSR {
+                    Some(handleSR) => {
+                        handleSR.meta_get_and(self.key.clone(), &mut then).ok_or(())
+                    },
+                    None => {Err(())}
+                }
+
+            }
         }
     }
 }
