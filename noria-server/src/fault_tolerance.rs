@@ -268,3 +268,53 @@ fn lose_multi_child_bottom_replica() {
     assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![9.into(), id.into()]]);
     println!("success! now clean shutdown...");
 }
+
+#[test]
+fn lose_stateless_multi_child_domain() {
+    let txt = "CREATE TABLE data (id int, x int, y int);\n
+               QUERY x: SELECT id, x FROM data WHERE x > 2019;\n
+               QUERY y: SELECT id, y FROM data WHERE x > 2019;";
+
+    // start enough workers for the multi-child filter node to be in its own domain
+    let authority = Arc::new(LocalAuthority::new());
+    let mut g = build_authority("worker-0", authority.clone(), false);
+    let g1 = build_authority("worker-1", authority.clone(), false);
+    let _g2 = build_authority("worker-2", authority.clone(), false);
+    let _g3 = build_authority("worker-3", authority.clone(), false);
+    let _g4 = build_authority("worker-4", authority.clone(), false);
+    sleep();
+
+    g.install_recipe(txt).unwrap();
+    sleep();
+
+    let mut mutx = g.table("data").unwrap().into_sync();
+    let mut q1 = g.view("x").unwrap().into_sync();
+    let mut q2 = g.view("y").unwrap().into_sync();
+    let id = 7;
+    let y = 100;
+
+    // prime the dataflow graph
+    mutx.insert(vec![id.into(), 2020.into(), y.into()]).unwrap();
+    sleep();
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 1);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 1);
+
+    // shutdown the bottom replica and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    drop(g1);
+    thread::sleep(Duration::from_secs(3));
+    for x in 2018..2021 {
+        mutx.insert(vec![id.into(), x.into(), y.into()]).unwrap();
+    }
+    sleep();
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 1);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 1);
+
+    // wait for recovery and observe both old (some were filtered out) and new writes
+    thread::sleep(Duration::from_secs(10));
+    mutx.insert(vec![id.into(), 2020.into(), y.into()]).unwrap();
+    sleep();
+    assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 3);
+    assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
+    println!("success! now clean shutdown...");
+}
