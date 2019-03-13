@@ -16,16 +16,8 @@ crate struct SetupReplayPath {
 }
 
 #[derive(Clone)]
-crate struct UpdateEgress {
-    node: LocalNodeIndex,
-    new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
-    new_tag: Option<(Tag, NodeIndex)>,
-}
-
-#[derive(Clone)]
 crate enum SegmentPacket {
     SetupReplayPath(SetupReplayPath),
-    UpdateEgress(UpdateEgress),
 }
 
 crate type DomainSegments = HashMap<DomainIndex, Vec<Box<SegmentPacket>>>;
@@ -50,17 +42,6 @@ impl SegmentPacket {
                     trigger: trigger.clone(),
                 }
             ),
-            Packet::UpdateEgress {
-                node,
-                new_tx,
-                new_tag,
-            } => box SegmentPacket::UpdateEgress(
-                UpdateEgress {
-                    node,
-                    new_tx,
-                    new_tag,
-                }
-            ),
             _ => unreachable!(),
         }
     }
@@ -74,13 +55,6 @@ impl SegmentPacket {
                     path: m.path,
                     notify_done: m.notify_done,
                     trigger: m.trigger,
-                }
-            },
-            SegmentPacket::UpdateEgress(m) => {
-                box Packet::UpdateEgress {
-                    node: m.node,
-                    new_tx: m.new_tx,
-                    new_tag: m.new_tag,
                 }
             },
         }
@@ -408,11 +382,6 @@ impl<'a> Plan<'a> {
                             new_tx: None,
                             new_tag: Some((tag, segments[i + 1].1[0].0.into())),
                         };
-
-                        self.segments
-                            .entry(domain)
-                            .or_insert(Vec::new())
-                            .push(SegmentPacket::from_packet(&m));
 
                         self.domains
                             .get_mut(&domain)
