@@ -505,16 +505,19 @@ impl ControllerInner {
                 .unwrap();
         }
 
-        let ingress_c = self.child(failed_egress);
-        self.migrate(|mig| assert_eq!(mig.link_nodes(egress_b2, &vec![ingress_c]).len(), 0));
+        let ingress_cs = self.ingredients
+            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<NodeIndex>>();
+        self.migrate(|mig| assert_eq!(mig.link_nodes(egress_b2, &ingress_cs).len(), 0));
 
         // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
         // sending messages. B2 is in charge of realizing from that message that it also needs to
         // tell A where to resume sending messages.
         //
         // dataflow graph: A ---> B2 -o-> C
-        // TODO(ygina): multiple children
-        self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
+        for ingress_c in ingress_cs {
+            self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
+        }
     }
 
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.

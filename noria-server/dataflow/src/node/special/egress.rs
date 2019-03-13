@@ -72,6 +72,10 @@ pub struct Egress {
     next_packet_to_send: HashMap<NodeIndex, usize>,
     /// The packet buffer
     buffer: PacketBuffer,
+    /// The set of nodes it is waiting to hear from for recovery
+    waiting_for: HashSet<NodeIndex>,
+    /// Where to resume, if in recovery mode
+    resume_at: Option<usize>,
 }
 
 impl Clone for Egress {
@@ -83,6 +87,8 @@ impl Clone for Egress {
             tags: self.tags.clone(),
             next_packet_to_send: self.next_packet_to_send.clone(),
             buffer: self.buffer.clone(),
+            waiting_for: Default::default(),
+            resume_at: None,
         }
     }
 }
@@ -94,6 +100,8 @@ impl Default for Egress {
             txs: Default::default(),
             next_packet_to_send: Default::default(),
             buffer: Default::default(),
+            waiting_for: Default::default(),
+            resume_at: None,
         }
     }
 }
@@ -191,6 +199,7 @@ impl Egress {
         for i in 0..self.txs.len() {
             if self.txs[i].node == child {
                 self.txs.swap_remove(i);
+                break;
             }
         }
         self.next_packet_to_send.remove(&child);
@@ -243,6 +252,17 @@ impl Egress {
             .collect()
     }
 
+    /// Enter recovery mode, in which we are waiting to process one ResumeAt message for each
+    /// child. That's one message per egress tx. Does nothing if we are already in recovery mode.
+    /// The egress node will exit recovery mode once it has processed the last ResumeAt.
+    pub fn wait_for_resume_at(&mut self) {
+        if self.waiting_for.len() == 0 {
+            self.waiting_for = self.txs.iter().map(|tx| tx.node).collect();
+            assert!(self.waiting_for.len() > 0);
+            assert!(self.resume_at.is_none());
+        }
+    }
+
     /// Resume sending messages to this node at the label after getting that node up to date.
     /// Returns the label of the message it needs to send next that is not in the buffer.
     pub fn resume_at(
@@ -251,7 +271,7 @@ impl Egress {
         label: usize,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) -> usize {
+    ) -> Option<usize> {
         let next_label = self.buffer.next_label_to_add();
         let to_nodes = {
             let mut hs = HashSet::new();
@@ -260,12 +280,33 @@ impl Egress {
         };
 
         if label >= next_label {
+            assert!(self.waiting_for.remove(&node));
+
             // we don't have the messages we need to send
             self.next_packet_to_send.insert(node, label);
-            self.buffer.set_min_label(label);
-            return label;
+            self.resume_at = match self.resume_at {
+                Some(old_label) => {
+                    if label < old_label {
+                        Some(label)
+                    } else {
+                        Some(old_label)
+                    }
+                },
+                None => Some(label),
+            };
+
+            // if we are not waiting for any more nodes, return the label for the parent to
+            // resume at to make the dataflow graph complete
+            if self.waiting_for.len() == 0 {
+                let min_label = self.resume_at.take().unwrap();
+                self.buffer.set_min_label(min_label);
+                return Some(min_label);
+            } else {
+                return None;
+            }
         }
 
+        assert_eq!(self.waiting_for.len(), 0);
         for i in label..next_label {
             // println!("RESUME AT #[{}, {}) -> {:?}", label, next_label, to_nodes);
             // TODO(ygina): ignore to nodes, which i think only matter when a packet is sent
@@ -283,6 +324,6 @@ impl Egress {
             );
         }
         self.next_packet_to_send.insert(node, next_label);
-        next_label
+        None
     }
 }

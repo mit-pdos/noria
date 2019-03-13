@@ -1334,12 +1334,22 @@ impl Domain {
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
                         let next_label = node.borrow_mut()
-                            .with_egress_mut(|e| e.resume_at(
-                                child,
-                                label,
-                                self.shard,
-                                sends,
-                            ));
+                            .with_egress_mut(|e| {
+                                if !complete {
+                                    // this node is responsible for sending an upwards resume at
+                                    // to complete the graph. however, it must wait to receive all
+                                    // incoming resume ats first. once it does, it can send a
+                                    // single upwards message with the minimum label
+                                    e.wait_for_resume_at();
+                                }
+
+                                e.resume_at(
+                                    child,
+                                    label,
+                                    self.shard,
+                                    sends,
+                                )
+                            });
 
                         debug!(
                             self.log,
@@ -1353,10 +1363,13 @@ impl Domain {
                         // connection between this domain and its (assumed) single parent domain.
                         // TODO(ygina): uphold this assumption somewhere
                         //
-                        // in the case this egress doesn't have the right messages buffered to
-                        // resume sending messages, we ask the parent to resume at the same index
-                        if !complete {
+                        // if this ResumeAt is not complete, it means this domain does not have
+                        // any messages buffered. in this case, we ask the parent to resume at the
+                        // same index, but only once we've heard from all our children first.
+                        // TODO(ygina): more complicated index for joins, possibly filters
+                        if next_label.is_some() {
                             // TODO(ygina): assumes this domain is linear with one ingress
+                            assert!(!complete);
                             let mut ingress = None;
                             for n in self.nodes.iter() {
                                 if n.1.borrow().is_ingress() {
@@ -1370,7 +1383,7 @@ impl Domain {
                             executor.send_resume_at(
                                 ingress.borrow().with_ingress(|i| i.src()),
                                 ingress.borrow().global_addr(),
-                                next_label,
+                                next_label.unwrap(),
                                 true,
                             );
                         }
