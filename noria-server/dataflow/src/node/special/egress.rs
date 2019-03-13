@@ -100,6 +100,15 @@ impl Default for Egress {
 
 impl Egress {
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
+        // avoid adding duplicate egress txs. this happens because we send Update Egress messages
+        // both when reconnecting a replicated stateless domain, and so the domain gets the correct
+        // tags for each tx. TODO(ygina): make this less hacky
+        for tx in &self.txs {
+            if tx.node == dst_g {
+                return;
+            }
+        }
+
         self.txs.push(EgressTx {
             node: dst_g,
             local: dst_l,
