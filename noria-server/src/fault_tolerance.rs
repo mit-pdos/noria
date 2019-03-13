@@ -318,3 +318,51 @@ fn lose_stateless_multi_child_domain() {
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
     println!("success! now clean shutdown...");
 }
+
+#[test]
+fn lose_stateless_multi_parent_domain() {
+    let txt = "CREATE TABLE a (id int, x int);\n
+               CREATE TABLE b (id int, y int);\n
+               QUERY q: SELECT x, y FROM a, b WHERE a.id = b.id;";
+
+    // start enough workers for the multi-parent join node to be on its own worker
+    let authority = Arc::new(LocalAuthority::new());
+    let mut g = build_authority("worker-0", authority.clone(), true);
+    let _g1 = build_authority("worker-1", authority.clone(), false);
+    let g2 = build_authority("worker-2", authority.clone(), false);
+    sleep();
+
+    g.install_recipe(txt).unwrap();
+    sleep();
+
+    let mut muta = g.table("a").unwrap().into_sync();
+    let mut mutb = g.table("b").unwrap().into_sync();
+    let mut q = g.view("q").unwrap().into_sync();
+    let n = 3;
+    let id = 1;
+    let row = vec![id.into(), n.into()];
+
+    // prime the dataflow graph
+    muta.insert(row.clone()).unwrap();
+    muta.insert(row.clone()).unwrap();
+    mutb.insert(row.clone()).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 2);
+
+    // shutdown the bottom replica and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    drop(g2);
+    thread::sleep(Duration::from_secs(3));
+    muta.insert(row.clone()).unwrap();
+    muta.insert(row.clone()).unwrap();
+    mutb.insert(row.clone()).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 2);
+
+    // wait for recovery and observe both old and new writes
+    thread::sleep(Duration::from_secs(10));
+    mutb.insert(row).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 12);
+    println!("success! now clean shutdown...");
+}
