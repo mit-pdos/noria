@@ -39,11 +39,11 @@ impl Populate {
         }
     }
 
-    pub fn enroll_students(&mut self) {
+    pub fn enroll_students(&mut self, classes_per_student : i32) {
         // println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();
-            while classes.len() < CLASSES_PER_STUDENT && (classes.len() as i32 != self.nclasses) {
+            while classes.len() < (classes_per_student as usize) && (classes.len() as i32 != self.nclasses) {
                 let cid = self.cid();
                 if !classes.contains(&cid) {
                     classes.push(cid.clone());

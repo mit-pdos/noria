@@ -235,6 +235,8 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
+    let partial = true;
+
     assert!(
         nlogged <= nusers,
         "nusers must be greater or equal to nlogged"
@@ -256,7 +258,9 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    p.enroll_students();
+
+    p.enroll_students(nclasses);
+
     let classes = p.get_classes();
     let users = p.get_users();
     let roles = p.get_roles();
@@ -280,7 +284,7 @@ fn main() {
 
     // if partial, read 25% of the keys
     if partial {
-        let leaf = format!("post_count");
+        let leaf = format!("posts");
         let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
@@ -323,7 +327,8 @@ fn main() {
 
     let mut dur = time::Duration::from_millis(0);
     let mut lookup_vectors = Vec::new();
-    let num_at_once = 5000;
+    let num_at_once = nclasses as usize;
+
     // for each user, find the list of classes that user belongs to, and construct a vector
     // of keys to look up that ranges over the list of the cids repeatedly up until it's of len 1000.
     for uid in 0..nlogged {
@@ -356,7 +361,7 @@ fn main() {
 
     let dur = dur_to_fsec!(dur);
 
-    let num_at_once : i32 = 5000;
+    let num_at_once : i32 = nclasses;
     println!(
         "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
         num_at_once * nlogged,
