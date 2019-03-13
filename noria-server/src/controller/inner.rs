@@ -358,15 +358,14 @@ impl ControllerInner {
     fn recover_domain(&mut self, domain: DomainIndex) -> bool {
         let nodes = self.nodes_in_domain(domain);
 
-        // domains must be linear with one ingress and one egress
-        let mut ingress = None;
+        // domains must be linear with one egress and possibly multiple ingress
+        let mut ingress = Vec::new();
         let mut egress = None;
         let mut stateful = Vec::new();
-        for ni in &nodes {
-            let node = &self.ingredients[*ni];
+        for &ni in &nodes {
+            let node = &self.ingredients[ni];
             if node.is_ingress() {
-                assert!(ingress.is_none());
-                ingress = Some(ni);
+                ingress.push(ni);
             }
             if node.is_egress() {
                 assert!(egress.is_none());
@@ -401,19 +400,19 @@ impl ControllerInner {
             }
         }
 
-        let ingress = ingress.unwrap();
+        assert!(ingress.len() > 0);
         let egress = egress.unwrap();
         if stateful.len() == 1 {
-            if self.ingredients[*stateful[0]].replica_type().is_some() && nodes.len() == 3 {
+            if self.ingredients[stateful[0]].replica_type().is_some() && nodes.len() == 3 {
                 // exactly one ingress, one egress, and one stateful replica
-                self.recover_hot_spare(*stateful[0], *ingress, *egress);
+                self.recover_hot_spare(stateful[0], ingress, egress);
                 true
             } else {
                 // the stateful node does not have a replica
                 false
             }
         } else if stateful.len() == 0 {
-            self.recover_stateless_domain(*ingress, *egress);
+            self.recover_stateless_domain(ingress, egress);
             true
         } else {
             // more than one stateful node
@@ -443,9 +442,10 @@ impl ControllerInner {
     /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
     fn recover_stateless_domain(
         &mut self,
-        failed_ingress: NodeIndex,
+        failed_ingress: Vec<NodeIndex>,
         failed_egress: NodeIndex,
     ) {
+        let failed_ingress = failed_ingress[0];
         let domain_b1 = self.ingredients[failed_ingress].domain();
         assert_eq!(domain_b1, self.ingredients[failed_egress].domain());
         warn!(
@@ -524,9 +524,10 @@ impl ControllerInner {
     fn recover_hot_spare(
         &mut self,
         ni: NodeIndex,
-        failed_ingress: NodeIndex,
+        failed_ingress: Vec<NodeIndex>,
         failed_egress: NodeIndex,
     ) {
+        let failed_ingress = failed_ingress[0];
         let failed_domain = self.ingredients[ni].domain();
         assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
         assert_eq!(failed_domain, self.ingredients[failed_egress].domain());
