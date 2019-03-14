@@ -1351,6 +1351,20 @@ impl Domain {
                                 )
                             });
 
+                        // TODO(ygina): Currently, the value of next_label is the label of the
+                        // next OUTGOING packet this domain needs to send. We assume it has a
+                        // 1-to-1 correspondence to the labels of INCOMING packets - that is,
+                        // the domain is linear. We need to instead know which multiple incoming
+                        // packet labels compose an outgoing packet label. The plan is to either
+                        // store the provenance of the graph up to a fixed depth, persist the
+                        // mapping, or both.
+                        //
+                        // If this domain has multiple children, we also have to ensure that we
+                        // go through all points in time. For example, if the last packet received
+                        // of child A was 8(3,5) and of child B was 10(3,7). We have to make sure
+                        // in resuming execution that we don't go through the time 9(4,5). Note
+                        // the next labels of the children should be linearizable [sic?].
+
                         debug!(
                             self.log,
                             "resuming messages from {}",
@@ -1368,24 +1382,25 @@ impl Domain {
                         // same index, but only once we've heard from all our children first.
                         // TODO(ygina): more complicated index for joins, possibly filters
                         if next_label.is_some() {
-                            // TODO(ygina): assumes this domain is linear with one ingress
+                            // TODO(ygina): assumes this domain is linear
                             assert!(!complete);
-                            let mut ingress = None;
+                            let mut ingresses = Vec::new();
                             for n in self.nodes.iter() {
                                 if n.1.borrow().is_ingress() {
-                                    assert!(ingress.is_none());
-                                    ingress = Some(n.1);
+                                    ingresses.push(n.1);
                                 }
                             }
-                            let ingress = ingress.unwrap();
+                            assert!(ingresses.len() > 0);
 
-                            // this resume at will definitely complete the graph
-                            executor.send_resume_at(
-                                ingress.borrow().with_ingress(|i| i.src()),
-                                ingress.borrow().global_addr(),
-                                next_label.unwrap(),
-                                true,
-                            );
+                            // these resume ats will definitely complete the graph
+                            for ingress in ingresses {
+                                executor.send_resume_at(
+                                    ingress.borrow().with_ingress(|i| i.src()),
+                                    ingress.borrow().global_addr(),
+                                    next_label.unwrap(),
+                                    true,
+                                );
+                            }
                         }
                     },
                     _ => unreachable!(),

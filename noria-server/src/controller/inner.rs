@@ -445,9 +445,7 @@ impl ControllerInner {
         failed_ingress: Vec<NodeIndex>,
         failed_egress: NodeIndex,
     ) {
-        let failed_ingress = failed_ingress[0];
-        let domain_b1 = self.ingredients[failed_ingress].domain();
-        assert_eq!(domain_b1, self.ingredients[failed_egress].domain());
+        let domain_b1 = self.ingredients[failed_egress].domain();
         warn!(
             self.log,
             "recovering stateless domain {}",
@@ -455,8 +453,13 @@ impl ControllerInner {
         );
 
         // obtain the (assumed) linear path in the domain
-        let mut ni = failed_ingress;
-        let mut path = Vec::new();
+        let mut path = failed_ingress.clone();
+        let mut ni = self.child(failed_ingress[0]);
+        for &ingress in &failed_ingress {
+            // all ingress nodes are in the same domain and have the same child
+            assert_eq!(domain_b1, self.ingredients[ingress].domain());
+            assert_eq!(ni, self.child(ingress));
+        };
         while ni != failed_egress {
             path.push(ni);
             ni = self.child(ni);
@@ -466,16 +469,18 @@ impl ControllerInner {
 
         // prevent A from sending messages to B2 even once the connection is regenerated.
         // B2 won't send messages to C since it'll be a new domain.
-        let egress_a = self.parent(failed_ingress);
-        let m = box Packet::RemoveChild {
-            node: self.ingredients[egress_a].local_addr(),
-            child: failed_ingress,
-        };
-        self.domains
-            .get_mut(&self.ingredients[egress_a].domain())
-            .unwrap()
-            .send_to_healthy(m, &self.workers)
-            .unwrap();
+        for &ingress in &failed_ingress {
+            let egress_a = self.parent(ingress);
+            let m = box Packet::RemoveChild {
+                node: self.ingredients[egress_a].local_addr(),
+                child: ingress,
+            };
+            self.domains
+                .get_mut(&self.ingredients[egress_a].domain())
+                .unwrap()
+                .send_to_healthy(m, &self.workers)
+                .unwrap();
+        }
 
         // do a migration that regenerates the nodes in domain B2, which has a different index
         // from domain B1. however, the nodes in B1 and B2 have the same indexes. the domains
@@ -493,10 +498,8 @@ impl ControllerInner {
         // they receive ResumeAts.
         //
         // dataflow graph: A ---> B2 ---> C
-        let ingress_b2 = failed_ingress;
         let egress_b2 = failed_egress;
-        let domain_b2 = self.ingredients[ingress_b2].domain();
-        assert_eq!(domain_b2, self.ingredients[egress_b2].domain());
+        let domain_b2 = self.ingredients[egress_b2].domain();
         for segment in self.materializations.get_segments(domain_b1, true) {
             self.domains
                 .get_mut(&domain_b2)
