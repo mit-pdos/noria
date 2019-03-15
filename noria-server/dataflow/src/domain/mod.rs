@@ -145,6 +145,17 @@ impl DomainBuilder {
             .map(|n| n.borrow().local_addr())
             .collect();
 
+        let ingress = self.nodes
+            .iter()
+            .filter(|(_, node)| node.borrow().is_ingress())
+            .map(|(ni, _)| ni)
+            .collect::<HashSet<LocalNodeIndex>>();
+        let egress = self.nodes
+            .iter()
+            .filter(|(_, node)| node.borrow().is_egress())
+            .map(|(ni, _)| ni)
+            .collect::<HashSet<LocalNodeIndex>>();
+
         let log = log.new(o!("domain" => self.index.index(), "shard" => self.shard.unwrap_or(0)));
         let control_reply_tx = TcpSender::connect(&control_addr).unwrap();
         let group_commit_queues = GroupCommitQueueSet::new(&self.persistence_parameters);
@@ -159,6 +170,8 @@ impl DomainBuilder {
             state: StateMap::default(),
             log,
             not_ready,
+            ingress,
+            egress,
             mode: DomainMode::Forwarding,
             waiting: Default::default(),
             reader_triggered: Default::default(),
@@ -202,6 +215,8 @@ pub struct Domain {
     log: Logger,
 
     not_ready: HashSet<LocalNodeIndex>,
+    ingress: HashSet<LocalNodeIndex>,
+    egress: HashSet<LocalNodeIndex>,
 
     ingress_inject: Map<(usize, Vec<DataType>)>,
 
@@ -1384,16 +1399,10 @@ impl Domain {
                         if next_label.is_some() {
                             // TODO(ygina): assumes this domain is linear
                             assert!(!complete);
-                            let mut ingresses = Vec::new();
-                            for n in self.nodes.iter() {
-                                if n.1.borrow().is_ingress() {
-                                    ingresses.push(n.1);
-                                }
-                            }
-                            assert!(ingresses.len() > 0);
-
                             // these resume ats will definitely complete the graph
-                            for ingress in ingresses {
+                            assert!(self.ingress.len() > 0);
+                            for &ni in &self.ingress {
+                                let ingress = &self.nodes[ni];
                                 executor.send_resume_at(
                                     ingress.borrow().with_ingress(|i| i.src()),
                                     ingress.borrow().global_addr(),
