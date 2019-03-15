@@ -147,6 +147,10 @@ impl Populate {
         records
     }
 
+    pub fn nclasses(&self) -> i32 {
+        self.nclasses
+    }
+
     pub fn get_posts_per_class(&mut self, cid: DataType) -> i32 {
         self.classes[&cid].clone()
     }
