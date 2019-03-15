@@ -294,6 +294,7 @@ pub enum Packet {
         node: LocalNodeIndex,
         child: NodeIndex,
         label: usize,
+        provenance: Provenance,
         complete: bool,
     },
 }

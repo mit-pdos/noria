@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use petgraph::graph::NodeIndex;
 use std::borrow::Cow;
 use std::cell;
@@ -1335,16 +1336,40 @@ impl Domain {
                             "new" => new.index(),
                         );
 
+                        // 1. the label for the new node to resume at
+                        // 2. the provenance of the new node's label
+                        let (label, provenance) = if self.egress.len() == 0 {
+                            // only domains with reader nodes don't have an egress
+                            // so we derive the next label directly, assuming a single ancestor
+                            (label, FnvHashMap::default())
+                        } else {
+                            // otherwise get the provenance of the last label from the egress node
+                            assert_eq!(self.egress.len(), 1);
+                            let egress = *self.egress.iter().next().unwrap();
+                            let (_, out_provenance) = self.nodes[egress]
+                                .borrow_mut()
+                                .with_egress_mut(|e| {
+                                    e.new_incoming(old, new);
+                                    e.get_last_provenance()
+                                });
+
+                            // TODO(ygina): more than one depth of provenance
+                            let label = *out_provenance.get(&new).unwrap_or(&0) + 1;
+                            let provenance = FnvHashMap::default();
+                            (label, provenance)
+                        };
+
                         // tell the new incoming connection where to resume sending messages,
                         // and whether resuming messages in this connection completes the graph
                         executor.send_resume_at(
                             new,
                             node.borrow().global_addr(),
                             label,
+                            provenance,
                             complete,
                         );
                     },
-                    Packet::ResumeAt { node, child, label, complete } => {
+                    Packet::ResumeAt { node, child, label, provenance, complete } => {
                         // sanity check: the node "node" should be an egress node
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
@@ -1393,22 +1418,40 @@ impl Domain {
                         // TODO(ygina): uphold this assumption somewhere
                         //
                         // if this ResumeAt is not complete, it means this domain does not have
-                        // any messages buffered. in this case, we ask the parent to resume at the
-                        // same index, but only once we've heard from all our children first.
+                        // any messages buffered. in this case, we ask the parents to resume at a
+                        // specific index, but only once we've heard from all our children first.
                         // TODO(ygina): more complicated index for joins, possibly filters
                         if next_label.is_some() {
                             // TODO(ygina): assumes this domain is linear
-                            assert!(!complete);
                             // these resume ats will definitely complete the graph
-                            assert!(self.ingress.len() > 0);
-                            for &ni in &self.ingress {
+                            //
+                            // if the domain is linear (there is only one ingress), we can infer
+                            // the next label directly. otherwise, use the given provenance info
+                            assert!(!complete);
+                            if self.ingress.len() == 1 {
+                                let ni = *self.ingress.iter().next().unwrap();
                                 let ingress = &self.nodes[ni];
                                 executor.send_resume_at(
                                     ingress.borrow().with_ingress(|i| i.src()),
                                     ingress.borrow().global_addr(),
                                     next_label.unwrap(),
+                                    FnvHashMap::default(),
                                     true,
                                 );
+                            } else {
+                                assert!(self.ingress.len() > 0);
+                                for &ni in &self.ingress {
+                                    let ingress = &self.nodes[ni];
+                                    let egress = ingress.borrow().with_ingress(|i| i.src());
+                                    // TODO(ygina): implement depth 2 provenance
+                                    executor.send_resume_at(
+                                        egress,
+                                        ingress.borrow().global_addr(),
+                                        *provenance.get(&egress).unwrap(),
+                                        FnvHashMap::default(),
+                                        true,
+                                    );
+                                }
                             }
                         }
                     },

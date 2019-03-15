@@ -8,7 +8,7 @@ use bincode;
 use bufstream::BufStream;
 use dataflow::{
     payload::SourceChannelIdentifier,
-    prelude::{DataType, Executor},
+    prelude::{DataType, Executor, Provenance},
     Domain, Packet, PollEvent, ProcessResult,
 };
 use failure::{self, ResultExt};
@@ -309,9 +309,22 @@ impl Executor for OutOfBand {
         self.back.entry(id.token).or_default().push(id.tag);
     }
 
-    fn send_resume_at(&mut self, node: NodeIndex, child: NodeIndex, label: usize, complete: bool) {
+    fn send_resume_at(
+        &mut self,
+        node: NodeIndex,
+        child: NodeIndex,
+        label: usize,
+        provenance: Provenance,
+        complete: bool,
+    ) {
         self.ctrl_tx
-            .unbounded_send(CoordinationPayload::SendResumeAt { node, child, label, complete })
+            .unbounded_send(CoordinationPayload::SendResumeAt {
+                node,
+                child,
+                label,
+                provenance,
+                complete,
+            })
             .expect("asked to send to controller, but controller has gone away");
     }
 

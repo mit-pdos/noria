@@ -697,6 +697,7 @@ impl ControllerInner {
         node: NodeIndex,
         child: NodeIndex,
         label: usize,
+        provenance: Provenance,
         complete: bool,
     ) {
         debug!(
@@ -714,6 +715,7 @@ impl ControllerInner {
             node: self.ingredients[node].local_addr(),
             child,
             label,
+            provenance,
             complete,
         };
         dh.send_to_healthy(m, &self.workers).unwrap();

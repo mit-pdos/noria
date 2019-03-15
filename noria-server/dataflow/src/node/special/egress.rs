@@ -55,6 +55,29 @@ impl PacketBuffer {
         self.arr.get(i)
     }
 
+    /// Replace mentions of the old connection with the new connection
+    fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
+        for i in 0..self.updates.len() {
+            if self.updates[i].0 == old {
+                self.updates[i].0 = new;
+            }
+        }
+    }
+
+    /// Calculate the provenance of the message with this label
+    fn get_provenance(&self, label: usize) -> Option<Provenance> {
+        if label >= self.min_label && label <= self.max_label() {
+            let mut provenance = self.min_provenance.clone();
+            for i in (self.min_label - 1)..label {
+                let (node, label) = self.updates[i];
+                provenance.insert(node, label);
+            }
+            Some(provenance)
+        } else {
+            None
+        }
+    }
+
     /// Add a packet to the buffer, including which node was updated to produce the packet
     fn add_packet(
         &mut self,
@@ -225,6 +248,16 @@ impl Egress {
     /// The label to be assigned to the next outgoing packet.
     pub fn next_label_to_add(&self) -> usize {
         self.buffer.next_label_to_add()
+    }
+
+    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
+        self.buffer.new_incoming(old, new);
+    }
+
+    pub fn get_last_provenance(&self) -> (usize, Provenance) {
+        let max_label = self.buffer.max_label();
+        let provenance = self.buffer.get_provenance(max_label).unwrap();
+        (max_label, provenance)
     }
 
     /// Stores the packet in the buffer and tests whether we should send to each node corresponding
