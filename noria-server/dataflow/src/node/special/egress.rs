@@ -13,15 +13,22 @@ struct EgressTx {
 struct PacketBuffer {
     /// Label of the first packet in the buffer
     min_label: usize,
+    /// Provenance of the first packet in the buffer
+    min_provenance: Provenance,
+
     /// Packet payloads and lists of to-nodes
     arr: Vec<(Box<Packet>, HashSet<NodeIndex>)>,
+    /// Provenance updates of depth 1
+    updates: Vec<(NodeIndex, usize)>,
 }
 
 impl Default for PacketBuffer {
     fn default() -> PacketBuffer {
         PacketBuffer {
             min_label: 1,
+            min_provenance: Default::default(),
             arr: Default::default(),
+            updates: Default::default(),
         }
     }
 }
@@ -48,13 +55,23 @@ impl PacketBuffer {
         self.arr.get(i)
     }
 
-    fn add_packet(&mut self, packet: Box<Packet>, label: usize, to: NodeIndex) {
+    /// Add a packet to the buffer, including which node was updated to produce the packet
+    fn add_packet(
+        &mut self,
+        packet: Box<Packet>,
+        label: usize,
+        to: NodeIndex,
+        update: Option<(NodeIndex, usize)>,
+    ) {
         assert_eq!(label, self.next_label_to_add());
-        assert_eq!(label, packet.get_id().label());
+        assert_eq!(label, packet.id().unwrap().label());
 
         let mut to_nodes = HashSet::new();
         to_nodes.insert(to);
         self.arr.push((packet, to_nodes));
+        if let Some(update) = update {
+            self.updates.push(update);
+        }
     }
 
     fn add_to_node(&mut self, label: usize, to: NodeIndex) {
@@ -217,20 +234,24 @@ impl Egress {
     /// Note that it's ok for the next packet to send to be ahead of the packets that have actually
     /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
     /// it is lost anyway on crash.
-    pub fn send_packet(&mut self, m: &Box<Packet>) -> HashSet<NodeIndex> {
+    pub fn send_packet(
+        &mut self,
+        m: &Box<Packet>,
+        update: Option<(NodeIndex, usize)>,
+    ) -> HashSet<NodeIndex> {
         let nodes: Vec<NodeIndex> = self.txs
             .iter()
             .map(|tx| tx.node)
             .collect();
 
-        // println!("SEND PACKET #{} -> {:?}", m.get_id().label(), nodes);
+        // println!("SEND PACKET #{} -> {:?}", m.id().unwrap().label(), nodes);
         nodes
             .iter()
             .filter(|&&ni| {
                 // push the packet payload and target to-nodes to the buffer
-                let label = m.get_id().label();
+                let label = m.id().unwrap().label();
                 if label > self.buffer.max_label() {
-                    self.buffer.add_packet(box m.clone_data(), label, ni);
+                    self.buffer.add_packet(box m.clone_data(), label, ni, update);
                 } else {
                     self.buffer.add_to_node(label, ni);
                 }

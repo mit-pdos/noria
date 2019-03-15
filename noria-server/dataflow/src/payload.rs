@@ -10,6 +10,7 @@ use noria::channel;
 use noria::internal::LocalOrNot;
 use prelude::*;
 
+use fnv::FnvHashMap;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::SocketAddr;
@@ -77,20 +78,25 @@ pub struct SourceChannelIdentifier {
     pub tag: u32,
 }
 
+pub type Provenance = FnvHashMap<NodeIndex, usize>;
+
 /// External ids are used the first time the packet appears in a domain.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PacketId {
     label: usize,
     from: NodeIndex,
+
+    // Provenance (depth 1)
+    update: NodeIndex,
 }
 
 impl PacketId {
     pub fn default() -> PacketId {
-        PacketId { label: 54321, from: NodeIndex::new(54321) }
+        unreachable!();
     }
 
-    pub fn new(label: usize, from: NodeIndex) -> PacketId {
-        PacketId { label, from }
+    pub fn new(label: usize, from: NodeIndex, update: NodeIndex) -> PacketId {
+        PacketId { label, from, update }
     }
 
     pub fn label(&self) -> usize {
@@ -99,6 +105,10 @@ impl PacketId {
 
     pub fn from(&self) -> NodeIndex {
         self.from
+    }
+
+    pub fn update(&self) -> NodeIndex {
+        self.update
     }
 }
 
@@ -289,10 +299,10 @@ pub enum Packet {
 }
 
 impl Packet {
-    crate fn get_id(&self) -> PacketId {
+    crate fn id(&self) -> Option<PacketId> {
         match *self {
-            Packet::Message { id, .. } => id.unwrap(),
-            Packet::ReplayPiece { id, .. } => id.unwrap(),
+            Packet::Message { id, .. } => id,
+            Packet::ReplayPiece { id, .. } => id,
             _ => unreachable!(),
         }
     }

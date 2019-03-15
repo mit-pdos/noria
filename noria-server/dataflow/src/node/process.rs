@@ -79,11 +79,18 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref e)) => {
-                let pid = PacketId::new(e.next_label_to_add(), self.global_addr());
+                let old_pid = m.as_ref().unwrap().id();
+                let pid = PacketId::new(
+                    e.next_label_to_add(),
+                    self.global_addr(),
+                    self.global_addr(),
+                );
                 m.as_mut().unwrap().set_id(pid);
 
                 self.with_egress_mut(|e| {
-                    let to_nodes = e.send_packet(m.as_ref().unwrap());
+                    // use the old packet id and from node to set the provenance of the new packet
+                    let update = old_pid.map(|pid| (pid.update(), pid.label()));
+                    let to_nodes = e.send_packet(m.as_ref().unwrap(), update);
                     e.process(m, on_shard.unwrap_or(0), output, &to_nodes)
                 });
                 (vec![], HashSet::new())
