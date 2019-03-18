@@ -209,20 +209,20 @@ impl<'a> Migration<'a> {
         if !self.readers.contains_key(&n) {
             let r = node::special::Reader::new(n);
 
-            println!("CREATING READER NODE in migration: name: {:?}, node index: {:?}", name, n);
-            println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
+            // println!("CREATING READER NODE in migration: name: {:?}, node index: {:?}", name, n);
+            // println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
             // make a reader
 
             let r = if let Some(name) = name.clone() {
-                println!("branch1");
+                // println!("branch1");
                 self.mainline.ingredients[n].named_mirror(r, name.clone())
             } else {
-                println!("branch2");
+                // println!("branch2");
                 self.mainline.ingredients[n].mirror(r)
             };
 
             let r = self.mainline.ingredients.add_node(r);
-            println!("new r: {:?}", r);
+            // println!("new r: {:?}", r);
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
@@ -246,7 +246,7 @@ impl<'a> Migration<'a> {
             let mut matched = false;
             match general_query {
                 Some(name_) => {
-                    println!("branch3");
+                    // println!("branch3");
                     let mut add = false;
                     let mut added_set = None;
                     match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -268,7 +268,7 @@ impl<'a> Migration<'a> {
             if !matched {
                 match name {
                     Some(name_) => {
-                        println!("branch4");
+                        // println!("branch4");
                         let mut add = false;
                         let mut added_set = None;
                         match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -287,7 +287,7 @@ impl<'a> Migration<'a> {
                 }
             }
 
-            println!("name: {:?}, reader: {:?}", n, r);
+            // println!("name: {:?}, reader: {:?}", n, r);
             self.readers.insert(n, r);
         }
     }

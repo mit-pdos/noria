@@ -117,7 +117,7 @@ impl Handle {
     where
         I: IntoIterator<Item = Record>,
     {
-        println!("adding");
+        // println!("adding");
         // println!("working yay: key: {:?} ", key.clone());
         let mut memory_delta = 0isize;
         match *self {

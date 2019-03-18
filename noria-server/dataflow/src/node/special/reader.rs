@@ -169,9 +169,9 @@ impl Reader {
     }
 
     pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool, id: Option<usize>) {
-        println!("reader node process. for node: {:?}", self.for_node);
+        // println!("reader node process. for node: {:?}", self.for_node);
         if let Some(ref mut state) = self.writer {
-            println!("reader node process. writer uid: {:?}", state.uid);
+            // println!("reader node process. writer uid: {:?}", state.uid);
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
@@ -222,15 +222,15 @@ impl Reader {
                 });
             }
 
-            println!("ID FOR STATE ADDED: {:?}", id);
+            // println!("ID FOR STATE ADDED: {:?}", id);
             if self.streamers.is_empty() {
-                println!("state add");
+                // println!("state add");
                 let data = m.take_data();
-                println!("data: {:?}", data);
+                // println!("data: {:?}", data);
                 // println!("reader data: {:?}", data);
                 state.add(data, id);
             } else {
-                println!("state add 2");
+                // println!("state add 2");
                 state.add(m.data().iter().cloned(), id);
             }
 

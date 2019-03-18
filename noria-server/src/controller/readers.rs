@@ -33,14 +33,14 @@ pub(crate) fn handle_message(
     m: ReadQuery,
     s: &mut Readers,
 ) -> impl Future<Item = ReadReply, Error = bincode::Error> + Send {
-    println!("read query: {:?}", m);
+    // println!("read query: {:?}", m);
     match m {
         ReadQuery::Normal {
             target,
             mut keys,
             block,
         } => {
-            println!("target: {:?}", target);
+            // println!("target: {:?}", target);
             let mut uid = None;
             let immediate = READERS.with(|readers_cache| {
                 let mut readers_cache = readers_cache.borrow_mut();
@@ -48,9 +48,9 @@ pub(crate) fn handle_message(
                     let readers = s.lock().unwrap();
                     readers.get(&target).unwrap().clone()
                 });
-                println!("handling message");
+                // println!("handling message");
 
-                println!("reader's uid: {:?}", reader.uid);
+                // println!("reader's uid: {:?}", reader.uid);
 
                 uid = Some(reader.uid);
 
@@ -61,7 +61,7 @@ pub(crate) fn handle_message(
                 let found = keys
                     .iter_mut()
                     .map(|key| {
-                        println!("trying to find key: {:?}", key);
+                        // println!("trying to find key: {:?}", key);
                         let rs = reader.try_find_and(key, dup).map(|r| r.0);
                         (key, rs)
                     })
@@ -96,7 +96,7 @@ pub(crate) fn handle_message(
                     // trigger backfills for all the keys we missed on for later
                     for key in &keys {
                         if !key.is_empty() {
-                            println!("triggering replay!");
+                            // println!("triggering replay!");
                             reader.trigger(key, uid);
                         }
                     }
@@ -109,10 +109,10 @@ pub(crate) fn handle_message(
                 Ok(reply) => Either::A(Either::A(future::ok(reply))),
                 Err((keys, ret)) => {
                     if !block {
-                        println!("non blocking read");
+                        // println!("non blocking read");
                         Either::A(Either::A(future::ok(ReadReply::Normal(Ok(ret)))))
                     } else {
-                        println!("about to do what looks like a blocking read, id: {:?}", uid);
+                        // println!("about to do what looks like a blocking read, id: {:?}", uid);
                         let trigger = time::Duration::from_micros(RETRY_TIMEOUT_US);
                         let retry = time::Duration::from_micros(10);
                         let now = time::Instant::now();
@@ -171,7 +171,7 @@ impl Future for BlockingRead {
                 readers.get(target).unwrap().clone()
             });
 
-            println!("blocking read: {:?}", reader.uid);
+            // println!("blocking read: {:?}", reader.uid);
 
             let mut triggered = false;
             let mut missing = false;
@@ -193,7 +193,7 @@ impl Future for BlockingRead {
                         }
                         Ok(None) => {
                             if now > self.next_trigger {
-                                println!("triggering");
+                                // println!("triggering");
                                 // maybe the key was filled but then evicted, and we missed it?
                                 reader.trigger(key, self.id);
                                 triggered = true;

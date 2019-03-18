@@ -138,7 +138,7 @@ impl Base {
         mut ops: Vec<TableOperation>,
         state: &StateMap,
     ) -> Records {
-        println!("process1");
+        // println!("process1");
         if self.primary_key.is_none() || ops.is_empty() {
             return ops
                 .into_iter()

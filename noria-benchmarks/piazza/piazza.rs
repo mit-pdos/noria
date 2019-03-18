@@ -248,8 +248,11 @@ fn main() {
 
     println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
+    println!("here1");
     backend.migrate(sloc, None).unwrap();
+    println!("here2");
     backend.set_security_config(ploc);
+    println!("here3");
     backend.migrate(sloc, Some(qloc)).unwrap();
     let populate = match populate.as_ref() {
         "before" => PopulateType::Before,
@@ -257,13 +260,18 @@ fn main() {
         _ => PopulateType::NoPopulate,
     };
 
+    println!("here4");
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-
+    println!("here5");
     p.enroll_students(nclasses);
 
+    println!("getting classes");
     let classes = p.get_classes();
+    println!("getting users");
     let users = p.get_users();
+    println!("getting roles");
     let roles = p.get_roles();
+    println!("getting posts");
     let posts = p.get_posts();
 
     backend.populate("Role", roles);
@@ -331,7 +339,7 @@ fn main() {
     for uid in 0..nlogged {
         match enrollment_info.get(&uid.into()) {
             Some(classes) => {
-                println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
                 let mut class_vec = Vec::new();
                 for class in classes {
                     class_vec.push([class.clone()].to_vec());
@@ -339,10 +347,10 @@ fn main() {
                 let leaf = format!("posts_u{}", uid);
                 let mut getter = backend.g.view(&leaf).unwrap();
                 let start = time::Instant::now();
-                println!("MULTI LOOKUP FOR USER {}", uid);
+                // println!("MULTI LOOKUP FOR USER {}", uid);
                 let res = getter.multi_lookup(class_vec.clone(), true);
                 dur += start.elapsed();
-                println!("res: {:?}", res);
+                // println!("res: {:?}", res);
             },
             None => println!("why isn't user {:?} enrolled", uid),
         }

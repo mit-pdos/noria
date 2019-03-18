@@ -295,6 +295,8 @@ impl Recipe {
             expressions_removed: 0,
         };
 
+        println!("recipe: creating universe");
+
         if self.security_config.is_some() {
             // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(

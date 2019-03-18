@@ -290,7 +290,7 @@ impl WriteHandle {
             match handle {
                 Some(hand) => {
                     let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    println!("CLONING NEW USER. uid: {}", uid);
+                    // println!("CLONING NEW USER. uid: {}", uid);
                     let r = r.clone_new_user(r_handle, uid.clone());
                     let w =  WriteHandle {
                         handle: None,
@@ -310,7 +310,7 @@ impl WriteHandle {
             return None;
         }
     }
-    
+
 
     pub(crate) fn clone_new_user_partial(&mut self, r: &mut SingleReadHandle, trigger: Option<Arc<Fn(&[DataType], Option<usize>) + Send + Sync>>) -> Option<(SingleReadHandle, WriteHandle)> {
         if self.srmap {
@@ -318,7 +318,7 @@ impl WriteHandle {
             match handle {
                 Some(hand) => {
                     let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    println!("CLONING NEW USER. uid: {}", uid);
+                    // println!("CLONING NEW USER. uid: {}", uid);
                     let r = r.clone_new_user_partial(r_handle, uid.clone(), trigger);
                     let w =  WriteHandle {
                         handle: None,
@@ -620,7 +620,7 @@ impl SingleReadHandle {
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         if self.srmap {
-            println!("try find and. uid: {:?}", self.uid);
+            // println!("try find and. uid: {:?}", self.uid);
             let handle = &mut self.handleSR;
             match handle {
                 Some(hand) => {
