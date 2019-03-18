@@ -39,6 +39,10 @@ impl Populate {
         }
     }
 
+    pub fn get_enrollment(&mut self) -> HashMap<DataType, Vec<DataType>> {
+        self.students.clone()
+    }
+
     pub fn enroll_students(&mut self, classes_per_student : i32) {
         // println!("Enrolling students...");
         for i in 0..self.nusers {

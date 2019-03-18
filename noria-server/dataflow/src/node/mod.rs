@@ -58,6 +58,7 @@ impl Node {
     }
 
     pub fn named_mirror<NT: Into<NodeType>>(&self, n: NT, name: String) -> Node {
+        println!("named mirror w/ name: {:?}, fields: {:?}", name, self.fields);
         Self::new(name, &self.fields, n)
     }
 }

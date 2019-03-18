@@ -235,7 +235,7 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
 
-    let partial = true;
+    //let partial = true;
 
     assert!(
         nlogged <= nusers,
@@ -326,37 +326,26 @@ fn main() {
     }
 
     let mut dur = time::Duration::from_millis(0);
-    let mut lookup_vectors = Vec::new();
     let num_at_once = nclasses as usize;
-
-    // for each user, find the list of classes that user belongs to, and construct a vector
-    // of keys to look up that ranges over the list of the cids repeatedly up until it's of len 1000.
+    let mut enrollment_info = p.get_enrollment();
     for uid in 0..nlogged {
-        let mut lookup_vec = Vec::new();
-
-        let classes_for_student = p.classes_for_student(uid as usize);
-
-        let mut posts_per_class = Vec::new();
-        for class in classes_for_student.clone() {
-            posts_per_class.push(p.get_posts_per_class(class.clone()));
+        match enrollment_info.get(&uid.into()) {
+            Some(classes) => {
+                println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                let mut class_vec = Vec::new();
+                for class in classes {
+                    class_vec.push([class.clone()].to_vec());
+                }
+                let leaf = format!("posts_u{}", uid);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                let start = time::Instant::now();
+                println!("MULTI LOOKUP FOR USER {}", uid);
+                let res = getter.multi_lookup(class_vec.clone(), true);
+                dur += start.elapsed();
+                println!("res: {:?}", res);
+            },
+            None => println!("why isn't user {:?} enrolled", uid),
         }
-
-        println!("Student: {:?}, Enrolled in classes: {:?}, # Posts per class: {:?}", uid, classes_for_student, posts_per_class);
-
-        for i in 0..(num_at_once/classes_for_student.len()) {
-            for class in classes_for_student.clone() {
-                lookup_vec.push([class.clone()].to_vec());
-            }
-        }
-        lookup_vectors.push(lookup_vec);
-    }
-
-    for uid in 0..nlogged {
-        let leaf = format!("posts_u{}", uid);
-        let mut getter = backend.g.view(&leaf).unwrap();
-        let start = time::Instant::now();
-        let res = getter.multi_lookup(lookup_vectors[uid as usize].clone(), false);
-        dur += start.elapsed();
     }
 
     let dur = dur_to_fsec!(dur);

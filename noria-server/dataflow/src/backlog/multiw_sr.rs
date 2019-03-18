@@ -113,10 +113,11 @@ impl Handle {
     }
 
 
-    pub fn add<I>(&mut self, key: &[usize], cols: usize, rs: I) -> isize
+    pub fn add<I>(&mut self, key: &[usize], cols: usize, rs: I, id: Option<usize>) -> isize
     where
         I: IntoIterator<Item = Record>,
     {
+        println!("adding");
         // println!("working yay: key: {:?} ", key.clone());
         let mut memory_delta = 0isize;
         match *self {
@@ -127,7 +128,7 @@ impl Handle {
                     match r {
                         Record::Positive(r) => {
                             memory_delta += r.deep_size_of() as isize;
-                            h.insert(r[key[0]].clone(), r);
+                            h.insert(r[key[0]].clone(), r, id);
                         }
                         Record::Negative(r) => {
                             // TODO: evmap will remove the empty vec for a key if we remove the
@@ -135,7 +136,7 @@ impl Handle {
                             // replay, which will produce an empty result. this will work, but is
                             // somewhat inefficient.
                             memory_delta -= r.deep_size_of() as isize;
-                            h.remove(r[key[0]].clone());
+                            h.remove(r[key[0]].clone(), id);
                         }
                     }
                 }
@@ -147,11 +148,11 @@ impl Handle {
                     match r {
                         Record::Positive(r) => {
                             memory_delta += r.deep_size_of() as isize;
-                            h.insert((r[key[0]].clone(), r[key[1]].clone()), r);
+                            h.insert((r[key[0]].clone(), r[key[1]].clone()), r, id);
                         }
                         Record::Negative(r) => {
                             memory_delta -= r.deep_size_of() as isize;
-                            h.remove((r[key[0]].clone(), r[key[1]].clone()));
+                            h.remove((r[key[0]].clone(), r[key[1]].clone()), id);
                         }
                     }
                 }
@@ -162,11 +163,11 @@ impl Handle {
                 match r {
                     Record::Positive(r) => {
                         memory_delta += r.deep_size_of() as isize;
-                        h.insert(key, r);
+                        h.insert(key, r, id);
                     }
                     Record::Negative(r) => {
                         memory_delta -= r.deep_size_of() as isize;
-                        h.remove(key);
+                        h.remove(key, id);
                     }
                 }
             }

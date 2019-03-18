@@ -359,17 +359,17 @@ impl SqlIncorporator {
         let reuse_candidates = reuse_config.reuse_candidates(&mut qg, &self.query_graphs);
 
         if reuse_candidates.len() > 0 {
-            info!(
-                self.log,
-                "Identified {} candidate QGs for reuse",
-                reuse_candidates.len()
-            );
-            info!(
-                self.log,
-                "This QG: {:#?}\nReuse candidates:\n{:#?}",
-                qg,
-                reuse_candidates
-            );
+            // info!(
+            //     self.log,
+            //     "Identified {} candidate QGs for reuse",
+            //     reuse_candidates.len()
+            // );
+            // info!(
+            //     self.log,
+            //     "This QG: {:#?}\nReuse candidates:\n{:#?}",
+            //     qg,
+            //     reuse_candidates
+            // );
 
             let mut mir_queries = Vec::new();
             for uid in reuse_config.reuse_universes(universe, &self.universes) {

@@ -33,19 +33,27 @@ pub(crate) fn handle_message(
     m: ReadQuery,
     s: &mut Readers,
 ) -> impl Future<Item = ReadReply, Error = bincode::Error> + Send {
+    println!("read query: {:?}", m);
     match m {
         ReadQuery::Normal {
             target,
             mut keys,
             block,
         } => {
+            println!("target: {:?}", target);
+            let mut uid = None;
             let immediate = READERS.with(|readers_cache| {
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
                     readers.get(&target).unwrap().clone()
                 });
-                let uid = reader.universe() + 1;
+                println!("handling message");
+
+                println!("reader's uid: {:?}", reader.uid);
+
+                uid = Some(reader.uid);
+
                 let mut ret = Vec::with_capacity(keys.len());
                 ret.resize(keys.len(), Vec::new());
                 // println!("searching for keys: {:?}", keys.clone());
@@ -53,6 +61,7 @@ pub(crate) fn handle_message(
                 let found = keys
                     .iter_mut()
                     .map(|key| {
+                        println!("trying to find key: {:?}", key);
                         let rs = reader.try_find_and(key, dup).map(|r| r.0);
                         (key, rs)
                     })
@@ -87,7 +96,8 @@ pub(crate) fn handle_message(
                     // trigger backfills for all the keys we missed on for later
                     for key in &keys {
                         if !key.is_empty() {
-                            reader.trigger(key);
+                            println!("triggering replay!");
+                            reader.trigger(key, uid);
                         }
                     }
                 }
@@ -99,11 +109,14 @@ pub(crate) fn handle_message(
                 Ok(reply) => Either::A(Either::A(future::ok(reply))),
                 Err((keys, ret)) => {
                     if !block {
+                        println!("non blocking read");
                         Either::A(Either::A(future::ok(ReadReply::Normal(Ok(ret)))))
                     } else {
+                        println!("about to do what looks like a blocking read, id: {:?}", uid);
                         let trigger = time::Duration::from_micros(RETRY_TIMEOUT_US);
                         let retry = time::Duration::from_micros(10);
                         let now = time::Instant::now();
+
                         Either::A(Either::B(BlockingRead {
                             target,
                             keys,
@@ -112,6 +125,7 @@ pub(crate) fn handle_message(
                             retry: tokio::timer::Interval::new(now + retry, retry),
                             trigger_timeout: trigger,
                             next_trigger: now,
+                            id: uid,
                         }))
                     }
                 }
@@ -141,6 +155,7 @@ struct BlockingRead {
     retry: tokio::timer::Interval,
     trigger_timeout: time::Duration,
     next_trigger: time::Instant,
+    id: Option<usize>,
 }
 
 impl Future for BlockingRead {
@@ -155,6 +170,8 @@ impl Future for BlockingRead {
                 let readers = s.lock().unwrap();
                 readers.get(target).unwrap().clone()
             });
+
+            println!("blocking read: {:?}", reader.uid);
 
             let mut triggered = false;
             let mut missing = false;
@@ -176,8 +193,9 @@ impl Future for BlockingRead {
                         }
                         Ok(None) => {
                             if now > self.next_trigger {
+                                println!("triggering");
                                 // maybe the key was filled but then evicted, and we missed it?
-                                reader.trigger(key);
+                                reader.trigger(key, self.id);
                                 triggered = true;
                             }
                             missing = true;

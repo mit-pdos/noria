@@ -1,6 +1,7 @@
 use backlog;
 use noria::channel;
 use prelude::*;
+use std::collections::HashMap;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
 #[derive(Clone, Debug, PartialEq)]
@@ -37,6 +38,7 @@ pub struct Reader {
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
     materialization_info: Option<(usize, usize)>,
+    pub replay_req_to_uid: HashMap<DataType, usize>,
 }
 
 impl Clone for Reader {
@@ -47,7 +49,8 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
-            materialization_info: None
+            materialization_info: None,
+            replay_req_to_uid: self.replay_req_to_uid.clone(),
         }
     }
 }
@@ -59,7 +62,8 @@ impl Reader {
             streamers: Vec::new(),
             state: None,
             for_node,
-            materialization_info: None
+            materialization_info: None,
+            replay_req_to_uid: HashMap::new(),
         }
     }
 
@@ -85,7 +89,8 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
-            materialization_info: None
+            materialization_info: None,
+            replay_req_to_uid: self.replay_req_to_uid.clone(),
         }
     }
 
@@ -163,8 +168,10 @@ impl Reader {
         }
     }
 
-    pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
+    pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool, id: Option<usize>) {
+        println!("reader node process. for node: {:?}", self.for_node);
         if let Some(ref mut state) = self.writer {
+            println!("reader node process. writer uid: {:?}", state.uid);
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
@@ -215,12 +222,16 @@ impl Reader {
                 });
             }
 
+            println!("ID FOR STATE ADDED: {:?}", id);
             if self.streamers.is_empty() {
+                println!("state add");
                 let data = m.take_data();
+                println!("data: {:?}", data);
                 // println!("reader data: {:?}", data);
-                state.add(data);
+                state.add(data, id);
             } else {
-                state.add(m.data().iter().cloned());
+                println!("state add 2");
+                state.add(m.data().iter().cloned(), id);
             }
 
             if swap {

@@ -253,6 +253,7 @@ impl Domain {
         miss_key: Vec<DataType>,
         miss_columns: &[usize],
         miss_in: LocalNodeIndex,
+        id: Option<usize>,
     ) {
         let mut found = false;
         let tags: Vec<Tag> = self.replay_paths.keys().cloned().collect();
@@ -359,7 +360,7 @@ impl Domain {
             return;
         }
 
-        self.find_tags_and_replay(miss_key, miss_columns, miss_in);
+        self.find_tags_and_replay(miss_key, miss_columns, miss_in, None);
     }
 
     fn send_partial_replay_request(&mut self, tag: Tag, key: Vec<DataType>) {
@@ -535,6 +536,7 @@ impl Domain {
                 true,
                 sends,
                 executor,
+                None,
             );
             assert_eq!(captured.len(), 0);
             self.process_ptimes.stop();
@@ -868,6 +870,7 @@ impl Domain {
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
+                                println!("partial global srmap, id: {:?}", gid);
 
                                 let mut srmap = true;
 
@@ -882,7 +885,6 @@ impl Domain {
                                             .unwrap()
                                             .build_async()
                                             .unwrap();
-
                                         tokio::spawn(
                                             self.shutdown_valve
                                                 .wrap(rx)
@@ -890,6 +892,7 @@ impl Domain {
                                                     key: miss,
                                                     cols: key.clone(),
                                                     node: node,
+                                                    id: uid,
                                                 })
                                                 .fold(sender, move |sender, m| {
                                                     sender.send(m).map_err(|e| {
@@ -905,8 +908,8 @@ impl Domain {
                                         tx
                                     }).collect::<Vec<_>>();
 
-                                let (mut r_part, mut w_part): (backlog::SingleReadHandle,
-                                                               backlog::WriteHandle);
+                                let mut handles: Option<(backlog::SingleReadHandle,
+                                                               backlog::WriteHandle)> = None;
 
                                 let mut ids = 0 as usize;
                                 match uid {
@@ -943,36 +946,19 @@ impl Domain {
                                             } else {
                                                 // SRMap created --> get set of handles.
                                                 create_new_srmap = false;
-
                                                 let mut res = &mut self.srmap_handles[offset];
-                                                let (mut tr_part, mut tw_part) = res.1.clone(&mut res.0).unwrap();
-                                                let (mut tr_part, mut tw_part) = tw_part.clone_new_user(&mut tr_part).unwrap();
-
-                                                let mut n = self.nodes[node].borrow_mut();
-                                                n.with_reader_mut(|r| {
-                                                    assert!(
-                                                        self.readers
-                                                            .lock()
-                                                            .unwrap()
-                                                            .insert(
-                                                                (gid, *self.shard.as_ref().unwrap_or(&0)),
-                                                                tr_part
-                                                            ).is_none()
-                                                    );
-
-                                                    r.set_materialization_info(materialization_info.clone());
-
-                                                    // make sure Reader is actually prepared to receive state
-                                                    r.set_write_handle(tw_part)
-                                                }).unwrap();
+                                                handles = Some(res.1.clone(&mut res.0).unwrap());
                                             }
                                         },
-                                        None => {}
+                                        None => {
+                                            // Create new SRMap if one doesn't already exist.
+
+                                        }
                                     };
 
-                                    // Create new SRMap if one doesn't already exist.
                                     if create_new_srmap {
-                                        let (mut tr_part, mut tw_part) = backlog::new_partial(srmap, cols, &k[..], move |miss| {
+                                        println!("creating new partial global srmap");
+                                        let (mut tr_part, mut tw_part) = backlog::new_partial(srmap, cols, &k[..], move |miss, uid| {
                                             let n = txs.len();
                                             let tx = if n == 1 {
                                                 &txs[0]
@@ -981,6 +967,7 @@ impl Domain {
                                                 assert_eq!(miss.len(), 1);
                                                 &txs[::shard_by(&miss[0], n)]
                                             };
+                                            println!("in trigger func");
                                             tx.unbounded_send(Vec::from(miss)).unwrap();
                                         }, ids);
 
@@ -1006,11 +993,52 @@ impl Domain {
                                             r.set_materialization_info(materialization_info.clone());
 
                                             // make sure Reader is actually prepared to receive state
-                                            r.set_write_handle(tw_part)
+                                            println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
+                                            r.set_write_handle(tw_part);
                                         }).unwrap();
+                                    } else {
+                                        match handles {
+                                            Some(mut _handles) => {
+                                                let (mut tr_part, mut tw_part) = _handles.1.clone_new_user_partial(&mut _handles.0, Some(Arc::new(move |miss, uid| {
+                                                    let n = txs.clone().len();
+                                                    let tx = if n == 1 {
+                                                        &txs[0]
+                                                    } else {
+                                                        // TODO: compound reader
+                                                        assert_eq!(miss.len(), 1);
+                                                        &txs[::shard_by(&miss[0], n)]
+                                                    };
+                                                    println!("in trigger func");
+                                                    tx.unbounded_send(Vec::from(miss)).unwrap();
+                                                }))).unwrap();
+
+                                                let mut n = self.nodes[node].borrow_mut();
+                                                n.with_reader_mut(|r| {
+                                                    assert!(
+                                                        self.readers
+                                                            .lock()
+                                                            .unwrap()
+                                                            .insert(
+                                                                (gid, *self.shard.as_ref().unwrap_or(&0)),
+                                                                tr_part
+                                                            ).is_none()
+                                                    );
+
+                                                    r.set_materialization_info(materialization_info.clone());
+
+                                                    // make sure Reader is actually prepared to receive state
+                                                    println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
+                                                    r.set_write_handle(tw_part);
+                                                }).unwrap();
+                                            },
+                                            None => {
+
+                                            }
+                                        }
                                     }
+
                                 } else {
-                                    let (r_part, w_part) = backlog::new_partial(false, cols, &k[..], move |miss| {
+                                    let (r_part, w_part) = backlog::new_partial(false, cols, &k[..], move |miss, uid| {
                                     let n = txs.len();
                                     let tx = if n == 1 {
                                         &txs[0]
@@ -1019,6 +1047,7 @@ impl Domain {
                                         assert_eq!(miss.len(), 1);
                                         &txs[::shard_by(&miss[0], n)]
                                     };
+                                    println!("MISS: {:?}", miss);
                                     tx.unbounded_send(Vec::from(miss)).unwrap();
                                     }, ids);
 
@@ -1221,6 +1250,7 @@ impl Domain {
                             }
                         };
 
+                        println!("REPLAY PATH: tag  = {:?}, path = {:?}", tag, path);
                         self.replay_paths.insert(
                             tag,
                             ReplayPath {
@@ -1231,19 +1261,23 @@ impl Domain {
                             },
                         );
                     }
-                    Packet::RequestReaderReplay { key, cols, node } => {
+                    Packet::RequestReaderReplay { key, cols, node, id } => {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
+                        println!("reader req replay for node: {:?}", node);
+
                         let still_miss = self.nodes[node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
+                                println!("request reader replay");
                                 let w = r
                                     .writer_mut()
                                     .expect("reader replay requested for non-materialized reader");
                                 // ensure that all writes have been applied
-
+                                println!("uid: {:?}", w.uid);
                                 w.swap();
+                                println!("call to try find and w key {:?}", key);
                                 w.with_key(&key[..])
                                     .try_find_and(|_| ())
                                     .expect("reader replay requested for non-ready reader")
@@ -1259,7 +1293,7 @@ impl Domain {
                             .or_default()
                             .insert(key.clone())
                         {
-                            self.find_tags_and_replay(key, &cols[..], node);
+                            self.find_tags_and_replay(key, &cols[..], node, id);
                         }
                     }
                     Packet::RequestPartialReplay { tag, key } => {
@@ -1313,6 +1347,7 @@ impl Domain {
                                 last: state.is_empty(),
                             },
                             data: Vec::<Record>::new().into(),
+                            id: None,
                         };
 
                         if !state.is_empty() {
@@ -1382,6 +1417,7 @@ impl Domain {
                                             link: link.clone(), // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
                                             data: chunk,
+                                            id: None,
                                         };
 
                                         trace!(log, "sending batch"; "#" => i, "[]" => len);
@@ -1635,6 +1671,7 @@ impl Domain {
                             ignore: false,
                         },
                         data: rs.into(),
+                        id: None,
                     })
                 } else {
                     None
@@ -1746,6 +1783,7 @@ impl Domain {
                             ignore: false,
                         },
                         data,
+                        id: None,
                     });
                     (m, source, None)
                 } else {
@@ -1830,7 +1868,9 @@ impl Domain {
                     link,
                     mut data,
                     mut context,
+                    id,
                 } => {
+                    println!("replaying piece!");
                     // println!("data in replay: {:?}", data.clone());
                     if let ReplayPieceContext::Partial { ref for_keys, .. } = context {
                         trace!(
@@ -1899,9 +1939,10 @@ impl Domain {
                         tag,
                         data,
                         context: context.clone(),
+                        id: None,
                     };
                     let mut m = Some(m);
-
+                    println!("path : {:?}", path);
                     for (i, segment) in path.iter().enumerate() {
                         let mut n = self.nodes[segment.node].borrow_mut();
                         let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
@@ -1938,9 +1979,11 @@ impl Domain {
                             // triggered this replay initially.
                             if let Some(state) = self.state.get_mut(segment.node) {
                                 for key in backfill_keys.iter() {
+                                    println!("mf1");
                                     state.mark_filled(key.clone(), &tag);
                                 }
                             } else {
+                                // println!("else block")
                                 n.with_reader_mut(|r| {
                                     // we must be filling a hole in a Reader. we need to ensure
                                     // that the hole for the key we're replaying ends up being
@@ -1948,6 +1991,7 @@ impl Domain {
                                     let w = r.writer_mut();
                                     w.map(|mut wh| {
                                         for key in backfill_keys.iter() {
+                                            println!("mf2");
                                             wh.mut_with_key(&key[..]).mark_filled();
                                         }
                                     });
@@ -1955,6 +1999,7 @@ impl Domain {
                                 .unwrap();
                             }
                         }
+                        println!("before here 3");
                         // // println!("m data: {:?}", m.as_ref().unwrap().data());
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
@@ -1966,7 +2011,10 @@ impl Domain {
                             false,
                             sends,
                             None,
+                            id
                         );
+
+                        println!("here3");
 
                         // // println!("m data 2: {:?}", m.as_ref().unwrap().data());
 
@@ -1992,6 +2040,7 @@ impl Domain {
                             HashSet::new()
                         };
 
+                        println!("here4");
                         if target {
                             if !misses.is_empty() {
                                 // we missed while processing
@@ -2027,6 +2076,8 @@ impl Domain {
                             }
                         }
 
+                        println!("here5");
+
                         if target && !captured.is_empty() {
                             // materialized union ate some of our keys,
                             // so we didn't *actually* fill those keys after all!
@@ -2049,6 +2100,7 @@ impl Domain {
                         // we're done with the node
                         drop(n);
 
+                        println!("here5");
                         if m.is_none() {
                             // eaten full replay
                             assert_eq!(misses.len(), 0);
@@ -2078,6 +2130,8 @@ impl Domain {
                         {
                             finished_partial = backfill_keys.as_ref().unwrap().len();
                         }
+
+                        println!("here7");
 
                         // only continue with the keys that weren't captured
                         if let box Packet::ReplayPiece {
@@ -2186,6 +2240,7 @@ impl Domain {
                             *mcontext = context.clone();
                         }
                     }
+                    println!("replay piece inner");
 
                     match context {
                         ReplayPieceContext::Regular { last } if last => {
@@ -2216,6 +2271,7 @@ impl Domain {
                             }
                         }
                     }
+                    println!("replay piece inner2");
                 }
                 _ => unreachable!(),
             }

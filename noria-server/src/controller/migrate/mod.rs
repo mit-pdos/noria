@@ -208,15 +208,21 @@ impl<'a> Migration<'a> {
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
             let r = node::special::Reader::new(n);
-            // println!("CREATING READER NODE: name: {:?}", name);
+
+            println!("CREATING READER NODE in migration: name: {:?}, node index: {:?}", name, n);
+            println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
             // make a reader
 
             let r = if let Some(name) = name.clone() {
+                println!("branch1");
                 self.mainline.ingredients[n].named_mirror(r, name.clone())
             } else {
+                println!("branch2");
                 self.mainline.ingredients[n].mirror(r)
             };
+
             let r = self.mainline.ingredients.add_node(r);
+            println!("new r: {:?}", r);
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
@@ -224,13 +230,10 @@ impl<'a> Migration<'a> {
                 query_hash.insert(k.clone());
             }
 
-            // println!("QUERIES HASHED: {:?}", query_hash);
-
             let mut general_query = None;
             match name.clone() {
                 Some(n) => {
                     for k in query_hash {
-                        // println!("comparing k {:?} with qn {:?}", k.clone(), n.clone());
                         if n.contains(k.as_str()) {
                             // println!("roughly same!");
                             general_query = Some(k);
@@ -240,11 +243,10 @@ impl<'a> Migration<'a> {
                 None => {}
             }
 
-            // println!("GEN QUERY: {:?}", general_query);
-
             let mut matched = false;
             match general_query {
                 Some(name_) => {
+                    println!("branch3");
                     let mut add = false;
                     let mut added_set = None;
                     match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -266,6 +268,7 @@ impl<'a> Migration<'a> {
             if !matched {
                 match name {
                     Some(name_) => {
+                        println!("branch4");
                         let mut add = false;
                         let mut added_set = None;
                         match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -284,8 +287,7 @@ impl<'a> Migration<'a> {
                 }
             }
 
-            // println!("QUERY TO READ {:?}", self.mainline.map_meta.query_to_readers);
-
+            println!("name: {:?}, reader: {:?}", n, r);
             self.readers.insert(n, r);
         }
     }

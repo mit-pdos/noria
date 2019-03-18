@@ -107,6 +107,7 @@ pub enum Packet {
         tag: Tag,
         data: Records,
         context: ReplayPieceContext,
+        id: Option<usize>,
     },
 
     /// Trigger an eviction from the target node.
@@ -208,6 +209,7 @@ pub enum Packet {
         node: LocalNodeIndex,
         cols: Vec<usize>,
         key: Vec<DataType>,
+        id: Option<usize>,
     },
 
     /// Instruct domain to replay the state of a particular node along an existing replay path.
@@ -353,11 +355,13 @@ impl Packet {
                 ref tag,
                 ref data,
                 ref context,
+                ref id,
             } => Packet::ReplayPiece {
                 link: link.clone(),
                 tag: tag.clone(),
                 data: data.clone(),
                 context: context.clone(),
+                id: id.clone()
             },
             _ => unreachable!(),
         }
