@@ -83,11 +83,11 @@ pub type Provenance = FnvHashMap<NodeIndex, usize>;
 /// External ids are used the first time the packet appears in a domain.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PacketId {
-    label: usize,
-    from: NodeIndex,
+    pub label: usize,
+    pub from: NodeIndex,
 
     // Provenance (depth 1)
-    update: NodeIndex,
+    pub update: NodeIndex,
 }
 
 impl PacketId {
@@ -95,20 +95,8 @@ impl PacketId {
         unreachable!();
     }
 
-    pub fn new(label: usize, from: NodeIndex, update: NodeIndex) -> PacketId {
-        PacketId { label, from, update }
-    }
-
-    pub fn label(&self) -> usize {
-        self.label
-    }
-
-    pub fn from(&self) -> NodeIndex {
-        self.from
-    }
-
-    pub fn update(&self) -> NodeIndex {
-        self.update
+    pub fn new(from: NodeIndex, update: NodeIndex) -> PacketId {
+        PacketId { label: 0, from, update }
     }
 }
 
@@ -279,6 +267,7 @@ pub enum Packet {
     RemoveChild {
         node: LocalNodeIndex,
         child: NodeIndex,
+        replace_with: Option<Vec<NodeIndex>>,
     },
 
     /// Notify downstream nodes of an incoming connection to replace an existing one
@@ -300,18 +289,18 @@ pub enum Packet {
 }
 
 impl Packet {
-    crate fn id(&self) -> Option<PacketId> {
+    crate fn id(&mut self) -> &Option<PacketId> {
         match *self {
-            Packet::Message { id, .. } => id,
-            Packet::ReplayPiece { id, .. } => id,
+            Packet::Message { ref id, .. } => id,
+            Packet::ReplayPiece { ref id, .. } => id,
             _ => unreachable!(),
         }
     }
 
-    crate fn set_id(&mut self, new_id: PacketId) {
+    crate fn id_mut(&mut self) -> &mut Option<PacketId> {
         match *self {
-            Packet::Message { ref mut id, .. } => *id = Some(new_id),
-            Packet::ReplayPiece { ref mut id, .. } => *id = Some(new_id),
+            Packet::Message { ref mut id, .. } => id,
+            Packet::ReplayPiece { ref mut id, .. } => id,
             _ => unreachable!(),
         }
     }

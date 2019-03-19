@@ -54,24 +54,9 @@ impl Materializations {
         }
     }
 
-    pub(in crate::controller) fn get_segments(
-        &self,
-        d: DomainIndex,
-        new_egress: bool,
-    ) -> Vec<Box<SegmentPacket>> {
+    pub(in crate::controller) fn get_segments(&self, d: DomainIndex) -> Vec<Box<SegmentPacket>> {
         if let Some(segments) = self.segments.get(&d) {
-            segments
-                .iter()
-                .filter_map(|m| {
-                    if let box SegmentPacket::SetupReplayPath(_) = *m {
-                        Some(m.clone())
-                    } else if new_egress {
-                        Some(m.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+            segments.clone()
         } else {
             vec![]
         }
