@@ -474,6 +474,7 @@ impl ControllerInner {
             let m = box Packet::RemoveChild {
                 node: self.ingredients[egress_a].local_addr(),
                 child: ingress,
+                replace_with: None,
             };
             self.domains
                 .get_mut(&self.ingredients[egress_a].domain())
@@ -500,7 +501,7 @@ impl ControllerInner {
         // dataflow graph: A ---> B2 ---> C
         let egress_b2 = failed_egress;
         let domain_b2 = self.ingredients[egress_b2].domain();
-        for segment in self.materializations.get_segments(domain_b1, true) {
+        for segment in self.materializations.get_segments(domain_b1) {
             self.domains
                 .get_mut(&domain_b2)
                 .unwrap()
@@ -562,7 +563,7 @@ impl ControllerInner {
         // TODO(ygina): should also _remove_ the failed domain from materializations
         // TODO(ygina): super hacky...assumes the domain being replaced and this domain
         // are exact copies down to the # of nodes and local node index assignment
-        for segment in self.materializations.get_segments(failed_domain, false) {
+        for segment in self.materializations.get_segments(failed_domain) {
             dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
         }
 
@@ -581,6 +582,7 @@ impl ControllerInner {
         let m = box Packet::RemoveChild {
             node: self.ingredients[new_egress].local_addr(),
             child: failed_ingress,
+            replace_with: Some(ingress.clone()),
         };
         self.domains
             .get_mut(&self.ingredients[new_egress].domain())

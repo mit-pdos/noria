@@ -80,25 +80,17 @@ pub struct SourceChannelIdentifier {
 /// External ids are used the first time the packet appears in a domain.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PacketId {
-    label: usize,
-    from: NodeIndex,
+    pub label: usize,
+    pub from: NodeIndex,
 }
 
 impl PacketId {
     pub fn default() -> PacketId {
-        PacketId { label: 54321, from: NodeIndex::new(54321) }
+        unreachable!();
     }
 
-    pub fn new(label: usize, from: NodeIndex) -> PacketId {
-        PacketId { label, from }
-    }
-
-    pub fn label(&self) -> usize {
-        self.label
-    }
-
-    pub fn from(&self) -> NodeIndex {
-        self.from
+    pub fn new(from: NodeIndex) -> PacketId {
+        PacketId { label: 0, from }
     }
 }
 
@@ -269,6 +261,7 @@ pub enum Packet {
     RemoveChild {
         node: LocalNodeIndex,
         child: NodeIndex,
+        replace_with: Option<Vec<NodeIndex>>,
     },
 
     /// Notify downstream nodes of an incoming connection to replace an existing one
@@ -289,18 +282,10 @@ pub enum Packet {
 }
 
 impl Packet {
-    crate fn get_id(&self) -> PacketId {
+    crate fn id_mut(&mut self) -> &mut Option<PacketId> {
         match *self {
-            Packet::Message { id, .. } => id.unwrap(),
-            Packet::ReplayPiece { id, .. } => id.unwrap(),
-            _ => unreachable!(),
-        }
-    }
-
-    crate fn set_id(&mut self, new_id: PacketId) {
-        match *self {
-            Packet::Message { ref mut id, .. } => *id = Some(new_id),
-            Packet::ReplayPiece { ref mut id, .. } => *id = Some(new_id),
+            Packet::Message { ref mut id, .. } => id,
+            Packet::ReplayPiece { ref mut id, .. } => id,
             _ => unreachable!(),
         }
     }

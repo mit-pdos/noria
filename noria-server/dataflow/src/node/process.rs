@@ -78,13 +78,10 @@ impl Node {
                 (vec![], HashSet::new())
             }
             NodeType::Egress(None) => unreachable!(),
-            NodeType::Egress(Some(ref e)) => {
-                let pid = PacketId::new(e.next_label_to_add(), self.global_addr());
-                m.as_mut().unwrap().set_id(pid);
-
+            NodeType::Egress(Some(_)) => {
+                let from = self.global_addr();
                 self.with_egress_mut(|e| {
-                    let to_nodes = e.send_packet(m.as_ref().unwrap());
-                    e.process(m, on_shard.unwrap_or(0), output, &to_nodes)
+                    e.send_packet(m, from, on_shard.unwrap_or(0), output);
                 });
                 (vec![], HashSet::new())
             }
@@ -250,18 +247,20 @@ impl Node {
         match self.inner {
             NodeType::Base(..) => {}
             NodeType::Egress(Some(ref mut e)) => {
+                // TODO(ygina): evictions
                 e.process(
-                    &mut Some(Box::new(Packet::EvictKeys {
-                        link: Link {
-                            src: addr,
-                            dst: addr,
-                        },
-                        tag,
-                        keys: keys.to_vec(),
-                    })),
+                    // &mut Some(Box::new(Packet::EvictKeys {
+                    //     link: Link {
+                    //         src: addr,
+                    //         dst: addr,
+                    //     },
+                    //     tag,
+                    //     keys: keys.to_vec(),
+                    // })),
+                    0,
                     on_shard.unwrap_or(0),
                     output,
-                    &HashSet::new(),  // TODO(ygina): evictions
+                    &FnvHashMap::default(),
                 );
             }
             NodeType::Sharder(ref mut s) => {

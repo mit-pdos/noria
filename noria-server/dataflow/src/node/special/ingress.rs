@@ -32,14 +32,15 @@ impl Ingress {
                 box Packet::ReplayPiece { id, .. } => id.unwrap(),
                 _ => unreachable!(),
             };
-            (id.from(), id.label())
+            (id.from, id.label)
         };
 
-        // println!("RECEIVE PACKET #{} <- {:?}", m.get_id().label(), from);
+        // println!("RECEIVE PACKET #{} <- {}", label, from.index());
 
-        // labels are not necessarily sequential, but must be increasing
-        let old_label = self.last_packet_received.insert(from, label);
-        assert!(label > old_label.unwrap_or(0));
+        // labels must be sequential
+        let old_label = self.last_packet_received.get(&from);
+        assert!(old_label.is_none() || label == old_label.unwrap() + 1);
+        self.last_packet_received.insert(from, label);
     }
 
     /// Replace an incoming connection from `old` with `new`.
