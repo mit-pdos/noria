@@ -249,18 +249,17 @@ impl Node {
             NodeType::Egress(Some(ref mut e)) => {
                 // TODO(ygina): evictions
                 e.process(
-                    // &mut Some(Box::new(Packet::EvictKeys {
-                    //     link: Link {
-                    //         src: addr,
-                    //         dst: addr,
-                    //     },
-                    //     tag,
-                    //     keys: keys.to_vec(),
-                    // })),
-                    0,
+                    Box::new(Packet::EvictKeys {
+                        link: Link {
+                            src: addr,
+                            dst: addr,
+                        },
+                        tag,
+                        keys: keys.to_vec(),
+                    }),
                     on_shard.unwrap_or(0),
                     output,
-                    &FnvHashMap::default(),
+                    &HashSet::default(),
                 );
             }
             NodeType::Sharder(ref mut s) => {

@@ -9,22 +9,19 @@ struct EgressTx {
     dest: ReplicaAddr,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Egress {
     txs: Vec<EgressTx>,
     tags: HashMap<Tag, NodeIndex>,
 
-    /// Provenance of the first packet in payloads
+    /// Base provenance
     min_provenance: Provenance,
-    /// Provenance updates of depth 1
+    /// Provenance updates of depth 1 starting with the first packet in payloads
     updates: Vec<(NodeIndex, usize)>,
-
+    /// Label of the first packet in payloads
+    min_label: usize,
     /// Packet payloads
     payloads: Vec<Box<Packet>>,
-    /// Label of the first packet per child buffer
-    node_min_labels: FnvHashMap<NodeIndex, usize>,
-    /// Buffer per child
-    node_buffers: FnvHashMap<NodeIndex, Vec<usize>>,
 
     /// Whitelist of nodes it's ok to send packets too
     ok_to_send: HashSet<NodeIndex>,
@@ -43,12 +40,27 @@ impl Clone for Egress {
             tags: self.tags.clone(),
             min_provenance: self.min_provenance.clone(),
             updates: self.updates.clone(),
+            min_label: self.min_label.clone(),
             payloads: self.payloads.clone(),
-            node_min_labels: self.node_min_labels.clone(),
-            node_buffers: self.node_buffers.clone(),
             ok_to_send: self.ok_to_send.clone(),
             waiting_for: Default::default(),
             resume_at: None,
+        }
+    }
+}
+
+impl Default for Egress {
+    fn default() -> Egress {
+        Egress {
+            txs: Default::default(),
+            tags: Default::default(),
+            min_provenance: Default::default(),
+            updates: Default::default(),
+            min_label: 1,
+            payloads: Default::default(),
+            ok_to_send: Default::default(),
+            waiting_for: Default::default(),
+            resume_at: Default::default(),
         }
     }
 }
@@ -69,12 +81,7 @@ impl Egress {
             local: dst_l,
             dest: addr,
         });
-
-        if !self.node_min_labels.contains_key(&dst_g) {
-            self.node_min_labels.insert(dst_g, 1);
-            self.node_buffers.insert(dst_g, vec![]);
-            self.ok_to_send.insert(dst_g);
-        }
+        self.ok_to_send.insert(dst_g);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -83,10 +90,10 @@ impl Egress {
 
     pub fn process(
         &mut self,
-        index: usize,
+        msg: Box<Packet>,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-        to_nodes: &FnvHashMap<NodeIndex, usize>,
+        to_nodes: &HashSet<NodeIndex>,
     ) {
         let &mut Self {
             ref mut txs,
@@ -95,23 +102,18 @@ impl Egress {
 
         // send any queued updates to all external children
         assert!(!txs.is_empty());
-        let original_m = &self.payloads[index];
-
         for (_, ref mut tx) in txs.iter_mut().enumerate() {
             if !self.ok_to_send.contains(&tx.node) {
                 continue;
             }
 
-            if !to_nodes.contains_key(&tx.node) {
+            if !to_nodes.contains(&tx.node) {
                 continue;
             }
 
             // calculate and set the label before sending
-            let mut m = box original_m.clone_data();
-            let label = to_nodes.get(&tx.node).unwrap();
-
-            m.id_mut().as_mut().unwrap().label = *label;
-            // println!("SEND PACKET #{} to {}", label, tx.node.index());
+            let mut m = box msg.clone_data();
+            println!("SEND PACKET #{} -> {}", m.id().as_ref().unwrap().label, tx.node.index());
 
             // src is usually ignored and overwritten by ingress
             // *except* if the ingress is marked as a shard merger
@@ -119,6 +121,7 @@ impl Egress {
             m.link_mut().src = unsafe { LocalNodeIndex::make(shard as u32) };
             m.link_mut().dst = tx.local;
 
+            // TODO(ygina): don't clone the last send
             output.entry(tx.dest).or_default().push_back(m);
             if to_nodes.len() == 1 {
                 break;
@@ -130,7 +133,7 @@ impl Egress {
 // fault tolerance
 impl Egress {
     /// Stop sending messages to this child.
-    pub fn remove_child(&mut self, child: NodeIndex, replace_with: Option<Vec<NodeIndex>>) {
+    pub fn remove_child(&mut self, child: NodeIndex) {
         for i in 0..self.txs.len() {
             if self.txs[i].node == child {
                 self.txs.swap_remove(i);
@@ -138,39 +141,6 @@ impl Egress {
             }
         }
         self.ok_to_send.remove(&child);
-
-        if let Some(replace_with) = replace_with {
-            let min_label = *self.node_min_labels.get(&child).unwrap();
-            let old_buffer = self.node_buffers.get(&child).unwrap().clone();
-
-            // if the child node were a bottom replica, and the replica had multiple children,
-            // then the child node could have only forwarded certain packets in the buffer to
-            // certain children. thus when we're reconnecting the graph to skip the failed
-            // bottom replica, we need to make sure only certain packets are in the buffers
-            // corresponding to each child.
-            // TODO(ygina): if min_label != 1 how do we know the packet labels?
-            assert_eq!(min_label, 1);
-            for ni in replace_with {
-                let buffer = old_buffer
-                    .iter()
-                    .filter(|&&i| {
-                        let m = &self.payloads[i];
-                        let tag = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
-                        match tag {
-                            Some(tag_ni) => ni == *tag_ni,
-                            None => true,
-                        }
-                    })
-                    .map(|&i| i)
-                    .collect();
-                self.node_min_labels.insert(ni, min_label);
-                self.node_buffers.insert(ni, buffer);
-            }
-
-            // clean up buffer of the failed bottom replica
-            self.node_min_labels.remove(&child);
-            self.node_buffers.remove(&child);
-        }
     }
 
     /// Replace mentions of the old connection with the new connection
@@ -217,39 +187,34 @@ impl Egress {
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        // update packet id to include the correct provenance update and from node. should not
-        // contain any label information because that's set by the egress right before sending.
+        // update packet id to include the correct label, provenance update, and from node.
         let mut m = m.as_ref().map(|m| box m.clone_data()).unwrap();
         let update = m.id().map(|pid| (pid.update, pid.label));
-        *m.id_mut() = Some(PacketId::new(from, from));
+        let label = self.min_label + self.payloads.len();
+        *m.id_mut() = Some(PacketId::new(label, from, from));
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
         let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
         let to_nodes = if let Some(ni) = replay_to {
-            vec![*ni]
+            let mut set = HashSet::new();
+            set.insert(*ni);
+            set
         } else {
-            self.txs.iter().map(|tx| tx.node).collect()
+            self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
         };
 
         // each message in payload should have a corresponding provenance update
+        // (unless the provenance doesn't reach back that far)
         self.payloads.push(m);
         if let Some(update) = update {
             self.updates.push(update);
         }
 
-        // add to node buffers since it's the first time we're seeing this message
-        let index = self.payloads.len() - 1;
-        let mut to_nodes_map = FnvHashMap::default();
-        for &node in &to_nodes {
-            let min_label = *self.node_min_labels.get_mut(&node).unwrap();
-            let buffer = self.node_buffers.get_mut(&node).unwrap();
-            to_nodes_map.insert(node, min_label + buffer.len());
-            buffer.push(index);
-        }
-
-        self.process(index, shard, output, &to_nodes_map);
+        // finally, send the message
+        let m = &self.payloads[label - self.min_label];
+        self.process(box m.clone_data(), shard, output, &to_nodes);
     }
 
     /// Enter recovery mode, in which we are waiting to process one ResumeAt message for each
@@ -272,18 +237,15 @@ impl Egress {
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) -> Option<usize> {
-        let min_label = *self.node_min_labels.get(&node).unwrap();
-        let buffer = self.node_buffers.get(&node).unwrap();
-        let next_label = min_label + buffer.len();
+        let next_label = self.min_label + self.payloads.len();
         self.ok_to_send.insert(node);
 
         // we don't have the messages we need to send
         // should only happen if we lost a stateless domain
         if label >= next_label {
+            println!("{} >= {}", label, next_label);
             assert!(self.waiting_for.remove(&node));
             assert!(self.payloads.is_empty());
-            *self.node_min_labels.get_mut(&node).unwrap() = label;
-
             self.resume_at = match self.resume_at {
                 // TODO(ygina): internal mapping from node-local label to provenance
                 // otherwise this is totally incorrect!
@@ -301,6 +263,7 @@ impl Egress {
             // resume at to make the dataflow graph complete
             if self.waiting_for.len() == 0 {
                 let min_label = self.resume_at.take().unwrap();
+                self.min_label = min_label;
                 // TODO(ygina): shouldn't be returning min label but earliest provenance
                 return Some(min_label);
             } else {
@@ -311,14 +274,17 @@ impl Egress {
         // send all buffered messages to this node only from the resume at label
         assert!(self.waiting_for.is_empty());
         println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
-        let mut label_index = Vec::new();
-        for i in label..next_label {
-            label_index.push((i, buffer[i - min_label]));
-        }
-        let mut to_nodes_map = FnvHashMap::default();
-        for (label, index) in label_index {
-            to_nodes_map.insert(node, label);
-            self.process(index, on_shard.unwrap_or(0), output, &to_nodes_map);
+        let mut to_nodes = HashSet::new();
+        to_nodes.insert(node);
+        for m_label in label..next_label {
+            let m = &self.payloads[m_label - self.min_label];
+            let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
+            if let Some(ni) = replay_to {
+                if node != *ni {
+                    continue;
+                }
+            }
+            self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
         }
         None
     }

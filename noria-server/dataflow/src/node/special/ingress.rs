@@ -39,7 +39,7 @@ impl Ingress {
 
         // labels must be sequential
         let old_label = self.last_packet_received.get(&from);
-        assert!(old_label.is_none() || label == old_label.unwrap() + 1);
+        assert!(old_label.is_none() || label > *old_label.unwrap());
         self.last_packet_received.insert(from, label);
     }
 

@@ -474,7 +474,6 @@ impl ControllerInner {
             let m = box Packet::RemoveChild {
                 node: self.ingredients[egress_a].local_addr(),
                 child: ingress,
-                replace_with: None,
             };
             self.domains
                 .get_mut(&self.ingredients[egress_a].domain())
@@ -582,7 +581,6 @@ impl ControllerInner {
         let m = box Packet::RemoveChild {
             node: self.ingredients[new_egress].local_addr(),
             child: failed_ingress,
-            replace_with: Some(ingress.clone()),
         };
         self.domains
             .get_mut(&self.ingredients[new_egress].domain())

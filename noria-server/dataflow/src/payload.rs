@@ -95,8 +95,8 @@ impl PacketId {
         unreachable!();
     }
 
-    pub fn new(from: NodeIndex, update: NodeIndex) -> PacketId {
-        PacketId { label: 0, from, update }
+    pub fn new(label: usize, from: NodeIndex, update: NodeIndex) -> PacketId {
+        PacketId { label, from, update }
     }
 }
 
@@ -267,7 +267,6 @@ pub enum Packet {
     RemoveChild {
         node: LocalNodeIndex,
         child: NodeIndex,
-        replace_with: Option<Vec<NodeIndex>>,
     },
 
     /// Notify downstream nodes of an incoming connection to replace an existing one
