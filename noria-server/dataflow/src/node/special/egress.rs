@@ -100,7 +100,18 @@ impl Egress {
 
             // calculate and set the label before sending
             let mut m = box msg.clone_data();
-            println!("SEND PACKET #{} -> {}", m.id().as_ref().unwrap().label, tx.node.index());
+            let mtype = match *m {
+                Packet::Message { .. } => "Message",
+                Packet::ReplayPiece { .. } => "ReplayPiece",
+                _ => unreachable!(),
+            };
+            println!(
+                "SEND PACKET {} #{} -> {} {:?}",
+                mtype,
+                m.id().as_ref().unwrap().label,
+                tx.node.index(),
+                m.id().as_ref().unwrap().update,
+            );
 
             // src is usually ignored and overwritten by ingress
             // *except* if the ingress is marked as a shard merger
@@ -130,17 +141,6 @@ impl Egress {
         self.ok_to_send.remove(&child);
     }
 
-    /// Replace mentions of the old connection with the new connection
-    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
-        for ref mut update in self.updates.iter_mut() {
-            for ref mut node_label in update.iter_mut() {
-                if (*node_label).0 == old {
-                    (*node_label).0 = new;
-                }
-            }
-        }
-    }
-
     fn get_provenance(&self, label: usize) -> Provenance {
         // TODO(ygina): egress-wide label counters
         let min_label = self.min_provenance.label();
@@ -148,7 +148,7 @@ impl Egress {
         assert!(label <= self.updates.len());
 
         let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[min_label..label].to_vec());
+        provenance.apply_updates(&self.updates[min_label..label]);
         provenance
     }
 
@@ -197,15 +197,8 @@ impl Egress {
         };
 
         // each message in payload should have a corresponding provenance update
-        // (unless the provenance doesn't reach back that far)
-        // for example, the root domain doesn't have any provenance history since all messages
-        // are derived from base tables.
         self.payloads.push(m);
-        if update.is_empty() {
-            assert!(self.updates.is_empty());
-        } else {
-            self.updates.push(update);
-        }
+        self.updates.push(update);
 
         // finally, send the message
         let m = &self.payloads[label - self.min_provenance.label() - 1];
@@ -275,7 +268,7 @@ impl Egress {
         let mut to_nodes = HashSet::new();
         to_nodes.insert(node);
         for m_label in label..next_label {
-            let m = &self.payloads[m_label - self.min_provenance.label()];
+            let m = &self.payloads[m_label - self.min_provenance.label() - 1];
             let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
             if let Some(ni) = replay_to {
                 if node != *ni {

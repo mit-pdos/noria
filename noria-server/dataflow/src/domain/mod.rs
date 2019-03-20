@@ -1348,17 +1348,14 @@ impl Domain {
                             // otherwise get the provenance of the last label from the egress node
                             assert_eq!(self.egress.len(), 1);
                             let egress = *self.egress.iter().next().unwrap();
-                            let out_provenance = self.nodes[egress]
+                            let provenance = self.nodes[egress]
                                 .borrow_mut()
-                                .with_egress_mut(|e| {
-                                    e.new_incoming(old, new);
-                                    e.get_last_provenance()
-                                });
+                                .with_egress_mut(|e| e.get_last_provenance());
 
                             // TODO(ygina): more than one depth of provenance
-                            let label = out_provenance.label() + 1;
-                            let provenance = out_provenance.subgraph(ni).clone();
-                            (label, *provenance)
+                            let subgraph = provenance.subgraph(new).clone();
+                            let label = subgraph.label() + 1;
+                            (label, *subgraph)
                         };
 
                         // tell the new incoming connection where to resume sending messages,
@@ -1430,12 +1427,12 @@ impl Domain {
                             assert!(self.ingress.len() > 0);
                             for &ni in &self.ingress {
                                 let ingress = &self.nodes[ni];
-                                let global_ni = ingress.borrow().global_addr();
-                                let subgraph = provenance.subgraph(global_ni).clone();
+                                let src = ingress.borrow().with_ingress(|i| i.src());
+                                let subgraph = provenance.subgraph(src).clone();
                                 executor.send_resume_at(
-                                    ingress.borrow().with_ingress(|i| i.src()),
+                                    src,
                                     ingress.borrow().global_addr(),
-                                    subgraph.label() + 1,
+                                    provenance.label() + 1,
                                     *subgraph,
                                     true,
                                 );

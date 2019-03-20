@@ -35,11 +35,27 @@ impl Provenance {
     pub fn init(&mut self, graph: &Graph, root: NodeIndex, depth: usize) {
         self.root = root;
         if depth > 0 {
-            let children = graph.neighbors_directed(root, petgraph::EdgeDirection::Incoming);
-            for child in children {
+            // TODO(ygina): operate on domain level instead of ingress/egress level
+            let mut egresses = Vec::new();
+            let mut queue = Vec::new();
+            queue.push(root);
+            while queue.len() > 0 {
+                let ni = queue.pop().unwrap();
+                if graph[ni].is_egress() && ni != root {
+                    egresses.push(ni);
+                    continue;
+                }
+
+                let mut children = graph
+                    .neighbors_directed(ni, petgraph::EdgeDirection::Incoming)
+                    .collect::<Vec<_>>();
+                queue.append(&mut children);
+            }
+
+            for egress in egresses {
                 let mut provenance = Provenance::default();
-                provenance.init(graph, child, depth - 1);
-                self.edges.insert(child, box provenance);
+                provenance.init(graph, egress, depth - 1);
+                self.edges.insert(egress, box provenance);
             }
         }
     }

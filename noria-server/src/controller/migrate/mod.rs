@@ -451,6 +451,17 @@ impl<'a> Migration<'a> {
         let mut sorted_new = new.iter().collect::<Vec<_>>();
         sorted_new.sort();
 
+        // Initialize egress provenance graphs
+        // let graph_clone = mainline.ingredients.clone();
+        let new_egress = sorted_new
+            .iter()
+            .filter(|&ni| mainline.ingredients[**ni].is_egress())
+            .collect::<Vec<_>>();
+        let graph_clone = mainline.ingredients.clone();
+        for &&&ni in &new_egress {
+            mainline.ingredients[ni].with_egress_mut(|e| e.init(&graph_clone, ni));
+        }
+
         // Find all nodes for domains that have changed
         let changed_domains: HashSet<DomainIndex> = sorted_new
             .iter()
