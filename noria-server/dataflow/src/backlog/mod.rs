@@ -72,6 +72,7 @@ fn new_inner(
     }
 
     if srmap {
+        println!("creating new srmap");
         let (r, w) = match (key.len(), srmap) {
             (0, _) => unreachable!(),
             (1, true) => make_srmap!(SingleSR),

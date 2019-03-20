@@ -1000,6 +1000,8 @@ impl ControllerInner {
                     .lookup(uid, true)
                     .unwrap();
 
+                println!("my groups: {:#?}", mygroups); 
+
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
@@ -1062,7 +1064,6 @@ impl ControllerInner {
                     }
                 }
                 topo_removals.reverse();
-
                 for leaf in topo_removals {
                     self.remove_leaf(leaf)?;
                 }
@@ -1160,6 +1161,7 @@ impl ControllerInner {
                     })
                     .is_err()
                 {
+                    println!("hereee");
                     return Err("Failed to persist recipe installation".to_owned());
                 }
                 println!("ir3");

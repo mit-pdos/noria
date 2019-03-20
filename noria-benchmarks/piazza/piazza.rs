@@ -90,12 +90,9 @@ impl Backend {
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
         // Read schema file
-        println!("h1");
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
-        println!("h2");
         sf.read_to_string(&mut s).unwrap();
-        println!("h3");
         let mut rs = s.clone();
         s.clear();
 
@@ -104,19 +101,15 @@ impl Backend {
             None => (),
             Some(qf) => {
                 let mut qf = File::open(qf).unwrap();
-                println!("h_");
                 qf.read_to_string(&mut s).unwrap();
-                println!("h adsf_");
                 rs.push_str("\n");
                 rs.push_str(&s);
             }
         }
-        println!("h4");
 
         // Install recipe
         let x = self.g.install_recipe(&rs).unwrap();
 
-        println!("h5");
         Ok(())
     }
 }
@@ -219,7 +212,7 @@ fn main() {
         .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.1")
+                .default_value("0.99")
                 .help("Percentage of private posts"),
         )
         .get_matches();
