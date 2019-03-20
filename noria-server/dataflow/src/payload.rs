@@ -10,7 +10,6 @@ use noria::channel;
 use noria::internal::LocalOrNot;
 use prelude::*;
 
-use fnv::FnvHashMap;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::SocketAddr;
@@ -78,16 +77,14 @@ pub struct SourceChannelIdentifier {
     pub tag: u32,
 }
 
-pub type Provenance = FnvHashMap<NodeIndex, usize>;
-
 /// External ids are used the first time the packet appears in a domain.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PacketId {
     pub label: usize,
     pub from: NodeIndex,
 
-    // Provenance (depth 1)
-    pub update: NodeIndex,
+    /// Provenance update starting the level above the from node.
+    pub update: ProvenanceUpdate,
 }
 
 impl PacketId {
@@ -95,7 +92,7 @@ impl PacketId {
         unreachable!();
     }
 
-    pub fn new(label: usize, from: NodeIndex, update: NodeIndex) -> PacketId {
+    pub fn new(label: usize, from: NodeIndex, update: ProvenanceUpdate) -> PacketId {
         PacketId { label, from, update }
     }
 }
@@ -288,7 +285,7 @@ pub enum Packet {
 }
 
 impl Packet {
-    crate fn id(&mut self) -> &Option<PacketId> {
+    crate fn id(&self) -> &Option<PacketId> {
         match *self {
             Packet::Message { ref id, .. } => id,
             Packet::ReplayPiece { ref id, .. } => id,
@@ -392,24 +389,24 @@ impl Packet {
     crate fn clone_data(&self) -> Self {
         match *self {
             Packet::Message {
-                id,
+                ref id,
                 link,
                 ref data,
                 ref tracer,
             } => Packet::Message {
-                id,
+                id: id.clone(),
                 link,
                 data: data.clone(),
                 tracer: tracer.clone(),
             },
             Packet::ReplayPiece {
-                id,
+                ref id,
                 link,
                 tag,
                 ref data,
                 ref context,
             } => Packet::ReplayPiece {
-                id,
+                id: id.clone(),
                 link,
                 tag,
                 data: data.clone(),

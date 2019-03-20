@@ -35,6 +35,7 @@ pub mod node;
 pub mod ops;
 pub mod payload; // it makes me _really_ sad that this has to be pub
 pub mod prelude;
+pub mod provenance;
 crate mod state;
 
 mod domain;

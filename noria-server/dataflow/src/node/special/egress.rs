@@ -17,7 +17,7 @@ pub struct Egress {
     /// Base provenance
     min_provenance: Provenance,
     /// Provenance updates of depth 1 starting with the first packet in payloads
-    updates: Vec<(NodeIndex, usize)>,
+    updates: Vec<ProvenanceUpdate>,
     /// Label of the first packet in payloads
     min_label: usize,
     /// Packet payloads
@@ -145,9 +145,11 @@ impl Egress {
 
     /// Replace mentions of the old connection with the new connection
     pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) {
-        for i in 0..self.updates.len() {
-            if self.updates[i].0 == old {
-                self.updates[i].0 = new;
+        for ref mut update in self.updates.iter_mut() {
+            for ref mut node_label in update.iter_mut() {
+                if (*node_label).0 == old {
+                    (*node_label).0 = new;
+                }
             }
         }
     }
@@ -160,8 +162,9 @@ impl Egress {
 
         let mut provenance = self.min_provenance.clone();
         for i in (min_label - 1)..index {
-            let (node, label) = self.updates[i];
-            provenance.insert(node, label);
+            for &(node, label) in self.updates[i].iter() {
+                provenance.insert(node, label);
+            }
         }
         provenance
     }
@@ -189,9 +192,15 @@ impl Egress {
     ) {
         // update packet id to include the correct label, provenance update, and from node.
         let mut m = m.as_ref().map(|m| box m.clone_data()).unwrap();
-        let update = m.id().map(|pid| (pid.update, pid.label));
         let label = self.min_label + self.payloads.len();
-        *m.id_mut() = Some(PacketId::new(label, from, from));
+        let mut update = Vec::new();
+        if let Some(ref pid) = m.as_ref().id() {
+            // TODO(ygina): trim this if necessary
+            // TODO(ygina): could probably more efficiently handle message cloning
+            update.push((pid.from, pid.label));
+            update.append(&mut pid.update.clone());
+        }
+        *m.id_mut() = Some(PacketId::new(label, from, update.clone()));
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
@@ -207,8 +216,12 @@ impl Egress {
 
         // each message in payload should have a corresponding provenance update
         // (unless the provenance doesn't reach back that far)
+        // for example, the root domain doesn't have any provenance history since all messages
+        // are derived from base tables.
         self.payloads.push(m);
-        if let Some(update) = update {
+        if update.is_empty() {
+            assert!(self.updates.is_empty());
+        } else {
             self.updates.push(update);
         }
 

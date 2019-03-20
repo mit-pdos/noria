@@ -28,8 +28,8 @@ impl Ingress {
     pub fn receive_packet(&mut self, m: &Box<Packet>) {
         let (from, label) = {
             let id = match m {
-                box Packet::Message { id, .. } => id.unwrap(),
-                box Packet::ReplayPiece { id, .. } => id.unwrap(),
+                box Packet::Message { ref id, .. } => id.as_ref().unwrap(),
+                box Packet::ReplayPiece { ref id, .. } => id.as_ref().unwrap(),
                 _ => unreachable!(),
             };
             (id.from, id.label)
