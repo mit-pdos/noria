@@ -90,9 +90,12 @@ impl Backend {
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
         // Read schema file
+        println!("h1");
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
+        println!("h2");
         sf.read_to_string(&mut s).unwrap();
+        println!("h3");
         let mut rs = s.clone();
         s.clear();
 
@@ -101,15 +104,19 @@ impl Backend {
             None => (),
             Some(qf) => {
                 let mut qf = File::open(qf).unwrap();
+                println!("h_");
                 qf.read_to_string(&mut s).unwrap();
+                println!("h adsf_");
                 rs.push_str("\n");
                 rs.push_str(&s);
             }
         }
+        println!("h4");
 
         // Install recipe
         let x = self.g.install_recipe(&rs).unwrap();
 
+        println!("h5");
         Ok(())
     }
 }
@@ -254,15 +261,14 @@ fn main() {
     backend.set_security_config(ploc);
     println!("here3");
     backend.migrate(sloc, Some(qloc)).unwrap();
+    println!("here4");
     let populate = match populate.as_ref() {
         "before" => PopulateType::Before,
         "after" => PopulateType::After,
         _ => PopulateType::NoPopulate,
     };
 
-    println!("here4");
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    println!("here5");
     p.enroll_students(nclasses);
 
     println!("getting classes");
@@ -334,27 +340,51 @@ fn main() {
     }
 
     let mut dur = time::Duration::from_millis(0);
-    let num_at_once = nclasses as usize;
-    let mut enrollment_info = p.get_enrollment();
-    for uid in 0..nlogged {
-        match enrollment_info.get(&uid.into()) {
-            Some(classes) => {
-                // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
-                let mut class_vec = Vec::new();
-                for class in classes {
-                    class_vec.push([class.clone()].to_vec());
-                }
-                let leaf = format!("posts_u{}", uid);
-                let mut getter = backend.g.view(&leaf).unwrap();
-                let start = time::Instant::now();
-                // println!("MULTI LOOKUP FOR USER {}", uid);
-                let res = getter.multi_lookup(class_vec.clone(), true);
-                dur += start.elapsed();
-                // println!("res: {:?}", res);
-            },
-            None => println!("why isn't user {:?} enrolled", uid),
+
+    // --- Posts Query ---
+    if !partial {
+        let num_at_once = nclasses as usize;
+        let mut enrollment_info = p.get_enrollment();
+        for uid in 0..nlogged {
+            match enrollment_info.get(&uid.into()) {
+                Some(classes) => {
+                    // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                    let mut class_vec = Vec::new();
+                    for class in classes {
+                        class_vec.push([class.clone()].to_vec());
+                    }
+                    let leaf = format!("posts_u{}", uid);
+                    let mut getter = backend.g.view(&leaf).unwrap();
+                    let start = time::Instant::now();
+                    let res = getter.multi_lookup(class_vec.clone(), true);
+                    // println!("res: {:?}", res);
+                    dur += start.elapsed();
+
+                },
+                None => println!("why isn't user {:?} enrolled", uid),
+            }
         }
     }
+
+    // --- PostCount Query ---
+
+    // if !partial {
+    //     let mut lookup_vec = Vec::new();
+    //     for auth in 0..nlogged {
+    //         lookup_vec.push([auth.into()].to_vec());
+    //     }
+    //
+    //     let mut dur = time::Duration::from_millis(0);
+    //     for uid in 0..nlogged {
+    //        let leaf = format!("post_count_u{}", uid);
+    //        let mut getter = backend.g.view(&leaf).unwrap();
+    //        let start = time::Instant::now();
+    //        for author in 0..nusers {
+    //            getter.lookup(&lookup_vec, true).unwrap();
+    //        }
+    //        dur += start.elapsed();
+    //     }
+    // }
 
     let dur = dur_to_fsec!(dur);
 

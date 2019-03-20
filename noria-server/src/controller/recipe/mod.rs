@@ -16,6 +16,8 @@ use slog;
 use std::collections::HashMap;
 use std::str;
 use std::vec::Vec;
+use std::time::{Duration, Instant};
+
 
 type QueryID = u64;
 
@@ -294,8 +296,9 @@ impl Recipe {
             expressions_added: 0,
             expressions_removed: 0,
         };
+        let now = Instant::now();
 
-        println!("recipe: creating universe");
+        println!("recipe: creating universe 1. {:?}", now.elapsed().as_nanos());
 
         if self.security_config.is_some() {
             // println!("setting security config! in recipe::create_universe");
@@ -309,6 +312,8 @@ impl Recipe {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }
         }
+
+        println!("recipe: creating universe 2. {:?}", now.elapsed().as_nanos());
 
         for expr in self.expressions.values() {
             let (n, q, is_leaf) = expr.clone();
@@ -333,6 +338,8 @@ impl Recipe {
                 None
             };
 
+            println!("recipe: creating universe 3. {:?}", now.elapsed().as_nanos());
+
             let is_leaf = if group.is_some() { false } else { is_leaf };
             let qfp = self
                 .inc
@@ -340,6 +347,7 @@ impl Recipe {
                 .unwrap()
                 .add_parsed_query(q, new_name.clone(), is_leaf, mig, n.clone())?;
 
+            println!("recipe: creating universe 4. {:?}", now.elapsed().as_nanos());
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
             let query_name = match n.clone() {
@@ -347,6 +355,7 @@ impl Recipe {
                 None => qfp.name.clone(),
             };
 
+            println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
 
