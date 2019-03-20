@@ -72,7 +72,7 @@ impl Backend {
     }
 
     pub fn populate_tables(&self, pop: &mut Populate) {
-        pop.enroll_students();
+        pop.enroll_students(pop.nclasses());
         let roles = pop.get_roles();
         let users = pop.get_users();
         let posts = pop.get_posts();

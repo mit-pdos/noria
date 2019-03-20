@@ -110,7 +110,3 @@ path = "replay/main.rs"
 [[bin]]
 name = "security-mysql"
 path = "piazza/mysql.rs"
-
-[[bin]]
-name = "securelobsters"
-path = "securelobsters/main.rs"
