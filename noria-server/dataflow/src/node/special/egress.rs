@@ -161,16 +161,17 @@ impl Egress {
         assert!(index <= self.payloads.len());
 
         let mut provenance = self.min_provenance.clone();
+        provenance.apply_updates(&self.updates[min_label - 1..index])
+
         for i in (min_label - 1)..index {
-            for &(node, label) in self.updates[i].iter() {
-                provenance.insert(node, label);
+            for update in self.updates[i].iter() {
+                provenance.apply_update(update);
             }
         }
         provenance
     }
 
     pub fn get_last_provenance(&self) -> (usize, Provenance) {
-        // TODO(ygina): egress-wide label counters
         let max_label = self.payloads.len();
         let provenance = self.get_provenance(max_label);
         (max_label, provenance)

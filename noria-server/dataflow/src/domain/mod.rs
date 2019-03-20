@@ -1341,6 +1341,8 @@ impl Domain {
                         let (label, provenance) = if self.egress.len() == 0 {
                             // only domains with reader nodes don't have an egress
                             // so we derive the next label directly, assuming a single ancestor
+                            // TODO(ygina): materialize the provenance in readers so we can recover
+                            // from losing the stateless domain above a reader.
                             (label, FnvHashMap::default())
                         } else {
                             // otherwise get the provenance of the last label from the egress node
@@ -1354,8 +1356,8 @@ impl Domain {
                                 });
 
                             // TODO(ygina): more than one depth of provenance
-                            let label = *out_provenance.get(&new).unwrap_or(&0) + 1;
-                            let provenance = FnvHashMap::default();
+                            let label = out_provenance.label();
+                            let provenance = out_provenance.subgraph(node.borrow().global_addr());
                             (label, provenance)
                         };
 
@@ -1431,11 +1433,12 @@ impl Domain {
                             if self.ingress.len() == 1 {
                                 let ni = *self.ingress.iter().next().unwrap();
                                 let ingress = &self.nodes[ni];
+                                let global_ni = ingress.borrow().global_addr();
                                 executor.send_resume_at(
                                     ingress.borrow().with_ingress(|i| i.src()),
-                                    ingress.borrow().global_addr(),
+                                    global_ni,
                                     next_label.unwrap(),
-                                    FnvHashMap::default(),
+                                    provenance.subgraph(global_ni),
                                     true,
                                 );
                             } else {
@@ -1443,12 +1446,12 @@ impl Domain {
                                 for &ni in &self.ingress {
                                     let ingress = &self.nodes[ni];
                                     let egress = ingress.borrow().with_ingress(|i| i.src());
-                                    // TODO(ygina): implement depth 2 provenance
+                                    let global_ni = ingress.borrow().global_addr();
                                     executor.send_resume_at(
                                         egress,
                                         ingress.borrow().global_addr(),
                                         *provenance.get(&egress).unwrap(),
-                                        FnvHashMap::default(),
+                                        provenance.subgraph(global_ni),
                                         true,
                                     );
                                 }
