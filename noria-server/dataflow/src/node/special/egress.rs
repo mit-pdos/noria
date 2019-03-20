@@ -9,17 +9,15 @@ struct EgressTx {
     dest: ReplicaAddr,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Egress {
     txs: Vec<EgressTx>,
     tags: HashMap<Tag, NodeIndex>,
 
-    /// Base provenance
+    /// Base provenance, including the label it represents
     min_provenance: Provenance,
     /// Provenance updates of depth 1 starting with the first packet in payloads
     updates: Vec<ProvenanceUpdate>,
-    /// Label of the first packet in payloads
-    min_label: usize,
     /// Packet payloads
     payloads: Vec<Box<Packet>>,
 
@@ -40,7 +38,6 @@ impl Clone for Egress {
             tags: self.tags.clone(),
             min_provenance: self.min_provenance.clone(),
             updates: self.updates.clone(),
-            min_label: self.min_label.clone(),
             payloads: self.payloads.clone(),
             ok_to_send: self.ok_to_send.clone(),
             waiting_for: Default::default(),
@@ -49,23 +46,13 @@ impl Clone for Egress {
     }
 }
 
-impl Default for Egress {
-    fn default() -> Egress {
-        Egress {
-            txs: Default::default(),
-            tags: Default::default(),
-            min_provenance: Default::default(),
-            updates: Default::default(),
-            min_label: 1,
-            payloads: Default::default(),
-            ok_to_send: Default::default(),
-            waiting_for: Default::default(),
-            resume_at: Default::default(),
-        }
-    }
-}
+const PROVENANCE_DEPTH: usize = 3;
 
 impl Egress {
+    pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
+        self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
+    }
+
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
         // avoid adding duplicate egress txs. this happens because we send Update Egress messages
         // both when reconnecting a replicated stateless domain, and so the domain gets the correct
@@ -154,27 +141,21 @@ impl Egress {
         }
     }
 
-    fn get_provenance(&self, index: usize) -> Provenance {
+    fn get_provenance(&self, label: usize) -> Provenance {
         // TODO(ygina): egress-wide label counters
-        let min_label = 1;
-        assert!(index >= min_label);
-        assert!(index <= self.payloads.len());
+        let min_label = self.min_provenance.label();
+        assert!(label >= min_label);
+        assert!(label <= self.updates.len());
 
         let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[min_label - 1..index])
-
-        for i in (min_label - 1)..index {
-            for update in self.updates[i].iter() {
-                provenance.apply_update(update);
-            }
-        }
+        provenance.apply_updates(&self.updates[min_label..label].to_vec());
         provenance
     }
 
-    pub fn get_last_provenance(&self) -> (usize, Provenance) {
-        let max_label = self.payloads.len();
+    pub fn get_last_provenance(&self) -> Provenance {
+        let max_label = self.min_provenance.label() + self.updates.len();
         let provenance = self.get_provenance(max_label);
-        (max_label, provenance)
+        provenance
     }
 
     /// Stores the packet in the buffer and tests whether we should send to each node corresponding
@@ -193,7 +174,7 @@ impl Egress {
     ) {
         // update packet id to include the correct label, provenance update, and from node.
         let mut m = m.as_ref().map(|m| box m.clone_data()).unwrap();
-        let label = self.min_label + self.payloads.len();
+        let label = self.min_provenance.label() + self.payloads.len() + 1;
         let mut update = Vec::new();
         if let Some(ref pid) = m.as_ref().id() {
             // TODO(ygina): trim this if necessary
@@ -227,7 +208,7 @@ impl Egress {
         }
 
         // finally, send the message
-        let m = &self.payloads[label - self.min_label];
+        let m = &self.payloads[label - self.min_provenance.label() - 1];
         self.process(box m.clone_data(), shard, output, &to_nodes);
     }
 
@@ -243,15 +224,19 @@ impl Egress {
     }
 
     /// Resume sending messages to this node at the label after getting that node up to date.
-    /// Returns the label of the message it needs to send next that is not in the buffer.
+    ///
+    /// Returns whether the node that called this method should propagate a secondary resume at
+    /// to its ancestors. The point to resume at is constructed from the node's own provenance
+    /// graph. TODO(ygina): the controller should be in charge of when to call the secondary
+    /// resume at.
     pub fn resume_at(
         &mut self,
         node: NodeIndex,
         label: usize,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) -> Option<usize> {
-        let next_label = self.min_label + self.payloads.len();
+    ) -> bool {
+        let next_label = self.min_provenance.label() + self.payloads.len() + 1;
         self.ok_to_send.insert(node);
 
         // we don't have the messages we need to send
@@ -277,11 +262,10 @@ impl Egress {
             // resume at to make the dataflow graph complete
             if self.waiting_for.len() == 0 {
                 let min_label = self.resume_at.take().unwrap();
-                self.min_label = min_label;
-                // TODO(ygina): shouldn't be returning min label but earliest provenance
-                return Some(min_label);
+                self.min_provenance.set_label(min_label - 1);
+                return true;
             } else {
-                return None;
+                return false;
             }
         }
 
@@ -291,7 +275,7 @@ impl Egress {
         let mut to_nodes = HashSet::new();
         to_nodes.insert(node);
         for m_label in label..next_label {
-            let m = &self.payloads[m_label - self.min_label];
+            let m = &self.payloads[m_label - self.min_provenance.label()];
             let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
             if let Some(ni) = replay_to {
                 if node != *ni {
@@ -300,6 +284,6 @@ impl Egress {
             }
             self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
         }
-        None
+        false
     }
 }

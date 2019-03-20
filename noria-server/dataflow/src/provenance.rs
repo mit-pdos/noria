@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use petgraph::graph::NodeIndex;
+use prelude::*;
 
 /// The upstream branch of nodes and message labels that was updated to produce the current
 /// message, starting at the node above the payload's "from" node. The number of nodes in the
@@ -14,22 +15,41 @@ pub struct Provenance {
     edges: FnvHashMap<NodeIndex, Box<Provenance>>,
 }
 
+impl Default for Provenance {
+    // TODO(ygina): it doesn't really make sense to have a provenance for imaginary node index 0,
+    // so maybe we should use options here. this is hacky and gross. the reason we have a default
+    // implementation is hack to intiialize the provenance graph in the egress AFTER it has
+    // been otherwise initialized and fit into the graph.
+    fn default() -> Provenance {
+        Provenance {
+            root: NodeIndex::new(0),
+            edges: Default::default(),
+            label: 0,
+        }
+    }
+}
+
 impl Provenance {
-    /// Initializes the view of the provenance from the root node up to the given depth
-    pub fn new(graph: &Graph, root: NodeIndex, depth: usize) -> Provenance {
-        let mut edges = FnvHashMap::default();
+    /// Initializes the provenance graph from the root node up to the given depth.
+    /// Typically called on a default Provenance struct, compared to an empty one.
+    pub fn init(&mut self, graph: &Graph, root: NodeIndex, depth: usize) {
+        self.root = root;
         if depth > 0 {
             let children = graph.neighbors_directed(root, petgraph::EdgeDirection::Incoming);
             for child in children {
-                let provenance = box Provenance::new(graph, child, depth - 1);
-                edges.insert(child, provenance);
+                let mut provenance = Provenance::default();
+                provenance.init(graph, child, depth - 1);
+                self.edges.insert(child, box provenance);
             }
         }
+    }
 
+    /// Constructs an empty, uninitialized provenance graph for the given node and label
+    pub fn empty(node: NodeIndex, label: usize) -> Provenance {
         Provenance {
-            root,
-            edges,
-            label: 0,
+            root: node,
+            edges: FnvHashMap::default(),
+            label,
         }
     }
 

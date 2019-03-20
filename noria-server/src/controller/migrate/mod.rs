@@ -151,8 +151,10 @@ impl<'a> Migration<'a> {
         let new_domain = self.mainline.ndomains.into();
         self.mainline.ndomains += 1;
         self.replicated.push((new_domain, nodes.clone()));
+
+        let graph_clone = graph.clone();
         for &ni in nodes {
-            graph[ni].recover(new_domain);
+            graph[ni].recover(&graph_clone, new_domain);
         }
 
         let egress = nodes[nodes.len() - 1];

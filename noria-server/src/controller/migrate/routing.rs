@@ -48,6 +48,10 @@ pub fn add(
     // so they know the true identifier of their parent in the graph.
     let mut swaps = HashMap::new();
 
+    // also keep track of egress nodes so we can set their provenance once they've been linked
+    // upwards in the graph
+    let mut new_egress = HashSet::new();
+
     // in the code below, there are three node type of interest: ingress, egress, and sharder. we
     // want to ensure the following properties:
     //
@@ -241,6 +245,7 @@ pub fn add(
 
                 // we also now need to deal with this egress node
                 new.insert(egress);
+                new_egress.insert(egress);
 
                 trace!(log,
                        "adding cross-domain egress to send to new ingress";
@@ -259,6 +264,11 @@ pub fn add(
 
             // NOTE: we *don't* need to update swaps here, because ingress doesn't care
         }
+    }
+
+    let graph_clone = graph.clone();
+    for egress in new_egress {
+        graph[egress].with_egress_mut(|e| e.init(&graph_clone, egress));
     }
 
     swaps

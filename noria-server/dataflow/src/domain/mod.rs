@@ -1,4 +1,3 @@
-use fnv::FnvHashMap;
 use petgraph::graph::NodeIndex;
 use std::borrow::Cow;
 use std::cell;
@@ -1338,17 +1337,18 @@ impl Domain {
 
                         // 1. the label for the new node to resume at
                         // 2. the provenance of the new node's label
+                        let ni = node.borrow().global_addr();
                         let (label, provenance) = if self.egress.len() == 0 {
                             // only domains with reader nodes don't have an egress
                             // so we derive the next label directly, assuming a single ancestor
                             // TODO(ygina): materialize the provenance in readers so we can recover
                             // from losing the stateless domain above a reader.
-                            (label, FnvHashMap::default())
+                            (label, Provenance::empty(ni, label - 1))
                         } else {
                             // otherwise get the provenance of the last label from the egress node
                             assert_eq!(self.egress.len(), 1);
                             let egress = *self.egress.iter().next().unwrap();
-                            let (_, out_provenance) = self.nodes[egress]
+                            let out_provenance = self.nodes[egress]
                                 .borrow_mut()
                                 .with_egress_mut(|e| {
                                     e.new_incoming(old, new);
@@ -1356,16 +1356,16 @@ impl Domain {
                                 });
 
                             // TODO(ygina): more than one depth of provenance
-                            let label = out_provenance.label();
-                            let provenance = out_provenance.subgraph(node.borrow().global_addr());
-                            (label, provenance)
+                            let label = out_provenance.label() + 1;
+                            let provenance = out_provenance.subgraph(ni).clone();
+                            (label, *provenance)
                         };
 
                         // tell the new incoming connection where to resume sending messages,
                         // and whether resuming messages in this connection completes the graph
                         executor.send_resume_at(
                             new,
-                            node.borrow().global_addr(),
+                            ni,
                             label,
                             provenance,
                             complete,
@@ -1375,7 +1375,7 @@ impl Domain {
                         // sanity check: the node "node" should be an egress node
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[node];
-                        let next_label = node.borrow_mut()
+                        let should_resume = node.borrow_mut()
                             .with_egress_mut(|e| {
                                 if !complete {
                                     // this node is responsible for sending an upwards resume at
@@ -1416,45 +1416,29 @@ impl Domain {
                         );
 
                         // sometimes the graph isn't complete yet, meaning we also need to mend the
-                        // connection between this domain and its (assumed) single parent domain.
+                        // connection between this domain and its parent domains.
                         // TODO(ygina): uphold this assumption somewhere
                         //
                         // if this ResumeAt is not complete, it means this domain does not have
                         // any messages buffered. in this case, we ask the parents to resume at a
                         // specific index, but only once we've heard from all our children first.
                         // TODO(ygina): more complicated index for joins, possibly filters
-                        if next_label.is_some() {
-                            // TODO(ygina): assumes this domain is linear
+                        if should_resume {
                             // these resume ats will definitely complete the graph
-                            //
-                            // if the domain is linear (there is only one ingress), we can infer
-                            // the next label directly. otherwise, use the given provenance info
+                            // use the given provenance info to figure out where to resume
                             assert!(!complete);
-                            if self.ingress.len() == 1 {
-                                let ni = *self.ingress.iter().next().unwrap();
+                            assert!(self.ingress.len() > 0);
+                            for &ni in &self.ingress {
                                 let ingress = &self.nodes[ni];
                                 let global_ni = ingress.borrow().global_addr();
+                                let subgraph = provenance.subgraph(global_ni).clone();
                                 executor.send_resume_at(
                                     ingress.borrow().with_ingress(|i| i.src()),
-                                    global_ni,
-                                    next_label.unwrap(),
-                                    provenance.subgraph(global_ni),
+                                    ingress.borrow().global_addr(),
+                                    subgraph.label() + 1,
+                                    *subgraph,
                                     true,
                                 );
-                            } else {
-                                assert!(self.ingress.len() > 0);
-                                for &ni in &self.ingress {
-                                    let ingress = &self.nodes[ni];
-                                    let egress = ingress.borrow().with_ingress(|i| i.src());
-                                    let global_ni = ingress.borrow().global_addr();
-                                    executor.send_resume_at(
-                                        egress,
-                                        ingress.borrow().global_addr(),
-                                        *provenance.get(&egress).unwrap(),
-                                        provenance.subgraph(global_ni),
-                                        true,
-                                    );
-                                }
                             }
                         }
                     },
