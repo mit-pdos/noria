@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 bincode = "1.0.0"
 evmap = { git = "https://github.com/ms705/rust-evmap" }
-srmap = { path = "/Users/alanamarzoev/Desktop/multidb/srmap" }
+srmap = { git = "https://github.com/amarzoev/srmap" }
 fnv = "1.0.5"
 futures = "0.1"
 itertools = "0.7.2"
