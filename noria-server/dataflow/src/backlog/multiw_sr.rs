@@ -66,7 +66,9 @@ impl Handle {
 
     pub fn refresh(&mut self) {
         match *self {
-            _ => (),
+            Handle::SingleSR(ref mut h) => {h.refresh()},
+            Handle::DoubleSR(ref mut h) => {h.refresh()},
+            Handle::ManySR(ref mut h) => {h.refresh()},
         }
     }
 
