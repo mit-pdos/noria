@@ -16,28 +16,6 @@ fn main() {
                 FROM Article, VoteCount \
                 WHERE Article.aid = VoteCount.aid AND Article.aid = ?;";
 
-<<<<<<< HEAD:examples/basic-distribution.rs
-    // let persistence_params = distributary::PersistenceParameters::new(
-    //     distributary::DurabilityMode::Permanent,
-    //     512,
-    //     Duration::from_millis(1),
-    //     Some(String::from("example")),
-    //     1,
-    // );
-
-    let log = distributary::logger_pls();
-
-    // set up Soup via recipe
-    let mut auth = ZookeeperAuthority::new("127.0.0.1:2181/basicdist").unwrap();
-    auth.log_with(log.clone());
-
-    let mut blender = ControllerHandle::new(auth).unwrap();
-    blender.extend_recipe(sql1).unwrap();
-    blender.extend_recipe(sql2).unwrap();
-    blender.extend_recipe(sql3).unwrap();
-    blender.extend_recipe(sql4).unwrap();
-    // println!("{}", blender.graphviz().unwrap());
-=======
     // set up Noria via recipe
     let auth = ZookeeperAuthority::new("127.0.0.1:2181/basicdist").unwrap();
     let mut db = ControllerHandle::new(auth).unwrap();
@@ -46,7 +24,6 @@ fn main() {
     db.extend_recipe(sql3).unwrap();
     db.extend_recipe(sql4).unwrap();
     println!("{}", db.graphviz().unwrap());
->>>>>>> 3272b3b37ba75c1730e6095c9090e8cc121bd776:noria/examples/basic-distribution.rs
 
     let get_view = |b: &mut ControllerHandle<ZookeeperAuthority>, n| loop {
         match b.view(n) {
