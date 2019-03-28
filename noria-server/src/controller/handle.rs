@@ -114,23 +114,6 @@ impl<A: Authority> LocalControllerHandle<A> {
             .clone();
 
         self.rpc::<_, ()>("create_universe", &context).unwrap();
-
-        // Write to Context table
-        let bname = match context.get("group") {
-            None => format!("UserContext_{}", uid.to_string()),
-            Some(g) => format!("GroupContext_{}_{}", g.to_string(), uid.to_string()),
-        };
-
-        let mut fields: Vec<_> = context.keys().collect();
-        fields.sort();
-        let record: Vec<DataType> = fields
-            .iter()
-            .map(|&f| context.get(f).unwrap().clone())
-            .collect();
-
-        let mut table = self.table(&bname).unwrap();
-
-        table.insert(record).unwrap();
     }
 
     /// Inform the local instance that it should exit, and wait for that to happen

@@ -71,6 +71,26 @@ impl TableBuilder {
         self
     }
 
+    #[doc(hidden)]
+    pub fn build_exclusive(self) -> io::Result<Table<ExclusiveConnection>> {
+        let c = DomainInputHandle::new(&self.txs[..])?;
+        let c = Rc::new(RefCell::new(c));
+
+        Ok(Table {
+            domain_input_handle: c,
+            shard_addrs: self.txs,
+            addr: self.addr,
+            key: self.key,
+            key_is_primary: self.key_is_primary,
+            dropped: self.dropped,
+            tracer: None,
+            table_name: self.table_name,
+            columns: self.columns,
+            schema: self.schema,
+            exclusivity: ExclusiveConnection,
+        })
+    }
+
     pub(crate) fn build(
         self,
         rpcs: &mut HashMap<Vec<SocketAddr>, TableRpc>,
