@@ -128,7 +128,7 @@ impl Populate {
             let content = format!("post #{}", i).into();
             let private = self.private();
             let anon = 1.into();
-            records.push(vec![pid, author, cid, content, private, anon]);
+            records.push(vec![pid, cid, author, content, private, anon]);
         }
         // // println!("finished populating...");
 
