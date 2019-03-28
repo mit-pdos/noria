@@ -212,7 +212,7 @@ fn main() {
         .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.99")
+                .default_value("0.0")
                 .help("Percentage of private posts"),
         )
         .get_matches();
@@ -236,6 +236,9 @@ fn main() {
     let private = value_t_or_exit!(args, "private", f32);
 
     //let partial = true;
+    let partial = false;
+    let query_type = "post_count";
+    // let query_type = "posts";
 
     assert!(
         nlogged <= nusers,
@@ -248,13 +251,10 @@ fn main() {
 
     println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
-    println!("here1");
     backend.migrate(sloc, None).unwrap();
-    println!("here2");
     backend.set_security_config(ploc);
-    println!("here3");
     backend.migrate(sloc, Some(qloc)).unwrap();
-    println!("here4");
+
     let populate = match populate.as_ref() {
         "before" => PopulateType::Before,
         "after" => PopulateType::After,
@@ -264,13 +264,9 @@ fn main() {
     let mut p = Populate::new(nposts, nusers, nclasses, private);
     p.enroll_students(nclasses);
 
-    println!("getting classes");
     let classes = p.get_classes();
-    println!("getting users");
     let users = p.get_users();
-    println!("getting roles");
     let roles = p.get_roles();
-    println!("getting posts");
     let posts = p.get_posts();
 
     backend.populate("Role", roles);
@@ -290,7 +286,15 @@ fn main() {
     thread::sleep(time::Duration::from_millis(2000));
 
     // if partial, read 25% of the keys
-    if partial {
+    if partial && query_type == "posts" {
+        let leaf = format!("posts");
+        let mut getter = backend.g.view(&leaf).unwrap();
+        for author in 0..nusers / 4 {
+            getter.lookup(&[author.into()], false).unwrap();
+        }
+    }
+
+    if partial && query_type == "post_count" {
         let leaf = format!("posts");
         let mut getter = backend.g.view(&leaf).unwrap();
         for author in 0..nusers / 4 {
@@ -313,8 +317,15 @@ fn main() {
         println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
-        if partial {
+        if partial && query_type == "posts" {
             let leaf = format!("posts_u{}", i);
+            let mut getter = backend.g.view(&leaf).unwrap();
+            for author in 0..nusers / 4 {
+                getter.lookup(&[author.into()], false).unwrap();
+            }
+        }
+        if partial && query_type == "post_count" {
+            let leaf = format!("post_count_u{}", i);
             let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
@@ -335,7 +346,8 @@ fn main() {
     let mut dur = time::Duration::from_millis(0);
 
     // --- Posts Query ---
-    if !partial {
+    if !partial && query_type == "posts" {
+        println!("post query");
         let num_at_once = nclasses as usize;
         let mut enrollment_info = p.get_enrollment();
         for uid in 0..nlogged {
@@ -359,23 +371,108 @@ fn main() {
         }
     }
 
-    // --- PostCount Query ---
+    if !partial && query_type == "post_count" {
+        println!("post count query");
+        let mut authors = p.authors();
+        for (author, count) in &authors {
+            println!("author: {:?}, count: {:?}", author, count);
+        }
 
-    // if !partial {
-    //     let mut lookup_vec = Vec::new();
-    //     for auth in 0..nlogged {
-    //         lookup_vec.push([auth.into()].to_vec());
+        let mut lookup_vec : Vec<Vec<DataType>>= Vec::new();
+        for inner in 0..nlogged {
+            lookup_vec.push([inner.clone().into()].to_vec());
+        }
+        for uid in 0..nlogged {
+            let leaf = format!("post_count_u{}", uid);
+            let mut getter = backend.g.view(&leaf).unwrap();
+            let start = time::Instant::now();
+            let res = getter.multi_lookup(lookup_vec.clone(), true);
+            dur += start.elapsed();
+            println!("res: {:?}", res);
+        }
+    }
+
+    // cid version of post_count query
+    // if !partial && query_type == "post_count" {
+    //     let mut counts = p.classes();
+    //     for (class, count) in &counts {
+    //         println!("class: {:?}, count: {:?}", class, count);
+    //     }
+    //     let num_at_once = nclasses as usize;
+    //     let mut enrollment_info = p.get_enrollment();
+    //     for uid in 0..nlogged {
+    //         match enrollment_info.get(&uid.into()) {
+    //             Some(classes) => {
+    //                 println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+    //                 let mut class_vec = Vec::new();
+    //                 for class in classes {
+    //                     class_vec.push([class.clone()].to_vec());
+    //                 }
+    //                 let leaf = format!("post_count_u{}", uid);
+    //                 let mut getter = backend.g.view(&leaf).unwrap();
+    //                 println!("looking up vec: {:?}", class_vec);
+    //                 let start = time::Instant::now();
+    //                 let res = getter.multi_lookup(class_vec.clone(), true);
+    //                 println!("res: {:?}", res);
+    //                 dur += start.elapsed();
+    //
+    //             },
+    //             None => println!("why isn't user {:?} enrolled", uid),
+    //         }
+    //     }
+    // }
+
+    // if !partial && query_type == "post_count" {
+    //     let mut authors = p.authors();
+    //     for (author, count) in &authors {
+    //         println!("author: {:?}, count: {:?}", author, count);
     //     }
     //
-    //     let mut dur = time::Duration::from_millis(0);
+    //     let num_at_once = nclasses as usize;
+    //     let mut enrollment_info = p.get_enrollment();
+    //
+    //     let mut class_to_students: HashMap<DataType, Vec<DataType>> = HashMap::new();
+    //     for (student, classes) in &enrollment_info {
+    //         for class in classes {
+    //             match class_to_students.get_mut(&class) {
+    //                 Some(student_list) => {
+    //                     student_list.push(student.clone());
+    //                 },
+    //                 None => {
+    //                     let mut stud_list = Vec::new();
+    //                     stud_list.push(student.clone());
+    //                     class_to_students.insert(class.clone(), stud_list);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //
+    //
     //     for uid in 0..nlogged {
-    //        let leaf = format!("post_count_u{}", uid);
-    //        let mut getter = backend.g.view(&leaf).unwrap();
-    //        let start = time::Instant::now();
-    //        for author in 0..nusers {
-    //            getter.lookup(&lookup_vec, true).unwrap();
-    //        }
-    //        dur += start.elapsed();
+    //         match enrollment_info.get(&uid.into()) {
+    //             Some(classes) => {
+    //                 println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+    //                 let mut query_vec = Vec::new();
+    //                 for class_id in classes {
+    //                     match class_to_students.get(&class_id) {
+    //                         Some(list) => {
+    //                             for student in list {
+    //                                 query_vec.push([student.clone()].to_vec());
+    //                             }
+    //                         },
+    //                         None => {},
+    //                     }
+    //                 }
+    //                 let leaf = format!("post_count_u{}", uid);
+    //                 let mut getter = backend.g.view(&leaf).unwrap();
+    //                 let start = time::Instant::now();
+    //                 let res = getter.multi_lookup(query_vec.clone(), true);
+    //                 println!("res: {:?}", res);
+    //                 dur += start.elapsed();
+    //
+    //             },
+    //             None => println!("why isn't user {:?} enrolled", uid),
+    //         }
     //     }
     // }
 

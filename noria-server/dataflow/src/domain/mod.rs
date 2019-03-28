@@ -522,6 +522,7 @@ impl Domain {
             return output_messages;
         }
 
+        println!("in dispatch1");
         let (mut m, evictions) = {
             let mut n = self.nodes[me].borrow_mut();
             self.process_times.start(me);
@@ -541,6 +542,8 @@ impl Domain {
             assert_eq!(captured.len(), 0);
             self.process_ptimes.stop();
             self.process_times.stop();
+
+            println!("in dispatch2");
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
@@ -1076,6 +1079,7 @@ impl Domain {
                                 use std::sync::Arc;
                                 let (mut r_part, mut w_part): (backlog::SingleReadHandle,
                                                                backlog::WriteHandle);
+
 
                                 let srmap = true;
 
@@ -2014,10 +2018,7 @@ impl Domain {
                             id
                         );
 
-                        // println!("here3");
-
-                        // // println!("m data 2: {:?}", m.as_ref().unwrap().data());
-
+                        println!("herehere2");
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {
                             a.on.cmp(&b.on)

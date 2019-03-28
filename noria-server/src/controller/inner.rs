@@ -1000,7 +1000,7 @@ impl ControllerInner {
                     .lookup(uid, true)
                     .unwrap();
 
-                println!("my groups: {:#?}", mygroups); 
+                println!("my groups: {:#?}", mygroups);
 
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)

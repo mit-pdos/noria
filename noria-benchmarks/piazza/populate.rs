@@ -22,7 +22,8 @@ pub struct Populate {
     rng: rand::ThreadRng,
     students: HashMap<DataType, Vec<DataType>>,
     tas: HashMap<DataType, Vec<DataType>>,
-    classes: HashMap<DataType, i32> // class ID to num posts in class mapping
+    pub classes: HashMap<DataType, i32>, // class ID to num posts in class mapping
+    pub authors: HashMap<DataType, i32>
 }
 
 impl Populate {
@@ -36,11 +37,20 @@ impl Populate {
             students: HashMap::new(),
             tas: HashMap::new(),
             classes: HashMap::new(),
+            authors: HashMap::new(),
         }
     }
 
     pub fn get_enrollment(&mut self) -> HashMap<DataType, Vec<DataType>> {
         self.students.clone()
+    }
+
+    pub fn classes(&mut self) -> HashMap<DataType, i32> {
+        self.classes.clone()
+    }
+
+    pub fn authors(&mut self) -> HashMap<DataType, i32> {
+        self.authors.clone()
     }
 
     pub fn enroll_students(&mut self, classes_per_student : i32) {
@@ -120,6 +130,10 @@ impl Populate {
         for i in 0..self.nposts {
             let pid = i.into();
             let author = self.uid();
+            match self.authors.get_mut(&author.clone()) {
+                Some(count) => *count += 1,
+                None => {self.authors.insert(author.clone(), 1);},
+            }
             let cid = self.cid_for(&author);
             match self.classes.get_mut(&cid.clone()) {
                 Some(count) => *count += 1,
@@ -128,6 +142,7 @@ impl Populate {
             let content = format!("post #{}", i).into();
             let private = self.private();
             let anon = 1.into();
+            // println!("post by auth: {:?}", author);
             records.push(vec![pid, author, cid, content, private, anon]);
         }
         // // println!("finished populating...");

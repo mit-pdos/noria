@@ -25,7 +25,7 @@ pub fn mir_query_to_flow_parts(
 
     let mut new_nodes = Vec::new();
     let mut reused_nodes = Vec::new();
-
+    // println!("MIR QUERY: {:?}", mir_query);
     // starting at the roots, add nodes in topological order
     let mut node_queue = VecDeque::new();
     node_queue.extend(mir_query.roots.iter().cloned());

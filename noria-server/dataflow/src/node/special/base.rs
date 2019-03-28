@@ -112,6 +112,7 @@ impl Default for Base {
 }
 
 fn key_val(i: usize, col: usize, r: &TableOperation) -> &DataType {
+    // println!("key_val: col: {:?} ", col);
     match *r {
         TableOperation::Insert(ref row) => &row[col],
         TableOperation::Delete { ref key } => &key[i],
@@ -138,7 +139,6 @@ impl Base {
         mut ops: Vec<TableOperation>,
         state: &StateMap,
     ) -> Records {
-        // println!("process1");
         if self.primary_key.is_none() || ops.is_empty() {
             return ops
                 .into_iter()
@@ -267,7 +267,7 @@ impl Base {
         for r in &mut results {
             self.fix(r);
         }
-
+        println!("results: {:?}", results);
         results.into()
     }
 

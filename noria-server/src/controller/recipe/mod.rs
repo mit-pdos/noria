@@ -299,7 +299,6 @@ impl Recipe {
         let now = Instant::now();
 
         // println!("recipe: creatng universe 1. {:?}", now.elapsed().as_nanos());
-
         if self.security_config.is_some() {
             // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
@@ -354,6 +353,8 @@ impl Recipe {
                 Some(name) => name,
                 None => qfp.name.clone(),
             };
+
+            println!("added query w name: {:?}", query_name);
 
             // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);

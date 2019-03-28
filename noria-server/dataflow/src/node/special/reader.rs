@@ -178,6 +178,7 @@ impl Reader {
             if m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
+                        println!("processing row: {:?}", row);
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // row would miss in partial state.
@@ -201,6 +202,8 @@ impl Reader {
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
+                        println!("processing row: {:?}", row);
+
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // filling a hole with replay -- ok
@@ -226,11 +229,11 @@ impl Reader {
             if self.streamers.is_empty() {
                 // println!("state add");
                 let data = m.take_data();
-                // println!("data: {:?}", data);
+                println!("data: {:?}", data);
                 // println!("reader data: {:?}", data);
                 state.add(data, id);
             } else {
-                // println!("state add 2");
+                println!("state add 2");
                 state.add(m.data().iter().cloned(), id);
             }
 
