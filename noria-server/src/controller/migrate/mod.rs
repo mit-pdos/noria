@@ -208,8 +208,6 @@ impl<'a> Migration<'a> {
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
             let r = node::special::Reader::new(n);
-
-            // println!("CREATING READER NODE in migration: name: {:?}, node index: {:?}", name, n);
             // println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
             // make a reader
 
@@ -222,7 +220,6 @@ impl<'a> Migration<'a> {
             };
 
             let r = self.mainline.ingredients.add_node(r);
-            // println!("new r: {:?}", r);
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
@@ -311,6 +308,7 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
+        println!("in maintain. calling ensure reader for with n: {:?}, name: {:?}", n, name);
         self.ensure_reader_for(n, Some(name));
 
         let ri = self.readers[&n];

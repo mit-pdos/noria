@@ -227,13 +227,10 @@ impl Reader {
 
             // println!("ID FOR STATE ADDED: {:?}", id);
             if self.streamers.is_empty() {
-                // println!("state add");
                 let data = m.take_data();
-                println!("data: {:?}", data);
-                // println!("reader data: {:?}", data);
+                println!("adding state: {:?}", data);
                 state.add(data, id);
             } else {
-                println!("state add 2");
                 state.add(m.data().iter().cloned(), id);
             }
 
@@ -241,6 +238,7 @@ impl Reader {
                 // TODO: avoid doing the pointer swap if we didn't modify anything (inc. ts)
                 state.swap();
             }
+            //state.swap();
         }
 
         // TODO: don't send replays to streams?

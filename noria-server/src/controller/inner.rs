@@ -1144,11 +1144,8 @@ impl ControllerInner {
         match Recipe::from_str(&r_txt, Some(self.log.clone())) {
             Ok(r) => {
                 let old = mem::replace(&mut self.recipe, Recipe::blank(None));
-                println!("ir1");
                 let new = old.replace(r).unwrap();
-                println!("ir2");
                 let activation_result = self.apply_recipe(new);
-                println!("ir22");
                 if authority
                     .read_modify_write(STATE_KEY, |state: Option<ControllerState>| match state {
                         None => unreachable!(),
@@ -1161,10 +1158,8 @@ impl ControllerInner {
                     })
                     .is_err()
                 {
-                    println!("hereee");
                     return Err("Failed to persist recipe installation".to_owned());
                 }
-                println!("ir3");
                 activation_result
             }
             Err(e) => {

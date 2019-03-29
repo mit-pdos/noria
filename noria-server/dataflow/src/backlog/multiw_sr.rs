@@ -66,7 +66,9 @@ impl Handle {
 
     pub fn refresh(&mut self) {
         match *self {
-            _ => (),
+            Handle::SingleSR(ref mut h) => h.refresh(),
+            Handle::DoubleSR(ref mut h) => h.refresh(),
+            Handle::ManySR(ref mut h) => h.refresh(),
         }
     }
 
@@ -126,7 +128,7 @@ impl Handle {
                     debug_assert!(r.len() >= cols);
                     match r {
                         Record::Positive(r) => {
-                            // println!("inserting {:?}", r);
+                            println!("inserting {:?}", r);
                             memory_delta += r.deep_size_of() as isize;
                             h.insert(r[key[0]].clone(), r, id);
                         }

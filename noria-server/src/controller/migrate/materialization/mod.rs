@@ -907,6 +907,7 @@ impl Materializations {
         // construct and disseminate a plan for each index
         let pending = {
             let mut plan = plan::Plan::new(self, graph, ni, domains, workers);
+            println!("here1");
             for index in index_on.drain() {
                 plan.add(index, replies);
             }

@@ -354,8 +354,6 @@ impl Recipe {
                 None => qfp.name.clone(),
             };
 
-            println!("added query w name: {:?}", query_name);
-
             // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }

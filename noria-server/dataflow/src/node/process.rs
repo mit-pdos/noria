@@ -42,7 +42,6 @@ impl Node {
                     }) => {
                         let Input { dst, data, tracer } = unsafe { inner.take() };
                         let mut rs = b.process(addr, data, &*state);
-                        println!("in node process. keyed by: {:?}", keyed_by);
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay
                         // through the base node itself should *NOT* update the materialization,

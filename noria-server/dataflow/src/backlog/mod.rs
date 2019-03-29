@@ -434,6 +434,7 @@ impl WriteHandle {
         I: IntoIterator<Item = Record>,
     {
         if self.srmap {
+            println!("srmap add");
             let handle = &mut self.handleSR;
             match handle {
                 Some(hand) => {
@@ -446,12 +447,12 @@ impl WriteHandle {
                             .checked_sub(mem_delta.checked_abs().unwrap() as usize)
                             .unwrap();
                     }
+                    // hand.refresh();
                 },
                 None => {},
             }
         } else {
-            let handle = &mut self.handle
-            ;
+            let handle = &mut self.handle;
             match handle {
                 Some(hand) => {
                     let mem_delta = hand.add(&self.key[..], self.cols, rs);
