@@ -308,7 +308,6 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
-        println!("in maintain. calling ensure reader for with n: {:?}, name: {:?}", n, name);
         self.ensure_reader_for(n, Some(name));
 
         let ri = self.readers[&n];

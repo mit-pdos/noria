@@ -267,7 +267,6 @@ impl Base {
         for r in &mut results {
             self.fix(r);
         }
-        println!("results: {:?}", results);
         results.into()
     }
 

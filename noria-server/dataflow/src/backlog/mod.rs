@@ -434,7 +434,6 @@ impl WriteHandle {
         I: IntoIterator<Item = Record>,
     {
         if self.srmap {
-            println!("srmap add");
             let handle = &mut self.handleSR;
             match handle {
                 Some(hand) => {

@@ -202,7 +202,7 @@ impl Reader {
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        println!("processing row: {:?}", row);
+                        // println!("processing row: {:?}", row);
 
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
@@ -225,10 +225,9 @@ impl Reader {
                 });
             }
 
-            // println!("ID FOR STATE ADDED: {:?}", id);
             if self.streamers.is_empty() {
                 let data = m.take_data();
-                println!("adding state: {:?}", data);
+                // println!("adding state: {:?}", data);
                 state.add(data, id);
             } else {
                 state.add(m.data().iter().cloned(), id);

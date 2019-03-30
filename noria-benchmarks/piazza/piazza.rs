@@ -388,7 +388,7 @@ fn main() {
             let start = time::Instant::now();
             let res = getter.multi_lookup(lookup_vec.clone(), true);
             dur += start.elapsed();
-            println!("res: {:?}", res);
+            // println!("res: {:?}", res);
         }
     }
 
