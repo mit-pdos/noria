@@ -188,19 +188,17 @@ pub(crate) struct WriteHandleEntry<'a> {
 
 impl<'a> MutWriteHandleEntry<'a> {
     pub fn mark_filled(&mut self) {
-        println!("markfilled 1");
         let handle = &mut self.handle.handleSR;
         match handle {
             Some(hand) => {
-                println!("markfilled 2");
                 if let Some((None, _)) = hand
                     .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
                 {
                     hand.clear(Cow::Borrowed(&*self.key));
-                    println!("markfilled 3");
                 } else {
                     unreachable!("attempted to fill already-filled key");
                 }
+                hand.refresh();
             },
             None => {}
         }
@@ -598,7 +596,6 @@ impl SingleReadHandle {
 
     /// Trigger a replay of a missing key from a partially materialized view.
     pub fn trigger(&self, key: &[DataType], id: Option<usize>) {
-        println!("triggering, uid: {:?}", id);
         assert!(
             self.trigger.is_some(),
             "tried to trigger a replay for a fully materialized view"
