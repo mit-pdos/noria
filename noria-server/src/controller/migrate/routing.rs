@@ -199,7 +199,8 @@ pub fn add(
 
             if graph[sender].is_sender() {
                 // all good -- we're already hooked up with an egress or sharder!
-                graph[ingress].with_ingress_mut(|i| i.set_src(sender));
+                let domain = graph[sender].domain();
+                graph[ingress].with_ingress_mut(|i| i.set_src(domain));
                 if graph[sender].is_egress() {
                     trace!(log,
                            "re-using cross-domain egress to new node";
@@ -255,7 +256,8 @@ pub fn add(
             let old = graph.find_edge(sender, ingress).unwrap();
             let was_materialized = graph.remove_edge(old).unwrap();
             graph.add_edge(egress, ingress, was_materialized);
-            graph[ingress].with_ingress_mut(|i| i.set_src(egress));
+            let domain = graph[egress].domain();
+            graph[ingress].with_ingress_mut(|i| i.set_src(domain));
 
             // NOTE: we *don't* need to update swaps here, because ingress doesn't care
         }

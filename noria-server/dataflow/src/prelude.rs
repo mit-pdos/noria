@@ -48,7 +48,7 @@ pub trait Executor {
     fn ack_resume_at(&mut self, from: DomainIndex);
     fn send_resume_at(
         &mut self,
-        node: NodeIndex,
+        domain: DomainIndex,
         child: NodeIndex,
         label: usize,
         provenance: Provenance,

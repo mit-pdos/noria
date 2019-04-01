@@ -141,6 +141,22 @@ impl Egress {
         self.ok_to_send.remove(&child);
     }
 
+    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
+        if self.min_provenance.new_incoming(old, new) {
+            // Remove the old domain from the updates entirely
+            for update in self.updates.iter_mut() {
+                assert_eq!(update[0].0, old);
+                update.remove(0);
+            }
+        } else {
+            // Replace the old domain with the new domain in all updates
+            for update in self.updates.iter_mut() {
+                assert_eq!(update[0].0, old);
+                update[0].0 = new;
+            }
+        }
+    }
+
     fn get_provenance(&self, label: usize) -> Provenance {
         // TODO(ygina): egress-wide label counters
         let min_label = self.min_provenance.label();
@@ -168,7 +184,7 @@ impl Egress {
     pub fn send_packet(
         &mut self,
         m: &mut Option<Box<Packet>>,
-        from: NodeIndex,
+        from: DomainIndex,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {

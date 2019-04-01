@@ -524,6 +524,7 @@ impl Domain {
             let mut m = Some(m);
             let (misses, captured) = n.process(
                 &mut m,
+                self.index,
                 None,
                 &mut self.state,
                 &self.nodes,
@@ -1344,12 +1345,15 @@ impl Domain {
                             // so we derive the next label directly, assuming a single ancestor
                             // TODO(ygina): materialize the provenance in readers so we can recover
                             // from losing the stateless domain above a reader.
-                            (label, Provenance::empty(ni, label - 1))
+                            (label, Provenance::empty(self.index, label - 1))
                         } else {
                             // otherwise get the provenance of the last label from the egress node
                             let provenance = self.nodes[self.egress.unwrap()]
                                 .borrow_mut()
-                                .with_egress_mut(|e| e.get_last_provenance());
+                                .with_egress_mut(|e| {
+                                    e.new_incoming(old, new);
+                                    e.get_last_provenance()
+                                });
 
                             // TODO(ygina): more than one depth of provenance
                             let subgraph = provenance.subgraph(new).clone();
@@ -1878,6 +1882,7 @@ impl Domain {
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
                             &mut m,
+                            self.index,
                             segment.partial_key.as_ref(),
                             &mut self.state,
                             &self.nodes,

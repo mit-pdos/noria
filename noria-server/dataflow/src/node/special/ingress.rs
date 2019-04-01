@@ -3,10 +3,10 @@ use std::collections::HashMap;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Ingress {
-    /// Parent egress node
-    src: Option<NodeIndex>,
+    /// Parent domain
+    src: Option<DomainIndex>,
     /// The last packet received from each parent
-    last_packet_received: HashMap<NodeIndex, usize>,
+    last_packet_received: HashMap<DomainIndex, usize>,
 }
 
 impl Ingress {
@@ -14,13 +14,13 @@ impl Ingress {
         Ingress::default()
     }
 
-    pub fn set_src(&mut self, src: NodeIndex) {
+    pub fn set_src(&mut self, src: DomainIndex) {
         assert!(self.src.is_none());
         self.src = Some(src);
     }
 
-    pub fn src(&self) -> NodeIndex {
-        self.src.expect("ingress should have an egress parent")
+    pub fn src(&self) -> DomainIndex {
+        self.src.expect("ingress should have a parent domain")
     }
 
     /// Receive a packet, keeping track of the latest packet received from each parent. If the
@@ -45,7 +45,7 @@ impl Ingress {
 
     /// Replace an incoming connection from `old` with `new`.
     /// Returns the label of the next message expected from the new connection.
-    pub fn new_incoming(&mut self, old: NodeIndex, new: NodeIndex) -> usize {
+    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> usize {
         assert_eq!(self.src, Some(old));
         self.src = Some(new);
         let label = self.last_packet_received.remove(&old).unwrap_or(0);

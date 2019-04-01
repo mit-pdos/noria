@@ -534,7 +534,7 @@ impl ControllerInner {
             self.waiting_on.insert(domain_a, waiting_on);
         }
         for ingress_c in ingress_cs {
-            self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
+            self.send_new_incoming(ingress_c, domain_b2, Some(domain_b1), false);
         }
     }
 
@@ -609,7 +609,7 @@ impl ControllerInner {
         let new_domain = self.ingredients[new_egress].domain();
         let mut waiting_on = HashSet::new();
         for &ingress_ni in &ingress {
-            self.send_new_incoming(ingress_ni, new_egress, Some(failed_egress), true);
+            self.send_new_incoming(ingress_ni, new_domain, Some(failed_domain), true);
             waiting_on.insert(self.ingredients[ingress_ni].domain());
         }
         self.waiting_on.insert(new_domain, waiting_on);
@@ -625,8 +625,8 @@ impl ControllerInner {
     fn send_new_incoming(
         &mut self,
         ingress: NodeIndex,
-        new_egress: NodeIndex,
-        old_egress: Option<NodeIndex>,
+        new_egress: DomainIndex,
+        old_egress: Option<DomainIndex>,
         complete: bool,
     ) {
         let old_egress = old_egress.unwrap_or(new_egress);
@@ -643,8 +643,8 @@ impl ControllerInner {
         let dh = self.domains.get_mut(&domain).unwrap();
         let m = box Packet::NewIncoming {
             to: self.ingredients[ingress].local_addr(),
-            old: self.ingredients[old_egress].global_addr(),
-            new: self.ingredients[new_egress].global_addr(),
+            old: old_egress,
+            new: new_egress,
             complete,
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
@@ -713,7 +713,7 @@ impl ControllerInner {
 
     pub(crate) fn handle_resume_at(
         &mut self,
-        node: NodeIndex,
+        domain: DomainIndex,
         child: NodeIndex,
         label: usize,
         provenance: Provenance,
@@ -722,13 +722,12 @@ impl ControllerInner {
         debug!(
             self.log,
             "controller received SendResumeAt coordination message to forward";
-            "node" => node.index(),
+            "domain" => domain.index(),
             "child" => child.index(),
             "label" => label,
             "complete" => complete,
         );
 
-        let domain = self.ingredients[node].domain();
         let dh = self.domains.get_mut(&domain).unwrap();
         let m = box Packet::ResumeAt {
             child,

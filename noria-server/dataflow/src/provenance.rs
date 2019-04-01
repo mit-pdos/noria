@@ -1,28 +1,27 @@
 use fnv::FnvHashMap;
-use petgraph::graph::NodeIndex;
 use prelude::*;
 
-/// The upstream branch of nodes and message labels that was updated to produce the current
+/// The upstream branch of domains and message labels that was updated to produce the current
 /// message, starting at the node above the payload's "from" node. The number of nodes in the
 /// update is linear in the depth of the update.
-pub type ProvenanceUpdate = Vec<(NodeIndex, usize)>;
+pub type ProvenanceUpdate = Vec<(DomainIndex, usize)>;
 
 /// The history of message labels that correspond to the production of the current message.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Provenance {
-    root: NodeIndex,
+    root: DomainIndex,
     label: usize,
-    edges: FnvHashMap<NodeIndex, Box<Provenance>>,
+    edges: FnvHashMap<DomainIndex, Box<Provenance>>,
 }
 
 impl Default for Provenance {
-    // TODO(ygina): it doesn't really make sense to have a provenance for imaginary node index 0,
+    // TODO(ygina): it doesn't really make sense to have a provenance for imaginary domain index 0,
     // so maybe we should use options here. this is hacky and gross. the reason we have a default
     // implementation is hack to intiialize the provenance graph in the egress AFTER it has
     // been otherwise initialized and fit into the graph.
     fn default() -> Provenance {
         Provenance {
-            root: NodeIndex::new(0),
+            root: 0.into(),
             edges: Default::default(),
             label: 0,
         }
@@ -33,7 +32,7 @@ impl Provenance {
     /// Initializes the provenance graph from the root node up to the given depth.
     /// Typically called on a default Provenance struct, compared to an empty one.
     pub fn init(&mut self, graph: &Graph, root: NodeIndex, depth: usize) {
-        self.root = root;
+        self.root = graph[root].domain();
         if depth > 0 {
             // TODO(ygina): operate on domain level instead of ingress/egress level
             let mut egresses = Vec::new();
@@ -55,15 +54,15 @@ impl Provenance {
             for egress in egresses {
                 let mut provenance = Provenance::default();
                 provenance.init(graph, egress, depth - 1);
-                self.edges.insert(egress, box provenance);
+                self.edges.insert(graph[egress].domain(), box provenance);
             }
         }
     }
 
-    /// Constructs an empty, uninitialized provenance graph for the given node and label
-    pub fn empty(node: NodeIndex, label: usize) -> Provenance {
+    /// Constructs an empty, uninitialized provenance graph for the given domain and label
+    pub fn empty(domain: DomainIndex, label: usize) -> Provenance {
         Provenance {
-            root: node,
+            root: domain,
             edges: FnvHashMap::default(),
             label,
         }
@@ -82,8 +81,8 @@ impl Provenance {
     pub fn apply_update(&mut self, update: &ProvenanceUpdate) {
         self.label += 1;
         let mut provenance = self;
-        for (node, label) in update {
-            if let Some(p) = provenance.edges.get_mut(node) {
+        for (domain, label) in update {
+            if let Some(p) = provenance.edges.get_mut(domain) {
                 p.set_label(*label);
                 provenance = p;
             } else {
@@ -98,10 +97,27 @@ impl Provenance {
         }
     }
 
-    /// Subgraph of this provenance graph with the given node as the new root. The new root must be
-    /// an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of the
-    /// given node. There's no reason we should obtain any other subgraph in the recovery protocol.
-    pub fn subgraph(&self, new_root: NodeIndex) -> &Box<Provenance> {
+    /// Returns whether a replica failed. :P
+    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
+        let mut provenance = self.edges.remove(&old).expect("old connection should exist");
+
+        if let Some(new_p) = provenance.edges.remove(&new){
+            // check if a replica failed. if so, make the grand-ancestor an ancestor
+            assert!(provenance.edges.is_empty());
+            self.edges.insert(new, new_p);
+            true
+        }  else {
+            // otherwise, just replace the domain index
+            provenance.root = new;
+            self.edges.insert(new, provenance);
+            false
+        }
+    }
+
+    /// Subgraph of this provenance graph with the given domain as the new root. The new root must
+    /// be an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of
+    /// the given node. There's no reason we should obtain any other subgraph in the protocol.
+    pub fn subgraph(&self, new_root: DomainIndex) -> &Box<Provenance> {
         if let Some(p) = self.edges.get(&new_root) {
             return p;
         }

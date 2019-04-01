@@ -10,6 +10,7 @@ impl Node {
     crate fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
+        domain: DomainIndex,
         keyed_by: Option<&Vec<usize>>,
         state: &mut StateMap,
         nodes: &DomainNodes,
@@ -79,9 +80,8 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(_)) => {
-                let from = self.global_addr();
                 self.with_egress_mut(|e| {
-                    e.send_packet(m, from, on_shard.unwrap_or(0), output);
+                    e.send_packet(m, domain, on_shard.unwrap_or(0), output);
                 });
                 (vec![], HashSet::new())
             }

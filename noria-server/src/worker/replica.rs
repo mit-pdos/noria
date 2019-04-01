@@ -323,7 +323,7 @@ impl Executor for OutOfBand {
 
     fn send_resume_at(
         &mut self,
-        node: NodeIndex,
+        domain: DomainIndex,
         child: NodeIndex,
         label: usize,
         provenance: Provenance,
@@ -331,7 +331,7 @@ impl Executor for OutOfBand {
     ) {
         self.ctrl_tx
             .unbounded_send(CoordinationPayload::SendResumeAt {
-                node,
+                domain,
                 child,
                 label,
                 provenance,

@@ -429,7 +429,7 @@ pub mod test {
                 fn ack_resume_at(&mut self, _: DomainIndex) {}
                 fn send_resume_at(
                     &mut self,
-                    _: NodeIndex,
+                    _: DomainIndex,
                     _: NodeIndex,
                     _: usize,
                     _: Provenance,

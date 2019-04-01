@@ -81,7 +81,7 @@ pub struct SourceChannelIdentifier {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PacketId {
     pub label: usize,
-    pub from: NodeIndex,
+    pub from: DomainIndex,
 
     /// Provenance update starting the level above the from node.
     pub update: ProvenanceUpdate,
@@ -92,7 +92,7 @@ impl PacketId {
         unreachable!();
     }
 
-    pub fn new(label: usize, from: NodeIndex, update: ProvenanceUpdate) -> PacketId {
+    pub fn new(label: usize, from: DomainIndex, update: ProvenanceUpdate) -> PacketId {
         PacketId { label, from, update }
     }
 }
@@ -269,8 +269,8 @@ pub enum Packet {
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
         to: LocalNodeIndex,
-        old: NodeIndex,
-        new: NodeIndex,
+        old: DomainIndex,
+        new: DomainIndex,
         complete: bool,
     },
 

@@ -110,7 +110,7 @@ pub(super) fn main<A: Authority + 'static>(
                         }
                     }
                     CoordinationPayload::SendResumeAt {
-                        node,
+                        domain,
                         child,
                         label,
                         provenance,
@@ -118,7 +118,7 @@ pub(super) fn main<A: Authority + 'static>(
                     } => {
                         if let Some(ref mut ctrl) = controller {
                             crate::block_on(|| ctrl.handle_resume_at(
-                                node,
+                                domain,
                                 child,
                                 label,
                                 provenance,
