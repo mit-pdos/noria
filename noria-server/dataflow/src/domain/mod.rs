@@ -154,7 +154,8 @@ impl DomainBuilder {
             .iter()
             .filter(|(_, node)| node.borrow().is_egress())
             .map(|(ni, _)| ni)
-            .collect::<HashSet<LocalNodeIndex>>();
+            .collect::<Vec<_>>();
+        assert!(egress.len() <= 1);
 
         let log = log.new(o!("domain" => self.index.index(), "shard" => self.shard.unwrap_or(0)));
         let control_reply_tx = TcpSender::connect(&control_addr).unwrap();
@@ -171,7 +172,7 @@ impl DomainBuilder {
             log,
             not_ready,
             ingress,
-            egress,
+            egress: egress.get(0).map(|&e| e),
             mode: DomainMode::Forwarding,
             waiting: Default::default(),
             reader_triggered: Default::default(),
@@ -216,7 +217,7 @@ pub struct Domain {
 
     not_ready: HashSet<LocalNodeIndex>,
     ingress: HashSet<LocalNodeIndex>,
-    egress: HashSet<LocalNodeIndex>,
+    egress: Option<LocalNodeIndex>,
 
     ingress_inject: Map<(usize, Vec<DataType>)>,
 
@@ -1338,7 +1339,7 @@ impl Domain {
                         // 1. the label for the new node to resume at
                         // 2. the provenance of the new node's label
                         let ni = node.borrow().global_addr();
-                        let (label, provenance) = if self.egress.len() == 0 {
+                        let (label, provenance) = if self.egress.is_none() {
                             // only domains with reader nodes don't have an egress
                             // so we derive the next label directly, assuming a single ancestor
                             // TODO(ygina): materialize the provenance in readers so we can recover
@@ -1346,9 +1347,7 @@ impl Domain {
                             (label, Provenance::empty(ni, label - 1))
                         } else {
                             // otherwise get the provenance of the last label from the egress node
-                            assert_eq!(self.egress.len(), 1);
-                            let egress = *self.egress.iter().next().unwrap();
-                            let provenance = self.nodes[egress]
+                            let provenance = self.nodes[self.egress.unwrap()]
                                 .borrow_mut()
                                 .with_egress_mut(|e| e.get_last_provenance());
 
