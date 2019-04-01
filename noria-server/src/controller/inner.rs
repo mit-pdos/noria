@@ -17,7 +17,7 @@ use noria::debug::stats::{DomainStats, GraphStats, NodeStats};
 use noria::ActivationResult;
 use petgraph::visit::Bfs;
 use slog::Logger;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -69,6 +69,11 @@ pub(super) struct ControllerInner {
     log: slog::Logger,
 
     pub(in crate::controller) replies: DomainReplies,
+
+    // Fault tolerance
+    // TODO(ygina): assumes one recovery process is going on at any time
+    waiting_on: HashMap<DomainIndex, HashSet<DomainIndex>>,
+    resume_ats: HashMap<DomainIndex, Vec<(DomainIndex, usize)>>,
 }
 
 pub(in crate::controller) struct DomainReplies(
@@ -776,6 +781,9 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
 
             replies: DomainReplies(drx),
+
+            waiting_on: Default::default(),
+            resume_ats: Default::default(),
         }
     }
 
