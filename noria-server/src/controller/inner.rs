@@ -474,14 +474,18 @@ impl ControllerInner {
 
         // prevent A from sending messages to B2 even once the connection is regenerated.
         // B2 won't send messages to C since it'll be a new domain.
+        let mut domain_as = Vec::new();
         for &ingress in &failed_ingress {
             let egress_a = self.parent(ingress);
+            let domain_a = self.ingredients[egress_a].domain();
+            domain_as.push(domain_a);
+
             let m = box Packet::RemoveChild {
                 node: self.ingredients[egress_a].local_addr(),
                 child: ingress,
             };
             self.domains
-                .get_mut(&self.ingredients[egress_a].domain())
+                .get_mut(&domain_a)
                 .unwrap()
                 .send_to_healthy(m, &self.workers)
                 .unwrap();
@@ -511,14 +515,24 @@ impl ControllerInner {
                 .unwrap();
         }
 
-        // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
-        // sending messages. B2 is in charge of realizing from that message that it also needs to
-        // tell A where to resume sending messages.
+        // initialize the waiting_on field in anticipation of getting resume at messages to
+        // forward. then tell C about the new incoming connection from B2 so that B2 can tell
+        // the controller all the necessary provenance information for recovery.
         //
         // dataflow graph: A ---> B2 -o-> C
         let ingress_cs = self.ingredients
             .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
             .collect::<Vec<_>>();
+        let domain_cs = ingress_cs
+            .iter()
+            .map(|&ni| self.ingredients[ni].domain())
+            .collect::<HashSet<_>>();
+        self.waiting_on.insert(domain_b2, domain_cs);
+        for domain_a in domain_as {
+            let mut waiting_on = HashSet::new();
+            waiting_on.insert(domain_b2);
+            self.waiting_on.insert(domain_a, waiting_on);
+        }
         for ingress_c in ingress_cs {
             self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
         }
@@ -592,9 +606,13 @@ impl ControllerInner {
         let path = self.migrate(|mig| mig.link_nodes(new_egress, &ingress));
         self.remove_nodes(&path[..]).unwrap();
 
+        let new_domain = self.ingredients[new_egress].domain();
+        let mut waiting_on = HashSet::new();
         for &ingress_ni in &ingress {
             self.send_new_incoming(ingress_ni, new_egress, Some(failed_egress), true);
+            waiting_on.insert(self.ingredients[ingress_ni].domain());
         }
+        self.waiting_on.insert(new_domain, waiting_on);
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
