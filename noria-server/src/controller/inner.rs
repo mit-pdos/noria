@@ -731,7 +731,6 @@ impl ControllerInner {
         let domain = self.ingredients[node].domain();
         let dh = self.domains.get_mut(&domain).unwrap();
         let m = box Packet::ResumeAt {
-            node: self.ingredients[node].local_addr(),
             child,
             label,
             provenance,

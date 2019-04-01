@@ -274,9 +274,8 @@ pub enum Packet {
         complete: bool,
     },
 
-    /// Notify the node to resume sending messages to this child from the given packet label
+    /// Notify the domain to resume sending messages to this child from the given packet label
     ResumeAt {
-        node: LocalNodeIndex,
         child: NodeIndex,
         label: usize,
         provenance: Provenance,

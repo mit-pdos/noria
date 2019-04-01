@@ -1367,10 +1367,10 @@ impl Domain {
                             complete,
                         );
                     },
-                    Packet::ResumeAt { node, child, label, provenance, complete } => {
-                        // sanity check: the node "node" should be an egress node
+                    Packet::ResumeAt { child, label, provenance, complete } => {
+                        // the domain should have one egress node to resume from
                         // update its node state so it's aware about its new child
-                        let node = &self.nodes[node];
+                        let node = &self.nodes[self.egress.unwrap()];
                         let should_resume = node.borrow_mut()
                             .with_egress_mut(|e| {
                                 if !complete {
