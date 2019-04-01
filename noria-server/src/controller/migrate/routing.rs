@@ -315,7 +315,7 @@ pub(super) fn connect(
         assert!(n.is_egress());
 
         for ni in graph.neighbors_directed(sender, petgraph::EdgeDirection::Outgoing) {
-            let node = &graph[sender];
+            let node = &graph[ni];
             if node.is_ingress() {
                 sender_nodes.push((sender, ni));
             }

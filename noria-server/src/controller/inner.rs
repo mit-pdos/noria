@@ -485,17 +485,15 @@ impl ControllerInner {
         // do a migration that regenerates the nodes in domain B2, which has a different index
         // from domain B1. however, the nodes in B1 and B2 have the same indexes. the domains
         // can't start sending messages until replay paths have been updated. the network
-        // connection between A and B2 initially exists due to how migrations work.
+        // connections between A and B2, and B2 and C initially exist due to how migrations work.
         //
-        // dataflow graph: A ---> B2 -x-> C
+        // dataflow graph: A ---> B2 ---> C
         self.migrate(|mig| {
             let new_egress = mig.replicate_nodes(&path);
             assert_eq!(new_egress, failed_egress);
         });
 
-        // set replay paths in B2 to the same as those that were in B1. then form the network
-        // connections, even though the domains won't start sending messages to each other until
-        // they receive ResumeAts.
+        // set replay paths in B2 to the same as those that were in B1.
         //
         // dataflow graph: A ---> B2 ---> C
         let egress_b2 = failed_egress;
@@ -508,16 +506,14 @@ impl ControllerInner {
                 .unwrap();
         }
 
-        let ingress_cs = self.ingredients
-            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
-            .collect::<Vec<NodeIndex>>();
-        self.migrate(|mig| assert_eq!(mig.link_nodes(egress_b2, &ingress_cs).len(), 0));
-
         // tell C about the new incoming connection from B2 so that it can tell B2 where to resume
         // sending messages. B2 is in charge of realizing from that message that it also needs to
         // tell A where to resume sending messages.
         //
         // dataflow graph: A ---> B2 -o-> C
+        let ingress_cs = self.ingredients
+            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<_>>();
         for ingress_c in ingress_cs {
             self.send_new_incoming(ingress_c, egress_b2, Some(failed_egress), false);
         }
