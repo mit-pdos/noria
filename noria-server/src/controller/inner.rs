@@ -739,6 +739,14 @@ impl ControllerInner {
         dh.send_to_healthy(m, &self.workers).unwrap();
     }
 
+    pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
+        unimplemented!();
+    }
+
+    pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
+        unimplemented!();
+    }
+
     /// Construct `ControllerInner` with a specified listening interface
     pub(super) fn new(
         log: slog::Logger,

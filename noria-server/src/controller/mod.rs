@@ -99,6 +99,16 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.create_universe(universe).unwrap());
                         }
                     }
+                    CoordinationPayload::AckNewIncoming { from, provenance } => {
+                        if let Some(ref mut ctrl) = controller {
+                            crate::block_on(|| ctrl.handle_ack_new_incoming(from, provenance));
+                        }
+                    }
+                    CoordinationPayload::AckResumeAt { from } => {
+                        if let Some(ref mut ctrl) = controller {
+                            crate::block_on(|| ctrl.handle_ack_resume_at(from));
+                        }
+                    }
                     CoordinationPayload::SendResumeAt {
                         node,
                         child,

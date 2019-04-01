@@ -425,6 +425,8 @@ pub mod test {
 
             impl Executor for Ex {
                 fn ack(&mut self, _: SourceChannelIdentifier) {}
+                fn ack_new_incoming(&mut self, _: DomainIndex, _: Provenance) {}
+                fn ack_resume_at(&mut self, _: DomainIndex) {}
                 fn send_resume_at(
                     &mut self,
                     _: NodeIndex,

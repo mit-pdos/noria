@@ -44,6 +44,8 @@ pub use PersistenceParameters;
 pub type ChannelCoordinator = noria::channel::ChannelCoordinator<(DomainIndex, usize), Box<Packet>>;
 pub trait Executor {
     fn ack(&mut self, tag: SourceChannelIdentifier);
+    fn ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance);
+    fn ack_resume_at(&mut self, from: DomainIndex);
     fn send_resume_at(
         &mut self,
         node: NodeIndex,
