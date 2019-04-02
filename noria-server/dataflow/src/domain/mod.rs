@@ -1337,40 +1337,6 @@ impl Domain {
                             "new" => new.index(),
                         );
 
-                        // 1. the label for the new node to resume at
-                        // 2. the provenance of the new node's label
-                        let ni = node.borrow().global_addr();
-                        let (label, provenance) = if self.egress.is_none() {
-                            // only domains with reader nodes don't have an egress
-                            // so we derive the next label directly, assuming a single ancestor
-                            // TODO(ygina): materialize the provenance in readers so we can recover
-                            // from losing the stateless domain above a reader.
-                            (label, Provenance::empty(self.index, label - 1))
-                        } else {
-                            // otherwise get the provenance of the last label from the egress node
-                            let provenance = self.nodes[self.egress.unwrap()]
-                                .borrow_mut()
-                                .with_egress_mut(|e| {
-                                    e.new_incoming(old, new);
-                                    e.get_last_provenance()
-                                });
-
-                            // TODO(ygina): more than one depth of provenance
-                            let subgraph = provenance.subgraph(new).clone();
-                            let label = subgraph.label() + 1;
-                            (label, *subgraph)
-                        };
-
-                        // tell the new incoming connection where to resume sending messages,
-                        // and whether resuming messages in this connection completes the graph
-                        executor.send_resume_at(
-                            new,
-                            ni,
-                            label,
-                            provenance,
-                            complete,
-                        );
-
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
                         let provenance = match self.egress {
@@ -1395,26 +1361,21 @@ impl Domain {
                     },
                     Packet::ResumeAt { child_labels, provenance, complete } => {
                         // the domain should have one egress node to resume from
-                        // update its node state so it's aware about its new child
+                        //
+                        // update its node state so it knows where to resume from for each child.
+                        // then set the label of the first message it expects to produce once
+                        // it starts receiving messages from upstream nodes again. (see note below)
                         let node = &self.nodes[self.egress.unwrap()];
-                        let (child, label) = child_labels[0];
-                        let should_resume = node.borrow_mut()
-                            .with_egress_mut(|e| {
-                                if !complete {
-                                    // this node is responsible for sending an upwards resume at
-                                    // to complete the graph. however, it must wait to receive all
-                                    // incoming resume ats first. once it does, it can send a
-                                    // single upwards message with the minimum label
-                                    e.wait_for_resume_at();
-                                }
-
-                                e.resume_at(
-                                    child,
-                                    label,
-                                    self.shard,
-                                    sends,
-                                )
+                        let mut min_label = std::usize::MAX;
+                        for &(child, label) in &child_labels {
+                            node.borrow_mut().with_egress_mut(|e| {
+                                e.resume_at(child, label, self.shard, sends)
                             });
+                            if label < min_label {
+                                min_label = label;
+                            }
+                        }
+                        node.borrow_mut().with_egress_mut(|e| e.set_min_label(min_label - 1));
 
                         // TODO(ygina): Currently, the value of next_label is the label of the
                         // next OUTGOING packet this domain needs to send. We assume it has a
@@ -1432,39 +1393,16 @@ impl Domain {
 
                         debug!(
                             self.log,
-                            "resuming messages from {}",
-                            node.borrow().global_addr().index();
-                            "child" => child.index(),
-                            "label" => label,
+                            "resuming messages from {} to {:?}",
+                            node.borrow().global_addr().index(),
+                            child_labels;
+                            "min_label" => min_label,
                         );
 
-                        // sometimes the graph isn't complete yet, meaning we also need to mend the
-                        // connection between this domain and its parent domains.
-                        // TODO(ygina): uphold this assumption somewhere
-                        //
-                        // if this ResumeAt is not complete, it means this domain does not have
-                        // any messages buffered. in this case, we ask the parents to resume at a
-                        // specific index, but only once we've heard from all our children first.
+                        // we ack the ResumeAt to the controller, and the controller takes care
+                        // of any upstream ResumeAts if, for example, this domain does not have
+                        // any messages buffered.
                         // TODO(ygina): more complicated index for joins, possibly filters
-                        if should_resume {
-                            // these resume ats will definitely complete the graph
-                            // use the given provenance info to figure out where to resume
-                            assert!(!complete);
-                            assert!(self.ingress.len() > 0);
-                            for &ni in &self.ingress {
-                                let ingress = &self.nodes[ni];
-                                let src = ingress.borrow().with_ingress(|i| i.src());
-                                let subgraph = provenance.subgraph(src).clone();
-                                executor.send_resume_at(
-                                    src,
-                                    ingress.borrow().global_addr(),
-                                    provenance.label() + 1,
-                                    *subgraph,
-                                    true,
-                                );
-                            }
-                        }
-
                         executor.ack_resume_at(self.index);
                     },
                     _ => unreachable!(),

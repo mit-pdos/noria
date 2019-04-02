@@ -831,8 +831,7 @@ impl ControllerInner {
 
             // Send the message!
             let dh = self.domains.get_mut(&domain).unwrap();
-            println!("send resume at... {:?}", m);
-            // dh.send_to_healthy(m, &self.workers).unwrap();
+            dh.send_to_healthy(m, &self.workers).unwrap();
         }
     }
 

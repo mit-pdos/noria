@@ -237,19 +237,21 @@ impl Egress {
         }
     }
 
+    pub fn set_min_label(&mut self, label: usize) {
+        self.min_provenance.set_label(label);
+    }
+
     /// Resume sending messages to this node at the label after getting that node up to date.
     ///
-    /// Returns whether the node that called this method should propagate a secondary resume at
-    /// to its ancestors. The point to resume at is constructed from the node's own provenance
-    /// graph. TODO(ygina): the controller should be in charge of when to call the secondary
-    /// resume at.
+    /// If we don't have the appropriate messages buffered, that means we lost a stateless domain.
+    /// Simply mark down where to resume sending messages to the child node for later.
     pub fn resume_at(
         &mut self,
         node: NodeIndex,
         label: usize,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) -> bool {
+    ) {
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
         self.min_label_to_send.insert(node, label);
 
@@ -257,34 +259,11 @@ impl Egress {
         // should only happen if we lost a stateless domain
         if label >= next_label {
             println!("{} >= {}", label, next_label);
-            assert!(self.waiting_for.remove(&node));
             assert!(self.payloads.is_empty());
-            self.resume_at = match self.resume_at {
-                // TODO(ygina): internal mapping from node-local label to provenance
-                // otherwise this is totally incorrect!
-                Some(old_label) => {
-                    if label < old_label {
-                        Some(label)
-                    } else {
-                        Some(old_label)
-                    }
-                },
-                None => Some(label),
-            };
-
-            // if we are not waiting for any more nodes, return the label for the parent to
-            // resume at to make the dataflow graph complete
-            if self.waiting_for.len() == 0 {
-                let min_label = self.resume_at.take().unwrap();
-                self.min_provenance.set_label(min_label - 1);
-                return true;
-            } else {
-                return false;
-            }
+            return;
         }
 
         // send all buffered messages to this node only from the resume at label
-        assert!(self.waiting_for.is_empty());
         println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
         let mut to_nodes = HashSet::new();
         to_nodes.insert(node);
@@ -298,6 +277,5 @@ impl Egress {
             }
             self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
         }
-        false
     }
 }
