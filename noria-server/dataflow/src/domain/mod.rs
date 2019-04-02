@@ -1321,7 +1321,7 @@ impl Domain {
                             .borrow_mut()
                             .with_egress_mut(|e| e.remove_child(child));
                     },
-                    Packet::NewIncoming { to, old, new, complete } => {
+                    Packet::NewIncoming { to, old, new } => {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection
                         let node = &self.nodes[to];
@@ -1359,7 +1359,7 @@ impl Domain {
                         };
                         executor.ack_new_incoming(self.index, *provenance);
                     },
-                    Packet::ResumeAt { child_labels, provenance, complete } => {
+                    Packet::ResumeAt { child_labels } => {
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.

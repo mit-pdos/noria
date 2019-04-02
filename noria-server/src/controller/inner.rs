@@ -534,7 +534,7 @@ impl ControllerInner {
             self.waiting_on.insert(domain_a, waiting_on);
         }
         for ingress_c in ingress_cs {
-            self.send_new_incoming(ingress_c, domain_b2, Some(domain_b1), false);
+            self.send_new_incoming(ingress_c, domain_b2, Some(domain_b1));
         }
     }
 
@@ -609,7 +609,7 @@ impl ControllerInner {
         let new_domain = self.ingredients[new_egress].domain();
         let mut waiting_on = HashSet::new();
         for &ingress_ni in &ingress {
-            self.send_new_incoming(ingress_ni, new_domain, Some(failed_domain), true);
+            self.send_new_incoming(ingress_ni, new_domain, Some(failed_domain));
             waiting_on.insert(self.ingredients[ingress_ni].domain());
         }
         self.waiting_on.insert(new_domain, waiting_on);
@@ -627,7 +627,6 @@ impl ControllerInner {
         ingress: NodeIndex,
         new_egress: DomainIndex,
         old_egress: Option<DomainIndex>,
-        complete: bool,
     ) {
         let old_egress = old_egress.unwrap_or(new_egress);
 
@@ -645,7 +644,6 @@ impl ControllerInner {
             to: self.ingredients[ingress].local_addr(),
             old: old_egress,
             new: new_egress,
-            complete,
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
     }
@@ -796,11 +794,7 @@ impl ControllerInner {
                 .iter()
                 .map(|(child_d, label)| (*domain_ingress.get(child_d).unwrap(), *label))
                 .collect::<Vec<_>>();
-            let m = box Packet::ResumeAt {
-                child_labels,
-                provenance: Default::default(),
-                complete: Default::default(),
-            };
+            let m = box Packet::ResumeAt { child_labels };
 
             // Send the message!
             let dh = self.domains.get_mut(&domain).unwrap();

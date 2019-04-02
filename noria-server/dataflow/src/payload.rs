@@ -271,14 +271,11 @@ pub enum Packet {
         to: LocalNodeIndex,
         old: DomainIndex,
         new: DomainIndex,
-        complete: bool,
     },
 
     /// Notify the domain to resume sending messages to its children from the given packet labels
     ResumeAt {
         child_labels: Vec<(NodeIndex, usize)>,
-        provenance: Provenance,
-        complete: bool,
     },
 }
 
