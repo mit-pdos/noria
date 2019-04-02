@@ -1463,6 +1463,8 @@ impl Domain {
                                 );
                             }
                         }
+
+                        executor.ack_resume_at(self.index);
                     },
                     _ => unreachable!(),
                 }

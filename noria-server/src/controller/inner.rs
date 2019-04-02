@@ -782,11 +782,29 @@ impl ControllerInner {
         }
 
         // We're no longer waiting on the node that acked the NewIncoming message
-        // TODO
+        self.handle_ack_resume_at(from);
     }
 
     pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
-        unimplemented!();
+        // Update waiting on lists of nodes that were waiting on "from"
+        let mut empty = vec![];
+        for (waiting, on) in self.waiting_on.iter_mut() {
+            let removed = on.remove(&from);
+            if removed && on.len() == 0 {
+                empty.push(waiting.clone());
+            }
+        }
+
+        // If those nodes aren't waiting on anyone else, send ResumeAts to them. Send ResumeAt
+        // information for all nodes in a single message so the sender domain can update its
+        // state atomically.
+        for domain in &empty {
+            assert!(self.waiting_on.remove(&domain).is_some());
+            let resume_ats = self.resume_ats.remove(&domain).unwrap();
+            for (child_domain, label) in resume_ats {
+                println!("TODO(ygina): {:?} should resume at {:?} {:?}", domain, child_domain, label);
+            }
+        }
     }
 
     /// Construct `ControllerInner` with a specified listening interface
