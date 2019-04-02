@@ -798,11 +798,43 @@ impl ControllerInner {
         // If those nodes aren't waiting on anyone else, send ResumeAts to them. Send ResumeAt
         // information for all nodes in a single message so the sender domain can update its
         // state atomically.
-        for domain in &empty {
+        for domain in empty {
             assert!(self.waiting_on.remove(&domain).is_some());
-            let resume_ats = self.resume_ats.remove(&domain).unwrap();
-            for (child_domain, label) in resume_ats {
-                println!("TODO(ygina): {:?} should resume at {:?} {:?}", domain, child_domain, label);
+
+            // Get the child ingress nodes of the egress in this domain.
+            // TODO(ygina): is this info cached somewhere?
+            let egress = self.ingredients
+                .node_indices()
+                .filter(|&ni| !self.ingredients[ni].is_source())
+                .filter(|&ni| self.ingredients[ni].domain() == domain)
+                .filter(|&ni| self.ingredients[ni].is_egress())
+                .collect::<Vec<_>>();
+            assert_eq!(egress.len(), 1);
+            let domain_ingress = self.ingredients
+                .neighbors_directed(egress[0], petgraph::EdgeDirection::Outgoing)
+                .filter(|&ni| self.ingredients[ni].is_ingress())
+                .map(|ni| (self.ingredients[ni].domain(), ni))
+                .collect::<HashMap<_, _>>();
+
+            // Convert the indexed resume at information into ResumeAt messages.
+            let resume_ats = self.resume_ats
+                .remove(&domain)
+                .unwrap()
+                .iter()
+                .map(|(child_d, label)| (domain_ingress.get(child_d).unwrap(), label))
+                .map(|(child_ni, label)| box Packet::ResumeAt {
+                    child: *child_ni,
+                    label: *label,
+                    provenance: Default::default(),
+                    complete: Default::default(),
+                })
+                .collect::<Vec<_>>();
+
+            // Send the messages! TODO(ygina): must be a single message to avoid races.
+            let dh = self.domains.get_mut(&domain).unwrap();
+            for m in resume_ats {
+                println!("send resume at... {:?}", m);
+                // dh.send_to_healthy(m, &self.workers).unwrap();
             }
         }
     }
