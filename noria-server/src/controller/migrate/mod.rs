@@ -451,15 +451,21 @@ impl<'a> Migration<'a> {
         let mut sorted_new = new.iter().collect::<Vec<_>>();
         sorted_new.sort();
 
-        // Initialize egress provenance graphs
-        // let graph_clone = mainline.ingredients.clone();
+        // Initialize egress and reader provenance graphs
         let new_egress = sorted_new
             .iter()
             .filter(|&ni| mainline.ingredients[**ni].is_egress())
             .collect::<Vec<_>>();
+        let new_reader = sorted_new
+            .iter()
+            .filter(|&ni| mainline.ingredients[**ni].is_reader())
+            .collect::<Vec<_>>();
         let graph_clone = mainline.ingredients.clone();
         for &&&ni in &new_egress {
             mainline.ingredients[ni].with_egress_mut(|e| e.init(&graph_clone, ni));
+        }
+        for &&&ni in &new_reader {
+            mainline.ingredients[ni].with_reader_mut(|r| r.init(&graph_clone, ni)).unwrap();
         }
 
         // Find all nodes for domains that have changed

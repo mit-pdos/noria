@@ -36,6 +36,12 @@ pub struct Reader {
 
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
+
+    /// Base provenance, including the label it represents
+    min_provenance: Provenance,
+    /// Provenance updates of depth 1 starting with the first packet received.
+    /// We don't have to store payloads in readers because there are no outgoing packets.
+    updates: Vec<ProvenanceUpdate>,
 }
 
 impl Clone for Reader {
@@ -46,9 +52,13 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
+            min_provenance: self.min_provenance.clone(),
+            updates: self.updates.clone(),
         }
     }
 }
+
+const PROVENANCE_DEPTH: usize = 3;
 
 impl Reader {
     pub fn new(for_node: NodeIndex) -> Self {
@@ -57,7 +67,13 @@ impl Reader {
             streamers: Vec::new(),
             state: None,
             for_node,
+            min_provenance: Default::default(),
+            updates: Default::default(),
         }
+    }
+
+    pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
+        self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
     }
 
     pub fn shard(&mut self, _: usize) {}
@@ -82,6 +98,8 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
+            min_provenance: self.min_provenance.clone(),
+            updates: self.updates.clone(),
         }
     }
 
@@ -153,6 +171,15 @@ impl Reader {
     pub(in crate::node) fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
         if let Some(ref mut state) = self.writer {
             let m = m.as_mut().unwrap();
+
+            // provenance
+            let mut update = Vec::new();
+            if let Some(ref pid) = m.id() {
+                update.push((pid.from, pid.label));
+                update.append(&mut pid.update.clone());
+            }
+            self.updates.push(update);
+
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
             if m.is_regular() && state.is_partial() {
@@ -239,5 +266,40 @@ impl Reader {
                 .is_ok()
             });
         }
+    }
+}
+
+// fault tolerance (duplicate code from egress.rs)
+impl Reader {
+    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
+        if self.min_provenance.new_incoming(old, new) {
+            // Remove the old domain from the updates entirely
+            for update in self.updates.iter_mut() {
+                assert_eq!(update[0].0, old);
+                update.remove(0);
+            }
+        } else {
+            // Replace the old domain with the new domain in all updates
+            for update in self.updates.iter_mut() {
+                assert_eq!(update[0].0, old);
+                update[0].0 = new;
+            }
+        }
+    }
+
+    fn get_provenance(&self, label: usize) -> Provenance {
+        let min_label = self.min_provenance.label();
+        assert!(label >= min_label);
+        assert!(label <= self.updates.len());
+
+        let mut provenance = self.min_provenance.clone();
+        provenance.apply_updates(&self.updates[min_label..label]);
+        provenance
+    }
+
+    pub fn get_last_provenance(&self) -> Provenance {
+        let max_label = self.min_provenance.label() + self.updates.len();
+        let provenance = self.get_provenance(max_label);
+        provenance
     }
 }

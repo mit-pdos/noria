@@ -155,6 +155,11 @@ impl DomainBuilder {
             .filter(|(_, node)| node.borrow().is_egress())
             .map(|(ni, _)| ni)
             .collect::<Vec<_>>();
+        let reader = self.nodes
+            .iter()
+            .filter(|(_, node)| node.borrow().is_reader())
+            .map(|(ni, _)| ni)
+            .collect::<Vec<_>>();
         assert!(egress.len() <= 1);
 
         let log = log.new(o!("domain" => self.index.index(), "shard" => self.shard.unwrap_or(0)));
@@ -173,6 +178,7 @@ impl DomainBuilder {
             not_ready,
             ingress,
             egress: egress.get(0).map(|&e| e),
+            reader: reader.get(0).map(|&r| r),
             mode: DomainMode::Forwarding,
             waiting: Default::default(),
             reader_triggered: Default::default(),
@@ -218,6 +224,7 @@ pub struct Domain {
     not_ready: HashSet<LocalNodeIndex>,
     ingress: HashSet<LocalNodeIndex>,
     egress: Option<LocalNodeIndex>,
+    reader: Option<LocalNodeIndex>,
 
     ingress_inject: Map<(usize, Vec<DataType>)>,
 
@@ -1349,12 +1356,15 @@ impl Domain {
                                     })
                             },
                             None => {
-                                // only domains with reader nodes don't have an egress so we derive
-                                // the next label directly, assuming a single ancestor
-                                // TODO(ygina): materialize the provenance in readers so we can
-                                // recover from losing the stateless domain above a reader.
-                                // Provenance::empty(ni, label - 1)
-                                unimplemented!()
+                                // only domains with reader nodes don't have an egress
+                                assert!(self.reader.is_some());
+                                self.nodes[self.reader.unwrap()]
+                                    .borrow_mut()
+                                    .with_reader_mut(|r| {
+                                        r.new_incoming(old, new);
+                                        r.get_last_provenance().subgraph(new).clone()
+                                    })
+                                    .unwrap()
                             }
                         };
                         executor.ack_new_incoming(self.index, *provenance);
