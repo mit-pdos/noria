@@ -1370,6 +1370,28 @@ impl Domain {
                             provenance,
                             complete,
                         );
+
+                        // tell the controller all the provenance information stored in this domain
+                        // to help the controller decide where to resume sending messages.
+                        let provenance = match self.egress {
+                            Some(ni) => {
+                                self.nodes[ni]
+                                    .borrow_mut()
+                                    .with_egress_mut(|e| {
+                                        e.new_incoming(old, new);
+                                        e.get_last_provenance().subgraph(new).clone()
+                                    })
+                            },
+                            None => {
+                                // only domains with reader nodes don't have an egress so we derive
+                                // the next label directly, assuming a single ancestor
+                                // TODO(ygina): materialize the provenance in readers so we can
+                                // recover from losing the stateless domain above a reader.
+                                // Provenance::empty(ni, label - 1)
+                                unimplemented!()
+                            }
+                        };
+                        executor.ack_new_incoming(self.index, *provenance);
                     },
                     Packet::ResumeAt { child, label, provenance, complete } => {
                         // the domain should have one egress node to resume from

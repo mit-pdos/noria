@@ -68,8 +68,16 @@ impl Provenance {
         }
     }
 
+    pub fn root(&self) -> DomainIndex {
+        self.root
+    }
+
     pub fn label(&self) -> usize {
         self.label
+    }
+
+    pub fn edges(&self) -> &FnvHashMap<DomainIndex, Box<Provenance>> {
+        &self.edges
     }
 
     pub fn set_label(&mut self, label: usize) {

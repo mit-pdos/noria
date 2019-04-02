@@ -739,7 +739,50 @@ impl ControllerInner {
     }
 
     pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
-        unimplemented!();
+        assert!(self.waiting_on.len() > 0, "in recovery mode");
+
+        // Continue until there is no intersection between the provenance information we know
+        // and the nodes we need to send ResumeAt messages to.
+        let mut queue = Vec::new();
+        queue.push((from, &provenance));
+        while queue.len() > 0 {
+            let (child_domain, p) = queue.pop().unwrap();
+            if !self.waiting_on.contains_key(&p.root()) {
+                continue;
+            }
+
+            let root = p.root();
+            let resume_ats = self.resume_ats.entry(root).or_insert(vec![]);
+            let mut exists = false;
+            // if an entry from this domain already exists, pick the minimum label
+            for i in 0..resume_ats.len() {
+                let (domain, label) = resume_ats[i];
+                if domain == child_domain {
+                    exists = true;
+                    if p.label() + 1 < label {
+                        resume_ats[i] = (child_domain, p.label() + 1);
+
+                        // we only need to push more onto the queue if the label is smaller
+                        // because earlier labels are constructed from a prefix of later labels
+                        for p_child in p.edges().values() {
+                            queue.push((root, p_child));
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // otherwise, add a new message to send
+            if !exists {
+                resume_ats.push((child_domain, p.label() + 1));
+                for p_child in p.edges().values() {
+                    queue.push((root, p_child));
+                }
+            }
+        }
+
+        // We're no longer waiting on the node that acked the NewIncoming message
+        // TODO
     }
 
     pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
