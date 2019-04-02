@@ -274,10 +274,9 @@ pub enum Packet {
         complete: bool,
     },
 
-    /// Notify the domain to resume sending messages to this child from the given packet label
+    /// Notify the domain to resume sending messages to its children from the given packet labels
     ResumeAt {
-        child: NodeIndex,
-        label: usize,
+        child_labels: Vec<(NodeIndex, usize)>,
         provenance: Provenance,
         complete: bool,
     },

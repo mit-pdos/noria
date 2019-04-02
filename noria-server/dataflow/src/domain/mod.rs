@@ -1393,10 +1393,11 @@ impl Domain {
                         };
                         executor.ack_new_incoming(self.index, *provenance);
                     },
-                    Packet::ResumeAt { child, label, provenance, complete } => {
+                    Packet::ResumeAt { child_labels, provenance, complete } => {
                         // the domain should have one egress node to resume from
                         // update its node state so it's aware about its new child
                         let node = &self.nodes[self.egress.unwrap()];
+                        let (child, label) = child_labels[0];
                         let should_resume = node.borrow_mut()
                             .with_egress_mut(|e| {
                                 if !complete {

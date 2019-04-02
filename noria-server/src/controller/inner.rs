@@ -729,9 +729,9 @@ impl ControllerInner {
         );
 
         let dh = self.domains.get_mut(&domain).unwrap();
+        let child_labels = vec![(child, label)];
         let m = box Packet::ResumeAt {
-            child,
-            label,
+            child_labels,
             provenance,
             complete,
         };
@@ -817,25 +817,22 @@ impl ControllerInner {
                 .collect::<HashMap<_, _>>();
 
             // Convert the indexed resume at information into ResumeAt messages.
-            let resume_ats = self.resume_ats
+            let child_labels = self.resume_ats
                 .remove(&domain)
                 .unwrap()
                 .iter()
-                .map(|(child_d, label)| (domain_ingress.get(child_d).unwrap(), label))
-                .map(|(child_ni, label)| box Packet::ResumeAt {
-                    child: *child_ni,
-                    label: *label,
-                    provenance: Default::default(),
-                    complete: Default::default(),
-                })
+                .map(|(child_d, label)| (*domain_ingress.get(child_d).unwrap(), *label))
                 .collect::<Vec<_>>();
+            let m = box Packet::ResumeAt {
+                child_labels,
+                provenance: Default::default(),
+                complete: Default::default(),
+            };
 
-            // Send the messages! TODO(ygina): must be a single message to avoid races.
+            // Send the message!
             let dh = self.domains.get_mut(&domain).unwrap();
-            for m in resume_ats {
-                println!("send resume at... {:?}", m);
-                // dh.send_to_healthy(m, &self.workers).unwrap();
-            }
+            println!("send resume at... {:?}", m);
+            // dh.send_to_healthy(m, &self.workers).unwrap();
         }
     }
 
