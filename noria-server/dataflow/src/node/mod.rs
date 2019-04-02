@@ -268,16 +268,6 @@ impl Node {
         }
     }
 
-    crate fn with_ingress<'a, F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&special::Ingress) -> R,
-    {
-        match self.inner {
-            NodeType::Ingress(ref i) => f(i),
-            _ => unreachable!(),
-        }
-    }
-
     pub fn with_reader_mut<'a, F, R>(&'a mut self, f: F) -> Result<R, ()>
     where
         F: FnOnce(&'a mut special::Reader) -> R,

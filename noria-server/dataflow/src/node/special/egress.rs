@@ -23,10 +23,6 @@ pub struct Egress {
 
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<NodeIndex, usize>,
-    /// The set of nodes it is waiting to hear from for recovery
-    waiting_for: HashSet<NodeIndex>,
-    /// Where to resume, if in recovery mode
-    resume_at: Option<usize>,
 }
 
 impl Clone for Egress {
@@ -40,8 +36,6 @@ impl Clone for Egress {
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
-            waiting_for: Default::default(),
-            resume_at: None,
         }
     }
 }
@@ -163,7 +157,6 @@ impl Egress {
     }
 
     fn get_provenance(&self, label: usize) -> Provenance {
-        // TODO(ygina): egress-wide label counters
         let min_label = self.min_provenance.label();
         assert!(label >= min_label);
         assert!(label <= self.updates.len());
@@ -224,17 +217,6 @@ impl Egress {
         // finally, send the message
         let m = &self.payloads[label - self.min_provenance.label() - 1];
         self.process(box m.clone_data(), shard, output, &to_nodes);
-    }
-
-    /// Enter recovery mode, in which we are waiting to process one ResumeAt message for each
-    /// child. That's one message per egress tx. Does nothing if we are already in recovery mode.
-    /// The egress node will exit recovery mode once it has processed the last ResumeAt.
-    pub fn wait_for_resume_at(&mut self) {
-        if self.waiting_for.len() == 0 {
-            self.waiting_for = self.txs.iter().map(|tx| tx.node).collect();
-            assert!(self.waiting_for.len() > 0);
-            assert!(self.resume_at.is_none());
-        }
     }
 
     pub fn set_min_label(&mut self, label: usize) {

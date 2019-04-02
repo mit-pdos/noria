@@ -59,15 +59,6 @@ impl Provenance {
         }
     }
 
-    /// Constructs an empty, uninitialized provenance graph for the given domain and label
-    pub fn empty(domain: DomainIndex, label: usize) -> Provenance {
-        Provenance {
-            root: domain,
-            edges: FnvHashMap::default(),
-            label,
-        }
-    }
-
     pub fn root(&self) -> DomainIndex {
         self.root
     }
