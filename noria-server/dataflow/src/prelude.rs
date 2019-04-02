@@ -46,13 +46,5 @@ pub trait Executor {
     fn ack(&mut self, tag: SourceChannelIdentifier);
     fn ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance);
     fn ack_resume_at(&mut self, from: DomainIndex);
-    fn send_resume_at(
-        &mut self,
-        domain: DomainIndex,
-        child: NodeIndex,
-        label: usize,
-        provenance: Provenance,
-        complete: bool,
-    );
     fn create_universe(&mut self, req: HashMap<String, DataType>);
 }

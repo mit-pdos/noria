@@ -39,19 +39,6 @@ pub enum CoordinationPayload {
     DomainBooted(DomainDescriptor),
     /// Create a new security universe.
     CreateUniverse(HashMap<String, DataType>),
-    /// Send a ResumeAt message to the controller to forward.
-    SendResumeAt {
-        /// The domain to resume sending messages from.
-        domain: DomainIndex,
-        /// The child to resume sending messages to.
-        child: NodeIndex,
-        /// The label of the first message to resume at.
-        label: usize,
-        /// The provenance of the message to resume at.
-        provenance: Provenance,
-        /// Whether resuming messages here would complete the dataflow graph.
-        complete: bool,
-    },
     /// Ack NewIncoming to start sending ResumeAts.
     AckNewIncoming {
         /// Who the ack is from.

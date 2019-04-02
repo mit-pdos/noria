@@ -144,7 +144,6 @@ pub(super) fn start_instance<A: Authority + 'static>(
                         CoordinationPayload::CreateUniverse(..) => fw(e, true),
                         CoordinationPayload::AckNewIncoming { .. } => fw(e, true),
                         CoordinationPayload::AckResumeAt { .. } => fw(e, true),
-                        CoordinationPayload::SendResumeAt { .. } => fw(e, true),
                     },
                     Event::ExternalRequest(..) => fw(e, true),
                     #[cfg(test)]

@@ -427,14 +427,6 @@ pub mod test {
                 fn ack(&mut self, _: SourceChannelIdentifier) {}
                 fn ack_new_incoming(&mut self, _: DomainIndex, _: Provenance) {}
                 fn ack_resume_at(&mut self, _: DomainIndex) {}
-                fn send_resume_at(
-                    &mut self,
-                    _: DomainIndex,
-                    _: NodeIndex,
-                    _: usize,
-                    _: Provenance,
-                    _: bool,
-                ) {}
                 fn create_universe(&mut self, _: HashMap<String, DataType>) {}
             }
 

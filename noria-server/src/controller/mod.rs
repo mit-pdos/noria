@@ -109,23 +109,6 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.handle_ack_resume_at(from));
                         }
                     }
-                    CoordinationPayload::SendResumeAt {
-                        domain,
-                        child,
-                        label,
-                        provenance,
-                        complete,
-                    } => {
-                        if let Some(ref mut ctrl) = controller {
-                            crate::block_on(|| ctrl.handle_resume_at(
-                                domain,
-                                child,
-                                label,
-                                provenance,
-                                complete,
-                            ));
-                        }
-                    }
                     CoordinationPayload::Register {
                         ref addr,
                         ref read_listen_addr,

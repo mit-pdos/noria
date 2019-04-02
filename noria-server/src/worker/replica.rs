@@ -19,7 +19,6 @@ use noria::channel::{DualTcpStream, CONNECTION_FROM_BASE};
 use noria::internal::DomainIndex;
 use noria::internal::LocalOrNot;
 use noria::{Input, Tagged};
-use petgraph::graph::NodeIndex;
 use slog;
 use std::collections::{HashMap, VecDeque};
 use std::io;
@@ -318,25 +317,6 @@ impl Executor for OutOfBand {
     fn ack_resume_at(&mut self, from: DomainIndex) {
         self.ctrl_tx
             .unbounded_send(CoordinationPayload::AckResumeAt { from })
-            .expect("asked to send to controller, but controller has gone away");
-    }
-
-    fn send_resume_at(
-        &mut self,
-        domain: DomainIndex,
-        child: NodeIndex,
-        label: usize,
-        provenance: Provenance,
-        complete: bool,
-    ) {
-        self.ctrl_tx
-            .unbounded_send(CoordinationPayload::SendResumeAt {
-                domain,
-                child,
-                label,
-                provenance,
-                complete,
-            })
             .expect("asked to send to controller, but controller has gone away");
     }
 

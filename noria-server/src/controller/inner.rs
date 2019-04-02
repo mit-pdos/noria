@@ -711,33 +711,6 @@ impl ControllerInner {
         Ok(())
     }
 
-    pub(crate) fn handle_resume_at(
-        &mut self,
-        domain: DomainIndex,
-        child: NodeIndex,
-        label: usize,
-        provenance: Provenance,
-        complete: bool,
-    ) {
-        debug!(
-            self.log,
-            "controller received SendResumeAt coordination message to forward";
-            "domain" => domain.index(),
-            "child" => child.index(),
-            "label" => label,
-            "complete" => complete,
-        );
-
-        let dh = self.domains.get_mut(&domain).unwrap();
-        let child_labels = vec![(child, label)];
-        let m = box Packet::ResumeAt {
-            child_labels,
-            provenance,
-            complete,
-        };
-        dh.send_to_healthy(m, &self.workers).unwrap();
-    }
-
     pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
 
