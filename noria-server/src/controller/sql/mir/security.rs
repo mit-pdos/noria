@@ -153,6 +153,14 @@ fn make_security_nodes(
         None => return Ok((vec![], vec![])),
     };
 
+    // for debugging purposes: print policies
+    debug!(
+	mir_converter.log,
+	"Row policies for table {}: {:?}",
+	table,
+	policies
+    );
+
     let mut node_count = 0;
     let mut local_node_for_rel = node_for_rel.clone();
 
@@ -179,6 +187,12 @@ fn make_security_nodes(
         let mut sorted_rels: Vec<&str> = qg.relations.keys().map(String::as_str).collect();
 
         sorted_rels.sort();
+	// for debugging
+	debug!(
+	    mir_converter.log,
+	    "Sorted relations: {:?}",
+	    sorted_rels
+	);
 
         // all base nodes should be present in local_node_for_rel, except for context views
         // if policy uses a context view, add it to local_node_for_rel
@@ -206,6 +220,14 @@ fn make_security_nodes(
                 .expect("relation should have a query graph node.");
             assert!(*rel != "computed_columns");
             let mut any_added = false;
+
+	    // for debugging
+	    debug!(
+	        mir_converter.log,
+		"# predicates: {}",
+		&qgn.predicates.len()
+	    );
+
             for pred in &qgn.predicates {
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),

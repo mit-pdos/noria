@@ -108,6 +108,7 @@ impl<A: Authority> LocalControllerHandle<A> {
 
     /// Install a new set of policies on the controller.
     pub fn create_universe(&mut self, context: HashMap<String, DataType>) {
+        println!("create_universe handle.rs context: {:?}", context);
         let uid = context
             .get("id")
             .expect("Universe context must have id")

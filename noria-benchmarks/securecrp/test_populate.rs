@@ -42,7 +42,6 @@ pub fn create_users(backend: &mut Backend) {
             "0",
             "normal",
         ],
-
         vec![
             "2",
             "2@mit.edu",
@@ -58,6 +57,14 @@ pub fn create_users(backend: &mut Backend) {
             "org",
             "0",
             "chair",
+        ],
+	vec![
+            "4",
+            "4@mit.edu",
+            "4",
+            "org",
+            "0",
+            "normal",
         ],
     ];
     let users: Vec<Vec<DataType>> = data
@@ -182,7 +189,7 @@ pub fn create_papers(backend: &mut Backend) {
         vec![
             "0".into(),
             2.into(),
-            "2".into(),
+            "4".into(),
             "great paper".into(),
             10.into(),
             10.into(),
@@ -192,7 +199,7 @@ pub fn create_papers(backend: &mut Backend) {
         vec![
             "0".into(),
             3.into(),
-            "2".into(),
+            "4".into(),
             "great paper".into(),
             10.into(),
             10.into(),
@@ -233,12 +240,12 @@ pub fn create_papers(backend: &mut Backend) {
         ],
         vec![
             2.into(),
-            "2".into(),
+            "4".into(),
             "blahblah".into(),
         ],
         vec![
             3.into(),
-            "2".into(),
+            "4".into(),
             "blahblah".into(),
         ],
         vec![

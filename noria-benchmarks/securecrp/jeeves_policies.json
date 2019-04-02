@@ -1,5 +1,31 @@
+
 {
     "groups": [
+	{
+            "name": "authors",
+            "membership": "SELECT author AS uid, paper AS gid FROM PaperCoauthor WHERE author = ?",
+            "policies": [
+                {
+                    "table": "Paper",
+                    "predicate": "SELECT * FROM Paper JOIN GroupContext ON (Paper.id = GroupContext.id)",
+                    "description": "Authors can see their own papers."
+		},
+		{
+                    "table": "Review",
+                    "predicate": "SELECT * FROM Review WHERE Review.paper = GroupContext.id",
+                    "description": "Authors can see reviews for their own paper."
+                },
+		{
+		    "action": "rewrite",
+                    "table": "Review",
+		    "value": "anonymous",
+		    "column": "reviewer",
+		    "key": "paper",
+                    "rewrite": "SELECT paper FROM Review;",
+                    "description": "Authors can't see reviewers identities."
+                }
+            ]
+        },
         {
             "name": "chairs",
             "membership": "SELECT username AS uid, level AS gid FROM UserProfile WHERE level = 'chair' AND username = ?",
@@ -11,7 +37,7 @@
                 },
 		{
 		   "table": "Review",
-		   "predicate": "SELECT * FROM Review WHERE Review.paper < 999",
+		   "predicate": "SELECT * FROM Review WHERE Review.paper < 800",
 		   "description": "Chairs can see all reviews."
 		}
             ]
@@ -44,32 +70,8 @@
                     "description": "Reviewers can't see reviewers identities."
                 }
             ]
-        },
-	{
-            "name": "authors",
-            "membership": "SELECT author AS uid, paper AS gid FROM PaperCoauthor WHERE author = ?",
-            "policies": [
-                {
-                    "table": "Paper",
-                    "predicate": "SELECT * FROM Paper WHERE Paper.id = GroupContext.id",
-                    "description": "Authors can see their own papers."
-		},
-		{
-                    "table": "Review",
-                    "predicate": "SELECT * FROM Review WHERE Review.paper = GroupContext.id",
-                    "description": "Authors can see reviews for their own paper."
-                },
-		{
-		    "action": "rewrite",
-                    "table": "Review",
-		    "value": "anonymous",
-		    "column": "reviewer",
-		    "key": "paper",
-                    "rewrite": "SELECT paper FROM Review;",
-                    "description": "Authors can't see reviewers identities."
-                }
-            ]
         }
+	
     ],
     "policies": [
       {

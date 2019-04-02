@@ -554,6 +554,8 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
                         match *cond {
                             ConditionExpression::ComparisonOp(ref ct) => {
                                 if tables_mentioned.len() == 2 {
+				    // FOR DEBUGGING
+				    println!("query_graph JoinRightSide: tables_mentioned is {:?}", tables_mentioned);
                                     // tables can appear in any order in the join predicate, but
                                     // we cannot just rely on that order, since it may lead us to
                                     // flip LEFT JOINs by accident (yes, this happened)

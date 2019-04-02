@@ -1,35 +1,33 @@
 use crate::controller::migrate::materialization::Materializations;
+use crate::controller::recipe::Schema;
+use crate::controller::schema;
 use crate::controller::{
     ControllerState, DomainHandle, DomainShardHandle, Migration, Recipe, Worker, WorkerIdentifier,
 };
-use crate::controller::recipe::Schema;
-use crate::controller::schema;
 use crate::coordination::{CoordinationMessage, CoordinationPayload, DomainDescriptor};
 use dataflow::payload::ControlReplyPacket;
 use dataflow::prelude::*;
 use dataflow::{node, payload, DomainBuilder, DomainConfig};
 use hyper::{self, Method, StatusCode};
 use mio::net::TcpListener;
+use nom_sql::ColumnSpecification;
 use noria::builders::*;
 use noria::channel::tcp::{SendError, TcpSender};
 use noria::consensus::{Authority, Epoch, STATE_KEY};
 use noria::debug::stats::{DomainStats, GraphStats, NodeStats};
 use noria::ActivationResult;
-use nom_sql::ColumnSpecification;
 use petgraph;
 use petgraph::visit::Bfs;
 use slog;
 use slog::Logger;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::iter::FromIterator;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{cell, io, thread, time};
 use tokio::prelude::*;
-use std::iter::FromIterator;
-
-
 
 #[derive(Clone)]
 pub(crate) struct MapMeta {
@@ -39,7 +37,6 @@ pub(crate) struct MapMeta {
     pub(super) query_to_materialization: HashMap<String, (usize, usize)>, // Query -> (DomainIndex, Offset)
     pub(super) domain_to_offset: HashMap<usize, usize>,
     pub(super) reader_to_uid: HashMap<NodeIndex, usize>,
-
 }
 
 impl MapMeta {
@@ -984,7 +981,7 @@ impl ControllerInner {
         let mut r = self.recipe.clone();
 
         let groups = self.recipe.security_groups();
-
+        println!("create_universe context: {:?}", context);
         let mut universe_groups = HashMap::new();
 
         let uid = context
@@ -994,22 +991,43 @@ impl ControllerInner {
         let uid = &[uid];
         if context.get("group").is_none() {
             for g in groups {
+                debug!(log, "create_universe groups g: {:?}, uid: {:?}", g, uid);
                 let rgb: Option<ViewBuilder> = self.view_builder(&g);
                 let mut view = rgb.map(|rgb| rgb.build_exclusive().unwrap()).unwrap();
-                let mygroups: Vec<Vec<DataType>> = view
-                    .lookup(uid, true)
-                    .unwrap();
+                debug!(
+                    log,
+                    "view cols: {:?}, schema: {:?}",
+                    view.columns(),
+                    view.schema()
+                );
+                let mygroups: Vec<Vec<DataType>> = view.lookup(uid, true).unwrap();
 
+                let tmp: Vec<Vec<DataType>> = view.lookup(&["3".into()], true).unwrap();
+                debug!(log, "3's groups (expect chairs): {:?}", tmp);
+                let tmp: Vec<Vec<DataType>> = view.lookup(&["2".into()], true).unwrap();
+                debug!(log, "2's groups (expect authors): {:?}", tmp);
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
                     .iter()
                     .map(|v| v[1].clone())
                     .collect();
-
+                debug!(log, "mygroups, flattened (inner.rs): {:?}", mygroups);
                 universe_groups.insert(g, my_groups);
             }
         }
+        // For debugging
+        //        let rgb_dbg: Option<ViewBuilder> = self.view_builder(&context.get("group").unwrap().into());
+        //        let mut view_dbg = rgb_dbg
+        //            .map(|rgb_dbg| rgb_dbg.build_exclusive().unwrap())
+        //            .unwrap();
+        //        let tmp: Vec<Vec<DataType>> = view_dbg.lookup(&["3".into()], true).unwrap();
+        //        debug!(log, "group not none. 3's groups (expect chairs): {:?}", tmp);
+        //        let tmp: Vec<Vec<DataType>> = view_dbg.lookup(&["2".into()], true).unwrap();
+        //        debug!(
+        //            log,
+        //            "group not none. 2's groups (expect authors): {:?}", tmp
+        //        );
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
@@ -1046,8 +1064,11 @@ impl ControllerInner {
             .map(|&f| context.get(f).unwrap().clone())
             .collect();
 
-        let tb = self.table_builder(&ctx_table_name).expect(&format!("context table {} doesn't exists", ctx_table_name));
+        let tb = self
+            .table_builder(&ctx_table_name)
+            .expect(&format!("context table {} doesn't exists", ctx_table_name));
         let mut table = tb.build_exclusive().unwrap();
+
         table.insert(record).unwrap();
 
         Ok(())
@@ -1239,10 +1260,10 @@ impl ControllerInner {
             // nodes can have only one reader attached
             assert!(readers.len() <= 1);
             debug!(
-                        self.log,
-                        "Removing query leaf \"{}\"", self.ingredients[leaf].name();
-                        "node" => leaf.index(),
-                    );
+                self.log,
+                "Removing query leaf \"{}\"", self.ingredients[leaf].name();
+                "node" => leaf.index(),
+            );
             if !readers.is_empty() {
                 removals.push(readers[0]);
                 leaf = readers[0];

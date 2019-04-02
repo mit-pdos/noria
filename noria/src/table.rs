@@ -26,15 +26,13 @@ pub enum TableError {
     /// The wrong number of columns was given when inserting a row.
     #[fail(
         display = "wrong number of columns specified: expected {}, got {}",
-        _0,
-        _1
+        _0, _1
     )]
     WrongColumnCount(usize, usize),
     /// The wrong number of key columns was given when modifying a row.
     #[fail(
         display = "wrong number of key columns used: expected {}, got {}",
-        _0,
-        _1
+        _0, _1
     )]
     WrongKeyColumnCount(usize, usize),
     /// The underlying connection to Soup produced an error.
@@ -107,7 +105,7 @@ impl TableBuilder {
             }
         };
 
-        // self.columns.push("internal_id".to_string()); 
+        // self.columns.push("internal_id".to_string());
 
         Ok(Table {
             domain_input_handle: dih,
@@ -486,7 +484,6 @@ impl<E> Table<E> {
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
-
         // println!("in table insert or update");
         assert!(
             !self.key.is_empty() && self.key_is_primary,

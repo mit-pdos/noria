@@ -73,4 +73,34 @@ mod tests {
             sql_parser::parse_query(membership).unwrap()
         );
     }
+
+    #[test]
+    fn it_parses_membership() {
+        use super::*;
+
+        let membership = "SELECT username AS uid, paper AS gid FROM RevAssgn WHERE username = ?";
+        let group_text = r#"
+            [
+                {
+                    "name": "reviewers",
+                    "membership": "SELECT username AS uid, paper AS gid FROM RevAssgn WHERE username = ?",
+                    "policies": [
+                        { 
+                          "table": "Paper",
+                          "predicate": "SELECT * FROM Paper WHERE Paper.id = GroupContext.id" 
+                        }
+                    ]
+                }
+            ]"#;
+
+        let groups = Group::parse(group_text);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].name, "reviewers");
+        println!("membership: {:?}", groups[0].membership);
+        assert_eq!(
+            groups[0].membership,
+            sql_parser::parse_query(membership).unwrap()
+        );
+    }
 }

@@ -358,6 +358,7 @@ fn main() {
         (num_at_once * nlogged) as f64 / dur,
     );
 
+    println!("{}", backend.g.graphviz().unwrap());
     println!("Done with benchmark.");
 
     if gloc.is_some() {

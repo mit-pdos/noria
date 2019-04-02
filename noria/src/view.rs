@@ -185,10 +185,7 @@ impl View<SharedConnection> {
     }
 }
 
-#[cfg_attr(
-    feature = "cargo-clippy",
-    allow(clippy::len_without_is_empty)
-)]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::len_without_is_empty))]
 impl<E> View<E> {
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
@@ -250,6 +247,7 @@ impl<E> View<E> {
     ) -> Result<Vec<Datas>, ViewError> {
         if self.shards.len() == 1 {
             let mut shard = self.shards[0].borrow_mut();
+            //            println!("view.rs node: {:?}", self.node); // not helpful, prints node id.
             let reply = shard
                 .send(&ReadQuery::Normal {
                     target: (self.node, 0),
@@ -300,6 +298,7 @@ impl<E> View<E> {
                     _ => unreachable!(),
                 }
             }
+            println!("view.rs multilookup result: {:?}", results);
             Ok(results)
         }
     }

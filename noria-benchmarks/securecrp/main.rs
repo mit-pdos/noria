@@ -189,18 +189,18 @@ fn main() {
         test_populate::create_users(&mut backend);
     }
 
+    if args.is_present("populate") {
+        test_populate::create_papers(&mut backend);
+        //        test_populate::dump_reviews(&mut backend, user);
+        //        test_populate::dump_papers(&mut backend, user);
+    }
+
     println!("user2");
 
     thread::sleep(time::Duration::from_millis(2000));
     backend.login(make_user(user)).is_ok();
     thread::sleep(time::Duration::from_millis(2000));
     println!("user logged in");
-
-    if args.is_present("populate") {
-        test_populate::create_papers(&mut backend);
-        //        test_populate::dump_reviews(&mut backend, user);
-        test_populate::dump_papers(&mut backend, user);
-    }
 
     //    test_populate::dump_all_papers(&mut backend);
 
@@ -213,23 +213,23 @@ fn main() {
     query_results.push(getter.lookup(&[0.into()], true).unwrap());
     println!("author membership view: {:?}", query_results);
 
-    // Check reviewer membership view
-    let mut getter = backend.g.view("reviewers").unwrap();
-    let mut query_results = Vec::new();
-    query_results.push(getter.lookup(&["4".into()], true).unwrap());
-    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
-    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
-    query_results.push(getter.lookup(&[0.into()], true).unwrap());
-    println!("reviewer membership view: {:?}", query_results);
+    /*    // Check reviewer membership view
+            let mut getter = backend.g.view("reviewers").unwrap();
+            let mut query_results = Vec::new();
+            query_results.push(getter.lookup(&["4".into()], true).unwrap());
+            query_results.push(getter.lookup(&["lara".into()], true).unwrap());
+            query_results.push(getter.lookup(&["malte".into()], true).unwrap());
+            query_results.push(getter.lookup(&[0.into()], true).unwrap());
+            println!("reviewer membership view: {:?}", query_results);
 
-    // Check chair membership view
-    let mut getter = backend.g.view("chairs").unwrap();
-    let mut query_results = Vec::new();
-    query_results.push(getter.lookup(&["3".into()], true).unwrap());
-    query_results.push(getter.lookup(&["kohler".into()], true).unwrap());
-    query_results.push(getter.lookup(&[0.into()], true).unwrap());
-    println!("chair membership view: {:?}", query_results);
-
+            // Check chair membership view
+            let mut getter = backend.g.view("chairs").unwrap();
+            let mut query_results = Vec::new();
+            query_results.push(getter.lookup(&["3".into()], true).unwrap());
+            query_results.push(getter.lookup(&["kohler".into()], true).unwrap());
+            query_results.push(getter.lookup(&[0.into()], true).unwrap());
+            println!("chair membership view: {:?}", query_results);
+    */
     backend
         .migrate(sloc, Some("jeeves_gpcontext_queries.sql"), true)
         .unwrap();
@@ -242,15 +242,15 @@ fn main() {
     }
 
     /*
-    // Check AuthorContext
-    let mut getter = backend.g.view("AuthorContext").unwrap();
-    let mut query_results = Vec::new();
-    // Look up by id (corresponds to Paper.id)
-    for i in 0..6 {
-        query_results.push(getter.lookup(&[i.into()], true).unwrap());
-    }
-    println!("GroupContext_authors_1: {:?}", query_results);
-     */
+        // Check AuthorContext
+        let mut getter = backend.g.view("AuthorContext").unwrap();
+        let mut query_results = Vec::new();
+        // Look up by id (corresponds to Paper.id)
+        for i in 0..6 {
+            query_results.push(getter.lookup(&[i.into()], true).unwrap());
+        }
+        println!("GroupContext_authors_1: {:?}", query_results);
+    */
 
     let mut getter = backend.g.view("ChairContext").unwrap();
     let mut query_results = Vec::new();

@@ -295,6 +295,13 @@ impl Recipe {
             expressions_removed: 0,
         };
 
+	// TODO: What is desired output of below?
+	debug!(
+	    self.log,
+	    "Universe groups (in create_universe): {:?}",
+	    universe_groups
+	);
+
         if self.security_config.is_some() {
             // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
@@ -310,6 +317,7 @@ impl Recipe {
 
         for expr in self.expressions.values() {
             let (n, q, is_leaf) = expr.clone();
+
 
             // add the universe-specific query
             // don't use query name to avoid conflict with global queries
@@ -348,7 +356,12 @@ impl Recipe {
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
 
-        // println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
+//        debug!(
+//	    self.log,
+//	    "Create universe: id: {:?}, new nodes: {:?}",
+//	    mig.universe().0,
+//	    result.new_nodes.clone()
+//	);
 
         Ok(result)
     }
@@ -396,6 +409,12 @@ impl Recipe {
                     "Creating membership view for group {}",
                     group.name()
                 );
+		debug!(
+		    self.log,
+		    "Membership for group {}: {:?}",
+		    group.name(),
+		    group.membership()
+		);
                 let qfp = self.inc.as_mut().unwrap().add_parsed_query(
                     group.membership(),
                     Some(group.name()),

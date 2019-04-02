@@ -93,6 +93,8 @@ impl Multiverse for SqlIncorporator {
             (uc_name, config.get_group_policies(group_name.to_string()))
         };
 
+        // Add GroupContext/UserContext (depending on group)
+        debug!(self.log, "Calling add_base on {}", uc_name.clone());
         let base = self.add_base(uc_name.clone(), &mut fields, mig);
         qfps.push(base);
 
@@ -178,7 +180,8 @@ impl Multiverse for SqlIncorporator {
 
         let parsed_query = sql_parser::parse_query(&s).unwrap();
 
-        self.add_parsed_query(parsed_query, Some(name), false, mig, None)
+        debug!(self.log, "security.rs add_base: name {}", name);
+        self.add_parsed_query(parsed_query, Some(name), true, mig, None)
             .unwrap()
     }
 }

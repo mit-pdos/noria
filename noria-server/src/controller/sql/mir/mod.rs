@@ -646,10 +646,9 @@ impl SqlToMirConverter {
         }
 
         // all columns on a base must have the base as their table
-        assert!(
-            cols.iter()
-                .all(|c| c.column.table == Some(String::from(name)))
-        );
+        assert!(cols
+            .iter()
+            .all(|c| c.column.table == Some(String::from(name))));
 
         // primary keys can either be specified directly (at the end of CREATE TABLE), or inline
         // with the definition of a field (i.e., as a ColumnConstraint).
@@ -737,11 +736,16 @@ impl SqlToMirConverter {
         // compound SELECT rewrite the table name on their output columns.
         let mut selected_cols = HashSet::new();
         for c in ucols.clone() {
-            if ancestors
-                .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name && !ac.clone().table.unwrap().contains("UserContext") && !ac.clone().table.unwrap().contains("GroupContext")))
-            {
-                if !c.clone().table.unwrap().contains("UserContext") || !c.clone().table.unwrap().contains("GroupContext") {
+            if ancestors.iter().all(|a| {
+                a.borrow().columns().iter().any(|ac| {
+                    *ac.name == c.name
+                        && !ac.clone().table.unwrap().contains("UserContext")
+                        && !ac.clone().table.unwrap().contains("GroupContext")
+                })
+            }) {
+                if !c.clone().table.unwrap().contains("UserContext")
+                    || !c.clone().table.unwrap().contains("GroupContext")
+                {
                     selected_cols.insert(c.name.clone());
                 }
             } else {
@@ -816,14 +820,19 @@ impl SqlToMirConverter {
 
         for c in ucols.clone() {
             for ancestor in ancestors.iter() {
-                if ancestor.borrow().columns().iter().any(|ac| *ac.name == c.name) {
+                if ancestor
+                    .borrow()
+                    .columns()
+                    .iter()
+                    .any(|ac| *ac.name == c.name)
+                {
                     match &c.table {
                         Some(table) => {
                             if !table.contains("UserContext") && !table.contains("GroupContext") {
                                 selected_cols.insert(c.name.clone());
                                 selected_col_objects.insert(c.clone());
                             }
-                        },
+                        }
                         None => {
                             selected_cols.insert(c.name.clone());
                             selected_col_objects.insert(c.clone());
@@ -1105,7 +1114,6 @@ impl SqlToMirConverter {
         right_node: MirNodeRef,
         kind: JoinType,
     ) -> MirNodeRef {
-
         // TODO(malte): this is where we overproject join columns in order to increase reuse
         // opportunities. Technically, we need to only project those columns here that the query
         // actually needs; at a minimum, we could start with just the join colums, relying on the
@@ -1489,7 +1497,12 @@ impl SqlToMirConverter {
         qg: &QueryGraph,
         has_leaf: bool,
         universe: UniverseId,
-    ) -> (bool, Vec<MirNodeRef>, Option<HashMap<(String, Option<String>), String>>, String) {
+    ) -> (
+        bool,
+        Vec<MirNodeRef>,
+        Option<HashMap<(String, Option<String>), String>>,
+        String,
+    ) {
         use crate::controller::sql::mir::grouped::make_grouped;
         use crate::controller::sql::mir::grouped::make_predicates_above_grouped;
         use crate::controller::sql::mir::join::make_joins;
@@ -1595,8 +1608,9 @@ impl SqlToMirConverter {
 
             // 3. Create security boundary
             use crate::controller::sql::mir::security::SecurityBoundary;
-            let (last_policy_nodes, policy_nodes) =
-                self.make_security_boundary(universe.clone(), &mut node_for_rel, prev_node.clone()).unwrap();
+            let (last_policy_nodes, policy_nodes) = self
+                .make_security_boundary(universe.clone(), &mut node_for_rel, prev_node.clone())
+                .unwrap();
 
             let mut ancestors =
                 self.universe
@@ -1620,9 +1634,10 @@ impl SqlToMirConverter {
                                     );
                                     Some(self.get_view(&view_name).unwrap())
                                 }
-                            }).collect();
+                            })
+                            .collect();
 
-                        trace!(self.log, "group views {:?}", group_views);
+                        debug!(self.log, "group views {:?}", group_views);
                         acc.extend(group_views);
                         acc
                     });
@@ -1815,7 +1830,7 @@ impl SqlToMirConverter {
                     &qg,
                     &ancestors,
                     new_node_count,
-                    sec_round
+                    sec_round,
                 );
 
                 if sec_round {
@@ -1826,9 +1841,7 @@ impl SqlToMirConverter {
                 new_node_count += nodes.len();
                 nodes_added.extend(nodes.clone());
 
-
                 nodes.last().unwrap().clone()
-
             } else {
                 ancestors.last().unwrap().clone()
             };
@@ -1836,15 +1849,15 @@ impl SqlToMirConverter {
             let final_node_cols: Vec<Column> =
                 final_node.borrow().columns().iter().cloned().collect();
             // 8. Generate leaf views that expose the query result
-            let mut projected_columns: Vec<Column> =
-              qg.columns
-                  .iter()
-                  .filter_map(|oc| match *oc {
-                      OutputColumn::Arithmetic(_) => None,
-                      OutputColumn::Data(ref c) => Some(Column::from(c)),
-                      OutputColumn::Literal(_) => None,
-                  })
-                  .collect();
+            let mut projected_columns: Vec<Column> = qg
+                .columns
+                .iter()
+                .filter_map(|oc| match *oc {
+                    OutputColumn::Arithmetic(_) => None,
+                    OutputColumn::Data(ref c) => Some(Column::from(c)),
+                    OutputColumn::Literal(_) => None,
+                })
+                .collect();
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);
@@ -1872,7 +1885,8 @@ impl SqlToMirConverter {
                     }
                     OutputColumn::Data(_) => None,
                     OutputColumn::Literal(_) => None,
-                }).collect();
+                })
+                .collect();
             let mut projected_literals: Vec<(String, DataType)> = qg
                 .columns
                 .iter()
@@ -1887,7 +1901,8 @@ impl SqlToMirConverter {
                             None
                         }
                     }
-                }).collect();
+                })
+                .collect();
 
             // if this query does not have any parameters, we must add a bogokey
             let has_bogokey = if has_leaf && qg.parameters().is_empty() {
@@ -1928,7 +1943,8 @@ impl SqlToMirConverter {
                     .map(|mut c| {
                         sanitize_leaf_column(&mut c, name);
                         c
-                    }).collect();
+                    })
+                    .collect();
 
                 let query_params = if has_bogokey {
                     vec![Column::new(None, "bogokey")]
@@ -1961,4 +1977,4 @@ impl SqlToMirConverter {
         // finally, we output all the nodes we generated
         (sec_round, nodes_added, table_mapping, union_base_name)
     }
-    }
+}

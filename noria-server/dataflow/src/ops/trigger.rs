@@ -50,6 +50,7 @@ impl Trigger {
     {
         use hyper;
         let url = format!("{}/{}", url, path);
+        println!("trigger.rs url: {}", url);
         let requests: Vec<_> = requests
             .iter()
             .map(|req| {
@@ -80,6 +81,7 @@ impl Trigger {
                 ref controller_url,
                 ref group,
             } => {
+                println!("trigger.rs: GroupCreation event, ids is {:?}", ids);
                 let contexts = ids
                     .iter()
                     .map(|gid| {
@@ -89,7 +91,10 @@ impl Trigger {
                         group_context
                     })
                     .collect();
-
+                println!(
+                    "trigger.rs: GroupCreation event, contexts is {:?}",
+                    contexts
+                );
                 self.rpc("create_universe", contexts, controller_url);
             }
         }

@@ -65,6 +65,11 @@ impl Ingredient for Filter {
         let srcn = &g[self.src.as_global()];
         // N.B.: <= because the adjacent node might be a base with a suffix of removed columns.
         // It's okay to just ignore those.
+        println!(
+            "Filter on_connected: {:?}, {:?}",
+            self.filter,
+            srcn.fields()
+        );
         assert!(self.filter.len() <= srcn.fields().len());
     }
 
