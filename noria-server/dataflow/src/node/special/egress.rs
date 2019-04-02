@@ -21,8 +21,8 @@ pub struct Egress {
     /// Packet payloads
     payloads: Vec<Box<Packet>>,
 
-    /// Whitelist of nodes it's ok to send packets too
-    ok_to_send: HashSet<NodeIndex>,
+    /// Nodes it's ok to send packets too and the minimum labels (inclusive)
+    min_label_to_send: HashMap<NodeIndex, usize>,
     /// The set of nodes it is waiting to hear from for recovery
     waiting_for: HashSet<NodeIndex>,
     /// Where to resume, if in recovery mode
@@ -39,7 +39,7 @@ impl Clone for Egress {
             min_provenance: self.min_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
-            ok_to_send: self.ok_to_send.clone(),
+            min_label_to_send: self.min_label_to_send.clone(),
             waiting_for: Default::default(),
             resume_at: None,
         }
@@ -68,7 +68,7 @@ impl Egress {
             local: dst_l,
             dest: addr,
         });
-        self.ok_to_send.insert(dst_g);
+        self.min_label_to_send.insert(dst_g, 0);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -90,7 +90,12 @@ impl Egress {
         // send any queued updates to all external children
         assert!(!txs.is_empty());
         for (_, ref mut tx) in txs.iter_mut().enumerate() {
-            if !self.ok_to_send.contains(&tx.node) {
+            if !self.min_label_to_send.contains_key(&tx.node) {
+                continue;
+            }
+
+            let label = msg.id().as_ref().unwrap().label;
+            if label < *self.min_label_to_send.get(&tx.node).unwrap() {
                 continue;
             }
 
@@ -138,7 +143,7 @@ impl Egress {
                 break;
             }
         }
-        self.ok_to_send.remove(&child);
+        self.min_label_to_send.remove(&child);
     }
 
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
@@ -246,7 +251,7 @@ impl Egress {
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) -> bool {
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
-        self.ok_to_send.insert(node);
+        self.min_label_to_send.insert(node, label);
 
         // we don't have the messages we need to send
         // should only happen if we lost a stateless domain
