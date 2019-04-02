@@ -287,19 +287,9 @@ impl Reader {
         }
     }
 
-    fn get_provenance(&self, label: usize) -> Provenance {
-        let min_label = self.min_provenance.label();
-        assert!(label >= min_label);
-        assert!(label <= self.updates.len());
-
-        let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[min_label..label]);
-        provenance
-    }
-
     pub fn get_last_provenance(&self) -> Provenance {
-        let max_label = self.min_provenance.label() + self.updates.len();
-        let provenance = self.get_provenance(max_label);
+        let mut provenance = self.min_provenance.clone();
+        provenance.apply_updates(&self.updates[..]);
         provenance
     }
 }

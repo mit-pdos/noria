@@ -156,19 +156,9 @@ impl Egress {
         }
     }
 
-    fn get_provenance(&self, label: usize) -> Provenance {
-        let min_label = self.min_provenance.label();
-        assert!(label >= min_label);
-        assert!(label <= self.updates.len());
-
-        let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[min_label..label]);
-        provenance
-    }
-
     pub fn get_last_provenance(&self) -> Provenance {
-        let max_label = self.min_provenance.label() + self.updates.len();
-        let provenance = self.get_provenance(max_label);
+        let mut provenance = self.min_provenance.clone();
+        provenance.apply_updates(&self.updates[..]);
         provenance
     }
 
@@ -186,9 +176,15 @@ impl Egress {
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        // update packet id to include the correct label, provenance update, and from node.
         let mut m = m.as_ref().map(|m| box m.clone_data()).unwrap();
-        let label = self.min_provenance.label() + self.payloads.len() + 1;
+        let is_replay = match m {
+            box Packet::ReplayPiece { .. } => true,
+            _ => false,
+        };
+
+        // update packet id to include the correct label, provenance update, and from node.
+        // replays don't get buffered and don't increment their label (they use the last label
+        // sent by this domain - think of replays as a snapshot of what's already been sent).
         let mut update = Vec::new();
         if let Some(ref pid) = m.as_ref().id() {
             // TODO(ygina): trim this if necessary
@@ -196,27 +192,33 @@ impl Egress {
             update.push((pid.from, pid.label));
             update.append(&mut pid.update.clone());
         }
+        let label = if is_replay {
+            self.min_provenance.label() + self.payloads.len()
+        } else {
+            self.min_provenance.label() + self.payloads.len() + 1
+        };
         *m.id_mut() = Some(PacketId::new(label, from, update.clone()));
+        if !is_replay {
+            self.payloads.push(box m.clone_data());
+        }
+        self.updates.push(update);
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
         let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
         let to_nodes = if let Some(ni) = replay_to {
+            assert!(is_replay);
             let mut set = HashSet::new();
             set.insert(*ni);
             set
         } else {
+            assert!(!is_replay);
             self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
         };
 
-        // each message in payload should have a corresponding provenance update
-        self.payloads.push(m);
-        self.updates.push(update);
-
         // finally, send the message
-        let m = &self.payloads[label - self.min_provenance.label() - 1];
-        self.process(box m.clone_data(), shard, output, &to_nodes);
+        self.process(m, shard, output, &to_nodes);
     }
 
     pub fn set_min_label(&mut self, label: usize) {

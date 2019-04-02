@@ -26,20 +26,30 @@ impl Ingress {
     /// Receive a packet, keeping track of the latest packet received from each parent. If the
     /// parent crashes, we can tell the parent's replacement where to resume sending messages.
     pub fn receive_packet(&mut self, m: &Box<Packet>) {
-        let (from, label) = {
+        let (from, label, is_replay) = {
+            let mut is_replay = false;
             let id = match m {
                 box Packet::Message { ref id, .. } => id.as_ref().unwrap(),
-                box Packet::ReplayPiece { ref id, .. } => id.as_ref().unwrap(),
+                box Packet::ReplayPiece { ref id, .. } => {
+                    is_replay = true;
+                    id.as_ref().unwrap()
+                },
                 _ => unreachable!(),
             };
-            (id.from, id.label)
+            (id.from, id.label, is_replay)
         };
 
         // println!("RECEIVE PACKET #{} <- {}", label, from.index());
 
-        // labels must be sequential
+        // labels must be increasing UNLESS the message is a replay
         let old_label = self.last_packet_received.get(&from);
-        assert!(old_label.is_none() || label > *old_label.unwrap());
+        if let Some(old_label) = old_label {
+            if label <= *old_label {
+                assert!(is_replay);
+                assert_eq!(label, *old_label);
+            }
+        }
+
         self.last_packet_received.insert(from, label);
     }
 
