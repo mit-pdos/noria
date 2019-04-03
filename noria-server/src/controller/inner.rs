@@ -1019,7 +1019,6 @@ impl ControllerInner {
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
-            println!("hi");
             match r.create_universe(&mut mig, universe_groups) {
                 Ok(ar) => {
                     info!(log, "{} expressions added", ar.expressions_added);
@@ -1032,7 +1031,6 @@ impl ControllerInner {
                 }
             }
             .unwrap();
-            println!("hi1");
 
         });
 

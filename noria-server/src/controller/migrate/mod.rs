@@ -125,7 +125,6 @@ impl<'a> Migration<'a> {
         );
 
         self.mainline.base_nodes.insert(name.to_string(), ni.clone());
-        println!("base nodes: {:?}", self.mainline.base_nodes);
 
         // keep track of the fact that it's new
         self.added.push(ni);

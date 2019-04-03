@@ -252,9 +252,7 @@ fn main() {
     println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
-    println!("1");
     backend.set_security_config(ploc);
-    println!("2");
     backend.migrate(sloc, Some(qloc)).unwrap();
 
     let populate = match populate.as_ref() {
@@ -264,7 +262,9 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    p.enroll_students(nclasses);
+    let classes_per_student = 10;
+    // let classes_per_student = nclasses;
+    p.enroll_students(classes_per_student);
 
     let classes = p.get_classes();
     let users = p.get_users();
@@ -497,3 +497,34 @@ fn main() {
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 }
+
+
+// #[test]
+// fn piazza_works() {
+//     let a = vec![1.into(), "a".into()];
+//     let b = vec![1.into(), "b".into()];
+//     let a_rec = vec![Record::Positive(a.clone())];
+//     let b_rec = vec![Record::Positive(b.clone())];
+//
+//     let (mut r1, mut w1) = new(true, 2, &[0], 0);
+//     let (mut r2, mut w2) = w1.clone_new_user(r1.clone());
+//     let (mut r3, mut w3) = w1.clone_new_user(r1.clone());
+//
+//     w1.add(a_rec.clone());
+//     w2.add(a_rec.clone());
+//     w2.add(b_rec.clone());
+//     w3.add(a_rec.clone());
+//
+//
+//     r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//     r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//     r3.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//     r3.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//     r2.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//
+//     // assert_eq!(r3.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+//     // assert_eq!(r2.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
+//     // assert_eq!(r2.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(1));
+//     // assert_eq!(r3.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(0));
+//
+// }

@@ -376,7 +376,6 @@ impl Recipe {
                                 };
 
                                 let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
-                                println!("SENDING WRITE POLICY PACKET");
                                 domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
                                 mig.mainline.replies.wait_for_acks(&domain);
 

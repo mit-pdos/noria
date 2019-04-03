@@ -102,9 +102,7 @@ impl Multiverse for SqlIncorporator {
         // a view creation and these views might be unique to each universe
         // e.g. if they reference UserContext.
         let mut row_policies_qg: HashMap<String, Vec<QueryGraph>> = HashMap::new();
-        println!("got this far");
         for policy in universe_policies {
-            println!("looking at policy: {:?}", policy);
             if !policy.is_row_policy() && !policy.is_write_policy() {
                 let qfp = self
                     .add_parsed_query(policy.predicate(), None, false, mig, None)
