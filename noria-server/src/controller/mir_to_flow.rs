@@ -14,6 +14,8 @@ use mir::node::{GroupedNodeType, MirNode, MirNodeType};
 use mir::query::{MirQuery, QueryFlowParts};
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
+use crate::controller::security::policy::Policy;
+
 
 pub fn mir_query_to_flow_parts(
     mir_query: &mut MirQuery,

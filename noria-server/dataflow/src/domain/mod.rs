@@ -738,6 +738,16 @@ impl Domain {
             consumed => {
                 match consumed {
                     // workaround #16223
+                    Packet::SetWritePolicy { node, predicate } => {
+                        let mut n = self.nodes[node].borrow_mut();
+                        match n.get_base_mut() {
+                            Some(ref mut b) => b.add_write_policy(predicate.clone()),
+                            None => {},
+                        }
+                        self.control_reply_tx
+                            .send(ControlReplyPacket::ack())
+                            .unwrap();
+                    },
                     Packet::AddNode { node, parents } => {
                         let addr = node.local_addr();
                         self.not_ready.insert(addr);

@@ -53,7 +53,7 @@ impl Populate {
         self.authors.clone()
     }
 
-    pub fn enroll_students(&mut self, classes_per_student : i32) {
+    pub fn enroll_students(&mut self, classes_per_student: i32) {
         // println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();

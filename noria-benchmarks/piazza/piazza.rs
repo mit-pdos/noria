@@ -252,7 +252,9 @@ fn main() {
     println!("Initializing database schema...");
     let mut backend = Backend::new(partial, shard, reuse);
     backend.migrate(sloc, None).unwrap();
+    println!("1");
     backend.set_security_config(ploc);
+    println!("2");
     backend.migrate(sloc, Some(qloc)).unwrap();
 
     let populate = match populate.as_ref() {

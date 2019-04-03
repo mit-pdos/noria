@@ -2,6 +2,8 @@ use crate::controller::security::SecurityConfig;
 use crate::controller::sql::reuse::ReuseConfigType;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::Migration;
+use crate::controller::security::policy::Policy;
+
 use dataflow::ops::trigger::Trigger;
 use dataflow::ops::trigger::TriggerEvent;
 use dataflow::prelude::DataType;
@@ -296,10 +298,12 @@ impl Recipe {
             expressions_added: 0,
             expressions_removed: 0,
         };
+
         let now = Instant::now();
 
         // println!("recipe: creatng universe 1. {:?}", now.elapsed().as_nanos());
         if self.security_config.is_some() {
+            mig.security_config = self.security_config.clone();
             // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
@@ -357,8 +361,33 @@ impl Recipe {
             // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
+        use dataflow::payload;
+        // Enforce write policies
+        if self.security_config.is_some() {
+            for policy in &self.security_config.clone().unwrap().policies {
+                match policy {
+                    Policy::Write(inner) => {
+                        match mig.mainline.base_nodes.get(&inner.table) {
+                            Some(ni) => {
+                                let n = &mig.mainline.ingredients[*ni];
+                                let m = box payload::Packet::SetWritePolicy {
+                                    node: n.local_addr(),
+                                    predicate: inner.predicate.clone(),
+                                };
 
-        // println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
+                                let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
+                                println!("SENDING WRITE POLICY PACKET");
+                                domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
+                                mig.mainline.replies.wait_for_acks(&domain);
+
+                            },
+                            None => {},
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
 
         Ok(result)
     }

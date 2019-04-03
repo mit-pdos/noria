@@ -21,6 +21,7 @@
 //! Beware, Here be dragons™
 
 use crate::controller::ControllerInner;
+use crate::controller::security::SecurityConfig;
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use std::collections::{HashMap, HashSet};
@@ -56,6 +57,7 @@ pub struct Migration<'a> {
 
     /// Additional migration information provided by the client
     pub(super) context: HashMap<String, DataType>,
+    pub(super) security_config: Option<SecurityConfig>,
 }
 
 impl<'a> Migration<'a> {
@@ -110,15 +112,20 @@ impl<'a> Migration<'a> {
         S2: ToString,
         FS: IntoIterator<Item = S2>,
     {
+
         // add to the graph
         let ni = self
             .mainline
             .ingredients
             .add_node(node::Node::new(name.to_string(), fields, b));
+
         info!(self.log,
               "adding new base";
               "node" => ni.index(),
         );
+
+        self.mainline.base_nodes.insert(name.to_string(), ni.clone());
+        println!("base nodes: {:?}", self.mainline.base_nodes);
 
         // keep track of the fact that it's new
         self.added.push(ni);
@@ -127,6 +134,7 @@ impl<'a> Migration<'a> {
             .ingredients
             .add_edge(self.mainline.source, ni, ());
         // and tell the caller its id
+
         ni.into()
     }
 

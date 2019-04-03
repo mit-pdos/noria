@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use vec_map::VecMap;
+use nom_sql::SqlQuery;
 
 /// Base is used to represent the root nodes of the Noria data flow graph.
 ///
@@ -13,7 +14,7 @@ use vec_map::VecMap;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Base {
     primary_key: Option<Vec<usize>>,
-
+    write_policy_predicate: Vec<SqlQuery>,
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
@@ -25,6 +26,12 @@ impl Base {
         let mut base = Base::default();
         base.defaults = defaults;
         base
+    }
+
+    pub fn add_write_policy(&mut self, write_policy: SqlQuery) {
+        println!("SETTING WRITE POLICY!");
+        self.write_policy_predicate.push(write_policy);
+        println!("new policy predicates: {:?}", self.write_policy_predicate);
     }
 
     /// Builder with a known primary key.
@@ -91,7 +98,7 @@ impl Clone for Base {
     fn clone(&self) -> Base {
         Base {
             primary_key: self.primary_key.clone(),
-
+            write_policy_predicate: self.write_policy_predicate.clone(),
             defaults: self.defaults.clone(),
             dropped: self.dropped.clone(),
             unmodified: self.unmodified,
@@ -103,7 +110,7 @@ impl Default for Base {
     fn default() -> Self {
         Base {
             primary_key: None,
-
+            write_policy_predicate: Vec::new(),
             defaults: Vec::new(),
             dropped: Vec::new(),
             unmodified: true,
@@ -139,6 +146,7 @@ impl Base {
         mut ops: Vec<TableOperation>,
         state: &StateMap,
     ) -> Records {
+            
         if self.primary_key.is_none() || ops.is_empty() {
             return ops
                 .into_iter()

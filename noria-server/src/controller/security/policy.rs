@@ -70,6 +70,15 @@ impl Policy {
         }
     }
 
+    pub fn is_write_policy(&self) -> bool {
+        match *self {
+            Policy::Rewrite(_) => false,
+            Policy::Allow(_) => false,
+            Policy::Deny(_) => false,
+            Policy::Write(_) => true,
+        }
+    }
+
     pub fn predicate(&self) -> SqlQuery {
         match *self {
             Policy::Rewrite(ref p) => p.rewrite_view.clone(),
@@ -192,7 +201,7 @@ impl Policy {
             predicate: sq,
         };
 
-        Policy::Write(rp) 
+        Policy::Write(rp)
     }
 }
 

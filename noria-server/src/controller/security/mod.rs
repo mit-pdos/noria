@@ -11,7 +11,7 @@ use crate::controller::security::policy::Policy;
 #[derive(Clone, Debug)]
 pub struct SecurityConfig {
     pub groups: HashMap<String, Group>,
-    policies: Vec<Policy>,
+    pub policies: Vec<Policy>,
     pub url: String,
 }
 
