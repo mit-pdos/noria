@@ -738,6 +738,16 @@ impl Domain {
             consumed => {
                 match consumed {
                     // workaround #16223
+                    Packet::SetWritePolicy { node, predicate } => {
+                        let mut n = self.nodes[node].borrow_mut();
+                        match n.get_base_mut() {
+                            Some(ref mut b) => b.add_write_policy(predicate.clone()),
+                            None => {},
+                        }
+                        self.control_reply_tx
+                            .send(ControlReplyPacket::ack())
+                            .unwrap();
+                    },
                     Packet::AddNode { node, parents } => {
                         let addr = node.local_addr();
                         self.not_ready.insert(addr);
@@ -870,7 +880,7 @@ impl Domain {
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
-                                println!("partial global srmap, id: {:?}", gid);
+                                // println!("partial global srmap, id: {:?}", gid);
 
                                 let mut srmap = true;
 
@@ -957,7 +967,7 @@ impl Domain {
                                     };
 
                                     if create_new_srmap {
-                                        println!("creating new partial global srmap");
+                                        // println!("creating new partial global srmap");
                                         let (mut tr_part, mut tw_part) = backlog::new_partial(srmap, cols, &k[..], move |miss, uid| {
                                             let n = txs.len();
                                             let tx = if n == 1 {
@@ -967,7 +977,7 @@ impl Domain {
                                                 assert_eq!(miss.len(), 1);
                                                 &txs[::shard_by(&miss[0], n)]
                                             };
-                                            println!("in trigger func");
+                                            // println!("in trigger func");
                                             tx.unbounded_send(Vec::from(miss)).unwrap();
                                         }, ids);
 
@@ -993,7 +1003,7 @@ impl Domain {
                                             r.set_materialization_info(materialization_info.clone());
 
                                             // make sure Reader is actually prepared to receive state
-                                            println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
+                                            // println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
                                             r.set_write_handle(tw_part);
                                         }).unwrap();
                                     } else {
@@ -1008,7 +1018,7 @@ impl Domain {
                                                         assert_eq!(miss.len(), 1);
                                                         &txs[::shard_by(&miss[0], n)]
                                                     };
-                                                    println!("in trigger func");
+                                                    // println!("in trigger func");
                                                     tx.unbounded_send(Vec::from(miss)).unwrap();
                                                 }))).unwrap();
 
@@ -1027,7 +1037,7 @@ impl Domain {
                                                     r.set_materialization_info(materialization_info.clone());
 
                                                     // make sure Reader is actually prepared to receive state
-                                                    println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
+                                                    // println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
                                                     r.set_write_handle(tw_part);
                                                 }).unwrap();
                                             },
@@ -1047,7 +1057,7 @@ impl Domain {
                                         assert_eq!(miss.len(), 1);
                                         &txs[::shard_by(&miss[0], n)]
                                     };
-                                    println!("MISS: {:?}", miss);
+                                    // println!("MISS: {:?}", miss);
                                     tx.unbounded_send(Vec::from(miss)).unwrap();
                                     }, ids);
 
@@ -1076,6 +1086,7 @@ impl Domain {
                                 use std::sync::Arc;
                                 let (mut r_part, mut w_part): (backlog::SingleReadHandle,
                                                                backlog::WriteHandle);
+
 
                                 let srmap = true;
 
@@ -1250,7 +1261,7 @@ impl Domain {
                             }
                         };
 
-                        println!("REPLAY PATH: tag  = {:?}, path = {:?}", tag, path);
+                        // println!("REPLAY PATH: tag  = {:?}, path = {:?}", tag, path);
                         self.replay_paths.insert(
                             tag,
                             ReplayPath {
@@ -1265,19 +1276,19 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
-                        println!("reader req replay for node: {:?}", node);
+                        // println!("reader req replay for node: {:?}", node);
 
                         let still_miss = self.nodes[node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
-                                println!("request reader replay");
+                                // println!("request reader replay");
                                 let w = r
                                     .writer_mut()
                                     .expect("reader replay requested for non-materialized reader");
                                 // ensure that all writes have been applied
-                                println!("uid: {:?}", w.uid);
+                                // println!("uid: {:?}", w.uid);
                                 w.swap();
-                                println!("call to try find and w key {:?}", key);
+                                // println!("call to try find and w key {:?}", key);
                                 w.with_key(&key[..])
                                     .try_find_and(|_| ())
                                     .expect("reader replay requested for non-ready reader")
@@ -1870,7 +1881,7 @@ impl Domain {
                     mut context,
                     id,
                 } => {
-                    println!("replaying piece!");
+                    // println!("replaying piece!");
                     // println!("data in replay: {:?}", data.clone());
                     if let ReplayPieceContext::Partial { ref for_keys, .. } = context {
                         trace!(
@@ -1942,7 +1953,7 @@ impl Domain {
                         id: None,
                     };
                     let mut m = Some(m);
-                    println!("path : {:?}", path);
+                    // println!("path : {:?}", path);
                     for (i, segment) in path.iter().enumerate() {
                         let mut n = self.nodes[segment.node].borrow_mut();
                         let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
@@ -1979,7 +1990,7 @@ impl Domain {
                             // triggered this replay initially.
                             if let Some(state) = self.state.get_mut(segment.node) {
                                 for key in backfill_keys.iter() {
-                                    println!("mf1");
+                                    // println!("mf1");
                                     state.mark_filled(key.clone(), &tag);
                                 }
                             } else {
@@ -1991,7 +2002,7 @@ impl Domain {
                                     let w = r.writer_mut();
                                     w.map(|mut wh| {
                                         for key in backfill_keys.iter() {
-                                            println!("mf2");
+                                            // println!("mf2");
                                             wh.mut_with_key(&key[..]).mark_filled();
                                         }
                                     });
@@ -1999,7 +2010,7 @@ impl Domain {
                                 .unwrap();
                             }
                         }
-                        println!("before here 3");
+                        // println!("before here 3");
                         // // println!("m data: {:?}", m.as_ref().unwrap().data());
                         // process the current message in this node
                         let (mut misses, captured) = n.process(
@@ -2013,10 +2024,6 @@ impl Domain {
                             None,
                             id
                         );
-
-                        println!("here3");
-
-                        // // println!("m data 2: {:?}", m.as_ref().unwrap().data());
 
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {
@@ -2040,7 +2047,7 @@ impl Domain {
                             HashSet::new()
                         };
 
-                        println!("here4");
+                        // println!("here4");
                         if target {
                             if !misses.is_empty() {
                                 // we missed while processing
@@ -2076,7 +2083,7 @@ impl Domain {
                             }
                         }
 
-                        println!("here5");
+                        // println!("here5");
 
                         if target && !captured.is_empty() {
                             // materialized union ate some of our keys,
@@ -2100,7 +2107,7 @@ impl Domain {
                         // we're done with the node
                         drop(n);
 
-                        println!("here5");
+                        // println!("here5");
                         if m.is_none() {
                             // eaten full replay
                             assert_eq!(misses.len(), 0);
@@ -2131,7 +2138,7 @@ impl Domain {
                             finished_partial = backfill_keys.as_ref().unwrap().len();
                         }
 
-                        println!("here7");
+                        // println!("here7");
 
                         // only continue with the keys that weren't captured
                         if let box Packet::ReplayPiece {
@@ -2240,7 +2247,7 @@ impl Domain {
                             *mcontext = context.clone();
                         }
                     }
-                    println!("replay piece inner");
+                    // println!("replay piece inner");
 
                     match context {
                         ReplayPieceContext::Regular { last } if last => {
@@ -2271,7 +2278,7 @@ impl Domain {
                             }
                         }
                     }
-                    println!("replay piece inner2");
+                    // println!("replay piece inner2");
                 }
                 _ => unreachable!(),
             }

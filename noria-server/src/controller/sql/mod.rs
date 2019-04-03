@@ -707,18 +707,18 @@ impl SqlIncorporator {
 
         // compare to existing query MIR and reuse prefix
         let mut reused_mir = new_opt_mir.clone();
-        let mut num_reused_nodes = 0;
-        for m in reuse_mirs {
-            if !self.mir_queries.contains_key(&m) {
-                continue;
-            }
-            let mq = self.mir_queries.get(&m).unwrap();
-            let res = merge_mir_for_queries(&self.log, &reused_mir, &mq);
-            reused_mir = res.clone().0;
-            if res.1 > num_reused_nodes {
-                num_reused_nodes = res.1;
-            }
-        }
+        // let mut num_reused_nodes = 0;
+        // for m in reuse_mirs {
+        //     if !self.mir_queries.contains_key(&m) {
+        //         continue;
+        //     }
+        //     let mq = self.mir_queries.get(&m).unwrap();
+        //     let res = merge_mir_for_queries(&self.log, &reused_mir, &mq);
+        //     reused_mir = res.clone().0;
+        //     if res.1 > num_reused_nodes {
+        //         num_reused_nodes = res.1;
+        //     }
+        // }
 
         let mut post_reuse_opt_mir = reused_mir.optimize_post_reuse();
 
@@ -745,10 +745,10 @@ impl SqlIncorporator {
         let qfp =
             mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig, table_mapping.as_ref(), global_name);
 
-        info!(
-            self.log,
-            "Reused {} nodes for {}", num_reused_nodes, query_name
-        );
+        // info!(
+        //     self.log,
+        //     "Reused {} nodes for {}", num_reused_nodes, query_name
+        // );
 
         // register local state
         self.register_query(query_name, Some(qg), &post_reuse_opt_mir, universe);

@@ -2,6 +2,8 @@ use crate::controller::security::SecurityConfig;
 use crate::controller::sql::reuse::ReuseConfigType;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::Migration;
+use crate::controller::security::policy::Policy;
+
 use dataflow::ops::trigger::Trigger;
 use dataflow::ops::trigger::TriggerEvent;
 use dataflow::prelude::DataType;
@@ -16,6 +18,8 @@ use slog;
 use std::collections::HashMap;
 use std::str;
 use std::vec::Vec;
+use std::time::{Duration, Instant};
+
 
 type QueryID = u64;
 
@@ -295,7 +299,11 @@ impl Recipe {
             expressions_removed: 0,
         };
 
+        let now = Instant::now();
+
+        // println!("recipe: creatng universe 1. {:?}", now.elapsed().as_nanos());
         if self.security_config.is_some() {
+            mig.security_config = self.security_config.clone();
             // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
@@ -307,6 +315,8 @@ impl Recipe {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }
         }
+
+        // println!("recipe: creating universe 2. {:?}", now.elapsed().as_nanos());
 
         for expr in self.expressions.values() {
             let (n, q, is_leaf) = expr.clone();
@@ -331,6 +341,8 @@ impl Recipe {
                 None
             };
 
+            // println!("recipe: creating universe 3. {:?}", now.elapsed().as_nanos());
+
             let is_leaf = if group.is_some() { false } else { is_leaf };
             let qfp = self
                 .inc
@@ -338,6 +350,7 @@ impl Recipe {
                 .unwrap()
                 .add_parsed_query(q, new_name.clone(), is_leaf, mig, n.clone())?;
 
+            // println!("recipe: creating universe 4. {:?}", now.elapsed().as_nanos());
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
             let query_name = match n.clone() {
@@ -345,10 +358,35 @@ impl Recipe {
                 None => qfp.name.clone(),
             };
 
+            // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
+        use dataflow::payload;
+        // Enforce write policies
+        if self.security_config.is_some() {
+            for policy in &self.security_config.clone().unwrap().policies {
+                match policy {
+                    Policy::Write(inner) => {
+                        match mig.mainline.base_nodes.get(&inner.table) {
+                            Some(ni) => {
+                                let n = &mig.mainline.ingredients[*ni];
+                                let m = box payload::Packet::SetWritePolicy {
+                                    node: n.local_addr(),
+                                    predicate: inner.predicate.clone(),
+                                };
 
-        // println!("Create universe: id: {:?}, new nodes: {:?}", mig.universe().0, result.new_nodes.clone());
+                                let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
+                                domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
+                                mig.mainline.replies.wait_for_acks(&domain);
+
+                            },
+                            None => {},
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
 
         Ok(result)
     }

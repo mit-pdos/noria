@@ -370,7 +370,6 @@ impl<'a> Plan<'a> {
 
                     // since we're partially materializing a reader node,
                     // we need to give it a way to trigger replays.
-                    println!("about to initialize partial global state");
                     InitialState::PartialGlobal {
                         gid: self.node,
                         cols: self.graph[self.node].fields().len(),

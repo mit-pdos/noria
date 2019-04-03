@@ -178,7 +178,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bit-vec"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -1235,7 +1235,7 @@ name = "mysql"
 version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bit-vec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bufstream 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "flate2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1303,7 +1303,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "atoi 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bit-vec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "checked 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2216,6 +2216,7 @@ version = "0.1.15"
 source = "git+https://github.com/amarzoev/srmap#344f49fb03055099f061e5acdb08910ad3746a64"
 dependencies = [
  "arccstr 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "evmap 4.2.2 (git+https://github.com/jonhoo/rust-evmap.git)",
  "nom-sql 0.0.3 (git+https://github.com/ms705/nom-sql.git?rev=791c0f5117b6e02c1e3f146cc4a2689ef7da7a54)",
@@ -2996,7 +2997,7 @@ dependencies = [
 "checksum bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9f2fb9e29e72fd6bc12071533d5dc7664cb01480c59406f656d7ac25c7bd8ff7"
 "checksum bindgen 0.37.4 (registry+https://github.com/rust-lang/crates.io-index)" = "1b25ab82877ea8fe6ce1ce1f8ac54361f0218bad900af9eb11803994bf67c221"
 "checksum bit-vec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "02b4ff8b16e6076c3e14220b39fbc1fabb6737522281a388998046859400895f"
-"checksum bit-vec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4440d5cb623bb7390ae27fec0bb6c61111969860f8e3ae198bfa0663645e67cf"
+"checksum bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f59bbe95d4e52a6398ec21238d31577f2b28a9d86807f06ca59d191d8440d0bb"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"

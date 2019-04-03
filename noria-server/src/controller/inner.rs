@@ -30,7 +30,6 @@ use tokio::prelude::*;
 use std::iter::FromIterator;
 
 
-
 #[derive(Clone)]
 pub(crate) struct MapMeta {
     pub(super) query_to_leaves: HashMap<String, HashSet<NodeIndex>>,
@@ -100,6 +99,7 @@ pub struct ControllerInner {
     log: slog::Logger,
 
     pub(crate) replies: DomainReplies,
+    pub base_nodes: HashMap<String, NodeIndex>,
 }
 
 pub(crate) struct DomainReplies(futures::sync::mpsc::UnboundedReceiver<ControlReplyPacket>);
@@ -493,6 +493,7 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
             map_meta: MapMeta::new(),
             replies: DomainReplies(drx),
+            base_nodes: HashMap::new(),
         }
     }
 
@@ -692,9 +693,11 @@ impl ControllerInner {
             context: context,
             start: time::Instant::now(),
             log: miglog,
+            security_config: None,
         };
         let r = f(&mut m);
         m.commit();
+
         r
     }
 
@@ -713,6 +716,7 @@ impl ControllerInner {
             context: Default::default(),
             start: time::Instant::now(),
             log: miglog,
+            security_config: None,
         };
         let r = f(&mut m);
         m.commit();
@@ -1000,6 +1004,8 @@ impl ControllerInner {
                     .lookup(uid, true)
                     .unwrap();
 
+                println!("my groups: {:#?}", mygroups);
+
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
@@ -1025,6 +1031,7 @@ impl ControllerInner {
                 }
             }
             .unwrap();
+
         });
 
         self.recipe = r;
@@ -1052,6 +1059,7 @@ impl ControllerInner {
 
         Ok(())
     }
+
 
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;
@@ -1084,7 +1092,6 @@ impl ControllerInner {
                     }
                 }
                 topo_removals.reverse();
-
                 for leaf in topo_removals {
                     self.remove_leaf(leaf)?;
                 }
@@ -1181,7 +1188,6 @@ impl ControllerInner {
                 {
                     return Err("Failed to persist recipe installation".to_owned());
                 }
-
                 activation_result
             }
             Err(e) => {

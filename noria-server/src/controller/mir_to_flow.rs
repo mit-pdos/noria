@@ -14,6 +14,8 @@ use mir::node::{GroupedNodeType, MirNode, MirNodeType};
 use mir::query::{MirQuery, QueryFlowParts};
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
+use crate::controller::security::policy::Policy;
+
 
 pub fn mir_query_to_flow_parts(
     mir_query: &mut MirQuery,
@@ -25,7 +27,6 @@ pub fn mir_query_to_flow_parts(
 
     let mut new_nodes = Vec::new();
     let mut reused_nodes = Vec::new();
-
     // starting at the roots, add nodes in topological order
     let mut node_queue = VecDeque::new();
     node_queue.extend(mir_query.roots.iter().cloned());
@@ -186,8 +187,8 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                     assert_eq!(mir_node.ancestors.len(), 1);
 
                     let parent = mir_node.ancestors[0].clone();
-                    let na = parent.borrow().flow_node_addr().unwrap();
 
+                    let na = parent.borrow().flow_node_addr().unwrap();
                     let mut g_name = "".to_string();
                     match global_name {
                         Some(gn) => {
@@ -311,6 +312,7 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                     ref column,
                     ref key,
                 } => {
+                    println!("make rewrite");
                     let src = mir_node.ancestors[0].clone();
                     let should_rewrite = mir_node.ancestors[1].clone();
 
