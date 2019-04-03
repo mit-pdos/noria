@@ -27,7 +27,7 @@ pub enum DataType {
     /// A 32-bit numeric value.
     Int(i32),
     /// A 64-bit numeric value.
-    BigInt(i64),
+    BigInt(i128),
     /// A fixed point real value. The first field is the integer part, while the second is the
     /// fractional and must be between -999999999 and 999999999.
     Real(i64, i32),
@@ -164,8 +164,8 @@ impl PartialEq for DataType {
             (&DataType::Int(a), &DataType::Int(b)) => a == b,
             (&DataType::BigInt(..), &DataType::Int(..))
             | (&DataType::Int(..), &DataType::BigInt(..)) => {
-                let a: i64 = self.into();
-                let b: i64 = other.into();
+                let a: i128 = self.into();
+                let b: i128 = other.into();
                 a == b
             }
             (&DataType::Real(ai, af), &DataType::Real(bi, bf)) => ai == bi && af == bf,
@@ -199,8 +199,8 @@ impl Ord for DataType {
             (&DataType::Int(a), &DataType::Int(b)) => a.cmp(&b),
             (&DataType::BigInt(..), &DataType::Int(..))
             | (&DataType::Int(..), &DataType::BigInt(..)) => {
-                let a: i64 = self.into();
-                let b: i64 = other.into();
+                let a: i128 = self.into();
+                let b: i128 = other.into();
                 a.cmp(&b)
             }
             (&DataType::Real(ai, af), &DataType::Real(ref bi, ref bf)) => {
@@ -227,7 +227,7 @@ impl Hash for DataType {
         match *self {
             DataType::None => {}
             DataType::Int(..) | DataType::BigInt(..) => {
-                let n: i64 = self.into();
+                let n: i128 = self.into();
                 n.hash(state)
             }
             DataType::Real(i, f) => {
@@ -243,9 +243,15 @@ impl Hash for DataType {
     }
 }
 
+impl From<i128> for DataType {
+    fn from(s: i128) -> Self {
+        DataType::BigInt(s)
+    }
+}
+
 impl From<i64> for DataType {
     fn from(s: i64) -> Self {
-        DataType::BigInt(s)
+        DataType::BigInt(i128::from(s))
     }
 }
 
@@ -351,21 +357,21 @@ impl Into<String> for DataType {
     }
 }
 
-impl Into<i64> for DataType {
-    fn into(self) -> i64 {
+impl Into<i128> for DataType {
+    fn into(self) -> i128 {
         match self {
             DataType::BigInt(s) => s,
-            DataType::Int(s) => i64::from(s),
+            DataType::Int(s) => i128::from(s),
             _ => unreachable!(),
         }
     }
 }
 
-impl<'a> Into<i64> for &'a DataType {
-    fn into(self) -> i64 {
+impl<'a> Into<i128> for &'a DataType {
+    fn into(self) -> i128 {
         match *self {
             DataType::BigInt(s) => s,
-            DataType::Int(s) => i64::from(s),
+            DataType::Int(s) => i128::from(s),
             _ => unreachable!(),
         }
     }
@@ -423,8 +429,8 @@ macro_rules! arithmetic_operation (
             (&DataType::None, _) | (_, &DataType::None) => DataType::None,
             (&DataType::Int(a), &DataType::Int(b)) => (a $op b).into(),
             (&DataType::BigInt(a), &DataType::BigInt(b)) => (a $op b).into(),
-            (&DataType::Int(a), &DataType::BigInt(b)) => (i64::from(a) $op b).into(),
-            (&DataType::BigInt(a), &DataType::Int(b)) => (a $op i64::from(b)).into(),
+            (&DataType::Int(a), &DataType::BigInt(b)) => (i128::from(a) $op b).into(),
+            (&DataType::BigInt(a), &DataType::Int(b)) => (a $op i128::from(b)).into(),
 
             (first @ &DataType::Int(..), second @ &DataType::Real(..)) |
             (first @ &DataType::Real(..), second @ &DataType::Int(..)) |
