@@ -215,6 +215,7 @@ pub enum Packet {
 
     /// Ask domain (nicely) to replay a particular key.
     RequestPartialReplay {
+        id: Option<PacketId>,
         tag: Tag,
         key: Vec<DataType>,
     },

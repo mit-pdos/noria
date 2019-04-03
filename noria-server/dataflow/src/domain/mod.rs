@@ -244,7 +244,8 @@ pub struct Domain {
     control_reply_tx: TcpSender<ControlReplyPacket>,
     channel_coordinator: Arc<ChannelCoordinator>,
 
-    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>)>,
+    // TODO(ygina): buffered replays may be the result of multiple previous updates
+    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<PacketId>)>,
     has_buffered_replay_requests: bool,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
@@ -308,7 +309,7 @@ impl Domain {
                 // and then get back to it after all processing has finished (at the bottom of
                 // `Self::handle()`)
                 self.delayed_for_self
-                    .push_back(box Packet::RequestPartialReplay { tag, key });
+                    .push_back(box Packet::RequestPartialReplay { id: None, tag, key });
                 found = true;
                 continue;
             }
@@ -395,6 +396,7 @@ impl Domain {
                 for trigger in options {
                     if trigger
                         .send(box Packet::RequestPartialReplay {
+                            id: None, // TODO(ygina): might need id
                             tag,
                             key: key.clone(), // sad to clone here
                         })
@@ -420,7 +422,7 @@ impl Domain {
             "concurrent" => self.concurrent_replays,
             );
             if options[shard]
-                .send(box Packet::RequestPartialReplay { tag, key })
+                .send(box Packet::RequestPartialReplay { id: None, tag, key })
                 .is_err()
             {
                 // we're shutting down -- it's fine.
@@ -1029,14 +1031,14 @@ impl Domain {
                             self.find_tags_and_replay(key, &cols[..], node);
                         }
                     }
-                    Packet::RequestPartialReplay { tag, key } => {
+                    Packet::RequestPartialReplay { id, tag, key } => {
                         trace!(
                             self.log,
                            "got replay request";
                            "tag" => tag.id(),
                            "key" => format!("{:?}", key)
                         );
-                        self.seed_replay(tag, &key[..], sends, executor);
+                        self.seed_replay(id, tag, &key[..], sends, executor);
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
@@ -1428,11 +1430,11 @@ impl Domain {
                 let has = &mut self.has_buffered_replay_requests;
                 self.buffered_replay_requests
                     .iter_mut()
-                    .filter_map(|(&tag, &mut (first, ref mut keys))| {
+                    .filter_map(|(&tag, &mut (first, ref mut keys, ref id))| {
                         if !keys.is_empty() && now.duration_since(first) > to {
                             use std::mem;
                             let l = keys.len();
-                            Some((tag, mem::replace(keys, HashSet::with_capacity(l))))
+                            Some((tag, mem::replace(keys, HashSet::with_capacity(l)), id.clone()))
                         } else {
                             if !keys.is_empty() {
                                 *has = true;
@@ -1442,8 +1444,8 @@ impl Domain {
                     })
                     .collect()
             };
-            for (tag, keys) in elapsed_replays {
-                self.seed_all(tag, keys, sends, executor);
+            for (tag, keys, id) in elapsed_replays {
+                self.seed_all(id, tag, keys, sends, executor);
             }
         }
 
@@ -1481,6 +1483,7 @@ impl Domain {
 
     fn seed_all(
         &mut self,
+        id: Option<PacketId>,
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
         sends: &mut EnqueuedSends,
@@ -1511,7 +1514,7 @@ impl Domain {
 
                 let m = if !keys.is_empty() {
                     let p = box Packet::ReplayPiece {
-                        id: None,
+                        id,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1571,6 +1574,7 @@ impl Domain {
 
     fn seed_replay(
         &mut self,
+        id: Option<PacketId>,
         tag: Tag,
         key: &[DataType],
         sends: &mut EnqueuedSends,
@@ -1587,6 +1591,8 @@ impl Domain {
             let key = Vec::from(key);
             match self.buffered_replay_requests.entry(tag) {
                 Entry::Occupied(mut o) => {
+                    // TODO(ygina): insert additional update rather than reassigning
+                    o.get_mut().2 = id;
                     if o.get().1.is_empty() {
                         o.get_mut().0 = time::Instant::now();
                     }
@@ -1596,7 +1602,7 @@ impl Domain {
                 Entry::Vacant(v) => {
                     let mut ks = HashSet::new();
                     ks.insert(key);
-                    v.insert((time::Instant::now(), ks));
+                    v.insert((time::Instant::now(), ks, id));
                     self.has_buffered_replay_requests = true;
                 }
             }
@@ -1631,7 +1637,7 @@ impl Domain {
                     let data = Records::from_iter(rs.into_iter().map(|r| self.seed_row(source, r)));
 
                     let m = box Packet::ReplayPiece {
-                        id: None,
+                        id,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1681,6 +1687,7 @@ impl Domain {
             return;
         }
 
+        let id = m.id().clone();
         let mut finished = None;
         let mut need_replay = Vec::new();
         let mut finished_partial = 0;
@@ -2195,6 +2202,7 @@ impl Domain {
                     for (tag, replay_key) in replay {
                         self.delayed_for_self
                             .push_back(box Packet::RequestPartialReplay {
+                                id: id.clone(),
                                 tag,
                                 key: replay_key,
                             });
@@ -2599,8 +2607,8 @@ impl Domain {
                     let now = time::Instant::now();
                     self.buffered_replay_requests
                         .iter()
-                        .filter(|&(_, &(_, ref keys))| !keys.is_empty())
-                        .map(|(_, &(first, _))| {
+                        .filter(|&(_, &(_, ref keys, _))| !keys.is_empty())
+                        .map(|(_, &(first, _, _))| {
                             self.replay_batch_timeout
                                 .checked_sub(now.duration_since(first))
                                 .unwrap_or(time::Duration::from_millis(0))
