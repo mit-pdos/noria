@@ -8,8 +8,8 @@ mod test_populate;
 use noria::{ControllerBuilder, DataType, LocalAuthority, LocalControllerHandle, ReuseConfigType};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
 use std::io::Read;
+use std::io::Write;
 use std::{thread, time};
 
 pub struct Backend {
@@ -57,7 +57,12 @@ impl Backend {
         self.g.set_security_config(config);
     }
 
-    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
+    fn migrate(
+        &mut self,
+        schema_file: &str,
+        query_file: Option<&str>,
+        ext: bool,
+    ) -> Result<(), String> {
         use std::fs::File;
         use std::io::Read;
 
@@ -81,7 +86,11 @@ impl Backend {
         }
 
         // Install recipe
-        self.g.install_recipe(&rs).unwrap();
+        if ext {
+            self.g.extend_recipe(&rs).unwrap();
+        } else {
+            self.g.install_recipe(&rs).unwrap();
+        }
 
         Ok(())
     }
@@ -165,16 +174,16 @@ fn main() {
     let user = args.value_of("user").unwrap();
 
     println!("user: {}", user);
-    
+
     let mut backend = Backend::new(partial, shard, reuse);
-    backend.migrate(sloc, None).unwrap();
+    backend.migrate(sloc, None, false).unwrap();
     println!("first mig");
     backend.set_security_config(ploc);
     println!("set sec config");
-    backend.migrate(sloc, Some(qloc)).unwrap();
+    backend.migrate(sloc, Some(qloc), false).unwrap();
     println!("second mig");
     thread::sleep(time::Duration::from_millis(2000));
-    
+
     if args.is_present("populate") {
         println!("here");
         test_populate::create_users(&mut backend);
@@ -184,16 +193,47 @@ fn main() {
 
     thread::sleep(time::Duration::from_millis(2000));
     backend.login(make_user(user)).is_ok();
+    thread::sleep(time::Duration::from_millis(2000));
+    println!("user logged in");
 
-    println!("user");
-    
     if args.is_present("populate") {
         test_populate::create_papers(&mut backend);
-        test_populate::dump_reviews(&mut backend, user);
-//        test_populate::dump_papers(&mut backend, user);
+        //        test_populate::dump_reviews(&mut backend, user);
+        test_populate::dump_papers(&mut backend, user);
     }
 
-//    test_populate::dump_all_papers(&mut backend);
+    //    test_populate::dump_all_papers(&mut backend);
+
+    // Check author membership view
+    let mut getter = backend.g.view("authors").unwrap();
+    let mut query_results = Vec::new();
+    query_results.push(getter.lookup(&["2".into()], true).unwrap());
+    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
+    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
+    query_results.push(getter.lookup(&[0.into()], true).unwrap());
+    println!("author membership view: {:?}", query_results);
+
+    // Check reviewer membership view
+    let mut getter = backend.g.view("reviewers").unwrap();
+    let mut query_results = Vec::new();
+    query_results.push(getter.lookup(&["4".into()], true).unwrap());
+    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
+    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
+    query_results.push(getter.lookup(&[0.into()], true).unwrap());
+    println!("reviewer membership view: {:?}", query_results);
+
+    // Check chair membership view
+    let mut getter = backend.g.view("chairs").unwrap();
+    let mut query_results = Vec::new();
+    query_results.push(getter.lookup(&["3".into()], true).unwrap());
+    query_results.push(getter.lookup(&["kohler".into()], true).unwrap());
+    query_results.push(getter.lookup(&[0.into()], true).unwrap());
+    println!("chair membership view: {:?}", query_results);
+
+    backend
+        .migrate(sloc, Some("jeeves_gpcontext_queries.sql"), true)
+        .unwrap();
+    println!("third mig");
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
@@ -201,26 +241,27 @@ fn main() {
         assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
     }
 
-/*    
-    // Check author membership view
-    let mut getter = backend.g.view("authors").unwrap();
+    /*
+    // Check AuthorContext
+    let mut getter = backend.g.view("AuthorContext").unwrap();
     let mut query_results = Vec::new();
-    query_results.push(getter.lookup(&["2".into()], true).unwrap());
-    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
-    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
-    println!("author membership view: {:?}", query_results);
+    // Look up by id (corresponds to Paper.id)
+    for i in 0..6 {
+        query_results.push(getter.lookup(&[i.into()], true).unwrap());
+    }
+    println!("GroupContext_authors_1: {:?}", query_results);
+     */
 
-    // Check reviewer membership view
-    let mut getter = backend.g.view("reviewers").unwrap();
+    let mut getter = backend.g.view("ChairContext").unwrap();
     let mut query_results = Vec::new();
-    query_results.push(getter.lookup(&["2".into()], true).unwrap());
-    query_results.push(getter.lookup(&["lara".into()], true).unwrap());
-    query_results.push(getter.lookup(&["malte".into()], true).unwrap());
-    println!("reviewer membership view: {:?}", query_results);
+    query_results.push(getter.lookup(&["chair".into()], true).unwrap());
+    query_results.push(getter.lookup(&[0.into()], true).unwrap());
+    query_results.push(getter.lookup(&["3".into()], true).unwrap());
+    println!("GroupContext_chairs_chair: {:?}", query_results);
 
-*/
     println!("{}", backend.g.graphviz().unwrap());
-    
+    println!("Reprinting user's papers"); // In case changes didn't have time to propagate
+    test_populate::dump_papers(&mut backend, user);
     println!("DONE!");
     // sleep "forever"
     thread::sleep(time::Duration::from_millis(200000000));
