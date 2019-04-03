@@ -23,7 +23,8 @@ pub struct Populate {
     students: HashMap<DataType, Vec<DataType>>,
     tas: HashMap<DataType, Vec<DataType>>,
     pub classes: HashMap<DataType, i32>, // class ID to num posts in class mapping
-    pub authors: HashMap<DataType, i32>
+    pub authors: HashMap<DataType, i32>,
+    pub largest: i32,
 }
 
 impl Populate {
@@ -38,6 +39,7 @@ impl Populate {
             tas: HashMap::new(),
             classes: HashMap::new(),
             authors: HashMap::new(),
+            largest: 0,
         }
     }
 
@@ -114,7 +116,6 @@ impl Populate {
     }
 
     pub fn get_users(&mut self) -> Vec<Vec<DataType>> {
-        // println!("Populating users...");
         let mut records = Vec::new();
         for i in 1..self.nusers + 1 {
             let uid = i.into();
@@ -128,7 +129,7 @@ impl Populate {
         println!("Populating posts... with {:?}", self.nposts);
         let mut records = Vec::new();
         for i in 0..self.nposts {
-            let pid = i.into();
+            let pid = self.largest.into();
             let author = self.uid();
             match self.authors.get_mut(&author.clone()) {
                 Some(count) => *count += 1,
@@ -142,12 +143,42 @@ impl Populate {
             let content = format!("post #{}", i).into();
             let private = self.private();
             let anon = 1.into();
-            // println!("post by auth: {:?}", author);
             records.push(vec![pid, cid, author, content, private, anon]);
+            self.largest += 1;
         }
-        // // println!("finished populating...");
 
         records
+    }
+
+    pub fn get_user_posts(&mut self, uid: i32, cid: DataType, nposts: i32) -> (Vec<Vec<DataType>>, i32, i32) {
+        println!("Populating posts... with {:?}", nposts);
+        let mut num_priv = 0;
+        let mut num_pub = 0;
+        let mut records = Vec::new();
+        for i in 0..nposts {
+            let pid = self.largest.into();
+            let author: DataType = uid.into();
+            match self.authors.get_mut(&author.clone()) {
+                Some(count) => *count += 1,
+                None => {self.authors.insert(author.clone(), 1);},
+            }
+            match self.classes.get_mut(&cid.clone()) {
+                Some(count) => *count += 1,
+                None => println!("cid {:?} nonexistent?!", cid),
+            }
+            let content = format!("post #{}", i).into();
+            let private = self.private();
+            if private == 0.into() {
+                num_pub += 1;
+            } else {
+                num_priv += 1;
+            }
+            let anon = 1.into();
+            records.push(vec![pid, cid.clone(), author.clone(), content, private, anon]);
+            self.largest += 1;
+        }
+        println!("populated for user {:?}. priv: {:?}, pub: {:?}", uid, num_priv, num_pub);
+        (records, num_priv, num_pub)
     }
 
     pub fn classes_for_student(&mut self, uid: usize) -> Vec<DataType> {

@@ -239,6 +239,7 @@ fn main() {
     //let partial = false;
     let query_type = "post_count";
     // let query_type = "posts";
+    let correctness_test = true;
 
     assert!(
         nlogged <= nusers,
@@ -278,253 +279,312 @@ fn main() {
     backend.populate("User", users);
     backend.populate("Class", classes);
 
-    if populate == PopulateType::Before {
-        backend.populate("Post", posts.clone());
-        println!("Waiting for posts to propagate...");
-        thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
-    }
-
-    println!("Finished writing! Sleeping for 2 seconds...");
-    thread::sleep(time::Duration::from_millis(2000));
-
-    // if partial, read 25% of the keys
-    if partial && query_type == "posts" {
-        let leaf = format!("posts");
-        let mut getter = backend.g.view(&leaf).unwrap();
-        for author in 0..nusers / 4 {
-            getter.lookup(&[author.into()], false).unwrap();
+    if !correctness_test {
+        if populate == PopulateType::Before {
+            backend.populate("Post", posts.clone());
+            println!("Waiting for posts to propagate...");
+            thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
         }
-    }
 
-    if partial && query_type == "post_count" {
-        let leaf = format!("post_count");
-        let mut getter = backend.g.view(&leaf).unwrap();
-        for author in 0..nusers / 4 {
-            getter.lookup(&[author.into()], false).unwrap();
-        }
-    }
-
-    if gloc.is_some() {
-        let graph_fname = gloc.unwrap();
-        let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-    }
-
-    // Login a user
-    println!("Login users...");
-    for i in 0..nlogged {
-        let start = time::Instant::now();
-        backend.login(make_user(i)).is_ok();
-        let dur = dur_to_fsec!(start.elapsed());
-        println!("Migration {} took {:.2}s!", i, dur,);
+        println!("Finished writing! Sleeping for 2 seconds...");
+        thread::sleep(time::Duration::from_millis(2000));
 
         // if partial, read 25% of the keys
         if partial && query_type == "posts" {
-            let leaf = format!("posts_u{}", i);
+            let leaf = format!("posts");
             let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
             }
         }
+
         if partial && query_type == "post_count" {
-            let leaf = format!("post_count_u{}", i);
+            let leaf = format!("post_count");
             let mut getter = backend.g.view(&leaf).unwrap();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
             }
         }
 
-        if iloc.is_some() && i % 50 == 0 {
-            use std::fs;
-            let fname = format!("{}-{}", iloc.unwrap(), i);
-            fs::copy("/proc/self/status", fname).unwrap();
+        if gloc.is_some() {
+            let graph_fname = gloc.unwrap();
+            let mut gf = File::create(graph_fname).unwrap();
+            assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
         }
-    }
 
-    if populate == PopulateType::After {
-        backend.populate("Post", posts);
-    }
+        // Login a user
+        println!("Login users...");
+        for i in 0..nlogged {
+            let start = time::Instant::now();
+            backend.login(make_user(i)).is_ok();
+            let dur = dur_to_fsec!(start.elapsed());
+            println!("Migration {} took {:.2}s!", i, dur,);
 
-    let mut dur = time::Duration::from_millis(0);
+            // if partial, read 25% of the keys
+            if partial && query_type == "posts" {
+                let leaf = format!("posts_u{}", i);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                for author in 0..nusers / 4 {
+                    getter.lookup(&[author.into()], false).unwrap();
+                }
+            }
+            if partial && query_type == "post_count" {
+                let leaf = format!("post_count_u{}", i);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                for author in 0..nusers / 4 {
+                    getter.lookup(&[author.into()], false).unwrap();
+                }
+            }
 
-    // --- Posts Query ---
-    if query_type == "posts" {
-        println!("post query");
-        let num_at_once = nclasses as usize;
-        let mut enrollment_info = p.get_enrollment();
-        for uid in 0..nlogged {
-            match enrollment_info.get(&uid.into()) {
-                Some(classes) => {
-                    // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
-                    let mut class_vec = Vec::new();
-                    for class in classes {
-                        class_vec.push([class.clone()].to_vec());
-                    }
-                    let leaf = format!("posts_u{}", uid);
-                    let mut getter = backend.g.view(&leaf).unwrap();
-                    let start = time::Instant::now();
-                    let res = getter.multi_lookup(class_vec.clone(), true);
-                    // println!("res: {:?}", res);
-                    dur += start.elapsed();
-
-                },
-                None => println!("why isn't user {:?} enrolled", uid),
+            if iloc.is_some() && i % 50 == 0 {
+                use std::fs;
+                let fname = format!("{}-{}", iloc.unwrap(), i);
+                fs::copy("/proc/self/status", fname).unwrap();
             }
         }
-    }
 
-    // if query_type == "post_count" {
-    //     println!("post count query");
-    //     let mut authors = p.authors();
-    //     for (author, count) in &authors {
-    //         println!("author: {:?}, count: {:?}", author, count);
-    //     }
-    //
-    //     let mut lookup_vec : Vec<Vec<DataType>>= Vec::new();
-    //     for inner in 0..nlogged {
-    //         lookup_vec.push([inner.clone().into()].to_vec());
-    //     }
-    //     for uid in 0..nlogged {
-    //         let leaf = format!("post_count_u{}", uid);
-    //         let mut getter = backend.g.view(&leaf).unwrap();
-    //         let start = time::Instant::now();
-    //         let res = getter.multi_lookup(lookup_vec.clone(), true);
-    //         dur += start.elapsed();
-    //         // println!("res: {:?}", res);
-    //     }
-    // }
-
-    // cid version of post_count query
-    if query_type == "post_count" {
-        let mut counts = p.classes();
-        for (class, count) in &counts {
-            println!("class: {:?}, count: {:?}", class, count);
+        if populate == PopulateType::After {
+            backend.populate("Post", posts);
         }
-        let num_at_once = nclasses as usize;
+
+        let mut dur = time::Duration::from_millis(0);
+
+        // --- Posts Query ---
+        if query_type == "posts" {
+            println!("post query");
+            let num_at_once = nclasses as usize;
+            let mut enrollment_info = p.get_enrollment();
+            for uid in 0..nlogged {
+                match enrollment_info.get(&uid.into()) {
+                    Some(classes) => {
+                        // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                        let mut class_vec = Vec::new();
+                        for class in classes {
+                            class_vec.push([class.clone()].to_vec());
+                        }
+                        let leaf = format!("posts_u{}", uid);
+                        let mut getter = backend.g.view(&leaf).unwrap();
+                        let start = time::Instant::now();
+                        let res = getter.multi_lookup(class_vec.clone(), true);
+                        // println!("res: {:?}", res);
+                        dur += start.elapsed();
+
+                    },
+                    None => println!("why isn't user {:?} enrolled", uid),
+                }
+            }
+        }
+
+        // cid version of post_count query
+        if query_type == "post_count" {
+            let mut counts = p.classes();
+            for (class, count) in &counts {
+                println!("class: {:?}, count: {:?}", class, count);
+            }
+            let mut enrollment_info = p.get_enrollment();
+            for uid in 0..nlogged {
+                match enrollment_info.get(&uid.into()) {
+                    Some(classes) => {
+                        // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                        let mut class_vec = Vec::new();
+                        for class in classes {
+                            class_vec.push([class.clone()].to_vec());
+                        }
+                        let leaf = format!("post_count_u{}", uid);
+
+                        let mut getter = backend.g.view(&leaf).unwrap();
+                        // println!("looking up vec: {:?}", class_vec);
+                        let start = time::Instant::now();
+                        let res = getter.multi_lookup(class_vec.clone(), true);
+                        println!("res: {:?}", res);
+                        dur += start.elapsed();
+
+                    },
+                    None => println!("why isn't user {:?} enrolled", uid),
+                }
+            }
+        }
+
+        let dur = dur_to_fsec!(dur);
+
+        let num_at_once : i32 = nclasses;
+        println!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            num_at_once * nlogged,
+            dur,
+            (num_at_once * nlogged) as f64 / dur,
+        );
+
+        println!("Done with benchmark.");
+
+        if gloc.is_some() {
+            let graph_fname = gloc.unwrap();
+            let mut gf = File::create(graph_fname).unwrap();
+            assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
+        }
+    } else {
+        // for each class a student is part of, write some number of public + private posts.
+        // assert that each user has consistent post_counts for public posts for all classes.
         let mut enrollment_info = p.get_enrollment();
+        let mut class_to_pub_posts = HashMap::new();
+        let mut user_class_to_priv_posts = HashMap::new();
+
+        // populate
         for uid in 0..nlogged {
             match enrollment_info.get(&uid.into()) {
                 Some(classes) => {
-                    // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                    for class in classes {
+                        let (posts, npriv, npub) = p.get_user_posts(uid, class.clone(), 2);
+                        backend.populate("Post", posts.clone());
+                        let mut prev_count = 0;
+                        let mut insert = false;
+                        match class_to_pub_posts.get_mut(&class.clone()) {
+                            Some(count) => {
+                                *count += npub;
+                            },
+                            None => { insert = true; }
+                        }
+                        println!("updating class: {:?} posts: {:?}", class, npub);
+                        if insert {
+                            class_to_pub_posts.insert(class.clone(), npub);
+                        }
+                        user_class_to_priv_posts.insert((uid, class), npriv);
+                    }
+                },
+                None => println!("why isn't user {:?} enrolled in any classes?", uid),
+            }
+        }
+
+        // log in users
+        for i in 0..nlogged {
+            let start = time::Instant::now();
+            backend.login(make_user(i)).is_ok();
+            let dur = dur_to_fsec!(start.elapsed());
+            println!("Migration {} took {:.2}s!", i, dur,);
+
+            // if partial, read 25% of the keys
+            if partial && query_type == "posts" {
+                let leaf = format!("posts_u{}", i);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                for author in 0..nusers / 4 {
+                    getter.lookup(&[author.into()], false).unwrap();
+                }
+            }
+            if partial && query_type == "post_count" {
+                let leaf = format!("post_count_u{}", i);
+                let mut getter = backend.g.view(&leaf).unwrap();
+                for author in 0..nusers / 4 {
+                    getter.lookup(&[author.into()], false).unwrap();
+                }
+            }
+        }
+
+        println!("class to pub posts: {:?}", class_to_pub_posts);
+
+        // test post_count query
+        for uid in 0..nlogged {
+            match enrollment_info.get(&uid.into()) {
+                Some(classes) => {
                     let mut class_vec = Vec::new();
+                    let mut expected_count = Vec::new();
                     for class in classes {
                         class_vec.push([class.clone()].to_vec());
+                        let mut expected_num_posts = *class_to_pub_posts.get(&class).unwrap();
+                        expected_num_posts += user_class_to_priv_posts.get(&(uid, class)).unwrap();
+                        expected_count.push(expected_num_posts);
                     }
+
                     let leaf = format!("post_count_u{}", uid);
 
                     let mut getter = backend.g.view(&leaf).unwrap();
-                    // println!("looking up vec: {:?}", class_vec);
+                    println!("looking up vec: {:?}", class_vec);
                     let start = time::Instant::now();
                     let res = getter.multi_lookup(class_vec.clone(), true);
-                    println!("res: {:?}", res);
-                    dur += start.elapsed();
-
+                    println!("results: {:?}", res);
+                    println!("expected counts: {:?}", expected_count);
                 },
-                None => println!("why isn't user {:?} enrolled", uid),
+                None => println!("why isn't user {:?} enrolled in any classes?", uid),
             }
         }
     }
 
-    // if !partial && query_type == "post_count" {
-    //     let mut authors = p.authors();
-    //     for (author, count) in &authors {
-    //         println!("author: {:?}, count: {:?}", author, count);
-    //     }
-    //
-    //     let num_at_once = nclasses as usize;
-    //     let mut enrollment_info = p.get_enrollment();
-    //
-    //     let mut class_to_students: HashMap<DataType, Vec<DataType>> = HashMap::new();
-    //     for (student, classes) in &enrollment_info {
-    //         for class in classes {
-    //             match class_to_students.get_mut(&class) {
-    //                 Some(student_list) => {
-    //                     student_list.push(student.clone());
-    //                 },
-    //                 None => {
-    //                     let mut stud_list = Vec::new();
-    //                     stud_list.push(student.clone());
-    //                     class_to_students.insert(class.clone(), stud_list);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //
-    //     for uid in 0..nlogged {
-    //         match enrollment_info.get(&uid.into()) {
-    //             Some(classes) => {
-    //                 println!("user {:?} is enrolled in classes: {:?}", uid, classes);
-    //                 let mut query_vec = Vec::new();
-    //                 for class_id in classes {
-    //                     match class_to_students.get(&class_id) {
-    //                         Some(list) => {
-    //                             for student in list {
-    //                                 query_vec.push([student.clone()].to_vec());
-    //                             }
-    //                         },
-    //                         None => {},
-    //                     }
-    //                 }
-    //                 let leaf = format!("post_count_u{}", uid);
-    //                 let mut getter = backend.g.view(&leaf).unwrap();
-    //                 let start = time::Instant::now();
-    //                 let res = getter.multi_lookup(query_vec.clone(), true);
-    //                 println!("res: {:?}", res);
-    //                 dur += start.elapsed();
-    //
-    //             },
-    //             None => println!("why isn't user {:?} enrolled", uid),
-    //         }
-    //     }
-    // }
-
-    let dur = dur_to_fsec!(dur);
-
-    let num_at_once : i32 = nclasses;
-    println!(
-        "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-        num_at_once * nlogged,
-        dur,
-        (num_at_once * nlogged) as f64 / dur,
-    );
-
-    println!("Done with benchmark.");
-
-    if gloc.is_some() {
-        let graph_fname = gloc.unwrap();
-        let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-    }
 }
 
 
-// #[test]
-// fn piazza_works() {
-//     let a = vec![1.into(), "a".into()];
-//     let b = vec![1.into(), "b".into()];
-//     let a_rec = vec![Record::Positive(a.clone())];
-//     let b_rec = vec![Record::Positive(b.clone())];
+// author version of post count query
+// if query_type == "post_count" {
+//     println!("post count query");
+//     let mut authors = p.authors();
+//     for (author, count) in &authors {
+//         println!("author: {:?}, count: {:?}", author, count);
+//     }
 //
-//     let (mut r1, mut w1) = new(true, 2, &[0], 0);
-//     let (mut r2, mut w2) = w1.clone_new_user(r1.clone());
-//     let (mut r3, mut w3) = w1.clone_new_user(r1.clone());
+//     let mut lookup_vec : Vec<Vec<DataType>>= Vec::new();
+//     for inner in 0..nlogged {
+//         lookup_vec.push([inner.clone().into()].to_vec());
+//     }
+//     for uid in 0..nlogged {
+//         let leaf = format!("post_count_u{}", uid);
+//         let mut getter = backend.g.view(&leaf).unwrap();
+//         let start = time::Instant::now();
+//         let res = getter.multi_lookup(lookup_vec.clone(), true);
+//         dur += start.elapsed();
+//         // println!("res: {:?}", res);
+//     }
+// }
+
+
+
+// if !partial && query_type == "post_count" {
+//     let mut authors = p.authors();
+//     for (author, count) in &authors {
+//         println!("author: {:?}, count: {:?}", author, count);
+//     }
 //
-//     w1.add(a_rec.clone());
-//     w2.add(a_rec.clone());
-//     w2.add(b_rec.clone());
-//     w3.add(a_rec.clone());
+//     let num_at_once = nclasses as usize;
+//     let mut enrollment_info = p.get_enrollment();
+//
+//     let mut class_to_students: HashMap<DataType, Vec<DataType>> = HashMap::new();
+//     for (student, classes) in &enrollment_info {
+//         for class in classes {
+//             match class_to_students.get_mut(&class) {
+//                 Some(student_list) => {
+//                     student_list.push(student.clone());
+//                 },
+//                 None => {
+//                     let mut stud_list = Vec::new();
+//                     stud_list.push(student.clone());
+//                     class_to_students.insert(class.clone(), stud_list);
+//                 }
+//             }
+//         }
+//     }
 //
 //
-//     r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-//     r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-//     r3.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-//     r3.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-//     r2.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+//     for uid in 0..nlogged {
+//         match enrollment_info.get(&uid.into()) {
+//             Some(classes) => {
+//                 println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+//                 let mut query_vec = Vec::new();
+//                 for class_id in classes {
+//                     match class_to_students.get(&class_id) {
+//                         Some(list) => {
+//                             for student in list {
+//                                 query_vec.push([student.clone()].to_vec());
+//                             }
+//                         },
+//                         None => {},
+//                     }
+//                 }
+//                 let leaf = format!("post_count_u{}", uid);
+//                 let mut getter = backend.g.view(&leaf).unwrap();
+//                 let start = time::Instant::now();
+//                 let res = getter.multi_lookup(query_vec.clone(), true);
+//                 println!("res: {:?}", res);
+//                 dur += start.elapsed();
 //
-//     // assert_eq!(r3.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-//     // assert_eq!(r2.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
-//     // assert_eq!(r2.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(1));
-//     // assert_eq!(r3.try_find_and(&b[0..1], |rs| rs.len()).unwrap().0, Some(0));
-//
+//             },
+//             None => println!("why isn't user {:?} enrolled", uid),
+//         }
+//     }
 // }
