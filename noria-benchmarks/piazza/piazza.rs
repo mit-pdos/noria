@@ -215,6 +215,12 @@ fn main() {
                 .default_value("0.0")
                 .help("Percentage of private posts"),
         )
+        .arg(
+            Arg::with_name("classes_per_user")
+                .short("m")
+                .default_value("10")
+                .help("Number of classes each student is in"),
+        )
         .get_matches();
 
     println!("Starting benchmark...");
@@ -234,12 +240,12 @@ fn main() {
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
+    let classes_per_student = value_t_or_exit!(args, "classes_per_user", i32);
 
-    let partial = true;
     //let partial = false;
     let query_type = "post_count";
     // let query_type = "posts";
-    let correctness_test = true;
+    let correctness_test = false;
 
     assert!(
         nlogged <= nusers,
@@ -263,8 +269,7 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    let classes_per_student = 10;
-    // let classes_per_student = nclasses;
+
     p.enroll_students(classes_per_student);
 
     let classes = p.get_classes();
@@ -396,7 +401,7 @@ fn main() {
                         // println!("looking up vec: {:?}", class_vec);
                         let start = time::Instant::now();
                         let res = getter.multi_lookup(class_vec.clone(), true);
-                        println!("res: {:?}", res);
+                    //    println!("res: {:?}", res);
                         dur += start.elapsed();
 
                     },
