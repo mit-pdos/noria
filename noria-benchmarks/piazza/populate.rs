@@ -144,10 +144,6 @@ impl Populate {
             let private = self.private();
             let anon = 1.into();
             records.push(vec![pid, cid, author, content, private, anon]);
-<<<<<<< HEAD
-=======
-            self.largest += 1;
->>>>>>> mdb_alana_test
         }
 
         records

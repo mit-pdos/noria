@@ -215,6 +215,12 @@ fn main() {
                 .default_value("0.0")
                 .help("Percentage of private posts"),
         )
+        .arg(
+            Arg::with_name("classes_per_user")
+                .short("m")
+                .default_value("10")
+                .help("Number of classes each student is in"),
+        )
         .get_matches();
 
     println!("Starting benchmark...");
@@ -234,12 +240,12 @@ fn main() {
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
+    let classes_per_student = value_t_or_exit!(args, "classes_per_user", i32);
 
-    let partial = true;
     //let partial = false;
     let query_type = "post_count";
     // let query_type = "posts";
-    let correctness_test = true;
+    let correctness_test = false;
 
     assert!(
         nlogged <= nusers,

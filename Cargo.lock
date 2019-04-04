@@ -2216,7 +2216,6 @@ version = "0.1.15"
 source = "git+https://github.com/amarzoev/srmap#344f49fb03055099f061e5acdb08910ad3746a64"
 dependencies = [
  "arccstr 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "evmap 4.2.2 (git+https://github.com/jonhoo/rust-evmap.git)",
  "nom-sql 0.0.3 (git+https://github.com/ms705/nom-sql.git?rev=791c0f5117b6e02c1e3f146cc4a2689ef7da7a54)",
