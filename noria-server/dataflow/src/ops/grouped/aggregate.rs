@@ -80,7 +80,9 @@ impl GroupedOperation for Aggregator {
             Aggregation::SUM => {
                 let v = match r[self.over] {
                     DataType::Int(n) => i128::from(n),
-                    DataType::BigInt(n) => n,
+                    DataType::UnsignedInt(n) => i128::from(n),
+                    DataType::BigInt(n) => i128::from(n),
+                    DataType::UnsignedBigInt(n) => i128::from(n),
                     DataType::None => 0,
                     ref x => unreachable!("tried to aggregate over {:?} on {:?}", x, r),
                 };
@@ -100,7 +102,9 @@ impl GroupedOperation for Aggregator {
     ) -> DataType {
         let n = match current {
             Some(&DataType::Int(n)) => i128::from(n),
-            Some(&DataType::BigInt(n)) => n,
+            Some(&DataType::UnsignedInt(n)) => i128::from(n),
+            Some(&DataType::BigInt(n)) => i128::from(n),
+            Some(&DataType::UnsignedBigInt(n)) => i128::from(n),
             None => 0,
             _ => unreachable!(),
         };

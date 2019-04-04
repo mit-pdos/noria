@@ -80,7 +80,9 @@ impl GroupedOperation for ExtremumOperator {
     fn to_diff(&self, r: &[DataType], pos: bool) -> Self::Diff {
         let v = match r[self.over] {
             DataType::Int(n) => i128::from(n),
-            DataType::BigInt(n) => n,
+            DataType::UnsignedInt(n) => i128::from(n),
+            DataType::BigInt(n) => i128::from(n),
+            DataType::UnsignedBigInt(n) => i128::from(n),
             _ => {
                 // the column we're aggregating over is non-numerical (or rather, this value is).
                 // if you've removed a column, chances are the  default value has the wrong type.
@@ -113,7 +115,9 @@ impl GroupedOperation for ExtremumOperator {
         if let Some(data) = current {
             match *data {
                 DataType::Int(n) => extreme_values.push(i128::from(n)),
-                DataType::BigInt(n) => extreme_values.push(n),
+                DataType::UnsignedInt(n) => extreme_values.push(i128::from(n)),
+                DataType::BigInt(n) => extreme_values.push(i128::from(n)),
+                DataType::UnsignedBigInt(n) => extreme_values.push(i128::from(n)),
                 _ => unreachable!(),
             }
         };
@@ -122,7 +126,9 @@ impl GroupedOperation for ExtremumOperator {
             if let Some(data) = current {
                 let n = match *data {
                     DataType::Int(n) => i128::from(n),
-                    DataType::BigInt(n) => n,
+                    DataType::UnsignedInt(n) => i128::from(n),
+                    DataType::BigInt(n) => i128::from(n),
+                    DataType::UnsignedBigInt(n) => i128::from(n),
                     _ => unreachable!(),
                 };
                 match self.op {
