@@ -169,15 +169,16 @@ impl Reader {
     }
 
     pub fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool, id: Option<usize>) {
-        println!("reader node process. for node: {:?}", self.for_node);
+        // println!("reader node process. for node: {:?}", self.for_node);
         if let Some(ref mut state) = self.writer {
-            println!("reader node process. writer uid: {:?}", state.uid);
+            // println!("reader node process. writer uid: {:?}", state.uid);
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
             if m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
+                        println!("processing row: {:?}", row);
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // row would miss in partial state.
@@ -201,6 +202,8 @@ impl Reader {
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
+                        // println!("processing row: {:?}", row);
+
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // filling a hole with replay -- ok
@@ -222,15 +225,11 @@ impl Reader {
                 });
             }
 
-            println!("ID FOR STATE ADDED: {:?}", id);
             if self.streamers.is_empty() {
-                println!("state add");
                 let data = m.take_data();
-                println!("data: {:?}", data);
-                // println!("reader data: {:?}", data);
+                // println!("adding state: {:?}", data);
                 state.add(data, id);
             } else {
-                println!("state add 2");
                 state.add(m.data().iter().cloned(), id);
             }
 
@@ -238,6 +237,7 @@ impl Reader {
                 // TODO: avoid doing the pointer swap if we didn't modify anything (inc. ts)
                 state.swap();
             }
+            //state.swap();
         }
 
         // TODO: don't send replays to streams?

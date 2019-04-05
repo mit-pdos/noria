@@ -14,6 +14,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::SocketAddr;
 use std::time;
+use nom_sql::SqlQuery;
+
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReplayPathSegment {
@@ -147,6 +149,11 @@ pub enum Packet {
         node: LocalNodeIndex,
         field: String,
         default: DataType,
+    },
+
+    SetWritePolicy {
+        node: LocalNodeIndex,
+        predicate: SqlQuery,
     },
 
     /// Drops an existing column from a `Base` node.

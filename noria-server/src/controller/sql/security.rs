@@ -105,7 +105,7 @@ impl Multiverse for SqlIncorporator {
         // e.g. if they reference UserContext.
         let mut row_policies_qg: HashMap<String, Vec<QueryGraph>> = HashMap::new();
         for policy in universe_policies {
-            if !policy.is_row_policy() {
+            if !policy.is_row_policy() && !policy.is_write_policy() {
                 let qfp = self
                     .add_parsed_query(policy.predicate(), None, false, mig, None)
                     .unwrap();
@@ -125,26 +125,28 @@ impl Multiverse for SqlIncorporator {
                 qfps.push(qfp);
                 continue;
             }
-            trace!(self.log, "Adding row policy {:?}", policy.name());
-            let predicate = self.rewrite_query(policy.predicate(), mig)?;
-            let st = match predicate {
-                SqlQuery::Select(ref st) => st,
-                _ => unreachable!(),
-            };
+            if !policy.is_write_policy() {
+                trace!(self.log, "Adding row policy {:?}", policy.name());
+                let predicate = self.rewrite_query(policy.predicate(), mig)?;
+                let st = match predicate {
+                    SqlQuery::Select(ref st) => st,
+                    _ => unreachable!(),
+                };
 
-            // TODO(larat): currently we only support policies with a single predicate. These can be
-            // represented as a query graph. This will change for more complex policies eg. column
-            // replacement and aggregation permission.
+                // TODO(larat): currently we only support policies with a single predicate. These can be
+                // represented as a query graph. This will change for more complex policies eg. column
+                // replacement and aggregation permission.
 
-            let qg = match to_query_graph(st) {
-                Ok(qg) => qg,
-                Err(e) => panic!(e),
-            };
+                let qg = match to_query_graph(st) {
+                    Ok(qg) => qg,
+                    Err(e) => panic!(e),
+                };
 
-            let e = row_policies_qg
-                .entry(policy.table().clone())
-                .or_insert_with(Vec::new);
-            e.push(qg);
+                let e = row_policies_qg
+                    .entry(policy.table().clone())
+                    .or_insert_with(Vec::new);
+                e.push(qg);
+            }
         }
 
         universe.row_policies = row_policies_qg;

@@ -21,6 +21,7 @@
 //! Beware, Here be dragons™
 
 use crate::controller::ControllerInner;
+use crate::controller::security::SecurityConfig;
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use std::collections::{HashMap, HashSet};
@@ -56,6 +57,7 @@ pub struct Migration<'a> {
 
     /// Additional migration information provided by the client
     pub(super) context: HashMap<String, DataType>,
+    pub(super) security_config: Option<SecurityConfig>,
 }
 
 impl<'a> Migration<'a> {
@@ -110,15 +112,22 @@ impl<'a> Migration<'a> {
         S2: ToString,
         FS: IntoIterator<Item = S2>,
     {
+
         // add to the graph
         let ni = self
             .mainline
             .ingredients
             .add_node(node::Node::new(name.to_string(), fields, b));
+
         info!(self.log,
               "adding new base";
               "node" => ni.index(),
         );
+
+        // don't add user or group context tables 
+        if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
+            self.mainline.base_nodes.insert(name.to_string(), ni.clone());
+        }
 
         // keep track of the fact that it's new
         self.added.push(ni);
@@ -127,6 +136,7 @@ impl<'a> Migration<'a> {
             .ingredients
             .add_edge(self.mainline.source, ni, ());
         // and tell the caller its id
+
         ni.into()
     }
 
@@ -208,21 +218,18 @@ impl<'a> Migration<'a> {
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
         if !self.readers.contains_key(&n) {
             let r = node::special::Reader::new(n);
-
-            println!("CREATING READER NODE in migration: name: {:?}, node index: {:?}", name, n);
-            println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
+            // println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
             // make a reader
 
             let r = if let Some(name) = name.clone() {
-                println!("branch1");
+                // println!("branch1");
                 self.mainline.ingredients[n].named_mirror(r, name.clone())
             } else {
-                println!("branch2");
+                // println!("branch2");
                 self.mainline.ingredients[n].mirror(r)
             };
 
             let r = self.mainline.ingredients.add_node(r);
-            println!("new r: {:?}", r);
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
@@ -246,7 +253,7 @@ impl<'a> Migration<'a> {
             let mut matched = false;
             match general_query {
                 Some(name_) => {
-                    println!("branch3");
+                    // println!("branch3");
                     let mut add = false;
                     let mut added_set = None;
                     match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -268,7 +275,7 @@ impl<'a> Migration<'a> {
             if !matched {
                 match name {
                     Some(name_) => {
-                        println!("branch4");
+                        // println!("branch4");
                         let mut add = false;
                         let mut added_set = None;
                         match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
@@ -287,7 +294,7 @@ impl<'a> Migration<'a> {
                 }
             }
 
-            println!("name: {:?}, reader: {:?}", n, r);
+            // println!("name: {:?}, reader: {:?}", n, r);
             self.readers.insert(n, r);
         }
     }

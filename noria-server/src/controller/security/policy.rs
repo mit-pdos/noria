@@ -15,6 +15,7 @@ pub enum Policy {
     Rewrite(RewritePolicy),
     Allow(RowPolicy),
     Deny(RowPolicy),
+    Write(WritePolicy),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
@@ -34,12 +35,20 @@ pub struct RewritePolicy {
     pub rewrite_view: SqlQuery,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
+pub struct WritePolicy {
+    pub name: String,
+    pub table: String,
+    pub predicate: SqlQuery,
+}
+
 impl Policy {
     pub fn name(&self) -> String {
         match *self {
             Policy::Rewrite(ref p) => p.name.clone(),
             Policy::Allow(ref p) => p.name.clone(),
             Policy::Deny(ref p) => p.name.clone(),
+            Policy::Write(ref p) => p.name.clone(),
         }
     }
 
@@ -48,6 +57,7 @@ impl Policy {
             Policy::Rewrite(ref p) => p.table.clone(),
             Policy::Allow(ref p) => p.table.clone(),
             Policy::Deny(ref p) => p.table.clone(),
+            Policy::Write(ref p) => p.table.clone(),
         }
     }
 
@@ -56,6 +66,16 @@ impl Policy {
             Policy::Rewrite(_) => false,
             Policy::Allow(_) => true,
             Policy::Deny(_) => true,
+            Policy::Write(_) => true,
+        }
+    }
+
+    pub fn is_write_policy(&self) -> bool {
+        match *self {
+            Policy::Rewrite(_) => false,
+            Policy::Allow(_) => false,
+            Policy::Deny(_) => false,
+            Policy::Write(_) => true,
         }
     }
 
@@ -64,6 +84,7 @@ impl Policy {
             Policy::Rewrite(ref p) => p.rewrite_view.clone(),
             Policy::Allow(ref p) => p.predicate.clone(),
             Policy::Deny(ref p) => p.predicate.clone(),
+            Policy::Write(ref p) => p.predicate.clone(),
         }
     }
 
@@ -72,6 +93,7 @@ impl Policy {
             Policy::Rewrite(ref p) => p.value.clone(),
             Policy::Allow(_) => panic!("Row policy doesn't have value field"),
             Policy::Deny(_) => panic!("Row policy doesn't have value field"),
+            Policy::Write(_) => panic!("Row policy doesn't have value field"),
         }
     }
 
@@ -80,6 +102,7 @@ impl Policy {
             Policy::Rewrite(ref p) => p.column.clone(),
             Policy::Allow(_) => panic!("Row policy doesn't have column field"),
             Policy::Deny(_) => panic!("Row policy doesn't have column field"),
+            Policy::Write(_) => panic!("Row policy doesn't have value field"),
         }
     }
 
@@ -88,6 +111,7 @@ impl Policy {
             Policy::Rewrite(ref p) => p.key.clone(),
             Policy::Allow(_) => panic!("Row policy doesn't have key field"),
             Policy::Deny(_) => panic!("Row policy doesn't have key field"),
+            Policy::Write(_) => panic!("Row policy doesn't have value field"),
         }
     }
 
@@ -104,6 +128,7 @@ impl Policy {
                     Some("rewrite") => Policy::parse_rewrite_policy(p),
                     Some("allow") => Policy::parse_row_policy(p, Action::Allow),
                     Some("deny") => Policy::parse_row_policy(p, Action::Deny),
+                    Some("write") => Policy::parse_write_policy(p),
                     _ => panic!("Unsupported policy action {}", action),
                 },
                 None => Policy::parse_row_policy(p, Action::Allow),
@@ -157,6 +182,26 @@ impl Policy {
             key: key.to_string(),
             rewrite_view: sq,
         })
+    }
+
+    fn parse_write_policy(p: &Value) -> Policy {
+        let name = match p.get("name") {
+            Some(n) => n.as_str().unwrap(),
+            None => "",
+        };
+
+        let table = p["table"].as_str().unwrap();
+        let pred = p["predicate"].as_str().unwrap();
+
+        let sq = sql_parser::parse_query(&format!("{};", pred)).unwrap();
+
+        let rp = WritePolicy {
+            name: name.to_string(),
+            table: table.to_string(),
+            predicate: sq,
+        };
+
+        Policy::Write(rp)
     }
 }
 

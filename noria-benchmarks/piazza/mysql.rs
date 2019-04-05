@@ -1,4 +1,6 @@
+#![feature(duration_float)]
 #![feature(type_ascription)]
+
 #[macro_use]
 extern crate clap;
 extern crate noria;
@@ -8,11 +10,13 @@ extern crate rand;
 
 use mysql as my;
 use noria::DataType;
+use std::time;
 
 #[macro_use]
 mod populate;
+
 use crate::populate::{Populate, NANOS_PER_SEC};
-use std::time;
+
 
 struct Backend {
     pool: mysql::Pool,
@@ -25,54 +29,36 @@ impl Backend {
         }
     }
 
-    // pub fn read(&self, uid: i32) {
-    //     let qstring = format!("SELECT p_author, COUNT(p_id) FROM Post WHERE p_author={} GROUP BY p_author", uid);
-    //     self.pool.prep_exec(qstring, ()).unwrap();
-    // }
-    //
-    // pub fn secure_read(&self, uid: i32, logged_uid: i32) {
-    //     let qstring = format!(
-    //         "SELECT p_author, count(p_id) FROM Post \
-    //             WHERE \
-    //             p_author = {} AND \
-    //             (
-    //                 (Post.p_private = 1 AND Post.p_author = {}) OR \
-    //                 (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
-    //                 (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
-    //             ) \
-    //             GROUP BY p_author",
-    //         uid,
-    //         logged_uid,
-    //         logged_uid,
-    //         logged_uid
-    //     );
-    //
-    //     self.pool.prep_exec(qstring, ()).unwrap();
-    // }
-
-    pub fn read(&self, uid: i32) {
-        let qstring = format!("SELECT * FROM Post WHERE p_author={}", uid);
+    pub fn read(&self, uid: i32, nclasses: i32) {
+        let qstring = format!(
+            "SELECT p_cid, COUNT(p_id) FROM Post WHERE p_cid > 0 AND p_cid < {} GROUP BY p_cid",
+            nclasses
+        );
         self.pool.prep_exec(qstring, ()).unwrap();
     }
 
-    pub fn secure_read(&self, uid: i32, logged_uid: i32) {
+    pub fn secure_read(&self, uid: i32, logged_uid: i32, nclasses: i32) {
         let qstring = format!(
-            "SELECT * FROM Post \
+            "SELECT p_cid, count(p_id) FROM Post \
                 WHERE \
-                p_author = {} AND \
+                p_cid > 0 AND p_cid < {} AND \
                 (
                     (Post.p_private = 1 AND Post.p_author = {}) OR \
-                    (Post.p_private = 0) \
-                )",
+                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
+                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+                ) \
+                GROUP BY p_cid",
+            nclasses,
             uid,
-            logged_uid,
+            uid,
+            uid
         );
 
         self.pool.prep_exec(qstring, ()).unwrap();
     }
 
-    pub fn populate_tables(&self, pop: &mut Populate) {
-        pop.enroll_students(pop.nclasses());
+    pub fn populate_tables(&self, pop: &mut Populate, nclasses: i32) {
+        pop.enroll_students(nclasses);
         let roles = pop.get_roles();
         let users = pop.get_users();
         let posts = pop.get_posts();
@@ -85,29 +71,30 @@ impl Backend {
     }
 
     fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
-        let params_arr: Vec<_> = records.iter().map(|ref r| {
-            match name.as_ref() {
-                "Role" => params!{
+        let params_arr: Vec<_> = records
+            .iter()
+            .map(|ref r| match name.as_ref() {
+                "Role" => params! {
                     "r_uid" => r[0].clone().into() : i32,
                     "r_cid" => r[1].clone().into() : i32,
                     "r_role" => r[2].clone().into() : i32,
                 },
-                "User" => params!{
+                "User" => params! {
                     "u_id" => r[0].clone().into() : i32,
                 },
-                "Post" => params!{
+                "Post" => params! {
                     "p_id" => r[0].clone().into() : i32,
                     "p_cid" => r[1].clone().into() : i32,
                     "p_author" => r[2].clone().into() : i32,
                     "p_content" => r[3].clone().into() : String,
                     "p_private" => r[4].clone().into() : i32,
                 },
-                "Class" => params!{
+                "Class" => params! {
                     "c_id" => r[0].clone().into() : i32,
                 },
                 _ => panic!("unspecified table"),
-            }
-        }).collect();
+            })
+            .collect();
 
         let qstring = match name.as_ref() {
             "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
@@ -123,7 +110,7 @@ impl Backend {
                 stmt.execute(params).unwrap();
             }
         }
-        let dur = dur_to_fsec!(start.elapsed());
+        let dur = start.elapsed().as_float_secs();
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             records.len(),
@@ -148,50 +135,57 @@ impl Backend {
     }
 
     fn create_tables(&self) {
-        self.pool.prep_exec(
-            "CREATE TABLE Post ( \
-              p_id int(11) NOT NULL, \
-              p_cid int(11) NOT NULL, \
-              p_author int(11) NOT NULL, \
-              p_content varchar(258) NOT NULL, \
-              p_private tinyint(1) NOT NULL default '0', \
-              PRIMARY KEY (p_id), \
-              UNIQUE KEY p_id (p_id), \
-              KEY p_cid (p_cid), \
-              KEY p_author (p_author) \
-            );",
-            (),
-        ).unwrap();
+        self.pool
+            .prep_exec(
+                "CREATE TABLE Post ( \
+                 p_id int(11) NOT NULL, \
+                 p_cid int(11) NOT NULL, \
+                 p_author int(11) NOT NULL, \
+                 p_content varchar(258) NOT NULL, \
+                 p_private tinyint(1) NOT NULL default '0', \
+                 PRIMARY KEY (p_id), \
+                 UNIQUE KEY p_id (p_id), \
+                 KEY p_cid (p_cid), \
+                 KEY p_author (p_author) \
+                 );",
+                (),
+            )
+            .unwrap();
 
-        self.pool.prep_exec(
-            "CREATE TABLE User ( \
-              u_id int(11) NOT NULL, \
-              PRIMARY KEY  (u_id), \
-              UNIQUE KEY u_id (u_id) \
-            );",
-            (),
-        ).unwrap();
+        self.pool
+            .prep_exec(
+                "CREATE TABLE User ( \
+                 u_id int(11) NOT NULL, \
+                 PRIMARY KEY  (u_id), \
+                 UNIQUE KEY u_id (u_id) \
+                 );",
+                (),
+            )
+            .unwrap();
 
-        self.pool.prep_exec(
-            "CREATE TABLE Class ( \
-              c_id int(11) NOT NULL, \
-              PRIMARY KEY  (c_id), \
-              UNIQUE KEY c_id (c_id) \
-            );",
-            (),
-        ).unwrap();
+        self.pool
+            .prep_exec(
+                "CREATE TABLE Class ( \
+                 c_id int(11) NOT NULL, \
+                 PRIMARY KEY  (c_id), \
+                 UNIQUE KEY c_id (c_id) \
+                 );",
+                (),
+            )
+            .unwrap();
 
-        self.pool.prep_exec(
-            "CREATE TABLE Role ( \
-              r_uid int(11) NOT NULL, \
-              r_cid int(11) NOT NULL, \
-              r_role tinyint(1) NOT NULL default '0', \
-              KEY r_uid (r_uid), \
-              KEY r_cid (r_cid) \
-            );",
-            (),
-        ).unwrap();
-
+        self.pool
+            .prep_exec(
+                "CREATE TABLE Role ( \
+                 r_uid int(11) NOT NULL, \
+                 r_cid int(11) NOT NULL, \
+                 r_role tinyint(1) NOT NULL default '0', \
+                 KEY r_uid (r_uid), \
+                 KEY r_cid (r_cid) \
+                 );",
+                (),
+            )
+            .unwrap();
     }
 }
 
@@ -201,10 +195,7 @@ fn main() {
     let args = App::new("piazza-mysql")
         .version("0.1")
         .about("Benchmarks a forum like application with security policies using MySql")
-        .arg(
-            Arg::with_name("dbname")
-                .required(true),
-        )
+        .arg(Arg::with_name("dbname").required(true))
         .arg(
             Arg::with_name("nusers")
                 .short("u")
@@ -251,37 +242,32 @@ fn main() {
     backend.create_tables();
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    backend.populate_tables(&mut p);
+    backend.populate_tables(&mut p, nclasses);
 
     // Do some reads without security
     let start = time::Instant::now();
-    for i in 0..1000 {
-        for uid in 0..nusers {
-            backend.read(uid);
-        }
+    for uid in 0..nusers {
+        backend.read(uid, nclasses);
     }
 
-    let dur = dur_to_fsec!(start.elapsed());
+    let dur = start.elapsed().as_float_secs();
     println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * 1000,
+        nusers,
         dur,
-        (nusers * 1000) as f64 / dur
+        (nusers) as f64 / dur
     );
 
     // Do some reads WITH security
     let start = time::Instant::now();
-    for i in 0..1000 {
-        for uid in 0..nusers {
-            backend.secure_read(uid, 0);
-        }
+    for uid in 0..nusers {
+        backend.secure_read(uid, nclasses, 0);
     }
-    let dur = dur_to_fsec!(start.elapsed());
+    let dur = start.elapsed().as_float_secs();
     println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
-        nusers * 1000,
+        nusers,
         dur,
-        (nusers * 1000) as f64 / dur
+        (nusers) as f64 / dur
     );
-
 }

@@ -28,6 +28,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{cell, io, thread, time};
 use tokio::prelude::*;
+use std::iter::FromIterator;
+
 
 #[derive(Clone)]
 pub(crate) struct MapMeta {
@@ -97,6 +99,7 @@ pub struct ControllerInner {
     log: slog::Logger,
 
     pub(crate) replies: DomainReplies,
+    pub base_nodes: HashMap<String, NodeIndex>,
 }
 
 pub(crate) struct DomainReplies(futures::sync::mpsc::UnboundedReceiver<ControlReplyPacket>);
@@ -490,6 +493,7 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
             map_meta: MapMeta::new(),
             replies: DomainReplies(drx),
+            base_nodes: HashMap::new(),
         }
     }
 
@@ -689,9 +693,11 @@ impl ControllerInner {
             context: context,
             start: time::Instant::now(),
             log: miglog,
+            security_config: None,
         };
         let r = f(&mut m);
         m.commit();
+
         r
     }
 
@@ -710,6 +716,7 @@ impl ControllerInner {
             context: Default::default(),
             start: time::Instant::now(),
             log: miglog,
+            security_config: None,
         };
         let r = f(&mut m);
         m.commit();
@@ -1002,10 +1009,15 @@ impl ControllerInner {
                 );
                 let mygroups: Vec<Vec<DataType>> = view.lookup(uid, true).unwrap();
 
+<<<<<<< HEAD
                 let tmp: Vec<Vec<DataType>> = view.lookup(&["3".into()], true).unwrap();
                 debug!(log, "3's groups (expect chairs): {:?}", tmp);
                 let tmp: Vec<Vec<DataType>> = view.lookup(&["2".into()], true).unwrap();
                 debug!(log, "2's groups (expect authors): {:?}", tmp);
+=======
+                println!("my groups: {:#?}", mygroups);
+
+>>>>>>> 5e83a1e77b43bad989f2fa94280ae79d3e47c39b
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
@@ -1043,6 +1055,7 @@ impl ControllerInner {
                 }
             }
             .unwrap();
+
         });
 
         self.recipe = r;
@@ -1073,6 +1086,7 @@ impl ControllerInner {
 
         Ok(())
     }
+
 
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;
@@ -1105,7 +1119,6 @@ impl ControllerInner {
                     }
                 }
                 topo_removals.reverse();
-
                 for leaf in topo_removals {
                     self.remove_leaf(leaf)?;
                 }
@@ -1202,7 +1215,6 @@ impl ControllerInner {
                 {
                     return Err("Failed to persist recipe installation".to_owned());
                 }
-
                 activation_result
             }
             Err(e) => {

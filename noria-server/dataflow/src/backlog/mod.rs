@@ -72,6 +72,7 @@ fn new_inner(
     }
 
     if srmap {
+        println!("creating new srmap");
         let (r, w) = match (key.len(), srmap) {
             (0, _) => unreachable!(),
             (1, true) => make_srmap!(SingleSR),
@@ -187,19 +188,17 @@ pub(crate) struct WriteHandleEntry<'a> {
 
 impl<'a> MutWriteHandleEntry<'a> {
     pub fn mark_filled(&mut self) {
-        println!("markfilled 1");
         let handle = &mut self.handle.handleSR;
         match handle {
             Some(hand) => {
-                println!("markfilled 2");
                 if let Some((None, _)) = hand
                     .meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
                 {
                     hand.clear(Cow::Borrowed(&*self.key));
-                    println!("markfilled 3");
                 } else {
                     unreachable!("attempted to fill already-filled key");
                 }
+                hand.refresh();
             },
             None => {}
         }
@@ -290,7 +289,7 @@ impl WriteHandle {
             match handle {
                 Some(hand) => {
                     let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    println!("CLONING NEW USER. uid: {}", uid);
+                    // println!("CLONING NEW USER. uid: {}", uid);
                     let r = r.clone_new_user(r_handle, uid.clone());
                     let w =  WriteHandle {
                         handle: None,
@@ -310,7 +309,7 @@ impl WriteHandle {
             return None;
         }
     }
-    
+
 
     pub(crate) fn clone_new_user_partial(&mut self, r: &mut SingleReadHandle, trigger: Option<Arc<Fn(&[DataType], Option<usize>) + Send + Sync>>) -> Option<(SingleReadHandle, WriteHandle)> {
         if self.srmap {
@@ -318,7 +317,7 @@ impl WriteHandle {
             match handle {
                 Some(hand) => {
                     let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    println!("CLONING NEW USER. uid: {}", uid);
+                    // println!("CLONING NEW USER. uid: {}", uid);
                     let r = r.clone_new_user_partial(r_handle, uid.clone(), trigger);
                     let w =  WriteHandle {
                         handle: None,
@@ -445,12 +444,12 @@ impl WriteHandle {
                             .checked_sub(mem_delta.checked_abs().unwrap() as usize)
                             .unwrap();
                     }
+                    // hand.refresh();
                 },
                 None => {},
             }
         } else {
-            let handle = &mut self.handle
-            ;
+            let handle = &mut self.handle;
             match handle {
                 Some(hand) => {
                     let mem_delta = hand.add(&self.key[..], self.cols, rs);
@@ -597,7 +596,6 @@ impl SingleReadHandle {
 
     /// Trigger a replay of a missing key from a partially materialized view.
     pub fn trigger(&self, key: &[DataType], id: Option<usize>) {
-        println!("triggering, uid: {:?}", id);
         assert!(
             self.trigger.is_some(),
             "tried to trigger a replay for a fully materialized view"
@@ -620,7 +618,7 @@ impl SingleReadHandle {
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         if self.srmap {
-            println!("try find and. uid: {:?}", self.uid);
+            // println!("try find and. uid: {:?}", self.uid);
             let handle = &mut self.handleSR;
             match handle {
                 Some(hand) => {
