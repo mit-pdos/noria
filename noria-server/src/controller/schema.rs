@@ -13,11 +13,11 @@ type Path = std::vec::Vec<(
 
 fn to_sql_type(d: &DataType) -> Option<SqlType> {
     match d {
-        DataType::Int(_) => Some(SqlType::Int(32)),
-        DataType::UnsignedInt(_) => Some(SqlType::Int(32)), // TODO support sign
-        DataType::BigInt(_) => Some(SqlType::Bigint(64)),
-        DataType::UnsignedBigInt(_) => Some(SqlType::Bigint(64)), // TODO support sign
-        DataType::Real(_, _) => Some(SqlType::Real),
+        DataType::Int(_) => Some(SqlType::Int(32, true)),
+        DataType::UnsignedInt(_) => Some(SqlType::Int(32, false)),
+        DataType::BigInt(_) => Some(SqlType::Bigint(64, true)),
+        DataType::UnsignedBigInt(_) => Some(SqlType::Bigint(64, false)),
+        DataType::Real(_, _) => Some(SqlType::Real(true)),
         DataType::Text(_) => Some(SqlType::Text),
         DataType::TinyText(_) => Some(SqlType::Varchar(8)),
         // TODO(malte): There is no SqlType for `NULL` (as it's not a
@@ -45,7 +45,7 @@ fn type_for_internal_column(
                 // computed expression
                 // TODO(malte): trace the actual column types, since this could be a
                 // real-valued arithmetic operation
-                Some(SqlType::Bigint(64))
+                Some(SqlType::Bigint(64, true))
             } else {
                 // literal
                 let off = column_index - (emits.0.len() + emits.2.len());
@@ -56,7 +56,7 @@ fn type_for_internal_column(
             // computed column is always emitted last
             if column_index == node.fields().len() - 1 {
                 // counts and sums always produce integral columns
-                Some(SqlType::Bigint(64))
+                Some(SqlType::Bigint(64, true))
             } else {
                 // no column that isn't the aggregation result column should ever trace
                 // back to an aggregation.
