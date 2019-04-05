@@ -1,6 +1,51 @@
 use crate::Backend;
 use noria::DataType;
 
+use std::{thread, time};
+
+pub fn create_single_trigger_data(backend: &mut Backend) {
+    let users: Vec<Vec<&str>> = vec![vec!["2", "2@mit.edu", "2", "2 University", "0", "normal"]];
+
+    let users: Vec<Vec<DataType>> = users
+        .into_iter()
+        .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
+        .collect();
+
+    let mut mutator = backend.g.table("UserProfile").unwrap();
+    println!("Inserting users");
+    mutator.insert_all(users).unwrap();
+
+    thread::sleep(time::Duration::from_millis(2000));
+
+    // Insert Papers
+    let papers: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into(), 0.into()]];
+    let mut mutator = backend.g.table("Paper").unwrap();
+    println!("Inserting into Paper");
+    mutator.insert_all(papers).unwrap();
+
+    thread::sleep(time::Duration::from_millis(2000));
+
+    // Insert PaperVersion
+    let paper_versions: Vec<Vec<DataType>> = vec![vec![
+        1.into(),
+        "Why Soup is Awesome".into(),
+        "Text".into(),
+        "Soup is tasty.".into(),
+        "0".into(),
+    ]];
+    let mut mutator = backend.g.table("PaperVersion").unwrap();
+    println!("Inserting into PaperVersion");
+    mutator.insert_all(paper_versions).unwrap();
+
+    thread::sleep(time::Duration::from_millis(2000));
+
+    // Insert PaperCoauthors
+    let paper_coauthors: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into()]];
+    let mut mutator = backend.g.table("PaperCoauthor").unwrap();
+    println!("Inserting into PaperCoauthor");
+    mutator.insert_all(paper_coauthors).unwrap();
+}
+
 pub fn create_users(backend: &mut Backend) {
     println!("creating users");
     // username varchar(1024),
@@ -42,30 +87,9 @@ pub fn create_users(backend: &mut Backend) {
             "0",
             "normal",
         ],
-        vec![
-            "2",
-            "2@mit.edu",
-            "2",
-            "org",
-            "0",
-            "normal",
-        ],
-        vec![
-            "3",
-            "3@mit.edu",
-            "3",
-            "org",
-            "0",
-            "chair",
-        ],
-	vec![
-            "4",
-            "4@mit.edu",
-            "4",
-            "org",
-            "0",
-            "normal",
-        ],
+        vec!["2", "2@mit.edu", "2", "org", "0", "normal"],
+        vec!["3", "3@mit.edu", "3", "org", "0", "chair"],
+        vec!["4", "4@mit.edu", "4", "org", "0", "normal"],
     ];
     let users: Vec<Vec<DataType>> = data
         .into_iter()
@@ -84,11 +108,11 @@ pub fn create_papers(backend: &mut Backend) {
     // author varchar(1024),
     // accepted tinyint(1),
     let papers: Vec<Vec<DataType>> = vec![
-        vec![1.into(), "malte".into(), "0".into()],
-        vec![2.into(), "lara".into(), "0".into()],
-        vec![3.into(), "malte".into(), "0".into()],
-        vec![4.into(), "2".into(), "0".into()],
-        vec![5.into(), "2".into(), "0".into()],
+        vec![1.into(), "malte".into(), 0.into()],
+        vec![2.into(), "lara".into(), 0.into()],
+        vec![3.into(), "malte".into(), 0.into()],
+        vec![4.into(), "2".into(), 0.into()],
+        vec![5.into(), "2".into(), 0.into()],
     ];
 
     // PaperVersion
@@ -134,35 +158,17 @@ pub fn create_papers(backend: &mut Backend) {
             "0".into(),
         ],
     ];
-    
+
     // PaperCoauthor
     // paper int,
     // author varchar(1024),
     let paper_coauthors: Vec<Vec<DataType>> = vec![
-        vec![
-            1.into(),
-            "malte".into(),
-        ],
-        vec![
-            1.into(),
-            "2".into(),
-        ],
-        vec![
-            2.into(),
-            "lara".into(),
-        ],
-        vec![
-            3.into(),
-            "malte".into(),
-        ],
-        vec![
-            4.into(),
-            "2".into(),
-        ],
-        vec![
-            5.into(),
-            "2".into(),
-        ],
+        vec![1.into(), "malte".into()],
+        vec![1.into(), "2".into()],
+        vec![2.into(), "lara".into()],
+        vec![3.into(), "malte".into()],
+        vec![4.into(), "2".into()],
+        vec![5.into(), "2".into()],
     ];
 
     // Review table
@@ -174,7 +180,7 @@ pub fn create_papers(backend: &mut Backend) {
     // score_presentation int,
     // score_technical int,
     // score_confidence int,
-    
+
     let reviews: Vec<Vec<DataType>> = vec![
         vec![
             "0".into(),
@@ -233,33 +239,13 @@ pub fn create_papers(backend: &mut Backend) {
     // username varchar(1024),
     // assign_type varchar(8), -- What is assign_type??
     let review_assignments: Vec<Vec<DataType>> = vec![
-        vec![
-            1.into(),
-            "lara".into(),
-            "blahblah".into(),
-        ],
-        vec![
-            2.into(),
-            "4".into(),
-            "blahblah".into(),
-        ],
-        vec![
-            3.into(),
-            "4".into(),
-            "blahblah".into(),
-        ],
-        vec![
-            4.into(),
-            "malte".into(),
-            "blahblah".into(),
-        ],
-        vec![
-            5.into(),
-            "lara".into(),
-            "blahblah".into(),
-        ],
+        vec![1.into(), "lara".into(), "blahblah".into()],
+        vec![2.into(), "4".into(), "blahblah".into()],
+        vec![3.into(), "4".into(), "blahblah".into()],
+        vec![4.into(), "malte".into(), "blahblah".into()],
+        vec![5.into(), "lara".into(), "blahblah".into()],
     ];
-    
+
     let mut mutator = backend.g.table("Paper").unwrap();
     mutator.insert_all(papers).unwrap();
 
@@ -274,13 +260,27 @@ pub fn create_papers(backend: &mut Backend) {
 
     let mut mutator = backend.g.table("ReviewAssignment").unwrap();
     mutator.insert_all(review_assignments).unwrap();
-
 }
 
-pub fn dump_papers(backend: &mut Backend, user: &str) {
+pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
     let mut get = backend.g.view(&format!("PaperList_u{}", user)).unwrap();
 
-    println!("user's papers: {:?}", get.lookup(&[0.into()], true)); // 0 is bogo key for id
+    if iterate > 0 {
+        let mut results = Vec::new();
+        for i in 1..iterate + 1 {
+            results.push(get.lookup(&[i.into()], true));
+        }
+        println!(
+            "user's papers (PaperList_u{}), by-key lookup: {:?}",
+            user, results
+        );
+    } else {
+        println!(
+            "user's papers (PaperList_u{}), bogokey lookup: {:?}",
+            user,
+            get.lookup(&[0.into()], true)
+        ); // 0 is bogo key for id
+    }
 }
 
 pub fn dump_reviews(backend: &mut Backend, user: &str) {
@@ -292,10 +292,19 @@ pub fn dump_reviews(backend: &mut Backend, user: &str) {
 pub fn dump_all_papers(backend: &mut Backend) {
     let mut get = backend.g.view("PaperList").unwrap();
 
-    println!("all papers: {:?}", get.lookup(&[0.into()], true));
+    println!(
+        "all papers, bogokey lookup: {:?}",
+        get.lookup(&[0.into()], true)
+    );
 }
 
-pub fn dump_context(backend: &mut Backend, query: &str, lookup_str: &str, lookup_int: i32, use_str: bool) {
+pub fn dump_context(
+    backend: &mut Backend,
+    query: &str,
+    lookup_str: &str,
+    lookup_int: i32,
+    use_str: bool,
+) {
     let mut get = backend.g.view(query).unwrap();
     if use_str {
         println!("{}: {:?}", query, get.lookup(&[lookup_str.into()], true));
