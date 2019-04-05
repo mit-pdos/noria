@@ -25,6 +25,14 @@ pub fn create_single_trigger_data(backend: &mut Backend) {
 
     thread::sleep(time::Duration::from_millis(2000));
 
+    // Insert PaperCoauthors
+    let paper_coauthors: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into()]];
+    let mut mutator = backend.g.table("PaperCoauthor").unwrap();
+    println!("Inserting into PaperCoauthor");
+    mutator.insert_all(paper_coauthors).unwrap();
+
+    thread::sleep(time::Duration::from_millis(2000));
+
     // Insert PaperVersion
     let paper_versions: Vec<Vec<DataType>> = vec![vec![
         1.into(),
@@ -36,14 +44,6 @@ pub fn create_single_trigger_data(backend: &mut Backend) {
     let mut mutator = backend.g.table("PaperVersion").unwrap();
     println!("Inserting into PaperVersion");
     mutator.insert_all(paper_versions).unwrap();
-
-    thread::sleep(time::Duration::from_millis(2000));
-
-    // Insert PaperCoauthors
-    let paper_coauthors: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into()]];
-    let mut mutator = backend.g.table("PaperCoauthor").unwrap();
-    println!("Inserting into PaperCoauthor");
-    mutator.insert_all(paper_coauthors).unwrap();
 }
 
 pub fn create_users(backend: &mut Backend) {
