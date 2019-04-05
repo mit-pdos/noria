@@ -522,7 +522,7 @@ dependencies = [
  "backtrace 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "common 0.1.0",
- "evmap 4.0.0 (git+https://github.com/ms705/rust-evmap)",
+ "evmap 4.2.2 (git+https://github.com/jonhoo/rust-evmap?branch=eviction)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -666,10 +666,11 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "4.0.0"
-source = "git+https://github.com/ms705/rust-evmap#bdd67f2d4c8aa6e1129335db9efde5171b2195ef"
+version = "4.2.2"
+source = "git+https://github.com/jonhoo/rust-evmap?branch=eviction#aeef46e2950561ae8561fc1051623e947b6df070"
 dependencies = [
  "rahashmap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3161,7 +3162,7 @@ dependencies = [
 "checksum encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
 "checksum env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)" = "15b0a4d2e39f8420210be8b27eeda28029729e2fd4291019455016c348240c38"
 "checksum error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff511d5dc435d703f4971bc399647c9bc38e20cb41452e3b9feb4765419ed3f3"
-"checksum evmap 4.0.0 (git+https://github.com/ms705/rust-evmap)" = "<none>"
+"checksum evmap 4.2.2 (git+https://github.com/jonhoo/rust-evmap?branch=eviction)" = "<none>"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
