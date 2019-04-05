@@ -186,9 +186,9 @@ fn main() {
 
     if args.is_present("populate") {
         println!("populating");
-        test_populate::create_single_trigger_data(&mut backend);
-        //        test_populate::create_users(&mut backend);
-        //        test_populate::create_papers(&mut backend);
+        //        test_populate::create_single_trigger_data(&mut backend);
+        test_populate::create_users(&mut backend);
+        test_populate::create_papers(&mut backend);
     }
 
     thread::sleep(time::Duration::from_millis(2000));
@@ -285,6 +285,7 @@ fn main() {
     println!("LatestPaperVersion: {:?}", query_results);
 
     println!("{}", backend.g.graphviz().unwrap());
+    test_populate::dump_reviews(&mut backend, user);
     test_populate::dump_papers(&mut backend, user, 0); // bogokey lookup
     test_populate::dump_papers(&mut backend, user, 5); // by-key lookup
     test_populate::dump_all_papers(&mut backend);

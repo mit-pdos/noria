@@ -249,17 +249,17 @@ pub fn create_papers(backend: &mut Backend) {
     let mut mutator = backend.g.table("Paper").unwrap();
     mutator.insert_all(papers).unwrap();
 
-    let mut mutator = backend.g.table("PaperVersion").unwrap();
-    mutator.insert_all(paper_versions).unwrap();
-
     let mut mutator = backend.g.table("PaperCoauthor").unwrap();
     mutator.insert_all(paper_coauthors).unwrap();
 
-    let mut mutator = backend.g.table("Review").unwrap();
-    mutator.insert_all(reviews).unwrap();
+    let mut mutator = backend.g.table("PaperVersion").unwrap();
+    mutator.insert_all(paper_versions).unwrap();
 
     let mut mutator = backend.g.table("ReviewAssignment").unwrap();
     mutator.insert_all(review_assignments).unwrap();
+
+    let mut mutator = backend.g.table("Review").unwrap();
+    mutator.insert_all(reviews).unwrap();
 }
 
 pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {

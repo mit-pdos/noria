@@ -22,8 +22,8 @@ QUERY PaperList: SELECT Paper.*
 	   JOIN LatestPaperVersion
 	   ON (Paper.id = LatestPaperVersion.paper);
 
---QUERY ReviewList: SELECT Review.*
---           FROM Review
+QUERY ReviewList: SELECT Review.*
+           FROM Review
 --	   WHERE Review.paper = ?;
---	   JOIN Paper
---	   ON (Review.paper = Paper.id);
+	   JOIN Paper
+	   ON (Review.paper = Paper.id);
