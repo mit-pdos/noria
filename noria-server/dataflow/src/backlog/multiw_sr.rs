@@ -10,9 +10,7 @@ pub enum Handle {
     ManySR(srmap::handle::handle::Handle<Vec<DataType>, Vec<DataType>, i64>),
 }
 
-
 impl Handle {
-
     pub fn is_empty(&self) -> bool {
         match *self {
             Handle::SingleSR(ref h) => h.is_empty(),
@@ -22,35 +20,47 @@ impl Handle {
     }
 
     pub fn clone_new_user(&mut self) -> (usize, super::multir_sr::Handle, Handle) {
-         match *self {
-             Handle::SingleSR(ref mut h) => {
-                                            let (uid, mut inr, mut inw) = h.clone_new_user();
-                                            (uid, super::multir_sr::Handle::SingleSR(inr), Handle::SingleSR(inw))
-                                             },
-             Handle::DoubleSR(ref mut h) => {
-                                             let (uid, mut inr, mut inw) = h.clone_new_user();
-                                             (uid, super::multir_sr::Handle::DoubleSR(inr), Handle::DoubleSR(inw))
-                                             },
-             Handle::ManySR(ref mut h) => {
-                                             let (uid, mut inr, mut inw) = h.clone_new_user();
-                                             (uid, super::multir_sr::Handle::ManySR(inr), Handle::ManySR(inw))
-                                           },
-         }
+        match *self {
+            Handle::SingleSR(ref mut h) => {
+                let (uid, mut inr, mut inw) = h.clone_new_user();
+                (
+                    uid,
+                    super::multir_sr::Handle::SingleSR(inr),
+                    Handle::SingleSR(inw),
+                )
+            }
+            Handle::DoubleSR(ref mut h) => {
+                let (uid, mut inr, mut inw) = h.clone_new_user();
+                (
+                    uid,
+                    super::multir_sr::Handle::DoubleSR(inr),
+                    Handle::DoubleSR(inw),
+                )
+            }
+            Handle::ManySR(ref mut h) => {
+                let (uid, mut inr, mut inw) = h.clone_new_user();
+                (
+                    uid,
+                    super::multir_sr::Handle::ManySR(inr),
+                    Handle::ManySR(inw),
+                )
+            }
+        }
     }
 
     pub fn clear(&mut self, k: Key) {
         match *self {
-            Handle::SingleSR(ref mut h) => {h.clear(key_to_single(k).into_owned())},
-            Handle::DoubleSR(ref mut h) => {h.clear(key_to_double(k).into_owned())},
-            Handle::ManySR(ref mut h) => {h.clear(k.into_owned())},
+            Handle::SingleSR(ref mut h) => h.clear(key_to_single(k).into_owned()),
+            Handle::DoubleSR(ref mut h) => h.clear(key_to_double(k).into_owned()),
+            Handle::ManySR(ref mut h) => h.clear(k.into_owned()),
         }
     }
 
     pub fn empty(&mut self, k: Key) {
         match *self {
-            Handle::SingleSR(ref mut h) => {h.empty(key_to_single(k).into_owned())},
-            Handle::DoubleSR(ref mut h) => {h.empty(key_to_double(k).into_owned())},
-            Handle::ManySR(ref mut h) => {h.empty(k.into_owned())},
+            Handle::SingleSR(ref mut h) => h.empty(key_to_single(k).into_owned()),
+            Handle::DoubleSR(ref mut h) => h.empty(key_to_double(k).into_owned()),
+            Handle::ManySR(ref mut h) => h.empty(k.into_owned()),
         }
     }
 
@@ -80,7 +90,7 @@ impl Handle {
             Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
-            },
+            }
             Handle::DoubleSR(ref h) => {
                 assert_eq!(key.len(), 2);
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
@@ -107,13 +117,10 @@ impl Handle {
                     mem::forget(stack_key);
                     v
                 }
-            },
-            Handle::ManySR(ref h) => {
-                h.meta_get_and(&key.to_vec(), then)
-            },
+            }
+            Handle::ManySR(ref h) => h.meta_get_and(&key.to_vec(), then),
         }
     }
-
 
     pub fn add<I>(&mut self, key: &[usize], cols: usize, rs: I, id: Option<usize>) -> isize
     where
@@ -159,17 +166,19 @@ impl Handle {
                     }
                 }
             }
-            Handle::ManySR(ref mut h) => for r in rs {
-                debug_assert!(r.len() >= cols);
-                let key = key.iter().map(|&k| &r[k]).cloned().collect();
-                match r {
-                    Record::Positive(r) => {
-                        memory_delta += r.deep_size_of() as isize;
-                        h.insert(key, r, id);
-                    }
-                    Record::Negative(r) => {
-                        memory_delta -= r.deep_size_of() as isize;
-                        h.remove(key, id);
+            Handle::ManySR(ref mut h) => {
+                for r in rs {
+                    debug_assert!(r.len() >= cols);
+                    let key = key.iter().map(|&k| &r[k]).cloned().collect();
+                    match r {
+                        Record::Positive(r) => {
+                            memory_delta += r.deep_size_of() as isize;
+                            h.insert(key, r, id);
+                        }
+                        Record::Negative(r) => {
+                            memory_delta -= r.deep_size_of() as isize;
+                            h.remove(key, id);
+                        }
                     }
                 }
             }

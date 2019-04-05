@@ -1,8 +1,8 @@
+use crate::controller::security::policy::Policy;
 use crate::controller::security::SecurityConfig;
 use crate::controller::sql::reuse::ReuseConfigType;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::Migration;
-use crate::controller::security::policy::Policy;
 
 use dataflow::ops::trigger::Trigger;
 use dataflow::ops::trigger::TriggerEvent;
@@ -17,9 +17,8 @@ use nom_sql::CreateTableStatement;
 use slog;
 use std::collections::HashMap;
 use std::str;
-use std::vec::Vec;
 use std::time::{Duration, Instant};
-
+use std::vec::Vec;
 
 type QueryID = u64;
 
@@ -299,14 +298,11 @@ impl Recipe {
             expressions_removed: 0,
         };
 
-
-	// TODO: What is desired output of below?
-	debug!(
-	    self.log,
-	    "Universe groups (in create_universe): {:?}",
-	    universe_groups
-	);
-
+        // TODO: What is desired output of below?
+        debug!(
+            self.log,
+            "Universe groups (in create_universe): {:?}", universe_groups
+        );
 
         let now = Instant::now();
 
@@ -331,7 +327,6 @@ impl Recipe {
         for expr in self.expressions.values() {
             let (n, q, is_leaf) = expr.clone();
 
-
             // add the universe-specific query
             // don't use query name to avoid conflict with global queries
             let (id, group) = mig.universe();
@@ -341,11 +336,12 @@ impl Recipe {
                     Some(ref g) => {
                         let in_group = true;
                         Some(format!(
-                        "{}_{}{}",
-                        n.clone().unwrap(),
-                        g.to_string(),
-                        id.to_string()
-                    ))},
+                            "{}_{}{}",
+                            n.clone().unwrap(),
+                            g.to_string(),
+                            id.to_string()
+                        ))
+                    }
                     None => Some(format!("{}_u{}", n.clone().unwrap(), id.to_string())),
                 }
             } else {
@@ -355,11 +351,13 @@ impl Recipe {
             // println!("recipe: creating universe 3. {:?}", now.elapsed().as_nanos());
 
             let is_leaf = if group.is_some() { false } else { is_leaf };
-            let qfp = self
-                .inc
-                .as_mut()
-                .unwrap()
-                .add_parsed_query(q, new_name.clone(), is_leaf, mig, n.clone())?;
+            let qfp = self.inc.as_mut().unwrap().add_parsed_query(
+                q,
+                new_name.clone(),
+                is_leaf,
+                mig,
+                n.clone(),
+            )?;
 
             // println!("recipe: creating universe 4. {:?}", now.elapsed().as_nanos());
             // If the user provided us with a query name, use that.
@@ -372,42 +370,36 @@ impl Recipe {
             // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
-<<<<<<< HEAD
 
-//        debug!(
-//	    self.log,
-//	    "Create universe: id: {:?}, new nodes: {:?}",
-//	    mig.universe().0,
-//	    result.new_nodes.clone()
-//	);
-=======
+        //        debug!(
+        //	    self.log,
+        //	    "Create universe: id: {:?}, new nodes: {:?}",
+        //	    mig.universe().0,
+        //	    result.new_nodes.clone()
+        //	);
         use dataflow::payload;
         // Enforce write policies
         if self.security_config.is_some() {
             for policy in &self.security_config.clone().unwrap().policies {
                 match policy {
-                    Policy::Write(inner) => {
-                        match mig.mainline.base_nodes.get(&inner.table) {
-                            Some(ni) => {
-                                let n = &mig.mainline.ingredients[*ni];
-                                let m = box payload::Packet::SetWritePolicy {
-                                    node: n.local_addr(),
-                                    predicate: inner.predicate.clone(),
-                                };
+                    Policy::Write(inner) => match mig.mainline.base_nodes.get(&inner.table) {
+                        Some(ni) => {
+                            let n = &mig.mainline.ingredients[*ni];
+                            let m = box payload::Packet::SetWritePolicy {
+                                node: n.local_addr(),
+                                predicate: inner.predicate.clone(),
+                            };
 
-                                let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
-                                domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
-                                mig.mainline.replies.wait_for_acks(&domain);
-
-                            },
-                            None => {},
+                            let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
+                            domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
+                            mig.mainline.replies.wait_for_acks(&domain);
                         }
+                        None => {}
                     },
-                    _ => {},
+                    _ => {}
                 }
             }
         }
->>>>>>> 5e83a1e77b43bad989f2fa94280ae79d3e47c39b
 
         Ok(result)
     }
@@ -455,18 +447,18 @@ impl Recipe {
                     "Creating membership view for group {}",
                     group.name()
                 );
-		debug!(
-		    self.log,
-		    "Membership for group {}: {:?}",
-		    group.name(),
-		    group.membership()
-		);
+                debug!(
+                    self.log,
+                    "Membership for group {}: {:?}",
+                    group.name(),
+                    group.membership()
+                );
                 let qfp = self.inc.as_mut().unwrap().add_parsed_query(
                     group.membership(),
                     Some(group.name()),
                     true,
                     mig,
-                    None
+                    None,
                 )?;
 
                 /// Add trigger node below group membership views
@@ -494,11 +486,13 @@ impl Recipe {
             let (n, q, is_leaf) = self.expressions[&qid].clone();
 
             // add the query
-            let qfp = self
-                .inc
-                .as_mut()
-                .unwrap()
-                .add_parsed_query(q, n.clone(), is_leaf, mig, n.clone())?;
+            let qfp = self.inc.as_mut().unwrap().add_parsed_query(
+                q,
+                n.clone(),
+                is_leaf,
+                mig,
+                n.clone(),
+            )?;
 
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.

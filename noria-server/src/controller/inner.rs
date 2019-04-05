@@ -28,8 +28,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{cell, io, thread, time};
 use tokio::prelude::*;
-use std::iter::FromIterator;
-
 
 #[derive(Clone)]
 pub(crate) struct MapMeta {
@@ -1009,15 +1007,8 @@ impl ControllerInner {
                 );
                 let mygroups: Vec<Vec<DataType>> = view.lookup(uid, true).unwrap();
 
-<<<<<<< HEAD
-                let tmp: Vec<Vec<DataType>> = view.lookup(&["3".into()], true).unwrap();
-                debug!(log, "3's groups (expect chairs): {:?}", tmp);
-                let tmp: Vec<Vec<DataType>> = view.lookup(&["2".into()], true).unwrap();
-                debug!(log, "2's groups (expect authors): {:?}", tmp);
-=======
                 println!("my groups: {:#?}", mygroups);
 
->>>>>>> 5e83a1e77b43bad989f2fa94280ae79d3e47c39b
                 let mut my_groups: Vec<DataType> = view
                     .lookup(uid, true)
                     .unwrap()
@@ -1055,7 +1046,6 @@ impl ControllerInner {
                 }
             }
             .unwrap();
-
         });
 
         self.recipe = r;
@@ -1086,7 +1076,6 @@ impl ControllerInner {
 
         Ok(())
     }
-
 
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;

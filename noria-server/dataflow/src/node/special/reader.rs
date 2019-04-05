@@ -99,7 +99,7 @@ impl Reader {
         self.materialization_info = mat_info;
     }
 
-    pub fn get_materialization_info(& self) -> Option<(usize, usize)> {
+    pub fn get_materialization_info(&self) -> Option<(usize, usize)> {
         self.materialization_info.clone()
     }
 

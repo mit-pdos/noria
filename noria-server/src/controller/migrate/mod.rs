@@ -20,8 +20,8 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
 use crate::controller::security::SecurityConfig;
+use crate::controller::ControllerInner;
 use dataflow::prelude::*;
 use dataflow::{node, payload};
 use std::collections::{HashMap, HashSet};
@@ -112,7 +112,6 @@ impl<'a> Migration<'a> {
         S2: ToString,
         FS: IntoIterator<Item = S2>,
     {
-
         // add to the graph
         let ni = self
             .mainline
@@ -124,9 +123,11 @@ impl<'a> Migration<'a> {
               "node" => ni.index(),
         );
 
-        // don't add user or group context tables 
+        // don't add user or group context tables
         if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
-            self.mainline.base_nodes.insert(name.to_string(), ni.clone());
+            self.mainline
+                .base_nodes
+                .insert(name.to_string(), ni.clone());
         }
 
         // keep track of the fact that it's new
@@ -233,7 +234,7 @@ impl<'a> Migration<'a> {
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
-            for (k, v) in self.mainline.map_meta.query_to_readers.clone(){
+            for (k, v) in self.mainline.map_meta.query_to_readers.clone() {
                 query_hash.insert(k.clone());
             }
 
@@ -246,7 +247,7 @@ impl<'a> Migration<'a> {
                             general_query = Some(k);
                         }
                     }
-                },
+                }
                 None => {}
             }
 
@@ -262,13 +263,18 @@ impl<'a> Migration<'a> {
                             let mut new_set = HashSet::new();
                             new_set.insert(r);
                             add = true;
-                            added_set = Some(new_set); true }
+                            added_set = Some(new_set);
+                            true
+                        }
                     };
                     if add {
-                        self.mainline.map_meta.query_to_readers.insert(name_.clone(), added_set.unwrap());
+                        self.mainline
+                            .map_meta
+                            .query_to_readers
+                            .insert(name_.clone(), added_set.unwrap());
                     }
                     matched = true;
-                },
+                }
                 None => {}
             }
 
@@ -284,12 +290,17 @@ impl<'a> Migration<'a> {
                                 let mut new_set = HashSet::new();
                                 new_set.insert(r);
                                 add = true;
-                                added_set = Some(new_set); true }
+                                added_set = Some(new_set);
+                                true
+                            }
                         };
                         if add {
-                            self.mainline.map_meta.query_to_readers.insert(name_.clone(), added_set.unwrap());
+                            self.mainline
+                                .map_meta
+                                .query_to_readers
+                                .insert(name_.clone(), added_set.unwrap());
                         }
-                    },
+                    }
                     None => {}
                 }
             }
@@ -329,15 +340,18 @@ impl<'a> Migration<'a> {
         if uid != "global".to_string() {
             uint = uid.parse().unwrap();
         }
-        let uid : usize = uint as usize;
+        let uid: usize = uint as usize;
 
-        self.mainline.map_meta.reader_to_uid.insert(ri.clone(), uid.clone());
+        self.mainline
+            .map_meta
+            .reader_to_uid
+            .insert(ri.clone(), uid.clone());
 
         let mut leaf_to_query = HashMap::new();
         for (query_n, node_list) in self.mainline.map_meta.query_to_leaves.iter() {
-           for node in node_list.clone() {
-               leaf_to_query.insert(node, query_n);
-           }
+            for node in node_list.clone() {
+                leaf_to_query.insert(node, query_n);
+            }
         }
         // match leaf_to_query.get(&n.clone()) {
         //     Some(query) => {
@@ -395,11 +409,7 @@ impl<'a> Migration<'a> {
         };
 
         // Assign domains
-        assignment::assign(
-            &log,
-            &mut mainline,
-            &new,
-        );
+        assignment::assign(&log, &mut mainline, &new);
 
         // Set up ingress and egress nodes
         let swapped1 = routing::add(&log, &mut mainline.ingredients, mainline.source, &mut new);

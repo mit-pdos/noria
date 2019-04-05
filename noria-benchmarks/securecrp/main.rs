@@ -185,17 +185,11 @@ fn main() {
     thread::sleep(time::Duration::from_millis(2000));
 
     if args.is_present("populate") {
-        println!("here");
-        test_populate::create_users(&mut backend);
+        println!("populating");
+        test_populate::create_single_trigger_data(&mut backend);
+        //        test_populate::create_users(&mut backend);
+        //        test_populate::create_papers(&mut backend);
     }
-
-    if args.is_present("populate") {
-        test_populate::create_papers(&mut backend);
-        //        test_populate::dump_reviews(&mut backend, user);
-        //        test_populate::dump_papers(&mut backend, user);
-    }
-
-    println!("user2");
 
     thread::sleep(time::Duration::from_millis(2000));
     backend.login(make_user(user)).is_ok();
@@ -204,16 +198,21 @@ fn main() {
 
     //    test_populate::dump_all_papers(&mut backend);
 
+    // Must happen after user login, since GroupContexts are not created until then.
+    //    backend
+    //        .migrate(sloc, Some("jeeves_gpcontext_queries.sql"), true)
+    //        .unwrap();
+    //    println!("third mig");
+    /*
     // Check author membership view
     let mut getter = backend.g.view("authors").unwrap();
     let mut query_results = Vec::new();
     query_results.push(getter.lookup(&["2".into()], true).unwrap());
     query_results.push(getter.lookup(&["lara".into()], true).unwrap());
     query_results.push(getter.lookup(&["malte".into()], true).unwrap());
-    query_results.push(getter.lookup(&[0.into()], true).unwrap());
     println!("author membership view: {:?}", query_results);
 
-    /*    // Check reviewer membership view
+        // Check reviewer membership view
             let mut getter = backend.g.view("reviewers").unwrap();
             let mut query_results = Vec::new();
             query_results.push(getter.lookup(&["4".into()], true).unwrap());
@@ -230,10 +229,6 @@ fn main() {
             query_results.push(getter.lookup(&[0.into()], true).unwrap());
             println!("chair membership view: {:?}", query_results);
     */
-    backend
-        .migrate(sloc, Some("jeeves_gpcontext_queries.sql"), true)
-        .unwrap();
-    println!("third mig");
 
     if gloc.is_some() {
         let graph_fname = gloc.unwrap();
@@ -252,16 +247,54 @@ fn main() {
         println!("GroupContext_authors_1: {:?}", query_results);
     */
 
-    let mut getter = backend.g.view("ChairContext").unwrap();
+    thread::sleep(time::Duration::from_millis(2000));
+    println!("sleep1");
+    thread::sleep(time::Duration::from_millis(2000));
+    println!("sleep2");
+    /*
+        let mut getter = backend.g.view("Authors5").unwrap();
+        let mut query_results = Vec::new();
+        query_results.push(getter.lookup(&[0.into()], true).unwrap());
+        println!(
+            "GroupContext_authors_5, bogokey lookup: {:?}",
+            query_results
+        );
+
+        let mut getter = backend.g.view("AuthorPaperList").unwrap();
+        let mut query_results = Vec::new();
+        for i in 0..6 {
+            query_results.push(getter.lookup(&[i.into()], true).unwrap());
+        }
+        //query_results.push(getter.lookup(&[0.into()], true).unwrap()); // empty (bogokey does exist)
+        println!(
+            "authors5 PaperList, bogokey & by-key lookup: {:?}",
+            query_results
+        );
+
+        let mut getter = backend.g.view("ChairPaperList").unwrap();
+        let mut query_results = Vec::new();
+        query_results.push(getter.lookup(&[0.into()], true).unwrap()); // empty (bogokey does exist)
+        println!("chairs PaperList, bogokey lookup: {:?}", query_results);
+    */
+    println!("Reading from LatestPaperVersion");
+    let mut getter = backend.g.view("LatestPaperVersion").unwrap();
     let mut query_results = Vec::new();
-    query_results.push(getter.lookup(&["chair".into()], true).unwrap());
-    query_results.push(getter.lookup(&[0.into()], true).unwrap());
-    query_results.push(getter.lookup(&["3".into()], true).unwrap());
-    println!("GroupContext_chairs_chair: {:?}", query_results);
+    for i in 0..6 {
+        query_results.push(getter.lookup(&[i.into()], true).unwrap());
+    }
+    println!("LatestPaperVersion: {:?}", query_results);
 
     println!("{}", backend.g.graphviz().unwrap());
-    println!("Reprinting user's papers"); // In case changes didn't have time to propagate
-    test_populate::dump_papers(&mut backend, user);
+    test_populate::dump_papers(&mut backend, user, 0); // bogokey lookup
+    test_populate::dump_papers(&mut backend, user, 5); // by-key lookup
+    test_populate::dump_all_papers(&mut backend);
+    let mut getter = backend.g.view("PaperList").unwrap();
+    let mut query_results = Vec::new();
+    // Look up by id (corresponds to Paper.id)
+    for i in 0..6 {
+        query_results.push(getter.lookup(&[i.into()], true).unwrap());
+    }
+    println!("PaperList (all papers, by-key lookup): {:?}", query_results);
     println!("DONE!");
     // sleep "forever"
     thread::sleep(time::Duration::from_millis(200000000));

@@ -1,10 +1,10 @@
+use nom_sql::SqlQuery;
 use noria::{Modification, Operation, TableOperation};
 use prelude::*;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use vec_map::VecMap;
-use nom_sql::SqlQuery;
 
 /// Base is used to represent the root nodes of the Noria data flow graph.
 ///
@@ -145,7 +145,6 @@ impl Base {
         mut ops: Vec<TableOperation>,
         state: &StateMap,
     ) -> Records {
-
         if self.primary_key.is_none() || ops.is_empty() {
             return ops
                 .into_iter()

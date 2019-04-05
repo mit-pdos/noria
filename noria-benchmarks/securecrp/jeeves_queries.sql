@@ -8,11 +8,13 @@
 --                AS LatestPaperVersion
 --           ON (Paper.id = LatestPaperVersion.paper);
 
-LatestPaperVersion: SELECT *
+QUERY LatestPaperVersion: SELECT *
+--LatestPaperVersion: SELECT *
                  FROM PaperVersion
+		 WHERE PaperVersion.paper = ?
 		 GROUP BY PaperVersion.paper
                  ORDER BY PaperVersion.time
-                 LIMIT 1;
+                 LIMIT 10;
 
 QUERY PaperList: SELECT Paper.*
            FROM Paper

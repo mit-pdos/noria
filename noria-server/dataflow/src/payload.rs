@@ -137,6 +137,7 @@ pub enum Packet {
     AddNode {
         node: Node,
         parents: Vec<LocalNodeIndex>,
+        //        all_parents: Vec<LocalNodeIndex>, // for debugging purposes
     },
 
     /// Direct domain to remove some nodes.
@@ -368,7 +369,7 @@ impl Packet {
                 tag: tag.clone(),
                 data: data.clone(),
                 context: context.clone(),
-                id: id.clone()
+                id: id.clone(),
             },
             _ => unreachable!(),
         }
@@ -403,7 +404,9 @@ impl Packet {
 impl fmt::Debug for Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Packet::Message { ref link, .. } => write!(f, "Packet::Message({:?})", link),
+            Packet::Message {
+                ref link, ref data, ..
+            } => write!(f, "Packet::Message({:?}), data={:?}", link, data),
             Packet::ReplayPiece {
                 ref link,
                 ref tag,
