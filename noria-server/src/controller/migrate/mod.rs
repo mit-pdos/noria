@@ -124,10 +124,10 @@ impl<'a> Migration<'a> {
               "node" => ni.index(),
         );
 
-        // don't add user or group context tables 
-        if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
-            self.mainline.base_nodes.insert(name.to_string(), ni.clone());
-        }
+        // don't add user or group context tables
+        // if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
+        //     self.mainline.base_nodes.insert(name.to_string(), ni.clone());
+        // }
 
         // keep track of the fact that it's new
         self.added.push(ni);
