@@ -819,7 +819,6 @@ impl SqlToMirConverter {
         let mut selected_col_objects = HashSet::new();
 
         for c in &ucols {
-            println!("ucols c: {:?}", c);
             match &c.table {
                 Some(table) => {
                     if table.contains("UserContext") || table.contains("GroupContext") {
