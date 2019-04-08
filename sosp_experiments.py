@@ -4,44 +4,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# EXPERIMENT 1:
+# read throughput as a function of the number of users. 1k to 5k users. 1 million posts, 1000 classes. 90% public posts. users enrolled in 10 classes each.
+nusers = [100, 200, 500]
+policies = ["basic-policies"]
+queries = ["post", "postcount"]
 
-# Read txput experiments:
-# partial basic
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 5000 -p 1000000 -u 5000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/basic-policies.json > 5kpartialbasic.txt"
-subprocess.call(cmd, shell=True)
+for users in nusers:
+    for mode in policies:
+        for query in queries:
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 --partial --policies noria-benchmarks/piazza/{}.json -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}-{}_queries-partial_READ.txt".format(users, users, mode, query, users, mode, query)
+            subprocess.call(cmd, shell=True)
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 --policies noria-benchmarks/piazza/{}.json -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}-{}_queries-full_READ.txt".format(users, users, mode, query, users, mode, query)
+            subprocess.call(cmd, shell=True)
 
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 1000 -p 1000000 -u 1000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/basic-policies.json > 1kpartialbasic.txt"
-subprocess.call(cmd, shell=True)
 
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 3000 -p 1000000 -u 3000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/basic-policies.json > 3kpartialbasic.txt"
-subprocess.call(cmd, shell=True)
+# EXPERIMENT 2 (and 3):
+# 2: write throughput as a function of the number of users.
+# 3: write throughput as a function of query complexity. (no policies, basic policies, complex policies)
+all_policies = ["basic-policies", "no"]
+for users in nusers:
+    for mode in all_policies:
+        for query in queries:
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza-write --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 --partial --policies noria-benchmarks/piazza/{}.json -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}-{}_queries-partial_WRITE.txt".format(users, users, mode, query, users, mode, query)
+            subprocess.call(cmd, shell=True)
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza-write --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 --policies noria-benchmarks/piazza/{}.json -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}-{}_queries-full_WRITE.txt".format(users, users, mode, query, users, mode, query)
+            subprocess.call(cmd, shell=True)
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza-write --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}_policies-{}_queries-full_WRITE.txt".format(users, users, query, users, mode, query)
+            subprocess.call(cmd, shell=True)
 
-# full basic
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 5000 -p 1000000 -u 5000 -c 1000 -m 10 --policies noria-benchmarks/piazza/basic-policies.json > 5kfullbasic.txt"
-subprocess.call(cmd, shell=True)
 
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 1000 -p 1000000 -u 1000 -c 1000 -m 10 --policies noria-benchmarks/piazza/basic-policies.json > 1kfullbasic.txt"
-subprocess.call(cmd, shell=True)
-
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 3000 -p 1000000 -u 3000 -c 1000 -m 10 --policies noria-benchmarks/piazza/basic-policies.json > 3kfullbasic.txt"
-subprocess.call(cmd, shell=True)
-
-# full complex
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 5000 -p 1000000 -u 5000 -c 1000 -m 10 --policies noria-benchmarks/piazza/complex-policies.json > 5kfullcomplex.txt"
-subprocess.call(cmd, shell=True)
-
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 1000 -p 1000000 -u 1000 -c 1000 -m 10 --policies noria-benchmarks/piazza/complex-policies.json > 1kfullcomplex.txt"
-subprocess.call(cmd, shell=True)
-
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 3000 -p 1000000 -u 3000 -c 1000 -m 10 --policies noria-benchmarks/piazza/complex-policies.json > 3kfullcomplex.txt"
-subprocess.call(cmd, shell=True)
-
-# partial complex
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 5000 -p 1000000 -u 5000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/complex-policies.json > 5kpartialcomplex.txt"
-subprocess.call(cmd, shell=True)
-
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 1000 -p 1000000 -u 1000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/complex-policies.json > 1kpartialcomplex.txt"
-subprocess.call(cmd, shell=True)
-
-cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l 3000 -p 1000000 -u 3000 -c 1000 -m 10 --partial --policies noria-benchmarks/piazza/complex-policies.json > 3kpartialcomplex.txt"
-subprocess.call(cmd, shell=True)
+# EXPERIMENT 4:
+# memory overhead as a function of number of users. (with groups + without)
+for users in nusers:
+    for query in ["post"]:
+        for mode in policies:
+            cmd = "/usr/bin/time perflock cargo run --release --bin=piazza --manifest-path noria-benchmarks/Cargo.toml -- -l {} -p 10000 -u {} -c 100 -m 10 --policies noria-benchmarks/piazza/{}.json -q noria-benchmarks/piazza/{}-queries.sql > {}_users-{}-{}_queries-full_MEMORY.txt".format(users, users, mode, query, users, mode, query)
+            subprocess.call(cmd, shell=True)

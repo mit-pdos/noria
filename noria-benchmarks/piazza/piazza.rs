@@ -60,13 +60,13 @@ impl Backend {
         // }
 
         let dur = dur_to_fsec!(start.elapsed());
-        println!(
-            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
-            name,
-            dur,
-            i as f64 / dur
-        );
+        // println!(
+        //     "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+        //     i,
+        //     name,
+        //     dur,
+        //     i as f64 / dur
+        // );
 
         i
     }
@@ -242,9 +242,11 @@ fn main() {
     let private = value_t_or_exit!(args, "private", f32);
     let classes_per_student = value_t_or_exit!(args, "classes_per_user", i32);
 
-    //let partial = false;
-    let query_type = "post_count";
-    // let query_type = "posts";
+    let mut query_type = "posts";
+    if qloc.contains("postcount-queries") {
+        query_type = "post_count";
+    }
+
     let correctness_test = false;
 
     assert!(
@@ -320,8 +322,10 @@ fn main() {
         // Login a user
         println!("Login users...");
         for i in 0..nlogged {
+            println!("logging in i: {:?}", i);
             let start = time::Instant::now();
             backend.login(make_user(i)).is_ok();
+            println!("after login");
             let dur = dur_to_fsec!(start.elapsed());
             println!("Migration {} took {:.2}s!", i, dur,);
 
@@ -362,16 +366,19 @@ fn main() {
             for uid in 0..nlogged {
                 match enrollment_info.get(&uid.into()) {
                     Some(classes) => {
-                        // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                        println!("user {:?} is enrolled in classes: {:?}", uid, classes);
                         let mut class_vec = Vec::new();
                         for class in classes {
                             class_vec.push([class.clone()].to_vec());
                         }
+                        println!("here1");
                         let leaf = format!("posts_u{}", uid);
+                        println!("here2");
                         let mut getter = backend.g.view(&leaf).unwrap();
+                        println!("here3");
                         let start = time::Instant::now();
                         let res = getter.multi_lookup(class_vec.clone(), true);
-                        // println!("res: {:?}", res);
+                        println!("res: {:?}", res);
                         dur += start.elapsed();
 
                     },
@@ -449,7 +456,6 @@ fn main() {
                             },
                             None => { insert = true; }
                         }
-                        println!("updating class: {:?} posts: {:?}", class, npub);
                         if insert {
                             class_to_pub_posts.insert(class.clone(), npub);
                         }
@@ -502,7 +508,6 @@ fn main() {
                     let leaf = format!("post_count_u{}", uid);
 
                     let mut getter = backend.g.view(&leaf).unwrap();
-                    println!("looking up vec: {:?}", class_vec);
                     let start = time::Instant::now();
                     let res = getter.multi_lookup(class_vec.clone(), true);
                     println!("results: {:?}", res);

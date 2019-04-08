@@ -129,7 +129,7 @@ impl Populate {
         println!("Populating posts... with {:?}", self.nposts);
         let mut records = Vec::new();
         for i in 0..self.nposts {
-            let pid = self.largest.into();
+            let pid = i.into();
             let author = self.uid();
             match self.authors.get_mut(&author.clone()) {
                 Some(count) => *count += 1,
@@ -144,14 +144,12 @@ impl Populate {
             let private = self.private();
             let anon = 1.into();
             records.push(vec![pid, cid, author, content, private, anon]);
-            self.largest += 1;
         }
 
         records
     }
 
     pub fn get_user_posts(&mut self, uid: i32, cid: DataType, nposts: i32) -> (Vec<Vec<DataType>>, i32, i32) {
-        println!("Populating posts... with {:?}", nposts);
         let mut num_priv = 0;
         let mut num_pub = 0;
         let mut records = Vec::new();
@@ -177,7 +175,6 @@ impl Populate {
             records.push(vec![pid, cid.clone(), author.clone(), content, private, anon]);
             self.largest += 1;
         }
-        println!("populated for user {:?}. priv: {:?}, pub: {:?}", uid, num_priv, num_pub);
         (records, num_priv, num_pub)
     }
 
