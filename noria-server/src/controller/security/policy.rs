@@ -1,4 +1,5 @@
 use nom_sql::parser as sql_parser;
+use nom_sql::Column;
 use nom_sql::SqlQuery;
 use serde_json;
 use serde_json::Value;
@@ -31,7 +32,7 @@ pub struct RewritePolicy {
     pub table: String,
     pub value: String,
     pub column: String,
-    pub key: String,
+    pub key: Column,
     pub rewrite_view: SqlQuery,
 }
 
@@ -106,7 +107,7 @@ impl Policy {
         }
     }
 
-    pub fn key(&self) -> String {
+    pub fn key(&self) -> Column {
         match *self {
             Policy::Rewrite(ref p) => p.key.clone(),
             Policy::Allow(_) => panic!("Row policy doesn't have key field"),
@@ -179,7 +180,12 @@ impl Policy {
             table: table.to_string(),
             value: value.to_string(),
             column: column.to_string(),
-            key: key.to_string(),
+            key: Column {
+                name: key.into(),
+                alias: None,
+                table: Some(table.to_string()),
+                function: None,
+            },
             rewrite_view: sq,
         })
     }

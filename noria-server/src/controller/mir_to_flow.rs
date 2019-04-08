@@ -3,8 +3,9 @@ use nom_sql::{
 };
 use std::collections::{HashMap, HashSet};
 
-use common::DataType;
+use crate::controller::security::policy::Policy;
 use crate::controller::Migration;
+use common::DataType;
 use dataflow::ops::filter::FilterCondition;
 use dataflow::ops::join::{Join, JoinType};
 use dataflow::ops::latest::Latest;
@@ -12,16 +13,23 @@ use dataflow::ops::project::{Project, ProjectExpression, ProjectExpressionBase};
 use dataflow::{node, ops};
 use mir::node::{GroupedNodeType, MirNode, MirNodeType};
 use mir::query::{MirQuery, QueryFlowParts};
+use mir::visualize::GraphViz;
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
-use crate::controller::security::policy::Policy;
-
 
 pub fn mir_query_to_flow_parts(
     mir_query: &mut MirQuery,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
-    global_name: Option<String>) -> QueryFlowParts {
+    global_name: Option<String>,
+) -> QueryFlowParts {
+    println!("mir_query_to_flow_parts, printing MirQuery digraph");
+    let graph = mir_query.to_graphviz();
+    match graph {
+        Ok(out) => println!("{}", out),
+        Err(out) => println!("ERR: {:?}", out),
+        _ => unreachable!(),
+    }
 
     use std::collections::VecDeque;
 
@@ -38,7 +46,12 @@ pub fn mir_query_to_flow_parts(
     while !node_queue.is_empty() {
         let n = node_queue.pop_front().unwrap();
         assert_eq!(in_edge_counts[&n.borrow().versioned_name()], 0);
-        let flow_node = mir_node_to_flow_parts(&mut n.borrow_mut(), mig, table_mapping.clone(), global_name.clone());
+        let flow_node = mir_node_to_flow_parts(
+            &mut n.borrow_mut(),
+            mig,
+            table_mapping.clone(),
+            global_name.clone(),
+        );
         match flow_node {
             FlowNode::New(na) => new_nodes.push(na),
             FlowNode::Existing(na) => reused_nodes.push(na),
@@ -75,7 +88,12 @@ pub fn mir_query_to_flow_parts(
     }
 }
 
-pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table_mapping: Option<&HashMap<(String, Option<String>), String>>, global_name: Option<String>) -> FlowNode {
+pub fn mir_node_to_flow_parts(
+    mir_node: &mut MirNode,
+    mig: &mut Migration,
+    table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+    global_name: Option<String>,
+) -> FlowNode {
     let name = mir_node.name.clone();
     match mir_node.flow_node {
         None => {
@@ -193,21 +211,34 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                     match global_name {
                         Some(gn) => {
                             g_name = gn;
-                        },
+                        }
                         None => {}
                     }
 
                     if g_name != "".to_string() {
                         // println!("global name not empty");
-                        if !mig.mainline.map_meta.query_to_leaves.contains_key(&g_name.clone()) {
+                        if !mig
+                            .mainline
+                            .map_meta
+                            .query_to_leaves
+                            .contains_key(&g_name.clone())
+                        {
                             let mut associated_nodes = HashSet::new();
                             associated_nodes.insert(na.clone());
-                            mig.mainline.map_meta.query_to_leaves.insert(g_name.clone(), associated_nodes);
+                            mig.mainline
+                                .map_meta
+                                .query_to_leaves
+                                .insert(g_name.clone(), associated_nodes);
                         } else {
-                            match mig.mainline.map_meta.query_to_leaves.get_mut(&g_name.clone()) {
-                               Some(list) => list.insert(na.clone()),
-                               None => false
-                           };
+                            match mig
+                                .mainline
+                                .map_meta
+                                .query_to_leaves
+                                .get_mut(&g_name.clone())
+                            {
+                                Some(list) => list.insert(na.clone()),
+                                None => false,
+                            };
                         }
                     }
 
@@ -312,7 +343,10 @@ pub fn mir_node_to_flow_parts(mir_node: &mut MirNode, mig: &mut Migration, table
                     ref column,
                     ref key,
                 } => {
-                    println!("make rewrite");
+                    println!(
+                        "make rewrite; mir_node inner: {:?}, column: {:?}, value: {:?}, key: {:?}",
+                        mir_node.inner, column, value, key
+                    );
                     let src = mir_node.ancestors[0].clone();
                     let should_rewrite = mir_node.ancestors[1].clone();
 
@@ -487,21 +521,22 @@ pub(crate) fn make_rewrite_node(
     columns: &[Column],
     value: &String,
     rewrite_col: &String,
-    key: &String,
+    key: &Column,
     mig: &mut Migration,
 ) -> FlowNode {
     let src_na = src.borrow().flow_node_addr().unwrap();
     let should_rewrite_na = should_rewrite.borrow().flow_node_addr().unwrap();
-    let column_names = columns.iter().map(|c| &c.name).collect::<Vec<_>>();
-    let rewrite_col = column_names
+    //    let column_names = columns.iter().map(|c| &c.name).collect::<Vec<_>>();
+    let rewrite_col = columns
         .iter()
-        .rposition(|c| *c == rewrite_col)
+        .rposition(|c| c.name == *rewrite_col)
         .unwrap();
-    let key = column_names.iter().rposition(|c| *c == key).unwrap();
+    let key = columns.iter().rposition(|c| *c == *key).unwrap();
 
+    let column_names = columns.iter().map(|c| &c.name).collect::<Vec<_>>();
     let node = mig.add_ingredient(
         String::from(name),
-        column_names.as_slice(),
+        column_names.as_slice(), // might have to be columns instead
         ops::rewrite::Rewrite::new(
             src_na,
             should_rewrite_na,
@@ -749,7 +784,9 @@ pub(crate) fn make_latest_node(
 fn generate_projection_base(parent: &MirNodeRef, base: &ArithmeticBase) -> ProjectExpressionBase {
     match *base {
         ArithmeticBase::Column(ref column) => {
-            let column_id = parent.borrow().column_id_for_column(&Column::from(column), None);
+            let column_id = parent
+                .borrow()
+                .column_id_for_column(&Column::from(column), None);
             ProjectExpressionBase::Column(column_id)
         }
         ArithmeticBase::Scalar(ref literal) => {

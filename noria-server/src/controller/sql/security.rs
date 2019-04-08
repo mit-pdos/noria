@@ -4,6 +4,7 @@ use crate::controller::sql::{QueryFlowParts, SqlIncorporator};
 use crate::controller::Migration;
 use dataflow::prelude::DataType;
 use nom_sql::parser as sql_parser;
+use nom_sql::Column;
 use nom_sql::SqlQuery;
 use std::collections::HashMap;
 
@@ -32,7 +33,7 @@ impl Universe {
 pub struct RewritePolicy {
     pub value: String,
     pub column: String,
-    pub key: String,
+    pub key: Column,
     pub rewrite_view: String,
 }
 

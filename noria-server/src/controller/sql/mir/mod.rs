@@ -904,6 +904,9 @@ impl SqlToMirConverter {
             emit.push(acols.clone());
         }
 
+        for e in &emit {
+            println!("cols {:?} len: {:?}", e, e.len());
+        }
         assert!(
             emit.iter().all(|e| e.len() == selected_cols.len()),
             "all ancestors columns must have the same size, but got emit: {:?}, selected: {:?}",

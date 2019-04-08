@@ -1,5 +1,6 @@
 use crate::controller::sql::mir::SqlToMirConverter;
 use mir::node::{MirNode, MirNodeType};
+use mir::Column;
 use mir::MirNodeRef;
 
 pub fn make_rewrite_nodes(
@@ -42,7 +43,7 @@ pub fn make_rewrite_nodes(
             MirNodeType::Rewrite {
                 value: p.value,
                 column: p.column,
-                key: p.key,
+                key: Column::from(p.key),
             },
             vec![parent.clone(), should_rewrite.clone()],
             vec![],

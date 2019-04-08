@@ -10,8 +10,8 @@ use dataflow::ops;
 use dataflow::ops::filter::FilterCondition;
 use dataflow::ops::grouped::aggregate::Aggregation as AggregationKind;
 use dataflow::ops::grouped::extremum::Extremum as ExtremumKind;
-use {FlowNode, MirNodeRef};
 use std::collections::HashMap;
+use {FlowNode, MirNodeRef};
 
 /// Helper enum to avoid having separate `make_aggregation_node` and `make_extremum_node` functions
 pub enum GroupedNodeType {
@@ -209,87 +209,87 @@ impl MirNode {
     }
 
     pub fn column_id_for_column(
-          &self,
-          c: &Column,
-          table_mapping: Option<&HashMap<(String, Option<String>), String>>,
-      ) -> usize {
-          match self.inner {
-              // if we're a base, translate to absolute column ID (taking into account deleted
-              // columns). We use the column specifications here, which track a tuple of (column
-              // spec, absolute column ID).
-              // Note that `rposition` is required because multiple columns of the same name might
-              // exist if a column has been removed and re-added. We always use the latest column,
-              // and assume that only one column of the same name ever exists at the same time.
-              MirNodeType::Base {
-                  ref column_specs, ..
-              } => match column_specs
-                  .iter()
-                  .rposition(|cs| Column::from(&cs.0.column) == *c)
-              {
-                  None => panic!(
-                      "tried to look up non-existent column {:?} in {}",
-                      c, self.name
-                  ),
-                  Some(id) => column_specs[id]
-                      .1
-                      .expect("must have an absolute column ID on base"),
-              },
-              MirNodeType::Reuse { ref node } => node.borrow().column_id_for_column(c, table_mapping),
-              // otherwise, just look up in the column set
-              _ => match self.columns.iter().position(|cc| cc == c) {
-                  None => {
-                      let get_column_index = |c: &Column, t_name: &str| -> usize {
-                          let mut ac = c.clone();
-                          ac.table = Some(t_name.to_owned());
-                          self.columns
-                              .iter()
-                              .position(|cc| *cc.name == ac.name)
-                              .expect(&format!(
-                                  "tried to look up non-existent column {:?} on node \
-                                   \"{}\" (columns: {:?})",
-                                  c, self.name, self.columns
-                              ))
-                      };
-                      // See if table mapping was passed in
-                      match table_mapping {
-                          // if mapping was passed in, then see if c has an associated table, and check
-                          // the mapping for a key based on this
-                          Some(map) => match c.table {
-                              Some(ref table) => {
-                                  let key = (c.name.clone(), Some(table.clone()));
-                                  match map.get(&key) {
-                                      Some(ref t_name) => get_column_index(c, t_name),
-                                      None => match map.get(&(c.name.clone(), None)) {
-                                          Some(ref t_name) => get_column_index(c, t_name),
-                                          None => {
-                                              panic!("alias is not in mapping table!");
-                                          }
-                                      },
-                                  }
-                              }
-                              None => match map.get(&(c.name.clone(), None)) {
-                                  Some(ref t_name) => get_column_index(c, t_name),
-                                  None => panic!(
-                                      "tried to look up non-existent column {:#?} on node \
-                                       \"{}\" (columns: {:#?})",
-                                      c, self.name, self.columns
-                                  ),
-                              },
-                          },
-                          // panic if no mapping was passed in
-                          None => {
-                              panic!(
-                                  "tried to look up non-existent column {:#?} on node \"{}\" \
-                                   (columns: {:#?})",
-                                  c, self.name, self.columns
-                              );
-                          }
-                      }
-                  }
-                  Some(id) => id,
-              },
-          }
-      }
+        &self,
+        c: &Column,
+        table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+    ) -> usize {
+        match self.inner {
+            // if we're a base, translate to absolute column ID (taking into account deleted
+            // columns). We use the column specifications here, which track a tuple of (column
+            // spec, absolute column ID).
+            // Note that `rposition` is required because multiple columns of the same name might
+            // exist if a column has been removed and re-added. We always use the latest column,
+            // and assume that only one column of the same name ever exists at the same time.
+            MirNodeType::Base {
+                ref column_specs, ..
+            } => match column_specs
+                .iter()
+                .rposition(|cs| Column::from(&cs.0.column) == *c)
+            {
+                None => panic!(
+                    "tried to look up non-existent column {:?} in {}",
+                    c, self.name
+                ),
+                Some(id) => column_specs[id]
+                    .1
+                    .expect("must have an absolute column ID on base"),
+            },
+            MirNodeType::Reuse { ref node } => node.borrow().column_id_for_column(c, table_mapping),
+            // otherwise, just look up in the column set
+            _ => match self.columns.iter().position(|cc| cc == c) {
+                None => {
+                    let get_column_index = |c: &Column, t_name: &str| -> usize {
+                        let mut ac = c.clone();
+                        ac.table = Some(t_name.to_owned());
+                        self.columns
+                            .iter()
+                            .position(|cc| *cc.name == ac.name)
+                            .expect(&format!(
+                                "tried to look up non-existent column {:?} on node \
+                                 \"{}\" (columns: {:?})",
+                                c, self.name, self.columns
+                            ))
+                    };
+                    // See if table mapping was passed in
+                    match table_mapping {
+                        // if mapping was passed in, then see if c has an associated table, and check
+                        // the mapping for a key based on this
+                        Some(map) => match c.table {
+                            Some(ref table) => {
+                                let key = (c.name.clone(), Some(table.clone()));
+                                match map.get(&key) {
+                                    Some(ref t_name) => get_column_index(c, t_name),
+                                    None => match map.get(&(c.name.clone(), None)) {
+                                        Some(ref t_name) => get_column_index(c, t_name),
+                                        None => {
+                                            panic!("alias is not in mapping table!");
+                                        }
+                                    },
+                                }
+                            }
+                            None => match map.get(&(c.name.clone(), None)) {
+                                Some(ref t_name) => get_column_index(c, t_name),
+                                None => panic!(
+                                    "tried to look up non-existent column {:#?} on node \
+                                     \"{}\" (columns: {:#?})",
+                                    c, self.name, self.columns
+                                ),
+                            },
+                        },
+                        // panic if no mapping was passed in
+                        None => {
+                            panic!(
+                                "tried to look up non-existent column {:#?} on node \"{}\" \
+                                 (columns: {:#?})",
+                                c, self.name, self.columns
+                            );
+                        }
+                    }
+                }
+                Some(id) => id,
+            },
+        }
+    }
 
     pub fn column_specifications(&self) -> &[(ColumnSpecification, Option<usize>)] {
         match self.inner {
@@ -463,7 +463,7 @@ pub enum MirNodeType {
     Rewrite {
         value: String,
         column: String,
-        key: String,
+        key: Column,
     },
 }
 
@@ -629,18 +629,18 @@ impl MirNodeType {
                                     if !table.contains("UserContext") {
                                         ret_val = true;
                                     }
-                                },
+                                }
                                 None => {}
                             }
                         }
 
                         if ret_val {
-                            return our_on_left == on_left && our_on_right == on_right && our_project == project;
+                            return our_on_left == on_left
+                                && our_on_right == on_right
+                                && our_project == project;
                         } else {
                             return ret_val;
                         }
-
-
                     }
                     _ => false,
                 }
