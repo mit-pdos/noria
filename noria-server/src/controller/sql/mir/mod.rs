@@ -818,39 +818,46 @@ impl SqlToMirConverter {
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
 
-        for c in ucols.clone() {
+        for c in &ucols {
+            println!("ucols c: {:?}", c);
+            match &c.table {
+                Some(table) => {
+                    if table.contains("UserContext") || table.contains("GroupContext") {
+                        continue;
+                    }
+                }
+                None => (),
+            }
             for ancestor in ancestors.iter() {
-                if ancestor
+                if let Some(ac) = ancestor
                     .borrow()
                     .columns()
                     .iter()
-                    .any(|ac| *ac.name == c.name)
+                    .find(|ac| *ac.name == c.name)
                 {
-                    match &c.table {
-                        Some(table) => {
-                            if !table.contains("UserContext") && !table.contains("GroupContext") {
-                                selected_cols.insert(c.name.clone());
-                                selected_col_objects.insert(c.clone());
-                            }
-                        }
-                        None => {
-                            selected_cols.insert(c.name.clone());
-                            selected_col_objects.insert(c.clone());
-                        }
-                    }
+                    println!("ucols {:?} matched w/ ancestor {:?}", c, ancestor);
+                    // below is weird because it always adds the column from the
+                    // first ancestor, rather than the ancestor being iterated through.
+                    // Can change to ac and complete this proposed refactor after
+                    // figuring how how that would affect precedent_table later in
+                    // this function.
+                    selected_cols.insert(c.name.clone());
+                    selected_col_objects.insert(c.clone());
                 }
             }
         }
 
+        // precedent_table will be the table corresponding to the last column that
+        // happens to be processed from selected_col_objects.
         let mut precedent_table = " ".to_string();
-        for col in selected_col_objects.clone() {
+        for col in &selected_col_objects {
             match &col.table {
                 Some(x) => {
                     debug!(
                         self.log,
                         "Selected column {} from table {} for UNION.", col.name, x
                     );
-                    precedent_table = col.table.unwrap();
+                    precedent_table = col.table.clone().unwrap();
                 }
                 None => {
                     debug!(
@@ -904,9 +911,6 @@ impl SqlToMirConverter {
             emit.push(acols.clone());
         }
 
-        for e in &emit {
-            println!("cols {:?} len: {:?}", e, e.len());
-        }
         assert!(
             emit.iter().all(|e| e.len() == selected_cols.len()),
             "all ancestors columns must have the same size, but got emit: {:?}, selected: {:?}",
