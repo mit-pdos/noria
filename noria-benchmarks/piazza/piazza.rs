@@ -60,13 +60,13 @@ impl Backend {
         // }
 
         let dur = dur_to_fsec!(start.elapsed());
-        println!(
-            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
-            name,
-            dur,
-            i as f64 / dur
-        );
+        // println!(
+        //     "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
+        //     i,
+        //     name,
+        //     dur,
+        //     i as f64 / dur
+        // );
 
         i
     }
@@ -215,6 +215,12 @@ fn main() {
                 .default_value("0.0")
                 .help("Percentage of private posts"),
         )
+        .arg(
+            Arg::with_name("classes_per_user")
+                .short("m")
+                .default_value("10")
+                .help("Number of classes each student is in"),
+        )
         .get_matches();
 
     println!("Starting benchmark...");
@@ -234,12 +240,14 @@ fn main() {
     let nclasses = value_t_or_exit!(args, "nclasses", i32);
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
+    let classes_per_student = value_t_or_exit!(args, "classes_per_user", i32);
 
-    let partial = true;
-    //let partial = false;
-    let query_type = "post_count";
-    // let query_type = "posts";
-    let correctness_test = true;
+    let mut query_type = "posts";
+    if qloc.contains("postcount-queries") {
+        query_type = "post_count";
+    }
+
+    let correctness_test = false;
 
     assert!(
         nlogged <= nusers,
@@ -263,8 +271,7 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    let classes_per_student = 10;
-    // let classes_per_student = nclasses;
+
     p.enroll_students(classes_per_student);
 
     let classes = p.get_classes();
@@ -357,7 +364,6 @@ fn main() {
             for uid in 0..nlogged {
                 match enrollment_info.get(&uid.into()) {
                     Some(classes) => {
-                        // println!("user {:?} is enrolled in classes: {:?}", uid, classes);
                         let mut class_vec = Vec::new();
                         for class in classes {
                             class_vec.push([class.clone()].to_vec());
@@ -366,7 +372,6 @@ fn main() {
                         let mut getter = backend.g.view(&leaf).unwrap();
                         let start = time::Instant::now();
                         let res = getter.multi_lookup(class_vec.clone(), true);
-                        // println!("res: {:?}", res);
                         dur += start.elapsed();
 
                     },
@@ -396,7 +401,6 @@ fn main() {
                         // println!("looking up vec: {:?}", class_vec);
                         let start = time::Instant::now();
                         let res = getter.multi_lookup(class_vec.clone(), true);
-                        println!("res: {:?}", res);
                         dur += start.elapsed();
 
                     },
@@ -444,7 +448,6 @@ fn main() {
                             },
                             None => { insert = true; }
                         }
-                        println!("updating class: {:?} posts: {:?}", class, npub);
                         if insert {
                             class_to_pub_posts.insert(class.clone(), npub);
                         }
@@ -497,7 +500,6 @@ fn main() {
                     let leaf = format!("post_count_u{}", uid);
 
                     let mut getter = backend.g.view(&leaf).unwrap();
-                    println!("looking up vec: {:?}", class_vec);
                     let start = time::Instant::now();
                     let res = getter.multi_lookup(class_vec.clone(), true);
                     println!("results: {:?}", res);

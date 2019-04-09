@@ -6,7 +6,7 @@ import numpy as np
 
 # EXPERIMENT 1:
 # read throughput as a function of the number of users. 1k to 5k users. 1 million posts, 1000 classes. 90% public posts. users enrolled in 10 classes each.
-nusers = [100, 200, 500]
+nusers = [1000, 2000, 5000]
 policies = ["basic-policies"]
 queries = ["post", "postcount"]
 
