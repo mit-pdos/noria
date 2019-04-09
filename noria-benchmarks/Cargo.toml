@@ -110,3 +110,11 @@ path = "replay/main.rs"
 [[bin]]
 name = "security-mysql"
 path = "piazza/mysql.rs"
+
+[[bin]]
+name = "piazza-write"
+path = "piazza/piazza-write.rs"
+
+[[bin]]
+name = "mysql-write"
+path = "piazza/mysql-write.rs"
