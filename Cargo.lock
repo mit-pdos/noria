@@ -515,7 +515,7 @@ dependencies = [
  "serde_derive 1.0.85 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "srmap 0.1.15 (git+https://github.com/amarzoev/srmap)",
+ "srmap 0.1.15",
  "stream-cancel 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "timekeeper 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2213,7 +2213,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "srmap"
 version = "0.1.15"
-source = "git+https://github.com/amarzoev/srmap#1be28d1dc0daa9460f3a841742a5c62b38596d81"
 dependencies = [
  "arccstr 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-vec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3208,7 +3207,6 @@ dependencies = [
 "checksum smallvec 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "f90c5e5fe535e48807ab94fc611d323935f39d4660c52b26b96446a7b33aef10"
 "checksum smallvec 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)" = "88aea073965ab29f6edb5493faf96ad662fb18aa9eeb186a3b7057951605ed15"
 "checksum snowflake 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "27207bb65232eda1f588cf46db2fee75c0808d557f6b3cf19a75f5d6d7c94df1"
-"checksum srmap 0.1.15 (git+https://github.com/amarzoev/srmap)" = "<none>"
 "checksum ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "dee822d619a700f98c4de3b5931f272ecc7cf2e924ceb2df47b61df4ae033a0c"
 "checksum stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 "checksum stream-cancel 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "9d62fea0968935ec8eedcf671b2738bf49c58e133db968097c301d32e32eaedf"

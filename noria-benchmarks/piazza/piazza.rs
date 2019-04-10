@@ -358,26 +358,77 @@ fn main() {
 
         // --- Posts Query ---
         if query_type == "posts" {
-            println!("post query");
+            let mut authors = p.authors();
+            for (author, count) in &authors {
+               println!("author: {:?}, count: {:?}", author, count);
+            }
+
             let num_at_once = nclasses as usize;
             let mut enrollment_info = p.get_enrollment();
-            for uid in 0..nlogged {
-                match enrollment_info.get(&uid.into()) {
-                    Some(classes) => {
-                        let mut class_vec = Vec::new();
-                        for class in classes {
-                            class_vec.push([class.clone()].to_vec());
-                        }
-                        let leaf = format!("posts_u{}", uid);
-                        let mut getter = backend.g.view(&leaf).unwrap();
-                        let start = time::Instant::now();
-                        let res = getter.multi_lookup(class_vec.clone(), true);
-                        dur += start.elapsed();
 
-                    },
-                    None => println!("why isn't user {:?} enrolled", uid),
-                }
+            let mut class_to_students: HashMap<DataType, Vec<DataType>> = HashMap::new();
+            for (student, classes) in &enrollment_info {
+               for class in classes {
+                   match class_to_students.get_mut(&class) {
+                       Some(student_list) => {
+                           student_list.push(student.clone());
+                       },
+                       None => {
+                           let mut stud_list = Vec::new();
+                           stud_list.push(student.clone());
+                           class_to_students.insert(class.clone(), stud_list);
+                       }
+                   }
+               }
             }
+
+
+            for uid in 0..nlogged {
+               match enrollment_info.get(&uid.into()) {
+                   Some(classes) => {
+                       println!("user {:?} is enrolled in classes: {:?}", uid, classes);
+                       let mut query_vec = Vec::new();
+                       for class_id in classes {
+                           match class_to_students.get(&class_id) {
+                               Some(list) => {
+                                   for student in list {
+                                       query_vec.push([student.clone()].to_vec());
+                                   }
+                               },
+                               None => {},
+                           }
+                       }
+                       let leaf = format!("post_count_u{}", uid);
+                       let mut getter = backend.g.view(&leaf).unwrap();
+                       let start = time::Instant::now();
+                       let res = getter.multi_lookup(query_vec.clone(), true);
+                       dur += start.elapsed();
+                       println!("res: {:?}", res);
+
+                   },
+                   None => println!("why isn't user {:?} enrolled", uid),
+               }
+            }
+            // println!("post query");
+            // let num_at_once = nclasses as usize;
+            // let mut enrollment_info = p.get_enrollment();
+            // for uid in 0..nlogged {
+            //     match enrollment_info.get(&uid.into()) {
+            //         Some(classes) => {
+            //             let mut class_vec = Vec::new();
+            //             for class in classes {
+            //                 class_vec.push([class.clone()].to_vec());
+            //             }
+            //             let leaf = format!("posts_u{}", uid);
+            //             let mut getter = backend.g.view(&leaf).unwrap();
+            //             let start = time::Instant::now();
+            //             let res = getter.multi_lookup(class_vec.clone(), true);
+            //             dur += start.elapsed();
+            //
+            //         },
+            //         None => println!("why isn't user {:?} enrolled", uid),
+            //     }
+            // }
         }
 
         // cid version of post_count query
