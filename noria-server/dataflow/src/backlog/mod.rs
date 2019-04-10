@@ -50,7 +50,7 @@ fn new_inner(
         contiguous
     };
 
-    let mut srmap = true;
+    let mut srmap = false;
 
     macro_rules! make_srmap {
     ($variant:tt) => {{
@@ -105,6 +105,7 @@ fn new_inner(
         (r, w)
 
     } else {
+        println!("creating new evmap!");
         let (r, w) = match (key.len(), srmap) {
             (0, _) => unreachable!(),
             (1, false) => make!(Single),

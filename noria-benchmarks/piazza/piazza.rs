@@ -212,7 +212,7 @@ fn main() {
         .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.0")
+                .default_value("0.1")
                 .help("Percentage of private posts"),
         )
         .arg(
@@ -247,7 +247,7 @@ fn main() {
         query_type = "post_count";
     }
 
-    let correctness_test = false;
+    let correctness_test = true;
 
     assert!(
         nlogged <= nusers,
@@ -382,7 +382,6 @@ fn main() {
                }
             }
 
-
             for uid in 0..nlogged {
                match enrollment_info.get(&uid.into()) {
                    Some(classes) => {
@@ -398,13 +397,12 @@ fn main() {
                                None => {},
                            }
                        }
-                       let leaf = format!("post_count_u{}", uid);
+                       let leaf = format!("postcount_u{}", uid);
                        let mut getter = backend.g.view(&leaf).unwrap();
                        let start = time::Instant::now();
                        let res = getter.multi_lookup(query_vec.clone(), true);
                        dur += start.elapsed();
                        println!("res: {:?}", res);
-
                    },
                    None => println!("why isn't user {:?} enrolled", uid),
                }
@@ -489,7 +487,7 @@ fn main() {
             match enrollment_info.get(&uid.into()) {
                 Some(classes) => {
                     for class in classes {
-                        let (posts, npriv, npub) = p.get_user_posts(uid, class.clone(), 2);
+                        let (posts, npriv, npub) = p.get_user_posts(uid, class.clone(), 10);
                         backend.populate("Post", posts.clone());
                         let mut prev_count = 0;
                         let mut insert = false;
@@ -535,17 +533,19 @@ fn main() {
 
         println!("class to pub posts: {:?}", class_to_pub_posts);
 
+        let mut dur = time::Duration::from_millis(0);
+
         // test post_count query
         for uid in 0..nlogged {
             match enrollment_info.get(&uid.into()) {
                 Some(classes) => {
                     let mut class_vec = Vec::new();
-                    let mut expected_count = Vec::new();
+                    let mut expected_count = HashMap::new();
                     for class in classes {
                         class_vec.push([class.clone()].to_vec());
                         let mut expected_num_posts = *class_to_pub_posts.get(&class).unwrap();
                         expected_num_posts += user_class_to_priv_posts.get(&(uid, class)).unwrap();
-                        expected_count.push(expected_num_posts);
+                        expected_count.insert(class.clone(), expected_num_posts);
                     }
 
                     let leaf = format!("post_count_u{}", uid);
@@ -553,12 +553,36 @@ fn main() {
                     let mut getter = backend.g.view(&leaf).unwrap();
                     let start = time::Instant::now();
                     let res = getter.multi_lookup(class_vec.clone(), true);
-                    println!("results: {:?}", res);
-                    println!("expected counts: {:?}", expected_count);
+                    dur += start.elapsed();
+
+                    // println!("res: {:?}", res.unwrap());
+                    for result in res.unwrap(){
+                        match expected_count.get(&result[0][0]) {
+                            Some(count) => {
+                                let count : i32 = *count;
+                                let count : DataType = count.into();
+                                assert!(result[0][1] == count);
+                            },
+                            None => {
+                                panic!("weren't supposed to return anything from this class?");
+                            }
+                        }
+                    }
+                    // println!("expected counts: {:?}", expected_count);
                 },
                 None => println!("why isn't user {:?} enrolled in any classes?", uid),
             }
         }
+
+        let dur = dur_to_fsec!(dur);
+
+        let num_read = classes_per_student * 10 * nlogged;
+        println!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            num_read,
+            dur,
+            (num_read) as f64 / dur,
+        );
     }
 
 }
