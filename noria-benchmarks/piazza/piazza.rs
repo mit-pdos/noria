@@ -33,6 +33,8 @@ impl Backend {
             cb.disable_partial();
         }
 
+        cb.set_sharding(None);
+
         match reuse.as_ref() {
             "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
             "full" => cb.set_reuse(ReuseConfigType::Full),
@@ -212,7 +214,7 @@ fn main() {
         .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.0")
+                .default_value("0.1")
                 .help("Percentage of private posts"),
         )
         .arg(
