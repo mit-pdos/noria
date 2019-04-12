@@ -33,6 +33,8 @@ impl Backend {
             cb.disable_partial();
         }
 
+        cb.set_sharding(None);
+
         match reuse.as_ref() {
             "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
             "full" => cb.set_reuse(ReuseConfigType::Full),
@@ -212,13 +214,19 @@ fn main() {
         .arg(
             Arg::with_name("private")
                 .long("private")
-                .default_value("0.0")
+                .default_value("0.1")
                 .help("Percentage of private posts"),
         )
         .arg(
             Arg::with_name("classes_per_user")
                 .short("m")
                 .default_value("10")
+                .help("Number of classes each student is in"),
+        )
+        .arg(
+            Arg::with_name("query_to_run")
+                .short("z")
+                .default_value("post_count")
                 .help("Number of classes each student is in"),
         )
         .get_matches();
@@ -241,10 +249,8 @@ fn main() {
     let nposts = value_t_or_exit!(args, "nposts", i32);
     let private = value_t_or_exit!(args, "private", f32);
     let classes_per_student = value_t_or_exit!(args, "classes_per_user", i32);
+    let query_type = args.value_of("query_to_run").unwrap_or("post_count");
 
-    //let partial = false;
-    let query_type = "post_count";
-    // let query_type = "posts";
     let correctness_test = false;
 
     assert!(
@@ -269,8 +275,7 @@ fn main() {
     };
 
     let mut p = Populate::new(nposts, nusers, nclasses, private);
-    let classes_per_student = 10;
-    // let classes_per_student = nclasses;
+
     p.enroll_students(classes_per_student);
 
     let classes = p.get_classes();
@@ -357,7 +362,6 @@ fn main() {
 
         // --- Posts Query ---
         if query_type == "posts" {
-            println!("post query");
             let num_at_once = nclasses as usize;
             let mut enrollment_info = p.get_enrollment();
             for uid in 0..nlogged {
@@ -401,7 +405,7 @@ fn main() {
                         // println!("looking up vec: {:?}", class_vec);
                         let start = time::Instant::now();
                         let res = getter.multi_lookup(class_vec.clone(), true);
-                        println!("res: {:?}", res);
+                    //    println!("res: {:?}", res);
                         dur += start.elapsed();
                     }
                     None => println!("why isn't user {:?} enrolled", uid),
@@ -411,13 +415,22 @@ fn main() {
 
         let dur = dur_to_fsec!(dur);
 
-        let num_at_once: i32 = nclasses;
-        println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            num_at_once * nlogged,
-            dur,
-            (num_at_once * nlogged) as f64 / dur,
-        );
+        if query_type == "posts" {
+            let posts_per_class = nposts / nclasses;
+            println!(
+                "Read {} keys in {:.4}s ({:.4} GETs/sec)!",
+                classes_per_student * nlogged * posts_per_class,
+                dur,
+                (nclasses * nlogged * posts_per_class) as f64 / dur,
+            );
+        } else if query_type == "post_count" {
+            println!(
+                "Read {} keys in {:.4}s ({:.4} GETs/sec)!",
+                classes_per_student * nlogged,
+                dur,
+                (classes_per_student * nlogged) as f64 / dur,
+            );
+        }
 
         println!("Done with benchmark.");
 
