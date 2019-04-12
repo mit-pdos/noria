@@ -178,7 +178,6 @@ impl Reader {
             if m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        println!("processing row: {:?}", row);
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // row would miss in partial state.

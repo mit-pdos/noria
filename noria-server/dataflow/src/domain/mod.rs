@@ -882,7 +882,7 @@ impl Domain {
                                 use std::sync::Arc;
                                 // println!("partial global srmap, id: {:?}", gid);
 
-                                let mut srmap = true;
+                                let mut srmap = false;
 
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
@@ -1088,7 +1088,7 @@ impl Domain {
                                                                backlog::WriteHandle);
 
 
-                                let srmap = true;
+                                let srmap = false;
 
                                 let mut ids = 0 as usize;
                                 match uid {
