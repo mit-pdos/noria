@@ -74,10 +74,6 @@ impl<'a> Migration<'a> {
         I: Ingredient + Into<NodeOperator>,
     {
         let mut i = node::Node::new(name.to_string(), fields, i.into());
-        println!("name: {:?}", i.name()); 
-        if i.name().contains("count") {
-            i.srmap = true;
-        }
 
         i.on_connected(&self.mainline.ingredients);
         let parents = i.ancestors();

@@ -881,8 +881,14 @@ impl Domain {
                                 use backlog;
                                 use std::sync::Arc;
                                 // println!("partial global srmap, id: {:?}", gid);
+                                let mut name = self.nodes[node].borrow();
 
-                                let srmap = self.nodes[node].borrow_mut().srmap;
+                                let srmap;
+                                if name.name().contains("count") {
+                                    srmap = false;
+                                } else {
+                                    srmap = true;
+                                }
 
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
@@ -1087,14 +1093,21 @@ impl Domain {
                                 let (mut r_part, mut w_part): (backlog::SingleReadHandle,
                                                                backlog::WriteHandle);
 
-                                let srmap = self.nodes[node].borrow_mut().srmap;
-
                                 let mut ids = 0 as usize;
                                 match uid {
                                    Some(id) => {
                                        ids = id;
                                    },
                                    None => {}
+                                }
+                                let srmap;
+                                let mut name = self.nodes[node].borrow().clone();
+
+
+                                if name.name().contains("count") {
+                                    srmap = false;
+                                } else {
+                                    srmap = true;
                                 }
 
                                 if srmap {
