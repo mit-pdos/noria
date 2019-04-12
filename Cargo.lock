@@ -2213,11 +2213,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "srmap"
 version = "0.1.15"
-<<<<<<< HEAD
-source = "git+https://github.com/amarzoev/srmap#344f49fb03055099f061e5acdb08910ad3746a64"
-=======
 source = "git+https://github.com/amarzoev/srmap#ec91b08f9c282f8e7202b2a0536bf2084cb0f618"
->>>>>>> working
 dependencies = [
  "arccstr 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
