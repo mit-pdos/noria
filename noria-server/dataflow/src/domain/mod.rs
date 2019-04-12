@@ -881,7 +881,7 @@ impl Domain {
                                 use backlog;
                                 use std::sync::Arc;
                                 // println!("partial global srmap, id: {:?}", gid);
-                                let mut name = self.nodes[node].borrow();
+                                let mut name = self.nodes[node].borrow().clone();
 
                                 let srmap;
                                 if name.name().contains("count") {
