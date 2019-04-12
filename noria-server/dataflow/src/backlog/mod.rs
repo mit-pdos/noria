@@ -50,8 +50,6 @@ fn new_inner(
         contiguous
     };
 
-    let mut srmap = false;
-
     macro_rules! make_srmap {
     ($variant:tt) => {{
             use srmap;

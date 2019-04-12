@@ -26,6 +26,7 @@ pub struct Node {
     children: Vec<LocalNodeIndex>,
     inner: NodeType,
     taken: bool,
+    pub srmap: bool,
 
     sharded_by: Sharding,
 }
@@ -48,6 +49,7 @@ impl Node {
             children: Vec::new(),
             inner: inner.into(),
             taken: false,
+            srmap: false,
 
             sharded_by: Sharding::None,
         }
