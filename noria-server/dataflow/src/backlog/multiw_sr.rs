@@ -1,6 +1,4 @@
 use super::{key_to_double, key_to_single, Key};
-use evmap;
-use fnv::FnvBuildHasher;
 use prelude::*;
 
 #[derive(Clone)]
@@ -66,12 +64,8 @@ impl Handle {
 
     /// Evict `count` randomly selected keys from state and return them along with the number of
     /// bytes freed.
-    pub fn empty_at_index(&mut self, index: usize) -> Option<&Vec<Vec<DataType>>> {
-        match *self {
-            Handle::SingleSR(ref mut h) => unimplemented!(),
-            Handle::DoubleSR(ref mut h) => unimplemented!(),
-            Handle::ManySR(ref mut h) => unimplemented!(),
-        }
+    pub fn empty_at_index(&mut self, _index: usize) -> Option<&Vec<Vec<DataType>>> {
+        unimplemented!()
     }
 
     pub fn refresh(&mut self) {

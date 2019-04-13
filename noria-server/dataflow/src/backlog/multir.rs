@@ -3,7 +3,7 @@ use evmap;
 use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
-pub enum Handle {
+pub(super) enum Handle {
     Single(evmap::ReadHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     Double(evmap::ReadHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     Many(evmap::ReadHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
@@ -26,7 +26,7 @@ impl Handle {
             Handle::Single(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
-            },
+            }
             Handle::Double(ref h) => {
                 assert_eq!(key.len(), 2);
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
@@ -54,10 +54,8 @@ impl Handle {
                     mem::forget(stack_key);
                     v
                 }
-            },
-            Handle::Many(ref h) => {
-                h.meta_get_and(&key.to_vec(), then)
-            },
+            }
+            Handle::Many(ref h) => h.meta_get_and(key, then),
         }
     }
 }

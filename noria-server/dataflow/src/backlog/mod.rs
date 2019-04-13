@@ -3,9 +3,7 @@ use fnv::FnvBuildHasher;
 use prelude::*;
 use rand::{Rng, ThreadRng};
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 /// Allocate a new end-user facing result table.
 crate fn new(

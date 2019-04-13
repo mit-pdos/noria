@@ -6,13 +6,9 @@
 //! module).
 
 use crate::controller::domain_handle::DomainHandle;
-use crate::controller::inner::ControllerInner;
 use crate::controller::inner::MapMeta;
 use crate::controller::recipe::Recipe;
-use crate::controller::{
-    inner::{graphviz, DomainReplies},
-    keys,
-};
+use crate::controller::{inner::DomainReplies, keys};
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::prelude::*;
 use petgraph;
@@ -830,10 +826,7 @@ impl Materializations {
                         }
                     }
                 }
-                None => {
-                    let n = &graph[ni];
-                    // println!("DECIDING: n: {:?}", n);
-                }
+                None => {}
             }
 
             match map_meta.reader_to_uid.get(&ni) {

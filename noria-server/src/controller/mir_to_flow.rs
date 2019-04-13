@@ -3,7 +3,6 @@ use nom_sql::{
 };
 use std::collections::{HashMap, HashSet};
 
-use crate::controller::security::policy::Policy;
 use crate::controller::Migration;
 use common::DataType;
 use dataflow::ops::filter::FilterCondition;
@@ -28,7 +27,6 @@ pub(super) fn mir_query_to_flow_parts(
     match graph {
         Ok(out) => println!("{}", out),
         Err(out) => println!("ERR: {:?}", out),
-        _ => unreachable!(),
     }
 
     use std::collections::VecDeque;

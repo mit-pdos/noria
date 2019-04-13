@@ -681,7 +681,6 @@ impl SqlIncorporator {
         mut mig: &mut Migration,
         global_name: Option<String>,
     ) -> Result<QueryFlowParts, String> {
-        use ::mir::reuse::merge_mir_for_queries;
         use ::mir::visualize::GraphViz;
         let universe = mig.universe();
 
@@ -706,7 +705,7 @@ impl SqlIncorporator {
         );
 
         // compare to existing query MIR and reuse prefix
-        let mut reused_mir = new_opt_mir.clone();
+        let reused_mir = new_opt_mir.clone();
         // let mut num_reused_nodes = 0;
         // for m in reuse_mirs {
         //     if !self.mir_queries.contains_key(&m) {

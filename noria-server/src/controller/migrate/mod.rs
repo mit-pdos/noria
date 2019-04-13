@@ -263,7 +263,7 @@ impl<'a> Migration<'a> {
             self.mainline.ingredients.add_edge(n, r, ());
 
             let mut query_hash = HashSet::new();
-            for (k, v) in self.mainline.map_meta.query_to_readers.clone() {
+            for k in self.mainline.map_meta.query_to_readers.keys() {
                 query_hash.insert(k.clone());
             }
 
@@ -609,11 +609,6 @@ impl<'a> Migration<'a> {
             }
 
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
-            let universe_id = match self.context.get("id") {
-                Some(id) => id.clone(),
-                None => "global".into(),
-            };
-
             let d = mainline.place_domain(
                 domain,
                 mainline.ingredients[nodes[0].0].sharded_by().shards(),

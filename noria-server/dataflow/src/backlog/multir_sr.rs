@@ -1,5 +1,4 @@
 use common::DataType;
-use fnv::FnvBuildHasher;
 
 #[derive(Clone)]
 pub enum Handle {
@@ -36,7 +35,7 @@ impl Handle {
             Handle::SingleSR(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
-            },
+            }
             Handle::DoubleSR(ref h) => {
                 assert_eq!(key.len(), 2);
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
@@ -64,10 +63,8 @@ impl Handle {
                     mem::forget(stack_key);
                     v
                 }
-            },
-             Handle::ManySR(ref h) => {
-                 h.meta_get_and(&key.to_vec(), then)
-              },
+            }
+            Handle::ManySR(ref h) => h.meta_get_and(&key.to_vec(), then),
         }
     }
 }

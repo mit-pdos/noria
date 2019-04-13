@@ -1,4 +1,3 @@
-use crate::controller::security::policy::Policy;
 use crate::controller::security::SecurityConfig;
 use crate::controller::sql::SqlIncorporator;
 use crate::controller::Migration;
@@ -16,7 +15,7 @@ use nom_sql::CreateTableStatement;
 use slog;
 use std::collections::HashMap;
 use std::str;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use std::vec::Vec;
 
 type QueryID = u64;

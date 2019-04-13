@@ -3,7 +3,7 @@ use evmap;
 use fnv::FnvBuildHasher;
 use prelude::*;
 
-pub enum Handle {
+pub(super) enum Handle {
     Single(evmap::WriteHandle<DataType, Vec<DataType>, i64, FnvBuildHasher>),
     Double(evmap::WriteHandle<(DataType, DataType), Vec<DataType>, i64, FnvBuildHasher>),
     Many(evmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
@@ -120,7 +120,7 @@ impl Handle {
                     v
                 }
             }
-            Handle::Many(ref h) => h.meta_get_and(&key.to_vec(), then),
+            Handle::Many(ref h) => h.meta_get_and(&key[..], then),
         }
     }
 

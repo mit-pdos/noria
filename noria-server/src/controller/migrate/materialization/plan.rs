@@ -1,5 +1,5 @@
 use crate::controller::domain_handle::DomainHandle;
-use crate::controller::inner::{graphviz, DomainReplies};
+use crate::controller::inner::DomainReplies;
 use crate::controller::keys;
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::payload::{ReplayPathSegment, SourceSelection, TriggerEndpoint};

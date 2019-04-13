@@ -6,9 +6,9 @@ use slog::Logger;
 use std::collections::{HashMap, HashSet};
 
 pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet<NodeIndex>) {
-    let mut graph = &mut mainline.ingredients;
+    let graph = &mut mainline.ingredients;
     let source = mainline.source;
-    let mut ndomains = &mut mainline.ndomains;
+    let ndomains = &mut mainline.ndomains;
     // we need to walk the data flow graph and assign domains to all new nodes.
     // we generally want as few domains as possible, but in *some* cases we must make new ones.
     // specifically:
@@ -43,15 +43,13 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
         *ndomains - 1
     };
 
-    let mut domain_map = &mut mainline.map_meta.query_to_domain;
+    let domain_map = &mut mainline.map_meta.query_to_domain;
 
     for node in topo_list {
         let assignment = (|| {
             let graph = &*graph;
             let n = &graph[node];
 
-            let mut srmap_assignment: usize;
-            let mut assigned = false;
             let mut srmap_reader_node = false;
             let mut srmap_query = "".to_string();
 
@@ -63,10 +61,7 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
                     srmap_reader_node = true;
                     match domain_map.get(query.clone()) {
                         Some(domain) => {
-                            srmap_query = query.to_string();
-                            srmap_assignment = *domain;
-                            assigned = true;
-                            return srmap_assignment;
+                            return *domain;
                         }
                         None => {
                             srmap_query = query.to_string();

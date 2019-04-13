@@ -18,7 +18,6 @@ use noria::ActivationResult;
 use petgraph::visit::Bfs;
 use slog::Logger;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::iter::FromIterator;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -94,7 +93,6 @@ pub(super) struct ControllerInner {
     log: slog::Logger,
 
     pub(in crate::controller) replies: DomainReplies,
-    pub(crate) base_nodes: HashMap<String, NodeIndex>,
 }
 
 pub(in crate::controller) struct DomainReplies(
@@ -490,7 +488,6 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
             map_meta: MapMeta::new(),
             replies: DomainReplies(drx),
-            base_nodes: HashMap::new(),
         }
     }
 

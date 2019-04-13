@@ -23,8 +23,6 @@ use tokio::{self, prelude::*};
 use Readers;
 
 use backlog;
-use srmap;
-use std::sync::Mutex;
 
 #[derive(Debug)]
 pub enum PollEvent {
@@ -249,7 +247,7 @@ impl Domain {
         miss_key: Vec<DataType>,
         miss_columns: &[usize],
         miss_in: LocalNodeIndex,
-        id: Option<usize>,
+        _id: Option<usize>,
     ) {
         let mut found = false;
         let tags: Vec<Tag> = self.replay_paths.keys().cloned().collect();
@@ -509,8 +507,7 @@ impl Domain {
             return;
         }
 
-        let mut node_id;
-
+        let node_id;
         let (mut m, evictions) = {
             // Node operator n
             let mut n = self.nodes[me].borrow_mut();
@@ -902,7 +899,7 @@ impl Domain {
                                 use backlog;
                                 use std::sync::Arc;
                                 // println!("partial global srmap, id: {:?}", gid);
-                                let mut name = self.nodes[node].borrow().clone();
+                                let name = self.nodes[node].borrow().clone();
 
                                 let srmap;
                                 if name.name().contains("count") {
@@ -986,7 +983,7 @@ impl Domain {
                                             } else {
                                                 // SRMap created --> get set of handles.
                                                 create_new_srmap = false;
-                                                let mut res = &mut self.srmap_handles[offset];
+                                                let res = &mut self.srmap_handles[offset];
                                                 handles = Some(res.1.clone(&mut res.0).unwrap());
                                             }
                                         }
@@ -998,7 +995,7 @@ impl Domain {
 
                                     if create_new_srmap {
                                         // println!("creating new partial global srmap");
-                                        let (mut tr_part, mut tw_part) = backlog::new_partial(
+                                        let (mut tr_part, tw_part) = backlog::new_partial(
                                             srmap,
                                             cols,
                                             &k[..],
@@ -1017,7 +1014,7 @@ impl Domain {
                                             ids,
                                         );
 
-                                        let (mut tr_clone, mut tw_clone) =
+                                        let (tr_clone, tw_clone) =
                                             tw_part.clone(&mut tr_part).unwrap();
 
                                         // Append to handles if this reader shares an SRMap.
@@ -1049,7 +1046,7 @@ impl Domain {
                                     } else {
                                         match handles {
                                             Some(mut _handles) => {
-                                                let (mut tr_part, mut tw_part) = _handles
+                                                let (tr_part, tw_part) = _handles
                                                     .1
                                                     .clone_new_user_partial(
                                                         &mut _handles.0,
@@ -1143,8 +1140,6 @@ impl Domain {
                                 materialization_info,
                                 uid,
                             } => {
-                                use backlog;
-                                use std::sync::Arc;
                                 let (mut r_part, mut w_part): (
                                     backlog::SingleReadHandle,
                                     backlog::WriteHandle,
@@ -1158,7 +1153,7 @@ impl Domain {
                                     None => {}
                                 }
                                 let srmap;
-                                let mut name = self.nodes[node].borrow().clone();
+                                let name = self.nodes[node].borrow().clone();
 
                                 if name.name().contains("count") {
                                     srmap = false;
@@ -1192,10 +1187,10 @@ impl Domain {
                                             } else {
                                                 // SRMap created --> get set of handles.
                                                 create_new_srmap = false;
-                                                let mut res = &mut self.srmap_handles[offset];
-                                                let (mut tr_part, mut tw_part) =
+                                                let res = &mut self.srmap_handles[offset];
+                                                let (mut tr_part, tw_part) =
                                                     res.1.clone(&mut res.0).unwrap();
-                                                let (mut tr_part, mut tw_part) =
+                                                let (tr_part, tw_part) =
                                                     tw_part.clone_new_user(&mut tr_part).unwrap();
                                                 r_part = tr_part;
                                                 w_part = tw_part;
@@ -1230,9 +1225,9 @@ impl Domain {
 
                                     // Create new SRMap if one doesn't already exist.
                                     if create_new_srmap {
-                                        let (mut tr_part, mut tw_part) =
+                                        let (mut tr_part, tw_part) =
                                             backlog::new(srmap, cols, &key[..], ids);
-                                        let (mut tr_clone, mut tw_clone) =
+                                        let (tr_clone, tw_clone) =
                                             tw_part.clone(&mut tr_part).unwrap();
 
                                         // Append to handles if this reader shares an SRMap.
