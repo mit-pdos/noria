@@ -14,7 +14,6 @@ use std::time;
 
 #[macro_use]
 mod populate;
-
 use crate::populate::Populate;
 
 struct Backend {
