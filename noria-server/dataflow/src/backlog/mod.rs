@@ -92,24 +92,23 @@ fn new_inner(
             cols,
             contiguous,
             mem_size: 0,
-            uid: uid,
+            uid,
         };
 
         let r = SingleReadHandle {
             handle: RHandleVariant::Srmap(r),
             trigger,
             key: Vec::from(key),
-            uid: uid,
+            uid,
         };
 
         (r, w)
     } else {
-        let (r, w) = match (key.len(), srmap) {
-            (0, _) => unreachable!(),
-            (1, false) => make!(Single),
-            (2, false) => make!(Double),
-            (_, false) => unreachable!(),
-            (_, true) => unreachable!(),
+        let (r, w) = match key.len() {
+            0 => unreachable!(),
+            1 => make!(Single),
+            2 => make!(Double),
+            _ => make!(Many),
         };
 
         let w = WriteHandle {
