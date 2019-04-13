@@ -336,7 +336,7 @@ fn check_query(
 #[test]
 #[ignore]
 fn mysql_comparison() {
-    // println!("");
+    println!("");
 
     let mut schemas: BTreeMap<String, Schema> = BTreeMap::new();
     run_for_all_in_directory("schemas", |file_name, contents| {
@@ -395,12 +395,12 @@ fn mysql_comparison() {
             io::stdout().flush().ok().expect("Could not flush stdout");
 
             if let Some(true) = query.ignore {
-                // println!("\x1B[33mIGNORED\x1B[m");
+                println!("\x1B[33mIGNORED\x1B[m");
                 continue;
             }
 
             if query.values.len() == 0 {
-                // println!("\x1B[33mPASS\x1B[m");
+                println!("\x1B[33mPASS\x1B[m");
                 continue;
             }
 
