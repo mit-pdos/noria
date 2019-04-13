@@ -180,7 +180,7 @@ crate struct MutWriteHandleEntry<'a> {
     key: Key<'a>,
 }
 crate struct WriteHandleEntry<'a> {
-    handle: &'a mut WriteHandle,
+    handle: &'a WriteHandle,
     key: Key<'a>,
 }
 
@@ -222,25 +222,14 @@ impl<'a> WriteHandleEntry<'a> {
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
-        if let WHandleVariant::Srmap(ref hand) = self.handle.handle {
-            hand.meta_get_and(self.key.clone(), &mut then).ok_or(())
-        } else {
-            unimplemented!()
+        match self.handle.handle {
+            WHandleVariant::Srmap(ref hand) => hand
+                .meta_get_and(Cow::Borrowed(&self.key), &mut then)
+                .ok_or(()),
+            WHandleVariant::Evmap(ref hand) => hand
+                .meta_get_and(Cow::Borrowed(&self.key), &mut then)
+                .ok_or(()),
         }
-        // match &self.handle.handle {
-        //     Some(handle) => {
-        //         handle.meta_get_and(self.key.clone(), &mut then).ok_or(())
-        //     },
-        //     None => {
-        //         match &self.handle.handleSR {
-        //             Some(handleSR) => {
-        //                 handleSR.meta_get_and(self.key.clone(), &mut then).ok_or(())
-        //             },
-        //             None => {Err(())}
-        //         }
-        //
-        //     }
-        // }
     }
 }
 
@@ -318,7 +307,7 @@ impl WriteHandle {
         None
     }
 
-    crate fn clone(&self, r: &SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
+    crate fn clone_srmap(&self, r: &SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
         if let WHandleVariant::Srmap(ref hand) = self.handle {
             let w_handle = hand.clone();
             if let RHandleVariant::Srmap(ref rhand) = r.handle {
@@ -331,7 +320,7 @@ impl WriteHandle {
                     mem_size: self.mem_size.clone(),
                     uid: self.uid.clone(),
                 };
-                return Some((r.clone(rhand.clone(), self.uid.clone()), w));
+                return Some((r.clone_srmap(rhand.clone(), self.uid.clone()), w));
             }
         }
         None
@@ -347,7 +336,7 @@ impl WriteHandle {
         }
     }
 
-    crate fn with_key<'a, K>(&'a mut self, key: K) -> WriteHandleEntry<'a>
+    crate fn with_key<'a, K>(&'a self, key: K) -> WriteHandleEntry<'a>
     where
         K: Into<Key<'a>>,
     {
@@ -366,7 +355,7 @@ impl WriteHandle {
         self.mut_with_key(key)
     }
 
-    crate fn entry_from_record<'a, R>(&'a mut self, record: R) -> WriteHandleEntry<'a>
+    crate fn entry_from_record<'a, R>(&'a self, record: R) -> WriteHandleEntry<'a>
     where
         R: Into<Cow<'a, [DataType]>>,
     {
@@ -388,30 +377,20 @@ impl WriteHandle {
     where
         I: IntoIterator<Item = Record>,
     {
-        match self.handle {
+        let mem_delta = match self.handle {
             WHandleVariant::Srmap(ref mut hand) => {
-                let mem_delta = hand.add(&self.key[..], self.cols, rs, Some(self.uid));
-                if mem_delta > 0 {
-                    self.mem_size += mem_delta as usize;
-                } else if mem_delta < 0 {
-                    self.mem_size = self
-                        .mem_size
-                        .checked_sub(mem_delta.checked_abs().unwrap() as usize)
-                        .unwrap();
-                }
-                // hand.refresh();
+                hand.add(&self.key[..], self.cols, rs, Some(self.uid))
             }
-            WHandleVariant::Evmap(ref mut hand) => {
-                let mem_delta = hand.add(&self.key[..], self.cols, rs);
-                if mem_delta > 0 {
-                    self.mem_size += mem_delta as usize;
-                } else if mem_delta < 0 {
-                    self.mem_size = self
-                        .mem_size
-                        .checked_sub(mem_delta.checked_abs().unwrap() as usize)
-                        .unwrap();
-                }
-            }
+            WHandleVariant::Evmap(ref mut hand) => hand.add(&self.key[..], self.cols, rs),
+        };
+
+        if mem_delta > 0 {
+            self.mem_size += mem_delta as usize;
+        } else if mem_delta < 0 {
+            self.mem_size = self
+                .mem_size
+                .checked_sub(mem_delta.checked_abs().unwrap() as usize)
+                .unwrap();
         }
     }
 
@@ -422,56 +401,46 @@ impl WriteHandle {
     /// Evict `count` randomly selected keys from state and return them along with the number of
     /// bytes that will be freed once the underlying `evmap` applies the operation.
     crate fn evict_random_key(&mut self, rng: &mut ThreadRng) -> u64 {
-        match self.handle {
-            WHandleVariant::Srmap(ref mut hand) => {
-                let mut bytes_to_be_freed = 0;
-                if self.mem_size > 0 {
-                    if hand.is_empty() {
-                        unreachable!("mem size is {}, but map is empty", self.mem_size);
-                    }
+        if self.mem_size == 0 {
+            return 0;
+        }
 
-                    match hand.empty_at_index(rng.gen()) {
-                        None => (),
-                        Some(vs) => {
-                            let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
-                            bytes_to_be_freed += size;
-                        }
-                    }
-                    self.mem_size = self
-                        .mem_size
-                        .checked_sub(bytes_to_be_freed as usize)
-                        .unwrap();
+        let mut bytes_to_be_freed = 0;
+        let vs = match self.handle {
+            WHandleVariant::Srmap(ref mut hand) => {
+                if hand.is_empty() {
+                    unreachable!("mem size is {}, but map is empty", self.mem_size);
                 }
-                bytes_to_be_freed
+
+                hand.empty_at_index(rng.gen()).map(|vs| &vs[..])
             }
             WHandleVariant::Evmap(ref mut hand) => {
-                let mut bytes_to_be_freed = 0;
-                if self.mem_size > 0 {
-                    if hand.is_empty() {
-                        unreachable!("mem size is {}, but map is empty", self.mem_size);
-                    }
-
-                    match hand.empty_at_index(rng.gen()) {
-                        None => (),
-                        Some(vs) => {
-                            let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
-                            bytes_to_be_freed += size;
-                        }
-                    }
-                    self.mem_size = self
-                        .mem_size
-                        .checked_sub(bytes_to_be_freed as usize)
-                        .unwrap();
+                if hand.is_empty() {
+                    unreachable!("mem size is {}, but map is empty", self.mem_size);
                 }
-                bytes_to_be_freed
+
+                hand.empty_at_index(rng.gen())
             }
+        };
+
+        if let Some(vs) = vs {
+            let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
+            bytes_to_be_freed += size;
+            self.mem_size = self
+                .mem_size
+                .checked_sub(bytes_to_be_freed as usize)
+                .unwrap();
         }
+
+        bytes_to_be_freed
     }
 
     crate fn clear(&mut self) {
         if let WHandleVariant::Evmap(ref mut h) = self.handle {
             self.mem_size = 0;
             h.purge();
+        } else {
+            unimplemented!()
         }
     }
 }
@@ -527,7 +496,7 @@ impl SingleReadHandle {
         }
     }
 
-    pub fn clone(&self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
+    pub fn clone_srmap(&self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
         SingleReadHandle {
             handle: RHandleVariant::Srmap(r),
             trigger: self.trigger.clone(),

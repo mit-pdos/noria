@@ -932,7 +932,8 @@ impl Domain {
                                                 // SRMap created --> get set of handles.
                                                 create_new_srmap = false;
                                                 let res = &mut self.srmap_handles[offset];
-                                                handles = Some(res.1.clone(&mut res.0).unwrap());
+                                                handles =
+                                                    Some(res.1.clone_srmap(&mut res.0).unwrap());
                                             }
                                         }
                                         None => {
@@ -963,7 +964,7 @@ impl Domain {
                                         );
 
                                         let (tr_clone, tw_clone) =
-                                            tw_part.clone(&mut tr_part).unwrap();
+                                            tw_part.clone_srmap(&mut tr_part).unwrap();
 
                                         // Append to handles if this reader shares an SRMap.
                                         if append_to_handles {
@@ -1137,7 +1138,7 @@ impl Domain {
                                                 create_new_srmap = false;
                                                 let res = &mut self.srmap_handles[offset];
                                                 let (mut tr_part, tw_part) =
-                                                    res.1.clone(&mut res.0).unwrap();
+                                                    res.1.clone_srmap(&mut res.0).unwrap();
                                                 let (tr_part, tw_part) =
                                                     tw_part.clone_new_user(&mut tr_part).unwrap();
                                                 r_part = tr_part;
@@ -1176,7 +1177,7 @@ impl Domain {
                                         let (mut tr_part, tw_part) =
                                             backlog::new(srmap, cols, &key[..], ids);
                                         let (tr_clone, tw_clone) =
-                                            tw_part.clone(&mut tr_part).unwrap();
+                                            tw_part.clone_srmap(&mut tr_part).unwrap();
 
                                         // Append to handles if this reader shares an SRMap.
                                         if append_to_handles {
