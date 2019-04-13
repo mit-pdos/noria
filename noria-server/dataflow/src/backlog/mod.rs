@@ -185,34 +185,41 @@ crate struct WriteHandleEntry<'a> {
 }
 
 impl<'a> MutWriteHandleEntry<'a> {
-    crate fn mark_filled(&mut self) {
-        if let WHandleVariant::Srmap(ref mut hand) = self.handle.handle {
-            if let Some((None, _)) =
-                hand.meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
-            {
-                hand.clear(Cow::Borrowed(&*self.key));
-            } else {
-                unreachable!("attempted to fill already-filled key");
+    crate fn mark_filled(self) {
+        if let Ok((None, _)) = self
+            .handle
+            .with_key(&*self.key)
+            .try_find_and(|rs| rs.is_empty())
+        {
+            match self.handle.handle {
+                WHandleVariant::Srmap(ref mut hand) => {
+                    hand.clear(self.key);
+                }
+                WHandleVariant::Evmap(ref mut hand) => {
+                    hand.clear(self.key);
+                }
             }
-            hand.refresh();
         } else {
-            unimplemented!();
+            unreachable!("attempted to fill already-filled key");
         }
     }
 
-    crate fn mark_hole(&mut self) {
-        if let WHandleVariant::Srmap(ref mut hand) = self.handle.handle {
-            println!("mark hole");
-            let size = hand
-                .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
-                    rs.iter().map(|r| r.deep_size_of()).sum()
-                })
-                .map(|r| r.0.unwrap_or(0))
-                .unwrap_or(0);
-            self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
-            hand.empty(Cow::Borrowed(&*self.key))
-        } else {
-            unimplemented!();
+    crate fn mark_hole(self) {
+        let size = self
+            .handle
+            .with_key(&*self.key)
+            .try_find_and(|rs| rs.iter().map(|r| r.deep_size_of()).sum())
+            .map(|r| r.0.unwrap_or(0))
+            .unwrap_or(0);
+        self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
+
+        match self.handle.handle {
+            WHandleVariant::Srmap(ref mut hand) => {
+                hand.empty(self.key);
+            }
+            WHandleVariant::Evmap(ref mut hand) => {
+                hand.empty(self.key);
+            }
         }
     }
 }
@@ -533,28 +540,16 @@ impl SingleReadHandle {
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         match self.handle {
-            RHandleVariant::Srmap(ref hand) => {
-                // println!("try find and. uid: {:?}", self.uid);
-                hand.meta_get_and(key, &mut then)
-                    .ok_or(())
-                    .map(|(mut records, meta)| {
-                        if records.is_none() && self.trigger.is_none() {
-                            records = Some(then(&[]));
-                        }
-                        (records, meta)
-                    })
-            }
-            RHandleVariant::Evmap(ref hand) => {
-                hand.meta_get_and(key, &mut then)
-                    .ok_or(())
-                    .map(|(mut records, meta)| {
-                        if records.is_none() && self.trigger.is_none() {
-                            records = Some(then(&[]));
-                        }
-                        (records, meta)
-                    })
-            }
+            RHandleVariant::Srmap(ref hand) => hand.meta_get_and(key, &mut then),
+            RHandleVariant::Evmap(ref hand) => hand.meta_get_and(key, &mut then),
         }
+        .ok_or(())
+        .map(|(mut records, meta)| {
+            if records.is_none() && self.trigger.is_none() {
+                records = Some(then(&[]));
+            }
+            (records, meta)
+        })
     }
 
     pub fn len(&self) -> usize {
