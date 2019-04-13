@@ -95,7 +95,6 @@ impl Reader {
     }
 
     crate fn set_materialization_info(&mut self, mat_info: Option<(usize, usize)>) {
-        // println!("Setting reader mat info to: {:?}", mat_info.clone());
         self.materialization_info = mat_info;
     }
 
@@ -226,9 +225,7 @@ impl Reader {
             }
 
             if self.streamers.is_empty() {
-                let data = m.take_data();
-                // println!("adding state: {:?}", data);
-                state.add(data, id);
+                state.add(m.take_data(), id);
             } else {
                 state.add(m.data().iter().cloned(), id);
             }

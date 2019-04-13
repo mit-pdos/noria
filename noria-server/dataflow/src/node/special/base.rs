@@ -30,7 +30,6 @@ impl Base {
 
     pub fn add_write_policy(&mut self, write_policy: SqlQuery) {
         self.write_policy_predicate.push(write_policy);
-        // println!("new policy predicates: {:?}", self.write_policy_predicate);
     }
 
     /// Builder with a known primary key.
