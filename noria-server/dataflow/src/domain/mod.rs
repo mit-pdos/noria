@@ -1,9 +1,7 @@
-use fnv::FnvHashMap;
 use petgraph::graph::NodeIndex;
 use std::borrow::Cow;
 use std::cell;
 use std::cmp;
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::mem;
 use std::net::SocketAddr;
@@ -27,8 +25,6 @@ use Readers;
 use backlog;
 use srmap;
 use std::sync::Mutex;
-
-type EnqueuedSends = FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>;
 
 #[derive(Debug)]
 pub enum PollEvent {
@@ -190,7 +186,7 @@ impl DomainBuilder {
 
             group_commit_queues,
 
-            state_size: state_size,
+            state_size,
             total_time: Timer::new(),
             total_ptime: Timer::new(),
             wait_time: Timer::new(),
@@ -433,8 +429,8 @@ impl Domain {
         }
     }
 
-    fn finished_partial_replay(&mut self, tag: &Tag, num: usize) {
-        match self.replay_paths[tag].trigger {
+    fn finished_partial_replay(&mut self, tag: Tag, num: usize) {
+        match self.replay_paths[&tag].trigger {
             TriggerEndpoint::End { .. } => {
                 // A backfill request we made to another domain was just satisfied!
                 // We can now issue another request from the concurrent replay queue.
@@ -444,7 +440,7 @@ impl Domain {
                 // `self.concurrent_replays` constantly grows by +1 (+2 for the backfill requests,
                 // -1 when satisfied), which would lead to a deadlock!
                 let mut requests_satisfied = {
-                    let last = self.replay_paths[tag].path.last().unwrap();
+                    let last = self.replay_paths[&tag].path.last().unwrap();
                     self.replay_paths
                         .iter()
                         .filter(|&(_, p)| {
@@ -492,16 +488,9 @@ impl Domain {
         }
     }
 
-    fn dispatch(
-        &mut self,
-        m: Box<Packet>,
-        enable_output: bool,
-        sends: &mut EnqueuedSends,
-        executor: Option<&mut Executor>,
-    ) -> HashMap<LocalNodeIndex, Vec<Record>> {
+    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut Executor) {
         let src = m.src();
         let me = m.dst();
-        let mut output_messages = HashMap::new();
 
         match self.mode {
             DomainMode::Forwarding => (),
@@ -511,13 +500,13 @@ impl Domain {
                 ..
             } if to == &me => {
                 buffered.push_back(m);
-                return output_messages;
+                return;
             }
             DomainMode::Replaying { .. } => (),
         }
 
         if !self.not_ready.is_empty() && self.not_ready.contains(&me) {
-            return output_messages;
+            return;
         }
 
         let mut node_id;
@@ -540,7 +529,7 @@ impl Domain {
             );
             // end for debugging
 
-            let (misses, captured) = n.process(
+            let (misses, _, captured) = n.process(
                 &mut m,
                 None,
                 &mut self.state,
@@ -561,7 +550,7 @@ impl Domain {
                     "Checkpoint 1: returning due to NoneType m (L557) (me: {:?})",
                     n.global_addr()
                 );
-                return output_messages;
+                return;
             }
 
             // normally, we ignore misses during regular forwarding.
@@ -640,11 +629,10 @@ impl Domain {
                 let mut evictions = HashMap::new();
                 for miss in misses {
                     for &(tag, ref keys) in &deps {
-                        evictions.entry(tag).or_insert_with(HashSet::new).insert(
-                            keys.into_iter()
-                                .map(|&key| miss.record[key].clone())
-                                .collect(),
-                        );
+                        evictions
+                            .entry(tag)
+                            .or_insert_with(HashSet::new)
+                            .insert(keys.iter().map(|&key| miss.record[key].clone()).collect());
                     }
                 }
 
@@ -663,7 +651,7 @@ impl Domain {
                     Box::new(Packet::EvictKeys {
                         keys: keys.into_iter().collect(),
                         link: Link::new(src, me),
-                        tag: tag,
+                        tag,
                     }),
                     sends,
                 );
@@ -677,7 +665,7 @@ impl Domain {
                     "Checkpoint 2: returning due to empty message (L669) (me: {:?})",
                     node_id
                 );
-                return output_messages;
+                return;
             }
             &box Packet::Message { .. } => {}
             &box Packet::ReplayPiece { .. } => {
@@ -686,8 +674,8 @@ impl Domain {
             ref m => unreachable!("dispatch process got {:?}", m),
         }
 
-        let nchildren = self.nodes[me].borrow().nchildren();
-        //        let mut children_ids = Vec::new(); // for debugging
+        // NOTE: we can't directly iterate over .children due to self.dispatch in the loop
+        let nchildren = self.nodes[me].borrow().children().len();
         println!(
             "DISPATCH children (me: {:?}): {:?}",
             node_id,
@@ -701,42 +689,21 @@ impl Domain {
                 m.as_ref().map(|m| box m.clone_data()).unwrap()
             };
 
-            let childi = *self.nodes[me].borrow().child(i);
-            //            children_ids.push(childi); // for debugging
-            let (child_is_output, child_is_merger) = {
+            let childi = self.nodes[me].borrow().children()[i];
+            let child_is_merger = {
                 // XXX: shouldn't NLL make this unnecessary?
                 let c = self.nodes[childi].borrow();
-                (c.is_output(), c.is_shard_merger())
+                c.is_shard_merger()
             };
 
-            if enable_output || !child_is_output {
-                if child_is_merger {
-                    // we need to preserve the egress src (which includes shard identifier)
-                } else {
-                    m.link_mut().src = me;
-                }
-                m.link_mut().dst = childi;
-
-                for (k, mut v) in self.dispatch(m, enable_output, sends, None) {
-                    use std::collections::hash_map::Entry;
-                    match output_messages.entry(k) {
-                        Entry::Occupied(mut rs) => rs.get_mut().append(&mut v),
-                        Entry::Vacant(slot) => {
-                            slot.insert(v);
-                        }
-                    }
-                }
+            if child_is_merger {
+                // we need to preserve the egress src (which includes shard identifier)
             } else {
-                let mut data = m.take_data();
-                match output_messages.entry(childi) {
-                    Entry::Occupied(entry) => {
-                        entry.into_mut().append(&mut data);
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(data.into());
-                    }
-                };
+                m.link_mut().src = me;
             }
+            m.link_mut().dst = childi;
+
+            self.dispatch(m, sends, executor);
         }
 
         //        let mut n = self.nodes[me].borrow_mut();
@@ -749,9 +716,9 @@ impl Domain {
             "Checkpoint 3: Returning at end of dispatch (me: {:?})",
             node_id
         );
-        output_messages
     }
 
+    #[allow(clippy::cyclomatic_complexity)]
     fn handle(
         &mut self,
         m: Box<Packet>,
@@ -765,10 +732,10 @@ impl Domain {
         match *m {
             Packet::Message { .. } | Packet::Input { .. } => {
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
-                self.dispatch(m, true, sends, Some(executor));
+                self.dispatch(m, sends, executor);
             }
             Packet::ReplayPiece { .. } => {
-                self.handle_replay(m, sends);
+                self.handle_replay(m, sends, executor);
             }
             Packet::Evict { .. } | Packet::EvictKeys { .. } => {
                 self.handle_eviction(m, sends);
@@ -824,6 +791,8 @@ impl Domain {
                         for node in nodes {
                             for cn in self.nodes.iter_mut() {
                                 cn.1.borrow_mut().try_remove_child(node);
+                                // NOTE: since nodes are always removed leaves-first, it's not
+                                // important to update parent pointers here
                             }
                         }
                     }
@@ -959,7 +928,7 @@ impl Domain {
                                                 .map(move |miss| box Packet::RequestReaderReplay {
                                                     key: miss,
                                                     cols: key.clone(),
-                                                    node: node,
+                                                    node,
                                                     id: uid,
                                                 })
                                                 .fold(sender, move |sender, m| {
@@ -1043,7 +1012,7 @@ impl Domain {
                                                     &txs[::shard_by(&miss[0], n)]
                                                 };
                                                 // println!("in trigger func");
-                                                tx.unbounded_send(Vec::from(miss)).unwrap();
+                                                tx.unbounded_send(Vec::from(miss)).is_ok()
                                             },
                                             ids,
                                         );
@@ -1095,7 +1064,7 @@ impl Domain {
                                                             };
                                                             // println!("in trigger func");
                                                             tx.unbounded_send(Vec::from(miss))
-                                                                .unwrap();
+                                                                .is_ok()
                                                         })),
                                                     )
                                                     .unwrap();
@@ -1143,7 +1112,7 @@ impl Domain {
                                                 &txs[::shard_by(&miss[0], n)]
                                             };
                                             // println!("MISS: {:?}", miss);
-                                            tx.unbounded_send(Vec::from(miss)).unwrap();
+                                            tx.unbounded_send(Vec::from(miss)).is_ok()
                                         },
                                         ids,
                                     );
@@ -1176,8 +1145,10 @@ impl Domain {
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
-                                let (mut r_part, mut w_part): (backlog::SingleReadHandle,
-                                                               backlog::WriteHandle);
+                                let (mut r_part, mut w_part): (
+                                    backlog::SingleReadHandle,
+                                    backlog::WriteHandle,
+                                );
 
                                 let mut ids = 0 as usize;
                                 match uid {
@@ -1188,7 +1159,6 @@ impl Domain {
                                 }
                                 let srmap;
                                 let mut name = self.nodes[node].borrow().clone();
-
 
                                 if name.name().contains("count") {
                                     srmap = false;
@@ -1430,7 +1400,7 @@ impl Domain {
                            "tag" => tag.id(),
                            "key" => format!("{:?}", key)
                         );
-                        self.seed_replay(tag, &key[..], sends);
+                        self.seed_replay(tag, &key[..], sends, executor);
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
@@ -1468,8 +1438,8 @@ impl Domain {
                         // we may already have processed some other messages that are not yet a
                         // part of state.
                         let p = box Packet::ReplayPiece {
-                            tag: tag,
-                            link: link.clone(),
+                            tag,
+                            link,
                             context: ReplayPieceContext::Regular {
                                 last: state.is_empty(),
                             },
@@ -1536,12 +1506,12 @@ impl Domain {
                                     // and then forward on tx (if there is one)
                                     while let Some((i, chunk)) = iter.next() {
                                         use std::iter::FromIterator;
-                                        let chunk = Records::from_iter(chunk.into_iter().map(&fix));
+                                        let chunk = Records::from_iter(chunk.map(&fix));
                                         let len = chunk.len();
                                         let last = iter.peek().is_none();
                                         let p = box Packet::ReplayPiece {
-                                            tag: tag,
-                                            link: link.clone(), // to is overwritten by receiver
+                                            tag,
+                                            link, // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
                                             data: chunk,
                                             id: None,
@@ -1563,13 +1533,15 @@ impl Domain {
                                 .unwrap();
                         }
 
-                        self.handle_replay(p, sends);
+                        self.handle_replay(p, sends, executor);
                     }
                     Packet::Finish(tag, ni) => {
-                        self.finish_replay(tag, ni, sends);
+                        self.finish_replay(tag, ni, sends, executor);
                     }
-                    Packet::Ready { node, index } => {
+                    Packet::Ready { node, purge, index } => {
                         assert_eq!(self.mode, DomainMode::Forwarding);
+
+                        self.nodes[node].borrow_mut().purge = purge;
 
                         if !index.is_empty() {
                             let mut s: Box<State> = {
@@ -1633,7 +1605,7 @@ impl Domain {
                             .nodes
                             .values()
                             .filter_map(|nd| {
-                                let ref n = *nd.borrow();
+                                let n = &*nd.borrow();
                                 let local_index = n.local_addr();
                                 let node_index: NodeIndex = n.global_addr();
 
@@ -1680,7 +1652,7 @@ impl Domain {
                                             desc: format!("{:?}", n),
                                             process_time: time.unwrap(),
                                             process_ptime: ptime.unwrap(),
-                                            mem_size: mem_size,
+                                            mem_size,
                                             materialized: mat_state,
                                         },
                                     ))
@@ -1729,7 +1701,7 @@ impl Domain {
                     .collect()
             };
             for (tag, keys) in elapsed_replays {
-                self.seed_all(tag, keys, sends);
+                self.seed_all(tag, keys, sends, executor);
             }
         }
 
@@ -1762,14 +1734,26 @@ impl Domain {
             return Record::Positive(row);
         }
 
-        return row.into_owned().into();
+        row.into_owned().into()
     }
 
-    fn seed_all(&mut self, tag: Tag, keys: HashSet<Vec<DataType>>, sends: &mut EnqueuedSends) {
+    fn seed_all(
+        &mut self,
+        tag: Tag,
+        keys: HashSet<Vec<DataType>>,
+        sends: &mut EnqueuedSends,
+        ex: &mut Executor,
+    ) {
         let (m, source, is_miss) = match self.replay_paths[&tag] {
             ReplayPath {
                 source: Some(source),
                 trigger: TriggerEndpoint::Start(ref cols),
+                ref path,
+                ..
+            }
+            | ReplayPath {
+                source: Some(source),
+                trigger: TriggerEndpoint::Local(ref cols),
                 ref path,
                 ..
             } => {
@@ -1792,7 +1776,7 @@ impl Domain {
                 let m = if !keys.is_empty() {
                     Some(box Packet::ReplayPiece {
                         link: Link::new(source, path[0].node),
-                        tag: tag,
+                        tag,
                         context: ReplayPieceContext::Partial {
                             for_keys: keys,
                             ignore: false,
@@ -1843,13 +1827,23 @@ impl Domain {
                 unreachable!();
             }
 
-            self.handle_replay(m, sends);
+            self.handle_replay(m, sends, ex);
         }
     }
 
-    fn seed_replay(&mut self, tag: Tag, key: &[DataType], sends: &mut EnqueuedSends) {
+    fn seed_replay(
+        &mut self,
+        tag: Tag,
+        key: &[DataType],
+        sends: &mut EnqueuedSends,
+        ex: &mut Executor,
+    ) {
         if let ReplayPath {
             trigger: TriggerEndpoint::Start(..),
+            ..
+        }
+        | ReplayPath {
+            trigger: TriggerEndpoint::Local(..),
             ..
         } = self.replay_paths[&tag]
         {
@@ -1904,7 +1898,7 @@ impl Domain {
 
                     let m = Some(box Packet::ReplayPiece {
                         link: Link::new(source, path[0].node),
-                        tag: tag,
+                        tag,
                         context: ReplayPieceContext::Partial {
                             for_keys: k,
                             ignore: false,
@@ -1938,11 +1932,12 @@ impl Domain {
         }
 
         if let Some(m) = m {
-            self.handle_replay(m, sends);
+            self.handle_replay(m, sends, ex);
         }
     }
 
-    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
+    #[allow(clippy::cyclomatic_complexity)]
+    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
             .borrow()
@@ -1954,14 +1949,16 @@ impl Domain {
         let mut finished = None;
         let mut need_replay = Vec::new();
         let mut finished_partial = 0;
-        'outer: loop {
-            // this loop is just here so we have a way of giving up the borrow of self.replay_paths
 
-            let &mut ReplayPath {
+        // this loop is just here so we have a way of giving up the borrow of self.replay_paths
+        #[allow(clippy::never_loop)]
+        'outer: loop {
+            let ReplayPath {
                 ref path,
+                ref source,
                 notify_done,
                 ..
-            } = self.replay_paths.get_mut(&tag).unwrap();
+            } = self.replay_paths[&tag];
 
             match self.mode {
                 DomainMode::Forwarding if notify_done => {
@@ -2062,7 +2059,7 @@ impl Domain {
 
                     // forward the current message through all local nodes.
                     let m = box Packet::ReplayPiece {
-                        link: link.clone(),
+                        link,
                         tag,
                         data,
                         context: context.clone(),
@@ -2100,6 +2097,20 @@ impl Domain {
 
                         // are we about to fill a hole?
                         if target {
+                            // if the node is a reader beyond the materialization frontier, we want
+                            // to purge it before we fill it with new keys so that we don't amass
+                            // any serious state. if it's just an internal materialization, state
+                            // will be evicted by our children when they process replays that use
+                            // this state.
+                            if n.beyond_mat_frontier() {
+                                let ni = n.global_addr().index();
+                                n.with_reader_mut(|r| {
+                                    trace!(self.log, "purging state from reader"; "node" => ni);
+                                    r.writer_mut().unwrap().clear();
+                                })
+                                .is_ok();
+                            }
+
                             let backfill_keys = backfill_keys.as_ref().unwrap();
                             // mark the state for the key being replayed as *not* a hole otherwise
                             // we'll just end up with the same "need replay" response that
@@ -2107,7 +2118,7 @@ impl Domain {
                             if let Some(state) = self.state.get_mut(segment.node) {
                                 for key in backfill_keys.iter() {
                                     // println!("mf1");
-                                    state.mark_filled(key.clone(), &tag);
+                                    state.mark_filled(key.clone(), tag);
                                 }
                             } else {
                                 // println!("else block")
@@ -2115,13 +2126,12 @@ impl Domain {
                                     // we must be filling a hole in a Reader. we need to ensure
                                     // that the hole for the key we're replaying ends up being
                                     // filled, even if that hole is empty!
-                                    let w = r.writer_mut();
-                                    w.map(|mut wh| {
+                                    if let Some(wh) = r.writer_mut() {
                                         for key in backfill_keys.iter() {
                                             // println!("mf2");
                                             wh.mut_with_key(&key[..]).mark_filled();
                                         }
-                                    });
+                                    }
                                 })
                                 .unwrap();
                             }
@@ -2129,7 +2139,7 @@ impl Domain {
                         // println!("before here 3");
                         // // println!("m data: {:?}", m.as_ref().unwrap().data());
                         // process the current message in this node
-                        let (mut misses, captured) = n.process(
+                        let (mut misses, lookups, captured) = n.process(
                             &mut m,
                             segment.partial_key.as_ref(),
                             &mut self.state,
@@ -2137,7 +2147,7 @@ impl Domain {
                             self.shard,
                             false,
                             sends,
-                            None,
+                            ex,
                             id,
                         );
 
@@ -2170,22 +2180,24 @@ impl Domain {
                                 // it's important that we clear out any partially-filled holes.
                                 if let Some(state) = self.state.get_mut(segment.node) {
                                     for miss in &missed_on {
-                                        state.mark_hole(&miss[..], &tag);
+                                        state.mark_hole(&miss[..], tag);
                                     }
                                 } else {
                                     n.with_reader_mut(|r| {
-                                        r.writer_mut().map(|wh| {
+                                        if let Some(wh) = r.writer_mut() {
                                             for miss in &missed_on {
                                                 wh.mut_with_key(&miss[..]).mark_hole();
                                             }
-                                        });
+                                        }
                                     })
                                     .unwrap();
                                 }
                             } else if is_reader {
                                 // we filled a hole! swap the reader.
                                 n.with_reader_mut(|r| {
-                                    r.writer_mut().map(|wh| wh.swap());
+                                    if let Some(wh) = r.writer_mut() {
+                                        wh.swap();
+                                    }
                                 })
                                 .unwrap();
                                 // and also unmark the replay request
@@ -2206,15 +2218,15 @@ impl Domain {
                             // so we didn't *actually* fill those keys after all!
                             if let Some(state) = self.state.get_mut(segment.node) {
                                 for key in &captured {
-                                    state.mark_hole(&key[..], &tag);
+                                    state.mark_hole(&key[..], tag);
                                 }
                             } else {
                                 n.with_reader_mut(|r| {
-                                    r.writer_mut().map(|wh| {
+                                    if let Some(wh) = r.writer_mut() {
                                         for key in &captured {
                                             wh.mut_with_key(&key[..]).mark_hole();
                                         }
-                                    });
+                                    }
                                 })
                                 .unwrap();
                             }
@@ -2317,6 +2329,153 @@ impl Domain {
                             break 'outer;
                         }
 
+                        // we successfully processed some upquery responses!
+                        //
+                        // at this point, we can discard the state that the replay used in n's
+                        // ancestors if they are beyond the materialization frontier (and thus
+                        // should not be allowed to amass significant state).
+                        //
+                        // we want to make sure we only remove state once it will no longer be
+                        // looked up into though. consider this dataflow graph:
+                        //
+                        //  (a)     (b)
+                        //   |       |
+                        //   |       |
+                        //  (q)      |
+                        //   |       |
+                        //   `--(j)--`
+                        //       |
+                        //
+                        // where j is a join, a and b are materialized, q is query-through. if we
+                        // removed state the moment a replay has passed through the next operator,
+                        // then the following could happen: a replay then comes from a, passes
+                        // through q, q then discards state from a and forwards to j. j misses in
+                        // b. replay happens to b, and re-triggers replay from a. however, state in
+                        // a is discarded, so replay to a needs to happen a second time. that's not
+                        // _wrong_, and we will eventually make progress, but it is pretty
+                        // inefficient.
+                        //
+                        // insted, we probably want the join to do the eviction. we achieve this by
+                        // only evicting from a after the replay has passed the join (or, more
+                        // generally, the operator that might perform lookups into a)
+                        if backfill_keys.is_some() {
+                            // first and foremost -- evict the source of the replay (if we own it).
+                            // we only do this when the replay has reached its target, or if it's
+                            // about to leave the domain, otherwise we might evict state that a
+                            // later operator (like a join) will still do lookups into.
+                            if i == path.len() - 1 {
+                                // only evict if we own the state where the replay originated
+                                if let Some(src) = source {
+                                    let n = self.nodes[*src].borrow();
+                                    if n.beyond_mat_frontier() {
+                                        let state = self
+                                            .state
+                                            .get_mut(*src)
+                                            .expect("replay sourced at non-materialized node");
+                                        trace!(self.log, "clearing keys from purgeable replay source after replay"; "node" => n.global_addr().index(), "keys" => ?backfill_keys.as_ref().unwrap());
+                                        for key in backfill_keys.as_ref().unwrap().iter() {
+                                            state.mark_hole(&key[..], tag);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // next, evict any state that we had to look up to process this replay.
+                            let mut evict_tag = None;
+                            let mut pns_for = None;
+                            let mut pns = Vec::new();
+                            let mut tmp = Vec::new();
+                            for lookup in lookups {
+                                // don't evict from our own state
+                                if lookup.on == segment.node {
+                                    continue;
+                                }
+
+                                // resolve any lookups through query-through nodes
+                                if pns_for != Some(lookup.on) {
+                                    pns.clear();
+                                    assert!(tmp.is_empty());
+                                    tmp.push(lookup.on);
+
+                                    while let Some(pn) = tmp.pop() {
+                                        if self.state.contains_key(pn) {
+                                            if self.nodes[pn].borrow().beyond_mat_frontier() {
+                                                // we should evict from this!
+                                                pns.push(pn);
+                                            } else {
+                                                // we should _not_ evict from this
+                                            }
+                                            continue;
+                                        }
+
+                                        // this parent needs to be resolved further
+                                        let pn = self.nodes[pn].borrow();
+                                        if !pn.can_query_through() {
+                                            unreachable!("lookup into non-materialized, non-query-through node");
+                                        }
+
+                                        for &ppn in pn.parents() {
+                                            tmp.push(ppn);
+                                        }
+                                    }
+                                    pns_for = Some(lookup.on);
+                                }
+
+                                let tag_match = |rp: &ReplayPath, pn| {
+                                    rp.path.last().unwrap().node == pn
+                                        && rp.path.last().unwrap().partial_key.as_ref().unwrap()
+                                            == &lookup.cols
+                                };
+
+                                for &pn in &pns {
+                                    let state = self.state.get_mut(pn).unwrap();
+                                    assert!(state.is_partial());
+
+                                    // this is a node that we were doing lookups into as part of
+                                    // the replay -- make sure we evict any state we may have added
+                                    // there.
+                                    if let Some(tag) = evict_tag {
+                                        if !tag_match(&self.replay_paths[&tag], pn) {
+                                            // we can't re-use this
+                                            evict_tag = None;
+                                        }
+                                    }
+
+                                    if evict_tag.is_none() {
+                                        for (&tag, rp) in &self.replay_paths {
+                                            match rp.trigger {
+                                                TriggerEndpoint::Local(..)
+                                                | TriggerEndpoint::End { .. } => {
+                                                    if tag_match(rp, pn) {
+                                                        // this is the tag we would have used to
+                                                        // fill a lookup hole in this ancestor, so
+                                                        // this is the tag we need to evict from.
+                                                        evict_tag = Some(tag);
+                                                        break;
+                                                    }
+                                                }
+                                                TriggerEndpoint::Start(..)
+                                                | TriggerEndpoint::None => {}
+                                            }
+                                        }
+                                    }
+
+                                    if let Some(tag) = evict_tag {
+                                        // NOTE: this assumes that the key order is the same
+                                        trace!(self.log, "clearing keys from purgeable materialization after replay"; "node" => self.nodes[pn].borrow().global_addr().index(), "key" => ?&lookup.key);
+                                        state.mark_hole(&lookup.key[..], tag);
+                                    } else {
+                                        unreachable!(
+                                            "no tag found for lookup target {:?}({:?}) (really {:?})",
+                                            self.nodes[lookup.on].borrow().global_addr(),
+                                            lookup.cols,
+                                            self.nodes[pn].borrow().global_addr(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
                         // we're all good -- continue propagating
                         if m.as_ref().map(|m| m.is_empty()).unwrap_or(true) {
                             if let ReplayPieceContext::Regular { last: false } = context {
@@ -2402,7 +2561,7 @@ impl Domain {
         }
 
         if finished_partial != 0 {
-            self.finished_partial_replay(&tag, finished_partial);
+            self.finished_partial_replay(tag, finished_partial);
         }
 
         for (node, while_replaying_key, miss_key, miss_cols, tag) in need_replay {
@@ -2441,10 +2600,12 @@ impl Domain {
                 // continue with their replays.
                 for key in for_keys.unwrap() {
                     let hole = (key_cols.clone(), key);
-                    let replay = waiting.redos.remove(&hole).expect(&format!(
-                        "got backfill for unnecessary key {:?} via tag {:?}",
-                        hole.1, tag
-                    ));
+                    let replay = waiting.redos.remove(&hole).unwrap_or_else(|| {
+                        panic!(
+                            "got backfill for unnecessary key {:?} via tag {:?}",
+                            hole.1, tag
+                        )
+                    });
 
                     // we may need more holes to fill before some replays should be re-attempted
                     let replay: Vec<_> = replay
@@ -2505,7 +2666,13 @@ impl Domain {
         }
     }
 
-    fn finish_replay(&mut self, tag: Tag, node: LocalNodeIndex, sends: &mut EnqueuedSends) {
+    fn finish_replay(
+        &mut self,
+        tag: Tag,
+        node: LocalNodeIndex,
+        sends: &mut EnqueuedSends,
+        ex: &mut Executor,
+    ) {
         let mut was = mem::replace(&mut self.mode, DomainMode::Forwarding);
         let finished = if let DomainMode::Replaying {
             ref to,
@@ -2536,7 +2703,7 @@ impl Domain {
                     // NOTE: we specifically need to override the buffering behavior that our
                     // self.replaying_to = Some above would initiate.
                     self.mode = DomainMode::Forwarding;
-                    self.dispatch(m, true, sends, None);
+                    self.dispatch(m, sends, ex);
                 } else {
                     unreachable!();
                 }
@@ -2589,6 +2756,7 @@ impl Domain {
     }
 
     pub fn handle_eviction(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
+        #[allow(clippy::too_many_arguments)]
         fn trigger_downstream_evictions(
             log: &Logger,
             key_columns: &[usize],
@@ -2632,7 +2800,7 @@ impl Domain {
                             continue;
                         }
 
-                        state[target.node].evict_keys(&tag, &keys[..]);
+                        state[target.node].evict_keys(*tag, &keys[..]);
                         trigger_downstream_evictions(
                             log,
                             &target.partial_key.as_ref().unwrap()[..],
@@ -2678,7 +2846,7 @@ impl Domain {
                     self.nodes
                         .values()
                         .filter_map(|nd| {
-                            let ref n = *nd.borrow();
+                            let n = &*nd.borrow();
                             let local_index = n.local_addr();
 
                             if n.is_reader() {
@@ -2789,7 +2957,7 @@ impl Domain {
                         if self.nodes[target].borrow().is_dropped() {
                             return;
                         }
-                        if let Some(evicted) = self.state[target].evict_keys(&tag, &keys) {
+                        if let Some(evicted) = self.state[target].evict_keys(tag, &keys) {
                             let key_columns = evicted.0.to_vec();
                             trigger_downstream_evictions(
                                 &self.log,
@@ -2829,7 +2997,7 @@ impl Domain {
             .nodes
             .values()
             .map(|nd| {
-                let ref n = *nd.borrow();
+                let n = &*nd.borrow();
                 let local_index = n.local_addr();
 
                 if n.is_reader() {

@@ -123,16 +123,11 @@ where
 
         // build a translation mechanism for going from output columns to input columns
         let colfix: Vec<_> = (0..self.cols)
-            .into_iter()
-            .filter_map(|col| {
-                if self.group_by.iter().any(|c| c == &col) {
-                    // since the generated value goes at the end,
-                    // this is the n'th output value
-                    Some(col)
-                } else {
-                    // this column does not appear in output
-                    None
-                }
+            .filter(|col| {
+                // since the generated value goes at the end,
+                // this is the n'th output value
+                // otherwise this column does not appear in output
+                self.group_by.iter().any(|c| c == col)
             })
             .collect();
         self.colfix.extend(colfix.into_iter());
@@ -148,6 +143,7 @@ where
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -160,7 +156,7 @@ where
         if rs.is_empty() {
             return ProcessingResult {
                 results: rs,
-                misses: vec![],
+                ..Default::default()
             };
         }
 
@@ -185,6 +181,7 @@ where
             .expect("grouped operators must have their own state materialized");
 
         let mut misses = Vec::new();
+        let mut lookups = Vec::new();
         let mut out = Vec::new();
         {
             let out_key = &self.out_key;
@@ -212,6 +209,14 @@ where
                     let rs = {
                         match db.lookup(&out_key[..], &KeyType::from(&group[..])) {
                             LookupResult::Some(rs) => {
+                                if replay_key_cols.is_some() {
+                                    lookups.push(Lookup {
+                                        on: *us,
+                                        cols: out_key.clone(),
+                                        key: group.clone(),
+                                    });
+                                }
+
                                 debug_assert!(rs.len() <= 1, "a group had more than 1 result");
                                 rs
                             }
@@ -273,15 +278,14 @@ where
 
         ProcessingResult {
             results: out.into(),
-            misses: misses,
+            lookups,
+            misses,
         }
     }
 
-    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         // index by our primary key
-        Some((this, (self.out_key.clone(), true)))
-            .into_iter()
-            .collect()
+        Some((this, self.out_key.clone())).into_iter().collect()
     }
 
     fn resolve(&self, col: usize) -> Option<Vec<(NodeIndex, usize)>> {

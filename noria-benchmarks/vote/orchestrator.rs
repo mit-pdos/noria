@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{io, thread, time};
 
-const SOUP_AMI: &str = "ami-04db1e82afa245def";
+const SOUP_AMI: &str = "ami-0fe49768bcb2d68f4";
 
 #[derive(Clone, Copy)]
 struct ClientParameters<'a> {
@@ -335,7 +335,7 @@ fn main() {
                 .is_ok();
             }
 
-            e// println!(" -> setting up mssql ramdisk");
+            eprintln!(" -> setting up mssql ramdisk");
             host.just_exec(&["sudo", "/opt/mssql/ramdisk.sh"])?.is_ok();
 
             let build = |host: &tsunami::Session| {
@@ -381,7 +381,7 @@ fn main() {
             }
 
             let build = |host: &tsunami::Session| {
-                e// println!(" -> building vote client on client");
+                eprintln!(" -> building vote client on client");
                 host.just_exec(&[
                     "cd",
                     "noria",
@@ -418,7 +418,7 @@ fn main() {
             "netsoup-4" => Some(Backend::Netsoup { shards: Some(4) }),
             "mssql" => Some(Backend::Mssql),
             b => {
-                e// println!("unknown backend '{}' specified", b);
+                eprintln!("unknown backend '{}' specified", b);
                 None
             }
         })
@@ -442,7 +442,7 @@ fn main() {
     if let Err(e) = ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
     }) {
-        e// println!("==> failed to set ^C handler: {}", e);
+        eprintln!("==> failed to set ^C handler: {}", e);
     }
 
     rayon::ThreadPoolBuilder::new()
@@ -474,7 +474,7 @@ fn main() {
         };
 
         if let Err(e) = r {
-            e// println!("failed to write out host files: {:?}", e);
+            eprintln!("failed to write out host files: {:?}", e);
         }
 
         let targets = if let Some(ts) = args.values_of("targets") {
@@ -488,24 +488,24 @@ fn main() {
         };
 
         for backend in backends {
-            e// println!("==> {}", backend.uniq_name());
+            eprintln!("==> {}", backend.uniq_name());
 
-            e// println!(" -> starting server");
+            eprintln!(" -> starting server");
             let mut s =
                 match server::start(server.ssh.as_ref().unwrap(), listen_addr, &backend).unwrap() {
                     Ok(s) => s,
                     Err(e) => {
-                        e// println!("failed to start {:?}: {:?}", backend, e);
+                        eprintln!("failed to start {:?}: {:?}", backend, e);
                         continue;
                     }
                 };
 
             // give the server a little time to get its stuff together
             if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
-                e// println!("failed to start {:?}: {:?}", backend, e);
+                eprintln!("failed to start {:?}: {:?}", backend, e);
                 continue;
             }
-            e// println!(" .. server started ");
+            eprintln!(" .. server started ");
 
             let mut first = true;
             'out: for &read_percentage in &read_percentages {
@@ -530,12 +530,12 @@ fn main() {
 
                                 // wait in case server was restarted
                                 if let Err(e) = s.wait(clients[0].ssh.as_ref().unwrap(), &backend) {
-                                    e// println!("failed to restart {:?}: {:?}", backend, e);
+                                    eprintln!("failed to restart {:?}: {:?}", backend, e);
                                     continue;
                                 }
                             }
 
-                            e// println!(
+                            eprintln!(
                                 " -> {} [run {}/{}] @ {}",
                                 params.name(target, ""),
                                 iter + 1,
@@ -558,9 +558,9 @@ fn main() {
                 }
             }
 
-            e// println!(" -> stopping server");
+            eprintln!(" -> stopping server");
             s.end(&backend).unwrap();
-            e// println!(" .. server stopped ");
+            eprintln!(" .. server stopped ");
 
             if !running.load(Ordering::SeqCst) {
                 // user pressed ^C
@@ -571,18 +571,18 @@ fn main() {
         }
 
         if !running.load(Ordering::SeqCst) {
-            e// println!("==> terminating early due to ^C");
+            eprintln!("==> terminating early due to ^C");
         }
 
-        e// println!("==> about to terminate the following ec2 instances:");
-        e// println!("server: {}", server.public_dns);
+        eprintln!("==> about to terminate the following ec2 instances:");
+        eprintln!("server: {}", server.public_dns);
         for client in &clients {
-            e// println!("client: {}", client.public_dns);
+            eprintln!("client: {}", client.public_dns);
         }
 
         let mut keep = args.is_present("keep");
         if !keep {
-            e// println!("==> press enter to interrupt");
+            eprintln!("==> press enter to interrupt");
             match timeout_readwrite::TimeoutReader::new(
                 io::stdin(),
                 Some(time::Duration::from_secs(10)),
@@ -601,7 +601,7 @@ fn main() {
         }
 
         if keep {
-            e// println!(" -> delaying shutdown; press enter to clean up");
+            eprintln!(" -> delaying shutdown; press enter to clean up");
             io::stdin().read(&mut [0u8]).is_ok();
         }
 
@@ -624,7 +624,7 @@ fn run_clients(
     // first, we need to prime from some host -- doesn't really matter which
     {
         clients[0].ssh.as_ref().unwrap().set_timeout(0);
-        e// println!(" .. prepopulating on {}", clients[0].public_dns);
+        eprintln!(" .. prepopulating on {}", clients[0].public_dns);
 
         let mut prime_params = params.clone();
         prime_params.warmup = 0;
@@ -645,20 +645,20 @@ fn run_clients(
         match clients[0].ssh.as_ref().unwrap().just_exec(&cmd[..]) {
             Ok(Ok(_)) => {}
             Ok(Err(e)) => {
-                e// println!("{} failed to populate:", clients[0].public_dns);
-                e// println!("{}", e);
-                e// println!("");
+                eprintln!("{} failed to populate:", clients[0].public_dns);
+                eprintln!("{}", e);
+                eprintln!("");
                 return false;
             }
             Err(e) => {
-                e// println!("{} failed to populate:", clients[0].public_dns);
-                e// println!("{:?}", e);
-                e// println!("");
+                eprintln!("{} failed to populate:", clients[0].public_dns);
+                eprintln!("{:?}", e);
+                eprintln!("");
                 return false;
             }
         }
 
-        e// println!(
+        eprintln!(
             " .. finished prepopulation @ {}",
             chrono::Local::now().time()
         );
@@ -679,7 +679,7 @@ fn run_clients(
              }| {
                 let ssh = ssh.as_ref().unwrap();
 
-                e// println!(
+                eprintln!(
                     " .. starting benchmarker on {} with target {}",
                     public_dns, target
                 );
@@ -708,9 +708,9 @@ fn run_clients(
                 match c {
                     Ok(c) => Some((public_dns, c)),
                     Err(e) => {
-                        e// println!("{} failed to run benchmark client:", public_dns);
-                        e// println!("{:?}", e);
-                        e// println!("");
+                        eprintln!("{} failed to run benchmark client:", public_dns);
+                        eprintln!("{:?}", e);
+                        eprintln!("");
                         None
                     }
                 }
@@ -820,9 +820,9 @@ fn run_clients(
         match r {
             Ok(c) => Some(c),
             Err(e) => {
-                e// println!("failed to run perf on server:");
-                e// println!("{:?}", e);
-                e// println!("");
+                eprintln!("failed to run perf on server:");
+                eprintln!("{:?}", e);
+                eprintln!("");
                 None
             }
         }
@@ -845,10 +845,10 @@ fn run_clients(
             .open(&fname)
     };
     if let Err(ref e) = outf {
-        e// println!(" !! failed to open output file {}: {}", fname, e);
+        eprintln!(" !! failed to open output file {}: {}", fname, e);
     }
 
-    e// println!(" .. waiting for benchmark to complete");
+    eprintln!(" .. waiting for benchmark to complete");
     for (host, mut chan) in workers {
         let mut got_lines = true;
         if let Ok(ref mut f) = outf {
@@ -874,7 +874,7 @@ fn run_clients(
             }
 
             if is_overloaded {
-                e// println!(" !! client {} was overloaded", host);
+                eprintln!(" !! client {} was overloaded", host);
             } else {
                 any_not_overloaded = true;
             }
@@ -882,7 +882,7 @@ fn run_clients(
             let was_overloaded = overloaded.unwrap_or(false);
             if overloaded.is_some() && is_overloaded != was_overloaded {
                 // one client was overloaded, while another wasn't....
-                e// println!(" !! unequal overload detected");
+                eprintln!(" !! unequal overload detected");
             }
 
             overloaded = Some(is_overloaded || was_overloaded);
@@ -894,14 +894,14 @@ fn run_clients(
         chan.wait_close().unwrap();
 
         if !got_lines || chan.exit_status().unwrap() != 0 {
-            e// println!("{} failed to run benchmark client:", host);
-            e// println!("{}", stderr);
-            e// println!("");
+            eprintln!("{} failed to run benchmark client:", host);
+            eprintln!("{}", stderr);
+            eprintln!("");
             any_not_overloaded = false;
         } else if !stderr.is_empty() {
-            e// println!("{} reported:", host);
-            let stderr = stderr.trim_right().replace('\n', "\n > ");
-            e// println!(" > {}", stderr);
+            eprintln!("{} reported:", host);
+            let stderr = stderr.trim_end().replace('\n', "\n > ");
+            eprintln!(" > {}", stderr);
         }
     }
 
@@ -909,13 +909,13 @@ fn run_clients(
         // also gather memory usage and stuff
         if f.write_all(b"# server stats:\n").is_ok() {
             if let Err(e) = server.write_stats(params.backend, f) {
-                e// println!(" !! failed to gather server stats: {}", e);
+                eprintln!(" !! failed to gather server stats: {}", e);
             }
         }
     }
 
     if let Some(mut c) = perf {
-        e// println!(" .. collecting perf results");
+        eprintln!(" .. collecting perf results");
 
         // make perf exit
         if let Perf::Hot = do_perf {
@@ -948,9 +948,9 @@ fn run_clients(
                     c.wait_eof().unwrap();
                 }
                 Err(e) => {
-                    e// println!("failed to parse perf report");
-                    e// println!("{:?}", e);
-                    e// println!("");
+                    eprintln!("failed to parse perf report");
+                    eprintln!("{:?}", e);
+                    eprintln!("");
                 }
             }
         }
@@ -969,7 +969,7 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
         "nano" | "micro" | "small" => Some(1),
         "medium" | "large" => Some(2),
         t if t.ends_with("xlarge") => {
-            let mult = t.trim_right_matches("xlarge").parse::<u16>().unwrap_or(1);
+            let mult = t.trim_end_matches("xlarge").parse::<u16>().unwrap_or(1);
             Some(4 * mult)
         }
         _ => None,
@@ -993,7 +993,7 @@ where
 
     // and then disable all the extra cores
     let cores = ec2_instance_type_cores("i3.metal").unwrap();
-    e// println!(" -> disabling extra cores on bare-metal machine");
+    eprintln!(" -> disabling extra cores on bare-metal machine");
     for corei in 16..cores {
         let core = format!("/sys/devices/system/cpu/cpu{}/online", corei);
         host.just_exec(&["echo", "0", "|", "sudo", "tee", &core])?
@@ -1013,7 +1013,7 @@ impl ConvenientSession for tsunami::Session {
             })
             .collect();
         let cmd = cmd.join(" ");
-        e// println!("    :> {}", cmd);
+        eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
         let cmd = format!("bash -c {}", shellwords::escape(&cmd));

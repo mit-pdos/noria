@@ -79,6 +79,7 @@ impl Ingredient for Filter {
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         _: LocalNodeIndex,
         mut rs: Records,
         _: &mut Tracer,
@@ -119,11 +120,11 @@ impl Ingredient for Filter {
 
         ProcessingResult {
             results: rs,
-            misses: Vec::new(),
+            ..Default::default()
         }
     }
 
-    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         HashMap::new()
     }
 
@@ -169,13 +170,13 @@ impl Ingredient for Filter {
                 .as_slice()
                 .join(", ")
         )
-        .into()
     }
 
     fn can_query_through(&self) -> bool {
         true
     }
 
+    #[allow(clippy::type_complexity)]
     fn query_through<'a>(
         &self,
         columns: &[usize],
@@ -217,7 +218,7 @@ impl Ingredient for Filter {
 
                 match result {
                     Some(rs) => {
-                        let r = Box::new(rs.into_iter().filter(move |r| filter(r))) as Box<_>;
+                        let r = Box::new(rs.filter(move |r| filter(r))) as Box<_>;
                         Some(Some(r))
                     }
                     None => Some(None),

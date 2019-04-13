@@ -3,7 +3,7 @@ use mir::node::{MirNode, MirNodeType};
 use mir::Column;
 use mir::MirNodeRef;
 
-pub fn make_rewrite_nodes(
+pub(super) fn make_rewrite_nodes(
     mir_converter: &SqlToMirConverter,
     name: &str,
     prev_node: MirNodeRef,
@@ -33,7 +33,7 @@ pub fn make_rewrite_nodes(
     let mut parent = prev_node;
 
     for p in rewrite_policies {
-        let fields = parent.borrow().columns().iter().cloned().collect();
+        let fields = parent.borrow().columns().to_vec();
         let should_rewrite = mir_converter.get_view(&p.rewrite_view)?;
 
         let rw = MirNode::new(

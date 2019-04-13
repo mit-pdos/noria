@@ -35,9 +35,9 @@ impl Rewrite {
         Rewrite {
             src: src.into(),
             signal: signal.into(),
-            rw_col: rw_col,
-            value: value,
-            signal_key: signal_key,
+            rw_col,
+            value,
+            signal_key,
         }
     }
 
@@ -73,6 +73,7 @@ impl Ingredient for Rewrite {
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -82,12 +83,13 @@ impl Ingredient for Rewrite {
     ) -> ProcessingResult {
         debug_assert!(from == *self.src || from == *self.signal);
         let mut misses = Vec::new();
+        let mut lookups = Vec::new();
         let mut emit_rs = Vec::with_capacity(rs.len());
 
         if rs.is_empty() {
             return ProcessingResult {
                 results: rs,
-                misses: vec![],
+                ..Default::default()
             };
         }
 
@@ -110,6 +112,14 @@ impl Ingredient for Rewrite {
                         record: r.extract().0,
                     });
                     continue;
+                }
+
+                if replay_key_cols.is_some() {
+                    lookups.push(Lookup {
+                        on: *self.signal,
+                        cols: vec![0],
+                        key: vec![key.clone()],
+                    });
                 }
 
                 let mut rc = rc.unwrap().peekable();
@@ -162,14 +172,15 @@ impl Ingredient for Rewrite {
 
         ProcessingResult {
             results: emit_rs.into(),
-            misses: misses,
+            lookups,
+            misses,
         }
     }
 
-    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         vec![
-            (self.signal.as_global(), (vec![0], true)),
-            (self.src.as_global(), (vec![self.signal_key], true)),
+            (self.signal.as_global(), vec![0]),
+            (self.src.as_global(), vec![self.signal_key]),
         ]
         .into_iter()
         .collect()
@@ -224,7 +235,7 @@ mod tests {
         let rw1 = vec![1.into()];
         let rw2 = vec![2.into()];
 
-        let result = vec![((vec![1.into(), "a".into()], true))].into();
+        let result = vec![(vec![1.into(), "a".into()], true)].into();
         rw.seed(src, src_a1.clone());
         let rs = rw.one_row(src, src_a1.clone(), false);
         assert_eq!(rs, result);
@@ -233,15 +244,15 @@ mod tests {
         rw.one_row(should_rw, rw2.clone(), false);
 
         // forward [2, b] to src; should be rewritten and produce [2, "NONE"].
-        let result = vec![((vec![2.into(), "NONE".into()], true))].into();
+        let result = vec![(vec![2.into(), "NONE".into()], true)].into();
         rw.seed(src, src_b2.clone());
         let rs = rw.one_row(src, src_b2.clone(), false);
         assert_eq!(rs, result);
 
         // forward 1 to signal; should produce Positive([1, "NONE"]) and Negative([1, "a"]).
         let result = vec![
-            ((vec![1.into(), "a".into()], false)),
-            ((vec![1.into(), "NONE".into()], true)),
+            (vec![1.into(), "a".into()], false),
+            (vec![1.into(), "NONE".into()], true),
         ]
         .into();
         rw.seed(should_rw, rw1.clone());

@@ -33,6 +33,7 @@ impl Ingredient for Identity {
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         _: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -42,11 +43,11 @@ impl Ingredient for Identity {
     ) -> ProcessingResult {
         ProcessingResult {
             results: rs,
-            misses: Vec::new(),
+            ..Default::default()
         }
     }
 
-    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         HashMap::new()
     }
 

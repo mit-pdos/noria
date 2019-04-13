@@ -23,18 +23,18 @@
 use crate::controller::security::SecurityConfig;
 use crate::controller::ControllerInner;
 use dataflow::prelude::*;
-use dataflow::{node, payload};
+use dataflow::{node, prelude::Packet};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use petgraph;
 use slog;
 
-pub mod assignment;
-pub mod augmentation;
-pub mod materialization;
-pub mod routing;
-pub mod sharding;
+mod assignment;
+mod augmentation;
+pub(super) mod materialization;
+mod routing;
+mod sharding;
 
 #[derive(Clone)]
 pub(super) enum ColumnChange {
@@ -46,9 +46,10 @@ pub(super) enum ColumnChange {
 ///
 /// Only one `Migration` can be in effect at any point in time. No changes are made to the running
 /// graph until the `Migration` is committed (using `Migration::commit`).
-pub struct Migration<'a> {
+// crate viz for tests
+crate struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
-    pub(super) added: Vec<NodeIndex>,
+    pub(super) added: HashSet<NodeIndex>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
     pub(super) readers: HashMap<NodeIndex, NodeIndex>,
 
@@ -66,24 +67,26 @@ impl<'a> Migration<'a> {
     /// The returned identifier can later be used to refer to the added ingredient.
     /// Edges in the data flow graph are automatically added based on the ingredient's reported
     /// `ancestors`.
-    pub fn add_ingredient<S1, FS, S2, I>(&mut self, name: S1, fields: FS, mut i: I) -> NodeIndex
+    // crate viz for tests
+    crate fn add_ingredient<S1, FS, S2, I>(&mut self, name: S1, fields: FS, i: I) -> NodeIndex
     where
         S1: ToString,
         S2: ToString,
         FS: IntoIterator<Item = S2>,
-        I: Ingredient + Into<NodeOperator>,
+        I: Into<NodeOperator>,
     {
         let mut i = node::Node::new(name.to_string(), fields, i.into());
+
+        if i.name().starts_with("SHALLOW_") {
+            i.purge = true;
+        }
 
         i.on_connected(&self.mainline.ingredients);
         let parents = i.ancestors();
         assert!(!parents.is_empty());
 
         // add to the graph
-        let ni =
-            self.mainline
-                .ingredients
-                .add_node(i);
+        let ni = self.mainline.ingredients.add_node(i);
         info!(self.log,
               "adding new node";
               "node" => ni.index(),
@@ -91,19 +94,20 @@ impl<'a> Migration<'a> {
         );
 
         // keep track of the fact that it's new
-        self.added.push(ni);
+        self.added.insert(ni);
         // insert it into the graph
         for parent in parents {
             self.mainline.ingredients.add_edge(parent, ni, ());
         }
         // and tell the caller its id
-        ni.into()
+        ni
     }
 
     /// Add the given `Base` to the Soup.
     ///
     /// The returned identifier can later be used to refer to the added ingredient.
-    pub fn add_base<S1, FS, S2>(
+    // crate viz for tests
+    crate fn add_base<S1, FS, S2>(
         &mut self,
         name: S1,
         fields: FS,
@@ -131,24 +135,44 @@ impl<'a> Migration<'a> {
         // }
 
         // keep track of the fact that it's new
-        self.added.push(ni);
+        self.added.insert(ni);
         // insert it into the graph
         self.mainline
             .ingredients
             .add_edge(self.mainline.source, ni, ());
         // and tell the caller its id
+        ni
+    }
 
-        ni.into()
+    /// Mark the given node as being beyond the materialization frontier.
+    ///
+    /// When a node is marked as such, it will quickly evict state after it is no longer
+    /// immediately useful, making such nodes generally mostly empty. This reduces read
+    /// performance (since most reads now need to do replays), but can significantly reduce memory
+    /// overhead and improve write performance.
+    ///
+    /// Note that if a node is marked this way, all of its children transitively _also_ have to be
+    /// marked.
+    crate fn mark_shallow(&mut self, ni: NodeIndex) {
+        info!(self.log,
+              "marking node as beyond materialization frontier";
+              "node" => ni.index(),
+        );
+        self.mainline.ingredients.node_weight_mut(ni).unwrap().purge = true;
+
+        if !self.added.contains(&ni) {
+            unimplemented!("marking existing node as beyond materialization frontier");
+        }
     }
 
     /// Returns the context of this migration
-    pub fn context(&self) -> &HashMap<String, DataType> {
+    pub(super) fn context(&self) -> &HashMap<String, DataType> {
         &self.context
     }
 
     /// Returns the universe in which this migration is operating in.
     /// If not specified, assumes `global` universe.
-    pub fn universe(&self) -> (DataType, Option<DataType>) {
+    pub(super) fn universe(&self) -> (DataType, Option<DataType>) {
         let id = match self.context.get("id") {
             Some(id) => id.clone(),
             None => "global".into(),
@@ -166,14 +190,15 @@ impl<'a> Migration<'a> {
     ///
     /// Note that a default value must be provided such that old writes can be converted into this
     /// new type.
-    pub fn add_column<S: ToString>(
+    // crate viz for tests
+    crate fn add_column<S: ToString>(
         &mut self,
         node: NodeIndex,
         field: S,
         default: DataType,
     ) -> usize {
         // not allowed to add columns to new nodes
-        assert!(!self.added.iter().any(|&ni| ni == node));
+        assert!(!self.added.contains(&node));
 
         let field = field.to_string();
         let base = &mut self.mainline.ingredients[node];
@@ -195,9 +220,10 @@ impl<'a> Migration<'a> {
     }
 
     /// Drop a column from a base node.
-    pub fn drop_column(&mut self, node: NodeIndex, column: usize) {
+    // crate viz for tests
+    crate fn drop_column(&mut self, node: NodeIndex, column: usize) {
         // not allowed to drop columns from new nodes
-        assert!(!self.added.iter().any(|&ni| ni == node));
+        assert!(!self.added.contains(&node));
 
         let base = &mut self.mainline.ingredients[node];
         assert!(base.is_base());
@@ -212,23 +238,26 @@ impl<'a> Migration<'a> {
     }
 
     #[cfg(test)]
-    pub fn graph(&self) -> &Graph {
+    crate fn graph(&self) -> &Graph {
         self.mainline.graph()
     }
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
-        if !self.readers.contains_key(&n) {
-            let r = node::special::Reader::new(n);
-            // println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
+        use std::collections::hash_map::Entry;
+        if let Entry::Vacant(e) = self.readers.entry(n) {
             // make a reader
+            let r = node::special::Reader::new(n);
 
-            let r = if let Some(name) = name.clone() {
-                // println!("branch1");
-                self.mainline.ingredients[n].named_mirror(r, name.clone())
+            // println!("query to readers: {:?}", self.mainline.map_meta.query_to_readers);
+            let mut r = if let Some(name) = name.clone() {
+                self.mainline.ingredients[n].named_mirror(r, name)
             } else {
-                // println!("branch2");
                 self.mainline.ingredients[n].mirror(r)
             };
+
+            if r.name().starts_with("SHALLOW_") {
+                r.purge = true;
+            }
 
             let r = self.mainline.ingredients.add_node(r);
             self.mainline.ingredients.add_edge(n, r, ());
@@ -306,7 +335,8 @@ impl<'a> Migration<'a> {
             }
 
             // println!("name: {:?}, reader: {:?}", n, r);
-            self.readers.insert(n, r);
+            self.added.insert(r);
+            e.insert(r);
         }
     }
 
@@ -314,7 +344,7 @@ impl<'a> Migration<'a> {
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     #[cfg(test)]
-    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
+    crate fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
@@ -328,7 +358,7 @@ impl<'a> Migration<'a> {
     /// Set up the given node such that its output can be efficiently queried.
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
-    pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
+    pub(super) fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
         self.ensure_reader_for(n, Some(name));
 
         let ri = self.readers[&n];
@@ -381,19 +411,15 @@ impl<'a> Migration<'a> {
     /// This will spin up an execution thread for each new thread domain, and hook those new
     /// domains into the larger Soup graph. The returned map contains entry points through which
     /// new updates should be sent to introduce them into the Soup.
-    pub fn commit(self) {
+    #[allow(clippy::cyclomatic_complexity)]
+    pub(super) fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
         // println!("in migration::commit. query_to_readers: {:?}", self.mainline.map_meta.query_to_readers.clone());
 
         let log = self.log;
         let start = self.start;
         let mut mainline = self.mainline;
-        let mut new: HashSet<_> = self.added.into_iter().collect();
-
-        // Readers are nodes too.
-        for (_parent, reader) in self.readers {
-            new.insert(reader);
-        }
+        let mut new = self.added;
 
         // Shard the graph as desired
         let mut swapped0 = if let Some(shards) = mainline.sharding {
@@ -627,14 +653,14 @@ impl<'a> Migration<'a> {
             for ni in inform {
                 let n = &mainline.ingredients[ni];
                 let m = match change.clone() {
-                    ColumnChange::Add(field, default) => box payload::Packet::AddBaseColumn {
+                    ColumnChange::Add(field, default) => box Packet::AddBaseColumn {
                         node: n.local_addr(),
-                        field: field,
-                        default: default,
+                        field,
+                        default,
                     },
-                    ColumnChange::Drop(column) => box payload::Packet::DropBaseColumn {
+                    ColumnChange::Drop(column) => box Packet::DropBaseColumn {
                         node: n.local_addr(),
-                        column: column,
+                        column,
                     },
                 };
 
@@ -660,7 +686,7 @@ impl<'a> Migration<'a> {
         info!(log, "initializing new materializations");
         mainline.materializations.commit(
             &mainline.recipe,
-            &mainline.ingredients,
+            &mut mainline.ingredients,
             &new,
             &mut mainline.domains,
             &mainline.workers,

@@ -78,7 +78,7 @@ impl Base {
             .collect()
     }
 
-    pub fn fix(&self, row: &mut Vec<DataType>) {
+    crate fn fix(&self, row: &mut Vec<DataType>) {
         if self.unmodified {
             return;
         }
@@ -135,11 +135,11 @@ fn key_of<'a>(key_cols: &'a [usize], r: &'a TableOperation) -> impl Iterator<Ite
 }
 
 impl Base {
-    pub(crate) fn take(&mut self) -> Self {
+    pub(in crate::node) fn take(&mut self) -> Self {
         Clone::clone(self)
     }
 
-    pub(crate) fn process(
+    pub(in crate::node) fn process(
         &mut self,
         us: LocalNodeIndex,
         mut ops: Vec<TableOperation>,
@@ -276,9 +276,9 @@ impl Base {
         results.into()
     }
 
-    pub(crate) fn suggest_indexes(&self, n: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    pub(in crate::node) fn suggest_indexes(&self, n: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         if self.primary_key.is_some() {
-            Some((n, (self.primary_key.as_ref().unwrap().clone(), true)))
+            Some((n, self.primary_key.as_ref().unwrap().clone()))
                 .into_iter()
                 .collect()
         } else {
@@ -342,7 +342,7 @@ mod tests {
         graph.node_weight_mut(global).unwrap().on_commit(&remap);
         graph.node_weight_mut(global).unwrap().add_to(0.into());
 
-        for (_, (col, _)) in graph[global].suggest_indexes(global) {
+        for (_, col) in graph[global].suggest_indexes(global) {
             state.add_key(&col[..], None);
         }
 

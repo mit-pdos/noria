@@ -73,8 +73,8 @@ impl GroupConcat {
         GroupedOperator::new(
             src,
             GroupConcat {
-                components: components,
-                separator: separator,
+                components,
+                separator,
                 group: Vec::new(),
                 slen: 0,
             },
@@ -276,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cyclomatic_complexity)]
     fn it_forwards() {
         let mut c = setup(true);
 
@@ -437,7 +438,7 @@ mod tests {
         assert!(idx.contains_key(&me));
 
         // should only index on the group-by column
-        assert_eq!(idx[&me], (vec![0], true));
+        assert_eq!(idx[&me], vec![0]);
     }
 
     #[test]

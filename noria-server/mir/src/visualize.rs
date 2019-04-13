@@ -126,7 +126,7 @@ impl GraphViz for MirNodeType {
                     out,
                     "B | {} | ⚷: {}",
                     column_specs
-                        .into_iter()
+                        .iter()
                         .map(|&(ref cs, _)| cs.column.name.as_str())
                         .collect::<Vec<_>>()
                         .join(", "),
@@ -252,7 +252,7 @@ impl GraphViz for MirNodeType {
                         .collect::<Vec<_>>()
                         .join(", "),
                     if arithmetic.is_empty() {
-                        format!("")
+                        "".into()
                     } else {
                         format!(
                             ", {}",
@@ -264,7 +264,7 @@ impl GraphViz for MirNodeType {
                         )
                     },
                     if literals.is_empty() {
-                        format!("")
+                        "".into()
                     } else {
                         format!(
                             ", lit: {}",
@@ -302,7 +302,7 @@ impl GraphViz for MirNodeType {
                             .map(|(c, o)| format!("{}: {}", c.name.as_str(), o))
                             .collect::<Vec<_>>()
                             .join(", "))
-                        .unwrap_or("".into())
+                        .unwrap_or_else(|| "".into())
                 )?;
             }
             MirNodeType::Union { ref emit } => {

@@ -9,9 +9,7 @@ pub enum Handle {
     Many(evmap::WriteHandle<Vec<DataType>, Vec<DataType>, i64, FnvBuildHasher>),
 }
 
-
 impl Handle {
-
     pub fn is_empty(&self) -> bool {
         match *self {
             Handle::Single(ref h) => h.is_empty(),
@@ -22,23 +20,49 @@ impl Handle {
 
     pub fn clear(&mut self, k: Key) {
         match *self {
-            Handle::Single(ref mut h) => h.clear(key_to_single(k).into_owned()),
-            Handle::Double(ref mut h) => h.clear(key_to_double(k).into_owned()),
-            Handle::Many(ref mut h) => h.clear(k.into_owned()),
+            Handle::Single(ref mut h) => {
+                h.clear(key_to_single(k).into_owned());
+            }
+            Handle::Double(ref mut h) => {
+                h.clear(key_to_double(k).into_owned());
+            }
+            Handle::Many(ref mut h) => {
+                h.clear(k.into_owned());
+            }
+        }
+    }
+
+    pub fn purge(&mut self) {
+        match *self {
+            Handle::Single(ref mut h) => {
+                h.purge();
+            }
+            Handle::Double(ref mut h) => {
+                h.purge();
+            }
+            Handle::Many(ref mut h) => {
+                h.purge();
+            }
         }
     }
 
     pub fn empty(&mut self, k: Key) {
         match *self {
-            Handle::Single(ref mut h) => h.empty(key_to_single(k).into_owned()),
-            Handle::Double(ref mut h) => h.empty(key_to_double(k).into_owned()),
-            Handle::Many(ref mut h) => h.empty(k.into_owned()),
+            Handle::Single(ref mut h) => {
+                h.empty(key_to_single(k).into_owned());
+            }
+            Handle::Double(ref mut h) => {
+                h.empty(key_to_double(k).into_owned());
+            }
+            Handle::Many(ref mut h) => {
+                h.empty(k.into_owned());
+            }
         }
     }
 
     /// Evict `count` randomly selected keys from state and return them along with the number of
     /// bytes freed.
-    pub fn empty_at_index(&mut self, index: usize) -> Option<&Vec<Vec<DataType>>> {
+    pub fn empty_at_index(&mut self, index: usize) -> Option<&[Vec<DataType>]> {
         match *self {
             Handle::Single(ref mut h) => h.empty_at_index(index).map(|r| r.1),
             Handle::Double(ref mut h) => h.empty_at_index(index).map(|r| r.1),
@@ -48,10 +72,15 @@ impl Handle {
 
     pub fn refresh(&mut self) {
         match *self {
-            Handle::Single(ref mut h) => h.refresh(),
-            Handle::Double(ref mut h) => h.refresh(),
-            Handle::Many(ref mut h) => h.refresh(),
-            _ => (),
+            Handle::Single(ref mut h) => {
+                h.refresh();
+            }
+            Handle::Double(ref mut h) => {
+                h.refresh();
+            }
+            Handle::Many(ref mut h) => {
+                h.refresh();
+            }
         }
     }
 
@@ -63,7 +92,7 @@ impl Handle {
             Handle::Single(ref h) => {
                 assert_eq!(key.len(), 1);
                 h.meta_get_and(&key[0], then)
-            },
+            }
             Handle::Double(ref h) => {
                 assert_eq!(key.len(), 2);
                 // we want to transmute &[T; 2] to &(T, T), but that's not actually safe
@@ -90,13 +119,10 @@ impl Handle {
                     mem::forget(stack_key);
                     v
                 }
-            },
-            Handle::Many(ref h) => {
-                h.meta_get_and(&key.to_vec(), then)
-            },
+            }
+            Handle::Many(ref h) => h.meta_get_and(&key.to_vec(), then),
         }
     }
-
 
     pub fn add<I>(&mut self, key: &[usize], cols: usize, rs: I) -> isize
     where
@@ -140,20 +166,22 @@ impl Handle {
                     }
                 }
             }
-            Handle::Many(ref mut h) => for r in rs {
-                debug_assert!(r.len() >= cols);
-                let key = key.iter().map(|&k| &r[k]).cloned().collect();
-                match r {
-                    Record::Positive(r) => {
-                        memory_delta += r.deep_size_of() as isize;
-                        h.insert(key, r);
-                    }
-                    Record::Negative(r) => {
-                        memory_delta -= r.deep_size_of() as isize;
-                        h.remove(key, r);
+            Handle::Many(ref mut h) => {
+                for r in rs {
+                    debug_assert!(r.len() >= cols);
+                    let key = key.iter().map(|&k| &r[k]).cloned().collect();
+                    match r {
+                        Record::Positive(r) => {
+                            memory_delta += r.deep_size_of() as isize;
+                            h.insert(key, r);
+                        }
+                        Record::Negative(r) => {
+                            memory_delta -= r.deep_size_of() as isize;
+                            h.remove(key, r);
+                        }
                     }
                 }
-            },
+            }
         }
         memory_delta
     }

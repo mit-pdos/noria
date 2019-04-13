@@ -23,7 +23,7 @@ impl Latest {
         Latest {
             us: None,
             src: src.into(),
-            key: key,
+            key,
         }
     }
 }
@@ -46,6 +46,7 @@ impl Ingredient for Latest {
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -62,6 +63,7 @@ impl Ingredient for Latest {
             .expect("latest must have its own state materialized");
 
         let mut misses = Vec::new();
+        let mut lookups = Vec::new();
         let mut out = Vec::with_capacity(rs.len());
         {
             let currents = rs.into_iter().filter_map(|r| {
@@ -74,6 +76,14 @@ impl Ingredient for Latest {
 
                 match db.lookup(&[self.key], &KeyType::Single(&r[self.key])) {
                     LookupResult::Some(rs) => {
+                        if replay_key_cols.is_some() {
+                            lookups.push(Lookup {
+                                on: *us,
+                                cols: vec![self.key],
+                                key: vec![r[self.key].clone()],
+                            });
+                        }
+
                         debug_assert!(rs.len() <= 1, "a group had more than 1 result");
                         Some((r, rs))
                     }
@@ -108,13 +118,14 @@ impl Ingredient for Latest {
 
         ProcessingResult {
             results: out.into(),
-            misses: misses,
+            lookups,
+            misses,
         }
     }
 
-    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         // index all key columns
-        Some((this, (vec![self.key], true))).into_iter().collect()
+        Some((this, vec![self.key])).into_iter().collect()
     }
 
     fn resolve(&self, col: usize) -> Option<Vec<(NodeIndex, usize)>> {
@@ -257,7 +268,7 @@ mod tests {
         assert!(idx.contains_key(&me));
 
         // should only index on the group-by column
-        assert_eq!(idx[&me], (vec![1], true));
+        assert_eq!(idx[&me], vec![1]);
     }
 
     #[test]

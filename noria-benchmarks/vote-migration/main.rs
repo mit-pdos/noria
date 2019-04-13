@@ -1,9 +1,8 @@
-#![feature(duration_as_u128)]
-
 const WRITE_BATCH_SIZE: usize = 1000;
 
 #[macro_use]
 extern crate clap;
+extern crate futures;
 extern crate noria;
 extern crate rand;
 extern crate zipf;
@@ -47,13 +46,13 @@ impl Reporter {
     pub fn new(every: time::Duration) -> Self {
         Reporter {
             last: time::Instant::now(),
-            every: every,
+            every,
             count: 0,
         }
     }
 }
 
-fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::File>) {
+fn one(s: &graph::Builder, skewed: bool, args: &clap::ArgMatches, w: Option<fs::File>) {
     let narticles = value_t_or_exit!(args, "narticles", usize);
     let runtime = time::Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
     let migrate_after = time::Duration::from_secs(value_t_or_exit!(args, "migrate", u64));
@@ -67,22 +66,17 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     persistence_params.mode = noria::DurabilityMode::MemoryOnly;
 
     // make the graph!
-    println!("Setting up soup");
-    let mut g = s.make(persistence_params);
-    println!("Getting accessors");
-    let mut articles = g.graph.table("Article").unwrap().into_exclusive().unwrap();
-    let mut votes = g.graph.table("Vote").unwrap().into_exclusive().unwrap();
-    let mut read_old = g
-        .graph
-        .view("ArticleWithVoteCount")
-        .unwrap()
-        .into_exclusive()
-        .unwrap();
+    eprintln!("Setting up soup");
+    let mut g = s.start_sync(persistence_params).unwrap();
+    eprintln!("Getting accessors");
+    let mut articles = g.graph.table("Article").unwrap().into_sync();
+    let mut votes = g.graph.table("Vote").unwrap().into_sync();
+    let mut read_old = g.graph.view("ArticleWithVoteCount").unwrap().into_sync();
 
     // prepopulate
-    println!("Prepopulating with {} articles", narticles);
+    eprintln!("Prepopulating with {} articles", narticles);
     articles
-        .insert_then_wait(
+        .perform_all(
             (0..narticles).map(|i| vec![(i as i32).into(), format!("Article #{}", i + 1).into()]),
         )
         .unwrap();
@@ -91,7 +85,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     let barrier = Arc::new(Barrier::new(3));
 
     // start writer that just does a bunch of old writes
-    println!("Starting old writer");
+    eprintln!("Starting old writer");
     let w1 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -104,7 +98,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let start = time::Instant::now();
             while start.elapsed() < runtime {
                 votes
-                    .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
+                    .perform_all((0..WRITE_BATCH_SIZE).map(|i| {
                         // always generate both so that we aren't artifically faster with one
                         let id_uniform = rng.gen_range(0, narticles);
                         let id_zipf = zipf.sample(&mut rng);
@@ -123,7 +117,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     };
 
     // start a read that just reads old forever
-    println!("Starting old reader");
+    eprintln!("Starting old reader");
     let r1 = {
         let barrier = barrier.clone();
         thread::spawn(move || {
@@ -157,24 +151,19 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     });
 
     // we now need to wait for migrate_after
-    println!("Waiting for migration time...");
+    eprintln!("Waiting for migration time...");
     thread::sleep(migrate_after);
 
     // all right, migration time
-    println!("Starting migration");
+    eprintln!("Starting migration");
     stat.send(("MIG START", 0.0)).unwrap();
     g.transition();
     stat.send(("MIG FINISHED", 0.0)).unwrap();
-    let mut ratings = g.graph.table("Rating").unwrap().into_exclusive().unwrap();
-    let mut read_new = g
-        .graph
-        .view("ArticleWithScore")
-        .unwrap()
-        .into_exclusive()
-        .unwrap();
+    let mut ratings = g.graph.table("Rating").unwrap().into_sync();
+    let mut read_new = g.graph.view("ArticleWithScore").unwrap().into_sync();
 
     // start writer that just does a bunch of new writes
-    println!("Starting new writer");
+    eprintln!("Starting new writer");
     let w2 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -186,7 +175,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
             let mut reporter = Reporter::new(every);
             while start.elapsed() < runtime {
                 ratings
-                    .batch_insert((0..WRITE_BATCH_SIZE).map(|i| {
+                    .perform_all((0..WRITE_BATCH_SIZE).map(|i| {
                         let id_uniform = rng.gen_range(0, narticles);
                         let id_zipf = zipf.sample(&mut rng);
                         let id = if skewed { id_zipf } else { id_uniform };
@@ -204,7 +193,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     };
 
     // start reader that keeps probing new read view
-    println!("Starting new read probe");
+    eprintln!("Starting new read probe");
     let r2 = {
         let stat = stat.clone();
         let barrier = barrier.clone();
@@ -223,13 +212,10 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
                         vec![DataType::from(if skewed { id_zipf } else { id_uniform })]
                     })
                     .collect();
-                match read_new.multi_lookup(ids, false) {
-                    Ok(rss) => {
-                        hits += rss.into_iter().filter(|rs| !rs.is_empty()).count();
-                    }
-                    _ => {
-                        // miss, or view not yet ready
-                    }
+                if let Ok(rss) = read_new.multi_lookup(ids, false) {
+                    hits += rss.into_iter().filter(|rs| !rs.is_empty()).count();
+                } else {
+                    // miss, or view not yet ready
                 }
 
                 if let Some((_, count)) = reporter.report(n) {
@@ -245,7 +231,7 @@ fn one(s: &graph::Setup, skewed: bool, args: &clap::ArgMatches, w: Option<fs::Fi
     barrier.wait();
 
     // everything finishes!
-    println!("Waiting for experiment to end...");
+    eprintln!("Waiting for experiment to end...");
     w1.join().unwrap();
     w2.join().unwrap();
     r1.join().unwrap();
@@ -337,7 +323,7 @@ fn main() {
         .get_matches();
 
     // set config options
-    let mut s = graph::Setup::default();
+    let mut s = graph::Builder::default();
     s.sharding = args
         .value_of("shards")
         .map(|_| value_t_or_exit!(args, "shards", usize));
@@ -345,10 +331,10 @@ fn main() {
 
     if args.is_present("all") || args.is_present("relevant") {
         let narticles = value_t_or_exit!(args, "narticles", usize);
-        let mills = format!("{}", narticles as f64 / 1_000_000 as f64);
+        let mills = format!("{}", narticles as f64 / 1_000_000.0);
 
         // do the ones we need for the paper first
-        println!("==> full no reuse (zipf)");
+        eprintln!("==> full no reuse (zipf)");
         s.partial = false;
         s.stupid = true;
         one(
@@ -360,7 +346,7 @@ fn main() {
                     .unwrap(),
             ),
         );
-        println!("==> partial with reuse (uniform)");
+        eprintln!("==> partial with reuse (uniform)");
         s.partial = true;
         s.stupid = false;
         one(
@@ -369,7 +355,7 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-reuse-{}M.uniform.log", mills)).unwrap()),
         );
-        println!("==> partial with reuse (zipf)");
+        eprintln!("==> partial with reuse (zipf)");
         s.partial = true;
         s.stupid = false;
         one(
@@ -384,7 +370,7 @@ fn main() {
         }
 
         // then the rest
-        println!("==> full no reuse (uniform)");
+        eprintln!("==> full no reuse (uniform)");
         s.partial = false;
         s.stupid = true;
         one(
@@ -395,7 +381,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-stupid-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        println!("==> full with reuse (uniform)");
+        eprintln!("==> full with reuse (uniform)");
         s.partial = false;
         s.stupid = false;
         one(
@@ -406,7 +392,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.uniform.log", mills)).unwrap(),
             ),
         );
-        println!("==> full with reuse (zipf)");
+        eprintln!("==> full with reuse (zipf)");
         s.partial = false;
         s.stupid = false;
         one(
@@ -417,7 +403,7 @@ fn main() {
                 fs::File::create(format!("vote-no-partial-reuse-{}M.zipf1.08.log", mills)).unwrap(),
             ),
         );
-        println!("==> partial no reuse (uniform)");
+        eprintln!("==> partial no reuse (uniform)");
         s.partial = true;
         s.stupid = true;
         one(
@@ -426,7 +412,7 @@ fn main() {
             &args,
             Some(fs::File::create(format!("vote-partial-stupid-{}M.uniform.log", mills)).unwrap()),
         );
-        println!("==> partial no reuse (zipf)");
+        eprintln!("==> partial no reuse (zipf)");
         s.partial = true;
         s.stupid = true;
         one(

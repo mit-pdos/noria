@@ -15,8 +15,7 @@ use std::time;
 #[macro_use]
 mod populate;
 
-use crate::populate::{Populate, NANOS_PER_SEC};
-
+use crate::populate::Populate;
 
 struct Backend {
     pool: mysql::Pool,

@@ -17,7 +17,7 @@ use mir::visualize::GraphViz;
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
 
-pub fn mir_query_to_flow_parts(
+pub(super) fn mir_query_to_flow_parts(
     mir_query: &mut MirQuery,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
@@ -82,13 +82,13 @@ pub fn mir_query_to_flow_parts(
 
     QueryFlowParts {
         name: mir_query.name.clone(),
-        new_nodes: new_nodes,
-        reused_nodes: reused_nodes,
+        new_nodes,
+        reused_nodes,
         query_leaf: leaf_na,
     }
 }
 
-pub fn mir_node_to_flow_parts(
+fn mir_node_to_flow_parts(
     mir_node: &mut MirNode,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
@@ -97,6 +97,7 @@ pub fn mir_node_to_flow_parts(
     let name = mir_node.name.clone();
     match mir_node.flow_node {
         None => {
+            #[allow(clippy::let_and_return)]
             let flow_node = match mir_node.inner {
                 MirNodeType::Aggregation {
                     ref on,
@@ -159,7 +160,7 @@ pub fn mir_node_to_flow_parts(
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
-                    let group_cols = parent.borrow().columns().iter().cloned().collect();
+                    let group_cols = parent.borrow().columns().to_vec();
                     make_grouped_node(
                         &name,
                         parent,
@@ -376,12 +377,12 @@ pub fn mir_node_to_flow_parts(
     }
 }
 
-pub(crate) fn adapt_base_node(
+fn adapt_base_node(
     over_node: MirNodeRef,
     mig: &mut Migration,
     column_specs: &mut [(ColumnSpecification, Option<usize>)],
-    add: &Vec<ColumnSpecification>,
-    remove: &Vec<ColumnSpecification>,
+    add: &[ColumnSpecification],
+    remove: &[ColumnSpecification],
 ) -> FlowNode {
     let na = match over_node.borrow().flow_node {
         None => panic!("adapted base node must have a flow node already!"),
@@ -431,10 +432,10 @@ fn column_names<'a>(cs: &'a [Column]) -> Vec<&'a str> {
     cs.iter().map(|c| c.name.as_str()).collect()
 }
 
-pub(crate) fn make_base_node(
+fn make_base_node(
     name: &str,
     column_specs: &mut [(ColumnSpecification, Option<usize>)],
-    pkey_columns: &Vec<Column>,
+    pkey_columns: &[Column],
     mig: &mut Migration,
 ) -> FlowNode {
     // remember the absolute base column ID for potential later removal
@@ -454,16 +455,15 @@ pub(crate) fn make_base_node(
         .iter()
         .map(|&(ref cs, _)| {
             for c in &cs.constraints {
-                match *c {
-                    ColumnConstraint::DefaultValue(ref dv) => return dv.into(),
-                    _ => (),
+                if let ColumnConstraint::DefaultValue(ref dv) = *c {
+                    return dv.into();
                 }
             }
-            return DataType::None;
+            DataType::None
         })
         .collect::<Vec<DataType>>();
 
-    let base = if pkey_columns.len() > 0 {
+    let base = if !pkey_columns.is_empty() {
         let pkey_column_ids = pkey_columns
             .iter()
             .map(|pkc| {
@@ -482,10 +482,10 @@ pub(crate) fn make_base_node(
     FlowNode::New(mig.add_base(name, column_names.as_slice(), base))
 }
 
-pub(crate) fn make_union_node(
+fn make_union_node(
     name: &str,
     columns: &[Column],
-    emit: &Vec<Vec<Column>>,
+    emit: &[Vec<Column>],
     ancestors: &[MirNodeRef],
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
@@ -496,7 +496,7 @@ pub(crate) fn make_union_node(
     // column_id_for_column doesn't take into consideration table aliases
     // which might cause improper ordering of columns in a union node
     // eg. Q6 in finkelstein.txt
-    for (i, n) in ancestors.clone().iter().enumerate() {
+    for (i, n) in ancestors.iter().enumerate() {
         let emit_cols = emit[i]
             .iter()
             .map(|c| n.borrow().column_id_for_column(c, table_mapping))
@@ -514,13 +514,13 @@ pub(crate) fn make_union_node(
     FlowNode::New(node)
 }
 
-pub(crate) fn make_rewrite_node(
+fn make_rewrite_node(
     name: &str,
     src: MirNodeRef,
     should_rewrite: MirNodeRef,
     columns: &[Column],
-    value: &String,
-    rewrite_col: &String,
+    value: &str,
+    rewrite_col: &str,
     key: &Column,
     mig: &mut Migration,
 ) -> FlowNode {
@@ -537,22 +537,16 @@ pub(crate) fn make_rewrite_node(
     let node = mig.add_ingredient(
         String::from(name),
         column_names.as_slice(), // might have to be columns instead
-        ops::rewrite::Rewrite::new(
-            src_na,
-            should_rewrite_na,
-            rewrite_col,
-            value.clone().into(),
-            key,
-        ),
+        ops::rewrite::Rewrite::new(src_na, should_rewrite_na, rewrite_col, value.into(), key),
     );
     FlowNode::New(node)
 }
 
-pub(crate) fn make_filter_node(
+fn make_filter_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
-    conditions: &Vec<Option<FilterCondition>>,
+    conditions: &[Option<FilterCondition>],
     mig: &mut Migration,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
@@ -560,22 +554,22 @@ pub(crate) fn make_filter_node(
     let node = mig.add_ingredient(
         String::from(name),
         column_names.as_slice(),
-        ops::filter::Filter::new(parent_na, conditions.as_slice()),
+        ops::filter::Filter::new(parent_na, conditions),
     );
     FlowNode::New(node)
 }
 
-pub(crate) fn make_grouped_node(
+fn make_grouped_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
     on: &Column,
-    group_by: &Vec<Column>,
+    group_by: &[Column],
     kind: GroupedNodeType,
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
 ) -> FlowNode {
-    assert!(group_by.len() > 0);
+    assert!(!group_by.is_empty());
     assert!(
         group_by.len() <= 6,
         format!(
@@ -599,7 +593,7 @@ pub(crate) fn make_grouped_node(
         })
         .collect::<Vec<_>>();
 
-    assert!(group_col_indx.len() > 0);
+    assert!(!group_col_indx.is_empty());
 
     let na = match kind {
         GroupedNodeType::Aggregation(agg) => mig.add_ingredient(
@@ -621,7 +615,7 @@ pub(crate) fn make_grouped_node(
     FlowNode::New(na)
 }
 
-pub(crate) fn make_identity_node(
+fn make_identity_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
@@ -638,14 +632,14 @@ pub(crate) fn make_identity_node(
     FlowNode::New(node)
 }
 
-pub(crate) fn make_join_node(
+fn make_join_node(
     name: &str,
     left: MirNodeRef,
     right: MirNodeRef,
     columns: &[Column],
-    on_left: &Vec<Column>,
-    on_right: &Vec<Column>,
-    proj_cols: &Vec<Column>,
+    on_left: &[Column],
+    on_right: &[Column],
+    proj_cols: &[Column],
     kind: JoinType,
     mig: &mut Migration,
 ) -> FlowNode {
@@ -690,21 +684,25 @@ pub(crate) fn make_join_node(
         .columns
         .iter()
         .position(|lc| lc == on_left.first().unwrap())
-        .expect(&format!(
-            "missing left-side join column {:#?} in {:#?}",
-            on_left.first().unwrap(),
-            left.borrow().columns
-        ));
+        .unwrap_or_else(|| {
+            panic!(
+                "missing left-side join column {:#?} in {:#?}",
+                on_left.first().unwrap(),
+                left.borrow().columns
+            )
+        });
     let right_join_col_id = right
         .borrow()
         .columns
         .iter()
         .position(|rc| rc == on_right.first().unwrap())
-        .expect(&format!(
-            "missing right-side join column {:#?} in {:#?}",
-            on_left.first().unwrap(),
-            right.borrow().columns
-        ));
+        .unwrap_or_else(|| {
+            panic!(
+                "missing right-side join column {:#?} in {:#?}",
+                on_left.first().unwrap(),
+                right.borrow().columns
+            )
+        });
 
     let mut from_left = 0;
     let mut from_right = 0;
@@ -755,11 +753,11 @@ pub(crate) fn make_join_node(
     FlowNode::New(n)
 }
 
-pub(crate) fn make_latest_node(
+fn make_latest_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
-    group_by: &Vec<Column>,
+    group_by: &[Column],
     mig: &mut Migration,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
@@ -796,13 +794,13 @@ fn generate_projection_base(parent: &MirNodeRef, base: &ArithmeticBase) -> Proje
     }
 }
 
-pub(crate) fn make_project_node(
+fn make_project_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
-    emit: &Vec<Column>,
-    arithmetic: &Vec<(String, ArithmeticExpression)>,
-    literals: &Vec<(String, DataType)>,
+    emit: &[Column],
+    arithmetic: &[(String, ArithmeticExpression)],
+    literals: &[(String, DataType)],
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
 ) -> FlowNode {
@@ -840,11 +838,11 @@ pub(crate) fn make_project_node(
     FlowNode::New(n)
 }
 
-pub(crate) fn make_distinct_node(
+fn make_distinct_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
-    group_by: &Vec<Column>,
+    group_by: &[Column],
     mig: &mut Migration,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
@@ -853,7 +851,6 @@ pub(crate) fn make_distinct_node(
     let group_by_indx = if group_by.is_empty() {
         // no query parameters, so we index on the first column
         columns
-            .clone()
             .iter()
             .map(|c| parent.borrow().column_id_for_column(c, None))
             .collect::<Vec<_>>()
@@ -873,12 +870,12 @@ pub(crate) fn make_distinct_node(
     FlowNode::New(na)
 }
 
-pub(crate) fn make_topk_node(
+fn make_topk_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
     order: &Option<Vec<(Column, OrderType)>>,
-    group_by: &Vec<Column>,
+    group_by: &[Column],
     k: usize,
     offset: usize,
     mig: &mut Migration,
@@ -930,10 +927,10 @@ pub(crate) fn make_topk_node(
     FlowNode::New(na)
 }
 
-pub(crate) fn materialize_leaf_node(
+fn materialize_leaf_node(
     parent: &MirNodeRef,
     name: String,
-    key_cols: &Vec<Column>,
+    key_cols: &[Column],
     mig: &mut Migration,
 ) {
     let na = parent.borrow().flow_node_addr().unwrap();

@@ -16,7 +16,7 @@ use petgraph::graph::NodeIndex;
 
 use slog::Logger;
 
-pub fn inform(
+pub(super) fn inform(
     log: &Logger,
     controller: &mut controller::ControllerInner,
     nodes: HashMap<DomainIndex, Vec<(NodeIndex, bool)>>,
@@ -69,7 +69,7 @@ pub fn inform(
             trace!(log, "request addition of node"; "node" => ni.index());
             ctx.send_to_healthy(
                 box Packet::AddNode {
-                    node: node,
+                    node,
                     parents: old_parents,
                     //                    all_parents: all_parents,
                 },

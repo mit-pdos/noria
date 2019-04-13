@@ -9,16 +9,16 @@ use nom_sql::SqlQuery;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct Universe {
-    pub id: DataType,
-    pub from_group: Option<DataType>,
-    pub member_of: HashMap<String, Vec<DataType>>,
-    pub row_policies: HashMap<String, Vec<QueryGraph>>,
-    pub rewrite_policies: HashMap<String, Vec<RewritePolicy>>,
+pub(super) struct Universe {
+    id: DataType,
+    from_group: Option<DataType>,
+    pub(super) member_of: HashMap<String, Vec<DataType>>,
+    pub(super) row_policies: HashMap<String, Vec<QueryGraph>>,
+    pub(super) rewrite_policies: HashMap<String, Vec<RewritePolicy>>,
 }
 
-impl Universe {
-    pub fn default() -> Universe {
+impl Default for Universe {
+    fn default() -> Universe {
         Universe {
             id: "".into(),
             from_group: None,
@@ -30,14 +30,14 @@ impl Universe {
 }
 
 #[derive(Clone, Debug)]
-pub struct RewritePolicy {
-    pub value: String,
-    pub column: String,
-    pub key: Column,
-    pub rewrite_view: String,
+pub(super) struct RewritePolicy {
+    pub(super) value: String,
+    pub(super) column: String,
+    pub(super) key: Column,
+    pub(super) rewrite_view: String,
 }
 
-pub trait Multiverse {
+pub(in crate::controller) trait Multiverse {
     /// Prepare a new security universe.
     /// It creates universe-specific nodes like UserContext and UserGroups and
     /// it derives universe-specific policies from the security configuration.
@@ -84,7 +84,7 @@ impl Multiverse for SqlIncorporator {
             (uc_name, config.policies())
         } else {
             info!(self.log, "Starting group universe {}", universe.id);
-            let group_name: DataType = group.clone().unwrap().into();
+            let group_name: DataType = group.clone().unwrap();
             let uc_name = format!(
                 "GroupContext_{}_{}",
                 group_name.to_string(),
@@ -115,7 +115,7 @@ impl Multiverse for SqlIncorporator {
                     value: policy.value(),
                     column: policy.column(),
                     key: policy.key(),
-                    rewrite_view: rewrite_view,
+                    rewrite_view,
                 };
 
                 let e = universe

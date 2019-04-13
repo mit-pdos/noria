@@ -1,16 +1,11 @@
 //! Functions for assigning new nodes to thread domains.
+use crate::controller::inner::ControllerInner;
 use dataflow::prelude::*;
 use petgraph;
 use slog::Logger;
 use std::collections::{HashMap, HashSet};
-use crate::controller::inner::ControllerInner;
 
-pub fn assign(
-    log: &Logger,
-    mainline: &mut ControllerInner,
-    new: &HashSet<NodeIndex>,
-)  {
-
+pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet<NodeIndex>) {
     let mut graph = &mut mainline.ingredients;
     let source = mainline.source;
     let mut ndomains = &mut mainline.ndomains;
@@ -55,7 +50,7 @@ pub fn assign(
             let graph = &*graph;
             let n = &graph[node];
 
-            let mut srmap_assignment : usize;
+            let mut srmap_assignment: usize;
             let mut assigned = false;
             let mut srmap_reader_node = false;
             let mut srmap_query = "".to_string();
@@ -71,13 +66,13 @@ pub fn assign(
                             srmap_query = query.to_string();
                             srmap_assignment = *domain;
                             assigned = true;
-                            return srmap_assignment
-                        },
+                            return srmap_assignment;
+                        }
                         None => {
                             srmap_query = query.to_string();
-                        },
+                        }
                     }
-                },
+                }
                 None => {}
             };
 
@@ -181,7 +176,7 @@ pub fn assign(
                     }
                     stack.extend(graph.neighbors_directed(p, petgraph::EdgeDirection::Incoming));
                 }
-                return false;
+                false
             };
 
             let parents: Vec<_> = graph
@@ -257,7 +252,7 @@ pub fn assign(
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
                     return domain_assignment;
-                },
+                }
                 None => {
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
@@ -266,7 +261,6 @@ pub fn assign(
                     return domain_assignment;
                 }
             }
-
         })();
 
         debug!(log, "node added to domain";
@@ -275,5 +269,4 @@ pub fn assign(
            "domain" => ?assignment);
         graph[node].add_to(assignment.into());
     }
-
 }

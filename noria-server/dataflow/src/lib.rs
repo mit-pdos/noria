@@ -1,9 +1,11 @@
 #![feature(nll)]
 #![feature(box_syntax)]
 #![feature(box_patterns)]
-#![feature(duration_as_u128)]
-#![feature(if_while_or_patterns)]
+#![feature(crate_visibility_modifier)]
 #![deny(unused_extern_crates)]
+
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[cfg(debug_assertions)]
 extern crate backtrace;
@@ -13,7 +15,6 @@ extern crate evmap;
 extern crate srmap;
 extern crate fnv;
 extern crate futures;
-extern crate hyper;
 extern crate itertools;
 extern crate nom_sql;
 extern crate noria;
@@ -25,7 +26,6 @@ extern crate rocksdb;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
 extern crate slog;
 extern crate stream_cancel;
@@ -34,12 +34,12 @@ extern crate timekeeper;
 extern crate tokio;
 extern crate vec_map;
 
-pub mod backlog;
+crate mod backlog;
 pub mod node;
 pub mod ops;
-pub mod payload;
+pub mod payload; // it makes me _really_ sad that this has to be pub
 pub mod prelude;
-pub mod state;
+crate mod state;
 
 mod domain;
 mod group_commit;
@@ -50,6 +50,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time;
 
+pub use backlog::SingleReadHandle;
 pub type Readers =
     Arc<Mutex<HashMap<(petgraph::graph::NodeIndex, usize), backlog::SingleReadHandle>>>;
 pub type DomainConfig = domain::Config;
@@ -135,8 +136,8 @@ impl PersistenceParameters {
         log_prefix: Option<String>,
         persistence_threads: i32,
     ) -> Self {
-        let log_prefix = log_prefix.unwrap_or(String::from("soup"));
-        assert!(!log_prefix.contains("-"));
+        let log_prefix = log_prefix.unwrap_or_else(|| String::from("soup"));
+        assert!(!log_prefix.contains('-'));
 
         Self {
             flush_timeout,

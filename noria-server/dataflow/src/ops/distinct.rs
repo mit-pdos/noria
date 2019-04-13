@@ -21,7 +21,7 @@ impl Distinct {
         Distinct {
             src: src.into(),
             us: None,
-            group_by: group_by,
+            group_by,
         }
     }
 }
@@ -38,6 +38,7 @@ impl Ingredient for Distinct {
 
     fn on_input(
         &mut self,
+        _: &mut Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -51,7 +52,7 @@ impl Ingredient for Distinct {
         if rs.is_empty() {
             return ProcessingResult {
                 results: rs,
-                misses: vec![],
+                ..Default::default()
             };
         }
 
@@ -109,20 +110,18 @@ impl Ingredient for Distinct {
             // make ready for the new one
             prev_grp.clear();
             prev_grp.extend(group_by.iter().map(|&col| &rec[col]).cloned());
-            prev_pos = rec.is_positive().clone();
+            prev_pos = rec.is_positive();
 
             let positive = rec.is_positive();
             match db.lookup(group_by, &KeyType::from(&group[..])) {
                 LookupResult::Some(rr) => {
                     if positive {
-                        //// println!("record {:?}", rr);
-                        if rr.len() == 0 {
+                        //println!("record {:?}", rr);
+                        if rr.is_empty() {
                             output.push(rec.clone());
                         }
-                    } else {
-                        if rr.len() != 0 {
-                            output.push(rec.clone());
-                        }
+                    } else if !rr.is_empty() {
+                        output.push(rec.clone());
                     }
                 }
                 LookupResult::Missing => unimplemented!("Distinct does not yet support partial"),
@@ -131,7 +130,7 @@ impl Ingredient for Distinct {
 
         ProcessingResult {
             results: output.into(),
-            misses: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -158,10 +157,8 @@ impl Ingredient for Distinct {
         true
     }
 
-    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
-        vec![(this, (self.group_by.clone(), true))]
-            .into_iter()
-            .collect()
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
+        vec![(this, self.group_by.clone())].into_iter().collect()
     }
 }
 
@@ -212,21 +209,21 @@ mod tests {
         let r3: Vec<DataType> = vec![3.into(), "c".into(), 2.into()];
 
         let a = g.narrow_one_row(r1.clone(), true);
-        // println!("{:?}", a);
+        println!("{:?}", a);
         assert_eq!(a, vec![r1.clone()].into());
 
         let a = g.narrow_one_row(r2.clone(), true);
-        // println!("{:?}", a);
+        println!("{:?}", a);
         assert_eq!(a, vec![r2.clone()].into());
 
         let a = g.narrow_one_row(r3.clone(), true);
         assert_eq!(a, vec![r3.clone()].into());
 
         let a = g.narrow_one_row((r1.clone(), false), true);
-        // println!("{:?}", a);
+        println!("{:?}", a);
 
         let a = g.narrow_one_row((r1.clone(), true), true);
-        // println!("{:?}", a);
+        println!("{:?}", a);
         assert_eq!(a, vec![r1.clone()].into());
     }
 

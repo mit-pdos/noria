@@ -3,14 +3,6 @@ use rand;
 use rand::Rng;
 use std::collections::HashMap;
 
-pub const NANOS_PER_SEC: u64 = 1_000_000_000;
-macro_rules! dur_to_fsec {
-    ($d:expr) => {{
-        let d = $d;
-        (d.as_secs() * NANOS_PER_SEC + d.subsec_nanos() as u64) as f64 / NANOS_PER_SEC as f64
-    }};
-}
-
 const CLASSES_PER_STUDENT: usize = 10;
 pub const TAS_PER_CLASS: usize = 1;
 
@@ -30,10 +22,10 @@ pub struct Populate {
 impl Populate {
     pub fn new(nposts: i32, nusers: i32, nclasses: i32, private: f32) -> Populate {
         Populate {
-            nposts: nposts,
-            nusers: nusers,
-            nclasses: nclasses,
-            private: private,
+            nposts,
+            nusers,
+            nclasses,
+            private,
             rng: rand::thread_rng(),
             students: HashMap::new(),
             tas: HashMap::new(),
@@ -59,7 +51,9 @@ impl Populate {
         // println!("Enrolling students...");
         for i in 0..self.nusers {
             let mut classes: Vec<DataType> = Vec::new();
-            while classes.len() < (classes_per_student as usize) && (classes.len() as i32 != self.nclasses) {
+            while classes.len() < (classes_per_student as usize)
+                && (classes.len() as i32 != self.nclasses)
+            {
                 let cid = self.cid();
                 if !classes.contains(&cid) {
                     classes.push(cid.clone());
@@ -133,7 +127,9 @@ impl Populate {
             let author = self.uid();
             match self.authors.get_mut(&author.clone()) {
                 Some(count) => *count += 1,
-                None => {self.authors.insert(author.clone(), 1);},
+                None => {
+                    self.authors.insert(author.clone(), 1);
+                }
             }
             let cid = self.cid_for(&author);
             match self.classes.get_mut(&cid.clone()) {
@@ -149,7 +145,12 @@ impl Populate {
         records
     }
 
-    pub fn get_user_posts(&mut self, uid: i32, cid: DataType, nposts: i32) -> (Vec<Vec<DataType>>, i32, i32) {
+    pub fn get_user_posts(
+        &mut self,
+        uid: i32,
+        cid: DataType,
+        nposts: i32,
+    ) -> (Vec<Vec<DataType>>, i32, i32) {
         println!("Populating posts... with {:?}", nposts);
         let mut num_priv = 0;
         let mut num_pub = 0;
@@ -159,7 +160,9 @@ impl Populate {
             let author: DataType = uid.into();
             match self.authors.get_mut(&author.clone()) {
                 Some(count) => *count += 1,
-                None => {self.authors.insert(author.clone(), 1);},
+                None => {
+                    self.authors.insert(author.clone(), 1);
+                }
             }
             match self.classes.get_mut(&cid.clone()) {
                 Some(count) => *count += 1,
@@ -173,15 +176,25 @@ impl Populate {
                 num_priv += 1;
             }
             let anon = 1.into();
-            records.push(vec![pid, cid.clone(), author.clone(), content, private, anon]);
+            records.push(vec![
+                pid,
+                cid.clone(),
+                author.clone(),
+                content,
+                private,
+                anon,
+            ]);
             self.largest += 1;
         }
-        println!("populated for user {:?}. priv: {:?}, pub: {:?}", uid, num_priv, num_pub);
+        println!(
+            "populated for user {:?}. priv: {:?}, pub: {:?}",
+            uid, num_priv, num_pub
+        );
         (records, num_priv, num_pub)
     }
 
     pub fn classes_for_student(&mut self, uid: usize) -> Vec<DataType> {
-        let res : DataType = uid.clone().into();
+        let res: DataType = uid.clone().into();
         self.students[&res].clone()
     }
 
@@ -189,7 +202,7 @@ impl Populate {
         println!("Populating classes...");
         let mut records = Vec::new();
         for i in 0..self.nclasses {
-            let cid : DataType = i.into();
+            let cid: DataType = i.into();
             self.classes.insert(cid.clone(), 0);
             records.push(vec![cid]);
         }

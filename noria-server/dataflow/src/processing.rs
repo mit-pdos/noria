@@ -7,37 +7,37 @@ use prelude::*;
 // TODO: make a Key type that is an ArrayVec<DataType>
 
 #[derive(PartialEq, Eq, Debug)]
-pub(crate) struct Miss {
+crate struct Miss {
     /// The node we missed when looking up into.
-    pub(crate) on: LocalNodeIndex,
+    crate on: LocalNodeIndex,
     /// The columns of `on` we were looking up on.
-    pub(crate) lookup_idx: Vec<usize>,
+    crate lookup_idx: Vec<usize>,
     /// The columns of `record` we were using for the lookup.
-    pub(crate) lookup_cols: Vec<usize>,
+    crate lookup_cols: Vec<usize>,
     /// The columns of `record` that identify the replay key (if any).
-    pub(crate) replay_cols: Option<Vec<usize>>,
+    crate replay_cols: Option<Vec<usize>>,
     /// The record we were processing when we missed.
-    pub(crate) record: Vec<DataType>,
+    crate record: Vec<DataType>,
 }
 
 impl Miss {
-    pub(crate) fn replay_key<'a>(&'a self) -> Option<impl Iterator<Item = &DataType> + 'a> {
+    crate fn replay_key<'a>(&'a self) -> Option<impl Iterator<Item = &DataType> + 'a> {
         self.replay_cols
             .as_ref()
             .map(move |rc| rc.iter().map(move |&rc| &self.record[rc]))
     }
 
-    pub(crate) fn replay_key_vec(&self) -> Option<Vec<DataType>> {
+    crate fn replay_key_vec(&self) -> Option<Vec<DataType>> {
         self.replay_cols
             .as_ref()
             .map(|rc| rc.iter().map(|&rc| &self.record[rc]).cloned().collect())
     }
 
-    pub(crate) fn lookup_key<'a>(&'a self) -> impl Iterator<Item = &DataType> + 'a {
+    crate fn lookup_key<'a>(&'a self) -> impl Iterator<Item = &DataType> + 'a {
         self.lookup_cols.iter().map(move |&rc| &self.record[rc])
     }
 
-    pub(crate) fn lookup_key_vec(&self) -> Vec<DataType> {
+    crate fn lookup_key_vec(&self) -> Vec<DataType> {
         self.lookup_cols
             .iter()
             .map(|&rc| &self.record[rc])
@@ -46,12 +46,28 @@ impl Miss {
     }
 }
 
-pub struct ProcessingResult {
-    pub(crate) results: Records,
-    pub(crate) misses: Vec<Miss>,
+#[derive(PartialEq, Eq, Debug)]
+crate struct Lookup {
+    /// The node we looked up into.
+    crate on: LocalNodeIndex,
+    /// The columns of `on` we were looking up on.
+    crate cols: Vec<usize>,
+    /// The key used for the lookup.
+    crate key: Vec<DataType>,
 }
 
-pub enum RawProcessingResult {
+#[derive(Default)]
+crate struct ProcessingResult {
+    pub(crate) results: Records,
+    pub(crate) misses: Vec<Miss>,
+
+    /// Lookups performed during processing.
+    ///
+    /// NOTE: Only populated if the processed update was an upquery response.
+    pub(crate) lookups: Vec<Lookup>,
+}
+
+crate enum RawProcessingResult {
     Regular(ProcessingResult),
     FullReplay(Records, bool),
     CapturedFull,
@@ -63,7 +79,7 @@ pub enum RawProcessingResult {
 }
 
 #[derive(Debug)]
-pub enum ReplayContext {
+crate enum ReplayContext {
     None,
     Partial {
         key_cols: Vec<usize>,
@@ -84,7 +100,7 @@ impl ReplayContext {
     }
 }
 
-pub trait Ingredient
+crate trait Ingredient
 where
     Self: Send,
 {
@@ -103,10 +119,8 @@ where
     /// Suggest fields of this view, or its ancestors, that would benefit from having an index.
     ///
     /// Note that a vector of length > 1 for any one node means that that node should be given a
-    /// *compound* key, *not* that multiple columns should be independently indexed. The bool in
-    /// the return value specifies if the node wants to do *lookups* on that key; false would imply
-    /// that this index will only be used for partial replay.
-    fn suggest_indexes(&self, you: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)>;
+    /// *compound* key, *not* that multiple columns should be independently indexed.
+    fn suggest_indexes(&self, you: NodeIndex) -> HashMap<NodeIndex, Vec<usize>>;
 
     /// Resolve where the given field originates from. If the view is materialized, or the value is
     /// otherwise created by this view, None should be returned.
@@ -146,8 +160,10 @@ where
 
     /// Process a single incoming message, optionally producing an update to be propagated to
     /// children.
+    #[allow(clippy::too_many_arguments)]
     fn on_input(
         &mut self,
+        executor: &mut Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -156,8 +172,10 @@ where
         states: &StateMap,
     ) -> ProcessingResult;
 
+    #[allow(clippy::too_many_arguments)]
     fn on_input_raw(
         &mut self,
+        executor: &mut Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -166,6 +184,7 @@ where
         states: &StateMap,
     ) -> RawProcessingResult {
         RawProcessingResult::Regular(self.on_input(
+            executor,
             from,
             data,
             tracer,
@@ -189,6 +208,8 @@ where
         false
     }
 
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::option_option)]
     fn query_through<'a>(
         &self,
         _columns: &[usize],
@@ -205,6 +226,8 @@ where
     ///  - `None` => no materialization of the parent state exists
     ///  - `Some(None)` => materialization exists, but lookup got a miss
     ///  - `Some(Some(rs))` => materialization exists, and got results rs
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::option_option)]
     fn lookup<'a>(
         &self,
         parent: LocalNodeIndex,
@@ -231,10 +254,10 @@ where
             })
     }
 
-    // Translate a column in this ingredient into the corresponding column(s) in
-    // parent ingredients. None for the column means that the parent doesn't
-    // have an associated column. Similar to resolve, but does not depend on
-    // materialization, and returns results even for computed columns.
+    /// Translate a column in this ingredient into the corresponding column(s) in
+    /// parent ingredients. None for the column means that the parent doesn't
+    /// have an associated column. Similar to resolve, but does not depend on
+    /// materialization, and returns results even for computed columns.
     fn parent_columns(&self, column: usize) -> Vec<(NodeIndex, Option<usize>)>;
 
     /// Performance hint: should return true if this operator reduces the size of its input

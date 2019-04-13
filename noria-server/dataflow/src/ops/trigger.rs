@@ -1,12 +1,5 @@
-use std::collections::HashMap;
-
 use prelude::*;
-
-use hyper::Client;
-use serde::Serialize;
-use serde_json;
-use std::thread;
-use tokio;
+use std::collections::HashMap;
 
 /// A Trigger data-flow operator.
 ///
@@ -23,10 +16,7 @@ pub struct Trigger {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TriggerEvent {
     /// Triggers the creation of a new group universe.
-    GroupCreation {
-        controller_url: String,
-        group: String,
-    },
+    GroupCreation { group: String },
 }
 
 impl Trigger {
@@ -39,63 +29,38 @@ impl Trigger {
         Trigger {
             us: None,
             src: src.into(),
-            trigger: trigger,
-            key: key,
+            trigger,
+            key,
         }
     }
 
-    fn rpc<Q: Serialize>(&self, path: &str, requests: Vec<Q>, url: &String)
+    fn create_universes<I>(&self, executor: &mut Executor, requests: I)
     where
-        Q: Send,
+        I: IntoIterator<Item = HashMap<String, DataType>>,
     {
-        use hyper;
-        let url = format!("{}/{}", url, path);
-        println!("trigger.rs url: {}", url);
-        let requests: Vec<_> = requests
-            .iter()
-            .map(|req| {
-                hyper::Request::post(&url)
-                    .body(hyper::Body::from(serde_json::to_string(&req).unwrap()))
-                    .unwrap()
-            })
-            .collect();
-
-        // TODO: instead of spawing a thred for each request, we could have a
-        // long running thread that we just send requests to.
-        thread::spawn(move || {
-            let client = Client::new();
-            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-            for r in requests {
-                rt.block_on(client.request(r)).unwrap();
-            }
-        });
+        println!("trigger.rs");
+        for req in requests {
+            executor.create_universe(req);
+        }
     }
 
-    fn trigger(&self, ids: Vec<DataType>) {
+    fn trigger(&self, executor: &mut Executor, ids: Vec<DataType>) {
         if ids.is_empty() {
             return;
         }
 
         match self.trigger {
-            TriggerEvent::GroupCreation {
-                ref controller_url,
-                ref group,
-            } => {
+            TriggerEvent::GroupCreation { ref group } => {
                 println!("trigger.rs: GroupCreation event, ids is {:?}", ids);
-                let contexts = ids
-                    .iter()
-                    .map(|gid| {
+                self.create_universes(
+                    executor,
+                    ids.iter().map(|gid| {
                         let mut group_context: HashMap<String, DataType> = HashMap::new();
                         group_context.insert(String::from("id"), gid.clone());
                         group_context.insert(String::from("group"), group.clone().into());
                         group_context
-                    })
-                    .collect();
-                println!(
-                    "trigger.rs: GroupCreation event, contexts is {:?}",
-                    contexts
+                    }),
                 );
-                self.rpc("create_universe", contexts, controller_url);
             }
         }
     }
@@ -119,6 +84,7 @@ impl Ingredient for Trigger {
 
     fn on_input(
         &mut self,
+        executor: &mut Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -143,7 +109,7 @@ impl Ingredient for Trigger {
             .iter()
             .filter_map(|k| match db.lookup(&[self.key], &KeyType::Single(&k)) {
                 LookupResult::Some(rs) => {
-                    if rs.len() == 0 {
+                    if rs.is_empty() {
                         Some(k)
                     } else {
                         None
@@ -154,17 +120,17 @@ impl Ingredient for Trigger {
             .cloned()
             .collect();
 
-        self.trigger(keys);
+        self.trigger(executor, keys);
 
         ProcessingResult {
             results: rs,
-            misses: Vec::new(),
+            ..Default::default()
         }
     }
 
-    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         // index all key columns
-        Some((this, (vec![self.key], true))).into_iter().collect()
+        Some((this, vec![self.key])).into_iter().collect()
     }
 
     fn resolve(&self, col: usize) -> Option<Vec<(NodeIndex, usize)>> {
@@ -198,7 +164,6 @@ mod tests {
         let mut g = ops::test::MockGraph::new();
         let s = g.add_base("source", &["x", "y", "z"]);
         let trigger_type = TriggerEvent::GroupCreation {
-            controller_url: String::from("localhost"),
             group: String::from("group"),
         };
         g.set_op(

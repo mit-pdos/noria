@@ -39,7 +39,6 @@ pub enum DataType {
     Timestamp(NaiveDateTime),
 }
 
-
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -85,28 +84,6 @@ impl fmt::Debug for DataType {
 }
 
 impl DataType {
-
-    pub fn to_string(&self) -> String {
-       match *self {
-           DataType::None => String::from("*"),
-           DataType::Text(..) | DataType::TinyText(..) => {
-               let text: Cow<str> = self.into();
-               format!("{}", text)
-           }
-           DataType::Int(n) => format!("{}", n),
-           DataType::BigInt(n) => format!("{}", n),
-           DataType::Real(i, frac) => {
-               if i == 0 && frac < 0 {
-                   // We have to insert the negative sign ourselves.
-                   format!("{}", format!("-0.{:09}", frac.abs()))
-               } else {
-                   format!("{}", format!("{}.{:09}", i, frac.abs()))
-               }
-           }
-           DataType::Timestamp(ts) => format!("{}", format!("{}", ts.format("%c"))),
-       }
-   }
-
     /// Clone the value contained within this `DataType`.
     ///
     /// This method crucially does not cause cache-line conflicts with the underlying data-store
@@ -575,13 +552,14 @@ mod tests {
     fn real_to_string() {
         let a: DataType = (2.5).into();
         let b: DataType = (-2.01).into();
-        let c: DataType = (-0.012345678).into();
+        let c: DataType = (-0.012_345_678).into();
         assert_eq!(a.to_string(), "2.500000000");
         assert_eq!(b.to_string(), "-2.010000000");
         assert_eq!(c.to_string(), "-0.012345678");
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn real_to_float() {
         let original = 2.5;
         let data_type: DataType = original.into();
@@ -677,6 +655,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cyclomatic_complexity)]
     fn data_type_fungibility() {
         use std::convert::TryFrom;
 

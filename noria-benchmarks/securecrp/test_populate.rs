@@ -11,25 +11,25 @@ pub fn create_single_trigger_data(backend: &mut Backend) {
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
 
-    let mut mutator = backend.g.table("UserProfile").unwrap();
+    let mut mutator = backend.g.table("UserProfile").unwrap().into_sync();
     println!("Inserting users");
-    mutator.insert_all(users).unwrap();
+    mutator.perform_all(users).unwrap();
 
     thread::sleep(time::Duration::from_millis(2000));
 
     // Insert Papers
     let papers: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into(), 0.into()]];
-    let mut mutator = backend.g.table("Paper").unwrap();
+    let mut mutator = backend.g.table("Paper").unwrap().into_sync();
     println!("Inserting into Paper");
-    mutator.insert_all(papers).unwrap();
+    mutator.perform_all(papers).unwrap();
 
     thread::sleep(time::Duration::from_millis(2000));
 
     // Insert PaperCoauthors
     let paper_coauthors: Vec<Vec<DataType>> = vec![vec![1.into(), "2".into()]];
-    let mut mutator = backend.g.table("PaperCoauthor").unwrap();
+    let mut mutator = backend.g.table("PaperCoauthor").unwrap().into_sync();
     println!("Inserting into PaperCoauthor");
-    mutator.insert_all(paper_coauthors).unwrap();
+    mutator.perform_all(paper_coauthors).unwrap();
 
     thread::sleep(time::Duration::from_millis(2000));
 
@@ -41,9 +41,9 @@ pub fn create_single_trigger_data(backend: &mut Backend) {
         "Soup is tasty.".into(),
         "0".into(),
     ]];
-    let mut mutator = backend.g.table("PaperVersion").unwrap();
+    let mut mutator = backend.g.table("PaperVersion").unwrap().into_sync();
     println!("Inserting into PaperVersion");
-    mutator.insert_all(paper_versions).unwrap();
+    mutator.perform_all(paper_versions).unwrap();
 }
 
 pub fn create_users(backend: &mut Backend) {
@@ -96,9 +96,9 @@ pub fn create_users(backend: &mut Backend) {
         .map(|v| v.into_iter().map(|e| e.into()).collect::<Vec<DataType>>())
         .collect();
 
-    let mut mutator = backend.g.table("UserProfile").unwrap();
+    let mut mutator = backend.g.table("UserProfile").unwrap().into_sync();
     println!("inserting users");
-    mutator.insert_all(users).unwrap();
+    mutator.perform_all(users).unwrap();
     println!("inserting users2");
 }
 
@@ -246,24 +246,28 @@ pub fn create_papers(backend: &mut Backend) {
         vec![5.into(), "lara".into(), "blahblah".into()],
     ];
 
-    let mut mutator = backend.g.table("Paper").unwrap();
-    mutator.insert_all(papers).unwrap();
+    let mut mutator = backend.g.table("Paper").unwrap().into_sync();
+    mutator.perform_all(papers).unwrap();
 
-    let mut mutator = backend.g.table("PaperCoauthor").unwrap();
-    mutator.insert_all(paper_coauthors).unwrap();
+    let mut mutator = backend.g.table("PaperCoauthor").unwrap().into_sync();
+    mutator.perform_all(paper_coauthors).unwrap();
 
-    let mut mutator = backend.g.table("PaperVersion").unwrap();
-    mutator.insert_all(paper_versions).unwrap();
+    let mut mutator = backend.g.table("PaperVersion").unwrap().into_sync();
+    mutator.perform_all(paper_versions).unwrap();
 
-    let mut mutator = backend.g.table("ReviewAssignment").unwrap();
-    mutator.insert_all(review_assignments).unwrap();
+    let mut mutator = backend.g.table("ReviewAssignment").unwrap().into_sync();
+    mutator.perform_all(review_assignments).unwrap();
 
-    let mut mutator = backend.g.table("Review").unwrap();
-    mutator.insert_all(reviews).unwrap();
+    let mut mutator = backend.g.table("Review").unwrap().into_sync();
+    mutator.perform_all(reviews).unwrap();
 }
 
 pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
-    let mut get = backend.g.view(&format!("PaperList_u{}", user)).unwrap();
+    let mut get = backend
+        .g
+        .view(&format!("PaperList_u{}", user))
+        .unwrap()
+        .into_sync();
 
     if iterate > 0 {
         let mut results = Vec::new();
@@ -284,13 +288,17 @@ pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
 }
 
 pub fn dump_reviews(backend: &mut Backend, user: &str) {
-    let mut get = backend.g.view(&format!("ReviewList_u{}", user)).unwrap();
+    let mut get = backend
+        .g
+        .view(&format!("ReviewList_u{}", user))
+        .unwrap()
+        .into_sync();
 
     println!("user's reviews: {:?}", get.lookup(&[0.into()], true)); // 0 is bogo key for id
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {
-    let mut get = backend.g.view("PaperList").unwrap();
+    let mut get = backend.g.view("PaperList").unwrap().into_sync();
 
     println!(
         "all papers, bogokey lookup: {:?}",
@@ -305,7 +313,7 @@ pub fn dump_context(
     lookup_int: i32,
     use_str: bool,
 ) {
-    let mut get = backend.g.view(query).unwrap();
+    let mut get = backend.g.view(query).unwrap().into_sync();
     if use_str {
         println!("{}: {:?}", query, get.lookup(&[lookup_str.into()], true));
     } else {

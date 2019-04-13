@@ -79,12 +79,14 @@ pub enum ReplayPieceContext {
     },
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SourceChannelIdentifier {
     pub token: usize,
+    pub tag: u32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum Packet {
     // Data messages
     //
@@ -97,10 +99,8 @@ pub enum Packet {
     /// Regular data-flow update.
     Message {
         link: Link,
-        src: Option<SourceChannelIdentifier>,
         data: Records,
         tracer: Tracer,
-        senders: Vec<SourceChannelIdentifier>,
     },
 
     /// Update that is part of a tagged data-flow replay path.
@@ -230,6 +230,7 @@ pub enum Packet {
     /// updates.
     Ready {
         node: LocalNodeIndex,
+        purge: bool,
         index: HashSet<Vec<usize>>,
     },
 
@@ -248,7 +249,7 @@ pub enum Packet {
 }
 
 impl Packet {
-    pub fn src(&self) -> LocalNodeIndex {
+    crate fn src(&self) -> LocalNodeIndex {
         match *self {
             Packet::Input { ref inner, .. } => {
                 // inputs come "from" the base table too
@@ -260,7 +261,7 @@ impl Packet {
         }
     }
 
-    pub fn dst(&self) -> LocalNodeIndex {
+    crate fn dst(&self) -> LocalNodeIndex {
         match *self {
             Packet::Input { ref inner, .. } => unsafe { inner.deref() }.dst,
             Packet::Message { ref link, .. } => link.dst,
@@ -269,7 +270,7 @@ impl Packet {
         }
     }
 
-    pub fn link_mut(&mut self) -> &mut Link {
+    crate fn link_mut(&mut self) -> &mut Link {
         match *self {
             Packet::Message { ref mut link, .. } => link,
             Packet::ReplayPiece { ref mut link, .. } => link,
@@ -278,7 +279,7 @@ impl Packet {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    crate fn is_empty(&self) -> bool {
         match *self {
             Packet::Message { ref data, .. } => data.is_empty(),
             Packet::ReplayPiece { ref data, .. } => data.is_empty(),
@@ -286,7 +287,7 @@ impl Packet {
         }
     }
 
-    pub fn map_data<F>(&mut self, map: F)
+    crate fn map_data<F>(&mut self, map: F)
     where
         F: FnOnce(&mut Records),
     {
@@ -300,14 +301,14 @@ impl Packet {
         }
     }
 
-    pub fn is_regular(&self) -> bool {
+    crate fn is_regular(&self) -> bool {
         match *self {
             Packet::Message { .. } => true,
             _ => false,
         }
     }
 
-    pub fn tag(&self) -> Option<Tag> {
+    crate fn tag(&self) -> Option<Tag> {
         match *self {
             Packet::ReplayPiece { tag, .. } => Some(tag),
             Packet::EvictKeys { tag, .. } => Some(tag),
@@ -315,7 +316,7 @@ impl Packet {
         }
     }
 
-    pub fn data(&self) -> &Records {
+    crate fn data(&self) -> &Records {
         match *self {
             Packet::Message { ref data, .. } => data,
             Packet::ReplayPiece { ref data, .. } => data,
@@ -323,17 +324,7 @@ impl Packet {
         }
     }
 
-    pub fn swap_data(&mut self, new_data: Records) -> Records {
-        use std::mem;
-        let inner = match *self {
-            Packet::Message { ref mut data, .. } => data,
-            Packet::ReplayPiece { ref mut data, .. } => data,
-            _ => unreachable!(),
-        };
-        mem::replace(inner, new_data)
-    }
-
-    pub fn take_data(&mut self) -> Records {
+    crate fn take_data(&mut self) -> Records {
         use std::mem;
         let inner = match *self {
             Packet::Message { ref mut data, .. } => data,
@@ -343,30 +334,26 @@ impl Packet {
         mem::replace(inner, Records::default())
     }
 
-    pub fn clone_data(&self) -> Self {
+    crate fn clone_data(&self) -> Self {
         match *self {
             Packet::Message {
-                ref link,
-                src: _,
+                link,
                 ref data,
                 ref tracer,
-                ref senders,
             } => Packet::Message {
-                link: link.clone(),
-                src: None,
+                link,
                 data: data.clone(),
                 tracer: tracer.clone(),
-                senders: senders.clone(),
             },
             Packet::ReplayPiece {
-                ref link,
-                ref tag,
+                link,
+                tag,
                 ref data,
                 ref context,
                 ref id,
             } => Packet::ReplayPiece {
-                link: link.clone(),
-                tag: tag.clone(),
+                link,
+                tag,
                 data: data.clone(),
                 context: context.clone(),
                 id: id.clone(),
@@ -375,25 +362,23 @@ impl Packet {
         }
     }
 
-    pub fn trace(&self, event: PacketEvent) {
-        match *self {
-            Packet::Message {
-                tracer: Some((tag, Some(ref sender))),
-                ..
-            } => {
-                use noria::debug::trace::{Event, EventType};
-                sender
-                    .send(Event {
-                        instant: time::Instant::now(),
-                        event: EventType::PacketEvent(event, tag),
-                    })
-                    .unwrap();
-            }
-            _ => {}
+    crate fn trace(&self, event: PacketEvent) {
+        if let Packet::Message {
+            tracer: Some((tag, Some(ref sender))),
+            ..
+        } = *self
+        {
+            use noria::debug::trace::{Event, EventType};
+            sender
+                .send(Event {
+                    instant: time::Instant::now(),
+                    event: EventType::PacketEvent(event, tag),
+                })
+                .unwrap();
         }
     }
 
-    pub fn tracer(&mut self) -> Option<&mut Tracer> {
+    crate fn tracer(&mut self) -> Option<&mut Tracer> {
         match *self {
             Packet::Message { ref mut tracer, .. } => Some(tracer),
             _ => None,
@@ -444,12 +429,12 @@ pub enum ControlReplyPacket {
 
 impl ControlReplyPacket {
     #[cfg(debug_assertions)]
-    pub fn ack() -> ControlReplyPacket {
+    crate fn ack() -> ControlReplyPacket {
         ControlReplyPacket::Ack(Backtrace::new())
     }
 
     #[cfg(not(debug_assertions))]
-    pub fn ack() -> ControlReplyPacket {
+    crate fn ack() -> ControlReplyPacket {
         ControlReplyPacket::Ack(())
     }
 }
