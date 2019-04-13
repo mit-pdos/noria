@@ -843,14 +843,7 @@ impl Domain {
                                 materialization_info,
                                 uid,
                             } => {
-                                let name = self.nodes[node].borrow().clone();
-
-                                let srmap;
-                                if name.name().contains("count") {
-                                    srmap = false;
-                                } else {
-                                    srmap = true;
-                                }
+                                let srmap = !self.nodes[node].borrow().name().contains("count");
 
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
