@@ -346,35 +346,27 @@ impl WriteHandle {
         }
     }
 
-    crate fn clone(&mut self, r: &mut SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
+    crate fn clone(&self, r: &mut SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
         if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    let w_handle = hand.clone();
-                    match r.handleSR.clone() {
-                        Some(rhand) => {
-                            let w = WriteHandle {
-                                handle: None,
-                                handleSR: Some(w_handle),
-                                srmap: true,
-                                partial: self.partial.clone(),
-                                cols: self.cols.clone(),
-                                key: self.key.clone(),
-                                contiguous: self.contiguous.clone(),
-                                mem_size: self.mem_size.clone(),
-                                uid: self.uid.clone(),
-                            };
-                            return Some((r.clone(rhand.clone(), self.uid.clone()), w));
-                        }
-                        None => None,
-                    }
+            if let Some(ref hand) = self.handleSR {
+                let w_handle = hand.clone();
+                if let Some(rhand) = r.handleSR.clone() {
+                    let w = WriteHandle {
+                        handle: None,
+                        handleSR: Some(w_handle),
+                        srmap: true,
+                        partial: self.partial.clone(),
+                        cols: self.cols.clone(),
+                        key: self.key.clone(),
+                        contiguous: self.contiguous.clone(),
+                        mem_size: self.mem_size.clone(),
+                        uid: self.uid.clone(),
+                    };
+                    return Some((r.clone(rhand.clone(), self.uid.clone()), w));
                 }
-                None => None,
             }
-        } else {
-            return None;
         }
+        None
     }
 
     crate fn mut_with_key<'a, K>(&'a mut self, key: K) -> MutWriteHandleEntry<'a>
@@ -416,20 +408,12 @@ impl WriteHandle {
 
     crate fn swap(&mut self) {
         if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    hand.refresh();
-                }
-                None => {}
+            if let Some(ref mut hand) = self.handleSR {
+                hand.refresh();
             }
         } else {
-            let handle = &mut self.handle;
-            match handle {
-                Some(hand) => {
-                    hand.refresh();
-                }
-                None => {}
+            if let Some(ref mut hand) = self.handle {
+                hand.refresh();
             }
         }
     }
@@ -442,37 +426,29 @@ impl WriteHandle {
         I: IntoIterator<Item = Record>,
     {
         if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    let mem_delta = hand.add(&self.key[..], self.cols, rs, Some(self.uid));
-                    if mem_delta > 0 {
-                        self.mem_size += mem_delta as usize;
-                    } else if mem_delta < 0 {
-                        self.mem_size = self
-                            .mem_size
-                            .checked_sub(mem_delta.checked_abs().unwrap() as usize)
-                            .unwrap();
-                    }
-                    // hand.refresh();
+            if let Some(ref mut hand) = self.handleSR {
+                let mem_delta = hand.add(&self.key[..], self.cols, rs, Some(self.uid));
+                if mem_delta > 0 {
+                    self.mem_size += mem_delta as usize;
+                } else if mem_delta < 0 {
+                    self.mem_size = self
+                        .mem_size
+                        .checked_sub(mem_delta.checked_abs().unwrap() as usize)
+                        .unwrap();
                 }
-                None => {}
+                // hand.refresh();
             }
         } else {
-            let handle = &mut self.handle;
-            match handle {
-                Some(hand) => {
-                    let mem_delta = hand.add(&self.key[..], self.cols, rs);
-                    if mem_delta > 0 {
-                        self.mem_size += mem_delta as usize;
-                    } else if mem_delta < 0 {
-                        self.mem_size = self
-                            .mem_size
-                            .checked_sub(mem_delta.checked_abs().unwrap() as usize)
-                            .unwrap();
-                    }
+            if let Some(ref mut hand) = self.handle {
+                let mem_delta = hand.add(&self.key[..], self.cols, rs);
+                if mem_delta > 0 {
+                    self.mem_size += mem_delta as usize;
+                } else if mem_delta < 0 {
+                    self.mem_size = self
+                        .mem_size
+                        .checked_sub(mem_delta.checked_abs().unwrap() as usize)
+                        .unwrap();
                 }
-                None => {}
             }
         }
     }
@@ -485,58 +461,51 @@ impl WriteHandle {
     /// bytes that will be freed once the underlying `evmap` applies the operation.
     crate fn evict_random_key(&mut self, rng: &mut ThreadRng) -> u64 {
         if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    let mut bytes_to_be_freed = 0;
-                    if self.mem_size > 0 {
-                        if hand.is_empty() {
-                            unreachable!("mem size is {}, but map is empty", self.mem_size);
-                        }
-
-                        match hand.empty_at_index(rng.gen()) {
-                            None => (),
-                            Some(vs) => {
-                                let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
-                                bytes_to_be_freed += size;
-                            }
-                        }
-                        self.mem_size = self
-                            .mem_size
-                            .checked_sub(bytes_to_be_freed as usize)
-                            .unwrap();
+            if let Some(ref mut hand) = self.handleSR {
+                let mut bytes_to_be_freed = 0;
+                if self.mem_size > 0 {
+                    if hand.is_empty() {
+                        unreachable!("mem size is {}, but map is empty", self.mem_size);
                     }
-                    bytes_to_be_freed
+
+                    match hand.empty_at_index(rng.gen()) {
+                        None => (),
+                        Some(vs) => {
+                            let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
+                            bytes_to_be_freed += size;
+                        }
+                    }
+                    self.mem_size = self
+                        .mem_size
+                        .checked_sub(bytes_to_be_freed as usize)
+                        .unwrap();
                 }
-                None => 0,
+                return bytes_to_be_freed;
             }
         } else {
-            let handle = &mut self.handle;
-            match handle {
-                Some(hand) => {
-                    let mut bytes_to_be_freed = 0;
-                    if self.mem_size > 0 {
-                        if hand.is_empty() {
-                            unreachable!("mem size is {}, but map is empty", self.mem_size);
-                        }
-
-                        match hand.empty_at_index(rng.gen()) {
-                            None => (),
-                            Some(vs) => {
-                                let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
-                                bytes_to_be_freed += size;
-                            }
-                        }
-                        self.mem_size = self
-                            .mem_size
-                            .checked_sub(bytes_to_be_freed as usize)
-                            .unwrap();
+            if let Some(ref mut hand) = self.handle {
+                let mut bytes_to_be_freed = 0;
+                if self.mem_size > 0 {
+                    if hand.is_empty() {
+                        unreachable!("mem size is {}, but map is empty", self.mem_size);
                     }
-                    bytes_to_be_freed
+
+                    match hand.empty_at_index(rng.gen()) {
+                        None => (),
+                        Some(vs) => {
+                            let size: u64 = vs.iter().map(|r| r.deep_size_of() as u64).sum();
+                            bytes_to_be_freed += size;
+                        }
+                    }
+                    self.mem_size = self
+                        .mem_size
+                        .checked_sub(bytes_to_be_freed as usize)
+                        .unwrap();
                 }
-                None => 0,
+                return bytes_to_be_freed;
             }
         }
+        0
     }
 
     crate fn clear(&mut self) {
@@ -632,65 +601,54 @@ impl SingleReadHandle {
     /// swapped in by the writer.
     ///
     /// Holes in partially materialized state are returned as `Ok((None, _))`.
-    pub fn try_find_and<F, T>(
-        &mut self,
-        key: &[DataType],
-        mut then: F,
-    ) -> Result<(Option<T>, i64), ()>
+    pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
         if self.srmap {
             // println!("try find and. uid: {:?}", self.uid);
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    hand.meta_get_and(key, &mut then)
-                        .ok_or(())
-                        .map(|(mut records, meta)| {
-                            if records.is_none() && self.trigger.is_none() {
-                                records = Some(then(&[]));
-                            }
-                            (records, meta)
-                        })
-                }
-                None => Err(()),
+            if let Some(ref hand) = self.handleSR {
+                return hand
+                    .meta_get_and(key, &mut then)
+                    .ok_or(())
+                    .map(|(mut records, meta)| {
+                        if records.is_none() && self.trigger.is_none() {
+                            records = Some(then(&[]));
+                        }
+                        (records, meta)
+                    });
             }
         } else {
-            let handle = &mut self.handle;
-            match handle {
-                Some(hand) => {
-                    hand.meta_get_and(key, &mut then)
-                        .ok_or(())
-                        .map(|(mut records, meta)| {
-                            if records.is_none() && self.trigger.is_none() {
-                                records = Some(then(&[]));
-                            }
-                            (records, meta)
-                        })
-                }
-                None => Err(()),
+            if let Some(ref hand) = self.handle {
+                return hand
+                    .meta_get_and(key, &mut then)
+                    .ok_or(())
+                    .map(|(mut records, meta)| {
+                        if records.is_none() && self.trigger.is_none() {
+                            records = Some(then(&[]));
+                        }
+                        (records, meta)
+                    });
             }
         }
+        Err(())
     }
 
-    pub fn len(&mut self) -> usize {
+    pub fn len(&self) -> usize {
         if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => hand.len(),
+            match self.handleSR {
+                Some(ref hand) => hand.len(),
                 None => 0,
             }
         } else {
-            let handle = &mut self.handle;
-            match handle {
-                Some(hand) => hand.len(),
+            match self.handle {
+                Some(ref hand) => hand.len(),
                 None => 0,
             }
         }
     }
 
-    pub fn is_empty(&mut self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
