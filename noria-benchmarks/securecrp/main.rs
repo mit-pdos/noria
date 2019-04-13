@@ -50,7 +50,6 @@ impl Backend {
     }
 
     fn set_security_config(&mut self, config_file: &str) {
-        use std::io::Read;
         let mut config = String::new();
         let mut cf = File::open(config_file).unwrap();
         cf.read_to_string(&mut config).unwrap();
@@ -65,8 +64,6 @@ impl Backend {
         query_file: Option<&str>,
         ext: bool,
     ) -> Result<(), String> {
-        use std::io::Read;
-
         // Read schema file
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();

@@ -77,12 +77,11 @@ fn new_inner(
 
     if srmap {
         println!("creating new srmap");
-        let (r, w) = match (key.len(), srmap) {
-            (0, _) => unreachable!(),
-            (1, true) => make_srmap!(SingleSR),
-            (2, true) => make_srmap!(DoubleSR),
-            (_, true) => make_srmap!(ManySR),
-            (_, false) => unreachable!(),
+        let (r, w) = match key.len() {
+            0 => unreachable!(),
+            1 => make_srmap!(SingleSR),
+            2 => make_srmap!(DoubleSR),
+            _ => make_srmap!(ManySR),
         };
 
         let w = WriteHandle {
@@ -118,14 +117,14 @@ fn new_inner(
             cols,
             contiguous,
             mem_size: 0,
-            uid: uid,
+            uid,
         };
 
         let r = SingleReadHandle {
             handle: RHandleVariant::Evmap(r),
             trigger,
             key: Vec::from(key),
-            uid: uid,
+            uid,
         };
 
         (r, w)
@@ -702,20 +701,25 @@ mod tests {
         let a_rec = vec![Record::Positive(a.clone())];
         let b_rec = vec![Record::Positive(b.clone())];
 
-        let (mut r1, mut w1) = new(true, 2, &[0], 0);
-        let (mut r2, mut w2) = w1.clone_new_user(&mut r1).unwrap();
-        let (mut r3, mut w3) = w1.clone_new_user(&mut r1).unwrap();
+        let (r1, mut w1) = new(true, 2, &[0], 0);
+        let (r2, mut w2) = w1.clone_new_user(&r1).unwrap();
+        let (r3, mut w3) = w1.clone_new_user(&r1).unwrap();
 
         w1.add(a_rec.clone(), None);
         w2.add(a_rec.clone(), None);
         w2.add(b_rec.clone(), None);
         w3.add(a_rec.clone(), None);
 
-        r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-        r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-        r3.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-        r3.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
-        r2.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()));
+        r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()))
+            .unwrap();
+        r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()))
+            .unwrap();
+        r3.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()))
+            .unwrap();
+        r3.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()))
+            .unwrap();
+        r2.try_find_and(&b[0..1], |rs| println!("Rs: {:?}", rs.clone()))
+            .unwrap();
 
         // assert_eq!(r3.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
         // assert_eq!(r2.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));

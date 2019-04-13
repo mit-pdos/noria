@@ -672,7 +672,6 @@ impl<'a> Migration<'a> {
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
         mainline.materializations.commit(
-            &mainline.recipe,
             &mut mainline.ingredients,
             &new,
             &mut mainline.domains,

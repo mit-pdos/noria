@@ -98,10 +98,6 @@ impl Reader {
         self.materialization_info = mat_info;
     }
 
-    crate fn get_materialization_info(&self) -> Option<(usize, usize)> {
-        self.materialization_info.clone()
-    }
-
     crate fn add_streamer(
         &mut self,
         new_streamer: channel::StreamSender<Vec<StreamUpdate>>,

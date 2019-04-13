@@ -7,7 +7,6 @@
 
 use crate::controller::domain_handle::DomainHandle;
 use crate::controller::inner::MapMeta;
-use crate::controller::recipe::Recipe;
 use crate::controller::{
     inner::{graphviz, DomainReplies},
     keys,
@@ -447,7 +446,6 @@ impl Materializations {
     /// populating new materializations.
     pub(super) fn commit(
         &mut self,
-        recipe: &Recipe,
         graph: &mut Graph,
         new: &HashSet<NodeIndex>,
         domains: &mut HashMap<DomainIndex, DomainHandle>,

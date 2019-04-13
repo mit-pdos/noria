@@ -28,8 +28,6 @@ enum PopulateType {
 impl Backend {
     pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = Builder::default();
-        let log = noria::logger_pls();
-        let blender_log = log.clone();
 
         if !partial {
             cb.disable_partial();
@@ -52,16 +50,13 @@ impl Backend {
         Backend { g }
     }
 
-    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+    pub fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
         let mut mutator = self.g.table(name).unwrap().into_sync();
 
         let start = time::Instant::now();
 
         let i = records.len();
-        mutator.perform_all(records);
-        // for r in records.drain(..) {
-        //     mutator.insert(r).unwrap();
-        // }
+        mutator.perform_all(records).unwrap();
 
         let dur = start.elapsed().as_secs_f64();
         println!(
@@ -368,8 +363,7 @@ fn main() {
 
         // --- Posts Query ---
         if query_type == "posts" {
-            let num_at_once = nclasses as usize;
-            let mut enrollment_info = p.get_enrollment();
+            let enrollment_info = p.get_enrollment();
             for uid in 0..nlogged {
                 match enrollment_info.get(&uid.into()) {
                     Some(classes) => {
@@ -379,10 +373,9 @@ fn main() {
                             class_vec.push([class.clone()].to_vec());
                         }
                         let leaf = format!("posts_u{}", uid);
-                        let mut getter = backend.g.view(&leaf).unwrap();
+                        let mut getter = backend.g.view(&leaf).unwrap().into_sync();
                         let start = time::Instant::now();
-                        let res = getter.multi_lookup(class_vec.clone(), true);
-                        // println!("res: {:?}", res);
+                        getter.multi_lookup(class_vec.clone(), true).unwrap();
                         dur += start.elapsed();
                     }
                     None => println!("why isn't user {:?} enrolled", uid),
@@ -392,11 +385,11 @@ fn main() {
 
         // cid version of post_count query
         if query_type == "post_count" {
-            let mut counts = p.classes();
+            let counts = p.classes();
             for (class, count) in &counts {
                 println!("class: {:?}, count: {:?}", class, count);
             }
-            let mut enrollment_info = p.get_enrollment();
+            let enrollment_info = p.get_enrollment();
             for uid in 0..nlogged {
                 match enrollment_info.get(&uid.into()) {
                     Some(classes) => {
@@ -407,11 +400,9 @@ fn main() {
                         }
                         let leaf = format!("post_count_u{}", uid);
 
-                        let mut getter = backend.g.view(&leaf).unwrap();
-                        // println!("looking up vec: {:?}", class_vec);
+                        let mut getter = backend.g.view(&leaf).unwrap().into_sync();
                         let start = time::Instant::now();
-                        let res = getter.multi_lookup(class_vec.clone(), true);
-                        //    println!("res: {:?}", res);
+                        getter.multi_lookup(class_vec.clone(), true).unwrap();
                         dur += start.elapsed();
                     }
                     None => println!("why isn't user {:?} enrolled", uid),
@@ -448,7 +439,7 @@ fn main() {
     } else {
         // for each class a student is part of, write some number of public + private posts.
         // assert that each user has consistent post_counts for public posts for all classes.
-        let mut enrollment_info = p.get_enrollment();
+        let enrollment_info = p.get_enrollment();
         let mut class_to_pub_posts = HashMap::new();
         let mut user_class_to_priv_posts = HashMap::new();
 
@@ -459,7 +450,6 @@ fn main() {
                     for class in classes {
                         let (posts, npriv, npub) = p.get_user_posts(uid, class.clone(), 2);
                         backend.populate("Post", posts.clone());
-                        let mut prev_count = 0;
                         let mut insert = false;
                         match class_to_pub_posts.get_mut(&class.clone()) {
                             Some(count) => {
@@ -523,7 +513,6 @@ fn main() {
 
                     let mut getter = backend.g.view(&leaf).unwrap().into_sync();
                     println!("looking up vec: {:?}", class_vec);
-                    let start = time::Instant::now();
                     let res = getter.multi_lookup(class_vec.clone(), true);
                     println!("results: {:?}", res);
                     println!("expected counts: {:?}", expected_count);

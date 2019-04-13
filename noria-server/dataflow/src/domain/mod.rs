@@ -843,9 +843,6 @@ impl Domain {
                                 materialization_info,
                                 uid,
                             } => {
-                                use backlog;
-                                use std::sync::Arc;
-                                // println!("partial global srmap, id: {:?}", gid);
                                 let name = self.nodes[node].borrow().clone();
 
                                 let srmap;
@@ -943,12 +940,11 @@ impl Domain {
                                     };
 
                                     if create_new_srmap {
-                                        // println!("creating new partial global srmap");
                                         let (mut tr_part, tw_part) = backlog::new_partial(
                                             srmap,
                                             cols,
                                             &k[..],
-                                            move |miss, uid| {
+                                            move |miss, _uid| {
                                                 let n = txs.len();
                                                 let tx = if n == 1 {
                                                     &txs[0]
@@ -957,7 +953,6 @@ impl Domain {
                                                     assert_eq!(miss.len(), 1);
                                                     &txs[::shard_by(&miss[0], n)]
                                                 };
-                                                // println!("in trigger func");
                                                 tx.unbounded_send(Vec::from(miss)).is_ok()
                                             },
                                             ids,
@@ -988,7 +983,6 @@ impl Domain {
                                             );
 
                                             // make sure Reader is actually prepared to receive state
-                                            // println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
                                             r.set_write_handle(tw_part);
                                         })
                                         .unwrap();
@@ -999,7 +993,7 @@ impl Domain {
                                                     .1
                                                     .clone_new_user_partial(
                                                         &mut _handles.0,
-                                                        Some(Arc::new(move |miss, uid| {
+                                                        Some(Arc::new(move |miss, _uid| {
                                                             let n = txs.clone().len();
                                                             let tx = if n == 1 {
                                                                 &txs[0]
@@ -1008,7 +1002,6 @@ impl Domain {
                                                                 assert_eq!(miss.len(), 1);
                                                                 &txs[::shard_by(&miss[0], n)]
                                                             };
-                                                            // println!("in trigger func");
                                                             tx.unbounded_send(Vec::from(miss))
                                                                 .is_ok()
                                                         })),
@@ -1035,7 +1028,6 @@ impl Domain {
                                                     );
 
                                                     // make sure Reader is actually prepared to receive state
-                                                    // println!("new user's write handle has uid: {}. node: {}", tw_part.uid, node);
                                                     r.set_write_handle(tw_part);
                                                 })
                                                 .unwrap();
@@ -1048,7 +1040,7 @@ impl Domain {
                                         false,
                                         cols,
                                         &k[..],
-                                        move |miss, uid| {
+                                        move |miss, _uid| {
                                             let n = txs.len();
                                             let tx = if n == 1 {
                                                 &txs[0]

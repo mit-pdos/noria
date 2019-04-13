@@ -28,8 +28,6 @@ enum PopulateType {
 impl Backend {
     pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
         let mut cb = Builder::default();
-        let log = noria::logger_pls();
-        let blender_log = log.clone();
 
         if !partial {
             cb.disable_partial();
@@ -51,13 +49,13 @@ impl Backend {
         Backend { g: g }
     }
 
-    pub fn populate(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>) -> usize {
+    pub fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
         let mut mutator = self.g.table(name).unwrap().into_sync();
 
         let start = time::Instant::now();
 
         let i = records.len();
-        mutator.perform_all(records);
+        mutator.perform_all(records).unwrap();
 
         let dur = start.elapsed().as_secs_f64();
         println!(
@@ -110,7 +108,7 @@ impl Backend {
         }
 
         // Install recipe
-        let x = self.g.install_recipe(&rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }
@@ -154,12 +152,6 @@ fn main() {
                 .short("g")
                 .default_value("pgraph.gv")
                 .help("File to dump application's soup graph, if set"),
-        )
-        .arg(
-            Arg::with_name("info")
-                .short("i")
-                .takes_value(true)
-                .help("Directory to dump runtime process info (doesn't work on OSX)"),
         )
         .arg(
             Arg::with_name("reuse")
@@ -232,7 +224,6 @@ fn main() {
     let qloc = args.value_of("queries").unwrap();
     let ploc = args.value_of("policies").unwrap();
     let gloc = args.value_of("graph");
-    let iloc = args.value_of("info");
     let partial = args.is_present("partial");
     let shard = args.is_present("shard");
     let reuse = args.value_of("reuse").unwrap();
@@ -301,12 +292,10 @@ fn main() {
         println!("Migration {} took {:.2}s!", i, dur,);
     }
 
-    let mut dur = time::Duration::from_millis(0);
-
     // cid version of post_count query
     if query_type == "post_count" {
         let mut class_vec = Vec::new();
-        let mut enrollment_info = p.get_enrollment();
+        let enrollment_info = p.get_enrollment();
         for uid in 0..nlogged {
             match enrollment_info.get(&uid.into()) {
                 Some(classes) => {
