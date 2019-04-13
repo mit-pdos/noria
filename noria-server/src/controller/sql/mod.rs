@@ -47,7 +47,7 @@ enum QueryGraphReuse {
 crate struct SqlIncorporator {
     log: slog::Logger,
     mir_converter: SqlToMirConverter,
-    pub leaf_addresses: HashMap<String, NodeIndex>,
+    pub(in crate::controller) leaf_addresses: HashMap<String, NodeIndex>,
 
     named_queries: HashMap<String, u64>,
     query_graphs: HashMap<u64, QueryGraph>,
@@ -348,18 +348,6 @@ impl SqlIncorporator {
         let reuse_candidates = reuse_config.reuse_candidates(&mut qg, &self.query_graphs);
 
         if !reuse_candidates.is_empty() {
-            // info!(
-            //     self.log,
-            //     "Identified {} candidate QGs for reuse",
-            //     reuse_candidates.len()
-            // );
-            // trace!(
-            //     self.log,
-            //     "This QG: {:#?}\nReuse candidates:\n{:#?}",
-            //     qg,
-            //     reuse_candidates
-            // );
-
             let mut mir_queries = Vec::new();
             for uid in reuse_config.reuse_universes(universe, &self.universes) {
                 let mqs: Vec<_> = reuse_candidates
@@ -538,6 +526,7 @@ impl SqlIncorporator {
             is_leaf,
             universe.clone(),
         )?;
+
         trace!(
             self.log,
             "Unoptimized MIR:\n{}",
@@ -654,6 +643,7 @@ impl SqlIncorporator {
         // TODO(malte): get rid of duplication and figure out where to track this state
         debug!(self.log, "registering query \"{}\"", query_name);
         self.view_schemas.insert(String::from(query_name), fields);
+
         // We made a new query, so store the query graph and the corresponding leaf MIR node.
         // TODO(malte): we currently store nothing if there is no QG (e.g., for compound queries).
         // This means we cannot reuse these queries.
@@ -706,19 +696,6 @@ impl SqlIncorporator {
 
         // compare to existing query MIR and reuse prefix
         let reused_mir = new_opt_mir.clone();
-        // let mut num_reused_nodes = 0;
-        // for m in reuse_mirs {
-        //     if !self.mir_queries.contains_key(&m) {
-        //         continue;
-        //     }
-        //     let mq = &self.mir_queries[&m];
-        //     let res = merge_mir_for_queries(&self.log, &reused_mir, &mq);
-        //     reused_mir = res.0;
-        //     if res.1 > num_reused_nodes {
-        //         num_reused_nodes = res.1;
-        //     }
-        // }
-
         let mut post_reuse_opt_mir = reused_mir.optimize_post_reuse();
 
         // traverse universe subgraph and update table names for
@@ -748,11 +725,6 @@ impl SqlIncorporator {
             global_name,
         );
 
-        // info!(
-        //     self.log,
-        //     "Reused {} nodes for {}", num_reused_nodes, query_name
-        // );
-
         // register local state
         self.register_query(query_name, Some(qg), &post_reuse_opt_mir, universe);
 
@@ -777,6 +749,7 @@ impl SqlIncorporator {
     /// Runs some standard rewrite passes on the query.
     fn rewrite_query(&mut self, q: SqlQuery, mig: &mut Migration) -> Result<SqlQuery, String> {
         // TODO: make this not take &mut self
+
         use passes::alias_removal::AliasRemoval;
         use passes::count_star_rewrite::CountStarRewrite;
         use passes::implied_tables::ImpliedTableExpansion;
@@ -920,17 +893,6 @@ impl SqlIncorporator {
                 self.add_select_query(&query_name, &sq, is_leaf, mig, global_name)?
                     .0
             }
-            // SqlQuery::CreateView(ref cvq) => {
-            //     use nom_sql::SelectSpecification;
-            //     match *cvq.definition {
-            //         SelectSpecification::Compound(ref csq) => {
-            //             self.add_compound_query(&cvq.name, csq, is_leaf, mig)?
-            //         }
-            //         SelectSpecification::Simple(ref sq) => {
-            //             self.add_select_query(&cvq.name, sq, is_leaf, mig, None).0
-            //         }
-            //     }
-            // }
             ref q @ SqlQuery::CreateTable { .. } => self.add_base_via_mir(&query_name, &q, mig),
             q => panic!("unhandled query type in recipe: {:?}", q),
         };

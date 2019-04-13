@@ -369,7 +369,6 @@ impl ControllerInner {
     }
 
     fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
-        println!("handled failed worker");
         // first, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
         for wi in failed {
@@ -396,8 +395,6 @@ impl ControllerInner {
         // back to original recipe, which should add the query again
         self.apply_recipe(original)
             .expect("failed to activate original recipe");
-
-        println!("handled failed worker");
     }
 
     pub(super) fn handle_heartbeat(&mut self, msg: &CoordinationMessage) -> Result<(), io::Error> {
@@ -678,7 +675,6 @@ impl ControllerInner {
         };
         let r = f(&mut m);
         m.commit();
-
         r
     }
 
@@ -968,9 +964,8 @@ impl ControllerInner {
     ) -> Result<(), String> {
         let log = self.log.clone();
         let mut r = self.recipe.clone();
-
         let groups = self.recipe.security_groups();
-        println!("create_universe context: {:?}", context);
+
         let mut universe_groups = HashMap::new();
 
         let uid = context
@@ -1009,18 +1004,6 @@ impl ControllerInner {
                 universe_groups.insert(g, my_groups);
             }
         }
-        // For debugging
-        //        let rgb_dbg: Option<ViewBuilder> = self.view_builder(&context.get("group").unwrap().into());
-        //        let mut view_dbg = rgb_dbg
-        //            .map(|rgb_dbg| rgb_dbg.build_exclusive().unwrap())
-        //            .unwrap();
-        //        let tmp: Vec<Vec<DataType>> = view_dbg.lookup(&["3".into()], true).unwrap();
-        //        debug!(log, "group not none. 3's groups (expect chairs): {:?}", tmp);
-        //        let tmp: Vec<Vec<DataType>> = view_dbg.lookup(&["2".into()], true).unwrap();
-        //        debug!(
-        //            log,
-        //            "group not none. 2's groups (expect authors): {:?}", tmp
-        //        );
 
         self.add_universe(context.clone(), |mut mig| {
             r.next();
@@ -1095,6 +1078,7 @@ impl ControllerInner {
                     }
                 }
                 topo_removals.reverse();
+
                 for leaf in topo_removals {
                     self.remove_leaf(leaf)?;
                 }
@@ -1128,6 +1112,7 @@ impl ControllerInner {
                 self.recipe = recipe.revert();
             }
         }
+
         r
     }
 

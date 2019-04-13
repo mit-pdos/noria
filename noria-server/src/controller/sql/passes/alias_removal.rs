@@ -192,7 +192,6 @@ impl AliasRemoval for SqlQuery {
                         jc
                     })
                     .collect();
-
                 // Remove them from conditions
                 sq.where_clause = match sq.where_clause {
                     None => None,

@@ -187,7 +187,7 @@ impl Ingredient for TopK {
                             })
                             .all(|&(_, is_new)| is_new);
                         if all_new_bottom {
-                            // println!("topk is guesstimating bottom row");
+                            eprintln!("topk is guesstimating bottom row");
                         }
                     }
                 }

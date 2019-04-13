@@ -512,7 +512,6 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
             new_node(table.name.clone(), Vec::new(), st),
         );
     }
-    
     for jc in &st.join {
         match jc.right {
             JoinRightSide::Table(ref table) => {
@@ -556,8 +555,6 @@ pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
                         match *cond {
                             ConditionExpression::ComparisonOp(ref ct) => {
                                 if tables_mentioned.len() == 2 {
-				    // FOR DEBUGGING
-				    println!("query_graph JoinRightSide: tables_mentioned is {:?}", tables_mentioned);
                                     // tables can appear in any order in the join predicate, but
                                     // we cannot just rely on that order, since it may lead us to
                                     // flip LEFT JOINs by accident (yes, this happened)

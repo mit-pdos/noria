@@ -108,11 +108,7 @@ fn rewrite_selection(
             })
             .collect::<Vec<String>>();
         if matches.len() > 1 {
-            // println!(
-            //     "Ambiguous column {} exists in tables: {} -- picking a random one",
-            //     f.name,
-            //     matches.as_slice().join(", ")
-            // );
+            // Ambiguous column exists in table -- picking a random one
             Some(matches.pop().unwrap())
         } else if matches.is_empty() {
             // This might be an alias for a computed column, which has no

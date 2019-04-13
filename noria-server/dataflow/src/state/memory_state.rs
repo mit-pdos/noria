@@ -184,7 +184,6 @@ impl MemoryState {
     }
 
     fn insert(&mut self, r: Vec<DataType>, partial_tag: Option<Tag>) -> bool {
-
         let r = Rc::new(r);
 
         if let Some(tag) = partial_tag {

@@ -505,7 +505,6 @@ impl SqlToMirConverter {
                 leaves.push(mn);
             }
         }
-
         assert_eq!(
             leaves.len(),
             1,
@@ -752,7 +751,6 @@ impl SqlToMirConverter {
                 );
             }
         }
-
         assert_eq!(
             num_ucols,
             selected_cols.len(),
@@ -808,7 +806,6 @@ impl SqlToMirConverter {
             .iter()
             .cloned()
             .collect();
-
         let num_ucols = ucols.len();
 
         let mut selected_cols = HashSet::new();
@@ -1148,7 +1145,6 @@ impl SqlToMirConverter {
         l_col.add_alias(&r_col);
         // add the alias to all instances of `l_col` in `fields` (there might be more than one
         // if `l_col` is explicitly projected multiple times)
-
         let fields: Vec<Column> = fields
             .into_iter()
             .filter_map(|mut f| {
@@ -1286,7 +1282,6 @@ impl SqlToMirConverter {
             vec![],
         )
     }
-
     fn make_topk_node(
         &self,
         name: &str,
@@ -1482,6 +1477,7 @@ impl SqlToMirConverter {
         }
     }
 
+    /// Returns list of nodes added
     #[allow(clippy::cyclomatic_complexity)]
     fn make_nodes_for_selection(
         &mut self,
@@ -1831,7 +1827,6 @@ impl SqlToMirConverter {
 
                 new_node_count += nodes.len();
                 nodes_added.extend(nodes.clone());
-
                 nodes.last().unwrap().clone()
             } else {
                 ancestors.last().unwrap().clone()

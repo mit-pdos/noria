@@ -8,7 +8,10 @@
 use crate::controller::domain_handle::DomainHandle;
 use crate::controller::inner::MapMeta;
 use crate::controller::recipe::Recipe;
-use crate::controller::{inner::DomainReplies, keys};
+use crate::controller::{
+    inner::{graphviz, DomainReplies},
+    keys,
+};
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::prelude::*;
 use petgraph;
@@ -252,6 +255,7 @@ impl Materializations {
                 }
             }
         }
+
         // we need to compute which views can be partial, and which can not.
         // in addition, we need to figure out what indexes each view should have.
         // this is surprisingly difficult to get right.
@@ -452,6 +456,7 @@ impl Materializations {
         replies: &mut DomainReplies,
     ) {
         self.extend(graph, new);
+
         // check that we don't have fully materialized nodes downstream of partially materialized
         // nodes.
         {
@@ -477,6 +482,7 @@ impl Materializations {
                 }
 
                 if let Some(pi) = any_partial(self, graph, ni) {
+                    println!("{}", graphviz(graph, true, &self));
                     crit!(self.log, "partial materializations above full materialization";
                               "full" => ni.index(),
                               "partial" => pi.index());
@@ -524,6 +530,7 @@ impl Materializations {
                                                 .find(|c| !index.contains(&c))
                                         });
                                     if let Some(not_shared) = unshared {
+                                        println!("{}", graphviz(graph, true, &self));
                                         crit!(self.log, "partially overlapping partial indices";
                                                   "parent" => pni.index(),
                                                   "pcols" => ?index,
@@ -591,7 +598,7 @@ impl Materializations {
                             .find(|&(c, res)| c != col && res == &src)
                         {
                             // another column in the merger's parent resolved to the source column!
-                            //// // println!("{}", graphviz(graph, &self));
+                            //println!("{}", graphviz(graph, &self));
                             crit!(self.log, "attempting to merge sharding by aliased column";
                                       "parent" => mat_anc.index(),
                                       "aliased" => res,
@@ -703,6 +710,7 @@ impl Materializations {
                             != self.have.get(&child).map(|i| i.len()).unwrap_or(0)
                         {
                             // node was previously materialized!
+                            println!("{}", graphviz(graph, true, &self));
                             crit!(
                                 self.log,
                                 "attempting to make old non-materialized node with children partial";
@@ -743,13 +751,13 @@ impl Materializations {
                 index_on.clear();
             } else if !n.sharded_by().is_none() {
                 // what do we even do here?!
+                println!("{}", graphviz(graph, true, &self));
                 crit!(self.log, "asked to add index to sharded node";
                            "node" => node.index(),
                            "cols" => ?index_on);
             // unimplemented!();
             } else {
                 use dataflow::payload::InitialState;
-                // println!("Preparing node... {:?}", node.clone());
                 domains
                     .get_mut(&n.domain())
                     .unwrap()
@@ -866,7 +874,6 @@ impl Materializations {
             // acknowledge the change. this is important so that we don't ready a child in a
             // different domain before the parent has been readied. it's also important to avoid us
             // returning before the graph is actually fully operational.
-
             trace!(self.log, "readying node"; "node" => ni.index());
             let domain = domains.get_mut(&n.domain()).unwrap();
             domain
@@ -889,6 +896,7 @@ impl Materializations {
                 );
             }
         }
+
         self.added.clear();
     }
 

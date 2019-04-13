@@ -10,12 +10,11 @@ use noria::channel;
 use noria::internal::LocalOrNot;
 use prelude::*;
 
+use nom_sql::SqlQuery;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::SocketAddr;
 use std::time;
-use nom_sql::SqlQuery;
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReplayPathSegment {
@@ -137,7 +136,6 @@ pub enum Packet {
     AddNode {
         node: Node,
         parents: Vec<LocalNodeIndex>,
-        //        all_parents: Vec<LocalNodeIndex>, // for debugging purposes
     },
 
     /// Direct domain to remove some nodes.

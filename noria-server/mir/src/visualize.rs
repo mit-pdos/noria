@@ -19,7 +19,6 @@ impl GraphViz for MirQuery {
 
         // starting at the roots, print nodes in topological order
         let mut node_queue = VecDeque::new();
-        println!("ROOTS: {:#?}", self.roots);
         node_queue.extend(self.roots.iter().cloned());
         let mut in_edge_counts = HashMap::new();
         for n in &node_queue {
@@ -45,8 +44,6 @@ impl GraphViz for MirQuery {
             for child in n.borrow().children.iter() {
                 let nd = child.borrow().versioned_name();
                 writeln!(out, "\"{}\" -> \"{}\"", n.borrow().versioned_name(), nd)?;
-                println!("looking at node: {:#?}", child);
-                println!("In edges: {:#?}", in_edge_counts);
                 let in_edges = if in_edge_counts.contains_key(&nd) {
                     in_edge_counts[&nd]
                 } else {

@@ -38,7 +38,6 @@ impl Trigger {
     where
         I: IntoIterator<Item = HashMap<String, DataType>>,
     {
-        println!("trigger.rs");
         for req in requests {
             executor.create_universe(req);
         }
@@ -51,7 +50,6 @@ impl Trigger {
 
         match self.trigger {
             TriggerEvent::GroupCreation { ref group } => {
-                println!("trigger.rs: GroupCreation event, ids is {:?}", ids);
                 self.create_universes(
                     executor,
                     ids.iter().map(|gid| {

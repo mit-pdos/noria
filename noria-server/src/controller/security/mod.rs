@@ -10,8 +10,8 @@ use crate::controller::security::policy::Policy;
 
 #[derive(Clone, Debug)]
 pub struct SecurityConfig {
-    pub groups: HashMap<String, Group>,
-    pub policies: Vec<Policy>,
+    pub(in crate::controller) groups: HashMap<String, Group>,
+    pub(in crate::controller) policies: Vec<Policy>,
 }
 
 impl SecurityConfig {

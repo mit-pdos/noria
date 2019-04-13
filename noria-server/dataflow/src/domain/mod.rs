@@ -18,11 +18,10 @@ use prelude::*;
 use slog::Logger;
 use stream_cancel::Valve;
 
+use backlog;
 use timekeeper::{RealTime, SimpleTracker, ThreadTime, Timer, TimerSet};
 use tokio::{self, prelude::*};
 use Readers;
-
-use backlog;
 
 #[derive(Debug)]
 pub enum PollEvent {
@@ -507,25 +506,11 @@ impl Domain {
             return;
         }
 
-        let node_id;
         let (mut m, evictions) = {
-            // Node operator n
             let mut n = self.nodes[me].borrow_mut();
-            node_id = n.global_addr();
             self.process_times.start(me);
             self.process_ptimes.start(me);
             let mut m = Some(m);
-
-            // for debugging
-            println!(
-                "--> DISPATCH me ({}, {:?}) processes packet ({:?}) from src ({:?})",
-                me,
-                n.global_addr(),
-                m,
-                src
-            );
-            // end for debugging
-
             let (misses, _, captured) = n.process(
                 &mut m,
                 None,
@@ -543,10 +528,6 @@ impl Domain {
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
-                println!(
-                    "Checkpoint 1: returning due to NoneType m (L557) (me: {:?})",
-                    n.global_addr()
-                );
                 return;
             }
 
@@ -658,10 +639,6 @@ impl Domain {
         match m.as_ref().unwrap() {
             m @ &box Packet::Message { .. } if m.is_empty() => {
                 // no need to deal with our children if we're not sending them anything
-                println!(
-                    "Checkpoint 2: returning due to empty message (L669) (me: {:?})",
-                    node_id
-                );
                 return;
             }
             &box Packet::Message { .. } => {}
@@ -673,11 +650,6 @@ impl Domain {
 
         // NOTE: we can't directly iterate over .children due to self.dispatch in the loop
         let nchildren = self.nodes[me].borrow().children().len();
-        println!(
-            "DISPATCH children (me: {:?}): {:?}",
-            node_id,
-            self.nodes[me].borrow().children()
-        );
         for i in 0..nchildren {
             // avoid cloning if we can
             let mut m = if i == nchildren - 1 {
@@ -702,17 +674,6 @@ impl Domain {
 
             self.dispatch(m, sends, executor);
         }
-
-        //        let mut n = self.nodes[me].borrow_mut();
-        //        println!(
-        //            "----> DISPATCH CHILDREN local addrs (me: {:?}): {:?}",
-        //            n.global_addr(),
-        //            children_ids
-        //        );
-        println!(
-            "Checkpoint 3: Returning at end of dispatch (me: {:?})",
-            node_id
-        );
     }
 
     #[allow(clippy::cyclomatic_complexity)]
@@ -753,20 +714,6 @@ impl Domain {
                     Packet::AddNode { node, parents } => {
                         let addr = node.local_addr();
                         self.not_ready.insert(addr);
-
-                        // For debugging.
-                        println!(
-                            "New node {:?} (local: {:?}) has {} old parent(s) ({:?}), children {:?}",
-                            node.global_addr(),
-                            node.local_addr(),
-                            parents.len(),
-                            parents,
-                            //                                .into_iter()
-                            //                                .map(|c| self.nodes[c].borrow().global_addr())
-                            //                                .collect::<Vec<_>>(),
-                            node.children()
-                        );
-                        //
 
                         for p in parents {
                             self.nodes
@@ -919,6 +866,7 @@ impl Domain {
                                             .unwrap()
                                             .build_async()
                                             .unwrap();
+
                                         tokio::spawn(
                                             self.shutdown_valve
                                                 .wrap(rx)
@@ -931,10 +879,10 @@ impl Domain {
                                                 .fold(sender, move |sender, m| {
                                                     sender.send(m).map_err(|e| {
                                                         // domain went away?
-                                                        // // println!(
-                                                        //     "replay source went away: {:?}",
-                                                        //     e
-                                                        // );
+                                                        eprintln!(
+                                                            "replay source went away: {:?}",
+                                                            e
+                                                        );
                                                     })
                                                 })
                                                 .map(|_| ()),
@@ -1336,7 +1284,6 @@ impl Domain {
                             }
                         };
 
-                        // println!("REPLAY PATH: tag  = {:?}, path = {:?}", tag, path);
                         self.replay_paths.insert(
                             tag,
                             ReplayPath {
@@ -1356,19 +1303,14 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
-                        // println!("reader req replay for node: {:?}", node);
-
                         let still_miss = self.nodes[node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
-                                // println!("request reader replay");
                                 let w = r
                                     .writer_mut()
                                     .expect("reader replay requested for non-materialized reader");
                                 // ensure that all writes have been applied
-                                // println!("uid: {:?}", w.uid);
                                 w.swap();
-                                // println!("call to try find and w key {:?}", key);
                                 w.with_key(&key[..])
                                     .try_find_and(|_| ())
                                     .expect("reader replay requested for non-ready reader")
@@ -1989,8 +1931,6 @@ impl Domain {
                     mut context,
                     id,
                 } => {
-                    // println!("replaying piece!");
-                    // println!("data in replay: {:?}", data.clone());
                     if let ReplayPieceContext::Partial { ref for_keys, .. } = context {
                         trace!(
                             self.log,
@@ -2061,7 +2001,7 @@ impl Domain {
                         id: None,
                     };
                     let mut m = Some(m);
-                    // println!("path : {:?}", path);
+
                     for (i, segment) in path.iter().enumerate() {
                         let mut n = self.nodes[segment.node].borrow_mut();
                         let is_reader = n.with_reader(|r| r.is_materialized()).unwrap_or(false);
@@ -2112,18 +2052,15 @@ impl Domain {
                             // triggered this replay initially.
                             if let Some(state) = self.state.get_mut(segment.node) {
                                 for key in backfill_keys.iter() {
-                                    // println!("mf1");
                                     state.mark_filled(key.clone(), tag);
                                 }
                             } else {
-                                // println!("else block")
                                 n.with_reader_mut(|r| {
                                     // we must be filling a hole in a Reader. we need to ensure
                                     // that the hole for the key we're replaying ends up being
                                     // filled, even if that hole is empty!
                                     if let Some(wh) = r.writer_mut() {
                                         for key in backfill_keys.iter() {
-                                            // println!("mf2");
                                             wh.mut_with_key(&key[..]).mark_filled();
                                         }
                                     }
@@ -2131,8 +2068,7 @@ impl Domain {
                                 .unwrap();
                             }
                         }
-                        // println!("before here 3");
-                        // // println!("m data: {:?}", m.as_ref().unwrap().data());
+
                         // process the current message in this node
                         let (mut misses, lookups, captured) = n.process(
                             &mut m,
@@ -2168,7 +2104,6 @@ impl Domain {
                             HashSet::new()
                         };
 
-                        // println!("here4");
                         if target {
                             if !misses.is_empty() {
                                 // we missed while processing
@@ -2206,8 +2141,6 @@ impl Domain {
                             }
                         }
 
-                        // println!("here5");
-
                         if target && !captured.is_empty() {
                             // materialized union ate some of our keys,
                             // so we didn't *actually* fill those keys after all!
@@ -2230,7 +2163,6 @@ impl Domain {
                         // we're done with the node
                         drop(n);
 
-                        // println!("here5");
                         if m.is_none() {
                             // eaten full replay
                             assert_eq!(misses.len(), 0);
@@ -2260,8 +2192,6 @@ impl Domain {
                         {
                             finished_partial = backfill_keys.as_ref().unwrap().len();
                         }
-
-                        // println!("here7");
 
                         // only continue with the keys that weren't captured
                         if let box Packet::ReplayPiece {
@@ -2517,7 +2447,6 @@ impl Domain {
                             *mcontext = context.clone();
                         }
                     }
-                    // println!("replay piece inner");
 
                     match context {
                         ReplayPieceContext::Regular { last } if last => {
@@ -2548,7 +2477,6 @@ impl Domain {
                             }
                         }
                     }
-                    // println!("replay piece inner2");
                 }
                 _ => unreachable!(),
             }

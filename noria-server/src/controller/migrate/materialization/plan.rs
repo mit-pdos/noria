@@ -1,5 +1,5 @@
 use crate::controller::domain_handle::DomainHandle;
-use crate::controller::inner::DomainReplies;
+use crate::controller::inner::{graphviz, DomainReplies};
 use crate::controller::keys;
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::payload::{ReplayPathSegment, SourceSelection, TriggerEndpoint};
@@ -162,6 +162,7 @@ impl<'a> Plan<'a> {
                 //  a domain may appear multiple times in this list if a path crosses into the same
                 //  domain more than once. currently, that will cause a deadlock.
                 if seen.contains(&domain) {
+                    println!("{}", graphviz(&self.graph, true, &self.m));
                     crit!(self.m.log, "detected a-b-a domain replay path");
                     unimplemented!();
                 }
@@ -379,18 +380,18 @@ impl<'a> Plan<'a> {
                         cols: self.graph[self.node].fields().len(),
                         key: Vec::from(r.key().unwrap()),
                         trigger_domain: (last_domain, num_shards),
-                        srmap_node: srmap_node,
-                        materialization_info: materialization_info,
-                        uid: uid,
+                        srmap_node,
+                        materialization_info,
+                        uid,
                     }
                 } else {
                     InitialState::Global {
                         cols: self.graph[self.node].fields().len(),
                         key: Vec::from(r.key().unwrap()),
                         gid: self.node,
-                        srmap_node: srmap_node,
-                        materialization_info: materialization_info,
-                        uid: uid,
+                        srmap_node,
+                        materialization_info,
+                        uid,
                     }
                 }
             })

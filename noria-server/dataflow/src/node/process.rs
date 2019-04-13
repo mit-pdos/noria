@@ -20,11 +20,10 @@ impl Node {
         id: Option<usize>,
     ) -> (Vec<Miss>, Vec<Lookup>, HashSet<Vec<DataType>>) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
-        // println!("process2");
+
         let addr = self.local_addr();
         match self.inner {
             NodeType::Ingress => {
-                // println!("p1");
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs| {
@@ -32,7 +31,6 @@ impl Node {
                 });
             }
             NodeType::Base(ref mut b) => {
-                // println!("p2");
                 // NOTE: bases only accept BaseOperations
                 match m.take() {
                     Some(box Packet::Input {
@@ -40,6 +38,7 @@ impl Node {
                     }) => {
                         let Input { dst, data, tracer } = unsafe { inner.take() };
                         let mut rs = b.process(addr, data, &*state);
+
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay
                         // through the base node itself should *NOT* update the materialization,
@@ -79,7 +78,6 @@ impl Node {
                 s.process(m, addr, on_shard.is_some(), output);
             }
             NodeType::Internal(ref mut i) => {
-                // println!("p4");
                 let mut captured_full = false;
                 let mut captured = HashSet::new();
                 let mut misses = Vec::new();

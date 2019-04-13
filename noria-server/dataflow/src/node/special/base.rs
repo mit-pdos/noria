@@ -118,7 +118,6 @@ impl Default for Base {
 }
 
 fn key_val(i: usize, col: usize, r: &TableOperation) -> &DataType {
-    // println!("key_val: col: {:?} ", col);
     match *r {
         TableOperation::Insert(ref row) => &row[col],
         TableOperation::Delete { ref key } => &key[i],
@@ -209,7 +208,7 @@ impl Base {
             let update = match op {
                 TableOperation::Insert(row) => {
                     if let Some(ref was) = was {
-                        println!("base ignoring {:?} since it already has {:?}", row, was);
+                        eprintln!("base ignoring {:?} since it already has {:?}", row, was);
                     } else {
                         //assert!(was.is_none());
                         current = Some(Cow::Owned(row));
@@ -273,6 +272,7 @@ impl Base {
         for r in &mut results {
             self.fix(r);
         }
+
         results.into()
     }
 

@@ -94,7 +94,8 @@ pub(super) fn pull_required_base_columns(
                     .ancestors()
                     .iter()
                     .any(|a| a.borrow().columns().iter().any(|ac| ac == c))
-            }).collect();
+            })
+            .collect();
 
         let mut found: Vec<&Column> = Vec::new();
         match table_mapping {

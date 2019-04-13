@@ -113,7 +113,6 @@ impl<A: Authority + 'static> Handle<A> {
     ) -> impl Future<Item = (), Error = failure::Error> {
         let mut c = self.c.clone().unwrap();
 
-        println!("create_universe handle.rs context: {:?}", context);
         let uid = context
             .get("id")
             .expect("Universe context must have id")

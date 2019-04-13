@@ -76,11 +76,9 @@ impl<'a> Migration<'a> {
         I: Into<NodeOperator>,
     {
         let mut i = node::Node::new(name.to_string(), fields, i.into());
-
         if i.name().starts_with("SHALLOW_") {
             i.purge = true;
         }
-
         i.on_connected(&self.mainline.ingredients);
         let parents = i.ancestors();
         assert!(!parents.is_empty());
@@ -123,16 +121,10 @@ impl<'a> Migration<'a> {
             .mainline
             .ingredients
             .add_node(node::Node::new(name.to_string(), fields, b));
-
         info!(self.log,
               "adding new base";
               "node" => ni.index(),
         );
-
-        // don't add user or group context tables
-        // if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
-        //     self.mainline.base_nodes.insert(name.to_string(), ni.clone());
-        // }
 
         // keep track of the fact that it's new
         self.added.insert(ni);
@@ -414,7 +406,6 @@ impl<'a> Migration<'a> {
     #[allow(clippy::cyclomatic_complexity)]
     pub(super) fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
-        // println!("in migration::commit. query_to_readers: {:?}", self.mainline.map_meta.query_to_readers.clone());
 
         let log = self.log;
         let start = self.start;

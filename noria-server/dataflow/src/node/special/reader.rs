@@ -174,9 +174,7 @@ impl Reader {
         swap: bool,
         id: Option<usize>,
     ) {
-        // println!("reader node process. for node: {:?}", self.for_node);
         if let Some(ref mut state) = self.writer {
-            // println!("reader node process. writer uid: {:?}", state.uid);
             let m = m.as_mut().unwrap();
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
@@ -206,8 +204,6 @@ impl Reader {
             if !m.is_regular() && state.is_partial() {
                 m.map_data(|data| {
                     data.retain(|row| {
-                        // println!("processing row: {:?}", row);
-
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
                                 // filling a hole with replay -- ok
@@ -241,7 +237,6 @@ impl Reader {
                 // TODO: avoid doing the pointer swap if we didn't modify anything (inc. ts)
                 state.swap();
             }
-            //state.swap();
         }
 
         // TODO: don't send replays to streams?

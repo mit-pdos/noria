@@ -12,7 +12,6 @@ use dataflow::ops::project::{Project, ProjectExpression, ProjectExpressionBase};
 use dataflow::{node, ops};
 use mir::node::{GroupedNodeType, MirNode, MirNodeType};
 use mir::query::{MirQuery, QueryFlowParts};
-use mir::visualize::GraphViz;
 use mir::{Column, FlowNode, MirNodeRef};
 use petgraph::graph::NodeIndex;
 
@@ -22,21 +21,14 @@ pub(super) fn mir_query_to_flow_parts(
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
     global_name: Option<String>,
 ) -> QueryFlowParts {
-    println!("mir_query_to_flow_parts, printing MirQuery digraph");
-    let graph = mir_query.to_graphviz();
-    match graph {
-        Ok(out) => println!("{}", out),
-        Err(out) => println!("ERR: {:?}", out),
-    }
-
     use std::collections::VecDeque;
 
     let mut new_nodes = Vec::new();
     let mut reused_nodes = Vec::new();
+
     // starting at the roots, add nodes in topological order
     let mut node_queue = VecDeque::new();
     node_queue.extend(mir_query.roots.iter().cloned());
-
     let mut in_edge_counts = HashMap::new();
     for n in &node_queue {
         in_edge_counts.insert(n.borrow().versioned_name(), 0);
@@ -69,7 +61,6 @@ pub(super) fn mir_query_to_flow_parts(
             in_edge_counts.insert(nd, in_edges - 1);
         }
     }
-
     let leaf_na = mir_query
         .leaf
         .borrow()
@@ -342,10 +333,6 @@ fn mir_node_to_flow_parts(
                     ref column,
                     ref key,
                 } => {
-                    println!(
-                        "make rewrite; mir_node inner: {:?}, column: {:?}, value: {:?}, key: {:?}",
-                        mir_node.inner, column, value, key
-                    );
                     let src = mir_node.ancestors[0].clone();
                     let should_rewrite = mir_node.ancestors[1].clone();
 

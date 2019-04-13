@@ -64,7 +64,9 @@ impl Multiverse for SqlIncorporator {
         mig: &mut Migration,
     ) -> Result<Vec<QueryFlowParts>, String> {
         let mut qfps = Vec::new();
+
         self.mir_converter.clear_universe();
+
         let (id, group) = mig.universe();
         let mut universe = Universe {
             id: id.clone(),

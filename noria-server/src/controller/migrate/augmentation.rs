@@ -57,21 +57,11 @@ pub(super) fn inform(
                 .map(|n| n.local_addr())
                 .collect();
 
-            // for debugging
-            /*          let all_parents = graph
-                            .neighbors_directed(ni, petgraph::EdgeDirection::Incoming)
-                            .filter(|&ni| ni != source)
-                            .map(|ni| &graph[ni])
-                            .filter(|n| n.domain() == domain)
-                            .map(|n| n.local_addr())
-                            .collect();
-            */
             trace!(log, "request addition of node"; "node" => ni.index());
             ctx.send_to_healthy(
                 box Packet::AddNode {
                     node,
                     parents: old_parents,
-                    //                    all_parents: all_parents,
                 },
                 &controller.workers,
             )

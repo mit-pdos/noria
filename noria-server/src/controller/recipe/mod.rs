@@ -15,7 +15,6 @@ use nom_sql::CreateTableStatement;
 use slog;
 use std::collections::HashMap;
 use std::str;
-use std::time::Instant;
 use std::vec::Vec;
 
 type QueryID = u64;
@@ -39,7 +38,7 @@ crate struct Recipe {
     prior: Option<Box<Recipe>>,
 
     /// Maintains lower-level state, but not the graph itself. Lazily initialized.
-    pub inc: Option<SqlIncorporator>,
+    pub(in crate::controller) inc: Option<SqlIncorporator>,
 
     log: slog::Logger,
 }
@@ -292,6 +291,7 @@ impl Recipe {
         universe_groups: HashMap<String, Vec<DataType>>,
     ) -> Result<ActivationResult, String> {
         use crate::controller::sql::security::Multiverse;
+
         let mut result = ActivationResult {
             new_nodes: HashMap::default(),
             removed_leaves: Vec::default(),
@@ -305,13 +305,8 @@ impl Recipe {
             "Universe groups (in create_universe): {:?}", universe_groups
         );
 
-        let now = Instant::now();
-
-        // println!("recipe: creatng universe 1. {:?}", now.elapsed().as_nanos());
-
         if self.security_config.is_some() {
             mig.security_config = self.security_config.clone();
-            // println!("setting security config! in recipe::create_universe");
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
                 &self.security_config.clone().unwrap(),
                 universe_groups,
@@ -322,8 +317,6 @@ impl Recipe {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }
         }
-
-        // println!("recipe: creating universe 2. {:?}", now.elapsed().as_nanos());
 
         for expr in self.expressions.values() {
             let (n, q, is_leaf) = expr.clone();
@@ -349,8 +342,6 @@ impl Recipe {
                 None
             };
 
-            // println!("recipe: creating universe 3. {:?}", now.elapsed().as_nanos());
-
             let is_leaf = if group.is_some() { false } else { is_leaf };
             let qfp = self.inc.as_mut().unwrap().add_parsed_query(
                 q,
@@ -360,50 +351,15 @@ impl Recipe {
                 n.clone(),
             )?;
 
-            // println!("recipe: creating universe 4. {:?}", now.elapsed().as_nanos());
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
-            let query_name = match n.clone() {
+            let query_name = match n {
                 Some(name) => name,
                 None => qfp.name.clone(),
             };
 
-            // println!("recipe: creating universe 5. {:?}", now.elapsed().as_nanos());
             result.new_nodes.insert(query_name, qfp.query_leaf);
         }
-
-        //        debug!(
-        //	    self.log,
-        //	    "Create universe: id: {:?}, new nodes: {:?}",
-        //	    mig.universe().0,
-        //	    result.new_nodes.clone()
-        //	);
-        use dataflow::payload;
-        // Enforce write policies
-        // if self.security_config.is_some() {
-        //     for policy in &self.security_config.clone().unwrap().policies {
-        //         match policy {
-        //             Policy::Write(inner) => {
-        //                 match mig.mainline.base_nodes.get(&inner.table) {
-        //                     Some(ni) => {
-        //                         let n = &mig.mainline.ingredients[*ni];
-        //                         let m = box payload::Packet::SetWritePolicy {
-        //                             node: n.local_addr(),
-        //                             predicate: inner.predicate.clone(),
-        //                         };
-        //
-        //                         let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
-        //                         domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
-        //                         mig.mainline.replies.wait_for_acks(&domain);
-        //
-        //                     },
-        //                     None => {},
-        //                 }
-        //             },
-        //             _ => {},
-        //         }
-        //     }
-        // }
 
         Ok(result)
     }
