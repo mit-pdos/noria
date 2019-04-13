@@ -103,7 +103,7 @@ fn main() {
     if let Err(e) = ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
     }) {
-        e// println!("==> failed to set ^C handler: {}", e);
+        eprintln!("==> failed to set ^C handler: {}", e);
     }
 
     // init lots of machines in parallel
@@ -116,17 +116,17 @@ fn main() {
     for scale in args.values_of("scales").unwrap() {
         match scale.parse::<u32>() {
             Ok(scale) => {
-                e// println!("==> {} servers", nservers * scale,);
+                eprintln!("==> {} servers", nservers * scale,);
 
                 let load = run_one(&args, nservers * scale).unwrap();
                 if load > 16.5 {
-                    e// println!(" !> server seems overloaded: {}/16", load);
+                    eprintln!(" !> server seems overloaded: {}/16", load);
                 // break;
                 } else {
-                    e// println!(" >> finished; registered load: {}/16", load);
+                    eprintln!(" >> finished; registered load: {}/16", load);
                 }
             }
-            Err(e) => e// println!("Ignoring malformed scale factor {}", e),
+            Err(e) => eprintln!("Ignoring malformed scale factor {}", e),
         }
 
         if !running.load(Ordering::SeqCst) {
@@ -164,7 +164,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
         "server",
         nservers,
         tsunami::MachineSetup::new(args.value_of("stype").unwrap(), SOUP_AMI, move |host| {
-            e// println!(" -> building eintopf on server");
+            eprintln!(" -> building eintopf on server");
             host.just_exec(&["git", "-C", "eintopf", "reset", "--hard", "2>&1"])
                 .context("git reset")?
                 .map_err(failure::err_msg)?;
@@ -203,7 +203,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                e// println!(" -> starting eintopf on {}", s.public_dns);
+                eprintln!(" -> starting eintopf on {}", s.public_dns);
                 let cmd: Vec<Cow<_>> = vec![
                     "env".into(),
                     "RUST_BACKTRACE=1".into(),
@@ -238,7 +238,7 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             nservers,
         ))?;
 
-        e// println!(" .. benchmark running @ {}", chrono::Local::now().time());
+        eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
         for (i, mut chan) in eintopfs.into_iter().enumerate() {
             let mut stdout = String::new();
             chan.read_to_string(&mut stdout)?;
@@ -249,12 +249,12 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             chan.wait_close()?;
 
             if chan.exit_status()? != 0 {
-                e// println!("{} failed to run benchmark client:", servers[i].public_dns);
-                e// println!("{}", stderr);
+                eprintln!("{} failed to run benchmark client:", servers[i].public_dns);
+                eprintln!("{}", stderr);
             } else if !stderr.is_empty() {
-                e// println!("{} reported:", servers[i].public_dns);
+                eprintln!("{} reported:", servers[i].public_dns);
                 let stderr = stderr.trim_right().replace('\n', "\n > ");
-                e// println!(" > {}", stderr);
+                eprintln!(" > {}", stderr);
             }
 
             outf.write_all(stdout.as_bytes())?;
@@ -288,7 +288,7 @@ impl ConvenientSession for tsunami::Session {
             })
             .collect();
         let cmd = cmd.join(" ");
-        e// println!("    :> {}", cmd);
+        eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
         let cmd = format!("bash -c {}", shellwords::escape(&cmd));

@@ -95,10 +95,12 @@ impl Backend {
 
     fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
         use std::io::Read;
+
         // Read schema file
         let mut sf = File::open(schema_file).unwrap();
         let mut s = String::new();
         sf.read_to_string(&mut s).unwrap();
+
         let mut rs = s.clone();
         s.clear();
 
@@ -114,7 +116,7 @@ impl Backend {
         }
 
         // Install recipe
-        let x = self.g.install_recipe(&rs).unwrap();
+        self.g.install_recipe(&rs).unwrap();
 
         Ok(())
     }

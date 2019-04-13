@@ -111,7 +111,7 @@ impl<'a> Server<'a> {
                 let a = self.listen_addr;
 
                 // these backends need to be cleared after every run
-                e// println!(" -> restarting server");
+                eprintln!(" -> restarting server");
                 self.end(backend)?;
 
                 // give it some time to shut down
@@ -119,7 +119,7 @@ impl<'a> Server<'a> {
 
                 // start a new one!
                 let s = start(s, a, backend)?.or_else(|e| bail!(e))?;
-                e// println!(" .. server restart completed");
+                eprintln!(" .. server restart completed");
                 Ok(s)
             }
             Backend::Mysql | Backend::Mssql => Ok(self),

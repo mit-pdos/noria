@@ -101,7 +101,7 @@ fn perform_reads(
     verbose: bool,
 ) {
     if verbose {
-        println!("Done populating state, now reading articles...");
+        eprintln!("Done populating state, now reading articles...");
     }
 
     let mut hist = Histogram::<u64>::new(4).unwrap();
@@ -329,7 +329,7 @@ fn main() {
         }
 
         if verbose {
-            println!("Populating with {} rows", rows);
+            eprintln!("Populating with {} rows", rows);
         }
 
         // Prepopulate with n rows:
