@@ -249,7 +249,12 @@ impl Egress {
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
-        self.min_label_to_send.insert(node, label);
+        // if label is 1, then just resume at 0
+        if label == 1 {
+            self.min_label_to_send.insert(node, 0);
+        } else {
+            self.min_label_to_send.insert(node, label);
+        }
 
         // we don't have the messages we need to send
         // should only happen if we lost a stateless domain
