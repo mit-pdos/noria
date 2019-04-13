@@ -608,7 +608,7 @@ mod tests {
     fn store_works() {
         let a = vec![1.into(), "a".into()];
 
-        let (r, mut w) = new(2, &[0]);
+        let (r, mut w) = new(false, 2, &[0], 0);
 
         // initially, store is uninitialized
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Err(()));
@@ -618,7 +618,7 @@ mod tests {
         // after first swap, it is empty, but ready
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
 
-        w.add(vec![Record::Positive(a.clone())]);
+        w.add(vec![Record::Positive(a.clone())], None);
 
         // it is empty even after an add (we haven't swapped yet)
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()), Ok((Some(0), -1)));
@@ -641,10 +641,10 @@ mod tests {
         use std::thread;
 
         let n = 10000;
-        let (r, mut w) = new(1, &[0]);
+        let (r, mut w) = new(false, 1, &[0], 0);
         thread::spawn(move || {
             for i in 0..n {
-                w.add(vec![Record::Positive(vec![i.into()])]);
+                w.add(vec![Record::Positive(vec![i.into()])], None);
                 w.swap();
             }
         });
@@ -667,10 +667,10 @@ mod tests {
         let a = vec![1.into(), "a".into()];
         let b = vec![1.into(), "b".into()];
 
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
+        let (r, mut w) = new(false, 2, &[0], 0);
+        w.add(vec![Record::Positive(a.clone())], None);
         w.swap();
-        w.add(vec![Record::Positive(b.clone())]);
+        w.add(vec![Record::Positive(b.clone())], None);
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
         assert!(r
@@ -688,11 +688,11 @@ mod tests {
         let b = vec![1.into(), "b".into()];
         let c = vec![1.into(), "c".into()];
 
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
+        let (r, mut w) = new(false, 2, &[0], 0);
+        w.add(vec![Record::Positive(a.clone())], None);
+        w.add(vec![Record::Positive(b.clone())], None);
         w.swap();
-        w.add(vec![Record::Positive(c.clone())]);
+        w.add(vec![Record::Positive(c.clone())], None);
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
         assert!(r
@@ -716,10 +716,10 @@ mod tests {
         let a = vec![1.into(), "a".into()];
         let b = vec![1.into(), "b".into()];
 
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
-        w.add(vec![Record::Negative(a.clone())]);
+        let (r, mut w) = new(false, 2, &[0], 0);
+        w.add(vec![Record::Positive(a.clone())], None);
+        w.add(vec![Record::Positive(b.clone())], None);
+        w.add(vec![Record::Negative(a.clone())], None);
         w.swap();
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
@@ -740,13 +740,13 @@ mod tests {
         let b_rec = vec![Record::Positive(b.clone())];
 
         let (mut r1, mut w1) = new(true, 2, &[0], 0);
-        let (mut r2, mut w2) = w1.clone_new_user(r1.clone());
-        let (mut r3, mut w3) = w1.clone_new_user(r1.clone());
+        let (mut r2, mut w2) = w1.clone_new_user(&mut r1).unwrap();
+        let (mut r3, mut w3) = w1.clone_new_user(&mut r1).unwrap();
 
-        w1.add(a_rec.clone());
-        w2.add(a_rec.clone());
-        w2.add(b_rec.clone());
-        w3.add(a_rec.clone());
+        w1.add(a_rec.clone(), None);
+        w2.add(a_rec.clone(), None);
+        w2.add(b_rec.clone(), None);
+        w3.add(a_rec.clone(), None);
 
         r1.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
         r2.try_find_and(&a[0..1], |rs| println!("Rs: {:?}", rs.clone()));
@@ -765,11 +765,11 @@ mod tests {
         let a = vec![1.into(), "a".into()];
         let b = vec![1.into(), "b".into()];
 
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![Record::Positive(a.clone())]);
-        w.add(vec![Record::Positive(b.clone())]);
+        let (r, mut w) = new(false, 2, &[0], 0);
+        w.add(vec![Record::Positive(a.clone())], None);
+        w.add(vec![Record::Positive(b.clone())], None);
         w.swap();
-        w.add(vec![Record::Negative(a.clone())]);
+        w.add(vec![Record::Negative(a.clone())], None);
         w.swap();
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
@@ -788,11 +788,11 @@ mod tests {
         let b = vec![1.into(), "b".into()];
         let c = vec![1.into(), "c".into()];
 
-        let (r, mut w) = new(2, &[0]);
-        w.add(vec![
-            Record::Positive(a.clone()),
-            Record::Positive(b.clone()),
-        ]);
+        let (r, mut w) = new(false, 2, &[0], 0);
+        w.add(
+            vec![Record::Positive(a.clone()), Record::Positive(b.clone())],
+            None,
+        );
         w.swap();
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
@@ -811,11 +811,14 @@ mod tests {
             .0
             .unwrap());
 
-        w.add(vec![
-            Record::Negative(a.clone()),
-            Record::Positive(c.clone()),
-            Record::Negative(c.clone()),
-        ]);
+        w.add(
+            vec![
+                Record::Negative(a.clone()),
+                Record::Positive(c.clone()),
+                Record::Negative(c.clone()),
+            ],
+            None,
+        );
         w.swap();
 
         assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(1));
