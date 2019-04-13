@@ -65,7 +65,6 @@ impl Backend {
         query_file: Option<&str>,
         ext: bool,
     ) -> Result<(), String> {
-        use std::fs::File;
         use std::io::Read;
 
         // Read schema file

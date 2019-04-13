@@ -108,7 +108,7 @@ impl Backend {
                 stmt.execute(params).unwrap();
             }
         }
-        let dur = start.elapsed().as_float_secs();
+        let dur = start.elapsed().as_secs_f64();
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             records.len(),
@@ -248,7 +248,7 @@ fn main() {
         backend.read(uid, nclasses);
     }
 
-    let dur = start.elapsed().as_float_secs();
+    let dur = start.elapsed().as_secs_f64();
     println!(
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,
@@ -261,7 +261,7 @@ fn main() {
     for uid in 0..nusers {
         backend.secure_read(uid, nclasses, 0);
     }
-    let dur = start.elapsed().as_float_secs();
+    let dur = start.elapsed().as_secs_f64();
     println!(
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,

@@ -59,7 +59,7 @@ impl Backend {
         let i = records.len();
         mutator.perform_all(records);
 
-        let dur = start.elapsed().as_float_secs();
+        let dur = start.elapsed().as_secs_f64();
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             i,
@@ -297,7 +297,7 @@ fn main() {
     for i in 0..nlogged {
         let start = time::Instant::now();
         backend.login(make_user(i)).is_ok();
-        let dur = start.elapsed().as_float_secs();
+        let dur = start.elapsed().as_secs_f64();
         println!("Migration {} took {:.2}s!", i, dur,);
     }
 

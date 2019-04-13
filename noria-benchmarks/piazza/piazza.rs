@@ -63,7 +63,7 @@ impl Backend {
         //     mutator.insert(r).unwrap();
         // }
 
-        let dur = start.elapsed().as_float_secs();
+        let dur = start.elapsed().as_secs_f64();
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             i,
@@ -334,7 +334,7 @@ fn main() {
         for i in 0..nlogged {
             let start = time::Instant::now();
             backend.login(make_user(i)).is_ok();
-            let dur = start.elapsed().as_float_secs();
+            let dur = start.elapsed().as_secs_f64();
             println!("Migration {} took {:.2}s!", i, dur,);
 
             // if partial, read 25% of the keys
@@ -419,7 +419,7 @@ fn main() {
             }
         }
 
-        let dur = dur.as_float_secs();
+        let dur = dur.as_secs_f64();
 
         if query_type == "posts" {
             let posts_per_class = nposts / nclasses;
@@ -484,7 +484,7 @@ fn main() {
         for i in 0..nlogged {
             let start = time::Instant::now();
             backend.login(make_user(i)).is_ok();
-            let dur = start.elapsed().as_float_secs();
+            let dur = start.elapsed().as_secs_f64();
             println!("Migration {} took {:.2}s!", i, dur,);
 
             // if partial, read 25% of the keys
