@@ -1101,15 +1101,8 @@ impl Domain {
                                     }
                                     None => {}
                                 }
-                                let srmap;
-                                let name = self.nodes[node].borrow().clone();
 
-                                if name.name().contains("count") {
-                                    srmap = false;
-                                } else {
-                                    srmap = true;
-                                }
-
+                                let srmap = !self.nodes[node].borrow().name().contains("count");
                                 if srmap {
                                     let mut create_new_srmap = true;
                                     let mut append_to_handles = false;
