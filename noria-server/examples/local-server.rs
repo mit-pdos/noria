@@ -36,18 +36,18 @@ fn main() {
 
     let mut blender = builder.start_simple().unwrap();
     blender.install_recipe(sql).unwrap();
-    // println!("{}", blender.graphviz().unwrap());
+    println!("{}", blender.graphviz().unwrap());
 
     // Get mutators and getter.
     let mut article = blender.table("Article").unwrap().into_sync();
     let mut vote = blender.table("Vote").unwrap().into_sync();
     let mut awvc = blender.view("ArticleWithVoteCount").unwrap().into_sync();
 
-    // println!("Creating article...");
+    println!("Creating article...");
     let aid = 1;
     // Make sure the article exists:
     if awvc.lookup(&[aid.into()], true).unwrap().is_empty() {
-        // println!("Creating new article...");
+        println!("Creating new article...");
         let title = "test title";
         let url = "http://pdos.csail.mit.edu";
         article
@@ -56,7 +56,7 @@ fn main() {
     }
 
     // Then create a new vote:
-    // println!("Casting vote...");
+    println!("Casting vote...");
     let uid = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -66,9 +66,9 @@ fn main() {
     vote.insert(vec![aid.into(), uid.into()]).unwrap();
     vote.insert(vec![aid.into(), uid.into()]).unwrap();
 
-    // println!("Finished writing! Let's wait for things to propagate...");
+    println!("Finished writing! Let's wait for things to propagate...");
     thread::sleep(Duration::from_millis(1000));
 
-    // println!("Reading...");
-    // println!("{:#?}", awvc.lookup(&[aid.into()], true))
+    println!("Reading...");
+    println!("{:#?}", awvc.lookup(&[aid.into()], true))
 }
