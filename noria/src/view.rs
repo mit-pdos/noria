@@ -343,10 +343,7 @@ impl View {
             })
             .and_then(move |mut svc| {
                 svc.call((keys, block)).then(move |res| match res {
-                    Ok(res) => {
-                        println!("view.rs multilookup result: {:?}", res);
-                        Ok((svc, res))
-                    }
+                    Ok(res) => Ok((svc, res)),
                     Err(e) => Err(AsyncViewError {
                         view: Some(svc),
                         error: e,

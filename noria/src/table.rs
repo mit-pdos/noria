@@ -584,7 +584,6 @@ impl Table {
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
-        // println!("in table insert or update");
         assert!(
             !self.key.is_empty() && self.key_is_primary,
             "update operations can only be applied to base nodes with key columns"

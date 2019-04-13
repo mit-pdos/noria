@@ -54,11 +54,11 @@ fn main() {
     let mut article = get_table(&mut db, "Article");
     let mut awvc = get_view(&mut db, "ArticleWithVoteCount");
 
-    // println!("Creating article...");
+    println!("Creating article...");
     let aid = 1;
     // Make sure the article exists:
     if awvc.lookup(&[aid.into()], true).unwrap().is_empty() {
-        // println!("Creating new article...");
+        println!("Creating new article...");
         let title = "test title";
         let url = "http://pdos.csail.mit.edu";
         article
@@ -83,9 +83,9 @@ fn main() {
             }
 
             for (k, c) in counts {
-                // println!("{}: {}", k, c);
+                println!("{}: {}", k, c);
             }
-            // println!("---------")
+            println!("---------")
         }
 
         let uid = SystemTime::now()
@@ -102,6 +102,6 @@ fn main() {
         // while let Err(_) = awvc.lookup(&[1.into()], false) {
         //     awvc = get_view(&mut db, "ArticleWithVoteCount");
         // }
-        // // println!(" Done");
+        // println!(" Done");
     }
 }
