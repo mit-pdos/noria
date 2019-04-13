@@ -19,26 +19,26 @@ impl Handle {
         }
     }
 
-    pub fn clone_new_user(&mut self) -> (usize, super::multir_sr::Handle, Handle) {
+    pub fn clone_new_user(&self) -> (usize, super::multir_sr::Handle, Handle) {
         match *self {
-            Handle::SingleSR(ref mut h) => {
-                let (uid, mut inr, mut inw) = h.clone_new_user();
+            Handle::SingleSR(ref h) => {
+                let (uid, inr, inw) = h.clone_new_user();
                 (
                     uid,
                     super::multir_sr::Handle::SingleSR(inr),
                     Handle::SingleSR(inw),
                 )
             }
-            Handle::DoubleSR(ref mut h) => {
-                let (uid, mut inr, mut inw) = h.clone_new_user();
+            Handle::DoubleSR(ref h) => {
+                let (uid, inr, inw) = h.clone_new_user();
                 (
                     uid,
                     super::multir_sr::Handle::DoubleSR(inr),
                     Handle::DoubleSR(inw),
                 )
             }
-            Handle::ManySR(ref mut h) => {
-                let (uid, mut inr, mut inw) = h.clone_new_user();
+            Handle::ManySR(ref h) => {
+                let (uid, inr, inw) = h.clone_new_user();
                 (
                     uid,
                     super::multir_sr::Handle::ManySR(inr),

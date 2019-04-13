@@ -95,7 +95,7 @@ fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    readers.get(&target).unwrap().clone()
+                    Clone::clone(readers.get(&target).unwrap())
                 });
 
                 uid = Some(reader.uid);
@@ -183,7 +183,7 @@ fn handle_message(
                 let mut readers_cache = readers_cache.borrow_mut();
                 let reader = readers_cache.entry(target).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    readers.get(&target).unwrap().clone()
+                    Clone::clone(readers.get(&target).unwrap())
                 });
 
                 reader.len()
@@ -225,7 +225,7 @@ impl Future for BlockingRead {
                 let target = &self.target;
                 let reader = readers_cache.entry(self.target).or_insert_with(|| {
                     let readers = s.lock().unwrap();
-                    readers.get(target).unwrap().clone()
+                    Clone::clone(readers.get(target).unwrap())
                 });
 
                 let mut triggered = false;

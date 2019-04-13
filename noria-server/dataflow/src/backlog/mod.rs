@@ -89,9 +89,7 @@ fn new_inner(
 
         let w = WriteHandle {
             partial: trigger.is_some(),
-            handle: None,
-            handleSR: Some(w),
-            srmap: true,
+            handle: WHandleVariant::Srmap(w),
             key: Vec::from(key),
             cols,
             contiguous,
@@ -100,9 +98,7 @@ fn new_inner(
         };
 
         let r = SingleReadHandle {
-            handle: None,
-            handleSR: Some(r),
-            srmap: true,
+            handle: RHandleVariant::Srmap(r),
             trigger,
             key: Vec::from(key),
             uid: uid,
@@ -120,9 +116,7 @@ fn new_inner(
 
         let w = WriteHandle {
             partial: trigger.is_some(),
-            handle: Some(w),
-            handleSR: None,
-            srmap: false,
+            handle: WHandleVariant::Evmap(w),
             key: Vec::from(key),
             cols,
             contiguous,
@@ -131,9 +125,7 @@ fn new_inner(
         };
 
         let r = SingleReadHandle {
-            handle: Some(r),
-            handleSR: None,
-            srmap: false,
+            handle: RHandleVariant::Evmap(r),
             trigger,
             key: Vec::from(key),
             uid: uid,
@@ -169,10 +161,13 @@ fn key_to_double(k: Key) -> Cow<(DataType, DataType)> {
     }
 }
 
+enum WHandleVariant {
+    Evmap(multiw::Handle),
+    Srmap(multiw_sr::Handle),
+}
+
 crate struct WriteHandle {
-    handle: Option<multiw::Handle>,
-    handleSR: Option<multiw_sr::Handle>,
-    srmap: bool,
+    handle: WHandleVariant,
     partial: bool,
     cols: usize,
     key: Vec<usize>,
@@ -193,49 +188,46 @@ crate struct WriteHandleEntry<'a> {
 
 impl<'a> MutWriteHandleEntry<'a> {
     crate fn mark_filled(&mut self) {
-        let handle = &mut self.handle.handleSR;
-        match handle {
-            Some(hand) => {
-                if let Some((None, _)) =
-                    hand.meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
-                {
-                    hand.clear(Cow::Borrowed(&*self.key));
-                } else {
-                    unreachable!("attempted to fill already-filled key");
-                }
-                hand.refresh();
+        if let WHandleVariant::Srmap(ref mut hand) = self.handle.handle {
+            if let Some((None, _)) =
+                hand.meta_get_and(Cow::Borrowed(&*self.key), |rs| rs.is_empty())
+            {
+                hand.clear(Cow::Borrowed(&*self.key));
+            } else {
+                unreachable!("attempted to fill already-filled key");
             }
-            None => {}
+            hand.refresh();
+        } else {
+            unimplemented!();
         }
     }
 
     crate fn mark_hole(&mut self) {
-        let handle = &mut self.handle.handleSR;
-        println!("mark hole");
-        match handle {
-            Some(hand) => {
-                let size = hand
-                    .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
-                        rs.iter().map(|r| r.deep_size_of()).sum()
-                    })
-                    .map(|r| r.0.unwrap_or(0))
-                    .unwrap_or(0);
-                self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
-                hand.empty(Cow::Borrowed(&*self.key))
-            }
-            None => {}
+        if let WHandleVariant::Srmap(ref mut hand) = self.handle.handle {
+            println!("mark hole");
+            let size = hand
+                .meta_get_and(Cow::Borrowed(&*self.key), |rs| {
+                    rs.iter().map(|r| r.deep_size_of()).sum()
+                })
+                .map(|r| r.0.unwrap_or(0))
+                .unwrap_or(0);
+            self.handle.mem_size = self.handle.mem_size.checked_sub(size as usize).unwrap();
+            hand.empty(Cow::Borrowed(&*self.key))
+        } else {
+            unimplemented!();
         }
     }
 }
 
 impl<'a> WriteHandleEntry<'a> {
-    crate fn try_find_and<F, T>(&mut self, mut then: F) -> Result<(Option<T>, i64), ()>
+    crate fn try_find_and<F, T>(&self, mut then: F) -> Result<(Option<T>, i64), ()>
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
-        match &self.handle.handleSR {
-            Some(handleSR) => handleSR.meta_get_and(self.key.clone(), &mut then).ok_or(()),
-            None => Err(()),
+        if let WHandleVariant::Srmap(ref hand) = self.handle.handle {
+            hand.meta_get_and(self.key.clone(), &mut then).ok_or(())
+        } else {
+            unimplemented!()
         }
         // match &self.handle.handle {
         //     Some(handle) => {
@@ -284,86 +276,64 @@ where
 
 impl WriteHandle {
     crate fn clone_new_user(
-        &mut self,
-        r: &mut SingleReadHandle,
+        &self,
+        r: &SingleReadHandle,
     ) -> Option<(SingleReadHandle, WriteHandle)> {
-        if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    // println!("CLONING NEW USER. uid: {}", uid);
-                    let r = r.clone_new_user(r_handle, uid.clone());
-                    let w = WriteHandle {
-                        handle: None,
-                        handleSR: Some(w_handle),
-                        srmap: true,
-                        partial: self.partial.clone(),
-                        cols: self.cols.clone(),
-                        key: self.key.clone(),
-                        contiguous: self.contiguous.clone(),
-                        mem_size: self.mem_size.clone(),
-                        uid: uid.clone(),
-                    };
-                    return Some((r, w));
-                }
-                None => None,
-            }
-        } else {
-            return None;
+        if let WHandleVariant::Srmap(ref hand) = self.handle {
+            let (uid, r_handle, w_handle) = hand.clone_new_user();
+            // println!("CLONING NEW USER. uid: {}", uid);
+            let r = r.clone_new_user(r_handle, uid.clone());
+            let w = WriteHandle {
+                handle: WHandleVariant::Srmap(w_handle),
+                partial: self.partial.clone(),
+                cols: self.cols.clone(),
+                key: self.key.clone(),
+                contiguous: self.contiguous.clone(),
+                mem_size: self.mem_size.clone(),
+                uid: uid.clone(),
+            };
+            return Some((r, w));
         }
+        None
     }
 
     crate fn clone_new_user_partial(
-        &mut self,
-        r: &mut SingleReadHandle,
+        &self,
+        r: &SingleReadHandle,
         trigger: Option<Arc<Fn(&[DataType], Option<usize>) -> bool + Send + Sync>>,
     ) -> Option<(SingleReadHandle, WriteHandle)> {
-        if self.srmap {
-            let handle = &mut self.handleSR;
-            match handle {
-                Some(hand) => {
-                    let (uid, r_handle, w_handle) = hand.clone_new_user();
-                    // println!("CLONING NEW USER. uid: {}", uid);
-                    let r = r.clone_new_user_partial(r_handle, uid.clone(), trigger);
-                    let w = WriteHandle {
-                        handle: None,
-                        handleSR: Some(w_handle),
-                        srmap: true,
-                        partial: self.partial.clone(),
-                        cols: self.cols.clone(),
-                        key: self.key.clone(),
-                        contiguous: self.contiguous.clone(),
-                        mem_size: self.mem_size.clone(),
-                        uid: uid.clone(),
-                    };
-                    return Some((r, w));
-                }
-                None => None,
-            }
-        } else {
-            return None;
+        if let WHandleVariant::Srmap(ref hand) = self.handle {
+            let (uid, r_handle, w_handle) = hand.clone_new_user();
+            // println!("CLONING NEW USER. uid: {}", uid);
+            let r = r.clone_new_user_partial(r_handle, uid.clone(), trigger);
+            let w = WriteHandle {
+                handle: WHandleVariant::Srmap(w_handle),
+                partial: self.partial.clone(),
+                cols: self.cols.clone(),
+                key: self.key.clone(),
+                contiguous: self.contiguous.clone(),
+                mem_size: self.mem_size.clone(),
+                uid: uid.clone(),
+            };
+            return Some((r, w));
         }
+        None
     }
 
-    crate fn clone(&self, r: &mut SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
-        if self.srmap {
-            if let Some(ref hand) = self.handleSR {
-                let w_handle = hand.clone();
-                if let Some(rhand) = r.handleSR.clone() {
-                    let w = WriteHandle {
-                        handle: None,
-                        handleSR: Some(w_handle),
-                        srmap: true,
-                        partial: self.partial.clone(),
-                        cols: self.cols.clone(),
-                        key: self.key.clone(),
-                        contiguous: self.contiguous.clone(),
-                        mem_size: self.mem_size.clone(),
-                        uid: self.uid.clone(),
-                    };
-                    return Some((r.clone(rhand.clone(), self.uid.clone()), w));
-                }
+    crate fn clone(&self, r: &SingleReadHandle) -> Option<(SingleReadHandle, WriteHandle)> {
+        if let WHandleVariant::Srmap(ref hand) = self.handle {
+            let w_handle = hand.clone();
+            if let RHandleVariant::Srmap(ref rhand) = r.handle {
+                let w = WriteHandle {
+                    handle: WHandleVariant::Srmap(w_handle),
+                    partial: self.partial.clone(),
+                    cols: self.cols.clone(),
+                    key: self.key.clone(),
+                    contiguous: self.contiguous.clone(),
+                    mem_size: self.mem_size.clone(),
+                    uid: self.uid.clone(),
+                };
+                return Some((r.clone(rhand.clone(), self.uid.clone()), w));
             }
         }
         None
@@ -407,26 +377,21 @@ impl WriteHandle {
     }
 
     crate fn swap(&mut self) {
-        if self.srmap {
-            if let Some(ref mut hand) = self.handleSR {
-                hand.refresh();
-            }
-        } else {
-            if let Some(ref mut hand) = self.handle {
-                hand.refresh();
-            }
+        match self.handle {
+            WHandleVariant::Srmap(ref mut hand) => hand.refresh(),
+            WHandleVariant::Evmap(ref mut hand) => hand.refresh(),
         }
     }
 
     /// Add a new set of records to the backlog.
     ///
     /// These will be made visible to readers after the next call to `swap()`.
-    crate fn add<I>(&mut self, rs: I, id: Option<usize>)
+    crate fn add<I>(&mut self, rs: I, _id: Option<usize>)
     where
         I: IntoIterator<Item = Record>,
     {
-        if self.srmap {
-            if let Some(ref mut hand) = self.handleSR {
+        match self.handle {
+            WHandleVariant::Srmap(ref mut hand) => {
                 let mem_delta = hand.add(&self.key[..], self.cols, rs, Some(self.uid));
                 if mem_delta > 0 {
                     self.mem_size += mem_delta as usize;
@@ -438,8 +403,7 @@ impl WriteHandle {
                 }
                 // hand.refresh();
             }
-        } else {
-            if let Some(ref mut hand) = self.handle {
+            WHandleVariant::Evmap(ref mut hand) => {
                 let mem_delta = hand.add(&self.key[..], self.cols, rs);
                 if mem_delta > 0 {
                     self.mem_size += mem_delta as usize;
@@ -460,8 +424,8 @@ impl WriteHandle {
     /// Evict `count` randomly selected keys from state and return them along with the number of
     /// bytes that will be freed once the underlying `evmap` applies the operation.
     crate fn evict_random_key(&mut self, rng: &mut ThreadRng) -> u64 {
-        if self.srmap {
-            if let Some(ref mut hand) = self.handleSR {
+        match self.handle {
+            WHandleVariant::Srmap(ref mut hand) => {
                 let mut bytes_to_be_freed = 0;
                 if self.mem_size > 0 {
                     if hand.is_empty() {
@@ -480,10 +444,9 @@ impl WriteHandle {
                         .checked_sub(bytes_to_be_freed as usize)
                         .unwrap();
                 }
-                return bytes_to_be_freed;
+                bytes_to_be_freed
             }
-        } else {
-            if let Some(ref mut hand) = self.handle {
+            WHandleVariant::Evmap(ref mut hand) => {
                 let mut bytes_to_be_freed = 0;
                 if self.mem_size > 0 {
                     if hand.is_empty() {
@@ -502,14 +465,13 @@ impl WriteHandle {
                         .checked_sub(bytes_to_be_freed as usize)
                         .unwrap();
                 }
-                return bytes_to_be_freed;
+                bytes_to_be_freed
             }
         }
-        0
     }
 
     crate fn clear(&mut self) {
-        if let Some(ref mut h) = self.handle {
+        if let WHandleVariant::Evmap(ref mut h) = self.handle {
             self.mem_size = 0;
             h.purge();
         }
@@ -528,23 +490,25 @@ impl SizeOf for WriteHandle {
     }
 }
 
+#[derive(Clone)]
+enum RHandleVariant {
+    Evmap(multir::Handle),
+    Srmap(multir_sr::Handle),
+}
+
 /// Handle to get the state of a single shard of a reader.
 #[derive(Clone)]
 pub struct SingleReadHandle {
-    handle: Option<multir::Handle>,
-    handleSR: Option<multir_sr::Handle>,
-    srmap: bool,
+    handle: RHandleVariant,
     trigger: Option<Arc<Fn(&[DataType], Option<usize>) -> bool + Send + Sync>>,
     key: Vec<usize>,
     pub uid: usize,
 }
 
 impl SingleReadHandle {
-    pub fn clone_new_user(&mut self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
+    pub fn clone_new_user(&self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
         SingleReadHandle {
-            handle: None,
-            handleSR: Some(r),
-            srmap: true,
+            handle: RHandleVariant::Srmap(r),
             trigger: self.trigger.clone(),
             key: self.key.clone(),
             uid: uid.clone(),
@@ -552,26 +516,22 @@ impl SingleReadHandle {
     }
 
     pub fn clone_new_user_partial(
-        &mut self,
+        &self,
         r: multir_sr::Handle,
         uid: usize,
         trigger: Option<Arc<Fn(&[DataType], Option<usize>) -> bool + Send + Sync>>,
     ) -> SingleReadHandle {
         SingleReadHandle {
-            handle: None,
-            handleSR: Some(r),
-            srmap: true,
+            handle: RHandleVariant::Srmap(r),
             trigger,
             key: self.key.clone(),
             uid: uid.clone(),
         }
     }
 
-    pub fn clone(&mut self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
+    pub fn clone(&self, r: multir_sr::Handle, uid: usize) -> SingleReadHandle {
         SingleReadHandle {
-            handle: None,
-            handleSR: Some(r),
-            srmap: true,
+            handle: RHandleVariant::Srmap(r),
             trigger: self.trigger.clone(),
             key: self.key.clone(),
             uid: uid.clone(),
@@ -605,46 +565,35 @@ impl SingleReadHandle {
     where
         F: FnMut(&[Vec<DataType>]) -> T,
     {
-        if self.srmap {
-            // println!("try find and. uid: {:?}", self.uid);
-            if let Some(ref hand) = self.handleSR {
-                return hand
-                    .meta_get_and(key, &mut then)
+        match self.handle {
+            RHandleVariant::Srmap(ref hand) => {
+                // println!("try find and. uid: {:?}", self.uid);
+                hand.meta_get_and(key, &mut then)
                     .ok_or(())
                     .map(|(mut records, meta)| {
                         if records.is_none() && self.trigger.is_none() {
                             records = Some(then(&[]));
                         }
                         (records, meta)
-                    });
+                    })
             }
-        } else {
-            if let Some(ref hand) = self.handle {
-                return hand
-                    .meta_get_and(key, &mut then)
+            RHandleVariant::Evmap(ref hand) => {
+                hand.meta_get_and(key, &mut then)
                     .ok_or(())
                     .map(|(mut records, meta)| {
                         if records.is_none() && self.trigger.is_none() {
                             records = Some(then(&[]));
                         }
                         (records, meta)
-                    });
+                    })
             }
         }
-        Err(())
     }
 
     pub fn len(&self) -> usize {
-        if self.srmap {
-            match self.handleSR {
-                Some(ref hand) => hand.len(),
-                None => 0,
-            }
-        } else {
-            match self.handle {
-                Some(ref hand) => hand.len(),
-                None => 0,
-            }
+        match self.handle {
+            RHandleVariant::Srmap(ref hand) => hand.len(),
+            RHandleVariant::Evmap(ref hand) => hand.len(),
         }
     }
 
