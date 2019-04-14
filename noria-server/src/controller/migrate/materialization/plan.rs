@@ -17,7 +17,6 @@ crate struct SetupReplayPath {
 
 #[derive(Clone)]
 crate struct UpdateEgress {
-    node: LocalNodeIndex,
     new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
     new_tag: Option<(Tag, NodeIndex)>,
 }
@@ -51,12 +50,10 @@ impl SegmentPacket {
                 }
             ),
             Packet::UpdateEgress {
-                node,
                 new_tx,
                 new_tag,
             } => box SegmentPacket::UpdateEgress(
                 UpdateEgress {
-                    node,
                     new_tx,
                     new_tag,
                 }
@@ -78,7 +75,6 @@ impl SegmentPacket {
             },
             SegmentPacket::UpdateEgress(m) => {
                 box Packet::UpdateEgress {
-                    node: m.node,
                     new_tx: m.new_tx,
                     new_tag: m.new_tag,
                 }
@@ -404,7 +400,6 @@ impl<'a> Plan<'a> {
                     let workers = &self.workers;
                     if n.is_egress() {
                         let m = box Packet::UpdateEgress {
-                            node: n.local_addr(),
                             new_tx: None,
                             new_tag: Some((tag, segments[i + 1].1[0].0.into())),
                         };

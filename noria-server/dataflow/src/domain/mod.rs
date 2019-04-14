@@ -782,11 +782,10 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::UpdateEgress {
-                        node,
                         new_tx,
                         new_tag,
                     } => {
-                        let mut n = self.nodes[node].borrow_mut();
+                        let mut n = self.nodes[self.egress.unwrap()].borrow_mut();
                         n.with_egress_mut(move |e| {
                             if let Some((node, local, addr)) = new_tx {
                                 e.add_tx(node, local, addr);

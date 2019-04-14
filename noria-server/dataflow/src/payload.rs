@@ -172,7 +172,6 @@ pub enum Packet {
 
     /// Update Egress node.
     UpdateEgress {
-        node: LocalNodeIndex,
         new_tx: Option<(NodeIndex, LocalNodeIndex, ReplicaAddr)>,
         new_tag: Option<(Tag, NodeIndex)>,
     },

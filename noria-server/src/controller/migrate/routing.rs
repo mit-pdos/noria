@@ -290,7 +290,6 @@ pub(super) fn connect(
                 domain.send_to_healthy_shard(
                     i,
                     box Packet::UpdateEgress {
-                        node: egress.local_addr(),
                         new_tx: Some((ini.into(), ingress.local_addr(), (ingress.domain(), i))),
                         new_tag: None,
                     },
@@ -301,7 +300,6 @@ pub(super) fn connect(
             assert_eq!(shards, 1);
             domain.send_to_healthy(
                 box Packet::UpdateEgress {
-                    node: egress.local_addr(),
                     new_tx: Some((ini.into(), ingress.local_addr(), (ingress.domain(), 0))),
                     new_tag: None,
                 },
@@ -361,7 +359,6 @@ pub(super) fn connect(
                         .send_to_healthy_shard(
                             i,
                             box Packet::UpdateEgress {
-                                node: sender_node.local_addr(),
                                 new_tx: Some((node.into(), n.local_addr(), (n.domain(), i))),
                                 new_tag: None,
                             },
@@ -378,7 +375,6 @@ pub(super) fn connect(
                 domain
                     .send_to_healthy(
                         box Packet::UpdateEgress {
-                            node: sender_node.local_addr(),
                             new_tx: Some((node.into(), n.local_addr(), (n.domain(), 0))),
                             new_tag: None,
                         },
