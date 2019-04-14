@@ -25,9 +25,10 @@ pub fn make_rewrite_nodes(
 
     debug!(
         mir_converter.log,
-        "Found {} rewrite policies for table {}",
+        "Found {} rewrite policies for table {} (policy: {:?})",
         rewrite_policies.len(),
-        table
+        table,
+        rewrite_policies
     );
 
     let mut parent = prev_node;

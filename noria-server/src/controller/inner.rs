@@ -1080,7 +1080,6 @@ impl ControllerInner {
     pub fn set_security_config(&mut self, config: (String, String)) -> Result<(), String> {
         let p = config.0;
         let url = config.1;
-        // println!("Setting security config: p {:?}, url {:?}", p.clone(), url.clone());
         self.recipe.set_security_config(&p, url);
         Ok(())
     }

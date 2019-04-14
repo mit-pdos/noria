@@ -236,11 +236,6 @@ impl Ingredient for Join {
         nodes: &DomainNodes,
         state: &StateMap,
     ) -> ProcessingResult {
-        println!(
-            "JOIN left: {}, right: {}, records: {:?}",
-            self.left, self.right, rs
-        );
-
         let mut misses = Vec::new();
 
         if rs.is_empty() {
@@ -521,11 +516,6 @@ impl Ingredient for Join {
                 }
             }
         }
-
-        println!(
-            "EMIT left: {}, right: {}, results: {:?}, misses: {:?}",
-            self.left, self.right, ret, misses
-        );
 
         ProcessingResult {
             results: ret.into(),

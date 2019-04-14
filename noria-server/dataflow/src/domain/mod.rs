@@ -530,16 +530,6 @@ impl Domain {
             self.process_ptimes.start(me);
             let mut m = Some(m);
 
-            // for debugging
-            println!(
-                "--> DISPATCH me ({}, {:?}) processes packet ({:?}) from src ({:?})",
-                me,
-                n.global_addr(),
-                m,
-                src
-            );
-            // end for debugging
-
             let (misses, captured) = n.process(
                 &mut m,
                 None,
@@ -557,10 +547,6 @@ impl Domain {
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
-                println!(
-                    "Checkpoint 1: returning due to NoneType m (L557) (me: {:?})",
-                    n.global_addr()
-                );
                 return output_messages;
             }
 
@@ -673,10 +659,6 @@ impl Domain {
         match m.as_ref().unwrap() {
             m @ &box Packet::Message { .. } if m.is_empty() => {
                 // no need to deal with our children if we're not sending them anything
-                println!(
-                    "Checkpoint 2: returning due to empty message (L669) (me: {:?})",
-                    node_id
-                );
                 return output_messages;
             }
             &box Packet::Message { .. } => {}
@@ -687,12 +669,6 @@ impl Domain {
         }
 
         let nchildren = self.nodes[me].borrow().nchildren();
-        //        let mut children_ids = Vec::new(); // for debugging
-        println!(
-            "DISPATCH children (me: {:?}): {:?}",
-            node_id,
-            self.nodes[me].borrow().children()
-        );
         for i in 0..nchildren {
             // avoid cloning if we can
             let mut m = if i == nchildren - 1 {
@@ -702,7 +678,7 @@ impl Domain {
             };
 
             let childi = *self.nodes[me].borrow().child(i);
-            //            children_ids.push(childi); // for debugging
+
             let (child_is_output, child_is_merger) = {
                 // XXX: shouldn't NLL make this unnecessary?
                 let c = self.nodes[childi].borrow();
@@ -739,16 +715,6 @@ impl Domain {
             }
         }
 
-        //        let mut n = self.nodes[me].borrow_mut();
-        //        println!(
-        //            "----> DISPATCH CHILDREN local addrs (me: {:?}): {:?}",
-        //            n.global_addr(),
-        //            children_ids
-        //        );
-        println!(
-            "Checkpoint 3: Returning at end of dispatch (me: {:?})",
-            node_id
-        );
         output_messages
     }
 
