@@ -110,6 +110,7 @@ fn lose_multi_child_bottom_replica() {
 
     g.install_recipe(txt).unwrap();
     sleep();
+    println!("{}", g.graphviz().unwrap());
 
     let mut mutx = g.table("vote").unwrap().into_sync();
     let mut q1 = g.view("q1").unwrap().into_sync();
@@ -117,26 +118,37 @@ fn lose_multi_child_bottom_replica() {
     let id = 8;
 
     // prime the dataflow graph
+    println!("check 1: write");
     mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    println!("check 2: lookup q1");
     assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+    println!("check 3: lookup q2");
     assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![1.into(), id.into()]]);
 
     // shutdown the bottom replica and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
+    println!("check 4: drop the bottom replica");
     drop(g2);
     thread::sleep(Duration::from_secs(3));
+    println!("check 5: write before recovery");
     for _ in 0..7 {
         mutx.insert(vec![1337.into(), id.into()]).unwrap();
     }
     sleep();
+    println!("check 6: lookup q1 before recovery");
     assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+    println!("check 7: lookup q2 before recovery");
     assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![1.into(), id.into()]]);
 
     // wait for recovery and observe both old and new writes
+    println!("check 8: wait for recovery");
     thread::sleep(Duration::from_secs(10));
+    println!("check 9: done! write after recovery");
     mutx.insert(vec![1337.into(), id.into()]).unwrap();
     sleep();
+    println!("check 10: lookup q1 after recovery");
     assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
+    println!("check 11: lookup q2 after recovery");
     assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![9.into(), id.into()]]);
     println!("success! now clean shutdown...");
 }
@@ -158,6 +170,7 @@ fn lose_stateless_multi_child_domain() {
 
     g.install_recipe(txt).unwrap();
     sleep();
+    println!("{}", g.graphviz().unwrap());
 
     let mut mutx = g.table("data").unwrap().into_sync();
     let mut q1 = g.view("x").unwrap().into_sync();
@@ -166,27 +179,38 @@ fn lose_stateless_multi_child_domain() {
     let y = 100;
 
     // prime the dataflow graph
+    println!("check 1: write");
     mutx.insert(vec![id.into(), 2020.into(), y.into()]).unwrap();
     sleep();
+    println!("check 2: lookup q1");
     assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 1);
+    println!("check 3: lookup q2");
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 1);
 
-    // shutdown the bottom replica and write while it is still recovering
+    // shutdown the node with multile children and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
+    println!("check 4: drop g1");
     drop(g1);
     thread::sleep(Duration::from_secs(3));
+    println!("check 5: write before recovery");
     for x in 2018..2021 {
         mutx.insert(vec![id.into(), x.into(), y.into()]).unwrap();
     }
     sleep();
+    println!("check 6: lookup q1 before recovery");
     assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 1);
+    println!("check 7: lookup q2 before recovery");
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 1);
 
     // wait for recovery and observe both old (some were filtered out) and new writes
+    println!("check 8: wait for recovery");
     thread::sleep(Duration::from_secs(10));
+    println!("check 9: done! write after recovery");
     mutx.insert(vec![id.into(), 2020.into(), y.into()]).unwrap();
     sleep();
+    println!("check 10: lookup q1 after recovery");
     assert_eq!(q1.lookup(&[0.into()], true).unwrap().len(), 3);
+    println!("check 11: lookup q2 after recovery");
     assert_eq!(q2.lookup(&[0.into()], true).unwrap().len(), 3);
     println!("success! now clean shutdown...");
 }
@@ -208,6 +232,7 @@ fn lose_stateless_multi_parent_domain() {
 
     g.install_recipe(txt).unwrap();
     sleep();
+    println!("{}", g.graphviz().unwrap());
 
     let mut muta = g.table("a").unwrap().into_sync();
     let mut mutb = g.table("b").unwrap().into_sync();
@@ -218,16 +243,21 @@ fn lose_stateless_multi_parent_domain() {
     let row = vec![id.into(), n.into()];
 
     // prime the dataflow graph
+    println!("check 1: write a");
     muta.insert(row.clone()).unwrap();
+    println!("check 2: write a");
     muta.insert(row.clone()).unwrap();
+    println!("check 3: write b");
     mutb.insert(row.clone()).unwrap();
     sleep();
     // assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 3);
 
-    // shutdown the bottom replica and write while it is still recovering
+    // shutdown the union node and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
+    println!("check 4: drop the union node");
     drop(g4);
     thread::sleep(Duration::from_secs(3));
+    println!("check 5: write a and b before recovery");
     muta.insert(row.clone()).unwrap();
     muta.insert(row.clone()).unwrap();
     mutb.insert(row.clone()).unwrap();
@@ -235,7 +265,9 @@ fn lose_stateless_multi_parent_domain() {
     // assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 3);
 
     // wait for recovery and observe both old and new writes
+    println!("check 6: wait for recovery");
     thread::sleep(Duration::from_secs(10));
+    println!("check 7: done! write b after recovery");
     mutb.insert(row).unwrap();
     sleep();
     // assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 7);
@@ -268,6 +300,7 @@ fn test_single_child_parent_replica(worker_to_drop: usize) {
     let row = vec![1337.into(), id.into()];
 
     // prime the dataflow graph
+    println!("check 1: send initial replay pieces before failure");
     let mut expected = 0;
     mutx.insert(row.clone()).unwrap();
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
@@ -275,16 +308,22 @@ fn test_single_child_parent_replica(worker_to_drop: usize) {
 
     // shutdown a worker and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
+    println!("check 2: drop worker {}", worker_to_drop);
     drop(g_dropped);
     thread::sleep(Duration::from_secs(3));
+    println!("check 3: write before recovery");
     mutx.insert(row.clone()).unwrap();
     sleep();
+    println!("check 4: lookup before recovery");
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
 
     // wait for recovery and observe both old and new writes
+    println!("check 5: wait for recovery");
     thread::sleep(Duration::from_secs(10));
+    println!("check 6: write after recovery");
     mutx.insert(row.clone()).unwrap();
     sleep();
+    println!("check 7: lookup after recovery");
     expected += 2;
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
 
