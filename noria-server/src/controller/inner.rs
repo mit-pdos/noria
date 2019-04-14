@@ -538,13 +538,69 @@ impl ControllerInner {
         }
     }
 
+    /// Consider A -> B1 -> B2 -> C, where we lose B1.
+    fn recover_lost_top_replica(
+        &mut self,
+        top: NodeIndex,
+        ingress_b1: Vec<NodeIndex>,
+        egress_b1: NodeIndex,
+    ) {
+        let ingress_b1 = ingress_b1[0];
+        let domain_b1 = self.ingredients[top].domain();
+        assert_eq!(domain_b1, self.ingredients[ingress_b1].domain());
+        assert_eq!(domain_b1, self.ingredients[egress_b1].domain());
+    }
+
+    /// Consider A -> B1 -> B2 -> C, where we lose B2.
+    fn recover_lost_bottom_replica(
+        &mut self,
+        bottom: NodeIndex,
+        ingress_b2: Vec<NodeIndex>,
+        egress_b2: NodeIndex,
+    ) {
+        let ingress_b2 = ingress_b2[0];
+        let domain_b2 = self.ingredients[bottom].domain();
+        assert_eq!(domain_b2, self.ingredients[ingress_b2].domain());
+        assert_eq!(domain_b2, self.ingredients[egress_b2].domain());
+    }
+
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
+    ///
+    /// Consider A -> B1 -> B2 -> C. B1 and B2 are always materialized nodes (otherwise there
+    /// is no reason to replicate them), and so there is always a replay path starting at B1 and
+    /// ending at B2. Any domain on a replay path except the END domain will have a NodeIndex of
+    /// an ingress node in the next domain in its egress. For example, A's egress will have the
+    /// NodeIndex of B1's ingress on the reply path through A to B1. The END domain of any replay
+    /// path will have a trigger endpoing to the START domain of that same path.
     fn recover_hot_spare(
         &mut self,
         ni: NodeIndex,
         failed_ingress: Vec<NodeIndex>,
         failed_egress: NodeIndex,
     ) {
+        match self.ingredients[ni].replica_type() {
+            Some(node::ReplicaType::Bottom { top, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed bottom replica";
+                    "bottom" => ni.index(),
+                    "top" => top.index(),
+                );
+                self.recover_lost_bottom_replica(ni, failed_ingress, failed_egress);
+            },
+            Some(node::ReplicaType::Top { bottom, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed top replica";
+                    "bottom" => bottom.index(),
+                    "top" => ni.index(),
+                );
+                self.recover_lost_top_replica(ni, failed_ingress, failed_egress);
+            },
+            None => unreachable!(),
+        }
+
+        /*
         let failed_ingress = failed_ingress[0];
         let failed_domain = self.ingredients[ni].domain();
         assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
@@ -563,13 +619,6 @@ impl ControllerInner {
             node: self.ingredients[r].local_addr(),
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
-
-        info!(
-            self.log,
-            "replacing failed replica";
-            "old" => ni.index(),
-            "new" => r.index(),
-        );
 
         // update replay paths
         //
@@ -613,6 +662,7 @@ impl ControllerInner {
             waiting_on.insert(self.ingredients[ingress_ni].domain());
         }
         self.waiting_on.insert(new_domain, waiting_on);
+        */
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
