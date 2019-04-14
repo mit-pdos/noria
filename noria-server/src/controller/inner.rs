@@ -549,6 +549,58 @@ impl ControllerInner {
         let domain_b1 = self.ingredients[top].domain();
         assert_eq!(domain_b1, self.ingredients[ingress_b1].domain());
         assert_eq!(domain_b1, self.ingredients[egress_b1].domain());
+
+        // STEP 1: Contact the bottom replica B2 to become a node operator
+        let bottom = match self.ingredients[top].replica_type() {
+            Some(node::ReplicaType::Top{ bottom, .. }) => bottom,
+            _ => unreachable!(),
+        };
+        let m = box Packet::MakeRecovery { node: self.ingredients[bottom].local_addr() };
+        let domain_b2 = self.ingredients[bottom].domain();
+        self.domains
+            .get_mut(&domain_b2)
+            .unwrap()
+            .send_to_healthy(m, &self.workers).unwrap();
+
+        // STEP 2: Clean up state in the egress of A about packets to B1. Also remove tags that
+        // refer to replay paths to B1.
+        //
+        // No node with multiple parents (UNION, JOIN) is stateful.
+        let egress_a = self
+            .ingredients
+            .neighbors_directed(ingress_b1, petgraph::EdgeDirection::Incoming)
+            .next()
+            .unwrap();
+        let m = box Packet::RemoveChild {
+            node: self.ingredients[egress_a].local_addr(),
+            child: ingress_b1,
+        };
+        let domain_a = self.ingredients[egress_a].domain();
+        self.domains
+            .get_mut(&domain_a)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 3: Link A and B2 together via a migration, which should create an egress tx from
+        // A to B2 that doesn't have any tag information.
+        //
+        // Top replicas have exactly one child, the ingress of their bottom replica.
+        let ingress_b2 = self
+            .ingredients
+            .neighbors_directed(egress_b1, petgraph::EdgeDirection::Outgoing)
+            .next()
+            .unwrap();
+        let path = self.migrate(|mig| mig.link_nodes(egress_a, &vec![ingress_b2]));
+        self.remove_nodes(&path[..]).unwrap();
+
+        // TODO(ygina): replay path stuff
+
+        // STEP 4: Send B2 a NewIncoming message and wait for ResumeAts to propagate.
+        let mut resume_to = HashSet::new();
+        self.send_new_incoming(ingress_b2, domain_a, Some(domain_b1));
+        resume_to.insert(domain_b2);
+        self.waiting_on.insert(domain_a, resume_to);
     }
 
     /// Consider A -> B1 -> B2 -> C, where we lose B2.
@@ -562,6 +614,57 @@ impl ControllerInner {
         let domain_b2 = self.ingredients[bottom].domain();
         assert_eq!(domain_b2, self.ingredients[ingress_b2].domain());
         assert_eq!(domain_b2, self.ingredients[egress_b2].domain());
+        // STEP 1: Contact the top replica B1 to no longer be a replica.
+        let top = match self.ingredients[bottom].replica_type() {
+            Some(node::ReplicaType::Bottom{ top, .. }) => top,
+            _ => unreachable!(),
+        };
+        let m = box Packet::MakeRecovery { node: self.ingredients[top].local_addr() };
+        let domain_b1 = self.ingredients[top].domain();
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers).unwrap();
+
+        // STEP 2: Clean up state in the egress of B1 about packets to B2. Also remove tags that
+        // refer to replay paths to B2.
+        //
+        // Bottom replicas have exactly one parent, the egress of their top replica.
+        let egress_b1 = self
+            .ingredients
+            .neighbors_directed(ingress_b2, petgraph::EdgeDirection::Incoming)
+            .next()
+            .unwrap();
+        let m = box Packet::RemoveChild {
+            node: self.ingredients[egress_b1].local_addr(),
+            child: ingress_b2,
+        };
+        let domain_b1 = self.ingredients[egress_b1].domain();
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 3: Link B1 and C together via a migration, which should create an egress tx from
+        // B1 to C that doesn't have any tag information.
+        let ingress_cs = self
+            .ingredients
+            .neighbors_directed(egress_b2, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<_>>();
+        let path = self.migrate(|mig| mig.link_nodes(egress_b1, &ingress_cs));
+        self.remove_nodes(&path[..]).unwrap();
+
+        // TODO(ygina): replay path stuff
+
+        // STEP 4: Send all Cs a NewIncoming message and wait for ResumeAts to propagate.
+        let mut resume_to = HashSet::new();
+        for ingress_c in ingress_cs {
+            let domain_c = self.ingredients[ingress_c].domain();
+            self.send_new_incoming(ingress_c, domain_b1, Some(domain_b2));
+            resume_to.insert(domain_c);
+        }
+        self.waiting_on.insert(domain_b1, resume_to);
     }
 
     /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
@@ -601,25 +704,6 @@ impl ControllerInner {
         }
 
         /*
-        let failed_ingress = failed_ingress[0];
-        let failed_domain = self.ingredients[ni].domain();
-        assert_eq!(failed_domain, self.ingredients[failed_ingress].domain());
-        assert_eq!(failed_domain, self.ingredients[failed_egress].domain());
-
-        // contact the remaining replica to start recovery
-        let r = match self.ingredients[ni].replica_type() {
-            Some(node::ReplicaType::Bottom{ top, .. }) => top,
-            Some(node::ReplicaType::Top{ bottom, .. }) => bottom,
-            None => unreachable!(),
-        };
-
-        let domain = self.ingredients[r].domain();
-        let dh = self.domains.get_mut(&domain).unwrap();
-        let m = box Packet::MakeRecovery {
-            node: self.ingredients[r].local_addr(),
-        };
-        dh.send_to_healthy(m, &self.workers).unwrap();
-
         // update replay paths
         //
         // harmless in the case of losing a bottom replica (doesn't do anything)
@@ -629,39 +713,6 @@ impl ControllerInner {
         for segment in self.materializations.get_segments(failed_domain) {
             dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
         }
-
-        // TODO(ygina): multiple previous nodes
-        let new_egress = self
-            .ingredients
-            .neighbors_directed(failed_ingress, petgraph::EdgeDirection::Incoming)
-            .next()
-            .unwrap();
-        let ingress = self
-            .ingredients
-            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
-            .collect::<Vec<NodeIndex>>();
-
-        // clean up state in egress
-        let m = box Packet::RemoveChild {
-            node: self.ingredients[new_egress].local_addr(),
-            child: failed_ingress,
-        };
-        self.domains
-            .get_mut(&self.ingredients[new_egress].domain())
-            .unwrap()
-            .send_to_healthy(m, &self.workers)
-            .unwrap();
-
-        let path = self.migrate(|mig| mig.link_nodes(new_egress, &ingress));
-        self.remove_nodes(&path[..]).unwrap();
-
-        let new_domain = self.ingredients[new_egress].domain();
-        let mut waiting_on = HashSet::new();
-        for &ingress_ni in &ingress {
-            self.send_new_incoming(ingress_ni, new_domain, Some(failed_domain));
-            waiting_on.insert(self.ingredients[ingress_ni].domain());
-        }
-        self.waiting_on.insert(new_domain, waiting_on);
         */
     }
 
