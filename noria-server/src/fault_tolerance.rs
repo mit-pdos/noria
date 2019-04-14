@@ -94,134 +94,6 @@ fn aggregations_work_with_replicas() {
 }
 
 #[test]
-fn lose_bottom_replica() {
-    let txt = "CREATE TABLE vote (user int, id int);\n
-               QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
-
-    // start a worker for each domain in the graph
-    let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let _g1 = build_authority("worker-1", authority.clone(), false);
-    let g2 = build_authority("worker-2", authority.clone(), false);
-    sleep();
-
-    g.install_recipe(txt).unwrap();
-    sleep();
-
-    let mut mutx = g.table("vote").unwrap().into_sync();
-    let mut q = g.view("votecount").unwrap().into_sync();
-    let id = 0;
-
-    // prime the dataflow graph
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // shutdown the bottom replica and write while it is still recovering
-    // no writes are reflected because the dataflow graph is disconnected
-    drop(g2);
-    thread::sleep(Duration::from_secs(3));
-    for _ in 0..7 {
-        mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    }
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // wait for recovery and observe both old and new writes
-    thread::sleep(Duration::from_secs(10));
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
-    println!("success! now clean shutdown...");
-}
-
-#[test]
-fn lose_top_replica() {
-    let txt = "CREATE TABLE vote (user int, id int);\n
-               QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
-
-    // start enough workers for the top replica to be assigned its own worker
-    let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let g1 = build_authority("worker-1", authority.clone(), false);
-    let _g2 = build_authority("worker-2", authority.clone(), false);
-    let _g3 = build_authority("worker-3", authority.clone(), false);
-    sleep();
-
-    g.install_recipe(txt).unwrap();
-    sleep();
-
-    let mut mutx = g.table("vote").unwrap().into_sync();
-    let mut q = g.view("votecount").unwrap().into_sync();
-    let id = 0;
-
-    // prime the dataflow graph
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // shutdown the top replica and write while it is still recovering
-    // no writes are reflected because the dataflow graph is disconnected
-    drop(g1);
-    thread::sleep(Duration::from_secs(3));
-    for _ in 0..7 {
-        mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    }
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // wait for recovery and observe both old and new writes
-    thread::sleep(Duration::from_secs(10));
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
-    println!("success! now clean shutdown...");
-}
-
-#[test]
-fn lose_stateless_domain() {
-    let txt = "CREATE TABLE vote (user int, id int);\n
-               QUERY user: SELECT id, user FROM vote WHERE id = ?;";
-
-    // start a worker for each domain
-    let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let g1 = build_authority("worker-1", authority.clone(), false);
-    let _g2 = build_authority("worker-2", authority.clone(), false);
-    sleep();
-
-    g.install_recipe(txt).unwrap();
-    sleep();
-
-    let mut mutx = g.table("vote").unwrap().into_sync();
-    let mut q = g.view("user").unwrap().into_sync();
-    let id = 0;
-
-    // prime the dataflow graph
-    mutx.insert(vec![1.into(), id.into()]).unwrap();
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // shutdown the worker with the middle node and write while it is still recovering
-    // no writes are reflected because the dataflow graph is disconnected
-    drop(g1);
-    thread::sleep(Duration::from_secs(3));
-    mutx.insert(vec![2.into(), id.into()]).unwrap();
-    sleep();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // wait for recovery and observe both old and new writes
-    thread::sleep(Duration::from_secs(10));
-    mutx.insert(vec![3.into(), id.into()]).unwrap();
-    sleep();
-    let expected = vec![
-        vec![id.into(), 1.into()],
-        vec![id.into(), 2.into()],
-        vec![id.into(), 3.into()],
-    ];
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), expected);
-    println!("success! now clean shutdown...");
-}
-
-#[test]
 fn lose_multi_child_bottom_replica() {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY q1: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;\n
@@ -368,4 +240,63 @@ fn lose_stateless_multi_parent_domain() {
     sleep();
     // assert_eq!(q.lookup(&[0.into()], true).unwrap().len(), 7);
     println!("success! now clean shutdown...");
+}
+
+fn test_single_child_parent_replica(worker_to_drop: usize) {
+    let txt = "CREATE TABLE vote (user int, id int);\n
+               QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
+
+    // start enough workers for each domain to be assigned its own worker
+    let authority = Arc::new(LocalAuthority::new());
+    let mut workers = vec![];
+    for i in 0..5 {
+        let name = format!("worker-{}", i);
+        let worker = build_authority(&name, authority.clone(), false);
+        workers.push(worker);
+    }
+    sleep();
+
+    let g_dropped = workers.remove(worker_to_drop);
+    let mut g = workers.remove(0);
+    g.install_recipe(txt).unwrap();
+    sleep();
+    println!("{}", g.graphviz().unwrap());
+
+    let mut mutx = g.table("vote").unwrap().into_sync();
+    let mut q = g.view("votecount").unwrap().into_sync();
+    let id = 0;
+    let row = vec![1337.into(), id.into()];
+
+    // prime the dataflow graph
+    let mut expected = 0;
+    mutx.insert(row.clone()).unwrap();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+    expected += 1;
+
+    // shutdown a worker and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    drop(g_dropped);
+    thread::sleep(Duration::from_secs(3));
+    mutx.insert(row.clone()).unwrap();
+    sleep();
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
+
+    // wait for recovery and observe both old and new writes
+    thread::sleep(Duration::from_secs(10));
+    mutx.insert(row.clone()).unwrap();
+    sleep();
+    expected += 2;
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
+
+    println!("success! now clean shutdown...");
+}
+
+#[test]
+fn lose_top_replica() {
+    test_single_child_parent_replica(1);
+}
+
+#[test]
+fn lose_bottom_replica() {
+    test_single_child_parent_replica(2);
 }
