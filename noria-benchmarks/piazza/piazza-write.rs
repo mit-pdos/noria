@@ -34,7 +34,7 @@ impl Backend {
         }
         cb.set_sharding(None);
 
-        match reuse.as_ref() {
+        match reuse {
             "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
             "full" => cb.set_reuse(ReuseConfigType::Full),
             "noreuse" => cb.set_reuse(ReuseConfigType::NoReuse),
@@ -46,7 +46,7 @@ impl Backend {
 
         let g = cb.start_simple().unwrap();
 
-        Backend { g: g }
+        Backend { g }
     }
 
     pub fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
@@ -252,7 +252,7 @@ fn main() {
     backend.set_security_config(ploc);
     backend.migrate(sloc, Some(qloc)).unwrap();
 
-    let populate = match populate.as_ref() {
+    let populate = match populate {
         "before" => PopulateType::Before,
         "after" => PopulateType::After,
         _ => PopulateType::NoPopulate,

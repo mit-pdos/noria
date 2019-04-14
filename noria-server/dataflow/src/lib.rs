@@ -3,6 +3,7 @@
 #![feature(box_patterns)]
 #![feature(crate_visibility_modifier)]
 #![deny(unused_extern_crates)]
+#![allow(clippy::type_complexity)]
 #![allow(clippy::redundant_closure)]
 
 #[global_allocator]
@@ -13,7 +14,6 @@ extern crate backtrace;
 extern crate bincode;
 extern crate common;
 extern crate evmap;
-extern crate srmap;
 extern crate fnv;
 extern crate futures;
 extern crate itertools;
@@ -25,6 +25,7 @@ extern crate rand;
 extern crate regex;
 extern crate rocksdb;
 extern crate serde;
+extern crate srmap;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]

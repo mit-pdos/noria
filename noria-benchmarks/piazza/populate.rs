@@ -111,7 +111,7 @@ impl Populate {
 
     pub fn get_users(&mut self) -> Vec<Vec<DataType>> {
         let mut records = Vec::new();
-        for i in 1..self.nusers + 1 {
+        for i in 1..=self.nusers {
             let uid = i.into();
             records.push(vec![uid]);
         }
@@ -194,7 +194,7 @@ impl Populate {
     }
 
     pub fn classes_for_student(&mut self, uid: usize) -> Vec<DataType> {
-        let res: DataType = uid.clone().into();
+        let res: DataType = uid.into();
         self.students[&res].clone()
     }
 
@@ -214,7 +214,7 @@ impl Populate {
     }
 
     pub fn get_posts_per_class(&mut self, cid: DataType) -> i32 {
-        self.classes[&cid].clone()
+        self.classes[&cid]
     }
 
     /// Generate random uid within bounds

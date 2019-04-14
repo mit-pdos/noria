@@ -261,69 +261,54 @@ impl<'a> Migration<'a> {
             }
 
             let mut general_query = None;
-            match name.clone() {
-                Some(n) => {
-                    for k in query_hash {
-                        if n.contains(k.as_str()) {
-                            // println!("roughly same!");
-                            general_query = Some(k);
-                        }
+            if let Some(n) = name.clone() {
+                for k in query_hash {
+                    if n.contains(k.as_str()) {
+                        // println!("roughly same!");
+                        general_query = Some(k);
                     }
                 }
-                None => {}
             }
 
-            let mut matched = false;
-            match general_query {
-                Some(name_) => {
-                    // println!("branch3");
-                    let mut add = false;
-                    let mut added_set = None;
-                    match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
-                        Some(set) => set.insert(r),
-                        None => {
-                            let mut new_set = HashSet::new();
-                            new_set.insert(r);
-                            add = true;
-                            added_set = Some(new_set);
-                            true
-                        }
-                    };
-                    if add {
-                        self.mainline
-                            .map_meta
-                            .query_to_readers
-                            .insert(name_.clone(), added_set.unwrap());
+            if let Some(name_) = general_query {
+                // println!("branch3");
+                let mut add = false;
+                let mut added_set = None;
+                match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
+                    Some(set) => set.insert(r),
+                    None => {
+                        let mut new_set = HashSet::new();
+                        new_set.insert(r);
+                        add = true;
+                        added_set = Some(new_set);
+                        true
                     }
-                    matched = true;
+                };
+                if add {
+                    self.mainline
+                        .map_meta
+                        .query_to_readers
+                        .insert(name_.clone(), added_set.unwrap());
                 }
-                None => {}
-            }
-
-            if !matched {
-                match name {
-                    Some(name_) => {
-                        // println!("branch4");
-                        let mut add = false;
-                        let mut added_set = None;
-                        match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
-                            Some(set) => set.insert(r),
-                            None => {
-                                let mut new_set = HashSet::new();
-                                new_set.insert(r);
-                                add = true;
-                                added_set = Some(new_set);
-                                true
-                            }
-                        };
-                        if add {
-                            self.mainline
-                                .map_meta
-                                .query_to_readers
-                                .insert(name_.clone(), added_set.unwrap());
-                        }
+            } else if let Some(name_) = name {
+                // println!("branch4");
+                let mut add = false;
+                let mut added_set = None;
+                match self.mainline.map_meta.query_to_readers.get_mut(&name_) {
+                    Some(set) => set.insert(r),
+                    None => {
+                        let mut new_set = HashSet::new();
+                        new_set.insert(r);
+                        add = true;
+                        added_set = Some(new_set);
+                        true
                     }
-                    None => {}
+                };
+                if add {
+                    self.mainline
+                        .map_meta
+                        .query_to_readers
+                        .insert(name_.clone(), added_set.unwrap());
                 }
             }
 
@@ -358,17 +343,14 @@ impl<'a> Migration<'a> {
 
         let uid = self.universe().0.to_string();
 
-        let mut uint = 0;
-
-        if uid != "global".to_string() {
-            uint = uid.parse().unwrap();
-        }
+        let uint = if uid == "global" {
+            0
+        } else {
+            uid.parse().unwrap()
+        };
         let uid: usize = uint as usize;
 
-        self.mainline
-            .map_meta
-            .reader_to_uid
-            .insert(ri.clone(), uid.clone());
+        self.mainline.map_meta.reader_to_uid.insert(ri, uid);
 
         let mut leaf_to_query = HashMap::new();
         for (query_n, node_list) in self.mainline.map_meta.query_to_leaves.iter() {

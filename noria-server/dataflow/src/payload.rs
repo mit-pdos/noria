@@ -348,13 +348,13 @@ impl Packet {
                 tag,
                 ref data,
                 ref context,
-                ref id,
+                id,
             } => Packet::ReplayPiece {
                 link,
                 tag,
                 data: data.clone(),
                 context: context.clone(),
-                id: id.clone(),
+                id,
             },
             _ => unreachable!(),
         }

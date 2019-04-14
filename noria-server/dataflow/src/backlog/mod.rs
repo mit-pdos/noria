@@ -273,15 +273,15 @@ impl WriteHandle {
         if let WHandleVariant::Srmap(ref hand) = self.handle {
             let (uid, r_handle, w_handle) = hand.clone_new_user();
             // println!("CLONING NEW USER. uid: {}", uid);
-            let r = r.clone_new_user(r_handle, uid.clone());
+            let r = r.clone_new_user(r_handle, uid);
             let w = WriteHandle {
                 handle: WHandleVariant::Srmap(w_handle),
-                partial: self.partial.clone(),
-                cols: self.cols.clone(),
+                partial: self.partial,
+                cols: self.cols,
                 key: self.key.clone(),
-                contiguous: self.contiguous.clone(),
-                mem_size: self.mem_size.clone(),
-                uid: uid.clone(),
+                contiguous: self.contiguous,
+                mem_size: self.mem_size,
+                uid,
             };
             return Some((r, w));
         }
@@ -296,15 +296,15 @@ impl WriteHandle {
         if let WHandleVariant::Srmap(ref hand) = self.handle {
             let (uid, r_handle, w_handle) = hand.clone_new_user();
             // println!("CLONING NEW USER. uid: {}", uid);
-            let r = r.clone_new_user_partial(r_handle, uid.clone(), trigger);
+            let r = r.clone_new_user_partial(r_handle, uid, trigger);
             let w = WriteHandle {
                 handle: WHandleVariant::Srmap(w_handle),
-                partial: self.partial.clone(),
-                cols: self.cols.clone(),
+                partial: self.partial,
+                cols: self.cols,
                 key: self.key.clone(),
-                contiguous: self.contiguous.clone(),
-                mem_size: self.mem_size.clone(),
-                uid: uid.clone(),
+                contiguous: self.contiguous,
+                mem_size: self.mem_size,
+                uid,
             };
             return Some((r, w));
         }
@@ -317,14 +317,14 @@ impl WriteHandle {
             if let RHandleVariant::Srmap(ref rhand) = r.handle {
                 let w = WriteHandle {
                     handle: WHandleVariant::Srmap(w_handle),
-                    partial: self.partial.clone(),
-                    cols: self.cols.clone(),
+                    partial: self.partial,
+                    cols: self.cols,
                     key: self.key.clone(),
-                    contiguous: self.contiguous.clone(),
-                    mem_size: self.mem_size.clone(),
-                    uid: self.uid.clone(),
+                    contiguous: self.contiguous,
+                    mem_size: self.mem_size,
+                    uid: self.uid,
                 };
-                return Some((r.clone_srmap(rhand.clone(), self.uid.clone()), w));
+                return Some((r.clone_srmap(rhand.clone(), self.uid), w));
             }
         }
         None
@@ -482,7 +482,7 @@ impl SingleReadHandle {
             handle: RHandleVariant::Srmap(r),
             trigger: self.trigger.clone(),
             key: self.key.clone(),
-            uid: uid.clone(),
+            uid,
         }
     }
 
@@ -496,7 +496,7 @@ impl SingleReadHandle {
             handle: RHandleVariant::Srmap(r),
             trigger,
             key: self.key.clone(),
-            uid: uid.clone(),
+            uid,
         }
     }
 
@@ -505,12 +505,12 @@ impl SingleReadHandle {
             handle: RHandleVariant::Srmap(r),
             trigger: self.trigger.clone(),
             key: self.key.clone(),
-            uid: uid.clone(),
+            uid,
         }
     }
 
     pub fn universe(&self) -> usize {
-        self.uid.clone()
+        self.uid
     }
 
     /// Trigger a replay of a missing key from a partially materialized view.

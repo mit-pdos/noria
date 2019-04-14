@@ -271,7 +271,7 @@ pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
 
     if iterate > 0 {
         let mut results = Vec::new();
-        for i in 1..iterate + 1 {
+        for i in 1..=iterate {
             results.push(get.lookup(&[i.into()], true));
         }
         println!(

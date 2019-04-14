@@ -1037,7 +1037,7 @@ impl ControllerInner {
         let x = Arc::new(Mutex::new(HashMap::new()));
         let tb = self
             .table_builder(&ctx_table_name)
-            .expect(&format!("context table {} doesn't exists", ctx_table_name));
+            .unwrap_or_else(|| panic!("context table {} doesn't exists", ctx_table_name));
         let mut table = tb.build(x.clone()).wait().unwrap().into_sync();
         table.insert(record).unwrap();
 

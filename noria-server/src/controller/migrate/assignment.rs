@@ -55,22 +55,19 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
             let mut srmap_query = "".to_string();
 
             // Check to see if this is a node that shares an SRMap
-            match reader_to_query.get(&node) {
+            if let Some(query) = reader_to_query.get(&node) {
                 // If it does share an SRMap, see if another node sharing that SRMap was already
                 // assigned to a domain, and if it was, place this node in the same domain
-                Some(query) => {
-                    srmap_reader_node = true;
-                    match domain_map.get(query.clone()) {
-                        Some(domain) => {
-                            return *domain;
-                        }
-                        None => {
-                            srmap_query = query.to_string();
-                        }
+                srmap_reader_node = true;
+                match domain_map.get(&**query) {
+                    Some(domain) => {
+                        return *domain;
+                    }
+                    None => {
+                        srmap_query = query.to_string();
                     }
                 }
-                None => {}
-            };
+            }
 
             if n.is_shard_merger() {
                 // shard mergers are always in their own domain.
@@ -247,14 +244,14 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
                     if srmap_reader_node {
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
-                    return domain_assignment;
+                    domain_assignment
                 }
                 None => {
                     let domain_assignment = next_domain();
                     if srmap_reader_node {
                         domain_map.insert(srmap_query.clone(), domain_assignment);
                     }
-                    return domain_assignment;
+                    domain_assignment
                 }
             }
         })();

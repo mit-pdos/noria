@@ -623,22 +623,19 @@ impl MirNodeType {
                         // succeeds if it does.
                         let mut ret_val = false;
                         for col in our_on_left {
-                            match col.clone().table {
-                                Some(table) => {
-                                    if !table.contains("UserContext") {
-                                        ret_val = true;
-                                    }
+                            if let Some(table) = col.clone().table {
+                                if !table.contains("UserContext") {
+                                    ret_val = true;
                                 }
-                                None => {}
                             }
                         }
 
                         if ret_val {
-                            return our_on_left == on_left
+                            our_on_left == on_left
                                 && our_on_right == on_right
-                                && our_project == project;
+                                && our_project == project
                         } else {
-                            return ret_val;
+                            ret_val
                         }
                     }
                     _ => false,

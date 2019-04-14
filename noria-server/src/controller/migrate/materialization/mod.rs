@@ -792,56 +792,46 @@ impl Materializations {
             // println!("considering node index: {:?}", ni);
             // println!("reader_to_q: {:?}", reader_to_q);
             // println!("recipe: leaf addr {:?}", recipe.clone().inc.unwrap().leaf_addresses);
-            match reader_to_q.get(&ni) {
-                Some(query) => {
-                    srmap_node = true;
-                    // Check to see if SRMap was already materialized
-                    match map_meta.query_to_materialization.get(query.clone()) {
-                        // If it was materialized, figure out where it's located (domain and offset)
-                        Some(info) => {
-                            materialization_info = Some(info.clone());
-                        }
-                        // If it wasn't materialized, materialize it!
-                        None => {
-                            match map_meta.query_to_domain.get(query.clone()) {
-                                Some(domain) => {
-                                    let mut new_offset = 0;
-                                    match map_meta.domain_to_offset.get_mut(&domain) {
-                                        Some(offset) => {
-                                            new_offset = *offset + 1;
-                                            materialization_info =
-                                                Some((domain.clone(), new_offset.clone()));
-                                        }
-                                        None => {
-                                            materialization_info = Some((domain.clone(), 0));
-                                        }
-                                    };
-                                    map_meta.domain_to_offset.insert(domain.clone(), new_offset);
-                                    match materialization_info {
-                                        Some(info) => {
-                                            // println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
-                                            map_meta
-                                                .query_to_materialization
-                                                .insert(query.clone().to_string(), info.clone());
-                                        }
-                                        None => {}
+            if let Some(query) = reader_to_q.get(&ni) {
+                srmap_node = true;
+                // Check to see if SRMap was already materialized
+                match map_meta.query_to_materialization.get(&**query) {
+                    // If it was materialized, figure out where it's located (domain and offset)
+                    Some(info) => {
+                        materialization_info = Some(*info);
+                    }
+                    // If it wasn't materialized, materialize it!
+                    None => {
+                        match map_meta.query_to_domain.get(&**query) {
+                            Some(&domain) => {
+                                let mut new_offset = 0;
+                                match map_meta.domain_to_offset.get_mut(&domain) {
+                                    Some(offset) => {
+                                        new_offset = *offset + 1;
+                                        materialization_info = Some((domain, new_offset));
                                     }
+                                    None => {
+                                        materialization_info = Some((domain, 0));
+                                    }
+                                };
+                                map_meta.domain_to_offset.insert(domain, new_offset);
+                                if let Some(info) = materialization_info {
+                                    // println!("UPDATING QUERY TO MAT INFO! {:?}", map_meta.query_to_materialization.clone());
+                                    map_meta
+                                        .query_to_materialization
+                                        .insert(query.to_string(), info);
                                 }
-                                None => {
-                                    panic!("SRMap node should be assigned to a domain!");
-                                }
+                            }
+                            None => {
+                                panic!("SRMap node should be assigned to a domain!");
                             }
                         }
                     }
                 }
-                None => {}
             }
 
-            match map_meta.reader_to_uid.get(&ni) {
-                Some(id) => {
-                    uid = Some(id.clone());
-                }
-                None => {}
+            if let Some(&id) = map_meta.reader_to_uid.get(&ni) {
+                uid = Some(id);
             };
 
             let n = &graph[ni];

@@ -730,6 +730,7 @@ impl SqlToMirConverter {
         // union. Unfortunately, we have to do it by name here because the nested queries in
         // compound SELECT rewrite the table name on their output columns.
         let mut selected_cols = HashSet::new();
+        #[allow(clippy::block_in_if_condition_stmt)]
         for c in ucols.clone() {
             if ancestors.iter().all(|a| {
                 a.borrow().columns().iter().any(|ac| {

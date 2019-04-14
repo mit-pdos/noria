@@ -71,7 +71,7 @@ impl Backend {
     fn populate(&self, name: &'static str, records: Vec<Vec<DataType>>) {
         let params_arr: Vec<_> = records
             .iter()
-            .map(|ref r| match name.as_ref() {
+            .map(|ref r| match name {
                 "Role" => params! {
                     "r_uid" => r[0].clone().into() : i32,
                     "r_cid" => r[1].clone().into() : i32,
@@ -94,7 +94,7 @@ impl Backend {
             })
             .collect();
 
-        let qstring = match name.as_ref() {
+        let qstring = match name {
             "Role" => "INSERT INTO Role (r_uid, r_cid, r_role) VALUES (:r_uid, :r_cid, :r_role)",
             "User" => "INSERT INTO User (u_id) VALUES (:u_id)",
             "Post" => "INSERT INTO Post (p_id, p_cid, p_author, p_content, p_private) VALUES (:p_id, :p_cid, :p_author, :p_content, :p_private)",
@@ -235,7 +235,7 @@ fn main() {
 
     let backend = Backend::new(dbn);
 
-    let db = &dbn[dbn.rfind("/").unwrap() + 1..];
+    let db = &dbn[dbn.rfind('/').unwrap() + 1..];
     backend.create_connection(db);
     backend.create_tables();
 
@@ -253,7 +253,7 @@ fn main() {
         "GET without security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,
         dur,
-        (nusers) as f64 / dur
+        f64::from(nusers) / dur
     );
 
     // Do some reads WITH security
@@ -266,6 +266,6 @@ fn main() {
         "GET with security: {} in {:.2}s ({:.2} GET/sec)!",
         nusers,
         dur,
-        (nusers) as f64 / dur
+        f64::from(nusers) / dur
     );
 }

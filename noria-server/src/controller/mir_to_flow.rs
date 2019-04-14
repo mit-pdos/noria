@@ -36,12 +36,8 @@ pub(super) fn mir_query_to_flow_parts(
     while !node_queue.is_empty() {
         let n = node_queue.pop_front().unwrap();
         assert_eq!(in_edge_counts[&n.borrow().versioned_name()], 0);
-        let flow_node = mir_node_to_flow_parts(
-            &mut n.borrow_mut(),
-            mig,
-            table_mapping.clone(),
-            global_name.clone(),
-        );
+        let flow_node =
+            mir_node_to_flow_parts(&mut n.borrow_mut(), mig, table_mapping, global_name.clone());
         match flow_node {
             FlowNode::New(na) => new_nodes.push(na),
             FlowNode::Existing(na) => reused_nodes.push(na),
@@ -198,14 +194,11 @@ fn mir_node_to_flow_parts(
 
                     let na = parent.borrow().flow_node_addr().unwrap();
                     let mut g_name = "".to_string();
-                    match global_name {
-                        Some(gn) => {
-                            g_name = gn;
-                        }
-                        None => {}
+                    if let Some(gn) = global_name {
+                        g_name = gn;
                     }
 
-                    if g_name != "".to_string() {
+                    if !g_name.is_empty() {
                         // println!("global name not empty");
                         if !mig
                             .mainline
@@ -214,7 +207,7 @@ fn mir_node_to_flow_parts(
                             .contains_key(&g_name.clone())
                         {
                             let mut associated_nodes = HashSet::new();
-                            associated_nodes.insert(na.clone());
+                            associated_nodes.insert(na);
                             mig.mainline
                                 .map_meta
                                 .query_to_leaves
@@ -226,7 +219,7 @@ fn mir_node_to_flow_parts(
                                 .query_to_leaves
                                 .get_mut(&g_name.clone())
                             {
-                                Some(list) => list.insert(na.clone()),
+                                Some(list) => list.insert(na),
                                 None => false,
                             };
                         }

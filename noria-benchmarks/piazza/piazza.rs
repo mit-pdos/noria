@@ -124,6 +124,7 @@ fn make_user(id: i32) -> HashMap<String, DataType> {
     user
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn main() {
     use clap::{App, Arg};
     let args = App::new("piazza")
@@ -418,14 +419,14 @@ fn main() {
                 "Read {} keys in {:.4}s ({:.4} GETs/sec)!",
                 classes_per_student * nlogged * posts_per_class,
                 dur,
-                (nclasses * nlogged * posts_per_class) as f64 / dur,
+                f64::from(nclasses * nlogged * posts_per_class) / dur,
             );
         } else if query_type == "post_count" {
             println!(
                 "Read {} keys in {:.4}s ({:.4} GETs/sec)!",
                 classes_per_student * nlogged,
                 dur,
-                (classes_per_student * nlogged) as f64 / dur,
+                f64::from(classes_per_student * nlogged) / dur,
             );
         }
 
