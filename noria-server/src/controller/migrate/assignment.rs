@@ -46,6 +46,7 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
     let domain_map = &mut mainline.map_meta.query_to_domain;
 
     for node in topo_list {
+        #[allow(clippy::cognitive_complexity)]
         let assignment = (|| {
             let graph = &*graph;
             let n = &graph[node];
