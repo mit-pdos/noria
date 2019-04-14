@@ -274,7 +274,7 @@ fn lose_stateless_multi_parent_domain() {
     println!("success! now clean shutdown...");
 }
 
-fn test_single_child_parent_replica(worker_to_drop: usize) {
+fn test_single_child_parent_replica(replay_after_recovery: bool, worker_to_drop: usize) {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
 
@@ -300,11 +300,15 @@ fn test_single_child_parent_replica(worker_to_drop: usize) {
     let row = vec![1337.into(), id.into()];
 
     // prime the dataflow graph
-    println!("check 1: send initial replay pieces before failure");
     let mut expected = 0;
-    mutx.insert(row.clone()).unwrap();
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-    expected += 1;
+    if !replay_after_recovery {
+        println!("check 1: send initial replay pieces before failure");
+        mutx.insert(row.clone()).unwrap();
+        assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+        expected += 1;
+    } else {
+        println!("check 1: continue without sending initial replay pieces");
+    }
 
     // shutdown a worker and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
@@ -327,15 +331,35 @@ fn test_single_child_parent_replica(worker_to_drop: usize) {
     expected += 2;
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
 
+    // if the replays were just set up, perform one more write and lookup
+    if replay_after_recovery {
+        println!("check 8: write after replays setup");
+        mutx.insert(row).unwrap();
+        sleep();
+        println!("check 9: lookup after replays setup");
+        expected += 1;
+        assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
+    }
+
     println!("success! now clean shutdown...");
 }
 
 #[test]
-fn lose_top_replica() {
-    test_single_child_parent_replica(1);
+fn lose_top_replica_without_replays() {
+    test_single_child_parent_replica(false, 1);
 }
 
 #[test]
-fn lose_bottom_replica() {
-    test_single_child_parent_replica(2);
+fn lose_bottom_replica_without_replays() {
+    test_single_child_parent_replica(false, 2);
+}
+
+#[test]
+fn lose_top_replica_with_replays() {
+    test_single_child_parent_replica(true, 1);
+}
+
+#[test]
+fn lose_bottom_replica_with_replays() {
+    test_single_child_parent_replica(true, 2);
 }
