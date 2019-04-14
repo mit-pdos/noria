@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 pub trait SecurityBoundary {
     fn reconcile(
-    &mut self,
-    name: &str,
-    qg: &QueryGraph,
-    ancestors: &Vec<MirNodeRef>,
-    node_count: usize,
-    sec: bool,
+        &mut self,
+        name: &str,
+        qg: &QueryGraph,
+        ancestors: &Vec<MirNodeRef>,
+        node_count: usize,
+        sec: bool,
     ) -> (
         Vec<MirNodeRef>,
         Option<HashMap<(String, Option<String>), String>>,
@@ -143,43 +143,63 @@ fn make_security_nodes(
     prev_node: &MirNodeRef,
     node_for_rel: HashMap<&str, MirNodeRef>,
 ) -> Result<(Vec<MirNodeRef>, Vec<MirNodeRef>), String> {
-    let policies = match mir_converter
+    println!("make_security_nodes called for table {}", table);
+    let row_policies = match mir_converter
         .universe
         .row_policies
         .get(&String::from(table))
     {
         Some(p) => p.clone(),
-        // no policies associated with this base node
-        None => return Ok((vec![], vec![])),
+        // no row policies associated with this base node
+        None => Vec::new(),
     };
 
-    // for debugging purposes: print policies
+    // for debugging purposes: print row policies
     debug!(
-	mir_converter.log,
-	"Row policies for table {}: {:?}",
-	table,
-	policies
+        mir_converter.log,
+        "Row policies for table {}: {:?}", table, row_policies
     );
-
-    let mut node_count = 0;
-    let mut local_node_for_rel = node_for_rel.clone();
-
     debug!(
         mir_converter.log,
         "Found {} row policies for table {}",
-        policies.len(),
+        row_policies.len(),
         table
     );
 
     let mut security_nodes = Vec::new();
     let mut last_policy_nodes = Vec::new();
+    let mut node_count = 0;
+
+    // If there are no row policies, there may still be rewrite policies.
+    // Process these and return.
+    if row_policies.len() == 0 {
+        let mut prev_node = prev_node.clone();
+        let rewrite_nodes = make_rewrite_nodes(
+            mir_converter,
+            &format!("sp_{}", "fakename"), // TODO: what actual name to use?
+            prev_node,
+            table,
+            node_count,
+        )?;
+
+        // If there are no rewrite nodes, return.
+        if rewrite_nodes.len() == 0 {
+            return Ok((vec![], vec![]));
+        }
+
+        security_nodes.extend(rewrite_nodes.clone());
+        last_policy_nodes.push(rewrite_nodes.last().unwrap().clone());
+        return Ok((last_policy_nodes, security_nodes));
+    }
+
+    let mut local_node_for_rel = node_for_rel.clone();
 
     // Policies are created in parallel and later union'ed
     // Differently from normal queries, the policies order filters
     // before joins, since we can always reuse filter, but if a policy
     // joins against a context view, we are unable to reuse it (context
     // views are universe-specific).
-    for qg in policies.iter() {
+    for qg in row_policies.iter() {
         let mut prev_node = Some(prev_node.clone());
         let mut base_nodes: Vec<MirNodeRef> = Vec::new();
         let mut filter_nodes: Vec<MirNodeRef> = Vec::new();
@@ -187,12 +207,8 @@ fn make_security_nodes(
         let mut sorted_rels: Vec<&str> = qg.relations.keys().map(String::as_str).collect();
 
         sorted_rels.sort();
-	// for debugging
-	debug!(
-	    mir_converter.log,
-	    "Sorted relations: {:?}",
-	    sorted_rels
-	);
+        // for debugging
+        debug!(mir_converter.log, "Sorted relations: {:?}", sorted_rels);
 
         // all base nodes should be present in local_node_for_rel, except for context views
         // if policy uses a context view, add it to local_node_for_rel
@@ -200,7 +216,10 @@ fn make_security_nodes(
             if *rel == "computed_columns" {
                 continue;
             }
-            if local_node_for_rel.contains_key(*rel) && !rel.contains("UserContext") && !rel.contains("GroupContext") {
+            if local_node_for_rel.contains_key(*rel)
+                && !rel.contains("UserContext")
+                && !rel.contains("GroupContext")
+            {
                 local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
                 continue;
             }
@@ -221,12 +240,8 @@ fn make_security_nodes(
             assert!(*rel != "computed_columns");
             let mut any_added = false;
 
-	    // for debugging
-	    debug!(
-	        mir_converter.log,
-		"# predicates: {}",
-		&qgn.predicates.len()
-	    );
+            // for debugging
+            debug!(mir_converter.log, "# predicates: {}", &qgn.predicates.len());
 
             for pred in &qgn.predicates {
                 let new_nodes = mir_converter.make_predicate_nodes(
