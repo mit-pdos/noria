@@ -363,3 +363,106 @@ fn lose_top_replica_with_replays() {
 fn lose_bottom_replica_with_replays() {
     test_single_child_parent_replica(true, 2);
 }
+
+fn vote(worker_to_drop: usize) {
+    let txt = "
+        # base tables
+        CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+        CREATE TABLE Vote (article_id int, user int);
+
+        # read queries
+        QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+                    FROM Article \
+                    LEFT JOIN (SELECT Vote.article_id, COUNT(user) AS votes \
+                               FROM Vote GROUP BY Vote.article_id) AS VoteCount \
+                    ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;
+    ";
+
+    // g - Article
+    // 1 - Vote
+    // 2 - *aggregation
+    // 3 - *replica
+    // 4 - *project
+    // 5 - join
+    // 6 - *project
+    // 7 - reader
+    let authority = Arc::new(LocalAuthority::new());
+    let mut workers = vec![];
+    for i in 0..8 {
+        let name = format!("worker-{}", i);
+        let worker = build_authority(&name, authority.clone(), i == 0);
+        workers.push(worker);
+    }
+    sleep();
+
+    let g_dropped = workers.remove(worker_to_drop);
+    let mut g = workers.remove(0);
+    g.install_recipe(txt).unwrap();
+    sleep();
+    println!("{}", g.graphviz().unwrap());
+
+    let mut a = g.table("Article").unwrap().into_sync();
+    let mut v = g.table("Vote").unwrap().into_sync();
+    let mut q = g.view("ArticleWithVoteCount").unwrap().into_sync();
+
+    // prime the dataflow graph
+    println!("check 1: write");
+    a.insert(vec![0i64.into(), "Article".into()]).unwrap();
+    v.insert(vec![0i64.into(), 0.into()]).unwrap();
+    println!("check 2: lookup to initialize replay");
+    assert_eq!(q.lookup(&[0i64.into()], true).unwrap()[0][2], 1.into());
+    println!("check 3: write again");
+    a.insert(vec![1i64.into(), "Article".into()]).unwrap();
+    a.insert(vec![2i64.into(), "Article".into()]).unwrap();
+    v.insert(vec![1i64.into(), 0.into()]).unwrap();
+    v.insert(vec![0i64.into(), 0.into()]).unwrap();
+    sleep();
+    sleep();
+
+    // shutdown the bottom replica and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    println!("check 4: drop");
+    drop(g_dropped);
+    thread::sleep(Duration::from_secs(3));
+    println!("check 5: send votes before recovery");
+    v.insert(vec![0i64.into(), 0.into()]).unwrap();
+    v.insert(vec![0i64.into(), 0.into()]).unwrap();
+    v.insert(vec![1i64.into(), 0.into()]).unwrap();
+    a.insert(vec![3i64.into(), "Article".into()]).unwrap();
+    sleep();
+    println!("check 7: lookup before recovery");
+    assert_eq!(q.lookup(&[0i64.into()], true).unwrap()[0][2], 2.into());
+    // assert_eq!(q.lookup(&[1i64.into()], true).unwrap()[0][2], 1.into());
+
+    // wait for recovery and observe both old and new writes
+    println!("check 8: wait for recovery");
+    thread::sleep(Duration::from_secs(8));
+    println!("check 9: send votes after recovery");
+    v.insert(vec![1i64.into(), 0.into()]).unwrap();
+    sleep();
+    println!("check 10: lookup after recovery");
+    assert_eq!(q.lookup(&[0i64.into()], true).unwrap()[0][2], 4.into());
+    // assert_eq!(q.lookup(&[1i64.into()], true).unwrap()[0][2], 3.into());
+    println!("success! now clean shutdown...");
+}
+
+#[test]
+fn vote_top_replica() {
+    vote(2);
+}
+
+#[test]
+fn vote_bottom_replica() {
+    vote(3);
+}
+
+#[test]
+fn vote_upper_projection() {
+    vote(4);
+}
+
+#[test]
+fn vote_lower_projection() {
+    vote(6);
+}
+
