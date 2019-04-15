@@ -147,21 +147,23 @@ fn lose_stateless_domain() {
     println!("success! now clean shutdown...");
 }
 
-#[test]
-fn lose_multi_child_bottom_replica() {
+fn multi_child_replica(replay_after_recovery: bool, worker_to_drop: usize) {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY q1: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;\n
                QUERY q2: SELECT COUNT(*) AS votes FROM vote WHERE id = ?;";
 
-    // start enough workers for the bottom replica to be in its own domain
+    // start enough workers for each domain to be on its own worker
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let _g1 = build_authority("worker-1", authority.clone(), false);
-    let g2 = build_authority("worker-2", authority.clone(), false);
-    let _g3 = build_authority("worker-3", authority.clone(), false);
-    let _g4 = build_authority("worker-4", authority.clone(), false);
+    let mut workers = vec![];
+    for i in 0..7 {
+        let name = format!("worker-{}", i);
+        let worker = build_authority(&name, authority.clone(), false);
+        workers.push(worker);
+    }
     sleep();
 
+    let g_dropped = workers.remove(worker_to_drop);
+    let mut g = workers.remove(0);
     g.install_recipe(txt).unwrap();
     sleep();
     println!("{}", g.graphviz().unwrap());
@@ -170,41 +172,77 @@ fn lose_multi_child_bottom_replica() {
     let mut q1 = g.view("q1").unwrap().into_sync();
     let mut q2 = g.view("q2").unwrap().into_sync();
     let id = 8;
+    let row = vec![1337.into(), id.into()];
 
     // prime the dataflow graph
-    println!("check 1: write");
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    println!("check 2: lookup q1");
-    assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-    println!("check 3: lookup q2");
-    assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![1.into(), id.into()]]);
+    let mut expected = 0;
+    if !replay_after_recovery {
+        println!("check 1: write and lookup q1 and q1 to send initial replay pieces");
+        mutx.insert(row.clone()).unwrap();
+        expected += 1;
+        assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
+        assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![expected.into(), id.into()]]);
+    } else {
+        println!("check 1: continue without sending initial replay pieces");
+    }
 
     // shutdown the bottom replica and write while it is still recovering
     // no writes are reflected because the dataflow graph is disconnected
     println!("check 4: drop the bottom replica");
-    drop(g2);
+    drop(g_dropped);
     thread::sleep(Duration::from_secs(3));
     println!("check 5: write before recovery");
-    for _ in 0..7 {
-        mutx.insert(vec![1337.into(), id.into()]).unwrap();
-    }
+    mutx.insert(row.clone()).unwrap();
     sleep();
     println!("check 6: lookup q1 before recovery");
-    assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+    assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
     println!("check 7: lookup q2 before recovery");
-    assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![1.into(), id.into()]]);
+    assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![expected.into(), id.into()]]);
 
     // wait for recovery and observe both old and new writes
     println!("check 8: wait for recovery");
     thread::sleep(Duration::from_secs(10));
     println!("check 9: done! write after recovery");
-    mutx.insert(vec![1337.into(), id.into()]).unwrap();
+    mutx.insert(row.clone()).unwrap();
+    expected += 2;
     sleep();
     println!("check 10: lookup q1 after recovery");
-    assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 9.into()]]);
+    assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
     println!("check 11: lookup q2 after recovery");
-    assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![9.into(), id.into()]]);
+    assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![expected.into(), id.into()]]);
+
+    // if the replays were just set up, perform one more write and lookup
+    if replay_after_recovery {
+        println!("check 12: write after replays setup");
+        mutx.insert(row).unwrap();
+        sleep();
+        println!("check 13: lookup after replays setup");
+        expected += 1;
+        assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), expected.into()]]);
+        assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![expected.into(), id.into()]]);
+    }
+
     println!("success! now clean shutdown...");
+}
+
+#[test]
+fn lose_bottom_multi_child_replica_without_replays() {
+    multi_child_replica(false, 2);
+}
+
+#[test]
+fn lose_bottom_multi_child_replica_with_replays() {
+    multi_child_replica(true, 2);
+}
+
+#[test]
+fn lose_top_multi_child_replica_without_replays() {
+    multi_child_replica(false, 1);
+}
+
+#[test]
+fn lose_top_multi_child_replica_with_replays() {
+    multi_child_replica(true, 1);
 }
 
 #[test]
