@@ -816,7 +816,7 @@ impl SqlToMirConverter {
                 None => (),
             }
             for ancestor in ancestors.iter() {
-                if let Some(ac) = ancestor
+                if let Some(_ac) = ancestor
                     .borrow()
                     .columns()
                     .iter()
@@ -1825,7 +1825,6 @@ impl SqlToMirConverter {
                 ancestors.last().unwrap().clone()
             };
 
-            let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
             // 8. Generate leaf views that expose the query result
             let mut projected_columns: Vec<Column> = qg
                 .columns

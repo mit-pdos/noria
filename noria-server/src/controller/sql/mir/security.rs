@@ -172,11 +172,10 @@ fn make_security_nodes(
     // If there are no row policies, there may still be rewrite policies.
     // Process these and return.
     if row_policies.len() == 0 {
-        let mut prev_node = prev_node.clone();
         let rewrite_nodes = make_rewrite_nodes(
             mir_converter,
             &format!("sp_{}", "fakename"), // TODO: what actual name to use?
-            prev_node,
+            prev_node.clone(),
             table,
             node_count,
         )?;
