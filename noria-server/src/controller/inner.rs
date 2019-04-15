@@ -507,11 +507,18 @@ impl ControllerInner {
         // dataflow graph: A ---> B2 ---> C
         let egress_b2 = failed_egress;
         let domain_b2 = self.ingredients[egress_b2].domain();
-        for segment in self.materializations.get_segments(domain_b1) {
+        for m in self.materializations.get_update_egresses(domain_b1) {
             self.domains
                 .get_mut(&domain_b2)
                 .unwrap()
-                .send_to_healthy(segment.into_packet(), &self.workers)
+                .send_to_healthy(m.clone().into_packet(), &self.workers)
+                .unwrap();
+        }
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            self.domains
+                .get_mut(&domain_b2)
+                .unwrap()
+                .send_to_healthy(m.clone().into_packet(), &self.workers)
                 .unwrap();
         }
 

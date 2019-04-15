@@ -8,77 +8,36 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
 crate struct SetupReplayPath {
-    tag: Tag,
-    source: Option<LocalNodeIndex>,
-    path: Vec<ReplayPathSegment>,
-    notify_done: bool,
-    trigger: TriggerEndpoint,
+    pub tag: Tag,
+    pub source: Option<LocalNodeIndex>,
+    pub path: Vec<ReplayPathSegment>,
+    pub notify_done: bool,
+    pub trigger: TriggerEndpoint,
+}
+
+impl SetupReplayPath {
+    pub(crate) fn into_packet(self) -> Box<Packet> {
+        box Packet::SetupReplayPath {
+            tag: self.tag,
+            source: self.source,
+            path: self.path,
+            notify_done: self.notify_done,
+            trigger: self.trigger,
+        }
+    }
 }
 
 #[derive(Clone)]
 crate struct UpdateEgress {
-    new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
-    new_tag: Option<(Tag, NodeIndex)>,
+    pub new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
+    pub new_tag: Option<(Tag, NodeIndex)>,
 }
 
-#[derive(Clone)]
-crate enum SegmentPacket {
-    SetupReplayPath(SetupReplayPath),
-    UpdateEgress(UpdateEgress),
-}
-
-crate type DomainSegments = HashMap<DomainIndex, Vec<Box<SegmentPacket>>>;
-
-impl SegmentPacket {
-    pub(crate) fn from_packet(m: &Box<Packet>) -> Box<SegmentPacket> {
-        // TODO(ygina): trigger might not be right for sending to a replaced domain
-        // for a failed node
-        match **m {
-            Packet::SetupReplayPath {
-                tag,
-                source,
-                ref path,
-                notify_done,
-                ref trigger,
-            } => box SegmentPacket::SetupReplayPath(
-                SetupReplayPath {
-                    tag,
-                    source,
-                    path: path.clone(),
-                    notify_done,
-                    trigger: trigger.clone(),
-                }
-            ),
-            Packet::UpdateEgress {
-                new_tx,
-                new_tag,
-            } => box SegmentPacket::UpdateEgress(
-                UpdateEgress {
-                    new_tx,
-                    new_tag,
-                }
-            ),
-            _ => unreachable!(),
-        }
-    }
-
+impl UpdateEgress {
     pub(crate) fn into_packet(self) -> Box<Packet> {
-        match self {
-            SegmentPacket::SetupReplayPath(m) => {
-                box Packet::SetupReplayPath {
-                    tag: m.tag,
-                    source: m.source,
-                    path: m.path,
-                    notify_done: m.notify_done,
-                    trigger: m.trigger,
-                }
-            },
-            SegmentPacket::UpdateEgress(m) => {
-                box Packet::UpdateEgress {
-                    new_tx: m.new_tx,
-                    new_tag: m.new_tag,
-                }
-            },
+        box Packet::UpdateEgress {
+            new_tx: self.new_tx,
+            new_tag: self.new_tag,
         }
     }
 }
@@ -93,7 +52,8 @@ pub(super) struct Plan<'a> {
 
     tags: HashMap<Vec<usize>, Vec<(Tag, DomainIndex)>>,
     paths: HashMap<Tag, Vec<NodeIndex>>,
-    segments: DomainSegments,
+    setup_replay_paths: HashMap<DomainIndex, Vec<SetupReplayPath>>,
+    update_egresses: HashMap<DomainIndex, Vec<UpdateEgress>>,
     pending: Vec<PendingReplay>,
 }
 
@@ -126,7 +86,8 @@ impl<'a> Plan<'a> {
             pending: Vec::new(),
             tags: Default::default(),
             paths: Default::default(),
-            segments: Default::default(),
+            setup_replay_paths: Default::default(),
+            update_egresses: Default::default(),
         }
     }
 
@@ -386,10 +347,24 @@ impl<'a> Plan<'a> {
                     }
                 }
 
-                self.segments
-                    .entry(domain)
-                    .or_insert(Vec::new())
-                    .push(SegmentPacket::from_packet(&setup));
+                if let box Packet::SetupReplayPath {
+                    tag,
+                    source,
+                    path,
+                    notify_done,
+                    trigger,
+                } = &setup {
+                    self.setup_replay_paths
+                        .entry(domain)
+                        .or_insert(Vec::new())
+                        .push(SetupReplayPath {
+                            tag: tag.clone(),
+                            source: source.clone(),
+                            path: path.clone(),
+                            notify_done: notify_done.clone(),
+                            trigger: trigger.clone(),
+                        });
+                }
 
                 if i != segments.len() - 1 {
                     // since there is a later domain, the last node of any non-final domain
@@ -399,20 +374,20 @@ impl<'a> Plan<'a> {
                     let n = &self.graph[nodes.last().unwrap().0];
                     let workers = &self.workers;
                     if n.is_egress() {
-                        let m = box Packet::UpdateEgress {
+                        let m = UpdateEgress {
                             new_tx: None,
                             new_tag: Some((tag, segments[i + 1].1[0].0.into())),
                         };
 
-                        self.segments
+                        self.update_egresses
                             .entry(domain)
                             .or_insert(Vec::new())
-                            .push(SegmentPacket::from_packet(&m));
+                            .push(m.clone());
 
                         self.domains
                             .get_mut(&domain)
                             .unwrap()
-                            .send_to_healthy(m, workers)
+                            .send_to_healthy(m.into_packet(), workers)
                             .unwrap();
                     } else {
                         assert!(n.is_sharder());
@@ -443,7 +418,11 @@ impl<'a> Plan<'a> {
     ///
     /// Returns a list of backfill replays that need to happen before the migration is complete
     /// and the new replay segments for each domain.
-    pub(super) fn finalize(mut self) -> (Vec<PendingReplay>, DomainSegments) {
+    pub(super) fn finalize(mut self) -> (
+        Vec<PendingReplay>,
+        HashMap<DomainIndex, Vec<SetupReplayPath>>,
+        HashMap<DomainIndex, Vec<UpdateEgress>>,
+    ) {
         use dataflow::payload::InitialState;
 
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
@@ -521,7 +500,7 @@ impl<'a> Plan<'a> {
         } else {
             assert!(self.pending.is_empty());
         }
-        (self.pending, self.segments)
+        (self.pending, self.setup_replay_paths, self.update_egresses)
     }
 
     pub(super) fn on_join<'b>(

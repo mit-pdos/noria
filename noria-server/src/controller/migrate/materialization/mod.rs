@@ -9,7 +9,7 @@ use crate::controller::domain_handle::DomainHandle;
 use crate::controller::{
     inner::{graphviz, DomainReplies},
     keys,
-    migrate::materialization::plan::{DomainSegments, SegmentPacket},
+    migrate::materialization::plan::{SetupReplayPath, UpdateEgress},
 };
 use crate::controller::{Worker, WorkerIdentifier};
 use dataflow::prelude::*;
@@ -33,7 +33,8 @@ pub(in crate::controller) struct Materializations {
     partial: HashSet<NodeIndex>,
     partial_enabled: bool,
 
-    segments: DomainSegments,
+    setup_replay_paths: HashMap<DomainIndex, Vec<SetupReplayPath>>,
+    update_egresses: HashMap<DomainIndex, Vec<UpdateEgress>>,
     tag_generator: AtomicUsize,
 }
 
@@ -49,14 +50,29 @@ impl Materializations {
             partial: HashSet::default(),
             partial_enabled: true,
 
-            segments: Default::default(),
+            setup_replay_paths: Default::default(),
+            update_egresses: Default::default(),
             tag_generator: AtomicUsize::default(),
         }
     }
 
-    pub(in crate::controller) fn get_segments(&self, d: DomainIndex) -> Vec<Box<SegmentPacket>> {
-        if let Some(segments) = self.segments.get(&d) {
-            segments.clone()
+    pub(in crate::controller) fn get_setup_replay_paths(
+        &self,
+        d: DomainIndex,
+    ) -> Vec<&SetupReplayPath> {
+        if let Some(ms) = self.setup_replay_paths.get(&d) {
+            ms.iter().map(|m| m).collect()
+        } else {
+            vec![]
+        }
+    }
+
+    pub(in crate::controller) fn get_update_egresses(
+        &self,
+        d: DomainIndex,
+    ) -> Vec<&UpdateEgress> {
+        if let Some(ms) = self.update_egresses.get(&d) {
+            ms.iter().map(|m| m).collect()
         } else {
             vec![]
         }
@@ -837,7 +853,7 @@ impl Materializations {
         }
 
         // construct and disseminate a plan for each index
-        let (pending, segments) = {
+        let (pending, setup_replay_paths, update_egresses) = {
             let mut plan = plan::Plan::new(self, graph, ni, domains, workers);
             for index in index_on.drain() {
                 plan.add(index, replies);
@@ -877,8 +893,11 @@ impl Materializations {
             replies.wait_for_acks(&domains[&target]);
         }
 
-        for (domain, mut paths) in segments {
-            self.segments.entry(domain).or_insert(Vec::new()).append(&mut paths);
+        for (domain, mut m) in setup_replay_paths {
+            self.setup_replay_paths.entry(domain).or_insert(Vec::new()).append(&mut m);
+        }
+        for (domain, mut m) in update_egresses {
+            self.update_egresses.entry(domain).or_insert(Vec::new()).append(&mut m);
         }
     }
 }
