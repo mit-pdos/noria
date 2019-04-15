@@ -156,6 +156,14 @@ impl Egress {
         if self.min_provenance.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
+                if update.len() == 0 {
+                    panic!(format!(
+                        "empty update: {:?}, old: {}, new: {}",
+                        self.updates,
+                        old.index(),
+                        new.index(),
+                    ));
+                }
                 assert_eq!(update[0].0, old);
                 update.remove(0);
             }
@@ -213,7 +221,10 @@ impl Egress {
         if !is_replay {
             self.payloads.push(box m.clone_data());
         }
-        self.updates.push(update);
+        if update.len() > 0 {
+            // no point storing if empty
+            self.updates.push(update);
+        }
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
