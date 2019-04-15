@@ -94,6 +94,60 @@ fn aggregations_work_with_replicas() {
 }
 
 #[test]
+fn lose_stateless_domain() {
+    let txt = "CREATE TABLE vote (user int, id int);\n
+               QUERY user: SELECT id, user FROM vote WHERE id = ?;";
+
+    // start a worker for each domain
+    let authority = Arc::new(LocalAuthority::new());
+    let mut g = build_authority("worker-0", authority.clone(), false);
+    let g1 = build_authority("worker-1", authority.clone(), false);
+    let _g2 = build_authority("worker-2", authority.clone(), false);
+    sleep();
+
+    g.install_recipe(txt).unwrap();
+    sleep();
+    println!("{}", g.graphviz().unwrap());
+
+    let mut mutx = g.table("vote").unwrap().into_sync();
+    let mut q = g.view("user").unwrap().into_sync();
+    let id = 0;
+
+    // prime the dataflow graph
+    println!("check 1: write");
+    mutx.insert(vec![1.into(), id.into()]).unwrap();
+    sleep();
+    println!("check 2: lookup");
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // shutdown the worker with the middle node and write while it is still recovering
+    // no writes are reflected because the dataflow graph is disconnected
+    println!("check 3: drop middle node");
+    drop(g1);
+    thread::sleep(Duration::from_secs(3));
+    println!("check 4: write before recovery");
+    mutx.insert(vec![2.into(), id.into()]).unwrap();
+    sleep();
+    println!("check 5: lookup before recovery");
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
+
+    // wait for recovery and observe both old and new writes
+    println!("check 6: wait for recovery");
+    thread::sleep(Duration::from_secs(10));
+    println!("check 7: done! write after recovery");
+    mutx.insert(vec![3.into(), id.into()]).unwrap();
+    sleep();
+    let expected = vec![
+        vec![id.into(), 1.into()],
+        vec![id.into(), 2.into()],
+        vec![id.into(), 3.into()],
+    ];
+    println!("check 8: lookup after recovery");
+    assert_eq!(q.lookup(&[id.into()], true).unwrap(), expected);
+    println!("success! now clean shutdown...");
+}
+
+#[test]
 fn lose_multi_child_bottom_replica() {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY q1: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;\n
