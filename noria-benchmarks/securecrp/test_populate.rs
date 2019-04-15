@@ -287,7 +287,7 @@ pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
     }
 }
 
-pub fn dump_reviews(backend: &mut Backend, user: &str) {
+pub fn dump_reviews(backend: &mut Backend, user: &str, iterate:i32) {
     let mut get = backend
         .g
         .view(&format!("ReviewList_u{}", user))
