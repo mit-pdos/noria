@@ -800,7 +800,7 @@ impl SqlToMirConverter {
         assert!(ancestors.len() > 1, "union must have more than 1 ancestors");
 
         let ucols: Vec<Column> = ancestors.first().unwrap().borrow().columns().to_vec();
-        let num_ucols = ucols.len();
+        let mut num_ucols = ucols.len();
 
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
