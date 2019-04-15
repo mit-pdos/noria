@@ -758,15 +758,57 @@ impl ControllerInner {
         }
 
         // STEP 6: Resend any SetupReplayPath messages originally to B2 and that don't refer to
-        // the tag of the replay path from B1 to B2.
+        // the tag of the replay path from B1 to B2. Use the cached replay paths to find the node
+        // that triggers to B2.
+        //
+        // TODO(ygina): There may be a materialized node between B2 and last_domain.
+        let mut tag_last_domain = vec![];
         for m in self.materializations.get_setup_replay_paths(domain_b2) {
             if m.tag != old_tag.unwrap() {
+                match m.trigger {
+                    TriggerEndpoint::Start(_) => {},
+                    _ => unreachable!(),
+                }
+                let path = self.materializations.get_path(m.tag).unwrap();
+                let last_node = path[path.len() - 1];
+                let last_domain = self.ingredients[last_node].domain();
+                tag_last_domain.push((m.tag, last_domain));
+
                 self.domains
                     .get_mut(&domain_b1)
                     .unwrap()
                     .send_to_healthy(m.clone().into_packet(), &self.workers)
                     .unwrap();
             }
+        }
+
+        // STEP 6.5 (bottom replica case only): Update the trigger endpoint so upqueries to B2
+        // contact B1 directly.
+        for (tag, last_domain) in tag_last_domain {
+            let mut sent = false;
+            for m in self.materializations.get_setup_replay_paths(last_domain) {
+                let mut m = m.clone();
+                match m.trigger {
+                    TriggerEndpoint::End(s, d) => {
+                        if tag != m.tag {
+                            continue;
+                        }
+
+                        assert!(!sent);
+                        assert_eq!(d, domain_b2);
+                        m.trigger = TriggerEndpoint::End(s, domain_b1);
+                        sent = true;
+
+                        self.domains
+                            .get_mut(&last_domain)
+                            .unwrap()
+                            .send_to_healthy(m.into_packet(), &self.workers)
+                            .unwrap();
+                    },
+                    _ => {},
+                }
+            }
+            assert!(sent);
         }
 
         // STEP 7: Send all Cs a NewIncoming message and wait for ResumeAts to propagate.
