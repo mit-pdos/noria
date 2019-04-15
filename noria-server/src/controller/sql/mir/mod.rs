@@ -809,6 +809,7 @@ impl SqlToMirConverter {
             match &c.table {
                 Some(table) => {
                     if table.contains("UserContext") || table.contains("GroupContext") {
+                        num_ucols -= 1; // Don't want to include Context columns in this count.
                         continue;
                     }
                 }
@@ -821,7 +822,6 @@ impl SqlToMirConverter {
                     .iter()
                     .find(|ac| *ac.name == c.name)
                 {
-                    println!("ucols {:?} matched w/ ancestor {:?}", c, ancestor);
                     // below is weird because it always adds the column from the
                     // first ancestor, rather than the ancestor being iterated through.
                     // Can change to ac and complete this proposed refactor after
