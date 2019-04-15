@@ -671,6 +671,7 @@ impl SqlIncorporator {
         mut mig: &mut Migration,
         global_name: Option<String>,
     ) -> Result<QueryFlowParts, String> {
+        use ::mir::reuse::merge_mir_for_queries;
         use ::mir::visualize::GraphViz;
         let universe = mig.universe();
 
@@ -695,7 +696,20 @@ impl SqlIncorporator {
         );
 
         // compare to existing query MIR and reuse prefix
-        let reused_mir = new_opt_mir.clone();
+        let mut reused_mir = new_opt_mir.clone();
+        let mut num_reused_nodes = 0;
+        for m in reuse_mirs {
+            if !self.mir_queries.contains_key(&m) {
+                continue;
+            }
+            let mq = &self.mir_queries[&m];
+            let res = merge_mir_for_queries(&self.log, &reused_mir, &mq);
+            reused_mir = res.0;
+            if res.1 > num_reused_nodes {
+                num_reused_nodes = res.1;
+            }
+        }
+
         let mut post_reuse_opt_mir = reused_mir.optimize_post_reuse();
 
         // traverse universe subgraph and update table names for
@@ -716,6 +730,11 @@ impl SqlIncorporator {
             self.log,
             "Post-reuse optimized MIR:\n{}",
             post_reuse_opt_mir.to_graphviz().unwrap()
+        );
+
+        info!(
+            self.log,
+            "Reused {} nodes for {}", num_reused_nodes, query_name
         );
 
         let qfp = mir_query_to_flow_parts(
