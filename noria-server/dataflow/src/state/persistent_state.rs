@@ -260,6 +260,10 @@ impl State for PersistentState {
         (total_keys / self.indices.len())
     }
 
+    fn replace_tag(&mut self, _: Tag, _: Tag) {
+        unreachable!();
+    }
+
     fn is_useful(&self) -> bool {
         !self.indices.is_empty()
     }

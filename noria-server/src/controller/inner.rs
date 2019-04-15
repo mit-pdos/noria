@@ -5,8 +5,9 @@ use crate::controller::schema;
 use crate::controller::{ControllerState, Migration, Recipe};
 use crate::controller::{Worker, WorkerIdentifier};
 use crate::coordination::{CoordinationMessage, CoordinationPayload, DomainDescriptor};
+use dataflow::payload::{ControlReplyPacket, TriggerEndpoint};
 use dataflow::prelude::*;
-use dataflow::{node, payload::ControlReplyPacket, prelude::Packet, DomainBuilder, DomainConfig};
+use dataflow::{node, prelude::Packet, DomainBuilder, DomainConfig};
 use hyper::{self, Method, StatusCode};
 use mio::net::TcpListener;
 use nom_sql::ColumnSpecification;
@@ -601,9 +602,65 @@ impl ControllerInner {
         let path = self.migrate(|mig| mig.link_nodes(egress_a, &vec![ingress_b2]));
         self.remove_nodes(&path[..]).unwrap();
 
-        // TODO(ygina): replay path stuff
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2. In memory state,
+        // replace it with the tag that refers to the replay path from A to B1, since B2 has a
+        // new parent node.
+        let mut old_tag = None;
+        let mut new_tag = None;
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            match m.trigger {
+                TriggerEndpoint::Start(..) => {
+                    assert!(old_tag.is_none());
+                    old_tag = Some(m.tag);
+                },
+                TriggerEndpoint::End(..) => {
+                    assert!(new_tag.is_none());
+                    new_tag = Some(m.tag);
+                },
+                _ => {},
+            }
+        }
+        let m = box Packet::RemoveTag {
+            replica: self.ingredients[bottom].local_addr(),
+            old_tag: old_tag.unwrap(),
+            new_tag: Some(new_tag.unwrap()),
+        };
+        self.domains
+            .get_mut(&domain_b2)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
 
-        // STEP 4: Send B2 a NewIncoming message and wait for ResumeAts to propagate.
+        // STEP 5: Resend any UpdateEgress messages to A that originally involved replay paths
+        // through B1 and B2, but replace instances of the old tag with the new tag.
+        for m in self.materializations.get_update_egresses(domain_b1) {
+            let mut m = m.clone();
+            if let Some((tag, _)) = &mut m.new_tag {
+                assert!(m.new_tx.is_none());
+                if *tag == old_tag.unwrap() {
+                    *tag = new_tag.unwrap();
+                }
+                self.domains
+                    .get_mut(&domain_a)
+                    .unwrap()
+                    .send_to_healthy(m.into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 6: Resend any SetupReplayPath messages originally to B1 and that don't refer to
+        // the tag of the replay path from B1 to B2.
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            if m.tag != old_tag.unwrap() {
+                self.domains
+                    .get_mut(&domain_b2)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 7: Send B2 a NewIncoming message and wait for ResumeAts to propagate.
         let mut resume_to = HashSet::new();
         self.send_new_incoming(ingress_b2, domain_a, Some(domain_b1));
         resume_to.insert(domain_b2);
@@ -662,9 +719,57 @@ impl ControllerInner {
         let path = self.migrate(|mig| mig.link_nodes(egress_b1, &ingress_cs));
         self.remove_nodes(&path[..]).unwrap();
 
-        // TODO(ygina): replay path stuff
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2. No replacement tag
+        // is necessary since B1 still has the same parent.
+        //
+        // TODO(ygina): If C is materialized, we might need to replace that tag in memory state?
+        let mut old_tag = None;
+        for m in self.materializations.get_setup_replay_paths(domain_b2) {
+            match m.trigger {
+                TriggerEndpoint::End(..) => {
+                    assert!(old_tag.is_none());
+                    old_tag = Some(m.tag);
+                },
+                _ => {},
+            }
+        }
+        let m = box Packet::RemoveTag {
+            replica: self.ingredients[bottom].local_addr(),
+            old_tag: old_tag.unwrap(),
+            new_tag: None,
+        };
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
 
-        // STEP 4: Send all Cs a NewIncoming message and wait for ResumeAts to propagate.
+        // STEP 5: Resend any UpdateEgress messages to B1 that originally involved replay paths
+        // through B2 and C, since B1 will setup these replay paths.
+        for m in self.materializations.get_update_egresses(domain_b2) {
+            if let Some(_) = m.new_tag {
+                assert!(m.new_tx.is_none());
+                self.domains
+                    .get_mut(&domain_b1)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 6: Resend any SetupReplayPath messages originally to B2 and that don't refer to
+        // the tag of the replay path from B1 to B2.
+        for m in self.materializations.get_setup_replay_paths(domain_b2) {
+            if m.tag != old_tag.unwrap() {
+                self.domains
+                    .get_mut(&domain_b1)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 7: Send all Cs a NewIncoming message and wait for ResumeAts to propagate.
         let mut resume_to = HashSet::new();
         for ingress_c in ingress_cs {
             let domain_c = self.ingredients[ingress_c].domain();
@@ -709,18 +814,6 @@ impl ControllerInner {
             },
             None => unreachable!(),
         }
-
-        /*
-        // update replay paths
-        //
-        // harmless in the case of losing a bottom replica (doesn't do anything)
-        // TODO(ygina): should also _remove_ the failed domain from materializations
-        // TODO(ygina): super hacky...assumes the domain being replaced and this domain
-        // are exact copies down to the # of nodes and local node index assignment
-        for segment in self.materializations.get_segments(failed_domain) {
-            dh.send_to_healthy(segment.into_packet(), &self.workers).unwrap();
-        }
-        */
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes

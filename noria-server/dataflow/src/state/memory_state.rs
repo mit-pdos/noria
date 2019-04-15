@@ -64,6 +64,12 @@ impl State for MemoryState {
         }
     }
 
+    fn replace_tag(&mut self, old_tag: Tag, new_tag: Tag) {
+        if let Some(i) = self.by_tag.remove(&old_tag) {
+            self.by_tag.insert(new_tag, i);
+        }
+    }
+
     fn is_useful(&self) -> bool {
         !self.state.is_empty()
     }

@@ -1329,6 +1329,17 @@ impl Domain {
                             .borrow_mut()
                             .with_egress_mut(|e| e.remove_child(child));
                     },
+                    Packet::RemoveTag { replica, old_tag, new_tag } => {
+                        self.replay_paths.remove(&old_tag);
+                        self.buffered_replay_requests.remove(&old_tag);
+
+                        if let Some(new_tag) = new_tag {
+                            self.state
+                                .get_mut(replica)
+                                .unwrap()
+                                .replace_tag(old_tag, new_tag);
+                        }
+                    },
                     Packet::NewIncoming { to, old, new } => {
                         // sanity check: the node "to" should be an ingress node
                         // update its node state so it's aware about the new incoming connection

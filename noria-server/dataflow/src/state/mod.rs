@@ -18,6 +18,9 @@ crate trait State: SizeOf + Send {
     /// Add an index keyed by the given columns and replayed to by the given partial tags.
     fn add_key(&mut self, columns: &[usize], partial: Option<Vec<Tag>>);
 
+    // Replace state for this tag with a new tag, for replicas.
+    fn replace_tag(&mut self, old_tag: Tag, new_tag: Tag);
+
     /// Returns whether this state is currently keyed on anything. If not, then it cannot store any
     /// infromation and is thus "not useful".
     fn is_useful(&self) -> bool;

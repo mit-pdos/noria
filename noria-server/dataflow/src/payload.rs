@@ -266,6 +266,13 @@ pub enum Packet {
         child: NodeIndex,
     },
 
+    /// Remove the replay path corresponding to the tag in the domain
+    RemoveTag {
+        replica: LocalNodeIndex,
+        old_tag: Tag,
+        new_tag: Option<Tag>,
+    },
+
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
         to: LocalNodeIndex,
