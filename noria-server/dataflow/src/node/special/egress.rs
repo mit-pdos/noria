@@ -268,10 +268,16 @@ impl Egress {
         }
 
         // we don't have the messages we need to send
-        // should only happen if we lost a stateless domain
-        if label >= next_label {
-            println!("{} >= {}", label, next_label);
+        // we must have lost a stateless domain
+        if label > next_label {
+            println!("{} > {}", label, next_label);
             assert!(self.payloads.is_empty());
+            return;
+        }
+
+        // it could also be that no new messages were sent since the connection went down.
+        if label == next_label {
+            println!("{} == {}", label, next_label);
             return;
         }
 
