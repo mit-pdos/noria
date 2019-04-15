@@ -1,0 +1,22 @@
+{
+    "groups": [
+	{
+            "name": "authors",
+            "membership": "SELECT author AS uid, paper AS gid FROM PaperCoauthor WHERE author = ?",
+            "policies": [
+                {
+                    "table": "Paper",
+                    "predicate": "SELECT * FROM Paper JOIN GroupContext ON (Paper.id = GroupContext.id)",
+                    "description": "Authors can see their own papers."
+		}
+            ]
+        }
+    ],
+    "policies": [
+      {
+        "description": "Everyone can see accepted papers",
+        "table": "Paper",
+        "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
+      }
+    ]
+}

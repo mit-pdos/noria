@@ -283,10 +283,25 @@ pub fn dump_papers(backend: &mut Backend, user: &str, iterate: i32) {
     }
 }
 
-pub fn dump_reviews(backend: &mut Backend, user: &str) {
+pub fn dump_reviews(backend: &mut Backend, user: &str, iterate: i32) {
     let mut get = backend.g.view(&format!("ReviewList_u{}", user)).unwrap();
 
-    println!("user's reviews: {:?}", get.lookup(&[0.into()], true)); // 0 is bogo key for id
+    if iterate > 0 {
+        let mut results = Vec::new();
+        for i in 1..iterate + 1 {
+            results.push(get.lookup(&[i.into()], true));
+        }
+        println!(
+            "user's reviews (ReviewList_u{}), by-key lookup: {:?}",
+            user, results
+        );
+    } else {
+        println!(
+            "user's reviews (ReviewList_u{}), bogokey lookup: {:?}",
+            user,
+            get.lookup(&[0.into()], true)
+        ); // 0 is bogo key for id
+    }
 }
 
 pub fn dump_all_papers(backend: &mut Backend) {

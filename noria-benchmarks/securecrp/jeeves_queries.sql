@@ -8,19 +8,19 @@
 --                AS LatestPaperVersion
 --           ON (Paper.id = LatestPaperVersion.paper);
 
-QUERY LatestPaperVersion: SELECT *
+--QUERY LatestPaperVersion: SELECT *
 --LatestPaperVersion: SELECT *
-                 FROM PaperVersion
-		 WHERE PaperVersion.paper = ?
-		 GROUP BY PaperVersion.paper
-                 ORDER BY PaperVersion.time
-                 LIMIT 10;
+--                 FROM PaperVersion
+--		 WHERE PaperVersion.paper = ?
+--		 GROUP BY PaperVersion.paper
+--                 ORDER BY PaperVersion.time
+--                 LIMIT 10;
 
-QUERY PaperList: SELECT Paper.*
-           FROM Paper
+--QUERY PaperList: SELECT Paper.*
+--           FROM Paper
 --	   WHERE Paper.id = ?;
-	   JOIN LatestPaperVersion
-	   ON (Paper.id = LatestPaperVersion.paper);
+--	   JOIN LatestPaperVersion
+--	   ON (Paper.id = LatestPaperVersion.paper);
 
 QUERY ReviewList: SELECT Review.*
            FROM Review

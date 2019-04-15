@@ -32,12 +32,12 @@
             "policies": [
                 {
                     "table": "Paper",
-                    "predicate": "SELECT * FROM Paper WHERE Paper.id < 999",
+                    "predicate": "SELECT * FROM Paper WHERE Paper.id = ?",
                     "description": "Chairs can see all papers."
                 },
 		{
 		   "table": "Review",
-		   "predicate": "SELECT * FROM Review WHERE Review.paper < 800",
+		   "predicate": "SELECT * FROM Review WHERE Review.paper = ?",
 		   "description": "Chairs can see all reviews."
 		}
             ]
@@ -74,10 +74,10 @@
 	
     ],
     "policies": [
-      {
-        "description": "Everyone can see accepted papers",
-        "table": "Paper",
-        "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
-      }
+	{
+            "description": "Everyone can see accepted papers",
+            "table": "Paper",
+            "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
+	}
     ]
 }

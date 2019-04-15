@@ -275,7 +275,7 @@ fn main() {
         let mut query_results = Vec::new();
         query_results.push(getter.lookup(&[0.into()], true).unwrap()); // empty (bogokey does exist)
         println!("chairs PaperList, bogokey lookup: {:?}", query_results);
-    */
+
     println!("Reading from LatestPaperVersion");
     let mut getter = backend.g.view("LatestPaperVersion").unwrap();
     let mut query_results = Vec::new();
@@ -283,19 +283,12 @@ fn main() {
         query_results.push(getter.lookup(&[i.into()], true).unwrap());
     }
     println!("LatestPaperVersion: {:?}", query_results);
+     */
 
     println!("{}", backend.g.graphviz().unwrap());
-    test_populate::dump_reviews(&mut backend, user);
-    test_populate::dump_papers(&mut backend, user, 0); // bogokey lookup
-    test_populate::dump_papers(&mut backend, user, 5); // by-key lookup
-    test_populate::dump_all_papers(&mut backend);
-    let mut getter = backend.g.view("PaperList").unwrap();
-    let mut query_results = Vec::new();
-    // Look up by id (corresponds to Paper.id)
-    for i in 0..6 {
-        query_results.push(getter.lookup(&[i.into()], true).unwrap());
-    }
-    println!("PaperList (all papers, by-key lookup): {:?}", query_results);
+    test_populate::dump_reviews(&mut backend, user, 0); // bogokey lookup
+    test_populate::dump_reviews(&mut backend, user, 5); // by-key lookup
+
     println!("DONE!");
     // sleep "forever"
     thread::sleep(time::Duration::from_millis(200000000));
