@@ -430,6 +430,7 @@ impl ControllerInner {
         if !state.config.partial_enabled {
             materializations.disable_partial()
         }
+        materializations.set_frontier_strategy(state.config.frontier_strategy);
 
         let cc = Arc::new(ChannelCoordinator::new());
         assert_ne!(state.config.quorum, 0);
@@ -916,7 +917,7 @@ impl ControllerInner {
                         node_stats
                             .into_iter()
                             .filter_map(|(ni, ns)| match ns.materialized {
-                                MaterializationStatus::Partial => Some((ni, ns.mem_size)),
+                                MaterializationStatus::Partial { .. } => Some((ni, ns.mem_size)),
                                 _ => None,
                             })
                     })

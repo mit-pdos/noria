@@ -1498,7 +1498,9 @@ impl Domain {
                                     match self.state.get(local_index) {
                                         Some(ref s) => {
                                             if s.is_partial() {
-                                                MaterializationStatus::Partial
+                                                MaterializationStatus::Partial {
+                                                    beyond_materialization_frontier: n.purge,
+                                                }
                                             } else {
                                                 MaterializationStatus::Full
                                             }
@@ -1508,7 +1510,9 @@ impl Domain {
                                 } else {
                                     n.with_reader(|r| {
                                         if r.is_partial() {
-                                            MaterializationStatus::Partial
+                                            MaterializationStatus::Partial {
+                                                beyond_materialization_frontier: n.purge,
+                                            }
                                         } else {
                                             MaterializationStatus::Full
                                         }
