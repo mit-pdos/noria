@@ -899,8 +899,14 @@ impl Domain {
                                 use backlog;
                                 use std::sync::Arc;
                                 // println!("partial global srmap, id: {:?}", gid);
+                                let mut name = self.nodes[node].borrow().clone();
 
-                                let mut srmap = true;
+                                let srmap;
+                                if name.name().contains("count") {
+                                    srmap = false;
+                                } else {
+                                    srmap = true;
+                                }
 
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
@@ -1136,12 +1142,8 @@ impl Domain {
                             } => {
                                 use backlog;
                                 use std::sync::Arc;
-                                let (mut r_part, mut w_part): (
-                                    backlog::SingleReadHandle,
-                                    backlog::WriteHandle,
-                                );
-
-                                let srmap = true;
+                                let (mut r_part, mut w_part): (backlog::SingleReadHandle,
+                                                               backlog::WriteHandle);
 
                                 let mut ids = 0 as usize;
                                 match uid {
@@ -1149,6 +1151,15 @@ impl Domain {
                                         ids = id;
                                     }
                                     None => {}
+                                }
+                                let srmap;
+                                let mut name = self.nodes[node].borrow().clone();
+
+
+                                if name.name().contains("count") {
+                                    srmap = false;
+                                } else {
+                                    srmap = true;
                                 }
 
                                 if srmap {

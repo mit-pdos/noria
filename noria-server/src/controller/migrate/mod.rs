@@ -73,6 +73,8 @@ impl<'a> Migration<'a> {
         FS: IntoIterator<Item = S2>,
         I: Ingredient + Into<NodeOperator>,
     {
+        let mut i = node::Node::new(name.to_string(), fields, i.into());
+
         i.on_connected(&self.mainline.ingredients);
         let parents = i.ancestors();
         assert!(!parents.is_empty());
@@ -81,7 +83,7 @@ impl<'a> Migration<'a> {
         let ni =
             self.mainline
                 .ingredients
-                .add_node(node::Node::new(name.to_string(), fields, i.into()));
+                .add_node(i);
         info!(self.log,
               "adding new node";
               "node" => ni.index(),
@@ -124,11 +126,9 @@ impl<'a> Migration<'a> {
         );
 
         // don't add user or group context tables
-        if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
-            self.mainline
-                .base_nodes
-                .insert(name.to_string(), ni.clone());
-        }
+        // if !name.to_string().contains("UserContext") && !name.to_string().contains("GroupContext") {
+        //     self.mainline.base_nodes.insert(name.to_string(), ni.clone());
+        // }
 
         // keep track of the fact that it's new
         self.added.push(ni);

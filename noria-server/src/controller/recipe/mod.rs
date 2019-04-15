@@ -379,27 +379,30 @@ impl Recipe {
         //	);
         use dataflow::payload;
         // Enforce write policies
-        if self.security_config.is_some() {
-            for policy in &self.security_config.clone().unwrap().policies {
-                match policy {
-                    Policy::Write(inner) => match mig.mainline.base_nodes.get(&inner.table) {
-                        Some(ni) => {
-                            let n = &mig.mainline.ingredients[*ni];
-                            let m = box payload::Packet::SetWritePolicy {
-                                node: n.local_addr(),
-                                predicate: inner.predicate.clone(),
-                            };
-
-                            let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
-                            domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
-                            mig.mainline.replies.wait_for_acks(&domain);
-                        }
-                        None => {}
-                    },
-                    _ => {}
-                }
-            }
-        }
+        // if self.security_config.is_some() {
+        //     for policy in &self.security_config.clone().unwrap().policies {
+        //         match policy {
+        //             Policy::Write(inner) => {
+        //                 match mig.mainline.base_nodes.get(&inner.table) {
+        //                     Some(ni) => {
+        //                         let n = &mig.mainline.ingredients[*ni];
+        //                         let m = box payload::Packet::SetWritePolicy {
+        //                             node: n.local_addr(),
+        //                             predicate: inner.predicate.clone(),
+        //                         };
+        //
+        //                         let domain = mig.mainline.domains.get_mut(&n.domain()).unwrap();
+        //                         domain.send_to_healthy(m, &mig.mainline.workers).unwrap();
+        //                         mig.mainline.replies.wait_for_acks(&domain);
+        //
+        //                     },
+        //                     None => {},
+        //                 }
+        //             },
+        //             _ => {},
+        //         }
+        //     }
+        // }
 
         Ok(result)
     }
