@@ -35,6 +35,7 @@ pub(in crate::controller) struct Materializations {
 
     setup_replay_paths: HashMap<DomainIndex, Vec<SetupReplayPath>>,
     update_egresses: HashMap<DomainIndex, Vec<UpdateEgress>>,
+    paths: HashMap<Tag, Vec<NodeIndex>>,
     tag_generator: AtomicUsize,
 }
 
@@ -52,6 +53,7 @@ impl Materializations {
 
             setup_replay_paths: Default::default(),
             update_egresses: Default::default(),
+            paths: Default::default(),
             tag_generator: AtomicUsize::default(),
         }
     }
@@ -76,6 +78,10 @@ impl Materializations {
         } else {
             vec![]
         }
+    }
+
+    pub(in crate::controller) fn get_path(&self, tag: Tag) -> Option<&Vec<NodeIndex>> {
+        self.paths.get(&tag)
     }
 
     #[allow(unused)]
@@ -853,7 +859,7 @@ impl Materializations {
         }
 
         // construct and disseminate a plan for each index
-        let (pending, setup_replay_paths, update_egresses) = {
+        let (pending, setup_replay_paths, update_egresses, paths) = {
             let mut plan = plan::Plan::new(self, graph, ni, domains, workers);
             for index in index_on.drain() {
                 plan.add(index, replies);
@@ -898,6 +904,9 @@ impl Materializations {
         }
         for (domain, mut m) in update_egresses {
             self.update_egresses.entry(domain).or_insert(Vec::new()).append(&mut m);
+        }
+        for (tag, path) in paths {
+            self.paths.insert(tag, path);
         }
     }
 }

@@ -422,6 +422,7 @@ impl<'a> Plan<'a> {
         Vec<PendingReplay>,
         HashMap<DomainIndex, Vec<SetupReplayPath>>,
         HashMap<DomainIndex, Vec<UpdateEgress>>,
+        HashMap<Tag, Vec<NodeIndex>>,
     ) {
         use dataflow::payload::InitialState;
 
@@ -500,7 +501,7 @@ impl<'a> Plan<'a> {
         } else {
             assert!(self.pending.is_empty());
         }
-        (self.pending, self.setup_replay_paths, self.update_egresses)
+        (self.pending, self.setup_replay_paths, self.update_egresses, self.paths)
     }
 
     pub(super) fn on_join<'b>(
