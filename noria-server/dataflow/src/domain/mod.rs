@@ -528,11 +528,7 @@ impl Domain {
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
-<<<<<<< HEAD
                 return;
-=======
-                return output_messages;
->>>>>>> multiversedb-working
             }
 
             // normally, we ignore misses during regular forwarding.
@@ -643,11 +639,7 @@ impl Domain {
         match m.as_ref().unwrap() {
             m @ &box Packet::Message { .. } if m.is_empty() => {
                 // no need to deal with our children if we're not sending them anything
-<<<<<<< HEAD
                 return;
-=======
-                return output_messages;
->>>>>>> multiversedb-working
             }
             &box Packet::Message { .. } => {}
             &box Packet::ReplayPiece { .. } => {
@@ -656,12 +648,8 @@ impl Domain {
             ref m => unreachable!("dispatch process got {:?}", m),
         }
 
-<<<<<<< HEAD
         // NOTE: we can't directly iterate over .children due to self.dispatch in the loop
         let nchildren = self.nodes[me].borrow().children().len();
-=======
-        let nchildren = self.nodes[me].borrow().nchildren();
->>>>>>> multiversedb-working
         for i in 0..nchildren {
             // avoid cloning if we can
             let mut m = if i == nchildren - 1 {
@@ -670,14 +658,8 @@ impl Domain {
                 m.as_ref().map(|m| box m.clone_data()).unwrap()
             };
 
-<<<<<<< HEAD
             let childi = self.nodes[me].borrow().children()[i];
             let child_is_merger = {
-=======
-            let childi = *self.nodes[me].borrow().child(i);
-
-            let (child_is_output, child_is_merger) = {
->>>>>>> multiversedb-working
                 // XXX: shouldn't NLL make this unnecessary?
                 let c = self.nodes[childi].borrow();
                 c.is_shard_merger()
@@ -690,12 +672,8 @@ impl Domain {
             }
             m.link_mut().dst = childi;
 
-<<<<<<< HEAD
             self.dispatch(m, sends, executor);
         }
-=======
-        output_messages
->>>>>>> multiversedb-working
     }
 
     #[allow(clippy::cognitive_complexity)]
