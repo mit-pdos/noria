@@ -84,6 +84,31 @@ impl fmt::Debug for DataType {
 }
 
 impl DataType {
+    /// Convert the value contained within this DataType to a string representation.
+    // This to_string implementation is necessary, do not delete!
+    // If removed, the to_string implementation silently defaults to a
+    // different implementation that encapsulates text in double quotes,
+    // causing a lot of problems for security universes.
+    pub fn to_string(&self) -> String {
+       match *self {
+           DataType::None => String::from("*"),
+           DataType::Text(..) | DataType::TinyText(..) => {
+               let text: Cow<str> = self.into();
+               format!("{}", text)
+           }
+           DataType::Int(n) => format!("{}", n),
+           DataType::BigInt(n) => format!("{}", n),
+           DataType::Real(i, frac) => {
+               if i == 0 && frac < 0 {
+                   // We have to insert the negative sign ourselves.
+                   format!("{}", format!("-0.{:09}", frac.abs()))
+               } else {
+                   format!("{}", format!("{}.{:09}", i, frac.abs()))
+               }
+           }
+           DataType::Timestamp(ts) => format!("{}", format!("{}", ts.format("%c"))),
+       }
+    }
     /// Clone the value contained within this `DataType`.
     ///
     /// This method crucially does not cause cache-line conflicts with the underlying data-store

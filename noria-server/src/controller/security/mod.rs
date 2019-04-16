@@ -22,7 +22,7 @@ impl SecurityConfig {
         };
 
         let groups = match config.get("groups") {
-            Some(groups) => Group::parse(&format!("{}", groups)),
+            Some(groups) => Group::parse(&groups.to_string()),
             None => Vec::new(),
         };
 

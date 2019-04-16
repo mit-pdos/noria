@@ -341,7 +341,7 @@ impl<'a> Migration<'a> {
 
         let ri = self.readers[&n];
 
-        let uid = self.universe().0.to_string();
+        let uid: String = self.universe().0.into();
 
         let uint = if uid == "global" {
             0
