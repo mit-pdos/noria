@@ -229,7 +229,7 @@ fn multi_child_replica(replay_after_recovery: bool, worker_to_drop: usize) {
         sleep();
         println!("check 13: lookup after replays setup");
         assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 4.into()]]);
-        assert_eq!(q1.lookup(&[id.into()], true).unwrap(), vec![vec![4.into(), id.into()]]);
+        assert_eq!(q2.lookup(&[id.into()], true).unwrap(), vec![vec![4.into(), id.into()]]);
     }
 
     println!("success! now clean shutdown...");
