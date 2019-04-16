@@ -91,7 +91,7 @@ path = "securecrp/main.rs"
 
 [[bin]]
 name = "piazza"
-path = "piazza/piazza.rs"
+path = "piazza/main.rs"
 
 [[bin]]
 name = "evict-o-rama"
@@ -116,7 +116,3 @@ path = "replay/main.rs"
 [[bin]]
 name = "security-mysql"
 path = "piazza/mysql.rs"
-
-[[bin]]
-name = "piazza-write"
-path = "piazza/piazza-write.rs"
