@@ -1600,6 +1600,7 @@ impl Domain {
                         for key in tp.keys {
                             wh.mut_with_key(&key[..]).mark_hole();
                         }
+                        wh.swap();
                     }
                 })
                 .unwrap();
