@@ -1,20 +1,16 @@
+#![feature(duration_float)]
+
 use clap::value_t_or_exit;
-use futures::Stream;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
-use rand::{Rng, SeedableRng};
-use rand::prelude::StdRng;
+use rand::Rng;
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 const STUDENTS_PER_CLASS: usize = 150;
 const TAS_PER_CLASS: usize = 5;
-const WRITE_CHUNK_SIZE: usize = 100;
-const CLASSES_PER_STUDENT: usize = 4;
-
-const DETERMINISTIC_SEED: u64 = 1235;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
@@ -36,7 +32,7 @@ impl std::fmt::Display for Operation {
 }
 
 fn main() {
-    use clap::{App, Arg, ArgGroup};
+    use clap::{App, Arg};
     let args = App::new("piazza")
         .version("0.1")
         .about("Benchmarks Piazza-like application with security policies.")
@@ -52,7 +48,7 @@ fn main() {
                 .long("runtime")
                 .short("r")
                 .default_value("10")
-                .help("Max number of seconds to run each stage of the benchmark for."),
+                .help("Seconds to run the benchmark for (first 1/3 of samples are dropped)"),
         )
         .arg(
             Arg::with_name("materialization")
@@ -66,37 +62,35 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/complex-policies.json")
+                .default_value("noria-benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
-        )
-        .group(
-            ArgGroup::with_name("n")
-                .args(&["nusers", "nclasses"])
-                .required(true),
         )
         .arg(
             Arg::with_name("nusers")
                 .short("u")
-                .takes_value(true)
-                .help("Number of users in the db (# clases is computed)"),
+                .default_value("5000")
+                .help("Number of users in the db"),
+        )
+        .arg(
+            Arg::with_name("nlogged")
+                .short("l")
+                .default_value("5000")
+                .help(
+                    "Number of logged users. \
+                     Must be less or equal than the number of users in the db",
+                ),
         )
         .arg(
             Arg::with_name("nclasses")
                 .short("c")
-                .takes_value(true)
-                .help("Number of classes in the db (# users is computed)"),
-        )
-        .arg(
-            Arg::with_name("logged-in")
-                .short("l")
-                .default_value("1.0")
-                .help("Fraction of users that are logged in."),
+                .default_value("1000")
+                .help("Number of classes in the db"),
         )
         .arg(
             Arg::with_name("nposts")
                 .short("p")
-                .default_value("1000")
-                .help("Number of posts per class in the db"),
+                .default_value("1000000")
+                .help("Number of posts in the db"),
         )
         .arg(
             Arg::with_name("private")
@@ -105,21 +99,10 @@ fn main() {
                 .help("Percentage of private posts"),
         )
         .arg(
-            Arg::with_name("iter")
-                .long("iter")
-                .default_value("1")
-                .help("Number of iterations to run"),
-        )
-        .arg(
             Arg::with_name("graph")
                 .short("g")
-                .takes_value(true)
+                .default_value("pgraph.gv")
                 .help("File to dump application's soup graph, if set"),
-        )
-        .arg(
-            Arg::with_name("deterministic")
-                .long("deterministic")
-                .help("Run with deterministic randomness"),
         )
         .arg(
             Arg::with_name("verbose")
@@ -127,55 +110,33 @@ fn main() {
                 .multiple(true)
                 .help("Enable verbose output"),
         )
+        .arg(
+            Arg::with_name("info")
+                .short("i")
+                .takes_value(true)
+                .help("Directory to dump runtime process info (doesn't work on OSX)"),
+        )
         .get_matches();
     let verbose = args.occurrences_of("verbose");
-    let loggedf = value_t_or_exit!(args, "logged-in", f64);
+    let nusers = value_t_or_exit!(args, "nusers", usize);
+    let nlogged = value_t_or_exit!(args, "nlogged", usize);
+    let nclasses = value_t_or_exit!(args, "nclasses", usize);
     let nposts = value_t_or_exit!(args, "nposts", usize);
     let private = value_t_or_exit!(args, "private", f64);
     let runtime = Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
-
-    let (nusers, nclasses) = if args.is_present("nusers") {
-        let nusers = value_t_or_exit!(args, "nusers", usize);
-        // how many classes should there be?
-        // well, there should be 4 classes per student,
-        // and 150 students per class,
-        // but the classes can overlap!
-        // so we work with expected values
-        //
-        // the expected number of students per class
-        //  = nusers * chance one students picks that class
-        //
-        // chance one student picks a class (assuming disjoint)
-        //  = classes per student / nclasses
-        //
-        // rearranging gives us
-        //
-        //   spc = #u * cps / #c
-        //    #c = #u * cps / spc
-        let nclasses =
-            ((nusers * CLASSES_PER_STUDENT) as f64 / STUDENTS_PER_CLASS as f64).ceil() as usize;
-        (nusers, nclasses)
-    } else if args.is_present("nclasses") {
-        let nclasses = value_t_or_exit!(args, "nclasses", usize);
-        // solving for #c instead of #u above gives us
-        //
-        //   spc = #u * cps / #c
-        //    #u = spc * #c / cps
-        let nusers =
-            ((STUDENTS_PER_CLASS * nclasses) as f64 / CLASSES_PER_STUDENT as f64).ceil() as usize;
-        (nusers, nclasses)
-    } else {
-        unreachable!();
-    };
-    let nposts = nposts * nclasses;
+    let iloc = args.value_of("info").map(std::path::Path::new);
 
     assert!(nusers >= STUDENTS_PER_CLASS + TAS_PER_CLASS);
-    assert!(loggedf >= 0.0);
-    assert!(loggedf <= 1.0);
-    let nlogged = (loggedf * nusers as f64) as usize;
     assert!(nlogged <= nusers);
     assert!(private >= 0.0);
     assert!(private <= 1.0);
+
+    if let Some(ref iloc) = iloc {
+        if !iloc.exists() {
+            std::fs::create_dir_all(iloc)
+                .expect("failed to create directory for runtime process info");
+        }
+    }
 
     let log = if verbose != 0 {
         noria::logger_pls()
@@ -183,453 +144,292 @@ fn main() {
         Logger::root(slog::Discard, o!())
     };
 
-    println!("# nusers: {}", nusers);
-    println!("# logged-in users: {}", nlogged);
-    println!("# nclasses: {}", nclasses);
-    println!("# nposts: {}", nposts);
-    println!("# private: {:.1}%", private * 100.0);
-    println!(
-        "# materialization: {}",
-        args.value_of("materialization").unwrap()
-    );
-    println!(
-        "# reuse: {}",
-        args.value_of("reuse").unwrap()
-    );
-
-    let mut cold_stats = HashMap::new();
-    let mut warm_stats = HashMap::new();
-    let iter = value_t_or_exit!(args, "iter", usize);
-    for i in 1..=iter {
-        info!(log, "starting up noria"; "iteration" => i);
-        debug!(log, "configuring noria");
-        let mut g = Builder::default();
-        match args.value_of("reuse").unwrap() {
-            "finkelstein" => g.set_reuse(ReuseConfigType::Finkelstein),
-            "full" => g.set_reuse(ReuseConfigType::Full),
-            "no" => g.set_reuse(ReuseConfigType::NoReuse),
-            "relaxed" => g.set_reuse(ReuseConfigType::Relaxed),
-            _ => unreachable!(),
+    info!(log, "starting up noria");
+    debug!(log, "configuring noria");
+    let mut g = Builder::default();
+    match args.value_of("reuse").unwrap() {
+        "finkelstein" => g.set_reuse(ReuseConfigType::Finkelstein),
+        "full" => g.set_reuse(ReuseConfigType::Full),
+        "noreuse" => g.set_reuse(ReuseConfigType::NoReuse),
+        "relaxed" => g.set_reuse(ReuseConfigType::Relaxed),
+        _ => unreachable!(),
+    }
+    match args.value_of("materialization").unwrap() {
+        "full" => {
+            g.disable_partial();
         }
-
-        match args.value_of("materialization").unwrap() {
-            "full" => {
-                g.disable_partial();
-            }
-            "partial" => {}
-            "shallow-readers" => {
-                g.set_frontier_strategy(FrontierStrategy::Readers);
-            }
-            "shallow-all" => {
-                g.set_frontier_strategy(FrontierStrategy::AllPartial);
-            }
-            _ => unreachable!(),
+        "partial" => {}
+        "shallow-readers" => {
+            g.set_frontier_strategy(FrontierStrategy::Readers);
         }
-        g.set_sharding(None);
-        if verbose > 1 {
-            g.log_with(log.clone());
+        "shallow-all" => {
+            g.set_frontier_strategy(FrontierStrategy::AllPartial);
         }
-        debug!(log, "spinning up");
-        let mut g = g.start_simple().unwrap();
-        debug!(log, "noria ready");
+        _ => unreachable!(),
+    }
+    g.set_sharding(None);
+    if verbose > 1 {
+        g.log_with(log.clone());
+    }
+    debug!(log, "spinning up");
+    let mut g = g.start_simple().unwrap();
+    debug!(log, "noria ready");
 
-        let init = Instant::now();
-        info!(log, "setting up database schema");
-        let mut rng = if args.is_present("deterministic") {
-            StdRng::seed_from_u64(DETERMINISTIC_SEED)
-        } else {
-            StdRng::seed_from_u64(rand::random::<u64>())
-        };
-        debug!(log, "setting up initial schema");
-        g.install_recipe(include_str!("schema.sql"))
-            .expect("failed to load initial schema");
-        debug!(log, "adding security policies");
-        g.on_worker(|w| {
-            w.set_security_config(
-                std::fs::read_to_string(args.value_of("policies").unwrap())
-                    .expect("failed to read policy file"),
-            )
-        })
+    let init = Instant::now();
+    info!(log, "setting up database schema");
+    let mut rng = rand::thread_rng();
+    debug!(log, "setting up initial schema");
+    g.install_recipe(include_str!("schema.sql"))
+        .expect("failed to load initial schema");
+    debug!(log, "adding security policies");
+    g.on_worker(|w| {
+        w.set_security_config(
+            std::fs::read_to_string(args.value_of("policies").unwrap())
+                .expect("failed to read policy file"),
+        )
+    })
+    .unwrap();
+    debug!(log, "adding queries");
+    g.extend_recipe(include_str!("post-queries.sql"))
+        .expect("failed to load queries");
+    if let Some(gloc) = args.value_of("graph") {
+        debug!(log, "extracing query graph");
+        let gv = g.graphviz().expect("failed to read graphviz");
+        std::fs::write(gloc, gv).expect("failed to save graphviz output");
+    }
+    debug!(log, "database schema setup done");
+
+    info!(log, "starting db population");
+    debug!(log, "creating users");
+    let mut users = g.table("User").unwrap().into_sync();
+    users
+        .perform_all((1..=nusers).map(|uid| vec![uid.into()]))
         .unwrap();
-        debug!(log, "adding queries");
-        g.extend_recipe(include_str!("post-queries.sql"))
-            .expect("failed to load queries");
-        debug!(log, "database schema setup done");
+    debug!(log, "creating classes");
+    let mut classes = g.table("Class").unwrap().into_sync();
+    classes
+        .perform_all((1..=nclasses).map(|cid| vec![cid.into()]))
+        .unwrap();
+    debug!(log, "enrolling users in classes");
+    let mut roles = g.table("Role").unwrap().into_sync();
+    let mut uids: Vec<_> = (1..=nusers).collect();
+    let mut enrolled = HashMap::new();
+    let mut records = Vec::new();
+    for cid in 1..=nclasses {
+        // in each class, some number of users are tas, and the rest are students.
+        uids.shuffle(&mut rng);
+        records.extend(
+            uids[0..(STUDENTS_PER_CLASS + TAS_PER_CLASS)]
+                .iter()
+                .enumerate()
+                .map(|(i, &uid)| {
+                    enrolled.entry(uid).or_insert_with(Vec::new).push(cid);
+                    let role = if i < TAS_PER_CLASS { 1 } else { 0 };
+                    vec![uid.into(), cid.into(), role.into()]
+                }),
+        );
+    }
+    roles.perform_all(records).unwrap();
+    debug!(log, "writing posts");
+    let mut posts = g.table("Post").unwrap().into_sync();
+    posts
+        .perform_all((1..=nposts).map(|pid| {
+            let author = 1 + rng.gen_range(0, nusers);
+            let cid = 1 + rng.gen_range(0, nclasses);
+            let private = if rng.gen_bool(private) { 1 } else { 0 };
+            let anon = 1;
+            vec![
+                pid.into(),
+                cid.into(),
+                author.into(),
+                format!("post #{}", pid).into(),
+                private.into(),
+                anon.into(),
+            ]
+        }))
+        .unwrap();
+    debug!(log, "population completed");
 
-        info!(log, "starting db population");
-        debug!(log, "creating users"; "n" => nusers);
-        let mut users = g.table("User").unwrap().into_sync();
-        users
-            .perform_all((1..=nusers).map(|uid| vec![uid.into()]))
-            .unwrap();
-        debug!(log, "creating classes"; "n" => nclasses);
-        let mut classes = g.table("Class").unwrap().into_sync();
-        classes
-            .perform_all((1..=nclasses).map(|cid| vec![cid.into()]))
-            .unwrap();
-        debug!(log, "enrolling users in classes");
-        let mut roles = g.table("Role").unwrap().into_sync();
-        let mut uids: Vec<_> = (1..=nusers).collect();
-        let mut enrolled = HashMap::new();
-        let mut records = Vec::new();
-        for cid in 1..=nclasses {
-            // in each class, some number of users are tas, and the rest are students.
-            uids.shuffle(&mut rng);
-            records.extend(
-                uids[0..(STUDENTS_PER_CLASS + TAS_PER_CLASS)]
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &uid)| {
-                        enrolled.entry(uid).or_insert_with(Vec::new).push(cid);
-                        let role = if i < TAS_PER_CLASS { 1 } else { 0 };
-                        vec![format!("{}", uid).into(), cid.into(), role.into()]
-                    }),
-            );
-        }
-        roles.perform_all(records).unwrap();
-        debug!(log, "writing posts"; "n" => nposts);
-        let mut posts = g.table("Post").unwrap().into_sync();
-        posts
-            .perform_all((1..=nposts).map(|pid| {
-                let author = 1 + rng.gen_range(0, nusers);
-                let cid = 1 + rng.gen_range(0, nclasses);
-                let private = if rng.gen_bool(private) { 1 } else { 0 };
-                vec![
-                    pid.into(),
-                    cid.into(),
-                    author.into(),
-                    format!("post #{}", pid).into(),
-                    private.into(),
-                ]
-            }))
-            .unwrap();
-        debug!(log, "population completed");
+    let mut stats = HashMap::new();
 
-        let memstats = |g: &mut noria::SyncHandle<_>, at| {
-            if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
-                debug!(log, "extracing process memory stats"; "at" => at);
-                let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
-                let data = mem.split_whitespace().nth(6 - 1).unwrap();
-                println!("# VmRSS @ {}: {} ", at, vmrss);
-                println!("# VmData @ {}: {} ", at, data);
+    info!(log, "logging in users");
+    let mut login_times = Vec::with_capacity(nlogged);
+    let mut login_stats = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
+    for uid in 1..=nlogged {
+        trace!(log, "logging in user"; "uid" => uid);
+        let user_context: HashMap<_, _> =
+            std::iter::once(("id".to_string(), uid.to_string().into())).collect();
+        let start = Instant::now();
+        g.on_worker(|w| w.create_universe(user_context.clone()))
+            .unwrap();
+        login_times.push(start.elapsed());
+        login_stats.saturating_record(login_times.last().unwrap().as_micros() as u64);
+
+        // TODO: measure space use, which means doing reads on partial
+        // TODO: or do we want to do that measurement separately?
+
+        if let Some(ref iloc) = iloc {
+            if uid % 100 == 0 {
+                std::fs::copy(
+                    "/proc/self/status",
+                    iloc.join(format!("login-{}.status", uid)),
+                )
+                .expect("failed to extract process info");
             }
+        }
+    }
+    stats.insert(Operation::Login, login_stats);
 
-            debug!(log, "extracing materialization memory stats"; "at" => at);
-            let mut base_mem = 0;
-            let mut mem = 0;
-            let stats = g.statistics().unwrap();
-            for (_, nstats) in stats.values() {
-                for nstat in nstats.values() {
-                    if nstat.desc == "B" {
-                        base_mem += nstat.mem_size;
-                    } else {
-                        mem += nstat.mem_size;
+    info!(log, "creating api handles");
+    debug!(log, "creating view handles for posts");
+    let mut posts_view: Vec<_> = (1..=nusers)
+        .map(|uid| {
+            trace!(log, "creating posts handle for user"; "uid" => uid);
+            g.view(format!("posts_u{}", uid)).unwrap().into_sync()
+        })
+        .collect();
+    debug!(log, "creating view handles for post_count");
+    let mut post_count_view: Vec<_> = (1..=nusers)
+        .map(|uid| {
+            trace!(log, "creating post count handle for user"; "uid" => uid);
+            g.view(format!("post_count_u{}", uid)).unwrap().into_sync()
+        })
+        .collect();
+    debug!(log, "all api handles created");
+    let setup = init.elapsed();
+
+    // now time to measure the cost of different operations
+    info!(log, "starting benchmark");
+    let mut n = 0;
+    let mut pid = nposts + 1;
+    let start = Instant::now();
+    while start.elapsed() < runtime {
+        let seed = rng.gen_range(0.0, 1.0);
+        let operation = if seed < 0.95 {
+            if seed < 0.95 / 2.0 {
+                Operation::ReadPosts
+            } else {
+                Operation::ReadPostCount
+            }
+        } else {
+            Operation::WritePost
+        };
+
+        let begin = match operation {
+            Operation::ReadPosts => {
+                trace!(log, "reading posts"; "seed" => seed);
+                // TODO: maybe only select from eligible users?
+                loop {
+                    let uid = 1 + rng.gen_range(0, nusers);
+                    trace!(log, "trying user"; "uid" => uid);
+                    if let Some(cids) = enrolled.get(&uid) {
+                        let cid = *cids.choose(&mut rng).unwrap();
+                        trace!(log, "chose class"; "cid" => cid);
+                        let start = Instant::now();
+                        posts_view[uid - 1].lookup(&[cid.into()], true).unwrap();
+                        break start;
                     }
                 }
             }
-            println!("# base memory @ {}: {}", at, base_mem);
-            println!("# materialization memory @ {}: {}", at, mem);
+            Operation::ReadPostCount => {
+                trace!(log, "reading post count"; "seed" => seed);
+                // TODO: maybe only select from eligible users?
+                loop {
+                    let uid = 1 + rng.gen_range(0, nusers);
+                    trace!(log, "trying user"; "uid" => uid);
+                    if let Some(cids) = enrolled.get(&uid) {
+                        let cid = *cids.choose(&mut rng).unwrap();
+                        trace!(log, "chose class"; "cid" => cid);
+                        let start = Instant::now();
+                        post_count_view[uid - 1]
+                            .lookup(&[cid.into()], true)
+                            .unwrap();
+                        break start;
+                    }
+                }
+            }
+            Operation::WritePost => {
+                trace!(log, "writing post"; "seed" => seed);
+                loop {
+                    let uid = 1 + rng.gen_range(0, nusers);
+                    trace!(log, "trying user"; "uid" => uid);
+                    if let Some(cids) = enrolled.get(&uid) {
+                        let cid = *cids.choose(&mut rng).unwrap();
+                        let private = if rng.gen_bool(private) { 1 } else { 0 };
+                        trace!(log, "making post"; "cid" => cid, "private" => ?private);
+                        let anon = 1;
+                        let start = Instant::now();
+                        posts
+                            .insert(vec![
+                                pid.into(),
+                                cid.into(),
+                                uid.into(),
+                                format!("post #{}", pid).into(),
+                                private.into(),
+                                anon.into(),
+                            ])
+                            .unwrap();
+                        pid += 1;
+                        break start;
+                    }
+                }
+            }
+            Operation::Login => unreachable!(),
         };
+        let took = begin.elapsed();
+        n += 1;
 
-        info!(log, "logging in users"; "n" => nlogged);
-        memstats(&mut g, "populated");
-        let mut login_times = Vec::with_capacity(nlogged);
-        let mut login_stats = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
-        for uid in 1..=nlogged {
-            trace!(log, "logging in user"; "uid" => uid);
-            let user_context: HashMap<_, _> =
-                std::iter::once(("id".to_string(), uid.to_string().into())).collect();
-            let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
-                .unwrap();
-            login_times.push(start.elapsed());
-            login_stats.saturating_record(login_times.last().unwrap().as_micros() as u64);
-
-            // TODO: measure space use, which means doing reads on partial
-            // TODO: or do we want to do that measurement separately?
-
-            if uid == 1 {
-                memstats(&mut g, "firstuser");
-            }
-
-            if uid == 2 && i == 1 {
-                if let Some(gloc) = args.value_of("graph") {
-                    debug!(log, "extracing query graph with two users");
-                    let gv = g.graphviz().expect("failed to read graphviz");
-                    std::fs::write(gloc, gv).expect("failed to save graphviz output");
-                }
-            }
-        }
-        use std::collections::hash_map::Entry;
-        match cold_stats.entry(Operation::Login) {
-            Entry::Vacant(v) => {
-                v.insert(login_stats);
-            }
-            Entry::Occupied(mut h) => {
-                *h.get_mut() += login_stats;
-            }
-        }
-        memstats(&mut g, "allusers");
-
-        info!(log, "creating api handles");
-        debug!(log, "creating view handles for posts");
-        let mut posts_view: HashMap<_, _> = (1..=nlogged)
-            .map(|uid| {
-                trace!(log, "creating posts handle for user"; "uid" => uid);
-                (uid, g.view(format!("posts_u{}", uid)).unwrap().into_sync())
-            })
-            .collect();
-        debug!(log, "creating view handles for post_count");
-        let mut post_count_view: HashMap<_, _> = (1..=nlogged)
-            .map(|uid| {
-                trace!(log, "creating post count handle for user"; "uid" => uid);
-                (
-                    uid,
-                    g.view(format!("post_count_u{}", uid)).unwrap().into_sync(),
-                )
-            })
-            .collect();
-        debug!(log, "all api handles created");
-
-        println!("# setup time: {:?}", init.elapsed());
-
-        // now time to measure the cost of different operations
-        info!(log, "starting cold read benchmarks");
-        debug!(log, "cold reads of posts");
-        let mut posts_reads = 0;
-        let start = Instant::now();
-        let mut requests = Vec::new();
-        'ps_outer: for (&uid, cids) in &mut enrolled {
-            if uid > nlogged {
-                // since users are randomly assigned to classes,
-                // this should still give us a random sampling.
-                continue;
-            }
-
-            cids.shuffle(&mut rng);
-            for &cid in &*cids {
-                if start.elapsed() >= runtime {
-                    debug!(log, "time limit reached"; "nreads" => posts_reads);
-                    break 'ps_outer;
-                }
-
-                trace!(log, "reading posts"; "uid" => uid, "cid" => cid);
-                requests.push((Operation::ReadPosts, uid, cid));
-                let begin = Instant::now();
-                posts_view
-                    .get_mut(&uid)
-                    .unwrap()
-                    .lookup(&[cid.into()], true)
-                    .unwrap();
-                let took = begin.elapsed();
-                posts_reads += 1;
-
-                // NOTE: do we want a warm-up period/drop first sample per uid?
-                // trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-
-                trace!(log, "recording sample"; "took" => ?took);
-                cold_stats
-                    .entry(Operation::ReadPosts)
-                    .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-                    .saturating_record(took.as_micros() as u64);
-            }
+        if start.elapsed() < runtime / 3 {
+            // warm-up
+            trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
+            continue;
         }
 
-        debug!(log, "cold reads of post count");
-        let mut post_count_reads = 0;
-        let start = Instant::now();
-        // re-randomize order of uids
-        let mut enrolled: HashMap<_, _> = enrolled.into_iter().collect();
-        'pc_outer: for (&uid, cids) in &mut enrolled {
-            if uid > nlogged {
-                continue;
-            }
+        trace!(log, "recording sample"; "took" => ?took);
+        stats
+            .entry(operation)
+            .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
+            .saturating_record(took.as_micros() as u64);
 
-            cids.shuffle(&mut rng);
-            for &cid in &*cids {
-                if start.elapsed() >= runtime {
-                    debug!(log, "time limit reached"; "nreads" => post_count_reads);
-                    break 'pc_outer;
-                }
-
-                trace!(log, "reading post count"; "uid" => uid, "cid" => cid);
-                requests.push((Operation::ReadPostCount, uid, cid));
-                let begin = Instant::now();
-                post_count_view
-                    .get_mut(&uid)
-                    .unwrap()
-                    .lookup(&[cid.into()], true)
-                    .unwrap();
-                let took = begin.elapsed();
-                post_count_reads += 1;
-
-                // NOTE: do we want a warm-up period/drop first sample per uid?
-                // trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-
-                trace!(log, "recording sample"; "took" => ?took);
-                cold_stats
-                    .entry(Operation::ReadPostCount)
-                    .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-                    .saturating_record(took.as_micros() as u64);
-            }
-        }
-
-        info!(log, "starting warm read benchmarks");
-        for (op, uid, cid) in requests {
-            match op {
-                Operation::ReadPosts => {
-                    trace!(log, "reading posts"; "uid" => uid, "cid" => cid);
-                }
-                Operation::ReadPostCount => {
-                    trace!(log, "reading post count"; "uid" => uid, "cid" => cid);
-                }
-                _ => unreachable!(),
-            }
-
-            let begin = Instant::now();
-            match op {
-                Operation::ReadPosts => {
-                    posts_view
-                        .get_mut(&uid)
-                        .unwrap()
-                        .lookup(&[cid.into()], true)
-                        .unwrap();
-                }
-                Operation::ReadPostCount => {
-                    post_count_view
-                        .get_mut(&uid)
-                        .unwrap()
-                        .lookup(&[cid.into()], true)
-                        .unwrap();
-                }
-                _ => unreachable!(),
-            }
-            let took = begin.elapsed();
-
-            // NOTE: no warm-up for "warm" reads
-
-            trace!(log, "recording sample"; "took" => ?took);
-            warm_stats
-                .entry(op)
-                .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-                .saturating_record(took.as_micros() as u64);
-        }
-
-        info!(log, "measuring space overhead");
-        debug!(log, "performing reads to fill materializations");
-        // have every user read every class so that we can measure total space overhead
-        let start = Instant::now();
-        let mut all = futures::stream::futures_unordered::FuturesUnordered::new();
-        for (&uid, cids) in &enrolled {
-            if uid > nlogged {
-                continue;
-            }
-
-            trace!(log, "reading all classes for user"; "uid" => uid, "classes" => ?cids);
-            let cids: Vec<_> = cids.iter().map(|&cid| vec![cid.into()]).collect();
-            all.push(
-                posts_view
-                    .get_mut(&uid)
-                    .unwrap()
-                    .clone()
-                    .into_async()
-                    .multi_lookup(cids.clone(), true),
-            );
-            all.push(
-                post_count_view
-                    .get_mut(&uid)
-                    .unwrap()
-                    .clone()
-                    .into_async()
-                    .multi_lookup(cids, true),
-            );
-        }
-        let _ = all.wait().count();
-        debug!(log, "filling done"; "took" => ?start.elapsed());
-        memstats(&mut g, "end");
-
-        info!(log, "performing write measurements");
-        let mut pid = nposts + 1;
-        let start = Instant::now();
-        while start.elapsed() < runtime {
-            trace!(log, "writing post");
-            let mut writes = Vec::new();
-            while writes.len() < WRITE_CHUNK_SIZE {
-                let uid = 1 + rng.gen_range(0, nlogged);
-                trace!(log, "trying user"; "uid" => uid);
-                if let Some(cids) = enrolled.get(&uid) {
-                    let cid = *cids.choose(&mut rng).unwrap();
-                    let private = if rng.gen_bool(private) { 1 } else { 0 };
-                    trace!(log, "making post"; "cid" => cid, "private" => ?private);
-                    writes.push(vec![
-                        pid.into(),
-                        cid.into(),
-                        uid.into(),
-                        format!("post #{}", pid).into(),
-                        private.into(),
-                    ]);
-                    pid += 1;
-                }
-            }
-
-            let begin = Instant::now();
-            posts.perform_all(writes).unwrap();
-            let took = begin.elapsed();
-
-            if start.elapsed() < runtime / 3 {
-                // warm-up
-                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-                continue;
-            }
-
-            trace!(log, "recording sample"; "took" => ?took);
-            cold_stats
-                .entry(Operation::WritePost)
-                .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-                .saturating_record((took.as_micros() / WRITE_CHUNK_SIZE as u128) as u64);
-        }
-
-        // TODO: do we also want to measure writes when we _haven't_ read all the keys?
-
-        let mut i = 0;
-        let stripe = login_times.len() / (runtime.as_secs() as usize);
-        while i < login_times.len() {
-            println!("# login sample[{}]: {:?}", i, login_times[i]);
-            if i == 0 {
-                // we want to include both 0 and 1
-                i += 1;
-            } else if i == 1 {
-                // and then go back to every stripe'th sample
-                i = stripe;
-            } else {
-                i += stripe;
+        if let Some(ref iloc) = iloc {
+            if n % 1000 == 0 {
+                std::fs::copy("/proc/self/status", iloc.join(format!("op-{}.status", n)))
+                    .expect("failed to extract process info");
             }
         }
     }
 
-    println!("# op\tphase\tpct\ttime");
-    for &q in &[5, 50, 95, 99, 100] {
-        for &heat in &["cold", "warm"] {
-            let stats = match heat {
-                "cold" => &cold_stats,
-                "warm" => &warm_stats,
-                _ => unreachable!(),
-            };
-            let mut keys: Vec<_> = stats.keys().collect();
-            keys.sort();
-            for op in keys {
-                let stats = &stats[op];
-                if q == 100 {
-                    println!("{}\t{}\t100\t{:.2}\tµs", op, heat, stats.max());
-                } else {
-                    println!(
-                        "{}\t{}\t{}\t{:.2}\tµs",
-                        op,
-                        heat,
-                        q,
-                        stats.value_at_quantile(q as f64 / 100.0)
-                    );
-                }
+    println!("# setup time: {:?}", setup);
+
+    if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
+        let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
+        let data = mem.split_whitespace().nth(6 - 1).unwrap();
+        println!("# VmRSS: {} ", vmrss);
+        println!("# VmData: {} ", data);
+    }
+
+    let mut i = 0;
+    let stripe = login_times.len() / (runtime.as_secs() as usize);
+    while i < login_times.len() {
+        println!("# login sample[{}]: {:?}", i, login_times[i]);
+        i += stripe;
+    }
+    println!("# number of operations: {}", n);
+    println!("#\top\tpct\ttime");
+    for &q in &[50, 95, 99, 100] {
+        let mut keys: Vec<_> = stats.keys().collect();
+        keys.sort();
+        for op in keys {
+            let stats = &stats[op];
+            if q == 100 {
+                println!("{}\t100\t{:.2}\tµs", op, stats.max());
+            } else {
+                println!(
+                    "{}\t{}\t{:.2}\tµs",
+                    op,
+                    q,
+                    stats.value_at_quantile(q as f64 / 100.0)
+                );
             }
         }
     }

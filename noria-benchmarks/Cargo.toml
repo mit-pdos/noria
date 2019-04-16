@@ -119,7 +119,3 @@ path = "replay/main.rs"
 [[bin]]
 name = "piazza-mysql"
 path = "piazza/mysql.rs"
-
-[[bin]]
-name = "albums"
-path = "albums/main.rs"
