@@ -138,18 +138,11 @@ impl Egress {
             }
         }
 
-        // Remove the tags associated with this child
-        let mut tags_to_remove = vec![];
-        for (tag, ni) in &self.tags {
-            if *ni == child {
-                tags_to_remove.push(*tag);
-            }
-        }
-        for tag in &tags_to_remove {
-            self.tags.remove(tag);
-        }
-
         self.min_label_to_send.remove(&child);
+    }
+
+    pub fn remove_tag(&mut self, tag: Tag) {
+        self.tags.remove(&tag);
     }
 
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {

@@ -570,8 +570,7 @@ impl ControllerInner {
             .unwrap()
             .send_to_healthy(m, &self.workers).unwrap();
 
-        // STEP 2: Clean up state in the egress of A about packets to B1. Also remove tags that
-        // refer to replay paths to B1.
+        // STEP 2: Clean up state in the egress of A about packets to B1.
         //
         // No node with multiple parents (UNION, JOIN) is stateful.
         let egress_a = self
@@ -602,9 +601,9 @@ impl ControllerInner {
         let path = self.migrate(|mig| mig.link_nodes(egress_a, &vec![ingress_b2]));
         self.remove_nodes(&path[..]).unwrap();
 
-        // STEP 4: Remove the tag that refers to the replay path from B1 to B2. In memory state,
-        // replace it with the tag that refers to the replay path from A to B1, since B2 has a
-        // new parent node.
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2 from the domain
+        // and the egress node. In memory state, replace it with the tag that refers to
+        // the replay path from A to B1, since B2 has a new parent node.
         let mut old_tag = None;
         let mut new_tag = None;
         for m in self.materializations.get_setup_replay_paths(domain_b1) {
@@ -690,8 +689,7 @@ impl ControllerInner {
             .unwrap()
             .send_to_healthy(m, &self.workers).unwrap();
 
-        // STEP 2: Clean up state in the egress of B1 about packets to B2. Also remove tags that
-        // refer to replay paths to B2.
+        // STEP 2: Clean up state in the egress of B1 about packets to B2.
         //
         // Bottom replicas have exactly one parent, the egress of their top replica.
         let egress_b1 = self
@@ -719,8 +717,8 @@ impl ControllerInner {
         let path = self.migrate(|mig| mig.link_nodes(egress_b1, &ingress_cs));
         self.remove_nodes(&path[..]).unwrap();
 
-        // STEP 4: Remove the tag that refers to the replay path from B1 to B2. No replacement tag
-        // is necessary since B1 still has the same parent.
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2 from the domain
+        // and the egress node. No replacement tag is necessary since B1 still has the same parent.
         //
         // TODO(ygina): If C is materialized, we might need to replace that tag in memory state?
         let mut old_tag = None;
