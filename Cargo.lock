@@ -1529,7 +1529,7 @@ dependencies = [
  "mysql 14.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "noria-server 0.1.0",
- "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_core 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1545,7 +1545,7 @@ dependencies = [
  "tower-service 0.2.0 (git+https://github.com/tower-rs/tower.git)",
  "tsunami 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "zipf 4.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zipf 5.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zookeeper 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -3182,14 +3182,6 @@ dependencies = [
 
 [[package]]
 name = "zipf"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "zipf"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -3550,7 +3542,6 @@ dependencies = [
 "checksum winutil 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7daf138b6b14196e3830a588acf1e86966c694d3e8fb026fb105b8b5dca07e6e"
 "checksum ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 "checksum xml-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c1cb601d29fe2c2ac60a2b2e5e293994d87a1f6fa9687a31a15270f909be9c2"
-"checksum zipf 4.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a9d654b300e2eb573bb4bd25a1f7f00997b2caf3664f55b2755cd8b60565053e"
 "checksum zipf 5.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2057772d87bedea0efd93842ee0e0f52fc0c313c556d5fa8ee787771c051a61f"
 "checksum zookeeper 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)" = "bf1d6537392e0210e2516dd2dd97e741b382c02be33221e8653414deb1a4b028"
 "checksum zookeeper_derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "deb033fa1544f8923fbda1e3ff7410671de3a9fa001e4820a9b5fbade395b9da"

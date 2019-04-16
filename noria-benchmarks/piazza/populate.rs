@@ -1,5 +1,5 @@
 use noria::DataType;
-use rand;
+use rand::seq::SliceRandom;
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -11,7 +11,7 @@ pub struct Populate {
     nusers: i32,
     nclasses: i32,
     private: f32,
-    rng: rand::ThreadRng,
+    rng: rand::rngs::ThreadRng,
     students: HashMap<DataType, Vec<DataType>>,
     tas: HashMap<DataType, Vec<DataType>>,
     pub classes: HashMap<DataType, i32>, // class ID to num posts in class mapping
@@ -229,7 +229,7 @@ impl Populate {
 
     fn cid_for(&mut self, uid: &DataType) -> DataType {
         let classes = self.students[uid].as_slice();
-        self.rng.choose(&classes).unwrap().clone()
+        classes.choose(&mut self.rng).unwrap().clone()
     }
 
     #[allow(dead_code)]

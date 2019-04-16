@@ -27,8 +27,8 @@ zookeeper = "0.5.3"
 # cli
 clap = "2.25.0"
 # distributions
-rand = "0.5.0"
-zipf = "4.0.0"
+rand = "0.6.0"
+zipf = "5.0.0"
 # sampling
 hdrhistogram = "6.1"
 # mssql
