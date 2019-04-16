@@ -142,7 +142,10 @@ fn make_security_nodes(
     prev_node: &MirNodeRef,
     node_for_rel: HashMap<&str, MirNodeRef>,
 ) -> Result<(Vec<MirNodeRef>, Vec<MirNodeRef>), String> {
-    println!("make_security_nodes called for table {}", table);
+    debug!(
+        mir_converter.log,
+        "make_security_nodes called for table {}", table
+    );
     let row_policies = match mir_converter
         .universe
         .row_policies
@@ -154,11 +157,13 @@ fn make_security_nodes(
     };
 
     // for debugging purposes: print row policies
-    debug!(
+    trace!(
         mir_converter.log,
-        "Row policies for table {}: {:?}", table, row_policies
+        "Row policies for table {}: {:?}",
+        table,
+        row_policies
     );
-    debug!(
+    trace!(
         mir_converter.log,
         "Found {} row policies for table {}",
         row_policies.len(),
