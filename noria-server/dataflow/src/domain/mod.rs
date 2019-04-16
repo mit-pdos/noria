@@ -838,7 +838,7 @@ impl Domain {
                                 materialization_info,
                                 uid,
                             } => {
-                                let srmap = !self.nodes[node].borrow().name().contains("count");
+                                let srmap = self.nodes[node].borrow().name().contains("SRMAP_");
 
                                 let k = key.clone(); // ugh
                                 let txs = (0..shards)
@@ -1052,7 +1052,7 @@ impl Domain {
                                 );
 
                                 let ids = if let Some(id) = uid { id } else { 0 };
-                                let srmap = !self.nodes[node].borrow().name().contains("count");
+                                let srmap = self.nodes[node].borrow().name().contains("SRMAP_");
                                 if srmap {
                                     let mut create_new_srmap = true;
                                     let mut append_to_handles = false;
