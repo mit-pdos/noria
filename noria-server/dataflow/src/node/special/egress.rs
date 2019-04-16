@@ -244,7 +244,18 @@ impl Egress {
         self.process(m, shard, output, &to_nodes);
     }
 
+    /// Set the minimum label of the provenance, which represents the label of the first
+    /// packet payload we have that is not stored. Truncate the payload buffer accordingly.
+    /// If the label is beyond the label of the payloads we actually have, just set the label
+    /// as given and clear the payload buffer.
     pub fn set_min_label(&mut self, label: usize) {
+        assert!(label >= self.min_provenance.label());
+        let num_to_truncate = label - self.min_provenance.label();
+        if num_to_truncate >= self.payloads.len() {
+            self.payloads = Vec::new();
+        } else {
+            self.payloads.drain(0..num_to_truncate);
+        }
         self.min_provenance.set_label(label);
     }
 
