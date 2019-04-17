@@ -41,6 +41,10 @@ impl SecurityBoundary for SqlToMirConverter {
         Option<HashMap<(String, Option<String>), String>>,
         String,
     ) {
+
+        // For debugging: check # ancestors
+        println!("# ancestors reconcile was passed: {}", ancestors.len());
+        
         use crate::controller::sql::mir::grouped::make_grouped;
 
         let mut nodes_added = Vec::new();
@@ -111,9 +115,10 @@ impl SecurityBoundary for SqlToMirConverter {
                 make_security_nodes(self, *rel, &prev_node, node_for_rel.clone())?;
             debug!(
                 self.log,
-                "Created {} security nodes for table {}",
+                "Created {} security nodes for table {} (last_nodes len: {})",
                 nodes.len(),
-                *rel
+                *rel,
+                last_nodes.len()
             );
 
             security_nodes.extend(nodes.clone());
@@ -128,6 +133,7 @@ impl SecurityBoundary for SqlToMirConverter {
             }
         }
 
+        // Needed (at least) as the default path for rewrite predicates
         if last_security_nodes.is_empty() {
             last_security_nodes.push(prev_node.clone());
         }
@@ -153,7 +159,10 @@ fn make_security_nodes(
     {
         Some(p) => p.clone(),
         // no row policies associated with this base node
-        None => Vec::new(),
+        // If there are no row policies, there should not be any
+        // rewrite policies associated with this base node! (this
+        // is in keeping with Multiverse's "default deny" paradigm)
+        None => return Ok((vec![], vec![])),
     };
 
     // for debugging purposes: print row policies
@@ -173,28 +182,6 @@ fn make_security_nodes(
     let mut security_nodes = Vec::new();
     let mut last_policy_nodes = Vec::new();
     let mut node_count = 0;
-
-    // If there are no row policies, there may still be rewrite policies.
-    // Process these and return.
-    if row_policies.len() == 0 {
-        let rewrite_nodes = make_rewrite_nodes(
-            mir_converter,
-            &format!("sp_{}", "fakename"), // TODO: what actual name to use?
-            prev_node.clone(),
-            table,
-            node_count,
-        )?;
-
-        // If there are no rewrite nodes, return.
-        if rewrite_nodes.len() == 0 {
-            return Ok((vec![], vec![]));
-        }
-
-        security_nodes.extend(rewrite_nodes.clone());
-        last_policy_nodes.push(rewrite_nodes.last().unwrap().clone());
-        return Ok((last_policy_nodes, security_nodes));
-    }
-
     let mut local_node_for_rel = node_for_rel.clone();
 
     // Policies are created in parallel and later union'ed

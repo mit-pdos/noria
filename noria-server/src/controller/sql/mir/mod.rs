@@ -899,8 +899,10 @@ impl SqlToMirConverter {
 
         assert!(
             emit.iter().all(|e| e.len() == selected_cols.len()),
-            "all ancestors columns must have the same size, but got emit: {:?}, selected: {:?}",
-            emit,
+            "all {} ancestors columns must have the same size (expected {}), but got emit:\n{}\n selected: {:?}",
+            ancestors.len(),
+            selected_cols.len(),
+            emit.iter().map(|c| format!("Size {}: {:?}\n", c.len(), c)).collect::<Vec<String>>().join("\n"),
             selected_cols
         );
 
@@ -1637,7 +1639,6 @@ impl SqlToMirConverter {
             // All query versions, including group queries will be reconciled at the end
             for n in last_policy_nodes.iter() {
                 prev_node = Some(n.clone());
-
                 // 3. Add function and grouped nodes
                 let mut func_nodes: Vec<MirNodeRef> = make_grouped(
                     self,
