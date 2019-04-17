@@ -49,7 +49,7 @@ fn main() {
                 .long("runtime")
                 .short("r")
                 .default_value("10")
-                .help("Seconds to run the benchmark for (first 1/3 of samples are dropped)"),
+                .help("Max number of seconds to run each stage of the benchmark for."),
         )
         .arg(
             Arg::with_name("materialization")
@@ -344,11 +344,8 @@ fn main() {
             let took = begin.elapsed();
             posts_reads += 1;
 
-            if start.elapsed() < runtime / 3 {
-                // warm-up
-                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-                continue;
-            }
+            // NOTE: do we want a warm-up period/drop first sample per uid?
+            // trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
 
             trace!(log, "recording sample"; "took" => ?took);
             cold_stats
@@ -380,11 +377,8 @@ fn main() {
             let took = begin.elapsed();
             post_count_reads += 1;
 
-            if start.elapsed() < runtime / 3 {
-                // warm-up
-                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-                continue;
-            }
+            // NOTE: do we want a warm-up period/drop first sample per uid?
+            // trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
 
             trace!(log, "recording sample"; "took" => ?took);
             cold_stats
