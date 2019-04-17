@@ -62,7 +62,7 @@ impl Egress {
             local: dst_l,
             dest: addr,
         });
-        self.min_label_to_send.insert(dst_g, 0);
+        self.min_label_to_send.insert(dst_g, 1);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -88,26 +88,28 @@ impl Egress {
                 continue;
             }
 
-            let label = msg.id().as_ref().unwrap().label;
-            if label < *self.min_label_to_send.get(&tx.node).unwrap() {
-                continue;
-            }
-
             if !to_nodes.contains(&tx.node) {
                 continue;
             }
 
-            // calculate and set the label before sending
             let mut m = box msg.clone_data();
-            let mtype = match *m {
-                Packet::Message { .. } => "Message",
-                Packet::ReplayPiece { .. } => "ReplayPiece",
+            let (mtype, is_replay) = match *m {
+                Packet::Message { .. } => ("Message", false),
+                Packet::ReplayPiece { .. } => ("ReplayPiece", true),
                 _ => unreachable!(),
             };
+
+            // forward all replays, but only messages with label at least the minimum label
+            let label = m.id().as_ref().unwrap().label;
+            let min_label = *self.min_label_to_send.get(&tx.node).unwrap();
+            if !is_replay && label < min_label {
+                continue;
+            }
+
             println!(
                 "SEND PACKET {} #{} -> {} {:?}",
                 mtype,
-                m.id().as_ref().unwrap().label,
+                label,
                 tx.node.index(),
                 m.id().as_ref().unwrap().update,
             );
@@ -264,12 +266,6 @@ impl Egress {
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
-        // if label is 1, then just resume at 0
-        if label == 1 {
-            self.min_label_to_send.insert(node, 0);
-        } else {
-            self.min_label_to_send.insert(node, label);
-        }
 
         // we don't have the messages we need to send
         // we must have lost a stateless domain
