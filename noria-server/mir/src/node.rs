@@ -619,11 +619,25 @@ impl MirNodeType {
                         ref on_right,
                         ref project,
                     } => {
-                        // TODO(malte): column order does not actually need to match, but this only
-                        // succeeds if it does.
-                        our_on_left == on_left
-                            && our_on_right == on_right
-                            && our_project == project
+                        // workaround for context tables not represented in the query graph
+                        let is_context = |c: &Column| -> bool {
+                            c.table.as_ref().map_or(false, |ref t| {
+                                t.contains("UserContext") || t.contains("GroupContext")
+                            })
+                        };
+                        if on_left.iter().any(|col| is_context(col))
+                            || on_right.iter().any(|col| is_context(col))
+                        {
+                            // can't reuse if there are any context tables involved (possibly
+                            // different universes)
+                            false
+                        } else {
+                            // TODO(malte): column order does not actually need to match, but this only
+                            // succeeds if it does.
+                            our_on_left == on_left
+                                && our_on_right == on_right
+                                && our_project == project
+                        }
                     }
                     _ => false,
                 }
