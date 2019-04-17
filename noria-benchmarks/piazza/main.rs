@@ -1,6 +1,7 @@
 #![feature(duration_float)]
 
 use clap::value_t_or_exit;
+use futures::Stream;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
@@ -426,14 +427,26 @@ fn main() {
     info!(log, "measuring space overhead");
     debug!(log, "performing reads to fill materializations");
     // have every user read every class so that we can measure total space overhead
+    let start = Instant::now();
+    let mut all = futures::stream::futures_unordered::FuturesUnordered::new();
     for (&uid, cids) in &enrolled {
         trace!(log, "reading all classes for user"; "uid" => uid, "classes" => ?cids);
         let cids: Vec<_> = cids.iter().map(|&cid| vec![cid.into()]).collect();
-        posts_view[uid - 1]
-            .multi_lookup(cids.clone(), true)
-            .unwrap();
-        post_count_view[uid - 1].multi_lookup(cids, true).unwrap();
+        all.push(
+            posts_view[uid - 1]
+                .clone()
+                .into_async()
+                .multi_lookup(cids.clone(), true),
+        );
+        all.push(
+            post_count_view[uid - 1]
+                .clone()
+                .into_async()
+                .multi_lookup(cids, true),
+        );
     }
+    let _ = all.wait().count();
+    debug!(log, "filling done"; "took" => ?start.elapsed());
     memstats(&mut g, "end");
 
     info!(log, "performing write measurements");
