@@ -438,15 +438,6 @@ impl WriteHandle {
 
         bytes_to_be_freed
     }
-
-    crate fn clear(&mut self) {
-        if let WHandleVariant::Evmap(ref mut h) = self.handle {
-            self.mem_size = 0;
-            h.purge();
-        } else {
-            unimplemented!()
-        }
-    }
 }
 
 impl SizeOf for WriteHandle {

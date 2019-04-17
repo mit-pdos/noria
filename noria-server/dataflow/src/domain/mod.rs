@@ -1589,6 +1589,7 @@ impl Domain {
             }
         }
 
+        let mut swap = HashSet::new();
         while let Some(tp) = self.timed_purges.front() {
             let now = time::Instant::now();
             if tp.time <= now {
@@ -1600,13 +1601,23 @@ impl Domain {
                         for key in tp.keys {
                             wh.mut_with_key(&key[..]).mark_hole();
                         }
-                        wh.swap();
+                        swap.insert(tp.view);
                     }
                 })
                 .unwrap();
             } else {
                 break;
             }
+        }
+        for n in swap {
+            self.nodes[n]
+                .borrow_mut()
+                .with_reader_mut(|r| {
+                    if let Some(wh) = r.writer_mut() {
+                        wh.swap();
+                    }
+                })
+                .unwrap();
         }
 
         if top {
@@ -1999,20 +2010,6 @@ impl Domain {
 
                         // are we about to fill a hole?
                         if target {
-                            // if the node is a reader beyond the materialization frontier, we want
-                            // to purge it before we fill it with new keys so that we don't amass
-                            // any serious state. if it's just an internal materialization, state
-                            // will be evicted by our children when they process replays that use
-                            // this state.
-                            if n.beyond_mat_frontier() {
-                                let ni = n.global_addr().index();
-                                n.with_reader_mut(|r| {
-                                    trace!(self.log, "purging state from reader"; "node" => ni);
-                                    r.writer_mut().unwrap().clear();
-                                })
-                                .is_ok();
-                            }
-
                             let backfill_keys = backfill_keys.as_ref().unwrap();
                             // mark the state for the key being replayed as *not* a hole otherwise
                             // we'll just end up with the same "need replay" response that
@@ -2435,7 +2432,8 @@ impl Domain {
                                 if self.nodes[dst].borrow().beyond_mat_frontier() {
                                     // make sure we eventually evict these from here
                                     self.timed_purges.push_back(TimedPurge {
-                                        time: time::Instant::now() + time::Duration::from_secs(1),
+                                        time: time::Instant::now()
+                                            + time::Duration::from_millis(50),
                                         keys: for_keys,
                                         view: dst,
                                         tag,
