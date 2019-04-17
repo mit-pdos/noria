@@ -7,9 +7,14 @@
             "policies": [
 		{
                     "table": "Paper",
-                    "predicate": "SELECT * FROM Paper WHERE Paper.id = GroupContext.id",
+                    "predicate": "SELECT * FROM Paper JOIN GroupContext ON (Paper.id = GroupContext.id)",
                     "description": "Reviewers can see papers they are assigned to."
                 },
+		{
+		    "table": "Review",
+		    "predicate": "SELECT * FROM Review JOIN GroupContext ON (Review.paper = GroupContext.id)",
+		    "description": "Reviewers can see reviews on papers they are assigned to."
+		},
 		{
 		    "action": "rewrite",
                     "table": "Paper",
@@ -36,6 +41,11 @@
         "description": "Everyone can see accepted papers",
         "table": "Paper",
         "predicate": "SELECT * FROM Paper WHERE Paper.accepted = 1;"
-      }
+      },
+	{
+	    "description": "test policy",
+	    "table": "Review",
+	    "predicate": "SELECT * FROM Review WHERE Review.reviewer = \"nobody\";"
+	}
     ]
 }

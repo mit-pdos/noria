@@ -12,7 +12,7 @@
 		},
 		{
                     "table": "Review",
-                    "predicate": "SELECT * FROM Review WHERE Review.paper = GroupContext.id",
+                    "predicate": "SELECT * FROM Review JOIN GroupContext ON (Review.paper = GroupContext.id)",
                     "description": "Authors can see reviews for their own paper."
                 },
 		{

@@ -2,6 +2,7 @@ use crate::Backend;
 use noria::DataType;
 
 use std::{thread, time};
+use std::collections::HashMap;
 
 pub fn create_single_trigger_data(backend: &mut Backend) {
     let users: Vec<Vec<&str>> = vec![vec!["2", "2@mit.edu", "2", "2 University", "0", "normal"]];
@@ -295,20 +296,16 @@ pub fn dump_reviews(backend: &mut Backend, user: &str, iterate:i32) {
         .into_sync();
 
     if iterate > 0 {
-        let mut results = Vec::new();
         for i in 1..iterate + 1 {
-            results.push(get.lookup(&[i.into()], true));
+            println!(
+                "user's reviews (ReviewList_u{}), lookup on key {}: {:?}",
+                user, i, get.lookup(&[i.into()], true)
+            );
         }
-        println!(
-            "user's reviews (ReviewList_u{}), by-key lookup: {:?}",
-            user, results
-        );
+        
     } else {
-        println!(
-            "user's reviews (ReviewList_u{}), bogokey lookup: {:?}",
-            user,
-            get.lookup(&[0.into()], true)
-        ); // 0 is bogo key for id
+        // 0 is bogo key for id
+        println!("user's reviews (ReviewList_u{}), bogokey lookup: {:?}", user, get.lookup(&[0.into()], true));
     }
 }
 
