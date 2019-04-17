@@ -906,7 +906,7 @@ impl SqlToMirConverter {
 
         (
             MirNode::new(
-                name,
+                &format!("spu_{}", name),
                 self.schema_version,
                 emit.first().unwrap().clone(),
                 MirNodeType::Union { emit },

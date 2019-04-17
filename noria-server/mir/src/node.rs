@@ -143,6 +143,11 @@ impl MirNode {
             }
         }
 
+        // XXX(malte): hacky workaround-- never reuse security unions
+        if self.name.starts_with("spu_") {
+            return false;
+        }
+
         have_all_columns && self.inner.can_reuse_as(&for_node.inner)
     }
 
