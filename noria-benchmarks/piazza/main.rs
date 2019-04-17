@@ -329,71 +329,69 @@ fn main() {
     let mut posts_reads = 0;
     let start = Instant::now();
     let mut requests = Vec::new();
-    while start.elapsed() < runtime {
-        trace!(log, "reading posts");
-        // TODO: maybe only select from eligible users?
-        let begin = loop {
-            let uid = 1 + rng.gen_range(0, nlogged);
-            trace!(log, "trying user"; "uid" => uid);
-            if let Some(cids) = enrolled.get(&uid) {
-                let cid = *cids.choose(&mut rng).unwrap();
-                trace!(log, "chose class"; "cid" => cid);
-                requests.push((Operation::ReadPosts, uid, cid));
-                let start = Instant::now();
-                posts_view[uid - 1].lookup(&[cid.into()], true).unwrap();
-                break start;
+    'ps_outer: for (&uid, cids) in &mut enrolled {
+        cids.shuffle(&mut rng);
+        for &cid in &*cids {
+            if start.elapsed() >= runtime {
+                debug!(log, "time limit reached"; "nreads" => posts_reads);
+                break 'ps_outer;
             }
-        };
-        let took = begin.elapsed();
-        posts_reads += 1;
 
-        if start.elapsed() < runtime / 3 {
-            // warm-up
-            trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-            continue;
+            trace!(log, "reading posts"; "uid" => uid, "cid" => cid);
+            requests.push((Operation::ReadPosts, uid, cid));
+            let begin = Instant::now();
+            posts_view[uid - 1].lookup(&[cid.into()], true).unwrap();
+            let took = begin.elapsed();
+            posts_reads += 1;
+
+            if start.elapsed() < runtime / 3 {
+                // warm-up
+                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
+                continue;
+            }
+
+            trace!(log, "recording sample"; "took" => ?took);
+            cold_stats
+                .entry(Operation::ReadPosts)
+                .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
+                .saturating_record(took.as_micros() as u64);
         }
-
-        trace!(log, "recording sample"; "took" => ?took);
-        cold_stats
-            .entry(Operation::ReadPosts)
-            .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-            .saturating_record(took.as_micros() as u64);
     }
 
     debug!(log, "cold reads of post count");
     let mut post_count_reads = 0;
     let start = Instant::now();
-    while start.elapsed() < runtime {
-        trace!(log, "reading post count");
-        // TODO: maybe only select from eligible users?
-        let begin = loop {
-            let uid = 1 + rng.gen_range(0, nlogged);
-            trace!(log, "trying user"; "uid" => uid);
-            if let Some(cids) = enrolled.get(&uid) {
-                let cid = *cids.choose(&mut rng).unwrap();
-                trace!(log, "chose class"; "cid" => cid);
-                requests.push((Operation::ReadPostCount, uid, cid));
-                let start = Instant::now();
-                post_count_view[uid - 1]
-                    .lookup(&[cid.into()], true)
-                    .unwrap();
-                break start;
+    // re-randomize order of uids
+    let mut enrolled: HashMap<_, _> = enrolled.into_iter().collect();
+    'pc_outer: for (&uid, cids) in &mut enrolled {
+        cids.shuffle(&mut rng);
+        for &cid in &*cids {
+            if start.elapsed() >= runtime {
+                debug!(log, "time limit reached"; "nreads" => post_count_reads);
+                break 'pc_outer;
             }
-        };
-        let took = begin.elapsed();
-        post_count_reads += 1;
 
-        if start.elapsed() < runtime / 3 {
-            // warm-up
-            trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-            continue;
+            trace!(log, "reading post count"; "uid" => uid, "cid" => cid);
+            requests.push((Operation::ReadPostCount, uid, cid));
+            let begin = Instant::now();
+            post_count_view[uid - 1]
+                .lookup(&[cid.into()], true)
+                .unwrap();
+            let took = begin.elapsed();
+            post_count_reads += 1;
+
+            if start.elapsed() < runtime / 3 {
+                // warm-up
+                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
+                continue;
+            }
+
+            trace!(log, "recording sample"; "took" => ?took);
+            cold_stats
+                .entry(Operation::ReadPostCount)
+                .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
+                .saturating_record(took.as_micros() as u64);
         }
-
-        trace!(log, "recording sample"; "took" => ?took);
-        cold_stats
-            .entry(Operation::ReadPostCount)
-            .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-            .saturating_record(took.as_micros() as u64);
     }
 
     info!(log, "starting warm read benchmarks");
@@ -408,7 +406,6 @@ fn main() {
             _ => unreachable!(),
         }
 
-        // TODO: maybe only select from eligible users?
         let begin = Instant::now();
         match op {
             Operation::ReadPosts => {
