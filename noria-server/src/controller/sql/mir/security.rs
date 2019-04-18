@@ -43,8 +43,12 @@ impl SecurityBoundary for SqlToMirConverter {
     ) {
 
         // For debugging: check # ancestors
-        println!("# ancestors reconcile was passed: {}", ancestors.len());
-        
+        trace!(
+            self.log,
+            "# ancestors reconcile was passed: {}",
+            ancestors.len()
+        );
+
         use crate::controller::sql::mir::grouped::make_grouped;
 
         let mut nodes_added = Vec::new();
