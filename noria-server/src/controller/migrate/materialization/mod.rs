@@ -560,7 +560,7 @@ impl Materializations {
             }
             // XXX Hack specifically for Piazza
             if let FrontierStrategy::Readers = self.frontier_strategy {
-                if n.name().starts_with("q_bd7080f53924ae80_") && !n.name().ends_with("_n0") {
+                if n.name().starts_with("q_bd7080f53924ae80_") {
                     n.purge = true;
                     continue;
                 }
