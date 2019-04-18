@@ -151,7 +151,8 @@ impl<A: Authority + 'static> Handle<A> {
             drop(self.c.take());
             drop(self.event_tx.take());
             drop(self.kill.take());
-            io.shutdown_on_idle();
+            io.shutdown();
+            // io.shutdown_on_idle();
         }
     }
 }

@@ -394,7 +394,6 @@ fn lose_stateless_multi_parent_domain() {
     println!("success! now clean shutdown...");
 }
 
-/*
 fn test_single_child_parent_replica(replay_after_recovery: bool, worker_to_drop: usize) {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY votecount: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;";
@@ -481,7 +480,16 @@ fn lose_top_replica_with_replays() {
 fn lose_bottom_replica_with_replays() {
     test_single_child_parent_replica(true, 2);
 }
-*/
+
+#[test]
+fn lose_reader_with_state() {
+    test_single_child_parent_replica(false, 4);
+}
+
+#[test]
+fn lose_reader_without_state() {
+    test_single_child_parent_replica(true, 4);
+}
 
 /// Returns a list of all the workers, and handles to Article, Vote, ArticleWithVoteCount.
 fn setup_vote() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
