@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 const STUDENTS_PER_CLASS: usize = 150;
 const TAS_PER_CLASS: usize = 5;
 const WRITE_CHUNK_SIZE: usize = 100;
+const CLASSES_PER_STUDENT: usize = 4;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
@@ -34,7 +35,7 @@ impl std::fmt::Display for Operation {
 }
 
 fn main() {
-    use clap::{App, Arg};
+    use clap::{App, Arg, ArgGroup};
     let args = App::new("piazza")
         .version("0.1")
         .about("Benchmarks Piazza-like application with security policies.")
@@ -67,11 +68,22 @@ fn main() {
                 .default_value("noria-benchmarks/piazza/basic-policies.json")
                 .help("Security policies file for Piazza application"),
         )
+        .group(
+            ArgGroup::with_name("n")
+                .args(&["nusers", "nclasses"])
+                .required(true),
+        )
         .arg(
             Arg::with_name("nusers")
                 .short("u")
-                .default_value("1000")
-                .help("Number of users in the db"),
+                .takes_value(true)
+                .help("Number of users in the db (# clases is computed)"),
+        )
+        .arg(
+            Arg::with_name("nclasses")
+                .short("c")
+                .takes_value(true)
+                .help("Number of classes in the db (# users is computed)"),
         )
         .arg(
             Arg::with_name("logged-in")
@@ -80,16 +92,10 @@ fn main() {
                 .help("Fraction of users that are logged in."),
         )
         .arg(
-            Arg::with_name("nclasses")
-                .short("c")
-                .default_value("100")
-                .help("Number of classes in the db"),
-        )
-        .arg(
             Arg::with_name("nposts")
                 .short("p")
-                .default_value("100000")
-                .help("Number of posts in the db"),
+                .default_value("1000")
+                .help("Number of posts per class in the db"),
         )
         .arg(
             Arg::with_name("private")
@@ -111,12 +117,45 @@ fn main() {
         )
         .get_matches();
     let verbose = args.occurrences_of("verbose");
-    let nusers = value_t_or_exit!(args, "nusers", usize);
     let loggedf = value_t_or_exit!(args, "logged-in", f64);
-    let nclasses = value_t_or_exit!(args, "nclasses", usize);
     let nposts = value_t_or_exit!(args, "nposts", usize);
     let private = value_t_or_exit!(args, "private", f64);
     let runtime = Duration::from_secs(value_t_or_exit!(args, "runtime", u64));
+
+    let (nusers, nclasses) = if args.is_present("nusers") {
+        let nusers = value_t_or_exit!(args, "nusers", usize);
+        // how many classes should there be?
+        // well, there should be 4 classes per student,
+        // and 150 students per class,
+        // but the classes can overlap!
+        // so we work with expected values
+        //
+        // the expected number of students per class
+        //  = nusers * chance one students picks that class
+        //
+        // chance one student picks a class (assuming disjoint)
+        //  = classes per student / nclasses
+        //
+        // rearranging gives us
+        //
+        //   spc = #u * cps / #c
+        //    #c = #u * cps / spc
+        let nclasses =
+            ((nusers * CLASSES_PER_STUDENT) as f64 / STUDENTS_PER_CLASS as f64).ceil() as usize;
+        (nusers, nclasses)
+    } else if args.is_present("nclasses") {
+        let nclasses = value_t_or_exit!(args, "nclasses", usize);
+        // solving for #c instead of #u above gives us
+        //
+        //   spc = #u * cps / #c
+        //    #u = spc * #c / cps
+        let nusers =
+            ((STUDENTS_PER_CLASS * nclasses) as f64 / CLASSES_PER_STUDENT as f64).ceil() as usize;
+        (nusers, nclasses)
+    } else {
+        unreachable!();
+    };
+    let nposts = nposts * nclasses;
 
     assert!(nusers >= STUDENTS_PER_CLASS + TAS_PER_CLASS);
     assert!(loggedf >= 0.0);
