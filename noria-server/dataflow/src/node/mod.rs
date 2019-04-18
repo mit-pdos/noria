@@ -318,12 +318,20 @@ impl Node {
 
 // attributes
 impl Node {
-    crate fn beyond_mat_frontier(&self) -> bool {
+    pub fn beyond_mat_frontier(&self) -> bool {
         self.purge
     }
 
     crate fn add_child(&mut self, child: LocalNodeIndex) {
         self.children.push(child);
+    }
+
+    pub fn is_security_union(&self) -> bool {
+        if let NodeType::Internal(ops::NodeOperator::Union(ref u)) = self.inner {
+            u.is_security_union()
+        } else {
+            false
+        }
     }
 
     crate fn try_remove_child(&mut self, child: LocalNodeIndex) -> bool {

@@ -780,6 +780,12 @@ impl Domain {
                             .send(ControlReplyPacket::ack())
                             .unwrap();
                     }
+                    Packet::EgressDropWrites { node, to } => {
+                        let mut n = self.nodes[node].borrow_mut();
+                        n.with_egress_mut(move |e| {
+                            e.drop_writes_to(to);
+                        });
+                    }
                     Packet::UpdateEgress {
                         node,
                         new_tx,

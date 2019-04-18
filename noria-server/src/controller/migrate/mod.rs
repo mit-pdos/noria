@@ -659,6 +659,49 @@ impl<'a> Migration<'a> {
             &mut mainline.replies,
         );
 
+        // Actually, one more piece: tell all egress nodes about children they have that are
+        // .purge. Ideally we'd do this then the ingress nodes are added, but we can't do that
+        // since .purge is only decided in the call to commit above :'(
+        for &ni in &new {
+            let n = &mainline.ingredients[ni];
+            if !n.is_ingress() || !n.beyond_mat_frontier() {
+                continue;
+            }
+
+            let egress = mainline
+                .ingredients
+                .neighbors_directed(ni, petgraph::Direction::Incoming)
+                .next()
+                .unwrap();
+
+            let egress = &mainline.ingredients[egress];
+            if !egress.is_egress() || mainline.domains[&n.domain()].shards() != 1 {
+                // TODO: work with sharded egress/sharders
+                continue;
+            }
+
+            // let the egress node know that this child is beyond the frontier,
+            // and should not receive writes
+            debug!(log,
+                   "dropping writes on egress connection";
+                   "egress" => egress.global_addr().index(),
+                   "ingress" => ni.index()
+            );
+
+            mainline
+                .domains
+                .get_mut(&egress.domain())
+                .unwrap()
+                .send_to_healthy(
+                    box Packet::EgressDropWrites {
+                        node: egress.local_addr(),
+                        to: ni,
+                    },
+                    &mainline.workers,
+                )
+                .unwrap();
+        }
+
         warn!(log, "migration completed"; "ms" => start.elapsed().as_millis());
     }
 }

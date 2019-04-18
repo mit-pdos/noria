@@ -168,6 +168,12 @@ pub enum Packet {
         new_tag: Option<(Tag, NodeIndex)>,
     },
 
+    /// Make an Egress node drop writs to a given target
+    EgressDropWrites {
+        node: LocalNodeIndex,
+        to: NodeIndex,
+    },
+
     /// Add a shard to a Sharder node.
     ///
     /// Note that this *must* be done *before* the sharder starts being used!

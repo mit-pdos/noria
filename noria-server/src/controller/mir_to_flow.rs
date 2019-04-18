@@ -286,7 +286,7 @@ fn mir_node_to_flow_parts(
                                FlowNode::Existing(na) => FlowNode::Existing(na),
                         }
                 }
-                MirNodeType::Union { ref emit } => {
+                MirNodeType::Union { ref emit, security } => {
                     assert_eq!(mir_node.ancestors.len(), emit.len());
                     make_union_node(
                         &name,
@@ -295,6 +295,7 @@ fn mir_node_to_flow_parts(
                         mir_node.ancestors(),
                         mig,
                         table_mapping,
+                        security,
                     )
                 }
                 MirNodeType::Distinct { ref group_by } => {
@@ -467,6 +468,7 @@ fn make_union_node(
     ancestors: &[MirNodeRef],
     mig: &mut Migration,
     table_mapping: Option<&HashMap<(String, Option<String>), String>>,
+    is_security: bool,
 ) -> FlowNode {
     let column_names = column_names(columns);
     let mut emit_column_id: HashMap<NodeIndex, Vec<usize>> = HashMap::new();
@@ -483,11 +485,12 @@ fn make_union_node(
         let ni = n.borrow().flow_node_addr().unwrap();
         emit_column_id.insert(ni, emit_cols);
     }
-    let node = mig.add_ingredient(
-        String::from(name),
-        column_names.as_slice(),
-        ops::union::Union::new(emit_column_id),
-    );
+
+    let mut u = ops::union::Union::new(emit_column_id);
+    if is_security {
+        u.mark_security_union();
+    }
+    let node = mig.add_ingredient(String::from(name), column_names.as_slice(), u);
 
     FlowNode::New(node)
 }

@@ -781,7 +781,10 @@ impl SqlToMirConverter {
             name,
             self.schema_version,
             emit.first().unwrap().clone(),
-            MirNodeType::Union { emit },
+            MirNodeType::Union {
+                emit,
+                security: false,
+            },
             ancestors.to_vec(),
             vec![],
         )
@@ -911,7 +914,10 @@ impl SqlToMirConverter {
                 &format!("spu_{}", name),
                 self.schema_version,
                 emit.first().unwrap().clone(),
-                MirNodeType::Union { emit },
+                MirNodeType::Union {
+                    emit,
+                    security: true,
+                },
                 ancestors.to_vec(),
                 vec![],
             ),
@@ -933,7 +939,10 @@ impl SqlToMirConverter {
             name,
             self.schema_version,
             columns,
-            MirNodeType::Union { emit },
+            MirNodeType::Union {
+                emit,
+                security: false,
+            },
             ancestors.clone(),
             vec![],
         )

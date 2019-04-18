@@ -681,6 +681,10 @@ impl Materializations {
         }
 
         for &ni in new {
+            if graph[ni].purge && (self.have.contains_key(&ni) || graph[ni].is_reader()) {
+                assert!(self.partial.contains(&ni));
+            }
+
             // any nodes marked as .purge should have their state be beyond the materialization
             // frontier. however, mir may have named an identity child instead of the node with a
             // materialization, so let's make sure the label gets correctly applied: specifically,
@@ -736,6 +740,37 @@ impl Materializations {
         }
         drop(non_purge);
 
+        // mark all non-materialized ancestors of .purge nodes as .purge.
+        // this helps us simplify later checks (like egress leading to .purge ingress).
+        let mut purge = Vec::new();
+        for &ni in new {
+            if (graph[ni].is_reader() || self.have.contains_key(&ni)) && graph[ni].purge {
+                purge.extend(graph.neighbors_directed(ni, petgraph::EdgeDirection::Incoming));
+            }
+        }
+        while let Some(ni) = purge.pop() {
+            // we can't be _too_ aggressive here without getting fancy: if a node has multiple
+            // children, some other child may have a non-.purge materialization, in which case we
+            // can't mark this node .purge. so we take the easy way out and simply stop at any node
+            // with multiple children. and hence: TODO
+            if graph
+                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
+                .count()
+                != 1
+            {
+                continue;
+            }
+
+            let mut n = graph.node_weight_mut(ni).unwrap();
+            if n.is_reader() || self.have.contains_key(&ni) || n.purge || !new.contains(&ni) {
+                continue;
+            }
+
+            n.purge = true;
+            purge.extend(graph.neighbors_directed(ni, petgraph::EdgeDirection::Incoming));
+        }
+        drop(purge);
+
         let mut reindex = Vec::with_capacity(new.len());
         let mut make = Vec::with_capacity(new.len());
         let mut topo = petgraph::visit::Topo::new(&*graph);
@@ -760,6 +795,13 @@ impl Materializations {
 
             // are they trying to make a non-materialized node materialized?
             if self.have[&node] == index_on {
+                if graph[node].purge {
+                    // this is a problem; there may be a Dropper above us!
+                    unimplemented!(
+                        "trying to make non-materialized node beyond the frontier materialized"
+                    );
+                }
+
                 if self.partial.contains(&node) {
                     // we can't make this node partial if any of its children are materialized, as
                     // we might stop forwarding updates to them, which would make them very sad.

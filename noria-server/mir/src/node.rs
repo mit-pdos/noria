@@ -443,6 +443,7 @@ pub enum MirNodeType {
     /// emit columns
     Union {
         emit: Vec<Vec<Column>>,
+        security: bool,
     },
     /// order function, group columns, k
     TopK {
@@ -504,7 +505,7 @@ impl MirNodeType {
             MirNodeType::Project { ref mut emit, .. } => {
                 emit.push(c);
             }
-            MirNodeType::Union { ref mut emit } => {
+            MirNodeType::Union { ref mut emit, .. } => {
                 for e in emit.iter_mut() {
                     e.push(c.clone());
                 }
@@ -720,8 +721,10 @@ impl MirNodeType {
                 MirNodeType::Leaf { ref keys, .. } => keys == our_keys,
                 _ => false,
             },
-            MirNodeType::Union { emit: ref our_emit } => match *other {
-                MirNodeType::Union { ref emit } => emit == our_emit,
+            MirNodeType::Union {
+                emit: ref our_emit, ..
+            } => match *other {
+                MirNodeType::Union { ref emit, .. } => emit == our_emit,
                 _ => false,
             },
             MirNodeType::Rewrite {
@@ -975,7 +978,7 @@ impl Debug for MirNodeType {
             MirNodeType::TopK {
                 ref order, ref k, ..
             } => write!(f, "TopK [k: {}, {:?}]", k, order),
-            MirNodeType::Union { ref emit } => {
+            MirNodeType::Union { ref emit, .. } => {
                 let cols = emit
                     .iter()
                     .map(|c| {

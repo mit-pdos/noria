@@ -43,6 +43,7 @@ pub struct Union {
     replay_pieces: HashMap<Vec<DataType>, ReplayPieces>,
 
     required: usize,
+    security: bool,
 
     full_wait_state: FullWait,
 }
@@ -52,6 +53,7 @@ impl Clone for Union {
         Union {
             emit: self.emit.clone(),
             required: self.required,
+            security: self.security,
             replay_key_orig: Vec::new(),
             // nothing can have been received yet
             replay_key: None,
@@ -90,6 +92,7 @@ impl Union {
                 cols_l: BTreeMap::new(),
             },
             required: parents,
+            security: false,
             replay_key_orig: Vec::new(),
             replay_key: None,
             replay_pieces: HashMap::new(),
@@ -105,9 +108,18 @@ impl Union {
             required: shards,
             replay_key_orig: Vec::new(),
             replay_key: None,
+            security: false,
             replay_pieces: HashMap::new(),
             full_wait_state: FullWait::None,
         }
+    }
+
+    pub fn mark_security_union(&mut self) {
+        self.security = true;
+    }
+
+    pub fn is_security_union(&self) -> bool {
+        self.security
     }
 
     pub fn is_shard_merger(&self) -> bool {

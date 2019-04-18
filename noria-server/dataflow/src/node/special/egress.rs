@@ -11,16 +11,17 @@ struct EgressTx {
 
 #[derive(Serialize, Deserialize)]
 pub struct Egress {
-    txs: Vec<EgressTx>,
+    all_txs: Vec<EgressTx>,
+    replay_txs: Vec<EgressTx>,
     tags: HashMap<Tag, NodeIndex>,
 }
 
 impl Clone for Egress {
     fn clone(&self) -> Self {
-        assert!(self.txs.is_empty());
-
+        assert_eq!(self.all_txs.len() + self.replay_txs.len(), 0);
         Self {
-            txs: Vec::new(),
+            all_txs: Vec::new(),
+            replay_txs: Vec::new(),
             tags: self.tags.clone(),
         }
     }
@@ -30,14 +31,15 @@ impl Default for Egress {
     fn default() -> Self {
         Self {
             tags: Default::default(),
-            txs: Default::default(),
+            all_txs: Default::default(),
+            replay_txs: Default::default(),
         }
     }
 }
 
 impl Egress {
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
-        self.txs.push(EgressTx {
+        self.all_txs.push(EgressTx {
             node: dst_g,
             local: dst_l,
             dest: addr,
@@ -48,6 +50,16 @@ impl Egress {
         self.tags.insert(tag, dst);
     }
 
+    pub fn drop_writes_to(&mut self, dst: NodeIndex) {
+        let mv = self
+            .all_txs
+            .iter()
+            .position(|etx| etx.node == dst)
+            .expect("told to drop writes to unknown node");
+        let tx = self.all_txs.swap_remove(mv);
+        self.replay_txs.push(tx);
+    }
+
     pub fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
@@ -55,26 +67,38 @@ impl Egress {
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         let &mut Self {
-            ref mut txs,
+            ref mut all_txs,
+            ref mut replay_txs,
             ref tags,
         } = self;
-
-        // send any queued updates to all external children
-        assert!(!txs.is_empty());
-        let txn = txs.len() - 1;
+        assert_ne!(all_txs.len() + replay_txs.len(), 0);
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
         let replay_to = m.as_ref().unwrap().tag().map(|tag| {
             tags.get(&tag)
-                .cloned()
                 .expect("egress node told about replay message, but not on replay path")
         });
 
-        for (txi, ref mut tx) in txs.iter_mut().enumerate() {
+        // don't send writes to replay-only ingress nodes
+        // (they're replay-only because they are beyond the materialization frontier)
+        let also = if replay_to.is_some() {
+            &mut replay_txs[..]
+        } else {
+            &mut []
+        };
+
+        if all_txs.is_empty() && also.is_empty() {
+            // no need to do anything!
+            return;
+        }
+
+        let txn = all_txs.len() + also.len() - 1;
+
+        for (txi, ref mut tx) in all_txs.iter_mut().chain(also.iter_mut()).enumerate() {
             let mut take = txi == txn;
-            if let Some(replay_to) = replay_to.as_ref() {
+            if let Some(replay_to) = replay_to {
                 if *replay_to == tx.node {
                     take = true;
                 } else {

@@ -302,7 +302,7 @@ impl GraphViz for MirNodeType {
                         .unwrap_or_else(|| "".into())
                 )?;
             }
-            MirNodeType::Union { ref emit } => {
+            MirNodeType::Union { ref emit, .. } => {
                 let cols = emit
                     .iter()
                     .map(|c| {
