@@ -346,17 +346,20 @@ fn main() {
 
     info!(log, "creating api handles");
     debug!(log, "creating view handles for posts");
-    let mut posts_view: Vec<_> = (1..=nlogged)
+    let mut posts_view: HashMap<_, _> = (1..=nlogged)
         .map(|uid| {
             trace!(log, "creating posts handle for user"; "uid" => uid);
-            g.view(format!("posts_u{}", uid)).unwrap().into_sync()
+            (uid, g.view(format!("posts_u{}", uid)).unwrap().into_sync())
         })
         .collect();
     debug!(log, "creating view handles for post_count");
-    let mut post_count_view: Vec<_> = (1..=nlogged)
+    let mut post_count_view: HashMap<_, _> = (1..=nlogged)
         .map(|uid| {
             trace!(log, "creating post count handle for user"; "uid" => uid);
-            g.view(format!("post_count_u{}", uid)).unwrap().into_sync()
+            (
+                uid,
+                g.view(format!("post_count_u{}", uid)).unwrap().into_sync(),
+            )
         })
         .collect();
     debug!(log, "all api handles created");
@@ -370,6 +373,12 @@ fn main() {
     let start = Instant::now();
     let mut requests = Vec::new();
     'ps_outer: for (&uid, cids) in &mut enrolled {
+        if uid > nlogged {
+            // since users are randomly assigned to classes,
+            // this should still give us a random sampling.
+            continue;
+        }
+
         cids.shuffle(&mut rng);
         for &cid in &*cids {
             if start.elapsed() >= runtime {
@@ -380,7 +389,11 @@ fn main() {
             trace!(log, "reading posts"; "uid" => uid, "cid" => cid);
             requests.push((Operation::ReadPosts, uid, cid));
             let begin = Instant::now();
-            posts_view[uid - 1].lookup(&[cid.into()], true).unwrap();
+            posts_view
+                .get_mut(&uid)
+                .unwrap()
+                .lookup(&[cid.into()], true)
+                .unwrap();
             let took = begin.elapsed();
             posts_reads += 1;
 
@@ -401,6 +414,10 @@ fn main() {
     // re-randomize order of uids
     let mut enrolled: HashMap<_, _> = enrolled.into_iter().collect();
     'pc_outer: for (&uid, cids) in &mut enrolled {
+        if uid > nlogged {
+            continue;
+        }
+
         cids.shuffle(&mut rng);
         for &cid in &*cids {
             if start.elapsed() >= runtime {
@@ -411,7 +428,9 @@ fn main() {
             trace!(log, "reading post count"; "uid" => uid, "cid" => cid);
             requests.push((Operation::ReadPostCount, uid, cid));
             let begin = Instant::now();
-            post_count_view[uid - 1]
+            post_count_view
+                .get_mut(&uid)
+                .unwrap()
                 .lookup(&[cid.into()], true)
                 .unwrap();
             let took = begin.elapsed();
@@ -443,10 +462,16 @@ fn main() {
         let begin = Instant::now();
         match op {
             Operation::ReadPosts => {
-                posts_view[uid - 1].lookup(&[cid.into()], true).unwrap();
+                posts_view
+                    .get_mut(&uid)
+                    .unwrap()
+                    .lookup(&[cid.into()], true)
+                    .unwrap();
             }
             Operation::ReadPostCount => {
-                post_count_view[uid - 1]
+                post_count_view
+                    .get_mut(&uid)
+                    .unwrap()
                     .lookup(&[cid.into()], true)
                     .unwrap();
             }
@@ -469,16 +494,24 @@ fn main() {
     let start = Instant::now();
     let mut all = futures::stream::futures_unordered::FuturesUnordered::new();
     for (&uid, cids) in &enrolled {
+        if uid > nlogged {
+            continue;
+        }
+
         trace!(log, "reading all classes for user"; "uid" => uid, "classes" => ?cids);
         let cids: Vec<_> = cids.iter().map(|&cid| vec![cid.into()]).collect();
         all.push(
-            posts_view[uid - 1]
+            posts_view
+                .get_mut(&uid)
+                .unwrap()
                 .clone()
                 .into_async()
                 .multi_lookup(cids.clone(), true),
         );
         all.push(
-            post_count_view[uid - 1]
+            post_count_view
+                .get_mut(&uid)
+                .unwrap()
                 .clone()
                 .into_async()
                 .multi_lookup(cids, true),
