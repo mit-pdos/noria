@@ -91,6 +91,7 @@ impl Egress {
 
         if all_txs.is_empty() && also.is_empty() {
             // no need to do anything!
+            drop(m.take());
             return;
         }
 
