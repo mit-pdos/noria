@@ -1810,56 +1810,9 @@ impl SqlToMirConverter {
                 ancestors.push(final_node);
             }
 
-            // If there are multiple Rewrite ancestors, remove all but the lowest one.
-            // Multiple Rewrite ancestors should *not* be union'd
-            // Get all Rewrite nodes from ancestors
-            let rewrite_ancestors: Vec<MirNodeRef> = ancestors.iter().cloned().filter(|a| match a.borrow().inner{
-                MirNodeType::Rewrite{..} => true,
-                _ => false,
-            }).collect();
-            // If we have multiple Rewrite ancestors, need to keep only the lowest.
-            if rewrite_ancestors.len() > 1 {
-                // Pick the Rewrite node that is lowest in the graph
-                // Each MirNode has ancestors & children set.
-                let mut lowest_rewrite = rewrite_ancestors.first().unwrap().clone();
-                let ra_names: HashSet<_> = rewrite_ancestors
-                    .iter().map(|ref a| a.borrow().name().to_owned()).collect();
-                for ra in rewrite_ancestors.iter() {
-                    let mut visited = HashSet::new();
-                    let mut queue = Vec::new();
-                    let mut found = false;
-                    queue.push(ra.clone());
-                    // Do BFS
-                    while !queue.is_empty() {
-                        let current = queue.remove(0).clone();
-                        // Check if found any other Rewrite ancestor
-                        if current.borrow().name() != ra.borrow().name() &&
-                            ra_names.contains(current.borrow().name()) {
-                                found = true;
-                                break;
-                        }
-                        // Add node to visited, put children on queue.
-                        visited.insert(current.borrow().name().to_owned());
-                        for c in current.borrow().children() {
-                            if !visited.contains(c.borrow().name()) {
-                                queue.push(c.clone());
-                            }
-                        }
-                    }
-                    // If no other rewrites were found, this one is the lowest.
-                    if found == false {
-                        lowest_rewrite = ra.clone();
-                        break;
-                    }
-                }
-                // Update ancestors so it contains only the lowest Rewrite node.
-                ancestors.retain(|a| match a.borrow().inner{
-                    MirNodeType::Rewrite{..} => false,
-                    _ => true,
-                });
-                println!("lowest rewrite: {:?}", lowest_rewrite);
-                ancestors.push(lowest_rewrite.clone()); 
-            }
+            // There should not be any ancestors passed to reconcile that have children (they
+            // are not leaf nodes and should not be unioned).
+            ancestors.retain(|a| a.borrow().children().len() == 0);
             
             println!("mk_nd_fr_sel # ancestors after pushing final node: {}", ancestors.len());
             let final_node = if ancestors.len() > 1 {
