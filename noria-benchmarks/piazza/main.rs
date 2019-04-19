@@ -268,7 +268,7 @@ fn main() {
                     .map(|(i, &uid)| {
                         enrolled.entry(uid).or_insert_with(Vec::new).push(cid);
                         let role = if i < TAS_PER_CLASS { 1 } else { 0 };
-                        vec![uid.into(), cid.into(), role.into()]
+                        vec![format!("{}", uid).into(), cid.into(), role.into()]
                     }),
             );
         }
