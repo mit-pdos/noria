@@ -90,6 +90,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "atoi"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "num-traits 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1306,6 +1314,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "mysql"
+version = "15.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bufstream 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flate2 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mysql_common 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "named_pipe 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nix 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.90 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "twox-hash 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "mysql_async"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1374,6 +1406,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "mysql_common"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "atoi 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-bigint 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.90 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sha1 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "twox-hash 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "named_pipe"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1423,6 +1480,18 @@ dependencies = [
 [[package]]
 name = "nix"
 version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.35 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nix"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1527,7 +1596,7 @@ dependencies = [
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "memcached-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.16 (registry+https://github.com/rust-lang/crates.io-index)",
- "mysql 14.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mysql 15.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom-sql 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "noria-server 0.1.0",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3238,6 +3307,7 @@ dependencies = [
 "checksum assert_infrequent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "28e856f8298901f495458d316d846b9502491e6a754c76c9ec0c9135daabbb50"
 "checksum async-bincode 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)" = "f964fa1c5ca3e80a6f4f881e6b90aa7173cd4a3e9eab831be47cd81c85eede50"
 "checksum atoi 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "102d3860b03bcf4574e3155722bb0cb3cca1a386d5ca012b2975e9025ce30a43"
+"checksum atoi 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "04475a7d319fc8b405a22948ac839e49fb92f8d54e83524e2b82dff0d4341acb"
 "checksum atty 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "9a7d5b8723950951411ee34d271d99dddcc2035a16ab25310ea2c8cfd4369652"
 "checksum autocfg 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a6d640bee2da49f60a4068a7fae53acde8982514ab7bae8b8cea9e88cbcfd799"
 "checksum backtrace 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "f106c02a3604afcdc0df5d36cc47b44b55917dbaf3d808f71c163a0ddba64637"
@@ -3371,13 +3441,16 @@ dependencies = [
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum mysql 14.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "51c8d77c3d68b26f74a2925bdeb195f0b4b0631bad7dce1587db91b3e9a62d0c"
+"checksum mysql 15.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "030f617ea61c1221c418887610214a7a0a1c48f1358434ff526fe19400610c7d"
 "checksum mysql_async 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5c50e3b239ce294c9f3152b8cea9bc8aa8399f60663674950468d822a030f690"
 "checksum mysql_common 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6b0b0b276f3f2a9f19f04b3b90d3dc1d14c096666014a7d2bd46a6bfd74ed257"
+"checksum mysql_common 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c406d61b9c96fcfd2681c662fb9fd490132dc90c4000419d92611db60c16670"
 "checksum mysql_common 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "82937dbd5b340ef85f59d4f0422402a91c5aec81b391fb7e5fcb39bc39ba45f4"
 "checksum named_pipe 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8ed10a5ac4f5f7e5d75552b12c1d5d542debca81e573279dd1e4c19fde6efa6d"
 "checksum native-tls 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ff8e08de0070bbf4c31f452ea2a70db092f36f6f2e4d897adf5674477d488fb2"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum nix 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d37e713a259ff641624b6cb20e3b12b2952313ba36b6823c0f16e6cfd9e5de17"
+"checksum nix 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "921f61dc817b379d0834e45d5ec45beaacfae97082090a49c2cf30dcbc30206f"
 "checksum nix 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a2c5afeb0198ec7be8569d666644b574345aad2e95a53baf3a532da3e0f3fb32"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 "checksum nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
