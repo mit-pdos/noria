@@ -532,9 +532,6 @@ impl Domain {
                 executor,
                 None,
             );
-            if let Some(ref m) = m {
-                assert_ne!(m.dst(), me, "packet recursion detected");
-            }
             assert_eq!(captured.len(), 0);
             self.process_ptimes.stop();
             self.process_times.stop();
