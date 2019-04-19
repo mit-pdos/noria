@@ -3,11 +3,10 @@ use crate::controller::inner::ControllerInner;
 use dataflow::prelude::*;
 use petgraph;
 use slog::Logger;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet<NodeIndex>) {
+pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, topo_list: &[NodeIndex]) {
     let graph = &mut mainline.ingredients;
-    let source = mainline.source;
     let ndomains = &mut mainline.ndomains;
     // we need to walk the data flow graph and assign domains to all new nodes.
     // we generally want as few domains as possible, but in *some* cases we must make new ones.
@@ -23,21 +22,6 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
         }
     }
 
-    let mut topo_list = Vec::with_capacity(new.len());
-    let mut topo = petgraph::visit::Topo::new(&*graph);
-    while let Some(node) = topo.next(&*graph) {
-        if node == source {
-            continue;
-        }
-        if graph[node].is_dropped() {
-            continue;
-        }
-        if !new.contains(&node) {
-            continue;
-        }
-        topo_list.push(node);
-    }
-
     let mut next_domain = || {
         *ndomains += 1;
         *ndomains - 1
@@ -45,7 +29,7 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, new: &HashSet
 
     let domain_map = &mut mainline.map_meta.query_to_domain;
 
-    for node in topo_list {
+    for &node in topo_list {
         #[allow(clippy::cognitive_complexity)]
         let assignment = (|| {
             let graph = &*graph;
