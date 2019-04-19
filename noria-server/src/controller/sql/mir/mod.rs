@@ -1153,10 +1153,12 @@ impl SqlToMirConverter {
         let fields: Vec<Column> = fields
             .into_iter()
             .filter_map(|mut f| {
-                if f == r_col {
+                // Check for non-equality to prevent dropping columns that are already aliased
+                // as a result of joining against the same table twice.
+                if f == r_col && f != l_col {
                     // drop instances of right-side column
                     None
-                } else if f == l_col {
+                } else if f == l_col && f != r_col {
                     // add alias for right-side column to any left-side column
                     // N.B.: since `l_col` is already aliased, need to check this *after* checking
                     // for equivalence with `r_col` (by now, `l_col` == `r_col` via alias), so
