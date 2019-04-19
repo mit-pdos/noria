@@ -1,5 +1,3 @@
-#![feature(duration_float)]
-
 use clap::value_t_or_exit;
 use futures::Stream;
 use hdrhistogram::Histogram;
@@ -65,7 +63,7 @@ fn main() {
             Arg::with_name("policies")
                 .long("policies")
                 .required(true)
-                .default_value("noria-benchmarks/piazza/basic-policies.json")
+                .default_value("noria-benchmarks/piazza/complex-policies.json")
                 .help("Security policies file for Piazza application"),
         )
         .group(
@@ -112,7 +110,7 @@ fn main() {
         .arg(
             Arg::with_name("graph")
                 .short("g")
-                .default_value("pgraph.gv")
+                .takes_value(true)
                 .help("File to dump application's soup graph, if set"),
         )
         .arg(
@@ -280,14 +278,12 @@ fn main() {
                 let author = 1 + rng.gen_range(0, nusers);
                 let cid = 1 + rng.gen_range(0, nclasses);
                 let private = if rng.gen_bool(private) { 1 } else { 0 };
-                let anon = 1;
                 vec![
                     pid.into(),
                     cid.into(),
                     author.into(),
                     format!("post #{}", pid).into(),
                     private.into(),
-                    anon.into(),
                 ]
             }))
             .unwrap();
@@ -549,14 +545,12 @@ fn main() {
                     let cid = *cids.choose(&mut rng).unwrap();
                     let private = if rng.gen_bool(private) { 1 } else { 0 };
                     trace!(log, "making post"; "cid" => cid, "private" => ?private);
-                    let anon = 1;
                     writes.push(vec![
                         pid.into(),
                         cid.into(),
                         uid.into(),
                         format!("post #{}", pid).into(),
                         private.into(),
-                        anon.into(),
                     ]);
                     pid += 1;
                 }
