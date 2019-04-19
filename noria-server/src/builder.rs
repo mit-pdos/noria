@@ -132,7 +132,9 @@ impl Builder {
     ///
     /// The returned handle executes all operations synchronously on a tokio runtime.
     pub fn start_simple(&self) -> Result<SyncHandle<LocalAuthority>, failure::Error> {
-        let mut rt = tokio::runtime::Runtime::new()?;
+        let mut rt = tokio::runtime::Builder::new()
+            .blocking_threads(1000)
+            .build()?;
         let wh = rt.block_on(self.start_local())?;
         Ok(SyncHandle::from_existing(rt, wh))
     }
