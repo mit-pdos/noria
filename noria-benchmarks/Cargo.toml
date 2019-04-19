@@ -35,7 +35,7 @@ hdrhistogram = "6.1"
 futures-state-stream = "0.1"
 tiberius = "0.3.1"
 # mysql
-mysql = "14.0.0"
+mysql = "15.0.0"
 # memcached
 memcached-rs = "0.3.0"
 # mio
@@ -114,5 +114,5 @@ name = "replay"
 path = "replay/main.rs"
 
 [[bin]]
-name = "security-mysql"
+name = "piazza-mysql"
 path = "piazza/mysql.rs"
