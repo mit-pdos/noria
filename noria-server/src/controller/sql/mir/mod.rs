@@ -1814,7 +1814,6 @@ impl SqlToMirConverter {
             // are not leaf nodes and should not be unioned).
             ancestors.retain(|a| a.borrow().children().len() == 0);
             
-            println!("mk_nd_fr_sel # ancestors after pushing final node: {}", ancestors.len());
             let final_node = if ancestors.len() > 1 {
                 // If we have multiple queries, reconcile them.
                 sec_round = true;

@@ -284,8 +284,8 @@ fn main() {
      */
 
     println!("{}", backend.g.graphviz().unwrap());
-    test_populate::dump_reviews(&mut backend, user, 0); // bogokey lookup
-    test_populate::dump_reviews(&mut backend, user, 5); // by-key lookup
+    test_populate::dump_papers(&mut backend, user, 0);
+    test_populate::dump_reviews(&mut backend, user, 0);
 
     println!("DONE!");
     // sleep "forever"
