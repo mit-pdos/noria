@@ -66,6 +66,30 @@ pub(super) fn make_universe_naming_consistent(
     }
 }
 
+fn check_materialized(mnr: MirNodeRef) -> bool {
+    // only recurse as far back as security nodes (i.e., next universe boundary).
+    // without this restriction, we never get an identity node because everything
+    // ultimately traces back to base tables.
+    if mnr.borrow().name().starts_with("sp_") {
+        return false;
+    }
+
+    match mnr.borrow().inner {
+        // materialized ancestors => do nothing
+        MirNodeType::Aggregation { .. }
+        | MirNodeType::Base { .. }
+        | MirNodeType::TopK { .. }
+        | MirNodeType::Join { .. } => true,
+        // query-through ancestors => check further
+        MirNodeType::Project { .. } | MirNodeType::Filter { .. } => {
+            check_materialized(mnr.borrow().ancestors[0].clone())
+        }
+        MirNodeType::Reuse { ref node } => check_materialized(node.clone()),
+        // unmaterialized, add identity
+        _ => false,
+    }
+}
+
 pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_version: usize) {
     let mut queue = Vec::new();
     queue.push(q.leaf.clone());
@@ -78,13 +102,8 @@ pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_vers
             // if not, we add a materialized identity node
             let mut to_rewrite = Vec::new();
             for ar in mnr.borrow().ancestors() {
-                match ar.borrow().inner {
-                    MirNodeType::Aggregation { .. } => (),
-                    MirNodeType::TopK { .. } => (),
-                    _ => {
-                        // unmaterialized, add identity
-                        to_rewrite.push(ar.clone());
-                    }
+                if !check_materialized(ar.clone()) {
+                    to_rewrite.push(ar.clone());
                 }
             }
 
