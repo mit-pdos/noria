@@ -405,6 +405,7 @@ impl Materializations {
                                     .insert(index.clone());
                             }
                             break;
+                        } else if !graph[pni].is_internal() {
                         } else if let NodeOperator::Identity(ref i) = *graph[pni] {
                             if i.eagerly_materialize() {
                                 // this identity node _really_ wants to be materialized.
