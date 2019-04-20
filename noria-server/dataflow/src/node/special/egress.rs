@@ -82,7 +82,6 @@ impl Egress {
             if let Where::InAll(i) = *tag {
                 if i == mv {
                     *tag = Where::InReplay(self.replay_txs.len() - 1);
-                    break;
                 }
             }
         }
