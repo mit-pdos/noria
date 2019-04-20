@@ -89,6 +89,11 @@ impl MirQuery {
         super::rewrite::make_universe_naming_consistent(&mut self, table_mapping, base_name);
         self
     }
+
+    pub fn force_materialization_above_secunion(mut self, schema_version: usize) -> MirQuery {
+        super::rewrite::force_materialization_above_secunion(&mut self, schema_version);
+        self
+    }
 }
 
 impl Display for MirQuery {

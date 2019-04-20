@@ -547,6 +547,8 @@ impl SqlIncorporator {
                     panic!("Missing table mapping when reconciling universe table names!");
                 }
             }
+
+            mir = mir.force_materialization_above_secunion(self.schema_version);
         }
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
@@ -724,6 +726,9 @@ impl SqlIncorporator {
                     panic!("Missing table mapping when reconciling universe table names!");
                 }
             }
+
+            post_reuse_opt_mir =
+                post_reuse_opt_mir.force_materialization_above_secunion(self.schema_version);
         }
 
         trace!(

@@ -1,4 +1,5 @@
 use column::Column;
+use node::{MirNode, MirNodeType};
 use query::MirQuery;
 use std::collections::HashMap;
 use MirNodeRef;
@@ -61,6 +62,53 @@ pub(super) fn make_universe_naming_consistent(
 
         for child in node_to_rewrite.borrow().children() {
             nodes_to_rewrite.push(child.clone());
+        }
+    }
+}
+
+pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_version: usize) {
+    let mut queue = Vec::new();
+    queue.push(q.leaf.clone());
+
+    while !queue.is_empty() {
+        let mnr = queue.pop().unwrap();
+        if mnr.borrow().name().starts_with("spu_") {
+            // found a security union, so check all its ancestors.
+            // if an ancestor is materialized, we're good.
+            // if not, we add a materialized identity node
+            let mut to_rewrite = Vec::new();
+            for ar in mnr.borrow().ancestors() {
+                match ar.borrow().inner {
+                    MirNodeType::Aggregation { .. } => (),
+                    MirNodeType::TopK { .. } => (),
+                    _ => {
+                        // unmaterialized, add identity
+                        to_rewrite.push(ar.clone());
+                    }
+                }
+            }
+
+            for ar in to_rewrite.drain(..) {
+                ar.borrow_mut().remove_child(mnr.clone());
+                mnr.borrow_mut().remove_ancestor(ar.clone());
+
+                let name = format!("{}_matid", ar.borrow().name());
+                let columns = ar.borrow().columns().to_vec();
+                let new_id = MirNode::new(
+                    &name,
+                    schema_version,
+                    columns,
+                    MirNodeType::Identity { materialized: true },
+                    vec![ar.clone()],
+                    vec![mnr.clone()],
+                );
+
+                mnr.borrow_mut().add_ancestor(new_id);
+            }
+        }
+
+        for ancestor in mnr.borrow().ancestors() {
+            queue.push(ancestor.clone());
         }
     }
 }
