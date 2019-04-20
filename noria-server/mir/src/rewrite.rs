@@ -90,6 +90,21 @@ fn check_materialized(mnr: MirNodeRef) -> bool {
     }
 }
 
+fn check_reuse_for_identity(node: &MirNodeRef) -> Option<MirNodeRef> {
+    // check if we have an identity already
+    for c in node.borrow().children() {
+        if c.borrow().name().ends_with("_matid") {
+            return Some(c.clone());
+        }
+    }
+
+    if let MirNodeType::Reuse { ref node } = node.borrow().inner {
+        check_reuse_for_identity(node)
+    } else {
+        None
+    }
+}
+
 pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_version: usize) {
     let mut queue = Vec::new();
     queue.push(q.leaf.clone());
@@ -101,10 +116,30 @@ pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_vers
             // if an ancestor is materialized, we're good.
             // if not, we add a materialized identity node
             let mut to_rewrite = Vec::new();
-            for ar in mnr.borrow().ancestors() {
+            let mut to_reuse = Vec::new();
+            'outer: for ar in mnr.borrow().ancestors() {
+                if let MirNodeType::Reuse { ref node } = ar.borrow().inner {
+                    if let Some(existing_identity) = check_reuse_for_identity(node) {
+                        to_reuse.push((ar.clone(), existing_identity));
+                        continue 'outer;
+                    }
+                }
                 if !check_materialized(ar.clone()) {
                     to_rewrite.push(ar.clone());
                 }
+            }
+
+            for (ar, cr) in to_reuse.drain(..) {
+                ar.borrow_mut().remove_child(mnr.clone());
+                mnr.borrow_mut().remove_ancestor(ar.clone());
+
+                let new_id = MirNode::reuse(cr, schema_version);
+
+                ar.borrow_mut().add_child(new_id.clone());
+                new_id.borrow_mut().add_ancestor(ar.clone());
+
+                new_id.borrow_mut().add_child(mnr.clone());
+                mnr.borrow_mut().add_ancestor(new_id);
             }
 
             for ar in to_rewrite.drain(..) {
