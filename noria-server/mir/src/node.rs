@@ -415,7 +415,9 @@ pub enum MirNodeType {
         separator: String,
     },
     /// no extra info required
-    Identity,
+    Identity {
+        materialized: bool,
+    },
     /// left node, right node, on left columns, on right columns, emit columns
     Join {
         on_left: Vec<Column>,
@@ -715,6 +717,12 @@ impl MirNodeType {
                 }
                 _ => false,
             },
+            MirNodeType::Identity {
+                materialized: ref our_mat,
+            } => match *other {
+                MirNodeType::Identity { ref materialized } => our_mat == materialized,
+                _ => false,
+            },
             MirNodeType::Leaf {
                 keys: ref our_keys, ..
             } => match *other {
@@ -864,7 +872,7 @@ impl Debug for MirNodeType {
                 ref on,
                 ref separator,
             } => write!(f, "||([{}], \"{}\")", on.name, separator),
-            MirNodeType::Identity => write!(f, "≡"),
+            MirNodeType::Identity { .. } => write!(f, "≡"),
             MirNodeType::Join {
                 ref on_left,
                 ref on_right,

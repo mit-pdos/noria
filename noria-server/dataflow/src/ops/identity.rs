@@ -7,12 +7,16 @@ use prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Identity {
     src: IndexPair,
+    materialized: bool,
 }
 
 impl Identity {
     /// Construct a new identity operator.
-    pub fn new(src: NodeIndex) -> Identity {
-        Identity { src: src.into() }
+    pub fn new(src: NodeIndex, materialized: bool) -> Identity {
+        Identity {
+            src: src.into(),
+            materialized: materialized,
+        }
     }
 }
 
@@ -61,6 +65,10 @@ impl Ingredient for Identity {
 
     fn parent_columns(&self, column: usize) -> Vec<(NodeIndex, Option<usize>)> {
         vec![(self.src.as_global(), Some(column))]
+    }
+
+    fn can_query_through(&self) -> bool {
+        !self.materialized
     }
 }
 

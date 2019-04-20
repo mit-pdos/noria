@@ -191,7 +191,7 @@ impl GraphViz for MirNodeType {
             } => {
                 write!(out, "||({}, \"{}\")", print_col(on), separator)?;
             }
-            MirNodeType::Identity => {
+            MirNodeType::Identity { .. } => {
                 write!(out, "≡")?;
             }
             MirNodeType::Join {
