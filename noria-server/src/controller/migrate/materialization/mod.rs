@@ -395,6 +395,7 @@ impl Materializations {
                             able = false;
                             break 'attempt;
                         }
+
                         let index: Vec<_> = cols.into_iter().map(Option::unwrap).collect();
                         if let Some(m) = self.have.get(&pni) {
                             if !m.contains(&index) {
@@ -404,6 +405,21 @@ impl Materializations {
                                     .insert(index.clone());
                             }
                             break;
+                        } else if let NodeOperator::Identity(ref i) = *graph[pni] {
+                            if i.eagerly_materialize() {
+                                // this identity node _really_ wants to be materialized.
+                                // since we now have an idea of what keys should be added for that
+                                // to happen in a reasonable way, let's grant its request!
+                                // NOTE: we don't need map_indices, since it's an identity node.
+                                self.have.entry(pni).or_default().insert(index.clone());
+                                // also add a replay obligation to enable partial
+                                replay_obligations
+                                    .entry(pni)
+                                    .or_default()
+                                    .insert(index.clone());
+
+                                self.added.entry(pni).or_default().insert(index);
+                            }
                         }
                     }
                 }

@@ -18,6 +18,10 @@ impl Identity {
             materialized: materialized,
         }
     }
+
+    pub fn eagerly_materialize(&self) -> bool {
+        self.materialized
+    }
 }
 
 impl Ingredient for Identity {
