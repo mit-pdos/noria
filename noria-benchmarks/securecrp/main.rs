@@ -311,7 +311,7 @@ fn main() {
     let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
     for iter in 1..=iter {
-        info!(log, "starting up noria");
+        info!(log, "starting up noria"; "iteration" => iter);
         debug!(log, "configuring noria");
         let mut g = Builder::default();
         match args.value_of("reuse").unwrap() {
@@ -367,6 +367,32 @@ fn main() {
         .expect("failed to load initial schema");
         debug!(log, "database schema setup done");
 
+        let memstats = |g: &mut noria::SyncHandle<_>, at| {
+            if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
+                debug!(log, "extracing process memory stats"; "at" => at);
+                let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
+                let data = mem.split_whitespace().nth(6 - 1).unwrap();
+                println!("# VmRSS @ {}: {} ", at, vmrss);
+                println!("# VmData @ {}: {} ", at, data);
+            }
+
+            debug!(log, "extracing materialization memory stats"; "at" => at);
+            let mut base_mem = 0;
+            let mut mem = 0;
+            let stats = g.statistics().unwrap();
+            for (_, nstats) in stats.values() {
+                for nstat in nstats.values() {
+                    if nstat.desc == "B" {
+                        base_mem += nstat.mem_size;
+                    } else {
+                        mem += nstat.mem_size;
+                    }
+                }
+            }
+            println!("# base memory @ {}: {}", at, base_mem);
+            println!("# materialization memory @ {}: {}", at, mem);
+        };
+
         info!(log, "starting db population");
         debug!(log, "getting handles to tables");
         let mut user_profile = g.table("UserProfile").unwrap().into_sync();
@@ -394,7 +420,30 @@ fn main() {
                 ]
             }))
             .unwrap();
+        debug!(log, "logging in users"; "n" => nlogged);
+        let mut login_times = Vec::with_capacity(nlogged);
+        let mut login_stats = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
+        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
+            trace!(log, "logging in user"; "uid" => uid);
+            let user_context: HashMap<_, _> =
+                std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
+            let start = Instant::now();
+            g.on_worker(|w| w.create_universe(user_context.clone()))
+                .unwrap();
+            login_times.push(start.elapsed());
+            login_stats.saturating_record(login_times.last().unwrap().as_micros() as u64);
+        }
+        use std::collections::hash_map::Entry;
+        match cold_stats.entry(Operation::Login) {
+            Entry::Vacant(v) => {
+                v.insert(login_stats);
+            }
+            Entry::Occupied(mut h) => {
+                *h.get_mut() += login_stats;
+            }
+        }
         debug!(log, "registering papers");
+        let start = Instant::now();
         paper
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
                 vec![
@@ -404,6 +453,11 @@ fn main() {
                 ]
             }))
             .unwrap();
+        println!(
+            "# paper registration: {} in {:?}",
+            papers.len(),
+            start.elapsed()
+        );
         trace!(log, "also registering paper version");
         version
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
@@ -416,19 +470,29 @@ fn main() {
                 ]
             }))
             .unwrap();
+        println!(
+            "# paper + version: {} in {:?}",
+            papers.len(),
+            start.elapsed()
+        );
         debug!(log, "registering paper authors");
+        let start = Instant::now();
+        let mut npauthors = 0;
         coauthor
             .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
+                npauthors += p.authors.len();
                 p.authors
                     .iter()
                     .skip(1)
                     .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into()])
             }))
             .unwrap();
+        println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
         debug!(log, "registering reviews");
         reviews.shuffle(&mut rng);
         // assume all reviews have been submitted
         trace!(log, "register assignments");
+        let start = Instant::now();
         review_assignment
             .perform_all(
                 reviews
@@ -441,7 +505,13 @@ fn main() {
                     }),
             )
             .unwrap();
+        println!(
+            "# review assignments: {} in {:?}",
+            reviews.len(),
+            start.elapsed()
+        );
         trace!(log, "register the actual reviews");
+        let start = Instant::now();
         review
             .perform_all(
                 reviews
@@ -463,73 +533,15 @@ fn main() {
                     }),
             )
             .unwrap();
+        println!("# reviews: {} in {:?}", reviews.len(), start.elapsed());
         debug!(log, "population completed");
-
-        let memstats = |g: &mut noria::SyncHandle<_>, at| {
-            if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
-                debug!(log, "extracing process memory stats"; "at" => at);
-                let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
-                let data = mem.split_whitespace().nth(6 - 1).unwrap();
-                println!("# VmRSS @ {}: {} ", at, vmrss);
-                println!("# VmData @ {}: {} ", at, data);
-            }
-
-            debug!(log, "extracing materialization memory stats"; "at" => at);
-            let mut base_mem = 0;
-            let mut mem = 0;
-            let stats = g.statistics().unwrap();
-            for (_, nstats) in stats.values() {
-                for nstat in nstats.values() {
-                    if nstat.desc == "B" {
-                        base_mem += nstat.mem_size;
-                    } else {
-                        mem += nstat.mem_size;
-                    }
-                }
-            }
-            println!("# base memory @ {}: {}", at, base_mem);
-            println!("# materialization memory @ {}: {}", at, mem);
-        };
-
-        info!(log, "logging in users"; "n" => nlogged);
         memstats(&mut g, "populated");
-        let mut login_times = Vec::with_capacity(nlogged);
-        let mut login_stats = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
-        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
-            trace!(log, "logging in user"; "uid" => uid);
-            let user_context: HashMap<_, _> =
-                std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
-            let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
-                .unwrap();
-            login_times.push(start.elapsed());
-            login_stats.saturating_record(login_times.last().unwrap().as_micros() as u64);
 
-            // TODO: measure space use, which means doing reads on partial
-            // TODO: or do we want to do that measurement separately?
-
-            if i == 0 {
-                memstats(&mut g, "firstuser");
-            }
-
-            if i == 1 && iter == 1 {
-                if let Some(gloc) = args.value_of("graph") {
-                    debug!(log, "extracing query graph with two users");
-                    let gv = g.graphviz().expect("failed to read graphviz");
-                    std::fs::write(gloc, gv).expect("failed to save graphviz output");
-                }
-            }
+        if let Some(gloc) = args.value_of("graph") {
+            debug!(log, "extracing query graph");
+            let gv = g.graphviz().expect("failed to read graphviz");
+            std::fs::write(gloc, gv).expect("failed to save graphviz output");
         }
-        use std::collections::hash_map::Entry;
-        match cold_stats.entry(Operation::Login) {
-            Entry::Vacant(v) => {
-                v.insert(login_stats);
-            }
-            Entry::Occupied(mut h) => {
-                *h.get_mut() += login_stats;
-            }
-        }
-        memstats(&mut g, "allusers");
 
         info!(log, "creating api handles");
         debug!(log, "creating view handles for paper list");
@@ -607,52 +619,6 @@ fn main() {
         info!(log, "measuring space overhead");
         // NOTE: we have already done all possible reads, so no need to do "filling" reads
         memstats(&mut g, "end");
-
-        /*
-        info!(log, "performing write measurements");
-        debug!(log, "writes to papers");
-        let mut pid = nposts + 1;
-        let start = Instant::now();
-        while start.elapsed() < runtime {
-            trace!(log, "writing post");
-            let mut writes = Vec::new();
-            while writes.len() < WRITE_CHUNK_SIZE {
-                let uid = 1 + rng.gen_range(0, nlogged);
-                trace!(log, "trying user"; "uid" => uid);
-                if let Some(cids) = enrolled.get(&uid) {
-                    let cid = *cids.choose(&mut rng).unwrap();
-                    let private = if rng.gen_bool(private) { 1 } else { 0 };
-                    trace!(log, "making post"; "cid" => cid, "private" => ?private);
-                    writes.push(vec![
-                        pid.into(),
-                        cid.into(),
-                        uid.into(),
-                        format!("post #{}", pid).into(),
-                        private.into(),
-                    ]);
-                    pid += 1;
-                }
-            }
-
-            let begin = Instant::now();
-            posts.perform_all(writes).unwrap();
-            let took = begin.elapsed();
-
-            if start.elapsed() < runtime / 3 {
-                // warm-up
-                trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-                continue;
-            }
-
-            trace!(log, "recording sample"; "took" => ?took);
-            cold_stats
-                .entry(Operation::WritePost)
-                .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-                .saturating_record((took.as_micros() / WRITE_CHUNK_SIZE as u128) as u64);
-        }
-        */
-
-        // TODO: do we also want to measure writes when we _haven't_ read all the keys?
 
         let mut i = 0;
         let stripe = login_times.len() / 10;
