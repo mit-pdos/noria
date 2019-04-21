@@ -7,13 +7,11 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 const PAPERS_PER_REVIEWER: usize = 5;
-const WRITE_CHUNK_SIZE: usize = 100;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
     Login,
     ReadPaperList,
-    WritePost,
 }
 
 impl std::fmt::Display for Operation {
@@ -21,7 +19,6 @@ impl std::fmt::Display for Operation {
         match *self {
             Operation::Login => write!(f, "login"),
             Operation::ReadPaperList => write!(f, "plist"),
-            Operation::WritePost => write!(f, "post"),
         }
     }
 }
