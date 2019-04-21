@@ -218,7 +218,7 @@ fn main() {
             .map(|author| {
                 let author = author.as_str().expect("author id is not a string");
                 *author_set.entry(author.to_string()).or_insert_with(|| {
-                    trace!(log, "adding author"; "name" => author);
+                    trace!(log, "adding author"; "name" => author, "uid" => author.len() + 1);
                     authors.push(author);
                     authors.len() - 1
                 })
@@ -379,7 +379,7 @@ fn main() {
         user_profile
             .perform_all(authors.iter().enumerate().map(|(i, &email)| {
                 vec![
-                    email.into(),
+                    format!("{}", i + 1).into(),
                     email.into(),
                     email.into(),
                     "university".into(),
@@ -399,7 +399,7 @@ fn main() {
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
                 vec![
                     (i + 1).into(),
-                    authors[p.authors[0]].into(),
+                    format!("{}", p.authors[0] + 1).into(),
                     if p.accepted { 1 } else { 0 }.into(),
                 ]
             }))
@@ -419,11 +419,10 @@ fn main() {
         debug!(log, "registering paper authors");
         coauthor
             .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
-                let authors = &authors;
                 p.authors
                     .iter()
                     .skip(1)
-                    .map(move |&a| vec![(i + 1).into(), authors[a].into()])
+                    .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into()])
             }))
             .unwrap();
         debug!(log, "registering reviews");
@@ -436,9 +435,9 @@ fn main() {
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
-                        let authors = &authors;
-                        rs.iter()
-                            .map(move |r| vec![r.paper.into(), authors[i].into(), "foo".into()])
+                        rs.iter().map(move |r| {
+                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into()]
+                        })
                     }),
             )
             .unwrap();
@@ -449,12 +448,11 @@ fn main() {
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
-                        let authors = &authors;
                         rs.iter().map(move |r| {
                             vec![
                                 "0".into(),
                                 r.paper.into(),
-                                authors[i].into(),
+                                format!("{}", i + 1).into(),
                                 "review text".into(),
                                 r.rating.into(),
                                 r.rating.into(),
@@ -500,7 +498,7 @@ fn main() {
         for (i, &uid) in authors.iter().take(nlogged).enumerate() {
             trace!(log, "logging in user"; "uid" => uid);
             let user_context: HashMap<_, _> =
-                std::iter::once(("id".to_string(), uid.into())).collect();
+                std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
             let start = Instant::now();
             g.on_worker(|w| w.create_universe(user_context.clone()))
                 .unwrap();
