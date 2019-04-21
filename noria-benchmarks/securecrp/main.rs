@@ -533,13 +533,14 @@ fn main() {
 
         info!(log, "creating api handles");
         debug!(log, "creating view handles for paper list");
-        let mut paper_list: HashMap<_, _> = authors[0..nlogged]
-            .iter()
+        let mut paper_list: HashMap<_, _> = (0..nlogged)
             .map(|uid| {
-                trace!(log, "creating posts handle for user"; "uid" => uid);
+                trace!(log, "creating posts handle for user"; "uid" => authors[uid]);
                 (
-                    uid,
-                    g.view(format!("PaperList_u{}", uid)).unwrap().into_sync(),
+                    authors[uid],
+                    g.view(format!("PaperList_u{}", uid + 1))
+                        .unwrap()
+                        .into_sync(),
                 )
             })
             .collect();
