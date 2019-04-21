@@ -157,10 +157,16 @@ fn mir_node_to_flow_parts(
                         table_mapping,
                     )
                 }
-                MirNodeType::Identity => {
+                MirNodeType::Identity { materialized } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
-                    make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)
+                    make_identity_node(
+                        &name,
+                        parent,
+                        mir_node.columns.as_slice(),
+                        materialized,
+                        mig,
+                    )
                 }
                 MirNodeType::Join {
                     ref on_left,
@@ -600,6 +606,7 @@ fn make_identity_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
+    materialized: bool,
     mig: &mut Migration,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
@@ -608,7 +615,7 @@ fn make_identity_node(
     let node = mig.add_ingredient(
         String::from(name),
         column_names.as_slice(),
-        ops::identity::Identity::new(parent_na),
+        ops::identity::Identity::new(parent_na, materialized),
     );
     FlowNode::New(node)
 }

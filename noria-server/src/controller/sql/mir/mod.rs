@@ -262,7 +262,9 @@ impl SqlToMirConverter {
                 &format!("{}_id", name),
                 self.schema_version,
                 columns.clone(),
-                MirNodeType::Identity,
+                MirNodeType::Identity {
+                    materialized: false,
+                },
                 vec![parent.clone()],
                 vec![],
             )
