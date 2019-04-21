@@ -2,8 +2,7 @@ use clap::value_t_or_exit;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
-use slog::debug as trace;
-use slog::{crit, debug, error, info, o, warn, Logger};
+use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
