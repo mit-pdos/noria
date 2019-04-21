@@ -10,14 +10,12 @@ const PAPERS_PER_REVIEWER: usize = 5;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
-    Login,
     ReadPaperList,
 }
 
 impl std::fmt::Display for Operation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            Operation::Login => write!(f, "login"),
             Operation::ReadPaperList => write!(f, "plist"),
         }
     }
@@ -418,8 +416,9 @@ fn main() {
             }))
             .unwrap();
         debug!(log, "logging in users"; "n" => nlogged);
+        let mut printi = 0;
+        let stripe = nlogged / 10;
         let mut login_times = Vec::with_capacity(nlogged);
-        let mut login_stats = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
         for (i, &uid) in authors.iter().take(nlogged).enumerate() {
             trace!(log, "logging in user"; "uid" => uid);
             let user_context: HashMap<_, _> =
@@ -427,16 +426,20 @@ fn main() {
             let start = Instant::now();
             g.on_worker(|w| w.create_universe(user_context.clone()))
                 .unwrap();
-            login_times.push(start.elapsed());
-            login_stats.saturating_record(login_times.last().unwrap().as_micros() as u64);
-        }
-        use std::collections::hash_map::Entry;
-        match cold_stats.entry(Operation::Login) {
-            Entry::Vacant(v) => {
-                v.insert(login_stats);
-            }
-            Entry::Occupied(mut h) => {
-                *h.get_mut() += login_stats;
+            let took = start.elapsed();
+            login_times.push(took);
+
+            if i == printi {
+                println!("# login sample[{}]: {:?}", i, login_times[i]);
+                if i == 0 {
+                    // we want to include both 0 and 1
+                    printi += 1;
+                } else if i == 1 {
+                    // and then go back to every stripe'th sample
+                    printi = stripe;
+                } else {
+                    printi += stripe;
+                }
             }
         }
         debug!(log, "registering papers");
@@ -589,7 +592,6 @@ fn main() {
                 Operation::ReadPaperList => {
                     trace!(log, "reading paper list"; "uid" => uid);
                 }
-                _ => unreachable!(),
             }
 
             let begin = Instant::now();
@@ -601,7 +603,6 @@ fn main() {
                         .lookup(&[0.into(/* bogokey */)], true)
                         .unwrap();
                 }
-                _ => unreachable!(),
             }
             let took = begin.elapsed();
 
@@ -617,21 +618,6 @@ fn main() {
         info!(log, "measuring space overhead");
         // NOTE: we have already done all possible reads, so no need to do "filling" reads
         memstats(&mut g, "end");
-
-        let mut i = 0;
-        let stripe = login_times.len() / 10;
-        while i < login_times.len() {
-            println!("# login sample[{}]: {:?}", i, login_times[i]);
-            if i == 0 {
-                // we want to include both 0 and 1
-                i += 1;
-            } else if i == 1 {
-                // and then go back to every stripe'th sample
-                i = stripe;
-            } else {
-                i += stripe;
-            }
-        }
     }
 
     println!("# op\tphase\tpct\ttime");
