@@ -338,13 +338,6 @@ fn main() {
         }
         debug!(log, "spinning up");
         let mut g = g.start_simple().unwrap();
-        debug!(log, "getting handles to tables");
-        let mut user_profile = g.table("UserProfile").unwrap().into_sync();
-        let mut paper = g.table("Paper").unwrap().into_sync();
-        let mut coauthor = g.table("PaperCoauthor").unwrap().into_sync();
-        let mut version = g.table("PaperVersion").unwrap().into_sync();
-        let mut review_assignment = g.table("ReviewAssignment").unwrap().into_sync();
-        let mut review = g.table("Review").unwrap().into_sync();
         debug!(log, "noria ready");
 
         let init = Instant::now();
@@ -372,6 +365,13 @@ fn main() {
         debug!(log, "database schema setup done");
 
         info!(log, "starting db population");
+        debug!(log, "getting handles to tables");
+        let mut user_profile = g.table("UserProfile").unwrap().into_sync();
+        let mut paper = g.table("Paper").unwrap().into_sync();
+        let mut coauthor = g.table("PaperCoauthor").unwrap().into_sync();
+        let mut version = g.table("PaperVersion").unwrap().into_sync();
+        let mut review_assignment = g.table("ReviewAssignment").unwrap().into_sync();
+        let mut review = g.table("Review").unwrap().into_sync();
         debug!(log, "creating users"; "n" => nusers);
         user_profile
             .perform_all(authors.iter().enumerate().map(|(i, &email)| {
