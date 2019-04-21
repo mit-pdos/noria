@@ -3,7 +3,8 @@ use futures::Stream;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand::prelude::StdRng;
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -12,6 +13,8 @@ const STUDENTS_PER_CLASS: usize = 150;
 const TAS_PER_CLASS: usize = 5;
 const WRITE_CHUNK_SIZE: usize = 100;
 const CLASSES_PER_STUDENT: usize = 4;
+
+const DETERMINISTIC_SEED: u64 = 1235;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
@@ -112,6 +115,11 @@ fn main() {
                 .short("g")
                 .takes_value(true)
                 .help("File to dump application's soup graph, if set"),
+        )
+        .arg(
+            Arg::with_name("deterministic")
+                .long("deterministic")
+                .help("Run with deterministic randomness"),
         )
         .arg(
             Arg::with_name("verbose")
@@ -223,7 +231,11 @@ fn main() {
 
         let init = Instant::now();
         info!(log, "setting up database schema");
-        let mut rng = rand::thread_rng();
+        let mut rng = if args.is_present("deterministic") {
+            StdRng::seed_from_u64(DETERMINISTIC_SEED)
+        } else {
+            StdRng::seed_from_u64(rand::random::<u64>())
+        };
         debug!(log, "setting up initial schema");
         g.install_recipe(include_str!("schema.sql"))
             .expect("failed to load initial schema");
