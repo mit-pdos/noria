@@ -357,7 +357,7 @@ fn main() {
         })
         .unwrap();
         debug!(log, "adding queries");
-        g.install_recipe(
+        g.extend_recipe(
             std::fs::read_to_string(args.value_of("queries").unwrap())
                 .expect("failed to read queries file"),
         )
