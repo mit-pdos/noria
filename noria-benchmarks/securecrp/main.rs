@@ -46,7 +46,7 @@ fn main() {
         .arg(
             Arg::with_name("reuse")
                 .long("reuse")
-                .default_value("full")
+                .default_value("no")
                 .possible_values(&["no", "finkelstein", "relaxed", "full"])
                 .help("Query reuse algorithm"),
         )
@@ -54,7 +54,7 @@ fn main() {
             Arg::with_name("materialization")
                 .long("materialization")
                 .short("m")
-                .default_value("partial")
+                .default_value("full")
                 .possible_values(&["full", "partial", "shallow-readers", "shallow-all"])
                 .help("Set materialization strategy for the benchmark"),
         )
@@ -78,7 +78,7 @@ fn main() {
                 .long("queries")
                 .short("q")
                 .required(true)
-                .default_value("noria-benchmarks/securecrp/scraped_queries.sql")
+                .default_value("noria-benchmarks/securecrp/jeeves_queries.sql")
                 .help("SQL query file"),
         )
         .arg(
