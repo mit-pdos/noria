@@ -477,10 +477,10 @@ fn main() {
         let mut npauthors = 0;
         coauthor
             .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
+                // XXX: should first author be repeated here?
                 npauthors += p.authors.len();
                 p.authors
                     .iter()
-                    .skip(1)
                     .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into()])
             }))
             .unwrap();
@@ -496,6 +496,7 @@ fn main() {
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
+                        // TODO: don't review own paper
                         rs.iter().map(move |r| {
                             vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into()]
                         })
