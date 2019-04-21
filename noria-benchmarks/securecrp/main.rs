@@ -60,13 +60,14 @@ fn main() {
         )
         .arg(
             Arg::with_name("source")
-                .short("s")
+                .long("source")
                 .default_value("https://openreview.net/group?id=ICLR.cc/2018/Conference")
                 .takes_value(true)
                 .help("Source to pull paper data from"),
         )
         .arg(
             Arg::with_name("schema")
+                .long("schema")
                 .short("s")
                 .required(true)
                 .default_value("noria-benchmarks/securecrp/jeeves_schema.sql")
@@ -74,6 +75,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("queries")
+                .long("queries")
                 .short("q")
                 .required(true)
                 .default_value("noria-benchmarks/securecrp/scraped_queries.sql")
@@ -82,6 +84,7 @@ fn main() {
         .arg(
             Arg::with_name("policies")
                 .long("policies")
+                .short("p")
                 .required(true)
                 .default_value("noria-benchmarks/securecrp/jeeves_policies.json")
                 .help("Security policies file"),
