@@ -372,6 +372,7 @@ fn main() {
             }
 
             debug!(log, "extracing materialization memory stats"; "at" => at);
+            let mut reader_mem = 0;
             let mut base_mem = 0;
             let mut mem = 0;
             let stats = g.statistics().unwrap();
@@ -379,12 +380,15 @@ fn main() {
                 for nstat in nstats.values() {
                     if nstat.desc == "B" {
                         base_mem += nstat.mem_size;
+                    } else if nstat.desc == "reader node" {
+                        reader_mem += nstat.mem_size;
                     } else {
                         mem += nstat.mem_size;
                     }
                 }
             }
             println!("# base memory @ {}: {}", at, base_mem);
+            println!("# reader memory @ {}: {}", at, reader_mem);
             println!("# materialization memory @ {}: {}", at, mem);
         };
 
