@@ -157,6 +157,10 @@ pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_vers
                     vec![mnr.clone()],
                 );
 
+                if let MirNodeType::Reuse { ref node } = ar.borrow().inner {
+                    node.borrow_mut().add_child(new_id.clone());
+                }
+
                 mnr.borrow_mut().add_ancestor(new_id);
             }
         }
