@@ -215,9 +215,9 @@ fn main() {
             .map(|author| {
                 let author = author.as_str().expect("author id is not a string");
                 *author_set.entry(author.to_string()).or_insert_with(|| {
-                    trace!(log, "adding author"; "name" => author, "id" => authors.len() + 1);
+                    trace!(log, "adding author"; "name" => author);
                     authors.push(author);
-                    authors.len()
+                    authors.len() - 1
                 })
             })
             .collect();;
