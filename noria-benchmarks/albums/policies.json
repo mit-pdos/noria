@@ -6,7 +6,7 @@
             "policies": [
                 {
                     "table": "Photo",
-                    "predicate": "SELECT Photo.* FROM Photo, GroupContext, Album WHERE Photo.a_id = Album.a_id AND Album.public = 0 and Album.u_id = GroupContext.id",
+                    "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) JOIN GroupContext ON (Album.u_id = GroupContext.id) WHERE Album.public = 0",
                     "description": "users can see photos in albums their friends have posted"
                 }
             ]
@@ -17,7 +17,7 @@
             "policies": [
                 {
                     "table": "Photo",
-                    "predicate": "SELECT Photo.* FROM Photo, GroupContext, Album WHERE Photo.a_id = Album.a_id AND Album.public = 0 and Album.u_id = GroupContext.id",
+                    "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) JOIN GroupContext ON (Album.u_id = GroupContext.id) WHERE Album.public = 0",
                     "description": "users can see photos in albums their friends have posted (for symmetry)"
                 }
             ]
@@ -26,12 +26,12 @@
     "policies": [
         {
             "table": "Photo",
-            "predicate": "SELECT Photo.* FROM Photo, UserContext, Album WHERE Photo.a_id = Album.a_id AND Album.public = 0 AND UserContext.id = Album.u_id",
+            "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) JOIN UserContext ON (UserContext.id = Album.u_id) WHERE Album.public = 0",
             "description": "users are allowed to see their own photos"
         },
         {
             "table": "Photo",
-            "predicate": "SELECT Photo.* FROM Photo, UserContext, Album WHERE Photo.a_id = Album.a_id AND Album.public = 1",
+            "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) WHERE Album.public = 1",
             "description": "users are allowed to see public photos"
         }
     ]
