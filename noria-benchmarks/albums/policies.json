@@ -1,28 +1,28 @@
 {
-    "groups": [
-        {
-            "name": "friend",
-            "membership": "SELECT usera AS uid, userb AS gid FROM Friend WHERE usera = ?",
-            "policies": [
-                {
-                    "table": "Photo",
-                    "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) JOIN GroupContext ON (Album.u_id = GroupContext.id) WHERE Album.public = 0",
-                    "description": "users can see photos in albums their friends have posted"
-                }
-            ]
-        },
-        {
-            "name": "friend_sym",
-            "membership": "SELECT userb AS uid, usera AS gid FROM Friend WHERE userb = ?",
-            "policies": [
-                {
-                    "table": "Photo",
-                    "predicate": "SELECT Photo.* FROM Photo JOIN Album ON (Photo.a_id = Album.a_id) JOIN GroupContext ON (Album.u_id = GroupContext.id) WHERE Album.public = 0",
-                    "description": "users can see photos in albums their friends have posted (for symmetry)"
-                }
-            ]
-        }
-    ],
+     "groups": [
+         {
+             "name": "friend",
+             "membership": "SELECT usera AS uid, Album.a_id AS gid FROM Friend JOIN Album ON (Album.u_id = Friend.userb) WHERE usera = ? AND Album.public = 0",
+             "policies": [
+                 {
+                     "table": "Photo",
+                     "predicate": "SELECT Photo.* FROM Photo JOIN GroupContext ON (Photo.a_id = GroupContext.id)",
+                     "description": "users can see photos in albums their friends have posted"
+                 }
+             ]
+         },
+         {
+             "name": "friend_sym",
+             "membership": "SELECT userb AS uid, Album.a_id AS gid FROM Friend JOIN Album ON (Album.u_id = Friend.usera) WHERE userb = ? AND Album.public = 0",
+             "policies": [
+                 {
+                     "table": "Photo",
+                     "predicate": "SELECT Photo.* FROM Photo JOIN GroupContext ON (Photo.a_id = GroupContext.id)",
+                     "description": "users can see photos in albums their friends have posted (for symmetry)"
+                 }
+             ]
+         }
+     ],
     "policies": [
         {
             "table": "Photo",
