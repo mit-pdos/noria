@@ -1,4 +1,5 @@
 use column::Column;
+use node::{MirNode, MirNodeType};
 use query::MirQuery;
 use std::collections::HashMap;
 use MirNodeRef;
@@ -61,6 +62,111 @@ pub(super) fn make_universe_naming_consistent(
 
         for child in node_to_rewrite.borrow().children() {
             nodes_to_rewrite.push(child.clone());
+        }
+    }
+}
+
+fn check_materialized(mnr: MirNodeRef) -> bool {
+    // only recurse as far back as security nodes (i.e., next universe boundary).
+    // without this restriction, we never get an identity node because everything
+    // ultimately traces back to base tables.
+    if mnr.borrow().name().starts_with("sp_") {
+        return false;
+    }
+
+    match mnr.borrow().inner {
+        // materialized ancestors => do nothing
+        MirNodeType::Aggregation { .. }
+        | MirNodeType::Base { .. }
+        | MirNodeType::TopK { .. }
+        | MirNodeType::Join { .. } => true,
+        // query-through ancestors => check further
+        MirNodeType::Project { .. } | MirNodeType::Filter { .. } => {
+            check_materialized(mnr.borrow().ancestors[0].clone())
+        }
+        MirNodeType::Reuse { ref node } => check_materialized(node.clone()),
+        // unmaterialized, add identity
+        _ => false,
+    }
+}
+
+fn check_reuse_for_identity(node: &MirNodeRef) -> Option<MirNodeRef> {
+    // check if we have an identity already
+    for c in node.borrow().children() {
+        if c.borrow().name().ends_with("_matid") {
+            return Some(c.clone());
+        }
+    }
+
+    if let MirNodeType::Reuse { ref node } = node.borrow().inner {
+        check_reuse_for_identity(node)
+    } else {
+        None
+    }
+}
+
+pub(super) fn force_materialization_above_secunion(q: &mut MirQuery, schema_version: usize) {
+    let mut queue = Vec::new();
+    queue.push(q.leaf.clone());
+
+    while !queue.is_empty() {
+        let mnr = queue.pop().unwrap();
+        if mnr.borrow().name().starts_with("spu_") {
+            // found a security union, so check all its ancestors.
+            // if an ancestor is materialized, we're good.
+            // if not, we add a materialized identity node
+            let mut to_rewrite = Vec::new();
+            let mut to_reuse = Vec::new();
+            'outer: for ar in mnr.borrow().ancestors() {
+                if let MirNodeType::Reuse { ref node } = ar.borrow().inner {
+                    if let Some(existing_identity) = check_reuse_for_identity(node) {
+                        to_reuse.push((ar.clone(), existing_identity));
+                        continue 'outer;
+                    }
+                }
+                if !check_materialized(ar.clone()) {
+                    to_rewrite.push(ar.clone());
+                }
+            }
+
+            for (ar, cr) in to_reuse.drain(..) {
+                ar.borrow_mut().remove_child(mnr.clone());
+                mnr.borrow_mut().remove_ancestor(ar.clone());
+
+                let new_id = MirNode::reuse(cr, schema_version);
+
+                ar.borrow_mut().add_child(new_id.clone());
+                new_id.borrow_mut().add_ancestor(ar.clone());
+
+                new_id.borrow_mut().add_child(mnr.clone());
+                mnr.borrow_mut().add_ancestor(new_id);
+            }
+
+            for ar in to_rewrite.drain(..) {
+                ar.borrow_mut().remove_child(mnr.clone());
+                mnr.borrow_mut().remove_ancestor(ar.clone());
+
+                let name = format!("{}_matid", ar.borrow().name());
+                let columns = ar.borrow().columns().to_vec();
+                let new_id = MirNode::new(
+                    &name,
+                    schema_version,
+                    columns,
+                    MirNodeType::Identity { materialized: true },
+                    vec![ar.clone()],
+                    vec![mnr.clone()],
+                );
+
+                if let MirNodeType::Reuse { ref node } = ar.borrow().inner {
+                    node.borrow_mut().add_child(new_id.clone());
+                }
+
+                mnr.borrow_mut().add_ancestor(new_id);
+            }
+        }
+
+        for ancestor in mnr.borrow().ancestors() {
+            queue.push(ancestor.clone());
         }
     }
 }

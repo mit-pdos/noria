@@ -262,7 +262,9 @@ impl SqlToMirConverter {
                 &format!("{}_id", name),
                 self.schema_version,
                 columns.clone(),
-                MirNodeType::Identity,
+                MirNodeType::Identity {
+                    materialized: false,
+                },
                 vec![parent.clone()],
                 vec![],
             )
@@ -1153,10 +1155,12 @@ impl SqlToMirConverter {
         let fields: Vec<Column> = fields
             .into_iter()
             .filter_map(|mut f| {
-                if f == r_col {
+                // Check for non-equality to prevent dropping columns that are already aliased
+                // as a result of joining against the same table twice.
+                if f == r_col && f != l_col {
                     // drop instances of right-side column
                     None
-                } else if f == l_col {
+                } else if f == l_col && f != r_col {
                     // add alias for right-side column to any left-side column
                     // N.B.: since `l_col` is already aliased, need to check this *after* checking
                     // for equivalence with `r_col` (by now, `l_col` == `r_col` via alias), so
@@ -1808,6 +1812,10 @@ impl SqlToMirConverter {
                 ancestors.push(final_node);
             }
 
+            // There should not be any ancestors passed to reconcile that have children (they
+            // are not leaf nodes and should not be unioned).
+            ancestors.retain(|a| a.borrow().children().len() == 0);
+            
             let final_node = if ancestors.len() > 1 {
                 // If we have multiple queries, reconcile them.
                 sec_round = true;

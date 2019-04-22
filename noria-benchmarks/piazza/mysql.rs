@@ -519,6 +519,7 @@ fn main() {
     }
 
     println!("# op\tphase\tpct\ttime");
+
     for &q in &[50, 95, 99, 100] {
         for &heat in &["cold", "warm"] {
             let stats = match heat {

@@ -157,10 +157,16 @@ fn mir_node_to_flow_parts(
                         table_mapping,
                     )
                 }
-                MirNodeType::Identity => {
+                MirNodeType::Identity { materialized } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
-                    make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)
+                    make_identity_node(
+                        &name,
+                        parent,
+                        mir_node.columns.as_slice(),
+                        materialized,
+                        mig,
+                    )
                 }
                 MirNodeType::Join {
                     ref on_left,
@@ -600,6 +606,7 @@ fn make_identity_node(
     name: &str,
     parent: MirNodeRef,
     columns: &[Column],
+    materialized: bool,
     mig: &mut Migration,
 ) -> FlowNode {
     let parent_na = parent.borrow().flow_node_addr().unwrap();
@@ -608,7 +615,7 @@ fn make_identity_node(
     let node = mig.add_ingredient(
         String::from(name),
         column_names.as_slice(),
-        ops::identity::Identity::new(parent_na),
+        ops::identity::Identity::new(parent_na, materialized),
     );
     FlowNode::New(node)
 }
@@ -625,18 +632,41 @@ fn make_join_node(
     mig: &mut Migration,
 ) -> FlowNode {
     use dataflow::ops::join::JoinSource;
-
+    
     assert_eq!(on_left.len(), on_right.len());
-
+    
     let column_names = column_names(columns);
 
-    let (projected_cols_left, rest): (Vec<Column>, Vec<Column>) = proj_cols
-        .iter()
-        .cloned()
-        .partition(|c| left.borrow().columns.contains(c));
-    let (projected_cols_right, rest): (Vec<Column>, Vec<Column>) = rest
-        .into_iter()
-        .partition(|c| right.borrow().columns.contains(c));
+    // Partition proj_cols into left and right.
+    // Put only one instance (the first) of a given column into projected_cols_left
+    // (or right).
+    // This is used in lieu of iter().partition(...) to address cases where a table
+    // and its derivative are both joined against the same table-column pair, to
+    // prevent an incorrect partition on the second join (where all copies of the
+    // right side columns go to left).
+    let mut rest = proj_cols.to_vec();
+    let mut projected_cols_left: Vec<Column> = Vec::new();
+    let mut projected_cols_right: Vec<Column> = Vec::new();
+
+    for c in left.borrow().columns() {
+        let i = match rest.iter().position(|rc| rc.clone() == c.clone()) {
+            Some(index) => index,
+            None => unimplemented!(),
+        };
+        let pc = rest.swap_remove(i);
+        projected_cols_left.push(pc);
+    }
+    for c in right.borrow().columns() {
+        // TODO it seems like there's a better way to handle the references
+        // than cloning
+        let i = match rest.iter().position(|rc| rc.clone() == c.clone()) {
+            Some(index) => index,
+            None => unimplemented!(),
+        };
+        let pc = rest.swap_remove(i);
+        projected_cols_right.push(pc);
+    }
+    
     assert!(
         rest.is_empty(),
         "could not resolve output columns projected from join: {:?}",
