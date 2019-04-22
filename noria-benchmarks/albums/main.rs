@@ -1,6 +1,7 @@
 use clap::value_t_or_exit;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
+use std::collections::HashMap;
 
 fn main() {
     use clap::{App, Arg};
@@ -54,6 +55,14 @@ fn main() {
     let mut albums = g.table("Album").unwrap().into_sync();
     let mut photos = g.table("Photo").unwrap().into_sync();
 
+    eprintln!("logging in users");
+    for uid in 1..=4 {
+        let user_context: HashMap<_, _> =
+            std::iter::once(("id".to_string(), uid.to_string().into())).collect();
+        g.on_worker(|w| w.create_universe(user_context.clone()))
+            .expect("failed to make user universe");
+    }
+
     // four users: 1, 2, 3, and 4
     // 1 and 2 are friends, 3 is a friend of 1 but not 2
     // 4 isn't friends with anyone
@@ -88,6 +97,7 @@ fn main() {
             vec!["d".into(), 4.into()],
         ])
         .unwrap();
+
     std::thread::sleep(std::time::Duration::from_secs(2));
 
     if let Some(gloc) = args.value_of("graph") {
