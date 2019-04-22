@@ -49,12 +49,6 @@ fn main() {
     g.extend_recipe(include_str!("queries.sql"))
         .expect("failed to load initial schema");
 
-    if let Some(gloc) = args.value_of("graph") {
-        debug!(log, "extracing query graph with two users");
-        let gv = g.graphviz().expect("failed to read graphviz");
-        std::fs::write(gloc, gv).expect("failed to save graphviz output");
-    }
-
     eprintln!("making some data");
     let mut friends = g.table("Friend").unwrap().into_sync();
     let mut albums = g.table("Album").unwrap().into_sync();
@@ -94,6 +88,13 @@ fn main() {
             vec!["d".into(), 4.into()],
         ])
         .unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    if let Some(gloc) = args.value_of("graph") {
+        debug!(log, "extracing query graph with two users");
+        let gv = g.graphviz().expect("failed to read graphviz");
+        std::fs::write(gloc, gv).expect("failed to save graphviz output");
+    }
 
     let mut test = move |uid| {
         let mut view = match uid {
