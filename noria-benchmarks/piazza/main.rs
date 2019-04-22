@@ -192,6 +192,10 @@ fn main() {
         "# materialization: {}",
         args.value_of("materialization").unwrap()
     );
+    println!(
+        "# reuse: {}",
+        args.value_of("reuse").unwrap()
+    );
 
     let mut cold_stats = HashMap::new();
     let mut warm_stats = HashMap::new();
@@ -604,7 +608,7 @@ fn main() {
     }
 
     println!("# op\tphase\tpct\ttime");
-    for &q in &[50, 95, 99, 100] {
+    for &q in &[5, 50, 95, 99, 100] {
         for &heat in &["cold", "warm"] {
             let stats = match heat {
                 "cold" => &cold_stats,
