@@ -462,7 +462,7 @@ fn setup_vote() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
     // 4 - *project
     // 5 - join
     // 6 - *project
-    // 7 - reader
+    // 7 - *reader
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
     for i in 0..8 {
@@ -532,6 +532,11 @@ fn vote(replay_after_recovery: bool, mut workers_to_drop: Vec<usize>) {
     v.insert(vec![1i64.into(), 0.into()]).unwrap();
     sleep();
     println!("check 10: lookup after recovery");
+    while q.lookup(&[0i64.into()], true).is_err() {
+        let mut g = workers.remove(0);
+        q = g.view("ArticleWithVoteCount").unwrap().into_sync();
+        workers.insert(0, g);
+    }
     assert_eq!(q.lookup(&[0i64.into()], true).unwrap()[0][2], 4.into());
     assert_eq!(q.lookup(&[1i64.into()], true).unwrap()[0][2], 3.into());
     println!("success! now clean shutdown...");
@@ -558,21 +563,31 @@ fn vote_lower_projection_with_replays() {
 }
 
 #[test]
+fn vote_reader_with_replays() {
+    vote(true, vec![7]);
+}
+
+#[test]
 fn vote_top_replica_without_replays() {
-    vote(true, vec![2]);
+    vote(false, vec![2]);
 }
 
 #[test]
 fn vote_bottom_replica_without_replays() {
-    vote(true, vec![3]);
+    vote(false, vec![3]);
 }
 
 #[test]
 fn vote_upper_projection_without_replays() {
-    vote(true, vec![4]);
+    vote(false, vec![4]);
 }
 
 #[test]
 fn vote_lower_projection_without_replays() {
-    vote(true, vec![6]);
+    vote(false, vec![6]);
+}
+
+#[test]
+fn vote_reader_without_replays() {
+    vote(false, vec![7]);
 }
