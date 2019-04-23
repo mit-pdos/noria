@@ -1345,8 +1345,8 @@ impl Domain {
                             .borrow_mut()
                             .with_egress_mut(|e| e.remove_child(child));
                     },
-                    Packet::RemoveTag { replica, old_tag, new_tag } => {
-                        println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_tag);
+                    Packet::RemoveTag { old_tag, new_state } => {
+                        println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
 
                         self.replay_paths.remove(&old_tag);
                         self.buffered_replay_requests.remove(&old_tag);
@@ -1354,9 +1354,9 @@ impl Domain {
                             .borrow_mut()
                             .with_egress_mut(|e| e.remove_tag(old_tag));
 
-                        if let Some(new_tag) = new_tag {
+                        if let Some((ni, new_tag)) = new_state {
                             self.state
-                                .get_mut(replica)
+                                .get_mut(ni)
                                 .unwrap()
                                 .replace_tag(old_tag, new_tag);
                         }

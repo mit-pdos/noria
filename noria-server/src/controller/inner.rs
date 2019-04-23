@@ -630,9 +630,8 @@ impl ControllerInner {
             }
         }
         let m = box Packet::RemoveTag {
-            replica: self.ingredients[bottom].local_addr(),
             old_tag: old_tag.unwrap(),
-            new_tag: Some(new_tag.unwrap()),
+            new_state: Some((self.ingredients[bottom].local_addr(), new_tag.unwrap())),
         };
         self.domains
             .get_mut(&domain_b2)
@@ -742,9 +741,8 @@ impl ControllerInner {
             }
         }
         let m = box Packet::RemoveTag {
-            replica: self.ingredients[bottom].local_addr(),
             old_tag: old_tag.unwrap(),
-            new_tag: None,
+            new_state: None,
         };
         self.domains
             .get_mut(&domain_b1)
