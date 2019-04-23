@@ -186,7 +186,6 @@ fn make_security_nodes(
     let mut security_nodes = Vec::new();
     let mut last_policy_nodes = Vec::new();
     let mut node_count = 0;
-    let mut local_node_for_rel = node_for_rel.clone();
 
     // Policies are created in parallel and later union'ed
     // Differently from normal queries, the policies order filters
@@ -194,10 +193,11 @@ fn make_security_nodes(
     // joins against a context view, we are unable to reuse it (context
     // views are universe-specific).
     for qg in row_policies.iter() {
-        let mut prev_node = Some(prev_node.clone());
+        let mut prev_node_for_policy = Some(prev_node.clone());
         let mut base_nodes: Vec<MirNodeRef> = Vec::new();
         let mut filter_nodes: Vec<MirNodeRef> = Vec::new();
 
+        let mut local_node_for_rel = node_for_rel.clone();
         let mut sorted_rels: Vec<&str> = qg.relations.keys().map(String::as_str).collect();
 
         sorted_rels.sort();
@@ -214,7 +214,6 @@ fn make_security_nodes(
                 && !rel.contains("UserContext")
                 && !rel.contains("GroupContext")
             {
-                local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
                 continue;
             }
 
@@ -245,7 +244,7 @@ fn make_security_nodes(
                     0,
                 );
 
-                prev_node = Some(
+                prev_node_for_policy = Some(
                     new_nodes
                         .iter()
                         .last()
@@ -258,7 +257,7 @@ fn make_security_nodes(
 
             // update local node relations so joins know which views to join
             if any_added {
-                local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
+                local_node_for_rel.insert(*rel, prev_node_for_policy.clone().unwrap());
             }
         }
 
@@ -272,15 +271,15 @@ fn make_security_nodes(
 
         node_count += join_nodes.len();
 
-        let prev_node = match join_nodes.last() {
-            Some(n) => n.clone(),
-            None => local_node_for_rel[table].clone(),
+        prev_node_for_policy = match join_nodes.last() {
+            Some(n) => Some(n.clone()),
+            None => prev_node_for_policy,
         };
 
         let rewrite_nodes = make_rewrite_nodes(
             mir_converter,
             &format!("sp_{:x}", qg.signature().hash),
-            prev_node,
+            prev_node_for_policy.as_ref().unwrap().clone(),
             table,
             node_count,
         )?;
