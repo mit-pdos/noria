@@ -235,7 +235,7 @@ fn make_security_nodes(
             let mut any_added = false;
 
             // for debugging
-            debug!(mir_converter.log, "# predicates: {}", &qgn.predicates.len());
+            debug!(mir_converter.log, "# predicates on {}: {}", rel, &qgn.predicates.len());
 
             for pred in &qgn.predicates {
                 let new_nodes = mir_converter.make_predicate_nodes(
