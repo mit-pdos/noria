@@ -96,75 +96,6 @@ fn aggregations_work_with_replicas() {
     assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), votes.into()]]);
 }
 
-/*
-fn stateless_domain(replay_after_recovery: bool) {
-    let txt = "CREATE TABLE vote (user int, id int);\n
-               QUERY user: SELECT id, user FROM vote WHERE id = ?;";
-
-    // start a worker for each domain
-    let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let g1 = build_authority("worker-1", authority.clone(), false);
-    let _g2 = build_authority("worker-2", authority.clone(), false);
-    sleep();
-
-    g.install_recipe(txt).unwrap();
-    sleep();
-    println!("{}", g.graphviz().unwrap());
-
-    let mut mutx = g.table("vote").unwrap().into_sync();
-    let mut q = g.view("user").unwrap().into_sync();
-    let id = 0;
-
-    // prime the dataflow graph
-    println!("check 1: write");
-    mutx.insert(vec![1.into(), id.into()]).unwrap();
-    sleep();
-    if !replay_after_recovery {
-        println!("check 2: lookup to seed replay pieces");
-        assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-    } else {
-        println!("check 2: continue without seeding replay pieces");
-    }
-
-    // shutdown the worker with the middle node and write while it is still recovering
-    // no writes are reflected because the dataflow graph is disconnected
-    println!("check 3: drop middle node");
-    drop(g1);
-    thread::sleep(Duration::from_secs(3));
-    println!("check 4: write before recovery");
-    mutx.insert(vec![2.into(), id.into()]).unwrap();
-    sleep();
-    println!("check 5: lookup before recovery CAN'T HANDLE");
-    // assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 1.into()]]);
-
-    // wait for recovery and observe both old and new writes
-    println!("check 6: wait for recovery");
-    thread::sleep(Duration::from_secs(10));
-    println!("check 7: done! write after recovery");
-    mutx.insert(vec![3.into(), id.into()]).unwrap();
-    sleep();
-    let expected = vec![
-        vec![id.into(), 1.into()],
-        vec![id.into(), 2.into()],
-        vec![id.into(), 3.into()],
-    ];
-    println!("check 8: lookup after recovery");
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), expected);
-    println!("success! now clean shutdown...");
-}
-
-#[test]
-fn lose_stateless_domain_without_replays() {
-    stateless_domain(false);
-}
-
-#[test]
-fn lose_stateless_domain_with_replays() {
-    stateless_domain(true);
-}
-*/
-
 fn multi_child_replica(replay_after_recovery: bool, worker_to_drop: usize) {
     let txt = "CREATE TABLE vote (user int, id int);\n
                QUERY q1: SELECT id, COUNT(*) AS votes FROM vote WHERE id = ?;\n
@@ -475,18 +406,28 @@ fn lose_top_replica_without_replays() {
 }
 
 #[test]
-fn lose_bottom_replica_without_replays() {
-    test_single_child_parent_replica(false, 2);
-}
-
-#[test]
 fn lose_top_replica_with_replays() {
     test_single_child_parent_replica(true, 1);
 }
 
 #[test]
+fn lose_bottom_replica_without_replays() {
+    test_single_child_parent_replica(false, 2);
+}
+
+#[test]
 fn lose_bottom_replica_with_replays() {
     test_single_child_parent_replica(true, 2);
+}
+
+#[test]
+fn lose_stateless_domain_without_replays() {
+    test_single_child_parent_replica(false, 3);
+}
+
+#[test]
+fn lose_stateless_domain_with_replays() {
+    test_single_child_parent_replica(true, 3);
 }
 
 #[test]
