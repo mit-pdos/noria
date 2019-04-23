@@ -240,7 +240,7 @@ fn make_security_nodes(
             for pred in &qgn.predicates {
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
-                    prev_node.expect("empty previous node"),
+                    local_node_for_rel[rel].clone(),
                     pred,
                     0,
                 );
