@@ -1350,9 +1350,12 @@ impl Domain {
 
                         self.replay_paths.remove(&old_tag);
                         self.buffered_replay_requests.remove(&old_tag);
-                        self.nodes[self.egress.unwrap()]
-                            .borrow_mut()
-                            .with_egress_mut(|e| e.remove_tag(old_tag));
+
+                        if let Some(egress) = self.egress {
+                            self.nodes[egress]
+                                .borrow_mut()
+                                .with_egress_mut(|e| e.remove_tag(old_tag));
+                        }
 
                         if let Some((ni, new_tag)) = new_state {
                             self.state

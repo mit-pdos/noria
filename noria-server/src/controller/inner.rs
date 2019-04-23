@@ -885,6 +885,30 @@ impl ControllerInner {
         // do a migration that regenerates the nodes from domain B1 in domain B2.
         self.migrate(|mig| mig.replicate_nodes(&vec![ingress, reader]));
 
+        // remove tags on replay paths involving domain B1 since materializations were
+        // recreated in the previous migration.
+        let tags = self.materializations
+            .get_setup_replay_paths(domain_b1)
+            .iter()
+            .map(|m| m.tag)
+            .collect::<Vec<_>>();
+        for tag in tags {
+            let path = self.materializations.get_path(tag).unwrap();
+            let domains = path
+                .iter()
+                .map(|&ni| self.ingredients[ni].domain())
+                .collect::<HashSet<_>>();
+            for domain in &domains {
+                // TODO(ygina): should get ack from RemoveTag before continuing
+                let m = box Packet::RemoveTag { old_tag: tag, new_state: None };
+                self.domains
+                    .get_mut(&domain)
+                    .unwrap()
+                    .send_to_healthy(m, &self.workers)
+                    .unwrap();
+            }
+        }
+
         // tell A to start from the first message to recover all state.
         //
         // if we, say, truncated the logs and don't have message 1, then perhaps domain B
