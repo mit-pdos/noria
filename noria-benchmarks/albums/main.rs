@@ -71,14 +71,14 @@ fn main() {
     //  - 3 should be able to see albums 1 and 3
     //  - 4 should be able to see albums 3 and 4
     friends
-        .perform_all(vec![vec![1.into(), 2.into()], vec![3.into(), 1.into()]])
+        .perform_all(vec![vec!["1".into(), "2".into()], vec!["3".into(), "1".into()]])
         .unwrap();
     albums
         .perform_all(vec![
-            vec![1.into(), 1.into(), 0.into()],
-            vec![2.into(), 2.into(), 0.into()],
-            vec![3.into(), 3.into(), 1.into()],
-            vec![4.into(), 4.into(), 0.into()],
+            vec![1.into(), "1".into(), 0.into()],
+            vec![2.into(), "2".into(), 0.into()],
+            vec![3.into(), "3".into(), 1.into()],
+            vec![4.into(), "4".into(), 0.into()],
         ])
         .unwrap();
     photos
