@@ -27,7 +27,9 @@ impl Group {
 
                 Group {
                     name: name.to_string(),
-                    membership: sql_parser::parse_query(membership).unwrap(),
+                    membership: sql_parser::parse_query(membership).unwrap_or_else(|e| {
+                        panic!("failed to parse membership query: {:?}:\n{}", e, membership)
+                    }),
                     policies: Policy::parse(&policies),
                 }
             })
