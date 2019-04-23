@@ -446,8 +446,16 @@ fn test_single_child_parent_replica(replay_after_recovery: bool, worker_to_drop:
     println!("check 6: write after recovery");
     mutx.insert(row.clone()).unwrap();
     sleep();
-    println!("check 7: lookup after recovery");
-    assert_eq!(q.lookup(&[id.into()], true).unwrap(), vec![vec![id.into(), 3.into()]]);
+    let res = q.lookup(&[id.into()], true);
+    let res = if res.is_err() {
+        println!("check 7: lookup after recovery (new client)");
+        q = g.view("votecount").unwrap().into_sync();
+        q.lookup(&[id.into()], true).unwrap()
+    } else {
+        println!("check 7: lookup after recovery");
+        res.unwrap()
+    };
+    assert_eq!(res, vec![vec![id.into(), 3.into()]]);
 
     // if the replays were just set up, perform one more write and lookup
     if replay_after_recovery {

@@ -368,6 +368,7 @@ impl ControllerInner {
         let mut ingress = Vec::new();
         let mut egress = None;
         let mut stateful = Vec::new();
+        let mut reader = Vec::new();
         for &ni in &nodes {
             let node = &self.ingredients[ni];
             if node.is_ingress() {
@@ -398,7 +399,10 @@ impl ControllerInner {
                     stateful.push(ni);
                 }
             }
-            if node.is_source() || node.is_sharder() || node.is_base() || node.is_reader() {
+            if node.is_reader() {
+                reader.push(ni);
+            }
+            if node.is_source() || node.is_sharder() || node.is_base() {
                 unimplemented!();
             }
             if node.is_dropped() {
@@ -407,18 +411,24 @@ impl ControllerInner {
         }
 
         assert!(ingress.len() > 0);
-        let egress = egress.unwrap();
-        if stateful.len() == 1 {
+        if reader.len() == 1 {
+            // reader leaf
+            assert_eq!(ingress.len(), 1);
+            assert!(stateful.is_empty());
+            assert!(egress.is_none());
+            self.recover_reader(ingress[0], reader[0]);
+            true
+        } else if stateful.len() == 1 {
             if self.ingredients[stateful[0]].replica_type().is_some() && nodes.len() == 3 {
                 // exactly one ingress, one egress, and one stateful replica
-                self.recover_hot_spare(stateful[0], ingress, egress);
+                self.recover_hot_spare(stateful[0], ingress, egress.unwrap());
                 true
             } else {
                 // the stateful node does not have a replica
                 false
             }
         } else if stateful.len() == 0 {
-            self.recover_stateless_domain(ingress, egress);
+            self.recover_stateless_domain(ingress, egress.unwrap());
             true
         } else {
             // more than one stateful node
@@ -854,6 +864,40 @@ impl ControllerInner {
             },
             None => unreachable!(),
         }
+    }
+
+    /// Recovers a domain with only an ingress A and a reader B1.
+    fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {
+        let domain_b1 = self.ingredients[ingress].domain();
+        assert_eq!(domain_b1, self.ingredients[reader].domain());
+
+        // prevent A from sending messages to B1 even once the connection is regenerated.
+        let egress_a = self.parent(ingress);
+        let domain_a = self.ingredients[egress_a].domain();
+        let m = box Packet::RemoveChild {
+            node: self.ingredients[egress_a].local_addr(),
+            child: ingress,
+        };
+        self.domains
+            .get_mut(&domain_a)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // do a migration that regenerates the nodes from domain B1 in domain B2.
+        self.migrate(|mig| mig.replicate_nodes(&vec![ingress, reader]));
+
+        // tell A to start from the first message to recover all state.
+        //
+        // if we, say, truncated the logs and don't have message 1, then perhaps domain B
+        // will automatically trigger a replay to fill in missed state? not sure about the
+        // intricacies here.
+        let m = box Packet::ResumeAt { child_labels: vec![(ingress, 1)] };
+        self.domains
+            .get_mut(&domain_a)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
