@@ -1264,6 +1264,7 @@ impl ControllerInner {
                 w.sender.peer_addr()
             );
             let src = w.sender.local_addr().unwrap();
+            w.domains.push(domain.index);
             w.sender
                 .send(CoordinationMessage {
                     epoch: self.epoch,
@@ -1597,10 +1598,12 @@ impl ControllerInner {
         GraphStats { domains }
     }
 
-    fn get_instances(&self) -> Vec<(WorkerIdentifier, bool, Duration)> {
+    fn get_instances(&self) -> Vec<(WorkerIdentifier, bool, Duration, Vec<DomainIndex>)> {
         self.workers
             .iter()
-            .map(|(&id, ref status)| (id, status.healthy, status.last_heartbeat.elapsed()))
+            .map(|(&id, ref status)| {
+                (id, status.healthy, status.last_heartbeat.elapsed(), status.domains.clone())
+            })
             .collect()
     }
 

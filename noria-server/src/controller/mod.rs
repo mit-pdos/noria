@@ -12,6 +12,7 @@ use futures::{self, Future, Sink, Stream};
 use hyper::{self, StatusCode};
 use noria::channel::TcpSender;
 use noria::consensus::{Authority, Epoch, STATE_KEY};
+use noria::internal::DomainIndex;
 use noria::ControllerDescriptor;
 use serde_json;
 use slog;
@@ -45,6 +46,7 @@ struct Worker {
     healthy: bool,
     last_heartbeat: time::Instant,
     sender: TcpSender<CoordinationMessage>,
+    domains: Vec<DomainIndex>,
 }
 
 impl Worker {
@@ -53,6 +55,7 @@ impl Worker {
             healthy: true,
             last_heartbeat: time::Instant::now(),
             sender,
+            domains: Default::default(),
         }
     }
 }
