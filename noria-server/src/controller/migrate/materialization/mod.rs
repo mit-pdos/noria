@@ -134,7 +134,12 @@ impl Materializations {
         //
 
         // Holds all lookup obligations. Keyed by the node that should be materialized.
-        let mut lookup_obligations = HashMap::new();
+        // It's an indexmap so that we can later .pop().
+        // See also
+        // https://github.com/rust-lang/rust/issues/27804
+        // and
+        // https://github.com/rust-lang/rfcs/issues/1800
+        let mut lookup_obligations = indexmap::IndexMap::new();
 
         // Holds all replay obligations. Keyed by the node whose *parent* should be materialized.
         let mut replay_obligations = HashMap::new();
@@ -177,7 +182,7 @@ impl Materializations {
                 if lookup {
                     lookup_obligations
                         .entry(ni)
-                        .or_insert_with(HashSet::new)
+                        .or_insert_with(indexmap::IndexSet::new)
                         .insert(cols);
                 } else {
                     replay_obligations
@@ -186,46 +191,6 @@ impl Materializations {
                         .insert(cols);
                 }
             }
-        }
-
-        // map all the indices to the corresponding columns in the parent
-        fn map_indices(
-            n: &Node,
-            parent: NodeIndex,
-            indices: &HashSet<Vec<usize>>,
-        ) -> Result<HashSet<Vec<usize>>, String> {
-            indices
-                .iter()
-                .map(|index| {
-                    index
-                        .iter()
-                        .map(|&col| {
-                            if !n.is_internal() {
-                                if n.is_base() {
-                                    unreachable!();
-                                }
-                                return Ok(col);
-                            }
-
-                            let really = n.parent_columns(col);
-                            let really = really
-                                .into_iter()
-                                .find(|&(anc, _)| anc == parent)
-                                .and_then(|(_, col)| col);
-
-                            really.ok_or_else(|| {
-                                format!(
-                                    "could not resolve obligation past operator;\
-                                     node => {}, ancestor => {}, column => {}",
-                                    n.global_addr().index(),
-                                    parent.index(),
-                                    col
-                                )
-                            })
-                        })
-                        .collect()
-                })
-                .collect()
         }
 
         // lookup obligations are fairly rigid, in that they require a materialization, and can
@@ -237,37 +202,99 @@ impl Materializations {
         // partial node may add indices to only a subset of the intermediate partial views between
         // it and the nearest full materialization (because the intermediate ones haven't been
         // marked as materialized yet).
-        for (ni, mut indices) in lookup_obligations {
+
+        // keep track of nodes we are currently querying through, and what columns we're querying
+        // through _with_, so that if one of those nodes are later chosen to be materialized after
+        // all, we add those indices there. the concern here is specifically if a later lookup
+        // obligation can't queried through a node that we have _previously_ granted a
+        // query-through for, and thus forces it to be materialized? then something that tries to
+        // use that previous key will instead look in that materialization, only to realize that
+        // the index isn't there...
+        let mut retro_index = HashMap::new();
+        while let Some((ni, mut indices)) = lookup_obligations.pop() {
             // we want to find the closest materialization that allows lookups (i.e., counting
             // query-through operators).
-            let mut mi = ni;
-            let mut m = &graph[mi];
-            loop {
-                if self.have.contains_key(&mi) {
-                    break;
-                }
-                if !m.is_internal() || !m.can_query_through() {
-                    break;
+            let mi = ni;
+            let m = &graph[mi];
+
+            if !self.have.contains_key(&mi) && indices.iter().all(|c| m.can_query_through(c)) {
+                // we can query through this node!
+                // resolve each index into an index on ancestor(s) instead.
+                // NOTE: this code looks an awful lot like the replay upquery path stuff -- share?
+                for cs in indices {
+                    // for each ancestor, what would we end up looking up by?
+                    let mut pcs = HashMap::new();
+
+                    let mut pis = HashSet::new();
+                    for &c in &cs {
+                        // TODO: !m.is_internal() (&& m.is_base() => unreachable!)
+                        for (pi, pc) in m.parent_columns(c) {
+                            if pc.is_none() {
+                                // only allow lookups into ancestors that have all columns
+                                // TODO: this requirement probably isn't strictly necessary:
+                                // you could imagine being able to query through by one column, and
+                                // then have the query-through implementation filter on the other key.
+                                // for example, a join could choose to replay using only a subset of
+                                // the key columns which are all on one side, and then internally
+                                // filter the rows with the other columns before returning the reults.
+                                pcs.remove(&pi);
+                                continue;
+                            }
+
+                            pis.insert(pi);
+                            pcs.entry(pi).or_insert_with(Vec::new).push(pc.unwrap());
+                        }
+                    }
+
+                    // in case we encountered [Some(c), None, Some(c)] in parent_columns
+                    pcs.retain(|_, cols| cols.len() == cs.len());
+                    assert_ne!(pcs.len(), 0);
+
+                    // okay, now, which ancestor(s) do we hoist the lookup obligation to?
+                    if m.is_join() {
+                        // the lookup will end up going to only one side
+                        let pi = if let Some(mra) = m.must_replay_among() {
+                            mra.into_iter()
+                                .find(|pi| pcs.contains_key(pi))
+                                .expect("query-through but no viable join ancestor found")
+                        } else {
+                            // TODO: we can choose, but we need to choose the same one that the
+                            // join will choose! how do we know which side its query-through impl
+                            // will favor?
+                            unimplemented!()
+                        };
+                        pcs.retain(|&candidate, _| candidate == pi);
+                    } else {
+                        // the lookup will go to all ancestors
+                        assert_eq!(
+                            pcs.len(),
+                            graph
+                                .neighbors_directed(mi, petgraph::Direction::Incoming)
+                                .count()
+                        );
+                    }
+
+                    // hoist index to parent
+                    trace!(self.log, "hoisting indexing obligations";
+                           "for" => mi.index(),
+                           "on" => ?cs,
+                           "to" => ?pcs);
+                    retro_index
+                        .entry(mi)
+                        .or_insert_with(HashSet::new)
+                        .insert(cs);
+                    for (pi, key) in pcs {
+                        lookup_obligations
+                            .entry(pi)
+                            .or_insert_with(indexmap::IndexSet::new)
+                            .insert(key);
+                    }
                 }
 
-                let mut parents = graph.neighbors_directed(mi, petgraph::EdgeDirection::Incoming);
-                let parent = parents.next().unwrap();
-                assert_eq!(
-                    parents.count(),
-                    0,
-                    "query_through had more than one ancestor"
-                );
-
-                // hoist index to parent
-                trace!(self.log, "hoisting indexing obligations";
-                       "for" => mi.index(),
-                       "to" => parent.index());
-                mi = parent;
-                indices = map_indices(m, mi, &indices).unwrap();
-                m = &graph[mi];
+                continue;
             }
 
-            for columns in indices {
+            while let Some(columns) = indices.pop() {
                 info!(self.log,
                     "adding lookup index to view";
                     "node" => ni.index(),
@@ -275,6 +302,14 @@ impl Materializations {
                 );
 
                 if self.have.entry(mi).or_default().insert(columns.clone()) {
+                    // have we previously granted query-through on this node?
+                    // if so, we now need to index those instead
+                    if let Some(missed) = retro_index.remove(&mi) {
+                        for key in missed {
+                            indices.insert(key);
+                        }
+                    }
+
                     // also add a replay obligation to enable partial
                     replay_obligations
                         .entry(mi)

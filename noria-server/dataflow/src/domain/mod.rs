@@ -2026,7 +2026,8 @@ impl Domain {
 
                                         // this parent needs to be resolved further
                                         let pn = self.nodes[pn].borrow();
-                                        if !pn.can_query_through() {
+                                        // TODO: need to resolve lookup.on to be right here
+                                        if !pn.can_query_through(&lookup.cols) {
                                             unreachable!("lookup into non-materialized, non-query-through node");
                                         }
 

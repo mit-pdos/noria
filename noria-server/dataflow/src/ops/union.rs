@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use prelude::*;
@@ -117,6 +118,15 @@ impl Union {
             false
         }
     }
+
+    fn map<'a>(
+        &'a self,
+        src: LocalNodeIndex,
+        it: Box<Iterator<Item = Cow<'a, [DataType]>>>,
+    ) -> impl Iterator<Item = Cow<'a, [DataType]>> + 'a {
+        // TODO
+        it
+    }
 }
 
 impl Ingredient for Union {
@@ -174,6 +184,104 @@ impl Ingredient for Union {
                 p.remap(remap);
             }
         }
+    }
+
+    fn can_query_through(&self, _: &[usize]) -> bool {
+        true
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn query_through<'a>(
+        &self,
+        columns: &[usize],
+        key: &KeyType,
+        nodes: &DomainNodes,
+        states: &'a StateMap,
+    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+        //  - `None` => no materialization of the parent state exists
+        //  - `Some(None)` => materialization exists, but lookup got a miss
+        //  - `Some(Some(rs))` => materialization exists, and got results rs
+        //
+        // we're going to have an issue here with joins, because the caller will need to know
+        // _how_ we missed!
+        //
+        // TODO: how do lookups interact with cached upquery responses?
+        // TODO: need to make columns/key before lookup
+        // TODO: replicate emit info since we can't keep &self
+        match self.emit {
+            Emit::AllFrom(src, _) => {
+                let src = src.as_local();
+                Some(
+                    self.lookup(src, columns, key, nodes, states)?
+                        .map(move |it| Box::new(self.map(src, it)) as Box<_>),
+                )
+            }
+            Emit::Project { ref emit_l, .. } => {
+                if emit_l.keys().any(|&ni| !states.contains_key(ni)) {
+                    return None;
+                }
+
+                let mut lookups = Vec::with_capacity(emit_l.len());
+                for &pni in emit_l.keys() {
+                    if let Some(it) = self.lookup(pni, columns, key, nodes, states)? {
+                        lookups.push((pni, it));
+                    } else {
+                        return Some(None);
+                    }
+                }
+
+                Some(Some(Box::new(
+                    lookups
+                        .into_iter()
+                        .flat_map(move |(pni, it)| self.map(pni, it)),
+                )))
+            }
+        }
+        /*
+        // TODO: in theory we might be able to return an
+        // empty result immediately by comparing the
+        // lookup key with the filtered columns...
+        self.lookup(*self.src, columns, key, nodes, states)
+            .and_then(|result| {
+                let f = self.filter.clone();
+                let filter = move |r: &[DataType]| {
+                    r.iter().enumerate().all(|(i, d)| {
+                        // check if this filter matches
+                        if let Some(ref cond) = f[i] {
+                            match *cond {
+                                FilterCondition::Comparison(ref op, ref f) => {
+                                    let v = match *f {
+                                        Value::Constant(ref dt) => dt,
+                                        Value::Column(c) => &r[c],
+                                    };
+                                    match *op {
+                                        Operator::Equal => d == v,
+                                        Operator::NotEqual => d != v,
+                                        Operator::Greater => d > v,
+                                        Operator::GreaterOrEqual => d >= v,
+                                        Operator::Less => d < v,
+                                        Operator::LessOrEqual => d <= v,
+                                        _ => unimplemented!(),
+                                    }
+                                }
+                                FilterCondition::In(ref fs) => fs.contains(d),
+                            }
+                        } else {
+                            // everything matches no condition
+                            true
+                        }
+                    })
+                };
+
+                match result {
+                    Some(rs) => {
+                        let r = Box::new(rs.filter(move |r| filter(r))) as Box<_>;
+                        Some(Some(r))
+                    }
+                    None => Some(None),
+                }
+            })
+            */
     }
 
     fn on_input(

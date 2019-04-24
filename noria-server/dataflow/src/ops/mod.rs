@@ -186,8 +186,8 @@ impl Ingredient for NodeOperator {
     ) {
         impl_ingredient_fn_mut!(self, on_eviction, from, key_columns, keys)
     }
-    fn can_query_through(&self) -> bool {
-        impl_ingredient_fn_ref!(self, can_query_through,)
+    fn can_query_through(&self, key: &[usize]) -> bool {
+        impl_ingredient_fn_ref!(self, can_query_through, key)
     }
     #[allow(clippy::type_complexity)]
     fn query_through<'a>(

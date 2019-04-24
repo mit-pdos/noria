@@ -137,8 +137,8 @@ impl Node {
         Ingredient::requires_full_materialization(&**self)
     }
 
-    pub fn can_query_through(&self) -> bool {
-        Ingredient::can_query_through(&**self)
+    pub fn can_query_through(&self, key: &[usize]) -> bool {
+        self.is_internal() && Ingredient::can_query_through(&**self, key)
     }
 
     pub fn is_join(&self) -> bool {

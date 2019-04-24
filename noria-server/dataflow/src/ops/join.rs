@@ -225,6 +225,41 @@ impl Ingredient for Join {
         self.right.remap(remap);
     }
 
+    fn can_query_through(&self, key: &[usize]) -> bool {
+        // in theory we could query through even if only a subset of the columns come from each
+        // side, but it requires a bit of finesse. consider the case where the query from below
+        // looks up by &[0, 1], where [0] comes from left (L) column 0 and [1] comes from right (R)
+        // column 0. to make this work, we first and foremost need there to be an index on _either_
+        // L0 or R0. if we're a left join, it has to be L0. the other side should _not_ have an
+        // index. when a query comes in, we need to make sure that we do lookups into the same side
+        // that the index was added on using either [0] or [1] (let's assume it's [0] so L0; the
+        // [1] case is symmetric). we then do the replay and do lookups into R as usual to perform
+        // the join. we then have to do an additional pre-processing step of filtering the values
+        // coming from R such that R0 is equal to the [1] part of the provided key.
+        //
+        // in theory, we could probably also do query through even if all the lookup columns come
+        // from the right-hand side of a left join, but that requires some more thinking.
+        //
+        // that is probably all doable, but for now:
+        // TODO
+        let all_from_left = key.iter().all(|&c| {
+            let (from_left, anc_c) = self.emit[c];
+            // available from the left?
+            from_left || anc_c == self.on.1
+        });
+        let all_from_right = key.iter().all(|&c| {
+            let (from_left, anc_c) = self.emit[c];
+            // available from the right?
+            !from_left || anc_c == self.on.0
+        });
+
+        false
+            && match self.kind {
+                JoinType::Inner => all_from_left || all_from_right,
+                JoinType::Left => all_from_left,
+            }
+    }
+
     #[allow(clippy::cognitive_complexity)]
     fn on_input(
         &mut self,

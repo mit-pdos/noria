@@ -271,7 +271,7 @@ impl Node {
 // by translating the Miss into the right parent.
 fn reroute_miss(nodes: &DomainNodes, miss: &mut Miss) {
     let node = nodes[miss.on].borrow();
-    if node.is_internal() && node.can_query_through() {
+    if node.is_internal() && node.can_query_through(&miss.lookup_idx) {
         let mut new_parent: Option<IndexPair> = None;
         for col in miss.lookup_idx.iter_mut() {
             let parents = node.resolve(*col).unwrap();

@@ -64,6 +64,10 @@ impl IndexPair {
         self.local.is_some()
     }
 
+    pub fn as_local(&self) -> LocalNodeIndex {
+        self.local.unwrap()
+    }
+
     pub fn as_global(&self) -> NodeIndex {
         self.global
     }

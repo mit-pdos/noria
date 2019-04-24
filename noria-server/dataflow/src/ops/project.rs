@@ -128,7 +128,7 @@ impl Ingredient for Project {
         vec![self.src.as_global()]
     }
 
-    fn can_query_through(&self) -> bool {
+    fn can_query_through(&self, _: &[usize]) -> bool {
         true
     }
 

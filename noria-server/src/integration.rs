@@ -2384,6 +2384,105 @@ fn remove_query() {
 }
 
 #[test]
+fn qtjoin() {
+    let mut b = Builder::default();
+    //b.disable_partial();
+    b.set_sharding(None);
+    b.log_with(crate::logger_pls());
+    let mut g = b.start_simple().unwrap();
+    g.install_recipe(
+        "CREATE TABLE l (lkey int);
+        CREATE TABLE m (mkey int);
+        CREATE TABLE r (rkey int);",
+    )
+    .unwrap();
+    g.extend_recipe("QUERY final: SELECT * FROM l JOIN m ON (l.lkey = m.mkey) JOIN r ON (m.mkey = r.rkey) WHERE l.lkey = ?;").unwrap();
+
+    let mut left = g.table("l").unwrap().into_sync();
+    let mut middle = g.table("m").unwrap().into_sync();
+    let mut right = g.table("r").unwrap().into_sync();
+    left.perform_all(vec![vec![1.into()], vec![2.into()], vec![3.into()]])
+        .unwrap();
+    middle
+        .perform_all(vec![vec![1.into()], vec![2.into()]])
+        .unwrap();
+    right.perform_all(vec![vec![1.into()]]).unwrap();
+
+    sleep();
+    let graph = g.graphviz().unwrap();
+    eprintln!("{}", graph);
+
+    let mut view = g.view("final").unwrap().into_sync();
+    assert_eq!(dbg!(view.lookup(&[1.into()], true).unwrap()).len(), 1);
+    assert_eq!(dbg!(view.lookup(&[2.into()], true).unwrap()).len(), 0);
+    assert_eq!(dbg!(view.lookup(&[3.into()], true).unwrap()).len(), 0);
+
+    for line in graph.lines() {
+        if line.contains('⋈') {
+            // no join should be materialized if join query-through works!
+            if line.contains('●') || line.contains('◕') {
+                eprintln!("{}", line);
+                panic!("join is materialized when it shouldn't need to be");
+            }
+        }
+    }
+}
+
+#[test]
+fn qtunion() {
+    let mut b = Builder::default();
+    // NOTE: partial _needs_ to be on to make this test effective
+    // if it's turned off, the regular write processing might do a lookup into the (materialized)
+    // ingress node from one of the unions, in which case you'll get the right answer regardless.
+    //b.disable_partial();
+    b.set_sharding(None);
+    b.log_with(crate::logger_pls());
+    let mut g = b.start_simple().unwrap();
+    // we want to force a join to be in the same domain as a union, so we give it a union on both sides
+    g.install_recipe(
+        "CREATE TABLE a (akey int);
+        CREATE TABLE b (bkey int);
+        CREATE TABLE c (ckey int);
+        CREATE TABLE d (dkey int);",
+    )
+    .unwrap();
+    g.extend_recipe("VIEW ab: SELECT a.akey AS k FROM a UNION SELECT b.bkey AS k FROM b;")
+        .unwrap();
+    g.extend_recipe("VIEW cd: SELECT c.ckey AS k FROM c UNION SELECT d.dkey AS k FROM d;")
+        .unwrap();
+    g.extend_recipe("QUERY final: SELECT ab.k FROM ab JOIN cd ON (ab.k = cd.k) WHERE ab.k = ?;")
+        .unwrap();
+
+    let mut a = g.table("a").unwrap().into_sync();
+    let mut b = g.table("b").unwrap().into_sync();
+    let mut c = g.table("c").unwrap().into_sync();
+    let mut d = g.table("d").unwrap().into_sync();
+    a.perform_all(vec![vec![1.into()]]).unwrap();
+    b.perform_all(vec![vec![2.into()]]).unwrap();
+    c.perform_all(vec![vec![1.into()]]).unwrap();
+    d.perform_all(vec![vec![3.into()]]).unwrap();
+
+    sleep();
+    let graph = g.graphviz().unwrap();
+    eprintln!("{}", graph);
+
+    let mut view = g.view("final").unwrap().into_sync();
+    assert_eq!(dbg!(view.lookup(&[1.into()], true).unwrap()).len(), 1);
+    assert_eq!(dbg!(view.lookup(&[2.into()], true).unwrap()).len(), 0);
+    assert_eq!(dbg!(view.lookup(&[3.into()], true).unwrap()).len(), 0);
+
+    for line in graph.lines() {
+        if line.contains('⋃') {
+            // no union should be materialized if union query-through works!
+            if line.contains('●') || line.contains('◕') {
+                eprintln!("{}", line);
+                panic!("union is materialized when it shouldn't need to be");
+            }
+        }
+    }
+}
+
+#[test]
 fn albums() {
     let mut b = Builder::default();
     //b.disable_partial();

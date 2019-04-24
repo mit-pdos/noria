@@ -204,7 +204,7 @@ where
     ) {
     }
 
-    fn can_query_through(&self) -> bool {
+    fn can_query_through(&self, _key: &[usize]) -> bool {
         false
     }
 

@@ -167,7 +167,7 @@ impl Ingredient for Filter {
         )
     }
 
-    fn can_query_through(&self) -> bool {
+    fn can_query_through(&self, _: &[usize]) -> bool {
         true
     }
 
@@ -179,6 +179,9 @@ impl Ingredient for Filter {
         nodes: &DomainNodes,
         states: &'a StateMap,
     ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+        // TODO: in theory we might be able to return an
+        // empty result immediately by comparing the
+        // lookup key with the filtered columns...
         self.lookup(*self.src, columns, key, nodes, states)
             .and_then(|result| {
                 let f = self.filter.clone();
