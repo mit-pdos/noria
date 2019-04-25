@@ -289,6 +289,14 @@ impl ControllerInner {
                     self.remove_nodes(vec![args].as_slice())
                         .map(|r| json::to_string(&r).unwrap())
                 }),
+            (Method::POST, "/shutdown_worker") => {
+                json::from_slice(&body)
+                .map_err(|_| StatusCode::BAD_REQUEST)
+                .map(|args| {
+                    self.shutdown_worker(args)
+                        .map(|r| json::to_string(&r).unwrap())
+                })
+            },
             _ => Err(StatusCode::NOT_FOUND),
         }
     }
@@ -1605,6 +1613,21 @@ impl ControllerInner {
                 (id, status.healthy, status.last_heartbeat.elapsed(), status.domains.clone())
             })
             .collect()
+    }
+
+    fn shutdown_worker(&mut self, instance_addr: String) -> Result<(), String> {
+        let instance_addr: WorkerIdentifier = instance_addr
+            .parse()
+            .expect("unable to parse socket address");
+        let w = self.workers.get_mut(&instance_addr).unwrap();
+        let src = w.sender.local_addr().unwrap();
+        w.sender
+            .send(CoordinationMessage {
+                epoch: self.epoch,
+                source: src,
+                payload: CoordinationPayload::Shutdown,
+            })
+            .map_err(|_| format!("failed to shutdown {:?}", instance_addr))
     }
 
     fn flush_partial(&mut self) -> u64 {

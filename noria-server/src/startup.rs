@@ -136,6 +136,7 @@ pub(super) fn start_instance<A: Authority + 'static>(
                 match e {
                     Event::InternalMessage(ref msg) => match msg.payload {
                         CoordinationPayload::Deregister => fw(e, true),
+                        CoordinationPayload::Shutdown => fw(e, false),
                         CoordinationPayload::RemoveDomain => fw(e, false),
                         CoordinationPayload::AssignDomain(..) => fw(e, false),
                         CoordinationPayload::DomainBooted(..) => fw(e, false),

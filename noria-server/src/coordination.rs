@@ -39,6 +39,8 @@ pub enum CoordinationPayload {
     DomainBooted(DomainDescriptor),
     /// Create a new security universe.
     CreateUniverse(HashMap<String, DataType>),
+    /// Shutdown a worker.
+    Shutdown,
     /// Ack NewIncoming to start sending ResumeAts.
     AckNewIncoming {
         /// Who the ack is from.
