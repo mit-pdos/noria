@@ -6,6 +6,25 @@ use std::collections::HashMap;
 
 type DomainMap = HashMap<(DomainIndex, usize), (DomainStats, HashMap<NodeIndex, NodeStats>)>;
 
+#[derive(Debug, Serialize, Deserialize)]
+/// Domain provenance information.
+pub struct Provenance {
+    /// Label of the message it represents.
+    pub label: usize,
+    /// Labels of upstream messages used to construct it.
+    pub edges: HashMap<DomainIndex, Box<Provenance>>,
+}
+
+impl Provenance {
+    /// New debug provenance.
+    pub fn new(label: usize) -> Provenance {
+        Provenance {
+            label,
+            edges: HashMap::new(),
+        }
+    }
+}
+
 /// Statistics about a domain.
 ///
 /// All times are in nanoseconds.
@@ -21,6 +40,8 @@ pub struct DomainStats {
     pub min_label: usize,
     /// Number of payloads stored in the log.
     pub log_size: usize,
+    /// Latest provenance.
+    pub provenance: Provenance,
 }
 
 /// Statistics about a node.

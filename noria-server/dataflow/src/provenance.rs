@@ -128,4 +128,12 @@ impl Provenance {
         }
         unreachable!("must be ancestor or grand-ancestor");
     }
+
+    pub fn into_debug(&self) -> noria::debug::stats::Provenance {
+        let mut p = noria::debug::stats::Provenance::new(self.label);
+        for (&domain, domain_p) in self.edges.iter() {
+            p.edges.insert(domain, box domain_p.into_debug());
+        }
+        p
+    }
 }

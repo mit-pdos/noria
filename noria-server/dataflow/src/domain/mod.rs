@@ -1244,18 +1244,26 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::GetStatistics => {
-                        let (min_label, log_size) = match self.egress {
+                        let (min_label, log_size, provenance) = match self.egress {
                             Some(ni) => {
                                 self.nodes[ni]
                                     .borrow()
-                                    .with_egress(|e| (e.min_provenance.label(), e.payloads.len()))
+                                    .with_egress(|e| (
+                                        e.min_provenance.label(),
+                                        e.payloads.len(),
+                                        e.get_last_provenance().into_debug(),
+                                    ))
                             },
                             None => {
                                 // only domains with reader nodes don't have an egress
                                 assert!(self.reader.is_some());
                                 self.nodes[self.reader.unwrap()]
                                     .borrow()
-                                    .with_reader(|r| (r.min_provenance.label(), r.num_payloads))
+                                    .with_reader(|r| (
+                                        r.min_provenance.label(),
+                                        r.num_payloads,
+                                        r.get_last_provenance().into_debug(),
+                                    ))
                                     .unwrap()
                             }
                         };
@@ -1266,6 +1274,7 @@ impl Domain {
                             wait_time: self.wait_time.num_nanoseconds(),
                             min_label,
                             log_size,
+                            provenance,
                         };
 
                         let node_stats = self
