@@ -38,12 +38,12 @@ pub struct Reader {
     state: Option<Vec<usize>>,
 
     /// Base provenance, including the label it represents
-    min_provenance: Provenance,
+    pub(crate) min_provenance: Provenance,
     /// Provenance updates of depth 1 starting with the first packet received.
     /// We don't have to store payloads in readers because there are no outgoing packets.
-    updates: Vec<ProvenanceUpdate>,
+    pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Number of non-replay messages received.
-    num_payloads: usize,
+    pub(crate) num_payloads: usize,
 }
 
 impl Clone for Reader {

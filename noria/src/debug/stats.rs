@@ -17,6 +17,10 @@ pub struct DomainStats {
     pub total_ptime: u64,
     /// Total wall-clock time spent waiting for work in this domain.
     pub wait_time: u64,
+    /// Label of base provenance.
+    pub min_label: usize,
+    /// Number of payloads stored in the log.
+    pub log_size: usize,
 }
 
 /// Statistics about a node.

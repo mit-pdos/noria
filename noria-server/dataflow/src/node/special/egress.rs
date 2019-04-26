@@ -15,11 +15,11 @@ pub struct Egress {
     tags: HashMap<Tag, NodeIndex>,
 
     /// Base provenance, including the label it represents
-    min_provenance: Provenance,
+    pub(crate) min_provenance: Provenance,
     /// Provenance updates of depth 1 starting with the first packet in payloads
-    updates: Vec<ProvenanceUpdate>,
+    pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Packet payloads
-    payloads: Vec<Box<Packet>>,
+    pub(crate) payloads: Vec<Box<Packet>>,
 
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<NodeIndex, usize>,

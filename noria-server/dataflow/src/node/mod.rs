@@ -258,6 +258,17 @@ impl Node {
         }
     }
 
+    pub fn with_egress<'a, F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&special::Egress) -> R,
+        R: 'a,
+    {
+        match self.inner {
+            NodeType::Egress(Some(ref e)) => f(e),
+            _ => unreachable!(),
+        }
+    }
+
     pub fn with_ingress_mut<'a, F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut special::Ingress) -> R,

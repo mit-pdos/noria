@@ -1244,10 +1244,28 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::GetStatistics => {
+                        let (min_label, log_size) = match self.egress {
+                            Some(ni) => {
+                                self.nodes[ni]
+                                    .borrow()
+                                    .with_egress(|e| (e.min_provenance.label(), e.payloads.len()))
+                            },
+                            None => {
+                                // only domains with reader nodes don't have an egress
+                                assert!(self.reader.is_some());
+                                self.nodes[self.reader.unwrap()]
+                                    .borrow()
+                                    .with_reader(|r| (r.min_provenance.label(), r.num_payloads))
+                                    .unwrap()
+                            }
+                        };
+
                         let domain_stats = noria::debug::stats::DomainStats {
                             total_time: self.total_time.num_nanoseconds(),
                             total_ptime: self.total_ptime.num_nanoseconds(),
                             wait_time: self.wait_time.num_nanoseconds(),
+                            min_label,
+                            log_size,
                         };
 
                         let node_stats = self
