@@ -42,6 +42,8 @@ pub struct Reader {
     /// Provenance updates of depth 1 starting with the first packet received.
     /// We don't have to store payloads in readers because there are no outgoing packets.
     updates: Vec<ProvenanceUpdate>,
+    /// Number of non-replay messages received.
+    num_payloads: usize,
 }
 
 impl Clone for Reader {
@@ -54,6 +56,7 @@ impl Clone for Reader {
             for_node: self.for_node,
             min_provenance: self.min_provenance.clone(),
             updates: self.updates.clone(),
+            num_payloads: self.num_payloads,
         }
     }
 }
@@ -69,6 +72,7 @@ impl Reader {
             for_node,
             min_provenance: Default::default(),
             updates: Default::default(),
+            num_payloads: 0,
         }
     }
 
@@ -100,6 +104,7 @@ impl Reader {
             for_node: self.for_node,
             min_provenance: self.min_provenance.clone(),
             updates: self.updates.clone(),
+            num_payloads: self.num_payloads,
         }
     }
 
@@ -179,6 +184,12 @@ impl Reader {
                 update.append(&mut pid.update.clone());
             }
             self.updates.push(update);
+
+            // update num_payloads if not a replay
+            if let box Packet::ReplayPiece { .. } = m {
+            } else {
+                self.num_payloads += 1;
+            }
 
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
@@ -289,7 +300,7 @@ impl Reader {
 
     pub fn get_last_provenance(&self) -> Provenance {
         let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[..]);
+        provenance.apply_updates(&self.updates[..], self.num_payloads);
         provenance
     }
 }

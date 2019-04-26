@@ -75,10 +75,7 @@ impl Provenance {
         self.label = label;
     }
 
-    /// Apply a single provenance update cached from the message payloads. In general, this method
-    /// is called only when the full provenance is necessary, as in when we need to make recovery.
-    pub fn apply_update(&mut self, update: &ProvenanceUpdate) {
-        self.label += 1;
+    fn apply_update(&mut self, update: &ProvenanceUpdate) {
         let mut provenance = self;
         for (domain, label) in update {
             if let Some(p) = provenance.edges.get_mut(domain) {
@@ -90,7 +87,10 @@ impl Provenance {
         }
     }
 
-    pub fn apply_updates(&mut self, updates: &[ProvenanceUpdate]) {
+    /// Apply all provenance updates to the provenance graph, and increment the base graph's label
+    /// by the number of packets in the payloads buffer.
+    pub fn apply_updates(&mut self, updates: &[ProvenanceUpdate], num_payloads: usize) {
+        self.label += num_payloads;
         for update in updates {
             self.apply_update(update);
         }
