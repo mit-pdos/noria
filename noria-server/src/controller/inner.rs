@@ -118,10 +118,13 @@ impl DomainReplies {
 
     fn wait_for_statistics(
         &mut self,
-        d: &DomainHandle,
+        num_healthy: usize,
     ) -> Vec<(DomainStats, HashMap<NodeIndex, NodeStats>)> {
-        let mut stats = Vec::with_capacity(d.shards());
-        for r in self.read_n_domain_replies(d.shards()) {
+        if num_healthy == 0 {
+            return vec![];
+        }
+        let mut stats = Vec::with_capacity(num_healthy);
+        for r in self.read_n_domain_replies(num_healthy) {
             match r {
                 ControlReplyPacket::Statistics(d, s) => stats.push((d, s)),
                 r => unreachable!("got unexpected non-stats control reply: {:?}", r),
@@ -1575,9 +1578,16 @@ impl ControllerInner {
             .domains
             .iter_mut()
             .flat_map(|(di, s)| {
-                s.send_to_healthy(box Packet::GetStatistics, workers)
-                    .unwrap();
-                replies.wait_for_statistics(&s).into_iter().enumerate().map(
+                let mut num_healthy = 0;
+                for i in 0..s.shards.len() {
+                    if s.send_to_healthy_shard(i, box Packet::GetStatistics, workers).is_ok() {
+                        num_healthy += 1;
+                    } else {
+                        // ignore unhealthy shards
+                    }
+                }
+
+                replies.wait_for_statistics(num_healthy).into_iter().enumerate().map(
                     move |(i, (domain_stats, node_stats))| {
                         let node_map = node_stats
                             .into_iter()
@@ -1629,7 +1639,7 @@ impl ControllerInner {
                 s.send_to_healthy(box Packet::GetStatistics, workers)
                     .unwrap();
                 let to_evict: Vec<(NodeIndex, u64)> = replies
-                    .wait_for_statistics(&s)
+                    .wait_for_statistics(s.shards.len())
                     .into_iter()
                     .flat_map(move |(_, node_stats)| {
                         node_stats
