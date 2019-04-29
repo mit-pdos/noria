@@ -499,10 +499,7 @@ impl ControllerInner {
             let domain_a = self.ingredients[egress_a].domain();
             domain_as.push(domain_a);
 
-            let m = box Packet::RemoveChild {
-                node: self.ingredients[egress_a].local_addr(),
-                child: ingress,
-            };
+            let m = box Packet::RemoveChild { child: ingress };
             self.domains
                 .get_mut(&domain_a)
                 .unwrap()
@@ -597,10 +594,7 @@ impl ControllerInner {
             .neighbors_directed(ingress_b1, petgraph::EdgeDirection::Incoming)
             .next()
             .unwrap();
-        let m = box Packet::RemoveChild {
-            node: self.ingredients[egress_a].local_addr(),
-            child: ingress_b1,
-        };
+        let m = box Packet::RemoveChild { child: ingress_b1 };
         let domain_a = self.ingredients[egress_a].domain();
         self.domains
             .get_mut(&domain_a)
@@ -715,10 +709,7 @@ impl ControllerInner {
             .neighbors_directed(ingress_b2, petgraph::EdgeDirection::Incoming)
             .next()
             .unwrap();
-        let m = box Packet::RemoveChild {
-            node: self.ingredients[egress_b1].local_addr(),
-            child: ingress_b2,
-        };
+        let m = box Packet::RemoveChild { child: ingress_b2 };
         let domain_b1 = self.ingredients[egress_b1].domain();
         self.domains
             .get_mut(&domain_b1)
@@ -881,10 +872,7 @@ impl ControllerInner {
         // prevent A from sending messages to B1 even once the connection is regenerated.
         let egress_a = self.parent(ingress);
         let domain_a = self.ingredients[egress_a].domain();
-        let m = box Packet::RemoveChild {
-            node: self.ingredients[egress_a].local_addr(),
-            child: ingress,
-        };
+        let m = box Packet::RemoveChild { child: ingress };
         self.domains
             .get_mut(&domain_a)
             .unwrap()

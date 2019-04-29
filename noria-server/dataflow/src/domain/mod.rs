@@ -1366,11 +1366,10 @@ impl Domain {
                         // update internal replica type
                         node.borrow_mut().remove_replica_type();
                     },
-                    Packet::RemoveChild { node, child } => {
-                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), self.nodes[node].borrow().global_addr(), child);
-                        self.nodes[node]
-                            .borrow_mut()
-                            .with_egress_mut(|e| e.remove_child(child));
+                    Packet::RemoveChild { child } => {
+                        let egress = &self.nodes[self.egress.unwrap()];
+                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), egress.borrow().global_addr(), child);
+                        egress.borrow_mut().with_egress_mut(|e| e.remove_child(child));
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
                         println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);

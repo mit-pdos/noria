@@ -262,7 +262,6 @@ pub enum Packet {
 
     /// Tell the node to stop sending messages to this child
     RemoveChild {
-        node: LocalNodeIndex,
         child: NodeIndex,
     },
 
