@@ -210,6 +210,7 @@ pub enum Packet {
         path: Vec<ReplayPathSegment>,
         notify_done: bool,
         trigger: TriggerEndpoint,
+        ack: bool,
     },
 
     /// Ask domain (nicely) to replay a particular key.

@@ -940,11 +940,14 @@ impl Domain {
                         path,
                         notify_done,
                         trigger,
+                        ack,
                     } => {
                         // let coordinator know that we've registered the tagged path
-                        self.control_reply_tx
-                            .send(ControlReplyPacket::ack())
-                            .unwrap();
+                        if ack {
+                            self.control_reply_tx
+                                .send(ControlReplyPacket::ack())
+                                .unwrap();
+                        }
 
                         if notify_done {
                             info!(self.log,

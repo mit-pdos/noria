@@ -23,6 +23,7 @@ impl SetupReplayPath {
             path: self.path,
             notify_done: self.notify_done,
             trigger: self.trigger,
+            ack: false,
         }
     }
 }
@@ -238,6 +239,7 @@ impl<'a> Plan<'a> {
                     path: locals,
                     notify_done: false,
                     trigger: TriggerEndpoint::None,
+                    ack: true,
                 };
 
                 // the first domain also gets to know source node
@@ -353,6 +355,7 @@ impl<'a> Plan<'a> {
                     path,
                     notify_done,
                     trigger,
+                    ..
                 } = &setup {
                     self.setup_replay_paths
                         .entry(domain)
