@@ -165,8 +165,11 @@ impl Egress {
         } else {
             // Replace the old domain with the new domain in all updates
             for update in self.updates.iter_mut() {
-                assert_eq!(update[0].0, old);
-                update[0].0 = new;
+                if update[0].0 == old {
+                    update[0].0 = new;
+                } else {
+                    // we hit this branch only if the domain has multiple parents
+                }
             }
         }
     }
