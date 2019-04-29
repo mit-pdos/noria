@@ -240,18 +240,21 @@ impl Egress {
     }
 
     /// Set the minimum label of the provenance, which represents the label of the first
-    /// packet payload we have that is not stored. Truncate the payload buffer accordingly.
+    /// packet payload we have that is not stored, but don't truncate the payload buffer.
+    ///
     /// If the label is beyond the label of the payloads we actually have, just set the label
-    /// as given and clear the payload buffer.
+    /// as given and clear the payload buffer. There's no reason the label should be beyond what
+    /// we actually have if we have a non-zero number of packets.
     pub fn set_min_label(&mut self, label: usize) {
         assert!(label >= self.min_provenance.label());
         let num_to_truncate = label - self.min_provenance.label();
-        if num_to_truncate >= self.payloads.len() {
+        if num_to_truncate > self.payloads.len() {
+            assert!(self.payloads.is_empty());
             self.payloads = Vec::new();
+            self.min_provenance.set_label(label);
         } else {
-            self.payloads.drain(0..num_to_truncate);
+            // self.payloads.drain(0..num_to_truncate);
         }
-        self.min_provenance.set_label(label);
     }
 
     /// Resume sending messages to this node at the label after getting that node up to date.

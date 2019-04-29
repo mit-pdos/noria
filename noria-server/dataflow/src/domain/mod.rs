@@ -1445,7 +1445,13 @@ impl Domain {
                                 min_label = label;
                             }
                         }
-                        node.borrow_mut().with_egress_mut(|e| e.set_min_label(min_label - 1));
+                        node.borrow_mut().with_egress_mut(|e| {
+                            // if setting the min_label would truncate any messages in the buffer,
+                            // that means there are no dependent upstream failures that will get
+                            // a ResumeAt in response to acking this ResumeAt. we won't set the
+                            // min_label here, letting some other process take truncate logs.
+                            e.set_min_label(min_label - 1)
+                        });
 
                         // TODO(ygina): Currently, the value of next_label is the label of the
                         // next OUTGOING packet this domain needs to send. We assume it has a
@@ -1460,6 +1466,10 @@ impl Domain {
                         // of child A was 8(3,5) and of child B was 10(3,7). We have to make sure
                         // in resuming execution that we don't go through the time 9(4,5). Note
                         // the next labels of the children should be linearizable [sic?].
+                        //
+                        // Theoretically, downstream nodes have this information by composing
+                        // their provenance and a list of updates. (depending on how we store
+                        // updates for replays...)
 
                         debug!(
                             self.log,
