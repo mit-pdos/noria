@@ -909,17 +909,7 @@ impl ControllerInner {
             }
         }
 
-        // tell A to start from the first message to recover all state.
-        //
-        // if we, say, truncated the logs and don't have message 1, then perhaps domain B
-        // will automatically trigger a replay to fill in missed state? not sure about the
-        // intricacies here.
-        let m = box Packet::ResumeAt { child_labels: vec![(ingress, 1)] };
-        self.domains
-            .get_mut(&domain_a)
-            .unwrap()
-            .send_to_healthy(m, &self.workers)
-            .unwrap();
+        // don't bother trying to recover reader state... just let there be a replay
     }
 
     /// Generates a new connection between two domains via an egress and ingress node, sometimes
