@@ -1,6 +1,7 @@
 use clap::value_t_or_exit;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
+use std::collections::HashMap;
 
 fn main() {
     use clap::{App, Arg};
@@ -49,12 +50,6 @@ fn main() {
     g.extend_recipe(include_str!("queries.sql"))
         .expect("failed to load initial schema");
 
-    if let Some(gloc) = args.value_of("graph") {
-        debug!(log, "extracing query graph with two users");
-        let gv = g.graphviz().expect("failed to read graphviz");
-        std::fs::write(gloc, gv).expect("failed to save graphviz output");
-    }
-
     eprintln!("making some data");
     let mut friends = g.table("Friend").unwrap().into_sync();
     let mut albums = g.table("Album").unwrap().into_sync();
@@ -76,14 +71,14 @@ fn main() {
     //  - 3 should be able to see albums 1 and 3
     //  - 4 should be able to see albums 3 and 4
     friends
-        .perform_all(vec![vec![1.into(), 2.into()], vec![3.into(), 1.into()]])
+        .perform_all(vec![vec!["1".into(), "2".into()], vec!["3".into(), "1".into()]])
         .unwrap();
     albums
         .perform_all(vec![
-            vec![1.into(), 1.into(), 0.into()],
-            vec![2.into(), 2.into(), 0.into()],
-            vec![3.into(), 3.into(), 1.into()],
-            vec![4.into(), 4.into(), 0.into()],
+            vec![1.into(), "1".into(), 0.into()],
+            vec![2.into(), "2".into(), 0.into()],
+            vec![3.into(), "3".into(), 1.into()],
+            vec![4.into(), "4".into(), 0.into()],
         ])
         .unwrap();
     photos
@@ -94,6 +89,22 @@ fn main() {
             vec!["d".into(), 4.into()],
         ])
         .unwrap();
+
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    eprintln!("logging in users");
+    for uid in 1..=4 {
+        let user_context: HashMap<_, _> =
+            std::iter::once(("id".to_string(), uid.to_string().into())).collect();
+        g.on_worker(|w| w.create_universe(user_context.clone()))
+            .expect("failed to make user universe");
+    }
+
+    if let Some(gloc) = args.value_of("graph") {
+        debug!(log, "extracing query graph with two users");
+        let gv = g.graphviz().expect("failed to read graphviz");
+        std::fs::write(gloc, gv).expect("failed to save graphviz output");
+    }
 
     let mut test = move |uid| {
         let mut view = match uid {
