@@ -560,7 +560,8 @@ impl ControllerInner {
             self.waiting_on.insert(domain_a, waiting_on);
         }
         for ingress_c in ingress_cs {
-            self.send_new_incoming(ingress_c, domain_b2, Some(domain_b1));
+            let domain_c = self.ingredients[ingress_c].domain();
+            self.send_new_incoming(domain_c, domain_b2, Some(domain_b1));
         }
     }
 
@@ -678,7 +679,7 @@ impl ControllerInner {
 
         // STEP 7: Send B2 a NewIncoming message and wait for ResumeAts to propagate.
         let mut resume_to = HashSet::new();
-        self.send_new_incoming(ingress_b2, domain_a, Some(domain_b1));
+        self.send_new_incoming(domain_b2, domain_a, Some(domain_b1));
         resume_to.insert(domain_b2);
         self.waiting_on.insert(domain_a, resume_to);
     }
@@ -829,7 +830,7 @@ impl ControllerInner {
         let mut resume_to = HashSet::new();
         for ingress_c in ingress_cs {
             let domain_c = self.ingredients[ingress_c].domain();
-            self.send_new_incoming(ingress_c, domain_b1, Some(domain_b2));
+            self.send_new_incoming(domain_c, domain_b1, Some(domain_b2));
             resume_to.insert(domain_c);
         }
         self.waiting_on.insert(domain_b1, resume_to);
@@ -939,7 +940,7 @@ impl ControllerInner {
     /// ingress even though there is a working connection until it receives a ResumeAt.
     fn send_new_incoming(
         &mut self,
-        ingress: NodeIndex,
+        to: DomainIndex,
         new_egress: DomainIndex,
         old_egress: Option<DomainIndex>,
     ) {
@@ -947,16 +948,14 @@ impl ControllerInner {
 
         debug!(
             self.log,
-            "notifying {} of new incoming connection",
-            ingress.index();
+            "notifying domain {} of new incoming connection",
+            to.index();
             "old" => old_egress.index(),
             "new" => new_egress.index(),
         );
 
-        let domain = self.ingredients[ingress].domain();
-        let dh = self.domains.get_mut(&domain).unwrap();
+        let dh = self.domains.get_mut(&to).unwrap();
         let m = box Packet::NewIncoming {
-            to: self.ingredients[ingress].local_addr(),
             old: old_egress,
             new: new_egress,
         };

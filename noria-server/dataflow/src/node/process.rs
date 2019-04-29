@@ -23,9 +23,7 @@ impl Node {
 
         let addr = self.local_addr();
         match self.inner {
-            NodeType::Ingress(ref mut i) => {
-                i.receive_packet(m.as_ref().unwrap());
-
+            NodeType::Ingress(_) => {
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs| {

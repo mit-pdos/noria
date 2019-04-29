@@ -274,7 +274,6 @@ pub enum Packet {
 
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
-        to: LocalNodeIndex,
         old: DomainIndex,
         new: DomainIndex,
     },

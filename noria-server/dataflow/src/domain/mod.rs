@@ -1391,20 +1391,12 @@ impl Domain {
                                 .replace_tag(old_tag, new_tag);
                         }
                     },
-                    Packet::NewIncoming { to, old, new } => {
-                        // sanity check: the node "to" should be an ingress node
-                        // update its node state so it's aware about the new incoming connection
+                    Packet::NewIncoming { old, new } => {
                         println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
-
-                        let node = &self.nodes[to];
-                        let _label = node
-                            .borrow_mut()
-                            .with_ingress_mut(|i| i.new_incoming(old, new));
-
                         debug!(
                             self.log,
-                            "updated incoming connection to {}",
-                            node.borrow().global_addr().index();
+                            "updated incoming connection to domain {}",
+                            self.index.index();
                             "old" => old.index(),
                             "new" => new.index(),
                         );
