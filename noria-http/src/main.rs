@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tiny_http::{Method, Response, StatusCode};
+use tiny_http::{Header, Method, Response, StatusCode};
 use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
@@ -170,7 +170,8 @@ fn main() {
             .handle_request(method, path, body)
             .map(|data| data.unwrap_or("".to_string()))
             .map(|data| Response::from_string(data).with_status_code(200))
-            .unwrap_or_else(|code| Response::from_string("".to_string()).with_status_code(code));
+            .unwrap_or_else(|code| Response::from_string("".to_string()).with_status_code(code))
+            .with_header(Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap());
         request.respond(response).unwrap();
     }
 }
