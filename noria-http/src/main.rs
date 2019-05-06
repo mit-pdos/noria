@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use tiny_http::{Method, Response, StatusCode};
 use std::collections::HashMap;
 use std::thread;
@@ -5,6 +6,7 @@ use std::time::Duration;
 use tokio;
 
 use noria::{
+    DataType,
     SyncControllerHandle,
     prelude::{SyncTable, SyncView},
 };
@@ -30,11 +32,26 @@ impl Default for NoriaHttpProxy {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct InsertArgs {
+    base: String,
+    data: Vec<DataType>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct LookupArgs {
+    name: String,
+    key: Vec<DataType>,
+    block: bool,
+}
+
 impl NoriaHttpProxy {
     /// Forwards a request to the controller through the HTTP proxy, or uses existing state.
     ///
     /// POST /build_table
     /// POST /build_view
+    /// POST /insert
+    /// GET  /lookup
     pub fn handle_request(
         &mut self,
         method: Method,
@@ -42,12 +59,19 @@ impl NoriaHttpProxy {
         body: String,
     ) -> Result<Option<Data>, StatusCode> {
         use serde_json as json;
+        println!("handle {:?} {} {}", method, path, body);
         match (method, path.as_ref()) {
             (Method::Post, "/build_table") => json::from_str(&body)
                 .map(|args| self.build_table(args))
                 .unwrap_or_else(|_| Err(StatusCode(400))),
             (Method::Post, "/build_view") => json::from_str(&body)
                 .map(|args| self.build_view(args))
+                .unwrap_or_else(|_| Err(StatusCode(400))),
+            (Method::Post, "/insert") => json::from_str(&body)
+                .map(|args| self.insert(args))
+                .unwrap_or_else(|_| Err(StatusCode(400))),
+            (Method::Post, "/lookup") => json::from_str(&body)
+                .map(|args| self.lookup(args))
                 .unwrap_or_else(|_| Err(StatusCode(400))),
             _ => Err(StatusCode(404)),
         }
@@ -101,6 +125,33 @@ impl NoriaHttpProxy {
         let view = get_view(&mut db, &name);
         self.views.insert(name, view);
         Ok(None)
+    }
+
+    /// Inserts a row via a local handle to a table.
+    fn insert(&mut self, args: InsertArgs) -> Result<Option<Data>, StatusCode> {
+        println!("insert {:?}", args);
+        if let Some(table) = self.tables.get_mut(&args.base) {
+            table.insert(args.data)
+                .map(|_| Ok(None))
+                .unwrap_or(Err(StatusCode(400)))
+        } else {
+            return Err(StatusCode(404));
+        }
+    }
+
+    /// Reads via a local handle to a view.
+    fn lookup(&mut self, args: LookupArgs) -> Result<Option<Data>, StatusCode> {
+        println!("lookup {:?}", args);
+        if let Some(view) = self.views.get_mut(&args.name) {
+            view.lookup(&args.key, args.block)
+                .map(|data| {
+                    println!("{}", format!("{:?}", data));
+                    Ok(Some(format!("{:?}", data)))
+                })
+                .unwrap_or_else(|_| Err(StatusCode(400)))
+        } else {
+            return Err(StatusCode(404));
+        }
     }
 }
 
