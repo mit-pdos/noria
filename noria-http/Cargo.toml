@@ -1,0 +1,12 @@
+[package]
+name = "noria-http"
+version = "0.1.0"
+authors = ["The Noria developers <noria@pdos.csail.mit.edu>"]
+edition = "2018"
+
+[dependencies]
+serde = "1.0.84"
+serde_json = "1.0.2"
+tiny_http = "0.6"
+tokio = "0.1.14"
+noria = { path = "../noria" }
