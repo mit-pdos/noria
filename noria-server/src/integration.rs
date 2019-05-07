@@ -2840,7 +2840,7 @@ fn manual_policy_graph_jconf() {
     });
 
     // BASE TABLE DIRECT DERIVATIVES
-    let (papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
+    let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
         let paper_rewrite = mig.add_ingredient(
             "paper_rewrite",
             &["paper", "author", "accepted"],
@@ -2862,7 +2862,7 @@ fn manual_policy_graph_jconf() {
             &["reviewer", "paper", "contents", "paper,reviewer"],
             Join::new(review, review_assgn, JoinType::Inner, vec![L(1), L(0), L(2), B(3, 2)]));
 
-        (papers_for_authors, submitted_reviews)
+        (paper_rewrite, papers_for_authors, submitted_reviews)
     });
 
     // NEXT LAYER
@@ -2895,8 +2895,8 @@ fn manual_policy_graph_jconf() {
         (reviews_by_r1, review_rewrite)
     });
 
-    // NEXT LAYER
-    let _ = g.migrate(move |mig| {
+    // REVIEWS FOR R1
+    let reviews_r1 = g.migrate(move |mig| {
         let reviews_r1 = mig.add_ingredient(
             "reviews_r1",
             &["reviewer", "paper", "contents"],
@@ -2904,6 +2904,16 @@ fn manual_policy_graph_jconf() {
         mig.maintain_anonymous(reviews_r1, &[1]);
 
         reviews_r1
+    });
+
+    // REVIEWLIST QUERY
+    let _ = g.migrate(move |mig| {
+        let revlist_r1 = mig.add_ingredient(
+            "revlist_r1",
+            &["paper", "reviewer", "contents", "author", "accepted"],
+            Join::new(paper_rewrite, reviews_r1,
+                      JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
+        mig.maintain_anonymous(revlist_r1, &[0]);
     });
 
     // Populate Base Tables
@@ -2962,4 +2972,13 @@ fn manual_policy_graph_jconf() {
                vec![vec!["anonymous".into(), "1".into(), "Great paper".into()],
                     vec!["anonymous".into(), "1".into(), "Hard to understand".into()]]);
     assert_eq!(reviews_r1_view.lookup(&["3".into()], true).unwrap().len(), 0);
+
+    // Check ReviewList for r1 (authors and pc members in this phase can't see any reviews)
+    let mut revlist_r1_view = g.view("revlist_r1").unwrap().into_sync();
+    assert_eq!(revlist_r1_view.lookup(&["1".into()], true).unwrap(),
+               vec![vec!["1".into(), "anonymous".into(), "Great paper".into(),
+                         "anonymous".into(), "0".into()],
+                    vec!["1".into(), "anonymous".into(), "Hard to understand".into(),
+                         "anonymous".into(), "0".into()]]);
+    assert_eq!(revlist_r1_view.lookup(&["3".into()], true).unwrap().len(), 0);
 }
