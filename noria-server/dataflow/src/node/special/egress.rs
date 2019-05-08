@@ -203,13 +203,11 @@ impl Egress {
         // update packet id to include the correct label, provenance update, and from node.
         // replays don't get buffered and don't increment their label (they use the last label
         // sent by this domain - think of replays as a snapshot of what's already been sent).
-        let mut update = Vec::new();
-        if let Some(ref pid) = m.as_ref().id() {
-            // TODO(ygina): trim this if necessary
-            // TODO(ygina): could probably more efficiently handle message cloning
-            update.push((pid.from, pid.label));
-            update.append(&mut pid.update.clone());
-        }
+        let update = if let Some(ref pid) = m.as_ref().id() {
+            pid.next_update()
+        } else {
+            vec![]
+        };
         let label = if is_replay {
             self.min_provenance.label() + self.payloads.len()
         } else {

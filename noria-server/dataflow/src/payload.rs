@@ -95,6 +95,13 @@ impl PacketId {
     pub fn new(label: usize, from: DomainIndex, update: ProvenanceUpdate) -> PacketId {
         PacketId { label, from, update }
     }
+
+    pub fn next_update(&self) -> ProvenanceUpdate {
+        let mut update = Vec::new();
+        update.push((self.from, self.label));
+        update.append(&mut self.update.clone());
+        update
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]

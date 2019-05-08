@@ -178,11 +178,11 @@ impl Reader {
             let m = m.as_mut().unwrap();
 
             // provenance
-            let mut update = Vec::new();
-            if let Some(ref pid) = m.id() {
-                update.push((pid.from, pid.label));
-                update.append(&mut pid.update.clone());
-            }
+            let update = if let Some(ref pid) = m.as_ref().id() {
+                pid.next_update()
+            } else {
+                vec![]
+            };
             self.updates.push(update);
 
             // update num_payloads if not a replay
