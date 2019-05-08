@@ -2824,6 +2824,7 @@ fn manual_policy_graph_jconf() {
             "review_assgn",
             &["paper", "reviewer", "paper,reviewer"],
             Base::new(vec![]).with_key(vec![2]));
+        mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
         let review = mig.add_base(
             "review",
             &["paper", "reviewer", "contents", "paper,reviewer"],
@@ -2973,6 +2974,15 @@ fn manual_policy_graph_jconf() {
                     vec!["anonymous".into(), "1".into(), "Hard to understand".into()]]);
     assert_eq!(reviews_r1_view.lookup(&["3".into()], true).unwrap().len(), 0);
 
+    let mut revassgn_view = g.view("review_assgn").unwrap().into_sync();
+    assert_eq!(revassgn_view.lookup(&["r1".into()], true).unwrap(),
+               vec![vec!["1".into(), "r1".into(), "1,r1".into()],
+                    vec!["3".into(), "r1".into(), "3,r1".into()]]);
+    assert_eq!(revassgn_view.lookup(&["r2".into()], true).unwrap(),
+               vec![vec!["1".into(), "r2".into(), "1,r2".into()]]);
+    assert_eq!(revassgn_view.lookup(&["r3".into()], true).unwrap(),
+               vec![vec!["2".into(), "r3".into(), "2,r3".into()]]);
+    
     // Check ReviewList for r1 (authors and pc members in this phase can't see any reviews)
     let mut revlist_r1_view = g.view("revlist_r1").unwrap().into_sync();
     assert_eq!(revlist_r1_view.lookup(&["1".into()], true).unwrap(),
