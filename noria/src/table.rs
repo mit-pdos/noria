@@ -187,8 +187,7 @@ impl TableBuilder {
                                         choose::RoundRobin::default(),
                                     ),
                                 1,
-                            )
-                            .unwrap_or_else(|_| panic!("no active tokio runtime"));
+                            );
                             h.insert(c.clone());
                             Ok((addr, c))
                         }
