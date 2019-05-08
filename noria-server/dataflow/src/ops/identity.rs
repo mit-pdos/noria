@@ -88,7 +88,7 @@ mod tests {
         g.set_op(
             "identity",
             &["x", "y", "z"],
-            Identity::new(s.as_global()),
+            Identity::new(s.as_global(), false),
             materialized,
         );
         g
