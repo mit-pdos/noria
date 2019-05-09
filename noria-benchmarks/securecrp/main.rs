@@ -6,7 +6,7 @@ use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use noria::dataflow::node::special::Base;
+use noria_server::manual::dataflow::node::special::Base;
 use noria::dataflow::ops::join::JoinSource::*;
 use dataflow::ops::join::{Join, JoinSource, JoinType};
 use dataflow::ops::rewrite::Rewrite;
@@ -349,6 +349,7 @@ fn main() {
 
         // Manual Graph
         if args.value_of("schema").unwrap() == "noschema" {
+            
             // BASE TABLES
             let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
                 // paper,reviewer col is a hacky way of doing multi-column joins
@@ -412,7 +413,7 @@ fn main() {
                 for i in 0..nauthors {
                     let uid = (i + 1).to_string();
                     let papers_ai = mig.add_ingredient(
-                        format!("{}{}", "PaperList_u", uid);
+                        format!("{}{}", "PaperList_u", uid),
                         &["author", "paper", "accepted"],
                         Filter::new(papers_for_authors,
                                     &[Some(FilterCondition::Comparison(Operator::Equal,
@@ -452,7 +453,7 @@ fn main() {
                 for i in 0..nreviewers {
                     let uid = (i + 1).to_string();
                     let reviews_ri = mig.add_ingredient(
-                        format!("{}{}", "reviews_r", uid);
+                        format!("{}{}", "reviews_r", uid),
                         &["reviewer", "paper", "contents", "rating", "confidence"],
                         Join::new(review_rewrite,
                                   reviews_by_ris.get(i),
