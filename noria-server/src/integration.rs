@@ -2939,8 +2939,8 @@ fn manual_policy_graph_jconf() {
             Base::new(vec![]).with_key(vec![0]));
         let coauthor = mig.add_base(
             "coauthor",
-            &["paper","author", "paper,author"],
-            Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
+            &["paper","author"],
+            Base::new(vec![]).with_key(vec![0,1])); // needs to be over multiple keys?
         (review, review_assgn, paper, coauthor)
     });
 
@@ -3038,10 +3038,10 @@ fn manual_policy_graph_jconf() {
     mutpaper.insert(vec!["2".into(), "a2".into(), "0".into()]).unwrap();
     mutpaper.insert(vec!["3".into(), "a3".into(), "0".into()]).unwrap();
 
-    mutcoauthor.insert(vec!["1".into(), "a1".into(), "1,a1".into()]).unwrap();
-    mutcoauthor.insert(vec!["2".into(), "a1".into(), "2,a1".into()]).unwrap();
-    mutcoauthor.insert(vec!["2".into(), "a2".into(), "2,a2".into()]).unwrap();
-    mutcoauthor.insert(vec!["3".into(), "a3".into(), "3,a3".into()]).unwrap();
+    mutcoauthor.insert(vec!["1".into(), "a1".into()]).unwrap();
+    mutcoauthor.insert(vec!["2".into(), "a1".into()]).unwrap();
+    mutcoauthor.insert(vec!["2".into(), "a2".into()]).unwrap();
+    mutcoauthor.insert(vec!["3".into(), "a3".into()]).unwrap();
     
     mutrevassgn.insert(vec!["1".into(), "r1".into(), "1,r1".into()]).unwrap();
     mutrevassgn.insert(vec!["3".into(), "r1".into(), "3,r1".into()]).unwrap();

@@ -6,6 +6,13 @@ use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
+use noria::dataflow::node::special::Base;
+use noria::dataflow::ops::join::JoinSource::*;
+use dataflow::ops::join::{Join, JoinSource, JoinType};
+use dataflow::ops::rewrite::Rewrite;
+use dataflow::ops::filter::{Filter, FilterCondition, Value};
+use nom_sql::Operator;
+
 const PAPERS_PER_REVIEWER: usize = 5;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -345,23 +352,27 @@ fn main() {
             // BASE TABLES
             let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
                 // paper,reviewer col is a hacky way of doing multi-column joins
+                let user_profile = mig.add_base(
+                    "UserProfile",
+                    &["username", "email", "name", "affiliation", "acm_number", "level"],
+                    Base::new(vec![]).with_key(vec![0]));
                 let review_assgn = mig.add_base(
-                    "review_assgn",
+                    "ReviewAssignment",
                     &["paper", "reviewer", "paper,reviewer"],
                     Base::new(vec![]).with_key(vec![2]));
-                mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
+                //                    mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
                 let review = mig.add_base(
-                    "review",
-                    &["paper", "reviewer", "contents", "paper,reviewer"],
+                    "Review",
+                    &["paper", "reviewer", "contents", "paper,reviewer", "rating", "confidence"],
                     Base::new(vec![]).with_key(vec![3]));
                 let paper = mig.add_base(
-                    "paper",
+                    "Paper",
                     &["paper","author","accepted"],
                     Base::new(vec![]).with_key(vec![0]));
                 let coauthor = mig.add_base(
-                    "coauthor",
-                    &["paper","author", "paper,author"],
-                    Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
+                    "Coauthor",
+                    &["paper","author"],
+                    Base::new(vec![]).with_key(vec![0, 1]));
                 (review, review_assgn, paper, coauthor)
             });
             
@@ -385,34 +396,47 @@ fn main() {
                 
                 let submitted_reviews = mig.add_ingredient(
                     "submitted_reviews",
-                    &["reviewer", "paper", "contents", "paper,reviewer"],
-                    Join::new(review, review_assgn, JoinType::Inner, vec![L(1), L(0), L(2), B(3, 2)]));
+                    &["reviewer", "paper", "contents", "rating", "confidence", "paper,reviewer"],
+                    Join::new(review,
+                              review_assgn,
+                              JoinType::Inner,
+                              vec![L(1), L(0), L(2), L(4), L(5), B(3, 2)]));
                 
                 (paper_rewrite, papers_for_authors, submitted_reviews)
             });
             
             // NEXT LAYER
-            let (reviews_by_r1, review_rewrite) = g.migrate(move |mig| {
-                let papers_a1 = mig.add_ingredient(
-                    "papers_a1",
-                    &["author", "paper", "accepted"], // another way to specify col? 
-                    Filter::new(papers_for_authors,
-                                &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                   Value::Constant("a1".into())))]));
-                mig.maintain_anonymous(papers_a1, &[0]);
-                
-                let reviews_by_r1 = mig.add_ingredient(
-                    "reviews_by_r1",
-                    &["reviewer", "paper", "contents"], // another way to specify col?
-                    Filter::new(submitted_reviews,
-                                &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                   Value::Constant("r1".into())))]));
+            let (reviews_by_ris, review_rewrite) = g.migrate(move |mig| {
+                // One view per author, per reviewer
+                let mut reviews_by_ris = Vec::new();
+                for i in 0..nauthors {
+                    let uid = (i + 1).to_string();
+                    let papers_ai = mig.add_ingredient(
+                        format!("{}{}", "PaperList_u", uid);
+                        &["author", "paper", "accepted"],
+                        Filter::new(papers_for_authors,
+                                    &[Some(FilterCondition::Comparison(Operator::Equal,
+                                                                       Value::Constant(uid.into())))]));
+                    mig.maintain_anonymous(papers_ai, &[0]);
+                    
+                    if i > nreviewers {
+                        continue;
+                    }
+                    
+                    let reviews_by_ri = mig.add_ingredient(
+                        format!("{}{}", "reviews_by_", uid);
+                        &["reviewer", "paper", "contents", "rating", "confidence"], // another way to specify col?
+                        Filter::new(submitted_reviews,
+                                    &[Some(FilterCondition::Comparison(Operator::Equal,
+                                                                       Value::Constant(uid.into())))]));
+                    reviews_by_ris.append(reviews_by_ri);
+                }
                 
                 // Note: anonymization doesn't happen if signal column comes from submitted_reviews
                 // instead of directly from review table.
                 let review_rewrite = mig.add_ingredient(
                     "review_rewrite",
-                    &["reviewer", "paper", "contents"],
+                    &["reviewer", "paper", "contents","rating", "confidence"],
                     Rewrite::new(
                         submitted_reviews,
                         review,
@@ -420,28 +444,22 @@ fn main() {
                         "anonymous".into(),
                         1 as usize));
                 
-                (reviews_by_r1, review_rewrite)
+                (reviews_by_ris, review_rewrite)
             });
             
             // REVIEWS FOR R1
-            let reviews_r1 = g.migrate(move |mig| {
-                let reviews_r1 = mig.add_ingredient(
-                    "reviews_r1",
-                    &["reviewer", "paper", "contents"],
-                    Join::new(review_rewrite, reviews_by_r1, JoinType::Inner, vec![L(0), B(1, 1), L(2)]));
-                mig.maintain_anonymous(reviews_r1, &[1]);
-                
-                reviews_r1
-            });
-            
-            // REVIEWLIST QUERY
             let _ = g.migrate(move |mig| {
-                let revlist_r1 = mig.add_ingredient(
-                    "revlist_r1",
-                    &["paper", "reviewer", "contents", "author", "accepted"],
-                    Join::new(paper_rewrite, reviews_r1,
-                              JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
-                mig.maintain_anonymous(revlist_r1, &[0]);
+                for i in 0..nreviewers {
+                    let uid = (i + 1).to_string();
+                    let reviews_ri = mig.add_ingredient(
+                        format!("{}{}", "reviews_r", uid);
+                        &["reviewer", "paper", "contents", "rating", "confidence"],
+                        Join::new(review_rewrite,
+                                  reviews_by_ris.get(i),
+                                  JoinType::Inner,
+                                  vec![L(0), B(1, 1), L(2), L(3), L(4)]));
+                    mig.maintain_anonymous(reviews_ri, &[0]);
+                }
             });
         } else {
         // Recipe Installation
@@ -459,14 +477,14 @@ fn main() {
                         .expect("failed to read policy file"),
                 )
             })
-        .unwrap();
-        debug!(log, "adding queries");
-        g.extend_recipe(
-            std::fs::read_to_string(args.value_of("queries").unwrap())
-                .expect("failed to read queries file"),
-        )
-        .expect("failed to load initial schema");
-        debug!(log, "database schema setup done");
+                .unwrap();
+            debug!(log, "adding queries");
+            g.extend_recipe(
+                std::fs::read_to_string(args.value_of("queries").unwrap())
+                    .expect("failed to read queries file"),
+            )
+                .expect("failed to load initial schema");
+            debug!(log, "database schema setup done");
         }
         let memstats = |g: &mut noria::SyncHandle<_>, at| {
             if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
@@ -503,7 +521,7 @@ fn main() {
         let mut user_profile = g.table("UserProfile").unwrap().into_sync();
         let mut paper = g.table("Paper").unwrap().into_sync();
         let mut coauthor = g.table("PaperCoauthor").unwrap().into_sync();
-        let mut version = g.table("PaperVersion").unwrap().into_sync();
+//        let mut version = g.table("PaperVersion").unwrap().into_sync();
         let mut review_assignment = g.table("ReviewAssignment").unwrap().into_sync();
         let mut review = g.table("Review").unwrap().into_sync();
         debug!(log, "creating users"; "n" => nusers);
@@ -517,41 +535,45 @@ fn main() {
                     "0".into(),
                     if i == 0 {
                         "chair".into()
-                    } else if i < nreviewers {
-                        "pc".into()
+//                    } else if i < nreviewers {
+//                        "pc".into()
                     } else {
                         "normal".into()
                     },
                 ]
             }))
             .unwrap();
-        debug!(log, "logging in users"; "n" => nlogged);
-        let mut printi = 0;
-        let stripe = nlogged / 10;
-        let mut login_times = Vec::with_capacity(nlogged);
-        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
-            trace!(log, "logging in user"; "uid" => uid);
-            let user_context: HashMap<_, _> =
-                std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
-            let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
-                .unwrap();
-            let took = start.elapsed();
-            login_times.push(took);
-
-            if i == printi {
-                println!("# login sample[{}]: {:?}", i, login_times[i]);
-                if i == 0 {
-                    // we want to include both 0 and 1
-                    printi += 1;
-                } else if i == 1 {
-                    // and then go back to every stripe'th sample
-                    printi = stripe;
-                } else {
-                    printi += stripe;
+        // skip this if manual graph
+        if args.value_of("schema").unwrap() != "noschema" {
+            debug!(log, "logging in users"; "n" => nlogged);
+            let mut printi = 0;
+            let stripe = nlogged / 10;
+            let mut login_times = Vec::with_capacity(nlogged);
+            for (i, &uid) in authors.iter().take(nlogged).enumerate() {
+                trace!(log, "logging in user"; "uid" => uid);
+                let user_context: HashMap<_, _> =
+                    std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
+                let start = Instant::now();
+                g.on_worker(|w| w.create_universe(user_context.clone()))
+                    .unwrap();
+                let took = start.elapsed();
+                login_times.push(took);
+                
+                if i == printi {
+                    println!("# login sample[{}]: {:?}", i, login_times[i]);
+                    if i == 0 {
+                        // we want to include both 0 and 1
+                        printi += 1;
+                    } else if i == 1 {
+                        // and then go back to every stripe'th sample
+                        printi = stripe;
+                    } else {
+                        printi += stripe;
+                    }
                 }
             }
         }
+        
         debug!(log, "registering papers");
         let start = Instant::now();
         paper
@@ -568,6 +590,8 @@ fn main() {
             papers.len(),
             start.elapsed()
         );
+        // For manual graph benchmarking, don't use PaperVersion table
+/*
         trace!(log, "also registering paper version");
         version
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
@@ -585,6 +609,7 @@ fn main() {
             papers.len(),
             start.elapsed()
         );
+*/
         debug!(log, "registering paper authors");
         let start = Instant::now();
         let mut npauthors = 0;
@@ -611,7 +636,7 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // TODO: don't review own paper
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into()]
+                            vec![r.paper.into(), format!("{}", i + 1).into()]
                         })
                     }),
             )
@@ -631,13 +656,13 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         rs.iter().map(move |r| {
                             vec![
-                                "0".into(),
+//                                "0".into(),
                                 r.paper.into(),
                                 format!("{}", i + 1).into(),
                                 "review text".into(),
                                 r.rating.into(),
-                                r.rating.into(),
-                                r.rating.into(),
+//                                r.rating.into(),
+//                                r.rating.into(),
                                 r.confidence.into(),
                             ]
                         })
@@ -707,11 +732,20 @@ fn main() {
             let begin = Instant::now();
             match op {
                 Operation::ReadPaperList => {
-                    paper_list
-                        .get_mut(uid)
-                        .unwrap()
-                        .lookup(&[0.into(/* bogokey */)], true)
-                        .unwrap();
+                    // Different "bogokey" for manually created graph
+                    if args.value_of("schema").unwrap() != "noschema" {
+                        paper_list
+                            .get_mut(uid)
+                            .unwrap()
+                            .lookup(&[uid.to_string().into()], true)
+                            .unwrap();
+                    } else { 
+                        paper_list
+                            .get_mut(uid)
+                            .unwrap()
+                            .lookup(&[0.into(/* bogokey */)], true)
+                            .unwrap();
+                    }
                 }
             }
             let took = begin.elapsed();
