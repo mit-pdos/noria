@@ -6,11 +6,11 @@ use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use noria_server::manual::dataflow::node::special::Base;
-use noria::dataflow::ops::join::JoinSource::*;
-use dataflow::ops::join::{Join, JoinSource, JoinType};
-use dataflow::ops::rewrite::Rewrite;
-use dataflow::ops::filter::{Filter, FilterCondition, Value};
+use noria::manual::Base;
+use noria::manual::ops::join::JoinSource::*;
+use noria::manual::ops::join::{Join, JoinType};
+use noria::manual::ops::rewrite::Rewrite;
+use noria::manual::ops::filter::{Filter, FilterCondition, Value};
 use nom_sql::Operator;
 
 const PAPERS_PER_REVIEWER: usize = 5;
@@ -345,18 +345,23 @@ fn main() {
         let mut g = g.start_simple().unwrap();
         debug!(log, "noria ready");
 
+        let manual_graph = (args.value_of("schema").unwrap() == "noschema");
+        
         let init = Instant::now();
-
+        let nauthors = authors.len();
         // Manual Graph
-        if args.value_of("schema").unwrap() == "noschema" {
-            
+        if manual_graph {
+            std::thread::sleep(std::time::Duration::from_secs(1)); // Allow Handle to realize it is leader
+            println!("noschema case: doing manually set-up migrations");
             // BASE TABLES
             let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
                 // paper,reviewer col is a hacky way of doing multi-column joins
+                println!("making user profile table");
                 let user_profile = mig.add_base(
                     "UserProfile",
                     &["username", "email", "name", "affiliation", "acm_number", "level"],
                     Base::new(vec![]).with_key(vec![0]));
+                println!("making review_assgn table");
                 let review_assgn = mig.add_base(
                     "ReviewAssignment",
                     &["paper", "reviewer", "paper,reviewer"],
@@ -371,12 +376,14 @@ fn main() {
                     &["paper","author","accepted"],
                     Base::new(vec![]).with_key(vec![0]));
                 let coauthor = mig.add_base(
-                    "Coauthor",
+                    "PaperCoauthor",
                     &["paper","author"],
                     Base::new(vec![]).with_key(vec![0, 1]));
+                println!("returning created tables");
                 (review, review_assgn, paper, coauthor)
             });
             
+            println!("created base tables");
             // BASE TABLE DIRECT DERIVATIVES
             let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
                 let paper_rewrite = mig.add_ingredient(
@@ -405,7 +412,8 @@ fn main() {
                 
                 (paper_rewrite, papers_for_authors, submitted_reviews)
             });
-            
+
+            println!("finished adding base table derivatives");
             // NEXT LAYER
             let (reviews_by_ris, review_rewrite) = g.migrate(move |mig| {
                 // One view per author, per reviewer
@@ -417,7 +425,7 @@ fn main() {
                         &["author", "paper", "accepted"],
                         Filter::new(papers_for_authors,
                                     &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                       Value::Constant(uid.into())))]));
+                                                                       Value::Constant(uid.clone().into())))]));
                     mig.maintain_anonymous(papers_ai, &[0]);
                     
                     if i > nreviewers {
@@ -425,12 +433,12 @@ fn main() {
                     }
                     
                     let reviews_by_ri = mig.add_ingredient(
-                        format!("{}{}", "reviews_by_", uid);
+                        format!("{}{}", "reviews_by_", uid),
                         &["reviewer", "paper", "contents", "rating", "confidence"], // another way to specify col?
                         Filter::new(submitted_reviews,
                                     &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                       Value::Constant(uid.into())))]));
-                    reviews_by_ris.append(reviews_by_ri);
+                                                                       Value::Constant(uid.clone().into())))]));
+                    reviews_by_ris.push(reviews_by_ri);
                 }
                 
                 // Note: anonymization doesn't happen if signal column comes from submitted_reviews
@@ -448,20 +456,23 @@ fn main() {
                 (reviews_by_ris, review_rewrite)
             });
             
+            println!("added reviews_by_ris and rewrite for review");
             // REVIEWS FOR R1
             let _ = g.migrate(move |mig| {
                 for i in 0..nreviewers {
                     let uid = (i + 1).to_string();
+                    let reviews_by_ri = *reviews_by_ris.get(i).expect("reviewer ids are off, can't find");
                     let reviews_ri = mig.add_ingredient(
                         format!("{}{}", "reviews_r", uid),
                         &["reviewer", "paper", "contents", "rating", "confidence"],
                         Join::new(review_rewrite,
-                                  reviews_by_ris.get(i),
+                                  reviews_by_ri,
                                   JoinType::Inner,
                                   vec![L(0), B(1, 1), L(2), L(3), L(4)]));
                     mig.maintain_anonymous(reviews_ri, &[0]);
                 }
             });
+            println!("done constructing graph");
         } else {
         // Recipe Installation
             info!(log, "setting up database schema");
@@ -500,8 +511,12 @@ fn main() {
             let mut reader_mem = 0;
             let mut base_mem = 0;
             let mut mem = 0;
+            
+            println!("getting stats");
             let stats = g.statistics().unwrap();
+            println!("got stats");
             for (_, nstats) in stats.values() {
+                println!("looping through values");
                 for nstat in nstats.values() {
                     if nstat.desc == "B" {
                         base_mem += nstat.mem_size;
@@ -545,7 +560,7 @@ fn main() {
             }))
             .unwrap();
         // skip this if manual graph
-        if args.value_of("schema").unwrap() != "noschema" {
+        if !manual_graph {
             debug!(log, "logging in users"; "n" => nlogged);
             let mut printi = 0;
             let stripe = nlogged / 10;
@@ -637,7 +652,12 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // TODO: don't review own paper
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + 1).into()]
+                            if manual_graph {
+                                vec![r.paper.into(),
+                                     format!("{}", i + 1).into(), format!("{},{}", r.paper, i+1).into()]
+                            } else {
+                                vec![r.paper.into(), format!("{}", i + 1).into()]
+                            }
                         })
                     }),
             )
@@ -656,16 +676,31 @@ fn main() {
                     .enumerate()
                     .flat_map(|(i, rs)| {
                         rs.iter().map(move |r| {
-                            vec![
-//                                "0".into(),
-                                r.paper.into(),
-                                format!("{}", i + 1).into(),
-                                "review text".into(),
-                                r.rating.into(),
-//                                r.rating.into(),
-//                                r.rating.into(),
-                                r.confidence.into(),
-                            ]
+                            if manual_graph {
+                                vec![
+                                    //                                "0".into(),
+                                    r.paper.into(),
+                                    format!("{}", i + 1).into(),
+                                    "review text".into(),
+                                    format!("{},{}", r.paper, i + 1).into(),
+                                    r.rating.into(),
+                                    //                                r.rating.into(),
+                                    //                                r.rating.into(),
+                                    r.confidence.into(),
+                                ]
+                            }
+                            else {
+                                vec![
+                                    //                                "0".into(),
+                                    r.paper.into(),
+                                    format!("{}", i + 1).into(),
+                                    "review text".into(),
+                                    r.rating.into(),
+                                    //                                r.rating.into(),
+                                    //                                r.rating.into(),
+                                    r.confidence.into(),
+                                ]
+                            }
                         })
                     }),
             )
@@ -705,11 +740,19 @@ fn main() {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));
             let begin = Instant::now();
-            paper_list
-                .get_mut(uid)
-                .unwrap()
-                .lookup(&[0.into(/* bogokey */)], true)
-                .unwrap();
+            if manual_graph {
+                paper_list
+                    .get_mut(uid)
+                    .unwrap()
+                    .lookup(&[uid.to_string().into()], true)
+                    .unwrap();
+            } else {
+                paper_list
+                    .get_mut(uid)
+                    .unwrap()
+                    .lookup(&[0.into(/* bogokey */)], true)
+                    .unwrap();
+            }
             let took = begin.elapsed();
 
             // NOTE: do we want a warm-up period/drop first sample per uid?
@@ -734,7 +777,7 @@ fn main() {
             match op {
                 Operation::ReadPaperList => {
                     // Different "bogokey" for manually created graph
-                    if args.value_of("schema").unwrap() != "noschema" {
+                    if manual_graph {
                         paper_list
                             .get_mut(uid)
                             .unwrap()
