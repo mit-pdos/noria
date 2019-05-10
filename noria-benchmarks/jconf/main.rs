@@ -185,8 +185,9 @@ fn main() {
     if args.is_present("populate") {
         println!("populating");
         //        test_populate::create_single_trigger_data(&mut backend);
-        test_populate::create_users(&mut backend);
-        test_populate::create_papers(&mut backend);
+        test_populate::create_n_users(&mut backend, 8);
+        test_populate::create_papers_coauthors(&mut backend, 5);
+        test_populate::create_reviews(&mut backend, 8, 5);
     }
 
     thread::sleep(time::Duration::from_millis(2000));
@@ -285,8 +286,8 @@ fn main() {
 
     println!("{}", backend.g.graphviz().unwrap());
     test_populate::dump_query(&mut backend, "ReviewList", 0); // bogokey lookup
-    test_populate::dump_query(&mut backend, "PapersReviewed", 0); // by-key lookup
-    test_populate::dump_query(&mut backend, "PapersReviewedPrelim", 0); // by-key lookup
+//    test_populate::dump_query(&mut backend, "PapersReviewed", 0); // by-key lookup
+//    test_populate::dump_query(&mut backend, "PapersReviewedPrelim", 0); // by-key lookup
 //    test_populate::dump_query(&mut backend, "PapersReviewed", 0); // bogokey lookup
 //    test_populate::dump_query(&mut backend, "PapersReviewed", 5); // by-key lookup
     

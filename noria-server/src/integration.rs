@@ -3096,3 +3096,167 @@ fn manual_policy_graph_jconf() {
                          "anonymous".into(), "0".into()]]);
     assert_eq!(revlist_r1_view.lookup(&["3".into()], true).unwrap().len(), 0);
 }
+
+#[test]
+fn manual_graph_multi_user() {
+    // set up graph
+    let mut b = Builder::default();
+    b.set_sharding(None);
+    b.set_persistence(PersistenceParameters::new(
+        DurabilityMode::DeleteOnExit,
+        Duration::from_millis(1),
+        Some(String::from("manual_policy_graph")),
+        1,
+    ));
+    println!("building graph");
+    let mut g = b.start_simple().unwrap();
+    let nauthors = 5;
+    let nreviewers = 3;
+    // BASE TABLES
+    let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
+        // paper,reviewer col is a hacky way of doing multi-column joins
+        let user_profile = mig.add_base(
+            "UserProfile",
+            &["username", "email", "name", "affiliation", "acm_number", "level"],
+            Base::new(vec![]).with_key(vec![0]));
+        let review_assgn = mig.add_base(
+            "ReviewAssignment",
+            &["paper", "reviewer", "paper,reviewer"],
+            Base::new(vec![]).with_key(vec![2]));
+        //                    mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
+        let review = mig.add_base(
+            "Review",
+            &["paper", "reviewer", "contents", "paper,reviewer", "rating", "confidence"],
+            Base::new(vec![]).with_key(vec![3]));
+        let paper = mig.add_base(
+            "Paper",
+            &["paper","author","accepted"],
+            Base::new(vec![]).with_key(vec![0]));
+        let coauthor = mig.add_base(
+            "PaperCoauthor",
+            &["paper","author"],
+            Base::new(vec![]).with_key(vec![0, 1]));
+        (review, review_assgn, paper, coauthor)
+    });
+    
+    // BASE TABLE DIRECT DERIVATIVES
+    let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
+        let paper_rewrite = mig.add_ingredient(
+            "paper_rewrite",
+            &["paper", "author", "accepted"],
+            Rewrite::new(
+                paper,
+                paper,
+                1 as usize,
+                "anonymous".into(),
+                0 as usize));
+        mig.maintain_anonymous(paper_rewrite, &[0]);
+        
+        let papers_for_authors = mig.add_ingredient(
+            "papers_for_authors",
+            &["author", "paper", "accepted"],
+            Join::new(paper, coauthor, JoinType::Inner, vec![R(1), B(0, 0), L(2)]));
+        
+        let submitted_reviews = mig.add_ingredient(
+            "submitted_reviews",
+            &["reviewer", "paper", "contents", "rating", "confidence", "paper,reviewer"],
+            Join::new(review,
+                      review_assgn,
+                      JoinType::Inner,
+                      vec![L(1), L(0), L(2), L(4), L(5), B(3, 2)]));
+        
+        (paper_rewrite, papers_for_authors, submitted_reviews)
+    });
+    
+    // NEXT LAYER
+    let (reviews_by_ris, review_rewrite) = g.migrate(move |mig| {
+        // One view per author, per reviewer
+        let mut reviews_by_ris = Vec::new();
+        for i in 0..nauthors {
+            let uid = (i + 1).to_string();
+            let papers_ai = mig.add_ingredient(
+                format!("{}{}", "PaperList_u", uid),
+                &["author", "paper", "accepted"],
+                Filter::new(papers_for_authors,
+                            &[Some(FilterCondition::Comparison(Operator::Equal,
+                                                               Value::Constant(uid.clone().into())))]));
+            mig.maintain_anonymous(papers_ai, &[0]);
+            
+            if i > nreviewers {
+                continue;
+            }
+            
+            let reviews_by_ri = mig.add_ingredient(
+                format!("{}{}", "reviews_by_", uid),
+                &["reviewer", "paper", "contents", "rating", "confidence"], // another way to specify col?
+                Filter::new(submitted_reviews,
+                            &[Some(FilterCondition::Comparison(Operator::Equal,
+                                                               Value::Constant(uid.into())))]));
+            reviews_by_ris.push(reviews_by_ri);
+        }
+        
+        // Note: anonymization doesn't happen if signal column comes from submitted_reviews
+        // instead of directly from review table.
+        let review_rewrite = mig.add_ingredient(
+            "review_rewrite",
+            &["reviewer", "paper", "contents","rating", "confidence"],
+            Rewrite::new(
+                submitted_reviews,
+                review,
+                0 as usize,
+                "anonymous".into(),
+                1 as usize));
+        
+        (reviews_by_ris, review_rewrite)
+    });
+    
+    // REVIEWS FOR R1
+    let _ = g.migrate(move |mig| {
+        for i in 0..nreviewers {
+            let uid = (i + 1).to_string();
+            let reviews_by_ri = *reviews_by_ris.get(i).expect("reviewer ids are off, can't find");
+            let reviews_ri = mig.add_ingredient(
+                format!("{}{}", "reviews_r", uid),
+                &["reviewer", "paper", "contents", "rating", "confidence"],
+                Join::new(review_rewrite,
+                          reviews_by_ri,
+                          JoinType::Inner,
+                          vec![L(0), B(1, 1), L(2), L(3), L(4)]));
+            mig.maintain_anonymous(reviews_ri, &[0]);
+        }
+    });
+    println!("{}", g.graphviz().unwrap());
+
+    // Populate Base Tables
+    println!("populating base tables");
+    let mut mutreview = g.table("Review").unwrap().into_sync();
+    let mut mutrevassgn = g.table("ReviewAssignment").unwrap().into_sync();
+    let mut mutpaper = g.table("Paper").unwrap().into_sync();
+    let mut mutcoauthor = g.table("PaperCoauthor").unwrap().into_sync();
+
+    // Schemas:
+    // review_assgn: "paper", "reviewer", "paper,reviewer"
+    // review: "paper", "reviewer", "contents", "paper,reviewer"
+    // user_profile: "username", "level"
+    // paper_pc_conflict: "username", "paper", "username,paper"
+
+    mutpaper.insert(vec!["1".into(), "a1".into(), "0".into()]).unwrap();
+    mutpaper.insert(vec!["2".into(), "a2".into(), "0".into()]).unwrap();
+    mutpaper.insert(vec!["3".into(), "a3".into(), "0".into()]).unwrap();
+
+    mutcoauthor.insert(vec!["1".into(), "a1".into()]).unwrap();
+    mutcoauthor.insert(vec!["2".into(), "a1".into()]).unwrap();
+    mutcoauthor.insert(vec!["2".into(), "a2".into()]).unwrap();
+    mutcoauthor.insert(vec!["3".into(), "a3".into()]).unwrap();
+    
+    mutrevassgn.insert(vec!["1".into(), "r1".into(), "1,r1".into()]).unwrap();
+    mutrevassgn.insert(vec!["3".into(), "r1".into(), "3,r1".into()]).unwrap();
+    mutrevassgn.insert(vec!["1".into(), "r2".into(), "1,r2".into()]).unwrap();
+    mutrevassgn.insert(vec!["2".into(), "r3".into(), "2,r3".into()]).unwrap();
+
+    mutreview.insert(vec!["1".into(), "r1".into(), "Great paper".into(), "1,r1".into()]).unwrap();
+    mutreview.insert(vec!["1".into(), "r2".into(), "Hard to understand".into(), "1,r2".into()]).unwrap();
+    
+    // Allow time to propagate
+    sleep();
+}
