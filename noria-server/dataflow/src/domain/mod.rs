@@ -245,7 +245,7 @@ pub struct Domain {
     channel_coordinator: Arc<ChannelCoordinator>,
 
     // TODO(ygina): buffered replays may be the result of multiple previous updates
-    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<PacketId>)>,
+    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<ProvenanceUpdate>)>,
     has_buffered_replay_requests: bool,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
@@ -1566,7 +1566,7 @@ impl Domain {
 
     fn seed_all(
         &mut self,
-        id: Option<PacketId>,
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
         sends: &mut EnqueuedSends,
@@ -1657,7 +1657,7 @@ impl Domain {
 
     fn seed_replay(
         &mut self,
-        id: Option<PacketId>,
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         key: &[DataType],
         sends: &mut EnqueuedSends,

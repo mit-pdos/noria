@@ -16,7 +16,7 @@ pub struct Egress {
 
     /// Base provenance, including the label it represents
     pub(crate) min_provenance: Provenance,
-    /// Provenance updates of depth 1 starting with the first packet in payloads
+    /// Provenance updates
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Packet payloads
     pub(crate) payloads: Vec<Box<Packet>>,
@@ -100,7 +100,7 @@ impl Egress {
             };
 
             // forward all replays, but only messages with label at least the minimum label
-            let label = m.id().as_ref().unwrap().label;
+            let label = m.id().as_ref().unwrap().label();
             let min_label = *self.min_label_to_send.get(&tx.node).unwrap();
             if !is_replay && label < min_label {
                 continue;
@@ -111,7 +111,7 @@ impl Egress {
                 mtype,
                 label,
                 tx.node.index(),
-                m.id().as_ref().unwrap().update,
+                m.id().as_ref().unwrap(),
             );
 
             // src is usually ignored and overwritten by ingress
@@ -205,24 +205,21 @@ impl Egress {
         // update packet id to include the correct label, provenance update, and from node.
         // replays don't get buffered and don't increment their label (they use the last label
         // sent by this domain - think of replays as a snapshot of what's already been sent).
-        let update = if let Some(ref pid) = m.as_ref().id() {
-            pid.next_update()
-        } else {
-            vec![]
-        };
         let label = if is_replay {
             self.min_provenance.label() + self.payloads.len()
         } else {
             self.min_provenance.label() + self.payloads.len() + 1
         };
-        *m.id_mut() = Some(PacketId::new(label, from, update.clone()));
+        let update = if let Some(ref diff) = m.as_ref().id() {
+            ProvenanceUpdate::new_with(from, label, diff)
+        } else {
+            ProvenanceUpdate::new(from, label)
+        };
+        *m.id_mut() = Some(update.clone());
         if !is_replay {
             self.payloads.push(box m.clone_data());
         }
-        if update.len() > 0 {
-            // no point storing if empty
-            self.updates.push(update);
-        }
+        self.updates.push(update);
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding

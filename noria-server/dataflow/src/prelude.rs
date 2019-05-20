@@ -32,7 +32,7 @@ pub use common::*;
 pub use node::{Node, ReplicaType};
 pub use noria::internal::*;
 pub use ops::NodeOperator;
-pub use payload::{Packet, PacketId};
+pub use payload::Packet;
 pub use provenance::{Provenance, ProvenanceUpdate};
 pub use petgraph::graph::NodeIndex;
 pub use Sharding;

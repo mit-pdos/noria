@@ -39,7 +39,7 @@ pub struct Reader {
 
     /// Base provenance, including the label it represents
     pub(crate) min_provenance: Provenance,
-    /// Provenance updates of depth 1 starting with the first packet received.
+    /// Provenance updates
     /// We don't have to store payloads in readers because there are no outgoing packets.
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Number of non-replay messages received.
@@ -178,10 +178,10 @@ impl Reader {
             let m = m.as_mut().unwrap();
 
             // provenance
-            let update = if let Some(ref pid) = m.as_ref().id() {
-                pid.next_update()
+            let update = if let Some(ref diff) = m.as_ref().id() {
+                ProvenanceUpdate::new_with(0.into(), self.num_payloads, diff)
             } else {
-                vec![]
+                ProvenanceUpdate::new(0.into(), self.num_payloads)
             };
             self.updates.push(update);
 

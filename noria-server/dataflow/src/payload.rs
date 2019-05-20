@@ -77,33 +77,6 @@ pub struct SourceChannelIdentifier {
     pub tag: u32,
 }
 
-/// External ids are used the first time the packet appears in a domain.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PacketId {
-    pub label: usize,
-    pub from: DomainIndex,
-
-    /// Provenance update starting the level above the from node.
-    pub update: ProvenanceUpdate,
-}
-
-impl PacketId {
-    pub fn default() -> PacketId {
-        unreachable!();
-    }
-
-    pub fn new(label: usize, from: DomainIndex, update: ProvenanceUpdate) -> PacketId {
-        PacketId { label, from, update }
-    }
-
-    pub fn next_update(&self) -> ProvenanceUpdate {
-        let mut update = Vec::new();
-        update.push((self.from, self.label));
-        update.append(&mut self.update.clone());
-        update
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum Packet {
@@ -117,7 +90,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
-        id: Option<PacketId>,
+        id: Option<ProvenanceUpdate>,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -125,7 +98,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
-        id: Option<PacketId>,
+        id: Option<ProvenanceUpdate>,
         link: Link,
         tag: Tag,
         data: Records,
@@ -222,7 +195,7 @@ pub enum Packet {
 
     /// Ask domain (nicely) to replay a particular key.
     RequestPartialReplay {
-        id: Option<PacketId>,
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         key: Vec<DataType>,
     },
@@ -292,7 +265,7 @@ pub enum Packet {
 }
 
 impl Packet {
-    crate fn id(&self) -> &Option<PacketId> {
+    crate fn id(&self) -> &Option<ProvenanceUpdate> {
         match *self {
             Packet::Message { ref id, .. } => id,
             Packet::ReplayPiece { ref id, .. } => id,
@@ -300,7 +273,7 @@ impl Packet {
         }
     }
 
-    crate fn id_mut(&mut self) -> &mut Option<PacketId> {
+    crate fn id_mut(&mut self) -> &mut Option<ProvenanceUpdate> {
         match *self {
             Packet::Message { ref mut id, .. } => id,
             Packet::ReplayPiece { ref mut id, .. } => id,

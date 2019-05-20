@@ -1,13 +1,45 @@
 use fnv::FnvHashMap;
 use prelude::*;
+use std::fmt;
 
 /// The upstream branch of domains and message labels that was updated to produce the current
 /// message, starting at the node above the payload's "from" node. The number of nodes in the
 /// update is linear in the depth of the update.
-pub type ProvenanceUpdate = Vec<(DomainIndex, usize)>;
+pub type ProvenanceUpdate = Provenance;
+
+impl fmt::Debug for ProvenanceUpdate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let edges = self.edges.iter().map(|(_, p)| p).collect::<Vec<_>>();
+        if edges.is_empty() {
+            write!(f, "D{}:{}", self.root.index(), self.label)
+        } else {
+            write!(f, "D{}:{} {:?}", self.root.index(), self.label, edges)
+        }
+    }
+}
+
+impl ProvenanceUpdate {
+    pub fn new(root: DomainIndex, label: usize) -> ProvenanceUpdate {
+        ProvenanceUpdate {
+            root,
+            label,
+            edges: Default::default(),
+        }
+    }
+
+    pub fn new_with(root: DomainIndex, label: usize, child: &ProvenanceUpdate) -> ProvenanceUpdate {
+        let mut p = ProvenanceUpdate::new(root, label);
+        p.add_child(child);
+        p
+    }
+
+    pub fn add_child(&mut self, child: &ProvenanceUpdate) {
+        self.edges.insert(child.root, box child.clone());
+    }
+}
 
 /// The history of message labels that correspond to the production of the current message.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Provenance {
     root: DomainIndex,
     label: usize,
@@ -75,14 +107,16 @@ impl Provenance {
         self.label = label;
     }
 
+    /// The diff must have the same root and label as the provenance it's being applied to.
+    /// The diff should strictly be ahead in time in comparison.
     fn apply_update(&mut self, update: &ProvenanceUpdate) {
-        let mut provenance = self;
-        for (domain, label) in update {
-            if let Some(p) = provenance.edges.get_mut(domain) {
-                p.set_label(*label);
-                provenance = p;
-            } else {
-                break;
+        assert_eq!(self.root, update.root);
+        assert!(self.label <= update.label);
+        self.label = update.label;
+
+        for (domain, p_diff) in &update.edges {
+            if let Some(p) = self.edges.get_mut(domain) {
+                p.apply_update(p_diff);
             }
         }
     }
