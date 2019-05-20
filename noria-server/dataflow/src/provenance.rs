@@ -109,8 +109,8 @@ impl Provenance {
 
     /// The diff must have the same root and label as the provenance it's being applied to.
     /// The diff should strictly be ahead in time in comparison.
-    fn apply_update(&mut self, update: &ProvenanceUpdate) {
-        assert_eq!(self.root, update.root);
+    pub fn apply_update(&mut self, update: &ProvenanceUpdate) {
+        // assert_eq!(self.root, update.root);
         assert!(self.label <= update.label);
         self.label = update.label;
 
@@ -131,15 +131,17 @@ impl Provenance {
     }
 
     /// Returns whether a replica failed. :P
-    /*
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
 
         if let Some(new_p) = provenance.edges.remove(&new){
             // check if a replica failed. if so, make the grand-ancestor an ancestor
+            /*
             assert!(provenance.edges.is_empty());
             self.edges.insert(new, new_p);
             true
+            */
+            unimplemented!();
         }  else {
             // otherwise, just replace the domain index
             provenance.root = new;
@@ -147,7 +149,6 @@ impl Provenance {
             false
         }
     }
-    */
 
     /// Subgraph of this provenance graph with the given domain as the new root. The new root must
     /// be an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of

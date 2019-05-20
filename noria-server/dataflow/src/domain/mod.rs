@@ -1373,15 +1373,11 @@ impl Domain {
                         unimplemented!();
                     },
                     Packet::RemoveChild { child } => {
-                        /*
                         let egress = &self.nodes[self.egress.unwrap()];
                         println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), egress.borrow().global_addr(), child);
                         egress.borrow_mut().with_egress_mut(|e| e.remove_child(child));
-                        */
-                        unimplemented!();
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
-                        /*
                         println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
 
                         self.replay_paths.remove(&old_tag);
@@ -1399,11 +1395,8 @@ impl Domain {
                                 .unwrap()
                                 .replace_tag(old_tag, new_tag);
                         }
-                        */
-                        unimplemented!();
                     },
                     Packet::NewIncoming { old, new } => {
-                        /*
                         println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
                         debug!(
                             self.log,
@@ -1437,11 +1430,8 @@ impl Domain {
                             }
                         };
                         executor.ack_new_incoming(self.index, *provenance);
-                        */
-                        unimplemented!();
                     },
                     Packet::ResumeAt { child_labels } => {
-                        /*
                         println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
                         // the domain should have one egress node to resume from
                         //
@@ -1497,8 +1487,6 @@ impl Domain {
                         // any messages buffered.
                         // TODO(ygina): more complicated index for joins, possibly filters
                         executor.ack_resume_at(self.index);
-                        */
-                        unimplemented!();
                     },
                     _ => unreachable!(),
                 }

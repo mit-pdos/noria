@@ -39,7 +39,9 @@ pub struct Reader {
 
     /// Base provenance, including the label it represents
     pub(crate) min_provenance: Provenance,
-    /// Provenance updates
+    /// Base provenance with all diffs applied
+    pub(crate) max_provenance: Provenance,
+    /// Provenance updates sent in outgoing packets
     /// We don't have to store payloads in readers because there are no outgoing packets.
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Number of non-replay messages received.
@@ -55,6 +57,7 @@ impl Clone for Reader {
             state: self.state.clone(),
             for_node: self.for_node,
             min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
         }
@@ -71,6 +74,7 @@ impl Reader {
             state: None,
             for_node,
             min_provenance: Default::default(),
+            max_provenance: Default::default(),
             updates: Default::default(),
             num_payloads: 0,
         }
@@ -78,6 +82,7 @@ impl Reader {
 
     pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
         self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
+        self.max_provenance = self.min_provenance.clone();
     }
 
     pub fn shard(&mut self, _: usize) {}
@@ -103,6 +108,7 @@ impl Reader {
             state: self.state.clone(),
             for_node: self.for_node,
             min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
         }
@@ -173,16 +179,22 @@ impl Reader {
         }
     }
 
-    pub(in crate::node) fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
+    pub(in crate::node) fn process(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        swap: bool,
+    ) {
         if let Some(ref mut state) = self.writer {
             let m = m.as_mut().unwrap();
 
             // provenance
             let update = if let Some(ref diff) = m.as_ref().id() {
-                ProvenanceUpdate::new_with(0.into(), self.num_payloads, diff)
+                ProvenanceUpdate::new_with(from, self.num_payloads, diff)
             } else {
-                ProvenanceUpdate::new(0.into(), self.num_payloads)
+                ProvenanceUpdate::new(from, self.num_payloads)
             };
+            self.max_provenance.apply_update(&update);
             self.updates.push(update);
 
             // update num_payloads if not a replay
@@ -282,23 +294,25 @@ impl Reader {
 
 // fault tolerance (duplicate code from egress.rs)
 impl Reader {
-    /*
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
         if self.min_provenance.new_incoming(old, new) {
+            /*
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 assert_eq!(update[0].0, old);
                 update.remove(0);
             }
+            */
+            unimplemented!();
         } else {
             // Replace the old domain with the new domain in all updates
+            // TODO(ygina): regenerated domains should have the same index
             for update in self.updates.iter_mut() {
-                assert_eq!(update[0].0, old);
-                update[0].0 = new;
+                update.new_incoming(old, new);
             }
         }
+
     }
-    */
 
     pub fn get_last_provenance(&self) -> Provenance {
         let mut provenance = self.min_provenance.clone();

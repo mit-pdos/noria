@@ -16,7 +16,9 @@ pub struct Egress {
 
     /// Base provenance, including the label it represents
     pub(crate) min_provenance: Provenance,
-    /// Provenance updates
+    /// Base provenance with all diffs applied
+    pub(crate) max_provenance: Provenance,
+    /// Provenance updates sent in outgoing packets
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Packet payloads
     pub(crate) payloads: Vec<Box<Packet>>,
@@ -33,6 +35,7 @@ impl Clone for Egress {
             txs: Vec::new(),
             tags: self.tags.clone(),
             min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
@@ -45,6 +48,7 @@ const PROVENANCE_DEPTH: usize = 3;
 impl Egress {
     pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
         self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
+        self.max_provenance = self.min_provenance.clone();
     }
 
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
@@ -131,7 +135,6 @@ impl Egress {
 
 // fault tolerance
 impl Egress {
-    /*
     /// Stop sending messages to this child.
     pub fn remove_child(&mut self, child: NodeIndex) {
         for i in 0..self.txs.len() {
@@ -150,6 +153,7 @@ impl Egress {
 
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
         if self.min_provenance.new_incoming(old, new) {
+            /*
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 if update.len() == 0 {
@@ -163,18 +167,16 @@ impl Egress {
                 assert_eq!(update[0].0, old);
                 update.remove(0);
             }
+            */
+            unimplemented!();
         } else {
             // Replace the old domain with the new domain in all updates
+            // TODO(ygina): regenerated domains should have the same index
             for update in self.updates.iter_mut() {
-                if update[0].0 == old {
-                    update[0].0 = new;
-                } else {
-                    // we hit this branch only if the domain has multiple parents
-                }
+                update.new_incoming(old, new);
             }
         }
     }
-    */
 
     pub fn get_last_provenance(&self) -> Provenance {
         let mut provenance = self.min_provenance.clone();
@@ -216,10 +218,11 @@ impl Egress {
             ProvenanceUpdate::new(from, label)
         };
         *m.id_mut() = Some(update.clone());
+        self.max_provenance.apply_update(&update);
         if !is_replay {
             self.payloads.push(box m.clone_data());
+            self.updates.push(self.max_provenance.clone());
         }
-        self.updates.push(update);
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
@@ -239,7 +242,6 @@ impl Egress {
         self.process(m, shard, output, &to_nodes);
     }
 
-    /*
     /// Set the minimum label of the provenance, which represents the label of the first
     /// packet payload we have that is not stored, but don't truncate the payload buffer.
     ///
@@ -300,5 +302,4 @@ impl Egress {
             self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
         }
     }
-    */
 }

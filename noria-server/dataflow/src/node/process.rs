@@ -73,7 +73,7 @@ impl Node {
                 (vec![], HashSet::new())
             }
             NodeType::Reader(ref mut r) => {
-                r.process(m, swap);
+                r.process(m, domain, swap);
                 (vec![], HashSet::new())
             }
             NodeType::Egress(None) => unreachable!(),
