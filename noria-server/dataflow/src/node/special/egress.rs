@@ -131,6 +131,7 @@ impl Egress {
 
 // fault tolerance
 impl Egress {
+    /*
     /// Stop sending messages to this child.
     pub fn remove_child(&mut self, child: NodeIndex) {
         for i in 0..self.txs.len() {
@@ -173,6 +174,7 @@ impl Egress {
             }
         }
     }
+    */
 
     pub fn get_last_provenance(&self) -> Provenance {
         let mut provenance = self.min_provenance.clone();
@@ -240,6 +242,7 @@ impl Egress {
         self.process(m, shard, output, &to_nodes);
     }
 
+    /*
     /// Set the minimum label of the provenance, which represents the label of the first
     /// packet payload we have that is not stored, but don't truncate the payload buffer.
     ///
@@ -300,4 +303,5 @@ impl Egress {
             self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
         }
     }
+    */
 }

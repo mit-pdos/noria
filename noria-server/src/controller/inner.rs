@@ -432,8 +432,9 @@ impl ControllerInner {
         } else if stateful.len() == 1 {
             if self.ingredients[stateful[0]].replica_type().is_some() && nodes.len() == 3 {
                 // exactly one ingress, one egress, and one stateful replica
-                self.recover_hot_spare(stateful[0], ingress, egress.unwrap());
-                true
+                // self.recover_hot_spare(stateful[0], ingress, egress.unwrap());
+                // true
+                unimplemented!();
             } else {
                 // the stateful node does not have a replica
                 false
@@ -565,6 +566,7 @@ impl ControllerInner {
         }
     }
 
+    /*
     /// Consider A -> B1 -> B2 -> C, where we lose B1.
     fn recover_lost_top_replica(
         &mut self,
@@ -866,6 +868,7 @@ impl ControllerInner {
             None => unreachable!(),
         }
     }
+    */
 
     /// Recovers a domain with only an ingress A and a reader B1.
     fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {

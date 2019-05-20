@@ -282,6 +282,7 @@ impl Reader {
 
 // fault tolerance (duplicate code from egress.rs)
 impl Reader {
+    /*
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
         if self.min_provenance.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
@@ -297,6 +298,7 @@ impl Reader {
             }
         }
     }
+    */
 
     pub fn get_last_provenance(&self) -> Provenance {
         let mut provenance = self.min_provenance.clone();

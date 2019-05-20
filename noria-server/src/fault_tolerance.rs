@@ -73,6 +73,7 @@ fn sleep() {
     thread::sleep(get_settle_time());
 }
 
+/*
 #[test]
 fn aggregations_work_with_replicas() {
     let txt = "CREATE TABLE vote (user int, id int);\n
@@ -190,6 +191,7 @@ fn lose_top_multi_child_replica_without_replays() {
 fn lose_top_multi_child_replica_with_replays() {
     multi_child_replica(true, 1);
 }
+*/
 
 fn stateless_multi_child_domain(replay_after_recovery: bool) {
     let txt = "CREATE TABLE data (id int, x int, y int);\n
@@ -400,6 +402,7 @@ fn test_single_child_parent_replica(replay_after_recovery: bool, worker_to_drop:
     println!("success! now clean shutdown...");
 }
 
+/*
 #[test]
 fn lose_top_replica_without_replays() {
     test_single_child_parent_replica(false, 1);
@@ -419,25 +422,30 @@ fn lose_bottom_replica_without_replays() {
 fn lose_bottom_replica_with_replays() {
     test_single_child_parent_replica(true, 2);
 }
+*/
 
 #[test]
-fn lose_stateless_domain_without_replays() {
+fn linear_stateless_domain_without_replays() {
+    // test_single_child_parent_replica(false, 3);
+    test_single_child_parent_replica(false, 2);
+}
+
+#[test]
+fn linear_stateless_domain_with_replays() {
+    // test_single_child_parent_replica(true, 3);
+    test_single_child_parent_replica(true, 2);
+}
+
+#[test]
+fn linear_reader_with_state() {
+    // test_single_child_parent_replica(false, 4);
     test_single_child_parent_replica(false, 3);
 }
 
 #[test]
-fn lose_stateless_domain_with_replays() {
+fn linear_reader_without_state() {
+    // test_single_child_parent_replica(true, 4);
     test_single_child_parent_replica(true, 3);
-}
-
-#[test]
-fn lose_reader_with_state() {
-    test_single_child_parent_replica(false, 4);
-}
-
-#[test]
-fn lose_reader_without_state() {
-    test_single_child_parent_replica(true, 4);
 }
 
 /// Returns a list of all the workers, and handles to Article, Vote, ArticleWithVoteCount.
@@ -542,6 +550,7 @@ fn vote(replay_after_recovery: bool, mut workers_to_drop: Vec<usize>) {
     println!("success! now clean shutdown...");
 }
 
+/*
 #[test]
 fn vote_top_replica_with_replays() {
     vote(true, vec![2]);
@@ -551,22 +560,27 @@ fn vote_top_replica_with_replays() {
 fn vote_bottom_replica_with_replays() {
     vote(true, vec![3]);
 }
+*/
 
 #[test]
 fn vote_upper_projection_with_replays() {
-    vote(true, vec![4]);
+    // vote(true, vec![4]);
+    vote(true, vec![3]);
 }
 
 #[test]
 fn vote_lower_projection_with_replays() {
-    vote(true, vec![6]);
+    // vote(true, vec![6]);
+    vote(true, vec![5]);
 }
 
 #[test]
 fn vote_reader_with_replays() {
-    vote(true, vec![7]);
+    // vote(true, vec![7]);
+    vote(true, vec![6]);
 }
 
+/*
 #[test]
 fn vote_top_replica_without_replays() {
     vote(false, vec![2]);
@@ -576,18 +590,19 @@ fn vote_top_replica_without_replays() {
 fn vote_bottom_replica_without_replays() {
     vote(false, vec![3]);
 }
+*/
 
 #[test]
 fn vote_upper_projection_without_replays() {
-    vote(false, vec![4]);
+    vote(false, vec![3]);
 }
 
 #[test]
 fn vote_lower_projection_without_replays() {
-    vote(false, vec![6]);
+    vote(false, vec![5]);
 }
 
 #[test]
 fn vote_reader_without_replays() {
-    vote(false, vec![7]);
+    vote(false, vec![6]);
 }

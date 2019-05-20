@@ -846,16 +846,16 @@ impl SqlToMirConverter {
                     true,
                 )
             };
-            let columns = node.borrow().columns.clone();
+            // let columns = node.borrow().columns.clone();
             out_nodes.push(node);
-            out_nodes.push(MirNode::new(
-                &(name.clone().to_owned() + "_identity"),
-                self.schema_version,
-                columns,
-                MirNodeType::Replica,
-                vec![out_nodes[0].clone()],
-                vec![],
-            ));
+            // out_nodes.push(MirNode::new(
+            //     &(name.clone().to_owned() + "_identity"),
+            //     self.schema_version,
+            //     columns,
+            //     MirNodeType::Replica,
+            //     vec![out_nodes[0].clone()],
+            //     vec![],
+            // ));
             out_nodes
         };
 
