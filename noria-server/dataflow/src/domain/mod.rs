@@ -1372,10 +1372,14 @@ impl Domain {
                         */
                         unimplemented!();
                     },
-                    Packet::RemoveChild { child } => {
+                    Packet::RemoveChild { child, domain } => {
+                        // Prevent the egress node from sending messages to the node
                         let egress = &self.nodes[self.egress.unwrap()];
                         println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), egress.borrow().global_addr(), child);
                         egress.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+
+                        // Tell the replica to uncache the sender
+                        executor.uncache_domain(domain);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
                         println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);

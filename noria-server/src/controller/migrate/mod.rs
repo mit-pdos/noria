@@ -142,19 +142,16 @@ impl<'a> Migration<'a> {
         );
 
         assert!(nodes.len() > 0);
-        let old_domain = graph[nodes[0]].domain();
+        let domain = graph[nodes[0]].domain();
         for &ni in nodes {
-            assert_eq!(graph[ni].domain(), old_domain);
+            assert_eq!(graph[ni].domain(), domain);
         }
 
-        // TODO(ygina): we might want to clean up references to the old domain
-        let new_domain = self.mainline.ndomains.into();
-        self.mainline.ndomains += 1;
-        self.replicated.push((new_domain, nodes.clone()));
+        self.replicated.push((domain, nodes.clone()));
 
         let graph_clone = graph.clone();
         for &ni in nodes {
-            graph[ni].recover(&graph_clone, new_domain);
+            graph[ni].recover(&graph_clone, domain);
         }
 
         let egress = nodes[nodes.len() - 1];
@@ -611,6 +608,9 @@ impl<'a> Migration<'a> {
         // These aren't really new nodes since they've already been assigned local indexes and
         // domains. All we want to do is place the new domain, and fix routing/materializations.
         for (domain, nodes) in &self.replicated {
+            // Since we're regenerating this domain, remove the old handle with this domain index
+            mainline.domains.remove(domain);
+
             uninformed_domain_nodes.insert(*domain, nodes.iter().map(|&n| (n, true)).collect());
             changed_domains.push(*domain);
             for &ni in nodes {

@@ -170,11 +170,7 @@ impl Egress {
             */
             unimplemented!();
         } else {
-            // Replace the old domain with the new domain in all updates
-            // TODO(ygina): regenerated domains should have the same index
-            for update in self.updates.iter_mut() {
-                update.new_incoming(old, new);
-            }
+            // Regenerated domains should have the same index
         }
     }
 

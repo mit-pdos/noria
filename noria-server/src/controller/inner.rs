@@ -503,7 +503,7 @@ impl ControllerInner {
             let domain_a = self.ingredients[egress_a].domain();
             domain_as.push(domain_a);
 
-            let m = box Packet::RemoveChild { child: ingress };
+            let m = box Packet::RemoveChild { child: ingress, domain: domain_b1 };
             self.domains
                 .get_mut(&domain_a)
                 .unwrap()
@@ -872,29 +872,30 @@ impl ControllerInner {
 
     /// Recovers a domain with only an ingress A and a reader B1.
     fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {
-        let domain_b1 = self.ingredients[ingress].domain();
-        assert_eq!(domain_b1, self.ingredients[reader].domain());
+        let domain_b = self.ingredients[ingress].domain();
+        assert_eq!(domain_b, self.ingredients[reader].domain());
 
         // prevent A from sending messages to B1 even once the connection is regenerated.
         let egress_a = self.parent(ingress);
         let domain_a = self.ingredients[egress_a].domain();
-        let m = box Packet::RemoveChild { child: ingress };
+        let m = box Packet::RemoveChild { child: ingress, domain: domain_b };
         self.domains
             .get_mut(&domain_a)
             .unwrap()
             .send_to_healthy(m, &self.workers)
             .unwrap();
 
-        // do a migration that regenerates the nodes from domain B1 in domain B2.
-        self.migrate(|mig| mig.replicate_nodes(&vec![ingress, reader]));
-
         // remove tags on replay paths involving domain B1 since materializations were
         // recreated in the previous migration.
         let tags = self.materializations
-            .get_setup_replay_paths(domain_b1)
+            .get_setup_replay_paths(domain_b)
             .iter()
             .map(|m| m.tag)
             .collect::<Vec<_>>();
+
+        // do a migration that regenerates the nodes from domain B1 in domain B2.
+        self.migrate(|mig| mig.replicate_nodes(&vec![ingress, reader]));
+
         for tag in tags {
             let path = self.materializations.get_path(tag).unwrap();
             let domains = path

@@ -165,6 +165,21 @@ impl Replica {
         let cc = &self.coord;
         let outputs = &mut self.outputs;
 
+        // uncache any domains
+        for domain in self.oob.domains.drain() {
+            let mut to_remove = Vec::new();
+            for ri in outputs.keys() {
+                if ri.0 == domain {
+                    to_remove.push(ri.clone());
+                }
+            }
+
+            for ri in to_remove {
+                outputs.remove(&ri);
+            }
+        }
+
+
         // just like in try_oob:
         // first, queue up any additional writes we have to do
         let mut err = Vec::new();
@@ -289,6 +304,9 @@ struct OutOfBand {
     back: FnvHashMap<usize, Vec<u32>>,
     pending: FnvHashSet<usize>,
 
+    // for uncaching deleted domains
+    domains: FnvHashSet<DomainIndex>,
+
     // for sending messages to the controller
     ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
 }
@@ -298,6 +316,7 @@ impl OutOfBand {
         OutOfBand {
             back: Default::default(),
             pending: Default::default(),
+            domains: Default::default(),
             ctrl_tx,
         }
     }
@@ -318,6 +337,10 @@ impl Executor for OutOfBand {
         self.ctrl_tx
             .unbounded_send(CoordinationPayload::AckResumeAt { from })
             .expect("asked to send to controller, but controller has gone away");
+    }
+
+    fn uncache_domain(&mut self, domain: DomainIndex) {
+        self.domains.insert(domain);
     }
 
     fn create_universe(&mut self, universe: HashMap<String, DataType>) {

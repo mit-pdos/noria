@@ -244,6 +244,7 @@ pub enum Packet {
     /// Tell the node to stop sending messages to this child
     RemoveChild {
         child: NodeIndex,
+        domain: DomainIndex,
     },
 
     /// Remove the replay path corresponding to the tag in the domain
