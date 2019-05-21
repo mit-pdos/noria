@@ -189,8 +189,8 @@ impl Reader {
             let m = m.as_mut().unwrap();
 
             // provenance
-            let update = if let Some(ref diff) = m.as_ref().id() {
-                ProvenanceUpdate::new_with(from, self.num_payloads, diff)
+            let update = if let Some(diff) = m.as_ref().id() {
+                ProvenanceUpdate::new_with(from, self.num_payloads, &[diff.clone()])
             } else {
                 ProvenanceUpdate::new(from, self.num_payloads)
             };

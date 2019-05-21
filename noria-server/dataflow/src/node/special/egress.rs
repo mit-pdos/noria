@@ -208,8 +208,8 @@ impl Egress {
         } else {
             self.min_provenance.label() + self.payloads.len() + 1
         };
-        let update = if let Some(ref diff) = m.as_ref().id() {
-            ProvenanceUpdate::new_with(from, label, diff)
+        let update = if let Some(diff) = m.as_ref().id() {
+            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
         } else {
             ProvenanceUpdate::new(from, label)
         };
