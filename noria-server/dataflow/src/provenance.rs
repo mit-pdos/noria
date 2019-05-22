@@ -142,15 +142,6 @@ impl Provenance {
         }
     }
 
-    /// Apply all provenance updates to the provenance graph, and increment the base graph's label
-    /// by the number of packets in the payloads buffer.
-    pub fn apply_updates(&mut self, updates: &[ProvenanceUpdate], num_payloads: usize) {
-        self.label += num_payloads;
-        for update in updates {
-            self.apply_update(update);
-        }
-    }
-
     /// Returns whether a replica failed. :P
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
         assert_eq!(old, new);

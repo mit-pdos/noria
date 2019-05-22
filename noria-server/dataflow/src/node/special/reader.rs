@@ -310,9 +310,7 @@ impl Reader {
 
     }
 
-    pub fn get_last_provenance(&self) -> Provenance {
-        let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[..], self.num_payloads);
-        provenance
+    pub fn get_last_provenance(&self) -> &Provenance {
+        &self.max_provenance
     }
 }

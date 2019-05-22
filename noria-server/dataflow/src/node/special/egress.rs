@@ -174,10 +174,8 @@ impl Egress {
         }
     }
 
-    pub fn get_last_provenance(&self) -> Provenance {
-        let mut provenance = self.min_provenance.clone();
-        provenance.apply_updates(&self.updates[..], self.payloads.len());
-        provenance
+    pub fn get_last_provenance(&self) -> &Provenance {
+        &self.max_provenance
     }
 
     /// Stores the packet in the buffer and tests whether we should send to each node corresponding
@@ -213,8 +211,8 @@ impl Egress {
         } else {
             ProvenanceUpdate::new(from, label)
         };
-        *m.id_mut() = Some(update.clone());
         self.max_provenance.apply_update(&update);
+        *m.id_mut() = Some(self.max_provenance.clone());
         if !is_replay {
             self.payloads.push(box m.clone_data());
             self.updates.push(self.max_provenance.clone());
