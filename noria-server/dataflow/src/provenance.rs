@@ -131,8 +131,24 @@ impl Provenance {
     /// The diff must have the same root and label as the provenance it's being applied to.
     /// The diff should strictly be ahead in time in comparison.
     pub fn apply_update(&mut self, update: &ProvenanceUpdate) {
-        // assert_eq!(self.root, update.root);
-        assert!(self.label <= update.label);
+        assert_eq!(self.root, update.root);
+        // Ignore the assertion below in the very specific case that a stateless domain with
+        // multiple parents is reconstructed but without being able to recover its lost provenance
+        // information. We could theoretically reconstruct this provenance by waiting for a message
+        // from each parent, but it shouldn't actually matter when losing multi-parent stateless
+        // domains since the result of one message shouldn't depend on the results of previous
+        // messages. For multi-parent stateful domain cases, the provenance information should
+        // have been replicated along with the materialized rows.
+        //
+        // We should be able to add this assertion back once we optimize how much provenance
+        // we send per message.
+        // assert!(self.label <= update.label);
+        if self.label >= update.label {
+            // short circuit since all domain-label combinations mean the same thing everywhere,
+            // and labels farther in the future contain all information from previous labels
+            return;
+        }
+
         self.label = update.label;
 
         for (domain, p_diff) in &update.edges {
