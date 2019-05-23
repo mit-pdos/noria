@@ -1443,21 +1443,19 @@ impl Domain {
                         // then set the label of the first message it expects to produce once
                         // it starts receiving messages from upstream nodes again. (see note below)
                         let node = &self.nodes[self.egress.unwrap()];
-                        let mut min_label = std::usize::MAX;
-                        for &(child, label) in &child_labels {
-                            node.borrow_mut().with_egress_mut(|e| {
-                                e.resume_at(child, label, self.shard, sends)
-                            });
-                            if label < min_label {
-                                min_label = label;
-                            }
-                        }
+                        debug!(
+                            self.log,
+                            "resuming messages from {} to {:?}",
+                            node.borrow().global_addr().index(),
+                            child_labels;
+                        );
+
                         node.borrow_mut().with_egress_mut(|e| {
                             // if setting the min_label would truncate any messages in the buffer,
                             // that means there are no dependent upstream failures that will get
                             // a ResumeAt in response to acking this ResumeAt. we won't set the
                             // min_label here, letting some other process take truncate logs.
-                            e.set_min_label(min_label - 1)
+                            e.resume_at(child_labels, self.shard, sends);
                         });
 
                         // TODO(ygina): Currently, the value of next_label is the label of the
@@ -1477,14 +1475,6 @@ impl Domain {
                         // Theoretically, downstream nodes have this information by composing
                         // their provenance and a list of updates. (depending on how we store
                         // updates for replays...)
-
-                        debug!(
-                            self.log,
-                            "resuming messages from {} to {:?}",
-                            node.borrow().global_addr().index(),
-                            child_labels;
-                            "min_label" => min_label,
-                        );
 
                         // we ack the ResumeAt to the controller, and the controller takes care
                         // of any upstream ResumeAts if, for example, this domain does not have

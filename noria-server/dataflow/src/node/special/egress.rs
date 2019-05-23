@@ -54,6 +54,14 @@ impl Egress {
         self.max_provenance = self.min_provenance.clone();
     }
 
+    // We initially have sent nothing to each node. Diffs are one depth shorter.
+    fn insert_default_last_provenance(&mut self, ni: NodeIndex) {
+        let mut p = self.min_provenance.clone();
+        p.trim(PROVENANCE_DEPTH - 1);
+        p.zero();
+        self.last_provenance.insert(ni, p);
+    }
+
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
         // avoid adding duplicate egress txs. this happens because we send Update Egress messages
         // both when reconnecting a replicated stateless domain, and so the domain gets the correct
@@ -70,12 +78,7 @@ impl Egress {
             dest: addr,
         });
         self.min_label_to_send.insert(dst_g, 1);
-
-        // we initially have sent nothing to each node. diffs are one depth shorter.
-        let mut p = self.min_provenance.clone();
-        p.trim(PROVENANCE_DEPTH - 1);
-        p.zero();
-        self.last_provenance.insert(dst_g, p);
+        self.insert_default_last_provenance(dst_g);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -129,8 +132,7 @@ impl Egress {
             let diff = self.last_provenance
                 .get(&tx.node)
                 .unwrap()
-                .diff(&self.max_provenance)
-                .unwrap();
+                .diff(&self.max_provenance);
             // TODO(ygina): is this valid if the sender domain just restarted? what if we
             // are sending from an earlier point in time? uphold this assertion later.
             assert_eq!(label, diff.label());
@@ -277,49 +279,79 @@ impl Egress {
         }
     }
 
-    /// Resume sending messages to this node at the label after getting that node up to date.
-    ///
-    /// If we don't have the appropriate messages buffered, that means we lost a stateless domain.
-    /// Simply mark down where to resume sending messages to the child node for later.
+    /// Resume sending messages to these children at the given labels.
     pub fn resume_at(
         &mut self,
-        node: NodeIndex,
-        label: usize,
+        node_labels: Vec<(NodeIndex, usize)>,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        let next_label = self.min_provenance.label() + self.payloads.len() + 1;
-
-        // we don't have the messages we need to send
-        // we must have lost a stateless domain
-        if label > next_label {
-            println!("{} > {}", label, next_label);
-            assert!(self.payloads.is_empty());
-            return;
-        }
-
-        // it could also be that no new messages were sent since the connection went down.
-        if label == next_label {
-            println!("{} == {}", label, next_label);
-            return;
-        }
-
-        // TODO(ygina): make sure we are sending the right diffs here...
-        // send all buffered messages to this node only from the resume at label
-        println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
-        let mut to_nodes = HashSet::new();
-        to_nodes.insert(node);
-        for m_label in label..next_label {
-            let m = &self.payloads[m_label - self.min_provenance.label() - 1];
-            let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
-            if let Some(ni) = replay_to {
-                if node != *ni {
-                    continue;
-                }
+        let mut min_label = std::usize::MAX;
+        for &(node, label) in &node_labels {
+            // calculate the min label
+            if label < min_label {
+                min_label = label;
             }
+            // don't duplicate sent messages
+            self.min_label_to_send.insert(node, label);
+        }
+
+        let next_label = self.min_provenance.label() + self.payloads.len() + 1;
+        for &(_, label) in &node_labels {
+            // we don't have the messages we need to send
+            // we must have lost a stateless domain
+            if label > next_label {
+                println!("{} > {}", label, next_label);
+                assert!(self.payloads.is_empty());
+                assert!(self.updates.is_empty());
+                self.min_provenance.set_label(min_label - 1);
+                self.max_provenance.set_label(min_label - 1);
+                return;
+            }
+            // if this is a stateless domain that was just regenerated, then it must not have sent
+            // any messages at all. otherwise, it just means no new messages were sent since the
+            // connection went down. only return in the first case since other children might not
+            // be as up to date.
+            if label == next_label && label == 1 {
+                println!("{} == {}", label, next_label);
+                return;
+            }
+        }
+
+        // If we made it this far, it means we have all the messages we need to send (assuming
+        // log truncation works correctly). Roll back provenance state to the minimum label and
+        // replay each message and diff as if they were just received.
+        // TODO(ygina): we can probably also just truncate up to min label
+        self.max_provenance = self.min_provenance.clone();
+        let min_label_index = min_label - self.min_provenance.label() - 1;
+        for i in 0..min_label_index {
+            let update = &self.updates[i];
+            self.max_provenance.apply_update(update);
+        }
+        for &(node, label) in &node_labels {
+            println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
+            self.insert_default_last_provenance(node);
+        }
+
+        // Resend all messages from the minimum label.
+        for i in min_label_index..self.payloads.len() {
+            let update = &self.updates[i];
+            let m = &self.payloads[i];
+            let label = update.label();
+            self.max_provenance.apply_update(update);
+
+            // Who would this message normally be sent to?
+            let replay_to = m.tag().map(|tag| self.tags.get(&tag).unwrap());
+            let to_nodes = if let Some(_) = replay_to {
+                // TODO(ygina): may be more selective with sharding
+                unreachable!()
+            } else {
+                self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
+            };
+
             self.process(
                 box m.clone_data(),
-                m_label,
+                label,
                 on_shard.unwrap_or(0),
                 output,
                 &to_nodes,
