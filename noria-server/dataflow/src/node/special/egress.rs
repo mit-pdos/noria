@@ -25,6 +25,8 @@ pub struct Egress {
 
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<NodeIndex, usize>,
+    /// The provenance of the last packet send to each node
+    last_provenance: HashMap<NodeIndex, Provenance>,
 }
 
 impl Clone for Egress {
@@ -39,6 +41,7 @@ impl Clone for Egress {
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
+            last_provenance: self.last_provenance.clone(),
         }
     }
 }
@@ -67,6 +70,12 @@ impl Egress {
             dest: addr,
         });
         self.min_label_to_send.insert(dst_g, 1);
+
+        // we initially have sent nothing to each node. diffs are one depth shorter.
+        let mut p = self.min_provenance.clone();
+        p.trim(PROVENANCE_DEPTH - 1);
+        p.zero();
+        self.last_provenance.insert(dst_g, p);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -76,6 +85,7 @@ impl Egress {
     pub fn process(
         &mut self,
         msg: Box<Packet>,
+        label: usize,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
         to_nodes: &HashSet<NodeIndex>,
@@ -104,11 +114,28 @@ impl Egress {
             };
 
             // forward all replays, but only messages with label at least the minimum label
-            let label = m.id().as_ref().unwrap().label();
             let min_label = *self.min_label_to_send.get(&tx.node).unwrap();
             if !is_replay && label < min_label {
                 continue;
             }
+
+            // src is usually ignored and overwritten by ingress
+            // *except* if the ingress is marked as a shard merger
+            // in which case it wants to know about the shard
+            m.link_mut().src = unsafe { LocalNodeIndex::make(shard as u32) };
+            m.link_mut().dst = tx.local;
+
+            // set the diff per child right before sending
+            let diff = self.last_provenance
+                .get(&tx.node)
+                .unwrap()
+                .diff(&self.max_provenance)
+                .unwrap();
+            // TODO(ygina): is this valid if the sender domain just restarted? what if we
+            // are sending from an earlier point in time? uphold this assertion later.
+            assert_eq!(label, diff.label());
+            self.last_provenance.get_mut(&tx.node).unwrap().apply_update(&diff);
+            *m.id_mut() = Some(diff);
 
             println!(
                 "SEND PACKET {} #{} -> {} {:?}",
@@ -117,12 +144,6 @@ impl Egress {
                 tx.node.index(),
                 m.id().as_ref().unwrap(),
             );
-
-            // src is usually ignored and overwritten by ingress
-            // *except* if the ingress is marked as a shard merger
-            // in which case it wants to know about the shard
-            m.link_mut().src = unsafe { LocalNodeIndex::make(shard as u32) };
-            m.link_mut().dst = tx.local;
 
             // TODO(ygina): don't clone the last send
             output.entry(tx.dest).or_default().push_back(m);
@@ -192,7 +213,7 @@ impl Egress {
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        let mut m = m.as_ref().map(|m| box m.clone_data()).unwrap();
+        let m = m.as_ref().map(|m| box m.clone_data()).unwrap();
         let is_replay = match m {
             box Packet::ReplayPiece { .. } => true,
             _ => false,
@@ -212,7 +233,6 @@ impl Egress {
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
-        *m.id_mut() = Some(self.max_provenance.clone());
         if !is_replay {
             self.payloads.push(box m.clone_data());
             self.updates.push(self.max_provenance.clone());
@@ -233,7 +253,7 @@ impl Egress {
         };
 
         // finally, send the message
-        self.process(m, shard, output, &to_nodes);
+        self.process(m, self.max_provenance.label(), shard, output, &to_nodes);
     }
 
     /// Set the minimum label of the provenance, which represents the label of the first
@@ -248,6 +268,9 @@ impl Egress {
         if num_to_truncate > self.payloads.len() {
             assert!(self.payloads.is_empty());
             self.payloads = Vec::new();
+            // WARNING: setting the label here without setting the rest of the provenance might
+            // cause some issues, since the min provenance won't represent the actual provenance
+            // of that message label
             self.min_provenance.set_label(label);
         } else {
             // self.payloads.drain(0..num_to_truncate);
@@ -281,6 +304,7 @@ impl Egress {
             return;
         }
 
+        // TODO(ygina): make sure we are sending the right diffs here...
         // send all buffered messages to this node only from the resume at label
         println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
         let mut to_nodes = HashSet::new();
@@ -293,7 +317,13 @@ impl Egress {
                     continue;
                 }
             }
-            self.process(box m.clone_data(), on_shard.unwrap_or(0), output, &to_nodes);
+            self.process(
+                box m.clone_data(),
+                m_label,
+                on_shard.unwrap_or(0),
+                output,
+                &to_nodes,
+            );
         }
     }
 }

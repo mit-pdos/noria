@@ -69,6 +69,13 @@ impl ProvenanceUpdate {
             unreachable!();
         }
     }
+
+    pub fn zero(&mut self) {
+        self.label = 0;
+        for (_, p) in self.edges.iter_mut() {
+            p.zero();
+        }
+    }
 }
 
 /// The history of message labels that correspond to the production of the current message.

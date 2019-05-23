@@ -255,6 +255,7 @@ impl Node {
                         tag,
                         keys: keys.to_vec(),
                     }),
+                    0,
                     on_shard.unwrap_or(0),
                     output,
                     &HashSet::default(),
