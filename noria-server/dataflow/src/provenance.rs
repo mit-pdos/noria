@@ -51,20 +51,20 @@ impl ProvenanceUpdate {
         }
     }
 
-    pub fn diff(&self, other: &ProvenanceUpdate) -> Option<ProvenanceUpdate> {
+    pub fn diff(&self, other: &ProvenanceUpdate) -> ProvenanceUpdate {
         assert_eq!(self.root, other.root);
         if self.label == other.label {
-            None
+            ProvenanceUpdate::new(self.root, self.label)
         } else if self.label < other.label {
             let mut diff = ProvenanceUpdate::new(other.root, other.label);
             for (domain, p_other) in &other.edges {
                 if let Some(p_self) = self.edges.get(domain) {
-                    if let Some(p_diff) = p_self.diff(p_other) {
-                        diff.add_child(p_diff);
+                    if p_self.label < p_other.label {
+                        diff.add_child(p_self.diff(p_other));
                     }
                 }
             }
-            Some(diff)
+            diff
         } else {
             unreachable!();
         }
@@ -161,7 +161,7 @@ impl Provenance {
         //
         // We should be able to add this assertion back once we optimize how much provenance
         // we send per message.
-        // assert!(self.label <= update.label);
+        assert!(self.label <= update.label);
         if self.label >= update.label {
             // short circuit since all domain-label combinations mean the same thing everywhere,
             // and labels farther in the future contain all information from previous labels
@@ -370,7 +370,7 @@ mod tests {
 
         // expected - original = diff
         // original + diff = expected
-        assert_eq!(original.diff(&expected).unwrap(), diff);
+        assert_eq!(original.diff(&expected), diff);
         original.apply_update(&diff);
         assert_eq!(original, expected);
     }
@@ -402,7 +402,7 @@ mod tests {
 
         // expected - original = diff
         // original + diff = expected
-        assert_eq!(original.diff(&expected).unwrap(), diff);
+        assert_eq!(original.diff(&expected), diff);
         original.apply_update(&diff);
         assert_eq!(original, expected);
     }
