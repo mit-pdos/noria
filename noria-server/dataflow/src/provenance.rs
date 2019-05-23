@@ -39,6 +39,18 @@ impl ProvenanceUpdate {
         self.edges.insert(child.root, box child);
     }
 
+    /// Trim the provenance tree to the given depth.
+    pub fn trim(&mut self, depth: usize) {
+        assert!(depth > 0);
+        if depth == 1 {
+            self.edges.clear();
+            return;
+        }
+        for (_, p) in self.edges.iter_mut() {
+            p.trim(depth - 1);
+        }
+    }
+
     pub fn diff(&self, other: &ProvenanceUpdate) -> Option<ProvenanceUpdate> {
         assert_eq!(self.root, other.root);
         if self.label == other.label {
@@ -386,5 +398,34 @@ mod tests {
         assert_eq!(original.diff(&expected).unwrap(), diff);
         original.apply_update(&diff);
         assert_eq!(original, expected);
+    }
+
+    #[test]
+    fn test_trim() {
+        let mut p = default_provenance();
+
+        // depth 3
+        p.trim(3);
+        assert!(p
+            .edges.get_mut(&DomainIndex::from(3)).unwrap()
+            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.is_empty());
+        assert!(p
+            .edges.get_mut(&DomainIndex::from(4)).unwrap()
+            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.is_empty());
+
+        // depth 2
+        p.trim(2);
+        assert!(p
+            .edges.get_mut(&DomainIndex::from(3)).unwrap()
+            .edges.is_empty());
+        assert!(p
+            .edges.get_mut(&DomainIndex::from(4)).unwrap()
+            .edges.is_empty());
+
+        // depth 1
+        p.trim(1);
+        assert!(p.edges.is_empty());
     }
 }
