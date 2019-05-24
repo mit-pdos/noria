@@ -85,7 +85,7 @@ impl Default for SqlIncorporator {
 
             schema_version: 0,
 
-            reuse_type: ReuseConfigType::Finkelstein,
+            reuse_type: ReuseConfigType::NoReuse,
             universes: HashMap::default(),
         }
     }

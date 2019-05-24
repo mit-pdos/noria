@@ -55,6 +55,9 @@ mio = "0.6.9"
 net2 = "0.2"
 async-bincode = "0.4.5"
 
+# random distribution
+rand = "0.6.5"
+
 [lib]
 path = "src/lib.rs"
 name = "noria"

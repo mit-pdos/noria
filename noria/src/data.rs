@@ -299,6 +299,13 @@ impl<'a> From<&'a Literal> for DataType {
     }
 }
 
+impl From<NaiveDateTime> for DataType {
+    fn from(ts: NaiveDateTime) -> Self {
+        DataType::Timestamp(ts)
+    }
+
+}
+
 impl From<Literal> for DataType {
     fn from(l: Literal) -> Self {
         match l {
