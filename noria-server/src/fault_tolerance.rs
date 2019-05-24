@@ -9,7 +9,6 @@ use std::time::Duration;
 use std::{env, thread};
 
 const DEFAULT_SETTLE_TIME_MS: u64 = 200;
-const DEFAULT_SHARDING: Option<usize> = Some(2);
 type Worker = SyncHandle<LocalAuthority>;
 
 // PersistenceParameters with a log_name on the form of `prefix` + timestamp,
@@ -20,16 +19,6 @@ fn get_persistence_params(prefix: &str) -> PersistenceParameters {
     params.mode = DurabilityMode::DeleteOnExit;
     params.log_prefix = String::from(prefix);
     params
-}
-
-#[allow(dead_code)]
-pub fn start_simple_unsharded(prefix: &str) -> Worker {
-    build(prefix, None, false)
-}
-
-#[allow(dead_code)]
-pub fn start_simple_logging(prefix: &str) -> Worker {
-    build(prefix, DEFAULT_SHARDING, true)
 }
 
 fn build(prefix: &str, sharding: Option<usize>, log: bool) -> Worker {
@@ -44,7 +33,6 @@ fn build(prefix: &str, sharding: Option<usize>, log: bool) -> Worker {
 }
 
 fn build_authority(
-    prefix: &str,
     authority: Arc<LocalAuthority>,
     log: bool,
 ) -> Worker {
@@ -54,7 +42,7 @@ fn build_authority(
         builder.log_with(logger_pls());
     }
     builder.set_sharding(None);
-    builder.set_persistence(get_persistence_params(prefix));
+    builder.set_persistence(get_persistence_params("ft"));
     builder.start_simple_authority(authority).unwrap()
 }
 
@@ -105,9 +93,8 @@ fn multi_child_replica(replay_after_recovery: bool, worker_to_drop: usize) {
     // start enough workers for each domain to be on its own worker
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
-    for i in 0..7 {
-        let name = format!("worker-{}", i);
-        let worker = build_authority(&name, authority.clone(), false);
+    for _ in 0..7 {
+        let worker = build_authority(authority.clone(), false);
         workers.push(worker);
     }
     sleep();
@@ -200,11 +187,11 @@ fn stateless_multi_child_domain(replay_after_recovery: bool) {
 
     // start enough workers for the multi-child filter node to be in its own domain
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let g1 = build_authority("worker-1", authority.clone(), false);
-    let _g2 = build_authority("worker-2", authority.clone(), false);
-    let _g3 = build_authority("worker-3", authority.clone(), false);
-    let _g4 = build_authority("worker-4", authority.clone(), false);
+    let mut g = build_authority(authority.clone(), false);
+    let g1 = build_authority(authority.clone(), false);
+    let _g2 = build_authority(authority.clone(), false);
+    let _g3 = build_authority(authority.clone(), false);
+    let _g4 = build_authority(authority.clone(), false);
     sleep();
 
     g.install_recipe(txt).unwrap();
@@ -276,11 +263,11 @@ fn lose_stateless_multi_parent_domain() {
 
     // start enough workers for the multi-parent join node to be on its own worker
     let authority = Arc::new(LocalAuthority::new());
-    let mut g = build_authority("worker-0", authority.clone(), false);
-    let _g1 = build_authority("worker-1", authority.clone(), false);
-    let _g2 = build_authority("worker-1", authority.clone(), false);
-    let _g3 = build_authority("worker-1", authority.clone(), false);
-    let g4 = build_authority("worker-2", authority.clone(), false);
+    let mut g = build_authority(authority.clone(), false);
+    let _g1 = build_authority(authority.clone(), false);
+    let _g2 = build_authority(authority.clone(), false);
+    let _g3 = build_authority(authority.clone(), false);
+    let g4 = build_authority(authority.clone(), false);
     sleep();
 
     g.install_recipe(txt).unwrap();
@@ -334,9 +321,8 @@ fn test_single_child_parent_replica(replay_after_recovery: bool, worker_to_drop:
     // start enough workers for each domain to be assigned its own worker
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
-    for i in 0..5 {
-        let name = format!("worker-{}", i);
-        let worker = build_authority(&name, authority.clone(), false);
+    for _ in 0..5 {
+        let worker = build_authority(authority.clone(), false);
         workers.push(worker);
     }
     sleep();
@@ -473,9 +459,8 @@ fn setup_vote() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
     // 7 - *reader
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
-    for i in 0..8 {
-        let name = format!("worker-{}", i);
-        let worker = build_authority(&name, authority.clone(), false);
+    for _ in 0..8 {
+        let worker = build_authority(authority.clone(), false);
         workers.push(worker);
     }
     sleep();
