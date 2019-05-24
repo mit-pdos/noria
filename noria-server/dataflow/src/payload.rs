@@ -217,6 +217,7 @@ pub enum Packet {
     /// updates.
     Ready {
         node: LocalNodeIndex,
+        purge: bool,
         index: HashSet<Vec<usize>>,
     },
 
@@ -424,7 +425,14 @@ impl Packet {
 impl fmt::Debug for Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Packet::Input { .. } => write!(f, "Packet::Input"),
             Packet::Message { ref link, .. } => write!(f, "Packet::Message({:?})", link),
+            Packet::RequestReaderReplay { ref key, .. } => {
+                write!(f, "Packet::RequestReaderReplay({:?})", key)
+            }
+            Packet::RequestPartialReplay { ref tag, .. } => {
+                write!(f, "Packet::RequestPartialReplay({:?})", tag)
+            }
             Packet::ReplayPiece {
                 ref link,
                 ref tag,

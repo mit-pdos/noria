@@ -225,7 +225,7 @@ impl Ingredient for Join {
         self.right.remap(remap);
     }
 
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn on_input(
         &mut self,
         _: &mut Executor,
@@ -237,11 +237,12 @@ impl Ingredient for Join {
         state: &StateMap,
     ) -> ProcessingResult {
         let mut misses = Vec::new();
+        let mut lookups = Vec::new();
 
         if rs.is_empty() {
             return ProcessingResult {
                 results: rs,
-                misses: vec![],
+                ..Default::default()
             };
         }
 
@@ -320,6 +321,14 @@ impl Ingredient for Join {
                         .unwrap_or_else(|| rs.len());
                     continue;
                 } else {
+                    if replay_key_cols.is_some() {
+                        lookups.push(Lookup {
+                            on: *self.right,
+                            cols: vec![self.on.1],
+                            key: vec![prev_join_key.clone()],
+                        });
+                    }
+
                     let rc = rc.unwrap().count();
                     old_right_count = Some(rc);
                     new_right_count = Some(rc);
@@ -354,6 +363,14 @@ impl Ingredient for Join {
                     record: mem::replace(&mut *rs[i], Vec::new()),
                 }));
                 continue;
+            }
+
+            if replay_key_cols.is_some() {
+                lookups.push(Lookup {
+                    on: other,
+                    cols: vec![other_key],
+                    key: vec![prev_join_key.clone()],
+                });
             }
 
             let start = at;
@@ -412,8 +429,6 @@ impl Ingredient for Join {
 
             let mut other_rows_count = 0;
             for r in &mut rs[start..at] {
-                use std::mem;
-
                 // put something bogus in rs (which will be discarded anyway) so we can take r.
                 let r = mem::replace(r, Record::Positive(Vec::new()));
                 let (row, positive) = r.extract();
@@ -519,14 +534,15 @@ impl Ingredient for Join {
 
         ProcessingResult {
             results: ret.into(),
+            lookups,
             misses,
         }
     }
 
-    fn suggest_indexes(&self, _this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, _this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         vec![
-            (self.left.as_global(), (vec![self.on.0], true)),
-            (self.right.as_global(), (vec![self.on.1], true)),
+            (self.left.as_global(), vec![self.on.0]),
+            (self.right.as_global(), vec![self.on.1]),
         ]
         .into_iter()
         .collect()
@@ -733,8 +749,8 @@ mod tests {
         let me = 2.into();
         let (g, l, r) = setup();
         let hm: HashMap<_, _> = vec![
-            (l.as_global(), (vec![0], true)), /* join column for left */
-            (r.as_global(), (vec![0], true)), /* join column for right */
+            (l.as_global(), vec![0]), /* join column for left */
+            (r.as_global(), vec![0]), /* join column for right */
         ]
         .into_iter()
         .collect();

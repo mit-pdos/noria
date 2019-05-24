@@ -336,7 +336,7 @@ impl Egress {
         // Resend all messages from the minimum label.
         for i in min_label_index..self.payloads.len() {
             let update = &self.updates[i];
-            let m = &self.payloads[i];
+            let m = box self.payloads[i].clone_data();
             let label = update.label();
             self.max_provenance.apply_update(update);
 
@@ -350,7 +350,7 @@ impl Egress {
             };
 
             self.process(
-                box m.clone_data(),
+                m,
                 label,
                 on_shard.unwrap_or(0),
                 output,

@@ -113,7 +113,7 @@ fn trace_column_type_on_path(
     log: &slog::Logger,
 ) -> Option<SqlType> {
     // column originates at last element of the path whose second element is not None
-    if let Some(pos) = path.iter().rposition(|e| e.1.iter().any(|c| c.is_some())) {
+    if let Some(pos) = path.iter().rposition(|e| e.1.iter().any(Option::is_some)) {
         let (ni, cols) = &path[pos];
 
         // We invoked provenance_of with a singleton slice, so must have got
@@ -154,11 +154,18 @@ pub(super) fn column_schema(
     column_index: usize,
     log: &slog::Logger,
 ) -> Option<ColumnSpecification> {
+    trace!(
+        log,
+        "tracing provenance of {} on {} for schema",
+        column_index,
+        view.index()
+    );
     let paths = provenance_of(graph, view, &[column_index], |_, _, _| None);
     let vn = &graph[view];
 
     let mut col_type = None;
     for p in paths {
+        trace!(log, "considering path {:?}", p);
         if let t @ Some(_) = trace_column_type_on_path(p, graph, recipe, log) {
             col_type = t;
         }

@@ -174,7 +174,7 @@ impl GroupedOperation for ExtremumOperator {
         let group_cols = self
             .group
             .iter()
-            .map(|g| g.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
         format!("{} γ[{}]", op_string, group_cols)
@@ -328,7 +328,7 @@ mod tests {
         assert!(idx.contains_key(&me));
 
         // should only index on the group-by column
-        assert_eq!(idx[&me], (vec![0], true));
+        assert_eq!(idx[&me], vec![0]);
     }
 
     #[test]

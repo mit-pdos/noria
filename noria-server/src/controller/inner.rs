@@ -48,6 +48,7 @@ pub(super) struct ControllerInner {
     recipe: Recipe,
 
     pub(super) domains: HashMap<DomainIndex, DomainHandle>,
+    pub(in crate::controller) domain_nodes: HashMap<DomainIndex, Vec<NodeIndex>>,
     pub(super) channel_coordinator: Arc<ChannelCoordinator>,
     pub(super) debug_channel: Option<SocketAddr>,
 
@@ -159,7 +160,7 @@ pub(super) fn graphviz(
     // node descriptions.
     for index in graph.node_indices() {
         let node = &graph[index];
-        let materialization_status = materializations.get_status(&index, node);
+        let materialization_status = materializations.get_status(index, node);
         indentln(&mut s);
         s.push_str(&format!("n{}", index.index()));
         s.push_str(&node.describe(index, detailed, materialization_status));
@@ -190,6 +191,24 @@ pub(super) fn graphviz(
 }
 
 impl ControllerInner {
+    pub(in crate::controller) fn topo_order(&self, new: &HashSet<NodeIndex>) -> Vec<NodeIndex> {
+        let mut topo_list = Vec::with_capacity(new.len());
+        let mut topo = petgraph::visit::Topo::new(&self.ingredients);
+        while let Some(node) = topo.next(&self.ingredients) {
+            if node == self.source {
+                continue;
+            }
+            if self.ingredients[node].is_dropped() {
+                continue;
+            }
+            if !new.contains(&node) {
+                continue;
+            }
+            topo_list.push(node);
+        }
+        topo_list
+    }
+
     pub(super) fn external_request<A: Authority + 'static>(
         &mut self,
         method: hyper::Method,
@@ -210,6 +229,9 @@ impl ControllerInner {
                 return Ok(Ok(json::to_string(&self.graphviz(true)).unwrap()));
             }
             (&Method::GET, "/get_statistics") => {
+                return Ok(Ok(format!("{:#?}", self.get_statistics())));
+            }
+            (&Method::POST, "/get_statistics") => {
                 return Ok(Ok(json::to_string(&self.get_statistics()).unwrap()));
             }
             _ => {}
@@ -231,7 +253,7 @@ impl ControllerInner {
                 // to individual query variables unfortunately. We'll probably want to factor this
                 // out into a helper method.
                 let nodes = if let Some(query) = query {
-                    let vars: Vec<_> = query.split("&").map(String::from).collect();
+                    let vars: Vec<_> = query.split('&').map(String::from).collect();
                     if let Some(n) = &vars.into_iter().find(|v| v.starts_with("w=")) {
                         self.nodes_on_worker(Some(&n[2..].parse().unwrap()))
                     } else {
@@ -248,6 +270,10 @@ impl ControllerInner {
                             let n = &self.ingredients[ni];
                             if n.is_internal() {
                                 Some((ni, n.name(), n.description(true)))
+                            } else if n.is_base() {
+                                Some((ni, n.name(), "Base table".to_owned()))
+                            } else if n.is_reader() {
+                                Some((ni, n.name(), "Leaf view".to_owned()))
                             } else {
                                 None
                             }
@@ -317,8 +343,8 @@ impl ControllerInner {
 
         let sender = TcpSender::connect(remote)?;
         let ws = Worker::new(sender);
-        self.workers.insert(msg.source.clone(), ws);
-        self.read_addrs.insert(msg.source.clone(), read_listen_addr);
+        self.workers.insert(msg.source, ws);
+        self.read_addrs.insert(msg.source, read_listen_addr);
 
         if self.workers.len() >= self.quorum {
             if let Some((recipes, recipe_version)) = self.pending_recovery.take() {
@@ -1118,6 +1144,7 @@ impl ControllerInner {
         if !state.config.partial_enabled {
             materializations.disable_partial()
         }
+        materializations.set_frontier_strategy(state.config.frontier_strategy);
 
         let cc = Arc::new(ChannelCoordinator::new());
         assert_ne!(state.config.quorum, 0);
@@ -1147,6 +1174,7 @@ impl ControllerInner {
             log,
 
             domains: Default::default(),
+            domain_nodes: Default::default(),
             channel_coordinator: cc,
             debug_channel: None,
             epoch: state.epoch,
@@ -1408,7 +1436,7 @@ impl ControllerInner {
             .map(|n| {
                 let base = &self.ingredients[n];
                 assert!(base.is_base());
-                (base.name().to_owned(), n.into())
+                (base.name().to_owned(), n)
             })
             .collect()
     }
@@ -1433,25 +1461,23 @@ impl ControllerInner {
             .collect()
     }
 
-    fn find_view_for(&self, node: NodeIndex) -> Option<NodeIndex> {
+    fn find_view_for(&self, node: NodeIndex, name: &str) -> Option<NodeIndex> {
         // reader should be a child of the given node. however, due to sharding, it may not be an
         // *immediate* child. furthermore, once we go beyond depth 1, we may accidentally hit an
         // *unrelated* reader node. to account for this, readers keep track of what node they are
         // "for", and we simply search for the appropriate reader by that metric. since we know
         // that the reader must be relatively close, a BFS search is the way to go.
         let mut bfs = Bfs::new(&self.ingredients, node);
-        let mut reader = None;
         while let Some(child) = bfs.next(&self.ingredients) {
             if self.ingredients[child]
                 .with_reader(|r| r.is_for() == node)
                 .unwrap_or(false)
+                && self.ingredients[child].name() == name
             {
-                reader = Some(child);
-                break;
+                return Some(child);
             }
         }
-
-        reader
+        None
     }
 
     /// Obtain a `ViewBuilder` that can be sent to a client and then used to query a given
@@ -1468,12 +1494,12 @@ impl ControllerInner {
             }
         };
 
-        self.find_view_for(node).map(|r| {
+        self.find_view_for(node, name).map(|r| {
             let domain = self.ingredients[r].domain();
             let columns = self.ingredients[r].fields().to_vec();
             let schema = self.view_schema(r);
             let shards = (0..self.domains[&domain].shards())
-                .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)].clone())
+                .map(|i| self.read_addrs[&self.domains[&domain].assignment(i)])
                 .collect();
 
             ViewBuilder {
@@ -1488,14 +1514,13 @@ impl ControllerInner {
     fn view_schema(&self, view_ni: NodeIndex) -> Option<Vec<ColumnSpecification>> {
         let n = &self.ingredients[view_ni];
         let schema: Vec<_> = (0..n.fields().len())
-            .into_iter()
             .map(|i| schema::column_schema(&self.ingredients, view_ni, &self.recipe, i, &self.log))
             .collect();
 
-        if schema.iter().any(|cs| cs.is_none()) {
+        if schema.iter().any(Option::is_none) {
             None
         } else {
-            Some(schema.into_iter().map(|cs| cs.unwrap()).collect())
+            Some(schema.into_iter().map(Option::unwrap).collect())
         }
     }
 
@@ -1513,7 +1538,6 @@ impl ControllerInner {
         let mut key = self.ingredients[ni]
             .suggest_indexes(ni)
             .remove(&ni)
-            .map(|(c, _)| c)
             .unwrap_or_else(Vec::new);
         let mut is_primary = false;
         if key.is_empty() {
@@ -1553,7 +1577,7 @@ impl ControllerInner {
 
         Some(TableBuilder {
             txs,
-            addr: node.local_addr().into(),
+            addr: node.local_addr(),
             key,
             key_is_primary: is_primary,
             dropped: base_operator.get_dropped(),
@@ -1565,13 +1589,16 @@ impl ControllerInner {
 
     /// Get statistics about the time spent processing different parts of the graph.
     fn get_statistics(&mut self) -> GraphStats {
+        trace!(self.log, "asked to get statistics");
+        let log = &self.log;
         let workers = &self.workers;
         let replies = &mut self.replies;
         // TODO: request stats from domains in parallel.
         let domains = self
             .domains
             .iter_mut()
-            .flat_map(|(di, s)| {
+            .flat_map(|(&di, s)| {
+                trace!(log, "requesting stats from domain"; "di" => di.index());
                 let mut num_healthy = 0;
                 for i in 0..s.shards.len() {
                     if s.send_to_healthy_shard(i, box Packet::GetStatistics, workers).is_ok() {
@@ -1639,7 +1666,7 @@ impl ControllerInner {
                         node_stats
                             .into_iter()
                             .filter_map(|(ni, ns)| match ns.materialized {
-                                MaterializationStatus::Partial => Some((ni, ns.mem_size)),
+                                MaterializationStatus::Partial { .. } => Some((ni, ns.mem_size)),
                                 _ => None,
                             })
                     })
@@ -1970,7 +1997,7 @@ impl ControllerInner {
             debug!(self.log, "Removed node {}", ni.index());
             domain_removals
                 .entry(self.ingredients[*ni].domain())
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(self.ingredients[*ni].local_addr())
         }
 
@@ -2063,7 +2090,7 @@ impl ControllerInner {
 
 impl Drop for ControllerInner {
     fn drop(&mut self) {
-        for (_, d) in &mut self.domains {
+        for d in self.domains.values_mut() {
             // XXX: this is a terrible ugly hack to ensure that all workers exit
             for _ in 0..100 {
                 // don't unwrap, because given domain may already have terminated

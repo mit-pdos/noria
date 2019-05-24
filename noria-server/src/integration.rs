@@ -1589,6 +1589,85 @@ fn full_aggregation_with_bogokey() {
 }
 
 #[test]
+fn materialization_frontier() {
+    // set up graph
+    let mut g = start_simple_unsharded("materialization_frontier");
+    g.migrate(|mig| {
+        // migrate
+
+        // add article base node
+        let article = mig.add_base("article", &["id", "title"], Base::default());
+
+        // add vote base table
+        let vote = mig.add_base(
+            "vote",
+            &["user", "id"],
+            Base::default().with_key(vec![0, 1]),
+        );
+
+        // add vote count
+        let vc = mig.add_ingredient(
+            "votecount",
+            &["id", "votes"],
+            Aggregation::COUNT.over(vote, 0, &[1]),
+        );
+        mig.mark_shallow(vc);
+
+        // add final join using first field from article and first from vc
+        let j = Join::new(article, vc, JoinType::Left, vec![B(0, 0), L(1), R(1)]);
+        let end = mig.add_ingredient("awvc", &["id", "title", "votes"], j);
+
+        let ri = mig.maintain_anonymous(end, &[0]);
+        mig.mark_shallow(ri);
+        (article, vote, vc, end)
+    });
+
+    let mut a = g.table("article").unwrap().into_sync();
+    let mut v = g.table("vote").unwrap().into_sync();
+    let mut r = g.view("awvc").unwrap().into_sync();
+
+    // seed votes
+    v.insert(vec!["a".into(), 1.into()]).unwrap();
+    v.insert(vec!["a".into(), 2.into()]).unwrap();
+    v.insert(vec!["b".into(), 1.into()]).unwrap();
+    v.insert(vec!["c".into(), 2.into()]).unwrap();
+    v.insert(vec!["d".into(), 2.into()]).unwrap();
+
+    // seed articles
+    a.insert(vec![1.into(), "Hello world #1".into()]).unwrap();
+    a.insert(vec![2.into(), "Hello world #2".into()]).unwrap();
+    sleep();
+
+    // we want to alternately read article 1 and 2, knowing that reading one will purge the other.
+    // we first "warm up" by reading both to ensure all other necessary state is present.
+    let one = 1.into();
+    let two = 2.into();
+    assert_eq!(
+        r.lookup(&[one], true).unwrap(),
+        vec![vec![1.into(), "Hello world #1".into(), 2.into()]]
+    );
+    assert_eq!(
+        r.lookup(&[two], true).unwrap(),
+        vec![vec![2.into(), "Hello world #2".into(), 3.into()]]
+    );
+
+    for _ in 0..1_000 {
+        for &id in &[1, 2] {
+            let r = r.lookup(&[id.into()], true).unwrap();
+            match id {
+                1 => {
+                    assert_eq!(r, vec![vec![1.into(), "Hello world #1".into(), 2.into()]]);
+                }
+                2 => {
+                    assert_eq!(r, vec![vec![2.into(), "Hello world #2".into(), 3.into()]]);
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[test]
 fn crossing_migration() {
     // set up graph
     let mut g = start_simple("crossing_migration");
@@ -2300,6 +2379,138 @@ fn remove_query() {
         .unwrap();
     sleep();
 
-    assert_eq!(qa.lookup(&[0.into()], true).unwrap().len(), 3);
-    assert_eq!(qb.lookup(&[0.into()], true).unwrap().len(), 1);
+    match qb.lookup(&[0.into()], true).unwrap_err() {
+        noria::error::ViewError::NotYetAvailable => {}
+        e => unreachable!("{:?}", e),
+    }
+}
+
+#[test]
+fn albums() {
+    let mut b = Builder::default();
+    //b.disable_partial();
+    b.set_sharding(None);
+    //b.log_with(crate::logger_pls());
+    let mut g = b.start_simple().unwrap();
+    g.install_recipe(
+        "CREATE TABLE friend (usera int, userb int);
+                 CREATE TABLE album (a_id text, u_id int, public tinyint(1));
+                 CREATE TABLE photo (p_id text, album text);",
+    )
+    .unwrap();
+    g.extend_recipe("VIEW album_friends: \
+                   (SELECT album.a_id AS aid, friend.userb AS uid FROM album JOIN friend ON (album.u_id = friend.usera) WHERE album.public = 0) \
+                   UNION \
+                   (SELECT album.a_id AS aid, friend.usera AS uid FROM album JOIN friend ON (album.u_id = friend.userb) WHERE album.public = 0) \
+                   UNION \
+                   (SELECT album.a_id AS aid, album.u_id AS uid FROM album WHERE album.public = 0);
+QUERY private_photos: \
+SELECT photo.p_id FROM photo JOIN album_friends ON (photo.album = album_friends.aid) WHERE album_friends.uid = ? AND photo.album = ?;
+QUERY public_photos: \
+SELECT photo.p_id FROM photo JOIN album ON (photo.album = album.a_id) WHERE album.public = 1 AND album.a_id = ?;").unwrap();
+
+    let mut friends = g.table("friend").unwrap().into_sync();
+    let mut albums = g.table("album").unwrap().into_sync();
+    let mut photos = g.table("photo").unwrap().into_sync();
+
+    // four users: 1, 2, 3, and 4
+    // 1 and 2 are friends, 3 is a friend of 1 but not 2
+    // 4 isn't friends with anyone
+    //
+    // four albums: x, y, z, and q; one authored by each user
+    // z is public.
+    //
+    // there's one photo in each album
+    //
+    // what should each user be able to see?
+    //
+    //  - 1 should be able to see albums x, y, and z
+    //  - 2 should be able to see albums x, y, and z
+    //  - 3 should be able to see albums x and z
+    //  - 4 should be able to see albums z and q
+    friends
+        .perform_all(vec![vec![1.into(), 2.into()], vec![3.into(), 1.into()]])
+        .unwrap();
+    albums
+        .perform_all(vec![
+            vec!["x".into(), 1.into(), 0.into()],
+            vec!["y".into(), 2.into(), 0.into()],
+            vec!["z".into(), 3.into(), 1.into()],
+            vec!["q".into(), 4.into(), 0.into()],
+        ])
+        .unwrap();
+    photos
+        .perform_all(vec![
+            vec!["a".into(), "x".into()],
+            vec!["b".into(), "y".into()],
+            vec!["c".into(), "z".into()],
+            vec!["d".into(), "q".into()],
+        ])
+        .unwrap();
+
+    let mut private = g.view("private_photos").unwrap().into_sync();
+    let mut public = g.view("public_photos").unwrap().into_sync();
+    let mut get = move |uid: usize, aid: &str| -> Vec<_> {
+        // combine private and public results
+        // also, there's currently a bug where MIR doesn't guarantee the order of parameters, so we try both O:)
+        let v = private
+            .lookup(&[uid.into(), aid.into()], true)
+            .unwrap()
+            .into_iter()
+            .chain(private.lookup(&[aid.into(), uid.into()], true).unwrap())
+            .chain(public.lookup(&[aid.into()], true).unwrap())
+            .collect();
+        eprintln!("check {} as {}: {:?}", aid, uid, v);
+        v
+    };
+
+    sleep();
+
+    assert_eq!(get(1, "x").len(), 1);
+    assert_eq!(get(1, "y").len(), 1);
+    assert_eq!(get(1, "z").len(), 1);
+    assert_eq!(get(1, "q").len(), 0);
+
+    assert_eq!(get(2, "x").len(), 1);
+    assert_eq!(get(2, "y").len(), 1);
+    assert_eq!(get(2, "z").len(), 1);
+    assert_eq!(get(2, "q").len(), 0);
+
+    assert_eq!(get(3, "x").len(), 1);
+    assert_eq!(get(3, "y").len(), 0);
+    assert_eq!(get(3, "z").len(), 1);
+    assert_eq!(get(3, "q").len(), 0);
+
+    assert_eq!(get(4, "x").len(), 0);
+    assert_eq!(get(4, "y").len(), 0);
+    assert_eq!(get(4, "z").len(), 1);
+    assert_eq!(get(4, "q").len(), 1);
+}
+
+#[test]
+fn correct_nested_view_schema() {
+    use nom_sql::{ColumnSpecification, SqlType};
+
+    let r_txt = "CREATE TABLE votes (story int, user int);
+                 CREATE TABLE stories (id int, content text);
+                 VIEW swvc: SELECT stories.id, stories.content, COUNT(votes.user) AS vc \
+                     FROM stories \
+                     JOIN votes ON (stories.id = votes.story) \
+                     WHERE stories.id = ? GROUP BY votes.story;";
+
+    let mut b = Builder::default();
+    // need to disable partial due to lack of support for key subsumption (#99)
+    b.disable_partial();
+    b.set_sharding(None);
+    let mut g = b.start_simple().unwrap();
+    g.install_recipe(r_txt).unwrap();
+
+    let q = g.view("swvc").unwrap().into_sync();
+
+    let expected_schema = vec![
+        ColumnSpecification::new("swvc.id".into(), SqlType::Int(32)),
+        ColumnSpecification::new("swvc.content".into(), SqlType::Text),
+        ColumnSpecification::new("swvc.vc".into(), SqlType::Bigint(64)),
+    ];
+    assert_eq!(q.schema(), Some(&expected_schema[..]));
 }

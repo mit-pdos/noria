@@ -75,16 +75,30 @@ impl Node {
 
                     match materialization_status {
                         MaterializationStatus::Not => {}
-                        MaterializationStatus::Full | MaterializationStatus::Partial => {
+                        MaterializationStatus::Full => {
+                            s.push_str(&format!(
+                                "n{}_m [shape=tab, style=\"bold,filled\", color=\"#AA4444\", fillcolor=\"#AA4444\", label=\"\"]\n\
+                                 n{} -> n{}_m {{ dir=none }}\n\
+                                 {{rank=same; n{} n{}_m}}\n",
+                                idx.index(),
+                                idx.index(),
+                                idx.index(),
+                                idx.index(),
+                                idx.index()
+                            ));
+                        }
+                        MaterializationStatus::Partial {
+                            beyond_materialization_frontier,
+                        } => {
                             s.push_str(&format!(
                                 "n{}_m [shape=tab, style=\"bold,filled\", color=\"#AA4444\", {}, label=\"\"]\n\
                                  n{} -> n{}_m {{ dir=none }}\n\
                                  {{rank=same; n{} n{}_m}}\n",
                                 idx.index(),
-                                if let MaterializationStatus::Full = materialization_status {
-                                    "fillcolor=\"#AA4444\""
+                                if beyond_materialization_frontier {
+                                "fillcolor=\"#EEBB99\""
                                 } else {
-                                    "fillcolor=\"#EE9999\""
+                                "fillcolor=\"#EE9999\""
                                 },
                                 idx.index(),
                                 idx.index(),
@@ -107,8 +121,16 @@ impl Node {
 
             let materialized = match materialization_status {
                 MaterializationStatus::Not => "",
-                MaterializationStatus::Partial => "| ░",
-                MaterializationStatus::Full => "| █",
+                MaterializationStatus::Partial {
+                    beyond_materialization_frontier,
+                } => {
+                    if beyond_materialization_frontier {
+                        "| ◔"
+                    } else {
+                        "| ◕"
+                    }
+                }
+                MaterializationStatus::Full => "| ●",
             };
 
             let sharding = match self.sharded_by {
@@ -171,7 +193,7 @@ impl Node {
                     ))
                 }
                 NodeType::Internal(ref i) => {
-                    s.push_str("{{");
+                    s.push_str("{");
 
                     // Output node name and description. First row.
                     s.push_str(&format!(
@@ -184,7 +206,8 @@ impl Node {
 
                     // Output node outputs. Second row.
                     s.push_str(&format!(" | {}", self.fields().join(", \\n")));
-                    s.push_str(&format!(" | {} }}", sharding))
+                    s.push_str(&format!(" | {}", sharding));
+                    s.push_str("}");
                 }
             };
             s.push_str("\"]\n");

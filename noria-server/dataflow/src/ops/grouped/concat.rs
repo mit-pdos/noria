@@ -222,7 +222,7 @@ impl GroupedOperation for GroupConcat {
         group_cols.sort();
         let group_cols = group_cols
             .iter()
-            .map(|g| g.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn it_forwards() {
         let mut c = setup(true);
 
@@ -438,7 +438,7 @@ mod tests {
         assert!(idx.contains_key(&me));
 
         // should only index on the group-by column
-        assert_eq!(idx[&me], (vec![0], true));
+        assert_eq!(idx[&me], vec![0]);
     }
 
     #[test]

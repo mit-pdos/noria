@@ -50,12 +50,12 @@ impl Ingredient for Replica {
     ) -> ProcessingResult {
         ProcessingResult {
             results: rs,
-            misses: Vec::new(),
+            ..Default::default()
         }
     }
 
     /// Suggest indexes to reflect the materialized state of its internal operator
-    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, this: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         self.op.as_ref().unwrap().suggest_indexes(this)
     }
 

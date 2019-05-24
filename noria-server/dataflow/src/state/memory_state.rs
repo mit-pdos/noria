@@ -75,7 +75,7 @@ impl State for MemoryState {
     }
 
     fn is_partial(&self) -> bool {
-        self.state.iter().any(|s| s.partial())
+        self.state.iter().any(SingleState::partial)
     }
 
     fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>) {
@@ -117,7 +117,7 @@ impl State for MemoryState {
     }
 
     fn rows(&self) -> usize {
-        self.state.iter().map(|s| s.rows()).sum()
+        self.state.iter().map(SingleState::rows).sum()
     }
 
     fn mark_filled(&mut self, key: Vec<DataType>, tag: Tag) {
@@ -172,6 +172,13 @@ impl State for MemoryState {
             self.mem_size = self.mem_size.saturating_sub(bytes);
             (self.state[index].key(), bytes)
         })
+    }
+
+    fn clear(&mut self) {
+        for state in &mut self.state {
+            state.clear();
+        }
+        self.mem_size = 0;
     }
 }
 

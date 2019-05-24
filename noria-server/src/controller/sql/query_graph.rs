@@ -257,8 +257,6 @@ fn classify_conditionals(
     global: &mut Vec<ConditionExpression>,
     params: &mut Vec<Column>,
 ) {
-    use std::cmp::Ordering;
-
     // Handling OR and AND expressions requires some care as there are some corner cases.
     //    a) we don't support OR expressions with predicates with placeholder parameters,
     //       because these expressions are meaningless in the Soup context.
@@ -456,7 +454,7 @@ fn classify_conditionals(
     }
 }
 
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 pub fn to_query_graph(st: &SelectStatement) -> Result<QueryGraph, String> {
     let mut qg = QueryGraph::new();
 

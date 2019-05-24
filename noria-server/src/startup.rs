@@ -18,9 +18,6 @@ use tokio::prelude::future::Either;
 use tokio::prelude::*;
 use tokio_io_pool;
 
-#[cfg(test)]
-use std::boxed::FnBox;
-
 use crate::handle::Handle;
 use crate::Config;
 
@@ -39,9 +36,8 @@ crate enum Event {
     CampaignError(failure::Error),
     #[cfg(test)]
     IsReady(futures::sync::oneshot::Sender<bool>),
-    #[cfg(test)]
     ManualMigration {
-        f: Box<FnBox(&mut crate::controller::migrate::Migration) + Send + 'static>,
+        f: Box<FnOnce(&mut crate::controller::migrate::Migration) + Send + 'static>,
         done: futures::sync::oneshot::Sender<()>,
     },
 }
@@ -57,7 +53,6 @@ impl fmt::Debug for Event {
             Event::CampaignError(ref e) => write!(f, "CampaignError({:?})", e),
             #[cfg(test)]
             Event::IsReady(..) => write!(f, "IsReady"),
-            #[cfg(test)]
             Event::ManualMigration { .. } => write!(f, "ManualMigration{{..}}"),
         }
     }
@@ -147,7 +142,6 @@ pub(super) fn start_instance<A: Authority + 'static>(
                         CoordinationPayload::AckResumeAt { .. } => fw(e, true),
                     },
                     Event::ExternalRequest(..) => fw(e, true),
-                    #[cfg(test)]
                     Event::ManualMigration { .. } => fw(e, true),
                     Event::LeaderChange(..) => fw(e, false),
                     Event::WonLeaderElection(..) => fw(e, true),
@@ -253,13 +247,6 @@ fn listen_external<A: Authority + 'static>(
                         let res = res.body(hyper::Body::from(include_str!("graph.html")));
                         return Box::new(futures::future::ok(res.unwrap()));
                     }
-                    "/js/layout-worker.js" => {
-                        let res = res.body(hyper::Body::from(
-                            "importScripts('https://cdn.rawgit.com/mstefaniuk/graph-viz-d3-js/\
-                             cf2160ee3ca39b843b081d5231d5d51f1a901617/dist/layout-worker.js');",
-                        ));
-                        return Box::new(futures::future::ok(res.unwrap()));
-                    }
                     path if path.starts_with("/zookeeper/") => {
                         let res = match self.1.try_read(&format!("/{}", &path[11..])) {
                             Ok(Some(data)) => {
@@ -279,7 +266,7 @@ fn listen_external<A: Authority + 'static>(
 
             let method = req.method().clone();
             let path = req.uri().path().to_string();
-            let query = req.uri().query().map(|s| s.to_owned());
+            let query = req.uri().query().map(ToOwned::to_owned);
             let event_tx = self.0.clone();
             Box::new(req.into_body().concat2().and_then(move |body| {
                 let body: Vec<u8> = body.iter().cloned().collect();

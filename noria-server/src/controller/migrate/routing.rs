@@ -22,26 +22,13 @@ pub fn add(
     graph: &mut Graph,
     source: NodeIndex,
     new: &mut HashSet<NodeIndex>,
+    topo_list: &[NodeIndex],
 ) -> HashMap<(NodeIndex, NodeIndex), NodeIndex> {
     // find all new nodes in topological order. we collect first since we'll be mutating the graph
     // below. it's convenient to have the nodes in topological order, because we then know that
     // we'll first add egress nodes, and then the related ingress nodes. if we're ever required to
     // add an ingress node, and its parent isn't an egress node, we know that we're seeing a
     // connection between an old node in one domain, and a new node in a different domain.
-    let mut topo_list = Vec::with_capacity(new.len());
-    let mut topo = petgraph::visit::Topo::new(&*graph);
-    while let Some(node) = topo.next(&*graph) {
-        if node == source {
-            continue;
-        }
-        if graph[node].is_dropped() {
-            continue;
-        }
-        if !new.contains(&node) {
-            continue;
-        }
-        topo_list.push(node);
-    }
 
     // we need to keep track of all the times we change the parent of a node (by replacing it with
     // an egress, and then with an ingress), since this remapping must be communicated to the nodes
@@ -63,7 +50,7 @@ pub fn add(
     // causing re-use of ingress and egress nodes that were added in a *previous* migration.
     //
     // we do this in a couple of passes, as described below.
-    for &node in &topo_list {
+    for &node in topo_list {
         let domain = graph[node].domain();
         let parents: Vec<_> = graph
             .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
@@ -164,9 +151,13 @@ pub fn add(
             });
 
             // we need to hook the ingress node in between us and our remote parent
-            let old = graph.find_edge(parent, node).unwrap();
-            let was_materialized = graph.remove_edge(old).unwrap();
-            graph.add_edge(ingress, node, was_materialized);
+            #[allow(clippy::unit_arg)]
+            #[allow(clippy::let_unit_value)]
+            {
+                let old = graph.find_edge(parent, node).unwrap();
+                let was_materialized = graph.remove_edge(old).unwrap();
+                graph.add_edge(ingress, node, was_materialized);
+            }
 
             // we now need to refer to the ingress instead of the "real" parent
             swaps.insert((node, parent), ingress);
@@ -253,11 +244,15 @@ pub fn add(
             });
 
             // we need to hook the egress in between the ingress and its "real" parent
-            let old = graph.find_edge(sender, ingress).unwrap();
-            let was_materialized = graph.remove_edge(old).unwrap();
-            graph.add_edge(egress, ingress, was_materialized);
-            let domain = graph[egress].domain();
-            graph[ingress].with_ingress_mut(|i| i.set_src(domain));
+            #[allow(clippy::unit_arg)]
+            #[allow(clippy::let_unit_value)]
+            {
+                let old = graph.find_edge(sender, ingress).unwrap();
+                let was_materialized = graph.remove_edge(old).unwrap();
+                graph.add_edge(egress, ingress, was_materialized);
+                let domain = graph[egress].domain();
+                graph[ingress].with_ingress_mut(|i| i.set_src(domain));
+            }
 
             // NOTE: we *don't* need to update swaps here, because ingress doesn't care
         }
@@ -359,7 +354,7 @@ pub(super) fn connect(
                         .send_to_healthy_shard(
                             i,
                             box Packet::UpdateEgress {
-                                new_tx: Some((node.into(), n.local_addr(), (n.domain(), i))),
+                                new_tx: Some((node, n.local_addr(), (n.domain(), i))),
                                 new_tag: None,
                             },
                             workers,
@@ -375,7 +370,7 @@ pub(super) fn connect(
                 domain
                     .send_to_healthy(
                         box Packet::UpdateEgress {
-                            new_tx: Some((node.into(), n.local_addr(), (n.domain(), 0))),
+                            new_tx: Some((node, n.local_addr(), (n.domain(), 0))),
                             new_tag: None,
                         },
                         workers,

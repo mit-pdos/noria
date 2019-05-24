@@ -60,7 +60,7 @@ impl Backend {
             mutator.insert(r).unwrap();
         }
 
-        let dur = start.elapsed().as_float_secs();
+        let dur = start.elapsed().as_secs_f64();
         println!(
             "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
             i,
@@ -289,7 +289,7 @@ fn main() {
 
     // if partial, read 25% of the keys
     if partial {
-        let leaf = "post_count".to_string();
+        let leaf = "posts".to_string();
         let mut getter = backend.g.view(&leaf).unwrap().into_sync();
         for author in 0..nusers / 4 {
             getter.lookup(&[author.into()], false).unwrap();
@@ -300,13 +300,13 @@ fn main() {
     println!("Login in users...");
     for i in 0..nlogged {
         let start = time::Instant::now();
-        backend.login(make_user(i)).is_ok();
-        let dur = start.elapsed().as_float_secs();
+        let _ = backend.login(make_user(i)).is_ok();
+        let dur = start.elapsed().as_secs_f64();
         println!("Migration {} took {:.2}s!", i, dur,);
 
         // if partial, read 25% of the keys
         if partial {
-            let leaf = format!("post_count_u{}", i);
+            let leaf = format!("posts_u{}", i);
             let mut getter = backend.g.view(&leaf).unwrap().into_sync();
             for author in 0..nusers / 4 {
                 getter.lookup(&[author.into()], false).unwrap();
@@ -327,7 +327,7 @@ fn main() {
     if !partial {
         let mut dur = time::Duration::from_millis(0);
         for uid in 0..nlogged {
-            let leaf = format!("post_count_u{}", uid);
+            let leaf = format!("posts_u{}", uid);
             let mut getter = backend.g.view(&leaf).unwrap().into_sync();
             let start = time::Instant::now();
             for author in 0..nusers {
@@ -336,7 +336,7 @@ fn main() {
             dur += start.elapsed();
         }
 
-        let dur = dur.as_float_secs();
+        let dur = dur.as_secs_f64();
 
         println!(
             "Read {} keys in {:.2}s ({:.2} GETs/sec)!",

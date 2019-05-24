@@ -270,12 +270,9 @@ impl Base {
         results.into()
     }
 
-    pub(in crate::node) fn suggest_indexes(
-        &self,
-        n: NodeIndex,
-    ) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    pub(in crate::node) fn suggest_indexes(&self, n: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         if self.primary_key.is_some() {
-            Some((n, (self.primary_key.as_ref().unwrap().clone(), true)))
+            Some((n, self.primary_key.as_ref().unwrap().clone()))
                 .into_iter()
                 .collect()
         } else {
@@ -313,7 +310,6 @@ mod tests {
     fn test_lots_of_changes_in_same_batch(mut state: Box<State>) {
         use node;
         use prelude::*;
-        use std::collections::HashMap;
 
         // most of this is from MockGraph
         let mut graph = Graph::new();
@@ -339,7 +335,7 @@ mod tests {
         graph.node_weight_mut(global).unwrap().on_commit(&remap);
         graph.node_weight_mut(global).unwrap().add_to(0.into());
 
-        for (_, (col, _)) in graph[global].suggest_indexes(global) {
+        for (_, col) in graph[global].suggest_indexes(global) {
             state.add_key(&col[..], None);
         }
 

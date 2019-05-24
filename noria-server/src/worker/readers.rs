@@ -14,12 +14,15 @@ use std::time;
 use stream_cancel::Valve;
 use tokio::prelude::*;
 use tokio_tower::multiplex::server;
-use tower_util::ServiceFn;
+use tower::service_fn;
+
+/// Retry reads every this often.
+const RETRY_TIMEOUT_US: u64 = 200;
 
 /// If a blocking reader finds itself waiting this long for a backfill to complete, it will
 /// re-issue the replay request. To avoid the system falling over if replays are slow for a little
 /// while, waiting readers will use exponential backoff on this delay if they continue to miss.
-const RETRY_TIMEOUT_US: u64 = 1_000;
+const TRIGGER_TIMEOUT_US: u64 = 50_000;
 
 thread_local! {
     static READERS: RefCell<HashMap<
@@ -48,7 +51,7 @@ pub(super) fn listen(
                 stream.set_nodelay(true).expect("could not set TCP_NODELAY");
                 server::Server::new(
                     AsyncBincodeStream::from(stream).for_async(),
-                    ServiceFn::new(move |req| handle_message(req, &readers)),
+                    service_fn(move |req| handle_message(req, &readers)),
                 )
                 .map_err(|e| {
                     if let server::Error::Service(()) = e {
@@ -68,9 +71,15 @@ pub(super) fn listen(
 }
 
 fn dup(rs: &[Vec<DataType>]) -> Vec<Vec<DataType>> {
-    rs.iter()
-        .map(|r| r.iter().map(|v| v.deep_clone()).collect())
-        .collect()
+    let mut outer = Vec::with_capacity(rs.len());
+    for r in rs {
+        let mut inner = Vec::with_capacity(r.len());
+        for v in r {
+            inner.push(v.deep_clone())
+        }
+        outer.push(inner);
+    }
+    outer
 }
 
 fn handle_message(
@@ -104,6 +113,7 @@ fn handle_message(
                     .enumerate();
 
                 let mut ready = true;
+                let mut replaying = false;
                 for (i, (key, v)) in found {
                     match v {
                         Ok(Some(rs)) => {
@@ -119,6 +129,7 @@ fn handle_message(
                         }
                         Ok(None) => {
                             // triggered partial replay
+                            replaying = true;
                         }
                     }
                 }
@@ -130,12 +141,18 @@ fn handle_message(
                     });
                 }
 
-                if !block {
-                    // trigger backfills for all the keys we missed on for later
-                    for key in &keys {
-                        if !key.is_empty() {
-                            reader.trigger(key);
-                        }
+                if !replaying {
+                    // we hit on all the keys!
+                    return Ok(Tagged {
+                        tag,
+                        v: ReadReply::Normal(Ok(ret)),
+                    });
+                }
+
+                // trigger backfills for all the keys we missed on for later
+                for key in &keys {
+                    if !key.is_empty() {
+                        reader.trigger(key);
                     }
                 }
 
@@ -151,7 +168,7 @@ fn handle_message(
                             v: ReadReply::Normal(Ok(ret)),
                         })))
                     } else {
-                        let trigger = time::Duration::from_micros(RETRY_TIMEOUT_US);
+                        let trigger = time::Duration::from_micros(TRIGGER_TIMEOUT_US);
                         let retry = time::Duration::from_micros(RETRY_TIMEOUT_US);
                         let now = time::Instant::now();
                         Either::A(Either::B(BlockingRead {
@@ -160,7 +177,7 @@ fn handle_message(
                             keys,
                             read: ret,
                             truth: s.clone(),
-                            retry: tokio::timer::Interval::new(now + retry, retry),
+                            retry: tokio_os_timer::Interval::new(retry).unwrap(),
                             trigger_timeout: trigger,
                             next_trigger: now,
                         }))
@@ -193,7 +210,7 @@ struct BlockingRead {
     target: (NodeIndex, usize),
     keys: Vec<Vec<DataType>>,
     truth: Readers,
-    retry: tokio::timer::Interval,
+    retry: tokio_os_timer::Interval,
     trigger_timeout: time::Duration,
     next_trigger: time::Instant,
 }

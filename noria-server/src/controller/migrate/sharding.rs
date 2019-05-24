@@ -6,32 +6,21 @@ use petgraph::graph::NodeIndex;
 use slog::Logger;
 use std::collections::{HashMap, HashSet};
 
+#[allow(clippy::cognitive_complexity)]
 pub fn shard(
     log: &Logger,
     graph: &mut Graph,
-    source: NodeIndex,
     new: &mut HashSet<NodeIndex>,
+    topo_list: &[NodeIndex],
     sharding_factor: usize,
-) -> HashMap<(NodeIndex, NodeIndex), NodeIndex> {
-    let mut topo_list = Vec::with_capacity(new.len());
-    let mut topo = petgraph::visit::Topo::new(&*graph);
-    while let Some(node) = topo.next(&*graph) {
-        if node == source {
-            continue;
-        }
-        if !new.contains(&node) {
-            continue;
-        }
-        topo_list.push(node);
-    }
-
+) -> (Vec<NodeIndex>, HashMap<(NodeIndex, NodeIndex), NodeIndex>) {
     // we must keep track of changes we make to the parent of a node, since this remapping must be
     // communicated to the nodes so they know the true identifier of their parent in the graph.
     let mut swaps = HashMap::new();
 
     // we want to shard every node by its "input" index. if the index required from a parent
     // doesn't match the current sharding key, we need to do a shuffle (i.e., a Union + Sharder).
-    'nodes: for node in topo_list {
+    'nodes: for &node in topo_list {
         let mut input_shardings: HashMap<_, _> = graph
             .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
             .map(|ni| (ni, graph[ni].sharded_by()))
@@ -40,7 +29,7 @@ pub fn shard(
         let mut need_sharding = if graph[node].is_internal() || graph[node].is_base() {
             // suggest_indexes is okay because `node` *must* be new, and therefore will return
             // global node indices.
-            graph[node].suggest_indexes(node.into())
+            graph[node].suggest_indexes(node)
         } else if graph[node].is_reader() {
             assert_eq!(input_shardings.len(), 1);
             let ni = input_shardings.keys().next().cloned().unwrap();
@@ -83,13 +72,14 @@ pub fn shard(
         if need_sharding.is_empty()
             && (input_shardings.len() == 1 || input_shardings.iter().all(|(_, &s)| s.is_none()))
         {
-            let mut s = input_shardings.iter().map(|(_, &s)| s).next().unwrap();
-            if input_shardings
+            let mut s = if input_shardings
                 .iter()
                 .any(|(_, &s)| s == Sharding::ForcedNone)
             {
-                s = Sharding::ForcedNone;
-            }
+                Sharding::ForcedNone
+            } else {
+                input_shardings.iter().map(|(_, &s)| s).next().unwrap()
+            };
             info!(log, "preserving sharding of pass-through node";
                   "node" => ?node,
                   "sharding" => ?s);
@@ -120,7 +110,7 @@ pub fn shard(
         }
 
         let mut complex = false;
-        for &(ref lookup_col, _) in need_sharding.values() {
+        for lookup_col in need_sharding.values() {
             if lookup_col.len() != 1 {
                 complex = true;
             }
@@ -141,7 +131,7 @@ pub fn shard(
         // if a node does a lookup into itself by a given key, it must be sharded by that key (or
         // not at all). this *also* means that its inputs must be sharded by the column(s) that the
         // output column resolves to.
-        if let Some((want_sharding, _)) = need_sharding.remove(&node) {
+        if let Some(want_sharding) = need_sharding.remove(&node) {
             assert_eq!(want_sharding.len(), 1);
             let want_sharding = want_sharding[0];
 
@@ -190,7 +180,7 @@ pub fn shard(
                     // lookups based on any *other* columns in any ancestor. if we do, we must
                     // force no sharding :(
                     let mut ok = true;
-                    for (ni, &(ref lookup_col, _)) in &need_sharding {
+                    for (ni, lookup_col) in &need_sharding {
                         assert_eq!(lookup_col.len(), 1);
                         let lookup_col = lookup_col[0];
 
@@ -281,7 +271,7 @@ pub fn shard(
                 // does it match the key we're doing lookups based on?
                 for &(ni, src) in &srcs {
                     match need_sharding.get(&ni) {
-                        Some(&(ref col, _)) if col.len() != 1 => {
+                        Some(col) if col.len() != 1 => {
                             // we're looking up by a compound key -- that's hard to shard
                             trace!(log, "column traces to node looked up in by compound key";
                                    "node" => ?node,
@@ -289,7 +279,7 @@ pub fn shard(
                                    "column" => src);
                             break 'outer;
                         }
-                        Some(&(ref col, _)) if col[0] != src => {
+                        Some(col) if col[0] != src => {
                             // we're looking up by a different key. it's kind of weird that this
                             // output column still resolved to a column in all our inputs...
                             trace!(log, "column traces to node that is not looked up by";
@@ -569,9 +559,21 @@ pub fn shard(
     }
 
     // check that we didn't mess anything up
-    validate(log, graph, source, new, sharding_factor);
+    // topo list changed though, so re-compute it
+    let mut topo_list = Vec::with_capacity(new.len());
+    let mut topo = petgraph::visit::Topo::new(&*graph);
+    while let Some(node) = topo.next(&*graph) {
+        if graph[node].is_source() || graph[node].is_dropped() {
+            continue;
+        }
+        if !new.contains(&node) {
+            continue;
+        }
+        topo_list.push(node);
+    }
+    validate(log, graph, &topo_list, sharding_factor);
 
-    swaps
+    (topo_list, swaps)
 }
 
 /// Modify the graph such that the path between `src` and `dst` shuffles the input such that the
@@ -605,7 +607,6 @@ fn reshard(
             n
         }
         Sharding::ByColumn(c, _) => {
-            use dataflow::node;
             let mut n = graph[src].mirror(node::special::Sharder::new(c));
             n.shard_by(graph[src].sharded_by());
             n
@@ -638,28 +639,10 @@ fn reshard(
     );
 }
 
-pub fn validate(
-    log: &Logger,
-    graph: &Graph,
-    source: NodeIndex,
-    new: &HashSet<NodeIndex>,
-    sharding_factor: usize,
-) {
-    let mut topo_list = Vec::with_capacity(new.len());
-    let mut topo = petgraph::visit::Topo::new(&*graph);
-    while let Some(node) = topo.next(&*graph) {
-        if node == source {
-            continue;
-        }
-        if !new.contains(&node) {
-            continue;
-        }
-        topo_list.push(node);
-    }
-
+pub fn validate(log: &Logger, graph: &Graph, topo_list: &[NodeIndex], sharding_factor: usize) {
     // ensure that each node matches the sharding of each of its ancestors, unless the ancestor is
     // a sharder or a shard merger
-    for node in topo_list {
+    for &node in topo_list {
         let n = &graph[node];
         if n.is_internal() && n.is_shard_merger() {
             // shard mergers legitimately have a different sharding than their ancestors

@@ -1,4 +1,5 @@
 use crate::data::*;
+use crate::BoxDynError;
 use crate::{Tagged, Tagger};
 use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use nom_sql::ColumnSpecification;
@@ -10,10 +11,10 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::prelude::*;
 use tokio_tower::multiplex;
+use tower::ServiceExt;
 use tower_balance::{choose, pool, Pool};
 use tower_buffer::Buffer;
 use tower_service::Service;
-use tower_util::ServiceExt;
 
 type Transport = AsyncBincodeStream<
     tokio::net::tcp::TcpStream,
@@ -62,6 +63,8 @@ pub(crate) type ViewRpc = Buffer<
     Tagged<ReadQuery>,
 >;
 
+type E = <ViewRpc as Service<Tagged<ReadQuery>>>::Error;
+
 /// A failed [`View`] operation.
 #[derive(Debug)]
 pub struct AsyncViewError {
@@ -74,12 +77,18 @@ pub struct AsyncViewError {
     pub error: ViewError,
 }
 
-impl From<<ViewRpc as Service<Tagged<ReadQuery>>>::Error> for AsyncViewError {
-    fn from(e: <ViewRpc as Service<Tagged<ReadQuery>>>::Error) -> Self {
+impl From<E> for AsyncViewError {
+    fn from(e: E) -> Self {
         AsyncViewError {
             view: None,
             error: ViewError::from(e),
         }
+    }
+}
+
+impl From<BoxDynError<E>> for AsyncViewError {
+    fn from(e: BoxDynError<E>) -> Self {
+        From::from(e.into_inner())
     }
 }
 
@@ -91,12 +100,12 @@ pub enum ViewError {
     NotYetAvailable,
     /// A lower-level error occurred while communicating with Soup.
     #[fail(display = "{}", _0)]
-    TransportError(#[cause] <ViewRpc as Service<Tagged<ReadQuery>>>::Error),
+    TransportError(#[cause] BoxDynError<E>),
 }
 
-impl From<<ViewRpc as Service<Tagged<ReadQuery>>>::Error> for ViewError {
-    fn from(e: <ViewRpc as Service<Tagged<ReadQuery>>>::Error) -> Self {
-        ViewError::TransportError(e)
+impl From<E> for ViewError {
+    fn from(e: E) -> Self {
+        ViewError::TransportError(BoxDynError::from(e))
     }
 }
 
@@ -168,9 +177,8 @@ impl ViewBuilder {
                                 (),
                                 choose::RoundRobin::default(),
                             ),
-                        0,
-                    )
-                    .unwrap_or_else(|_| panic!("no active tokio runtime"));
+                        1,
+                    );
                     h.insert(c.clone());
                     Ok((addr, c))
                 }
@@ -228,6 +236,26 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
 
     fn call(&mut self, (keys, block): (Vec<Vec<DataType>>, bool)) -> Self::Future {
         // TODO: optimize for when there's only one shard
+        if self.shards.len() == 1 {
+            return future::Either::A(
+                self.shards[0]
+                    .call(
+                        ReadQuery::Normal {
+                            target: (self.node, 0),
+                            keys,
+                            block,
+                        }
+                        .into(),
+                    )
+                    .map_err(ViewError::from)
+                    .and_then(|reply| match reply.v {
+                        ReadReply::Normal(Ok(rows)) => Ok(rows),
+                        ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
+                        _ => unreachable!(),
+                    }),
+            );
+        }
+
         assert!(keys.iter().all(|k| k.len() == 1));
         let mut shard_queries = vec![Vec::new(); self.shards.len()];
         for key in keys {
@@ -236,31 +264,43 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
         }
 
         let node = self.node;
-        futures::stream::futures_ordered(
-            self.shards
-                .iter_mut()
-                .enumerate()
-                .zip(shard_queries.into_iter())
-                .filter(|&(_, ref shard_queries)| !shard_queries.is_empty())
-                .map(move |((shardi, shard), shard_queries)| {
-                    shard
-                        .call(
-                            ReadQuery::Normal {
-                                target: (node, shardi),
-                                keys: shard_queries,
-                                block,
-                            }
-                            .into(),
-                        )
-                        .map_err(ViewError::from)
-                        .and_then(|reply| match reply.v {
-                            ReadReply::Normal(Ok(rows)) => Ok(rows),
-                            ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
-                            _ => unreachable!(),
-                        })
-                }),
+        future::Either::B(
+            futures::stream::futures_ordered(
+                self.shards
+                    .iter_mut()
+                    .enumerate()
+                    .zip(shard_queries.into_iter())
+                    .filter_map(|((shardi, shard), shard_queries)| {
+                        if shard_queries.is_empty() {
+                            // poll_ready reserves a sender slot which we have to release
+                            // we do that by dropping the old handle and replacing it with a clone
+                            // https://github.com/tokio-rs/tokio/issues/898
+                            *shard = shard.clone();
+                            None
+                        } else {
+                            Some(((shardi, shard), shard_queries))
+                        }
+                    })
+                    .map(move |((shardi, shard), shard_queries)| {
+                        shard
+                            .call(
+                                ReadQuery::Normal {
+                                    target: (node, shardi),
+                                    keys: shard_queries,
+                                    block,
+                                }
+                                .into(),
+                            )
+                            .map_err(ViewError::from)
+                            .and_then(|reply| match reply.v {
+                                ReadReply::Normal(Ok(rows)) => Ok(rows),
+                                ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
+                                _ => unreachable!(),
+                            })
+                    }),
+            )
+            .concat2(),
         )
-        .concat2()
     }
 }
 
@@ -273,7 +313,7 @@ impl View {
 
     /// Get the schema definition of this view.
     pub fn schema(&self) -> Option<&[ColumnSpecification]> {
-        self.schema.as_ref().map(|s| s.as_slice())
+        self.schema.as_ref().map(Vec::as_slice)
     }
 
     /// Get the current size of this view.
@@ -380,6 +420,22 @@ macro_rules! sync {
 
 #[allow(clippy::len_without_is_empty)]
 impl SyncView {
+    /// Get the list of columns in this view.
+    pub fn columns(&self) -> &[String] {
+        self.0
+            .as_ref()
+            .expect("tried to use View after its transport has failed")
+            .columns()
+    }
+
+    /// Get the schema definition of this view.
+    pub fn schema(&self) -> Option<&[ColumnSpecification]> {
+        self.0
+            .as_ref()
+            .expect("tried to use View after its transport has failed")
+            .schema()
+    }
+
     /// See [`View::len`].
     pub fn len(&mut self) -> Result<usize, ViewError> {
         sync!(self.len())

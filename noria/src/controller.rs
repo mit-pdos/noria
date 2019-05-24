@@ -212,9 +212,8 @@ impl<A: Authority + 'static> ControllerHandle<A> {
                         authority,
                         client: hyper::Client::new(),
                     },
-                    0,
-                )
-                .unwrap_or_else(|_| panic!("no running tokio executor")),
+                    1,
+                ),
             })
         })
     }
@@ -498,6 +497,14 @@ where
     /// Get a handle to the underlying asynchronous controller handle.
     pub fn handle(&mut self) -> &mut ControllerHandle<A> {
         &mut self.handle
+    }
+
+    /// Get statistics about the time spent processing different parts of the graph.
+    ///
+    /// See [`ControllerHandle::statistics`].
+    pub fn statistics(&mut self) -> Result<stats::GraphStats, failure::Error> {
+        let fut = self.handle.statistics();
+        self.run(fut)
     }
 
     /// Enumerate all known base tables.

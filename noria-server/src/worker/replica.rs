@@ -23,7 +23,6 @@ use slog;
 use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::sync::Arc;
-use std::time;
 use stream_cancel::{Valve, Valved};
 use streamunordered::{StreamUnordered, StreamYield};
 use tokio;
@@ -37,9 +36,10 @@ pub(super) struct Replica {
 
     coord: Arc<ChannelCoordinator>,
 
+    retry: Option<Box<Packet>>,
     incoming: Valved<tokio::net::tcp::Incoming>,
     first_byte: FuturesUnordered<tokio::io::ReadExact<tokio::net::tcp::TcpStream, Vec<u8>>>,
-    locals: futures::sync::mpsc::UnboundedReceiver<Box<Packet>>,
+    locals: tokio_sync::mpsc::UnboundedReceiver<Box<Packet>>,
     inputs: StreamUnordered<
         DualTcpStream<
             BufStream<tokio::net::TcpStream>,
@@ -57,7 +57,7 @@ pub(super) struct Replica {
     >,
 
     outbox: FnvHashMap<ReplicaIndex, VecDeque<Box<Packet>>>,
-    timeout: Option<tokio::timer::Delay>,
+    timeout: Option<tokio_os_timer::Delay>,
     oob: OutOfBand,
 }
 
@@ -66,7 +66,7 @@ impl Replica {
         valve: &Valve,
         mut domain: Domain,
         on: tokio::net::TcpListener,
-        locals: futures::sync::mpsc::UnboundedReceiver<Box<Packet>>,
+        locals: tokio_sync::mpsc::UnboundedReceiver<Box<Packet>>,
         ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
         log: slog::Logger,
         cc: Arc<ChannelCoordinator>,
@@ -77,6 +77,7 @@ impl Replica {
         Replica {
             coord: cc,
             domain,
+            retry: None,
             incoming: valve.wrap(on.incoming()),
             first_byte: FuturesUnordered::new(),
             locals,
@@ -283,7 +284,7 @@ impl Replica {
         Ok(true)
     }
 
-    fn try_timeout(&mut self) -> Poll<(), tokio::timer::Error> {
+    fn try_timeout(&mut self) -> Poll<(), io::Error> {
         if let Some(mut to) = self.timeout.take() {
             if let Async::Ready(()) = to.poll()? {
                 crate::block_on(|| {
@@ -388,24 +389,51 @@ impl Future for Replica {
                 let mut local_done = false;
                 let mut remote_done = false;
                 let mut check_local = true;
-                let readiness = loop {
+                let readiness = 'ready: loop {
+                    let d = &mut self.domain;
+                    let oob = &mut self.oob;
+                    let ob = &mut self.outbox;
+
+                    macro_rules! process {
+                        ($retry:expr, $p:expr, $pp:expr) => {{
+                            $retry = Some($p);
+                            let retry = &mut $retry;
+                            match tokio_threadpool::blocking(|| $pp(retry.take().unwrap())) {
+                                Ok(Async::Ready(ProcessResult::StopPolling)) => {
+                                    // domain got a message to quit
+                                    // TODO: should we finish up remaining work?
+                                    return Ok(Async::Ready(()));
+                                }
+                                Ok(Async::Ready(_)) => {}
+                                Ok(Async::NotReady) => {
+                                    // NOTE: the packet is still left in $retry, so we'll try again
+                                    break 'ready Async::NotReady;
+                                }
+                                Err(e) => {
+                                    unreachable!("trying to block without tokio runtime: {:?}", e)
+                                }
+                            }
+                        }};
+                    }
+
                     let mut interrupted = false;
+                    if let Some(p) = self.retry.take() {
+                        // first try the thing we failed to process last time again
+                        process!(self.retry, p, |p| d.on_event(
+                            oob,
+                            PollEvent::Process(p),
+                            ob
+                        ));
+                    }
+
                     for i in 0..FORCE_INPUT_YIELD_EVERY {
                         if !local_done && (check_local || remote_done) {
                             match self.locals.poll() {
-                                Ok(Async::Ready(Some(packet))) => {
-                                    let d = &mut self.domain;
-                                    let oob = &mut self.oob;
-                                    let ob = &mut self.outbox;
-
-                                    if let ProcessResult::StopPolling = crate::block_on(|| {
-                                        d.on_event(oob, PollEvent::Process(packet), ob)
-                                    }) {
-                                        // domain got a message to quit
-                                        // TODO: should we finish up remaining work?
-                                        return Ok(Async::Ready(()));
-                                    }
-                                }
+                                Ok(Async::Ready(Some(packet))) => process!(
+                                    self.retry,
+                                    packet,
+                                    |p| d.on_event(oob, PollEvent::Process(p), ob)
+                                ),
                                 Ok(Async::Ready(None)) => {
                                     // local input stream finished?
                                     // TODO: should we finish up remaining work?
@@ -424,25 +452,17 @@ impl Future for Replica {
 
                         if !remote_done && (!check_local || local_done) {
                             match self.inputs.poll() {
-                                Ok(Async::Ready(Some((StreamYield::Item(packet), _)))) => {
-                                    let d = &mut self.domain;
-                                    let oob = &mut self.oob;
-                                    let ob = &mut self.outbox;
-
-                                    if let ProcessResult::StopPolling = crate::block_on(|| {
-                                        d.on_event(oob, PollEvent::Process(packet), ob)
-                                    }) {
-                                        // domain got a message to quit
-                                        // TODO: should we finish up remaining work?
-                                        return Ok(Async::Ready(()));
-                                    }
-                                }
+                                Ok(Async::Ready(Some((StreamYield::Item(packet), _)))) => process!(
+                                    self.retry,
+                                    packet,
+                                    |p| d.on_event(oob, PollEvent::Process(p), ob)
+                                ),
                                 Ok(Async::Ready(Some((
                                     StreamYield::Finished(_stream),
                                     streami,
                                 )))) => {
-                                    self.oob.back.remove(&streami);
-                                    self.oob.pending.remove(&streami);
+                                    oob.back.remove(&streami);
+                                    oob.pending.remove(&streami);
                                     // FIXME: what about if a later flush flushes to this stream?
                                 }
                                 Ok(Async::Ready(None)) => {
@@ -496,16 +516,17 @@ impl Future for Replica {
                 ) {
                     ProcessResult::KeepPolling(timeout) => {
                         if let Some(timeout) = timeout {
-                            self.timeout =
-                                Some(tokio::timer::Delay::new(time::Instant::now() + timeout));
+                            // tokio-timer has a resolution of 1ms, so we can't use it :'(
+                            // TODO: how about we don't create a new timer each time?
+                            self.timeout = Some(tokio_os_timer::Delay::new(timeout).unwrap());
 
-                            // we need to poll the delay to ensure we'll get woken up
+                            // we need to poll the timer to ensure we'll get woken up
                             if let Async::Ready(()) =
                                 self.try_timeout().context("check timeout after setting")?
                             {
                                 // the timer expired and we did some stuff
                                 // make sure we don't return while there's more work to do
-                                continue;
+                                task::current().notify();
                             }
                         }
                     }

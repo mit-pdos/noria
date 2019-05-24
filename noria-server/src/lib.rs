@@ -350,12 +350,10 @@
 //! ```
 #![feature(allow_fail)]
 #![feature(optin_builtin_traits)]
-#![feature(try_from)]
 #![feature(box_patterns)]
 #![feature(box_syntax)]
 #![feature(nll)]
 #![feature(try_blocks)]
-#![feature(fnbox)]
 #![feature(vec_remove_item)]
 #![feature(crate_visibility_modifier)]
 #![deny(missing_docs)]
@@ -363,11 +361,10 @@
 //#![deny(unreachable_pub)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::redundant_closure)]
 
 #[macro_use]
 extern crate failure;
-#[macro_use]
-extern crate nom;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -396,10 +393,18 @@ pub enum ReuseConfigType {
 
 pub use crate::builder::Builder;
 pub use crate::handle::{Handle, SyncHandle};
+pub use controller::migrate::materialization::FrontierStrategy;
 pub use dataflow::{DurabilityMode, PersistenceParameters};
 pub use noria::consensus::LocalAuthority;
 pub use noria::*;
 pub use petgraph::graph::NodeIndex;
+
+#[doc(hidden)]
+pub mod manual {
+    pub use crate::controller::migrate::Migration;
+    pub use dataflow::node::special::Base;
+    pub use dataflow::ops;
+}
 
 use dataflow::DomainConfig;
 use std::time;
@@ -411,7 +416,7 @@ where
     use tokio::prelude::*;
     use tokio_threadpool::blocking;
     let mut wrap = Some(f);
-    future::poll_fn(|| blocking(wrap.take().unwrap()))
+    future::poll_fn(|| blocking(|| wrap.take().unwrap()()))
         .wait()
         .unwrap()
 }
@@ -420,6 +425,7 @@ where
 crate struct Config {
     crate sharding: Option<usize>,
     crate partial_enabled: bool,
+    crate frontier_strategy: FrontierStrategy,
     crate domain_config: DomainConfig,
     crate persistence: PersistenceParameters,
     crate heartbeat_every: time::Duration,
@@ -436,9 +442,10 @@ impl Default for Config {
             #[cfg(not(test))]
             sharding: None,
             partial_enabled: true,
+            frontier_strategy: Default::default(),
             domain_config: DomainConfig {
                 concurrent_replays: 512,
-                replay_batch_timeout: time::Duration::new(0, 10_000),
+                replay_batch_timeout: time::Duration::new(0, 100_000),
             },
             persistence: Default::default(),
             heartbeat_every: time::Duration::from_secs(1),

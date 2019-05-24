@@ -2,6 +2,7 @@ use crate::channel::CONNECTION_FROM_BASE;
 use crate::data::*;
 use crate::debug::trace::Tracer;
 use crate::internal::*;
+use crate::BoxDynError;
 use crate::LocalOrNot;
 use crate::{Tagged, Tagger};
 use async_bincode::{AsyncBincodeStream, AsyncDestination};
@@ -13,10 +14,10 @@ use std::sync::{Arc, Mutex};
 use std::{fmt, io};
 use tokio::prelude::*;
 use tokio_tower::multiplex;
+use tower::ServiceExt;
 use tower_balance::{choose, pool, Pool};
 use tower_buffer::Buffer;
 use tower_service::Service;
-use tower_util::ext::ServiceExt;
 use vec_map::VecMap;
 
 type Transport = AsyncBincodeStream<
@@ -71,16 +72,7 @@ pub(crate) type TableRpc = Buffer<
     Tagged<LocalOrNot<Input>>,
 >;
 
-type E = tower_buffer::Error<
-    tower_balance::Error<
-        tower_buffer::Error<
-            tokio_tower::multiplex::client::Error<
-                tokio_tower::multiplex::MultiplexTransport<Transport, Tagger>,
-            >,
-        >,
-        tokio_tower::multiplex::client::SpawnError<std::io::Error>,
-    >,
->;
+type E = <TableRpc as Service<Tagged<LocalOrNot<Input>>>>::Error;
 
 /// A failed [`Table`] operation.
 #[derive(Debug)]
@@ -94,11 +86,11 @@ pub struct AsyncTableError {
     pub error: TableError,
 }
 
-impl From<E> for AsyncTableError {
-    fn from(e: E) -> Self {
+impl From<BoxDynError<E>> for AsyncTableError {
+    fn from(e: BoxDynError<E>) -> Self {
         AsyncTableError {
             table: None,
-            error: TableError::from(e),
+            error: TableError::from(e.into_inner()),
         }
     }
 }
@@ -122,12 +114,12 @@ pub enum TableError {
 
     /// The underlying connection to Noria produced an error.
     #[fail(display = "{}", _0)]
-    TransportError(#[cause] E),
+    TransportError(#[cause] BoxDynError<<TableRpc as Service<Tagged<LocalOrNot<Input>>>>::Error>),
 }
 
 impl From<E> for TableError {
     fn from(e: E) -> Self {
-        TableError::TransportError(e)
+        TableError::TransportError(BoxDynError::from(e))
     }
 }
 
@@ -193,9 +185,8 @@ impl TableBuilder {
                                         (),
                                         choose::RoundRobin::default(),
                                     ),
-                                0,
-                            )
-                            .unwrap_or_else(|_| panic!("no active tokio runtime"));
+                                1,
+                            );
                             h.insert(c.clone());
                             Ok((addr, c))
                         }
@@ -335,12 +326,17 @@ impl Service<Input> for Table {
                     };
 
                     wait_for.push(self.shards[s].call(p.into()));
+                } else {
+                    // poll_ready reserves a sender slot which we have to release
+                    // we do that by dropping the old handle and replacing it with a clone
+                    // https://github.com/tokio-rs/tokio/issues/898
+                    self.shards[s] = self.shards[s].clone()
                 }
             }
 
             future::Either::B(
                 wait_for
-                    .fold((), |_, _| Ok(()))
+                    .for_each(|_| Ok(()))
                     .map_err(TableError::from)
                     .map(Tagged::from),
             )
@@ -523,7 +519,7 @@ impl Table {
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
     {
-        self.quick_n_dirty(i.into_iter().map(|r| r.into()).collect::<Vec<_>>())
+        self.quick_n_dirty(i.into_iter().map(Into::into).collect::<Vec<_>>())
     }
 
     /// Delete the row with the given key from this base table.

@@ -121,7 +121,7 @@ impl Ingredient for NodeOperator {
     fn must_replay_among(&self) -> Option<HashSet<NodeIndex>> {
         impl_ingredient_fn_ref!(self, must_replay_among,)
     }
-    fn suggest_indexes(&self, you: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, you: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         impl_ingredient_fn_ref!(self, suggest_indexes, you)
     }
     fn resolve(&self, i: usize) -> Option<Vec<(NodeIndex, usize)>> {
@@ -300,7 +300,6 @@ pub mod test {
         where
             I: Ingredient + Into<NodeOperator>,
         {
-            use petgraph;
             assert!(self.nut.is_none(), "only one node under test is supported");
 
             i.on_connected(&self.graph);
@@ -330,7 +329,7 @@ pub mod test {
 
             // we need to set the indices for all the base tables so they *actually* store things.
             let idx = self.graph[global].suggest_indexes(global);
-            for (tbl, (col, _)) in idx {
+            for (tbl, col) in idx {
                 if let Some(ref mut s) = self.states.get_mut(self.graph[tbl].local_addr()) {
                     s.add_key(&col[..], None);
                 }
@@ -373,10 +372,7 @@ pub mod test {
 
             self.nodes = nodes
                 .into_iter()
-                .map(|(_, n)| {
-                    use std::cell;
-                    (n.local_addr(), cell::RefCell::new(n))
-                })
+                .map(|(_, n)| (n.local_addr(), cell::RefCell::new(n)))
                 .collect();
         }
 
@@ -408,7 +404,7 @@ pub mod test {
             let global = self.nut.unwrap().as_global();
             let idx = self.graph[global].suggest_indexes(global);
             let mut state = MemoryState::default();
-            for (tbl, (col, _)) in idx {
+            for (tbl, col) in idx {
                 if tbl == base.as_global() {
                     state.add_key(&col[..], None);
                 }

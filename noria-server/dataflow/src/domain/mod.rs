@@ -183,6 +183,7 @@ impl DomainBuilder {
             waiting: Default::default(),
             reader_triggered: Default::default(),
             replay_paths: Default::default(),
+            replay_paths_by_dst: Default::default(),
 
             ingress_inject: Default::default(),
 
@@ -192,8 +193,8 @@ impl DomainBuilder {
             channel_coordinator,
 
             buffered_replay_requests: Default::default(),
-            has_buffered_replay_requests: false,
             replay_batch_timeout: self.config.replay_batch_timeout,
+            timed_purges: Default::default(),
 
             concurrent_replays: 0,
             max_concurrent_replays: self.config.concurrent_replays,
@@ -210,6 +211,14 @@ impl DomainBuilder {
             process_ptimes: TimerSet::new(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+struct TimedPurge {
+    time: time::Instant,
+    view: LocalNodeIndex,
+    tag: Tag,
+    keys: HashSet<Vec<DataType>>,
 }
 
 pub struct Domain {
@@ -234,6 +243,9 @@ pub struct Domain {
     waiting: Map<Waiting>,
     replay_paths: HashMap<Tag, ReplayPath>,
     reader_triggered: Map<HashSet<Vec<DataType>>>,
+    timed_purges: VecDeque<TimedPurge>,
+
+    replay_paths_by_dst: Map<HashMap<Vec<usize>, Vec<Tag>>>,
 
     concurrent_replays: usize,
     max_concurrent_replays: usize,
@@ -246,7 +258,6 @@ pub struct Domain {
 
     // TODO(ygina): buffered replays may be the result of multiple previous updates
     buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<ProvenanceUpdate>)>,
-    has_buffered_replay_requests: bool,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
 
@@ -267,24 +278,16 @@ impl Domain {
         miss_columns: &[usize],
         miss_in: LocalNodeIndex,
     ) {
-        let mut found = false;
-        let tags: Vec<Tag> = self.replay_paths.keys().cloned().collect();
-        for tag in tags {
-            if let TriggerEndpoint::Start(..) = self.replay_paths[&tag].trigger {
-                continue;
+        let mut tags = Vec::new();
+        if let Some(ref candidates) = self.replay_paths_by_dst.get(miss_in) {
+            if let Some(ts) = candidates.get(miss_columns) {
+                // the clone is a bit sad; self.request_partial_replay doesn't use
+                // self.replay_paths_by_dst.
+                tags = ts.clone();
             }
-            {
-                let p = self.replay_paths[&tag].path.last().unwrap();
-                if p.node != miss_in {
-                    continue;
-                }
-                assert!(p.partial_key.is_some());
-                let pkey = p.partial_key.as_ref().unwrap();
-                if &pkey[..] != miss_columns {
-                    continue;
-                }
-            }
+        }
 
+        for &tag in &tags {
             // send a message to the source domain(s) responsible
             // for the chosen tag so they'll start replay.
             let key = miss_key.clone(); // :(
@@ -310,7 +313,6 @@ impl Domain {
                 // `Self::handle()`)
                 self.delayed_for_self
                     .push_back(box Packet::RequestPartialReplay { id: None, tag, key });
-                found = true;
                 continue;
             }
 
@@ -318,11 +320,9 @@ impl Domain {
             // these ancestors now, and some later. this will cause more of the replay to be
             // buffered up at the union above us, but that's probably fine.
             self.request_partial_replay(tag, key);
-            found = true;
-            continue;
         }
 
-        if !found {
+        if tags.is_empty() {
             unreachable!(format!(
                 "no tag found to fill missing value {:?} in {}.{:?}",
                 miss_key, miss_in, miss_columns
@@ -456,20 +456,23 @@ impl Domain {
                 // we just naively release one slot here, a union with two parents would mean that
                 // `self.concurrent_replays` constantly grows by +1 (+2 for the backfill requests,
                 // -1 when satisfied), which would lead to a deadlock!
-                let mut requests_satisfied = {
-                    let last = self.replay_paths[&tag].path.last().unwrap();
-                    self.replay_paths
-                        .iter()
-                        .filter(|&(_, p)| {
-                            if let TriggerEndpoint::End { .. } = p.trigger {
-                                let p = p.path.last().unwrap();
-                                p.node == last.node && p.partial_key == last.partial_key
-                            } else {
-                                false
-                            }
-                        })
-                        .count()
-                };
+                let mut requests_satisfied = 0;
+                let last = self.replay_paths[&tag].path.last().unwrap();
+                if let Some(ref cs) = self.replay_paths_by_dst.get(last.node) {
+                    if let Some(ref tags) = cs.get(last.partial_key.as_ref().unwrap()) {
+                        requests_satisfied = tags
+                            .iter()
+                            .filter(|tag| {
+                                if let TriggerEndpoint::End { .. } = self.replay_paths[tag].trigger
+                                {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                            .count();
+                    }
+                }
 
                 // we also sent that many requests *per key*.
                 requests_satisfied *= num;
@@ -531,7 +534,7 @@ impl Domain {
             self.process_times.start(me);
             self.process_ptimes.start(me);
             let mut m = Some(m);
-            let (misses, captured) = n.process(
+            let (misses, _, captured) = n.process(
                 &mut m,
                 self.index,
                 None,
@@ -593,6 +596,7 @@ impl Domain {
                 // but, for now, here we go:
                 // first, what partial replay paths go through this node?
                 let from = self.nodes[src].borrow().global_addr();
+                // TODO: this is a linear walk of replay paths -- we should make that not linear
                 let deps: Vec<_> = self
                     .replay_paths
                     .iter()
@@ -669,7 +673,8 @@ impl Domain {
         }
 
         // TODO(ygina): forks and merges here -- what will happen to packet id?
-        let nchildren = self.nodes[me].borrow().nchildren();
+        // NOTE: we can't directly iterate over .children due to self.dispatch in the loop
+        let nchildren = self.nodes[me].borrow().children().len();
         for i in 0..nchildren {
             // avoid cloning if we can
             let mut m = if i == nchildren - 1 {
@@ -678,7 +683,7 @@ impl Domain {
                 m.as_ref().map(|m| box m.clone_data()).unwrap()
             };
 
-            let childi = *self.nodes[me].borrow().child(i);
+            let childi = self.nodes[me].borrow().children()[i];
             let child_is_merger = {
                 // XXX: shouldn't NLL make this unnecessary?
                 let c = self.nodes[childi].borrow();
@@ -698,7 +703,7 @@ impl Domain {
         }
     }
 
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn handle(
         &mut self,
         m: Box<Packet>,
@@ -747,6 +752,8 @@ impl Domain {
                         for node in nodes {
                             for cn in self.nodes.iter_mut() {
                                 cn.1.borrow_mut().try_remove_child(node);
+                                // NOTE: since nodes are always removed leaves-first, it's not
+                                // important to update parent pointers here
                             }
                         }
                     }
@@ -810,12 +817,8 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::StateSizeProbe { node } => {
-                        let row_count = self.state.get(node).map(|state| state.rows()).unwrap_or(0);
-                        let mem_size = self
-                            .state
-                            .get(node)
-                            .map(|state| state.deep_size_of())
-                            .unwrap_or(0);
+                        let row_count = self.state.get(node).map(|r| r.rows()).unwrap_or(0);
+                        let mem_size = self.state.get(node).map(|s| s.deep_size_of()).unwrap_or(0);
                         self.control_reply_tx
                             .send(ControlReplyPacket::StateSize(row_count, mem_size))
                             .unwrap();
@@ -1002,6 +1005,16 @@ impl Domain {
                                 TriggerEndpoint::End { ask_all, options }
                             }
                         };
+
+                        if let TriggerEndpoint::End { .. } | TriggerEndpoint::Local(..) = trigger {
+                            let last = path.last().unwrap();
+                            self.replay_paths_by_dst
+                                .entry(last.node)
+                                .or_insert_with(HashMap::new)
+                                .entry(last.partial_key.clone().unwrap())
+                                .or_insert_with(Vec::new)
+                                .push(tag);
+                        }
 
                         self.replay_paths.insert(
                             tag,
@@ -1192,8 +1205,10 @@ impl Domain {
                     Packet::Finish(tag, ni) => {
                         self.finish_replay(tag, ni, sends, executor);
                     }
-                    Packet::Ready { node, index } => {
+                    Packet::Ready { node, purge, index } => {
                         assert_eq!(self.mode, DomainMode::Forwarding);
+
+                        self.nodes[node].borrow_mut().purge = purge;
 
                         if !index.is_empty() {
                             let mut s: Box<State> = {
@@ -1298,7 +1313,7 @@ impl Domain {
                                 } else {
                                     self.state
                                         .get(local_index)
-                                        .map(|state| state.deep_size_of())
+                                        .map(|s| s.deep_size_of())
                                         .unwrap_or(0)
                                 };
 
@@ -1306,7 +1321,9 @@ impl Domain {
                                     match self.state.get(local_index) {
                                         Some(ref s) => {
                                             if s.is_partial() {
-                                                MaterializationStatus::Partial
+                                                MaterializationStatus::Partial {
+                                                    beyond_materialization_frontier: n.purge,
+                                                }
                                             } else {
                                                 MaterializationStatus::Full
                                             }
@@ -1316,7 +1333,9 @@ impl Domain {
                                 } else {
                                     n.with_reader(|r| {
                                         if r.is_partial() {
-                                            MaterializationStatus::Partial
+                                            MaterializationStatus::Partial {
+                                                beyond_materialization_frontier: n.purge,
+                                            }
                                         } else {
                                             MaterializationStatus::Full
                                         }
@@ -1487,31 +1506,58 @@ impl Domain {
             }
         }
 
-        if self.has_buffered_replay_requests {
+        if !self.buffered_replay_requests.is_empty() {
             let now = time::Instant::now();
             let to = self.replay_batch_timeout;
-            self.has_buffered_replay_requests = false;
             let elapsed_replays: Vec<_> = {
-                let has = &mut self.has_buffered_replay_requests;
                 self.buffered_replay_requests
                     .iter_mut()
                     .filter_map(|(&tag, &mut (first, ref mut keys, ref id))| {
                         if !keys.is_empty() && now.duration_since(first) > to {
-                            use std::mem;
-                            let l = keys.len();
-                            Some((tag, mem::replace(keys, HashSet::with_capacity(l)), id.clone()))
+                            // will be removed by retain below
+                            Some((tag, mem::replace(keys, HashSet::new()), id.clone()))
                         } else {
-                            if !keys.is_empty() {
-                                *has = true;
-                            }
                             None
                         }
                     })
                     .collect()
             };
+            self.buffered_replay_requests
+                .retain(|_, (_, ref keys, _)| !keys.is_empty());
             for (tag, keys, id) in elapsed_replays {
                 self.seed_all(id, tag, keys, sends, executor);
             }
+        }
+
+        let mut swap = HashSet::new();
+        while let Some(tp) = self.timed_purges.front() {
+            let now = time::Instant::now();
+            if tp.time <= now {
+                let tp = self.timed_purges.pop_front().unwrap();
+                let mut node = self.nodes[tp.view].borrow_mut();
+                trace!(self.log, "eagerly purging state from reader"; "node" => node.global_addr().index());
+                node.with_reader_mut(|r| {
+                    if let Some(wh) = r.writer_mut() {
+                        for key in tp.keys {
+                            wh.mut_with_key(&key[..]).mark_hole();
+                        }
+                        swap.insert(tp.view);
+                    }
+                })
+                .unwrap();
+            } else {
+                break;
+            }
+        }
+        for n in swap {
+            self.nodes[n]
+                .borrow_mut()
+                .with_reader_mut(|r| {
+                    if let Some(wh) = r.writer_mut() {
+                        wh.swap();
+                    }
+                })
+                .unwrap();
         }
 
         if top {
@@ -1558,6 +1604,12 @@ impl Domain {
             ReplayPath {
                 source: Some(source),
                 trigger: TriggerEndpoint::Start(ref cols),
+                ref path,
+                ..
+            }
+            | ReplayPath {
+                source: Some(source),
+                trigger: TriggerEndpoint::Local(ref cols),
                 ref path,
                 ..
             } => {
@@ -1648,6 +1700,10 @@ impl Domain {
         if let ReplayPath {
             trigger: TriggerEndpoint::Start(..),
             ..
+        }
+        | ReplayPath {
+            trigger: TriggerEndpoint::Local(..),
+            ..
         } = self.replay_paths[&tag]
         {
             // maybe delay this seed request so that we can batch respond later?
@@ -1655,20 +1711,17 @@ impl Domain {
             use std::collections::hash_map::Entry;
             let key = Vec::from(key);
             match self.buffered_replay_requests.entry(tag) {
-                Entry::Occupied(mut o) => {
+                Entry::Occupied(o) => {
+                    assert!(!o.get().1.is_empty());
+                    let o = o.into_mut();
+                    o.1.insert(key);
                     // TODO(ygina): insert additional update rather than reassigning
-                    o.get_mut().2 = id;
-                    if o.get().1.is_empty() {
-                        o.get_mut().0 = time::Instant::now();
-                    }
-                    o.into_mut().1.insert(key);
-                    self.has_buffered_replay_requests = true;
+                    o.2 = id;
                 }
                 Entry::Vacant(v) => {
                     let mut ks = HashSet::new();
                     ks.insert(key);
                     v.insert((time::Instant::now(), ks, id));
-                    self.has_buffered_replay_requests = true;
                 }
             }
 
@@ -1742,7 +1795,7 @@ impl Domain {
         }
     }
 
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
@@ -1760,11 +1813,12 @@ impl Domain {
         // this loop is just here so we have a way of giving up the borrow of self.replay_paths
         #[allow(clippy::never_loop)]
         'outer: loop {
-            let &mut ReplayPath {
+            let ReplayPath {
                 ref path,
+                ref source,
                 notify_done,
                 ..
-            } = self.replay_paths.get_mut(&tag).unwrap();
+            } = self.replay_paths[&tag];
 
             match self.mode {
                 DomainMode::Forwarding if notify_done => {
@@ -1925,7 +1979,7 @@ impl Domain {
                         }
 
                         // process the current message in this node
-                        let (mut misses, captured) = n.process(
+                        let (mut misses, lookups, captured) = n.process(
                             &mut m,
                             self.index,
                             segment.partial_key.as_ref(),
@@ -2109,6 +2163,148 @@ impl Domain {
                             break 'outer;
                         }
 
+                        // we successfully processed some upquery responses!
+                        //
+                        // at this point, we can discard the state that the replay used in n's
+                        // ancestors if they are beyond the materialization frontier (and thus
+                        // should not be allowed to amass significant state).
+                        //
+                        // we want to make sure we only remove state once it will no longer be
+                        // looked up into though. consider this dataflow graph:
+                        //
+                        //  (a)     (b)
+                        //   |       |
+                        //   |       |
+                        //  (q)      |
+                        //   |       |
+                        //   `--(j)--`
+                        //       |
+                        //
+                        // where j is a join, a and b are materialized, q is query-through. if we
+                        // removed state the moment a replay has passed through the next operator,
+                        // then the following could happen: a replay then comes from a, passes
+                        // through q, q then discards state from a and forwards to j. j misses in
+                        // b. replay happens to b, and re-triggers replay from a. however, state in
+                        // a is discarded, so replay to a needs to happen a second time. that's not
+                        // _wrong_, and we will eventually make progress, but it is pretty
+                        // inefficient.
+                        //
+                        // insted, we probably want the join to do the eviction. we achieve this by
+                        // only evicting from a after the replay has passed the join (or, more
+                        // generally, the operator that might perform lookups into a)
+                        if backfill_keys.is_some() {
+                            // first and foremost -- evict the source of the replay (if we own it).
+                            // we only do this when the replay has reached its target, or if it's
+                            // about to leave the domain, otherwise we might evict state that a
+                            // later operator (like a join) will still do lookups into.
+                            if i == path.len() - 1 {
+                                // only evict if we own the state where the replay originated
+                                if let Some(src) = source {
+                                    let n = self.nodes[*src].borrow();
+                                    if n.beyond_mat_frontier() {
+                                        let state = self
+                                            .state
+                                            .get_mut(*src)
+                                            .expect("replay sourced at non-materialized node");
+                                        trace!(self.log, "clearing keys from purgeable replay source after replay"; "node" => n.global_addr().index(), "keys" => ?backfill_keys.as_ref().unwrap());
+                                        for key in backfill_keys.as_ref().unwrap().iter() {
+                                            state.mark_hole(&key[..], tag);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // next, evict any state that we had to look up to process this replay.
+                            let mut evict_tag = None;
+                            let mut pns_for = None;
+                            let mut pns = Vec::new();
+                            let mut tmp = Vec::new();
+                            for lookup in lookups {
+                                // don't evict from our own state
+                                if lookup.on == segment.node {
+                                    continue;
+                                }
+
+                                // resolve any lookups through query-through nodes
+                                if pns_for != Some(lookup.on) {
+                                    pns.clear();
+                                    assert!(tmp.is_empty());
+                                    tmp.push(lookup.on);
+
+                                    while let Some(pn) = tmp.pop() {
+                                        if self.state.contains_key(pn) {
+                                            if self.nodes[pn].borrow().beyond_mat_frontier() {
+                                                // we should evict from this!
+                                                pns.push(pn);
+                                            } else {
+                                                // we should _not_ evict from this
+                                            }
+                                            continue;
+                                        }
+
+                                        // this parent needs to be resolved further
+                                        let pn = self.nodes[pn].borrow();
+                                        if !pn.can_query_through() {
+                                            unreachable!("lookup into non-materialized, non-query-through node");
+                                        }
+
+                                        for &ppn in pn.parents() {
+                                            tmp.push(ppn);
+                                        }
+                                    }
+                                    pns_for = Some(lookup.on);
+                                }
+
+                                let tag_match = |rp: &ReplayPath, pn| {
+                                    rp.path.last().unwrap().node == pn
+                                        && rp.path.last().unwrap().partial_key.as_ref().unwrap()
+                                            == &lookup.cols
+                                };
+
+                                for &pn in &pns {
+                                    let state = self.state.get_mut(pn).unwrap();
+                                    assert!(state.is_partial());
+
+                                    // this is a node that we were doing lookups into as part of
+                                    // the replay -- make sure we evict any state we may have added
+                                    // there.
+                                    if let Some(tag) = evict_tag {
+                                        if !tag_match(&self.replay_paths[&tag], pn) {
+                                            // we can't re-use this
+                                            evict_tag = None;
+                                        }
+                                    }
+
+                                    if evict_tag.is_none() {
+                                        if let Some(ref cs) = self.replay_paths_by_dst.get(pn) {
+                                            if let Some(ref tags) = cs.get(&lookup.cols) {
+                                                // this is the tag we would have used to
+                                                // fill a lookup hole in this ancestor, so
+                                                // this is the tag we need to evict from.
+
+                                                // TODO: could there have been multiple
+                                                assert_eq!(tags.len(), 1);
+                                                evict_tag = Some(tags[0]);
+                                            }
+                                        }
+                                    }
+
+                                    if let Some(tag) = evict_tag {
+                                        // NOTE: this assumes that the key order is the same
+                                        trace!(self.log, "clearing keys from purgeable materialization after replay"; "node" => self.nodes[pn].borrow().global_addr().index(), "key" => ?&lookup.key);
+                                        state.mark_hole(&lookup.key[..], tag);
+                                    } else {
+                                        unreachable!(
+                                            "no tag found for lookup target {:?}({:?}) (really {:?})",
+                                            self.nodes[lookup.on].borrow().global_addr(),
+                                            lookup.cols,
+                                            self.nodes[pn].borrow().global_addr(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
                         // we're all good -- continue propagating
                         if m.as_ref().map(|m| m.is_empty()).unwrap_or(true) {
                             if let ReplayPieceContext::Regular { last: false } = context {
@@ -2173,6 +2369,16 @@ impl Domain {
                         ReplayPieceContext::Partial { for_keys, ignore } => {
                             assert!(!ignore);
                             if dst_is_reader {
+                                if self.nodes[dst].borrow().beyond_mat_frontier() {
+                                    // make sure we eventually evict these from here
+                                    self.timed_purges.push_back(TimedPurge {
+                                        time: time::Instant::now()
+                                            + time::Duration::from_millis(50),
+                                        keys: for_keys,
+                                        view: dst,
+                                        tag,
+                                    });
+                                }
                                 assert_ne!(finished_partial, 0);
                             } else if dst_is_target {
                                 trace!(self.log, "partial replay completed"; "local" => dst.id());
@@ -2357,7 +2563,6 @@ impl Domain {
         mem::replace(&mut self.mode, was);
 
         if finished {
-            use std::mem;
             // node is now ready, and should start accepting "real" updates
             if let DomainMode::Replaying { passes, .. } =
                 mem::replace(&mut self.mode, DomainMode::Forwarding)
@@ -2401,6 +2606,7 @@ impl Domain {
             state: &mut StateMap,
             nodes: &mut DomainNodes,
         ) {
+            // TODO: this is a linear walk of replay paths -- we should make that not linear
             for (tag, ref path) in replay_paths {
                 if path.source == Some(node) {
                     // Check whether this replay path is for the same key.
@@ -2647,7 +2853,7 @@ impl Domain {
                     self.state
                         .get(local_index)
                         .filter(|state| state.is_partial())
-                        .map(|state| state.deep_size_of())
+                        .map(|s| s.deep_size_of())
                         .unwrap_or(0)
                 }
             })
@@ -2667,20 +2873,37 @@ impl Domain {
         //self.total_time.start();
         //self.total_ptime.start();
         let res = match event {
-            PollEvent::ResumePolling => ProcessResult::KeepPolling(
-                self.group_commit_queues.duration_until_flush().or_else(|| {
-                    let now = time::Instant::now();
-                    self.buffered_replay_requests
-                        .iter()
-                        .filter(|&(_, &(_, ref keys, _))| !keys.is_empty())
-                        .map(|(_, &(first, _, _))| {
-                            self.replay_batch_timeout
-                                .checked_sub(now.duration_since(first))
-                                .unwrap_or(time::Duration::from_millis(0))
-                        })
-                        .min()
-                }),
-            ),
+            PollEvent::ResumePolling => {
+                // when do we need to be woken up again?
+                let now = time::Instant::now();
+                let opt1 = self
+                    .buffered_replay_requests
+                    .iter()
+                    .filter(|&(_, &(_, ref keys, _))| !keys.is_empty())
+                    .map(|(_, &(first, _, _))| {
+                        self.replay_batch_timeout
+                            .checked_sub(now.duration_since(first))
+                            .unwrap_or(time::Duration::from_millis(0))
+                    })
+                    .min();
+                let opt2 = self.group_commit_queues.duration_until_flush();
+                let opt3 = self.timed_purges.front().map(|tp| {
+                    if tp.time > now {
+                        tp.time - now
+                    } else {
+                        time::Duration::from_millis(0)
+                    }
+                });
+
+                let mut timeout = opt1.or(opt2).or(opt3);
+                if let Some(opt2) = opt2 {
+                    timeout = Some(std::cmp::min(timeout.unwrap(), opt2));
+                }
+                if let Some(opt3) = opt3 {
+                    timeout = Some(std::cmp::min(timeout.unwrap(), opt3));
+                }
+                ProcessResult::KeepPolling(timeout)
+            }
             PollEvent::Process(packet) => {
                 if let Packet::Quit = *packet {
                     return ProcessResult::StopPolling;
@@ -2708,7 +2931,7 @@ impl Domain {
                     self.handle(m, sends, executor, true);
                 }
 
-                if self.has_buffered_replay_requests {
+                if !self.buffered_replay_requests.is_empty() || !self.timed_purges.is_empty() {
                     self.handle(box Packet::Spin, sends, executor, true);
                 }
 

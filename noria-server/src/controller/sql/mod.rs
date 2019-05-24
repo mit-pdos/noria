@@ -401,7 +401,7 @@ impl SqlIncorporator {
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`.
         // Note that we don't need to optimize the MIR here, because the query is trivial.
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
 
         self.register_query(query_name, None, &mir, mig.universe());
 
@@ -422,7 +422,7 @@ impl SqlIncorporator {
         // no optimization, because standalone base nodes can't be optimized
 
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
 
         // remember the schema in case we need it later
         // on base table schema change, we will overwrite the existing schema here.
@@ -467,7 +467,7 @@ impl SqlIncorporator {
             is_leaf,
         );
 
-        let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig);
+        let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig, None);
 
         self.register_query(query_name, None, &combined_mir_query, mig.universe());
 
@@ -523,7 +523,7 @@ impl SqlIncorporator {
         let universe = mig.universe();
         // no QG-level reuse possible, so we'll build a new query.
         // first, compute the MIR representation of the SQL query
-        let mut mir = self.mir_converter.named_query_to_mir(
+        let (sec, og_mir, table_mapping, base_name) = self.mir_converter.named_query_to_mir(
             query_name,
             query,
             &qg,
@@ -531,15 +531,26 @@ impl SqlIncorporator {
             universe.clone(),
         )?;
 
-        trace!(self.log, "Unoptimized MIR:\n{}", mir.to_graphviz().unwrap());
+        trace!(self.log, "Unoptimized MIR:\n{}", og_mir.to_graphviz().unwrap());
 
         // run MIR-level optimizations
-        mir = mir.optimize();
+        let mut mir = og_mir.optimize(table_mapping.as_ref(), sec);
 
         trace!(self.log, "Optimized MIR:\n{}", mir.to_graphviz().unwrap());
 
+        if sec {
+            match table_mapping {
+                Some(ref x) => {
+                    mir = mir.make_universe_naming_consistent(x, base_name);
+                }
+                None => {
+                    panic!("Missing table mapping when reconciling universe table names!");
+                }
+            }
+        }
+
         // push it into the flow graph using the migration in `mig`, and obtain `QueryFlowParts`
-        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig);
+        let qfp = mir_query_to_flow_parts(&mut mir, &mut mig, None);
 
         // register local state
         self.register_query(query_name, Some(qg), &mir, universe);
@@ -666,16 +677,17 @@ impl SqlIncorporator {
 
         // no QG-level reuse possible, so we'll build a new query.
         // first, compute the MIR representation of the SQL query
-        let new_query_mir = self.mir_converter.named_query_to_mir(
-            query_name,
-            query,
-            &qg,
-            is_leaf,
-            universe.clone(),
-        )?;
+        let (sec, new_query_mir, table_mapping, base_name) = self
+            .mir_converter
+            .named_query_to_mir(query_name, query, &qg, is_leaf, universe.clone())?;
 
-        // TODO(malte): should we run the MIR-level optimizations here?
-        let new_opt_mir = new_query_mir.optimize();
+        trace!(
+            self.log,
+            "Original MIR:\n{}",
+            new_query_mir.to_graphviz().unwrap()
+        );
+
+        let new_opt_mir = new_query_mir.optimize(table_mapping.as_ref(), sec);
 
         trace!(
             self.log,
@@ -700,13 +712,28 @@ impl SqlIncorporator {
 
         let mut post_reuse_opt_mir = reused_mir.optimize_post_reuse();
 
+        // traverse universe subgraph and update table names for
+        // internal consistency using the table mapping as guidance
+        if sec {
+            match table_mapping {
+                Some(ref x) => {
+                    post_reuse_opt_mir =
+                        post_reuse_opt_mir.make_universe_naming_consistent(x, base_name);
+                }
+                None => {
+                    panic!("Missing table mapping when reconciling universe table names!");
+                }
+            }
+        }
+
         trace!(
             self.log,
             "Post-reuse optimized MIR:\n{}",
             post_reuse_opt_mir.to_graphviz().unwrap()
         );
 
-        let qfp = mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig);
+        let qfp =
+            mir_query_to_flow_parts(&mut post_reuse_opt_mir, &mut mig, table_mapping.as_ref());
 
         info!(
             self.log,
@@ -950,6 +977,18 @@ mod tests {
         mig.graph().node_weight(na).unwrap()
     }
 
+    fn get_reader<'a>(inc: &SqlIncorporator, mig: &'a Migration, name: &str) -> &'a Node {
+        let na = inc
+            .get_flow_node_address(name, 0)
+            .unwrap_or_else(|| panic!("No node named \"{}\" exists", name));
+        let children: Vec<_> = mig
+            .graph()
+            .neighbors_directed(na, petgraph::EdgeDirection::Outgoing)
+            .collect();
+        assert_eq!(children.len(), 1);
+        mig.graph().node_weight(children[0]).unwrap()
+    }
+
     /// Helper to compute a query ID hash via the same method as in `QueryGraph::signature()`.
     /// Note that the argument slices must be ordered in the same way as &str and &Column are
     /// ordered by `Ord`.
@@ -1173,6 +1212,37 @@ mod tests {
             assert_eq!(mig.graph().node_count(), ncount + 3);
             // should have ended up with a different leaf node
             assert_ne!(qfp.query_leaf, leaf);
+        });
+    }
+
+    #[test]
+    fn it_orders_parameter_columns() {
+        // set up graph
+        let mut g = integration::start_simple("it_orders_parameter_columns");
+        g.migrate(|mig| {
+            let mut inc = SqlIncorporator::default();
+            assert!(inc
+                .add_query(
+                    "CREATE TABLE users (id int, name varchar(40), age int);",
+                    None,
+                    mig
+                )
+                .is_ok());
+
+            // Add a new query with two parameters
+            let res = inc.add_query(
+                "SELECT id, name FROM users WHERE users.name = ? AND id = ?;",
+                None,
+                mig,
+            );
+            assert!(res.is_ok());
+            let qfp = res.unwrap();
+            // fields should be projected in query order
+            assert_eq!(get_node(&inc, mig, &qfp.name).fields(), &["id", "name"]);
+            // key columns should be in opposite order (i.e., the order of parameters in the query)
+            let n = get_reader(&inc, mig, &qfp.name);
+            n.with_reader(|r| assert_eq!(r.key().unwrap(), &[1, 0]))
+                .unwrap();
         });
     }
 

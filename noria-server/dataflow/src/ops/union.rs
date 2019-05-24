@@ -127,7 +127,7 @@ impl Ingredient for Union {
     fn ancestors(&self) -> Vec<NodeIndex> {
         match self.emit {
             Emit::AllFrom(p, _) => vec![p.as_global()],
-            Emit::Project { ref emit, .. } => emit.keys().map(|k| k.as_global()).collect(),
+            Emit::Project { ref emit, .. } => emit.keys().map(IndexPair::as_global).collect(),
         }
     }
 
@@ -189,7 +189,7 @@ impl Ingredient for Union {
         match self.emit {
             Emit::AllFrom(..) => ProcessingResult {
                 results: rs,
-                misses: Vec::new(),
+                ..Default::default()
             },
             Emit::Project { ref emit_l, .. } => {
                 let rs = rs
@@ -211,7 +211,7 @@ impl Ingredient for Union {
                     .collect();
                 ProcessingResult {
                     results: rs,
-                    misses: Vec::new(),
+                    ..Default::default()
                 }
             }
         }
@@ -272,7 +272,7 @@ impl Ingredient for Union {
                         // we clone above so that we can also return the processed results
                         return RawProcessingResult::Regular(ProcessingResult {
                             results: rs,
-                            misses: Vec::new(),
+                            ..Default::default()
                         });
                     } else {
                         unreachable!();
@@ -627,7 +627,7 @@ impl Ingredient for Union {
         });
     }
 
-    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, (Vec<usize>, bool)> {
+    fn suggest_indexes(&self, _: NodeIndex) -> HashMap<NodeIndex, Vec<usize>> {
         // index nothing (?)
         HashMap::new()
     }
@@ -655,7 +655,7 @@ impl Ingredient for Union {
                     .map(|&(src, emit)| {
                         let cols = emit
                             .iter()
-                            .map(|e| e.to_string())
+                            .map(ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ");
                         format!("{}:[{}]", src.as_global().index(), cols)

@@ -32,7 +32,7 @@ use slog;
 
 mod assignment;
 mod augmentation;
-pub(super) mod materialization;
+crate mod materialization;
 mod routing;
 mod sharding;
 
@@ -47,9 +47,9 @@ pub(super) enum ColumnChange {
 /// Only one `Migration` can be in effect at any point in time. No changes are made to the running
 /// graph until the `Migration` is committed (using `Migration::commit`).
 // crate viz for tests
-crate struct Migration<'a> {
+pub struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
-    pub(super) added: Vec<NodeIndex>,
+    pub(super) added: HashSet<NodeIndex>,
     pub(super) replicated: Vec<(DomainIndex, Vec<NodeIndex>)>,
     pub(super) linked: Vec<(NodeIndex, NodeIndex)>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
@@ -164,7 +164,7 @@ impl<'a> Migration<'a> {
     /// Edges in the data flow graph are automatically added based on the ingredient's reported
     /// `ancestors`.
     // crate viz for tests
-    crate fn add_ingredient<S1, FS, S2, I>(&mut self, name: S1, fields: FS, i: I) -> NodeIndex
+    pub fn add_ingredient<S1, FS, S2, I>(&mut self, name: S1, fields: FS, i: I) -> NodeIndex
     where
         S1: ToString,
         S2: ToString,
@@ -185,7 +185,7 @@ impl<'a> Migration<'a> {
         );
 
         // keep track of the fact that it's new
-        self.added.push(ni);
+        self.added.insert(ni);
         // insert it into the graph
         for parent in &parents {
             self.mainline.ingredients.add_edge(*parent, ni, ());
@@ -208,7 +208,7 @@ impl<'a> Migration<'a> {
     ///
     /// The returned identifier can later be used to refer to the added ingredient.
     // crate viz for tests
-    crate fn add_base<S1, FS, S2>(
+    pub fn add_base<S1, FS, S2>(
         &mut self,
         name: S1,
         fields: FS,
@@ -230,13 +230,35 @@ impl<'a> Migration<'a> {
         );
 
         // keep track of the fact that it's new
-        self.added.push(ni);
+        self.added.insert(ni);
         // insert it into the graph
         self.mainline
             .ingredients
             .add_edge(self.mainline.source, ni, ());
         // and tell the caller its id
         ni
+    }
+
+    /// Mark the given node as being beyond the materialization frontier.
+    ///
+    /// When a node is marked as such, it will quickly evict state after it is no longer
+    /// immediately useful, making such nodes generally mostly empty. This reduces read
+    /// performance (since most reads now need to do replays), but can significantly reduce memory
+    /// overhead and improve write performance.
+    ///
+    /// Note that if a node is marked this way, all of its children transitively _also_ have to be
+    /// marked.
+    #[cfg(test)]
+    crate fn mark_shallow(&mut self, ni: NodeIndex) {
+        info!(self.log,
+              "marking node as beyond materialization frontier";
+              "node" => ni.index(),
+        );
+        self.mainline.ingredients.node_weight_mut(ni).unwrap().purge = true;
+
+        if !self.added.contains(&ni) {
+            unimplemented!("marking existing node as beyond materialization frontier");
+        }
     }
 
     /// Returns the context of this migration
@@ -265,14 +287,14 @@ impl<'a> Migration<'a> {
     /// Note that a default value must be provided such that old writes can be converted into this
     /// new type.
     // crate viz for tests
-    crate fn add_column<S: ToString>(
+    pub fn add_column<S: ToString>(
         &mut self,
         node: NodeIndex,
         field: S,
         default: DataType,
     ) -> usize {
         // not allowed to add columns to new nodes
-        assert!(!self.added.iter().any(|&ni| ni == node));
+        assert!(!self.added.contains(&node));
 
         let field = field.to_string();
         let base = &mut self.mainline.ingredients[node];
@@ -295,9 +317,9 @@ impl<'a> Migration<'a> {
 
     /// Drop a column from a base node.
     // crate viz for tests
-    crate fn drop_column(&mut self, node: NodeIndex, column: usize) {
+    pub fn drop_column(&mut self, node: NodeIndex, column: usize) {
         // not allowed to drop columns from new nodes
-        assert!(!self.added.iter().any(|&ni| ni == node));
+        assert!(!self.added.contains(&node));
 
         let base = &mut self.mainline.ingredients[node];
         assert!(base.is_base());
@@ -321,13 +343,17 @@ impl<'a> Migration<'a> {
         if let Entry::Vacant(e) = self.readers.entry(n) {
             // make a reader
             let r = node::special::Reader::new(n);
-            let r = if let Some(name) = name {
+            let mut r = if let Some(name) = name {
                 self.mainline.ingredients[n].named_mirror(r, name)
             } else {
                 self.mainline.ingredients[n].mirror(r)
             };
+            if r.name().starts_with("SHALLOW_") {
+                r.purge = true;
+            }
             let r = self.mainline.ingredients.add_node(r);
             self.mainline.ingredients.add_edge(n, r, ());
+            self.added.insert(r);
             e.insert(r);
         }
     }
@@ -335,8 +361,7 @@ impl<'a> Migration<'a> {
     /// Set up the given node such that its output can be efficiently queried.
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
-    #[cfg(test)]
-    crate fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
+    pub fn maintain_anonymous(&mut self, n: NodeIndex, key: &[usize]) -> NodeIndex {
         self.ensure_reader_for(n, None);
         let ri = self.readers[&n];
 
@@ -350,7 +375,7 @@ impl<'a> Migration<'a> {
     /// Set up the given node such that its output can be efficiently queried.
     ///
     /// To query into the maintained state, use `ControllerInner::get_getter`.
-    pub(super) fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
+    pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
         self.ensure_reader_for(n, Some(name));
         let ri = self.readers[&n];
 
@@ -364,29 +389,23 @@ impl<'a> Migration<'a> {
     /// This will spin up an execution thread for each new thread domain, and hook those new
     /// domains into the larger Soup graph. The returned map contains entry points through which
     /// new updates should be sent to introduce them into the Soup.
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     pub(super) fn commit(self) {
         info!(self.log, "finalizing migration"; "#nodes" => self.added.len());
 
         let log = self.log;
         let start = self.start;
         let mut mainline = self.mainline;
-        let mut new: HashSet<_> = self.added.into_iter().collect();
-
-        // Readers are nodes too.
-        for (_parent, reader) in self.readers {
-            new.insert(reader);
-        }
+        let mut new = self.added;
+        let mut topo = mainline.topo_order(&new);
 
         // Shard the graph as desired
         let mut swapped0 = if let Some(shards) = mainline.sharding {
-            sharding::shard(
-                &log,
-                &mut mainline.ingredients,
-                mainline.source,
-                &mut new,
-                shards,
-            )
+            let (t, swapped) =
+                sharding::shard(&log, &mut mainline.ingredients, &mut new, &topo, shards);
+            topo = t;
+
+            swapped
         } else {
             HashMap::default()
         };
@@ -395,13 +414,19 @@ impl<'a> Migration<'a> {
         assignment::assign(
             &log,
             &mut mainline.ingredients,
-            mainline.source,
-            &new,
+            &topo,
             &mut mainline.ndomains,
         );
 
         // Set up ingress and egress nodes
-        let swapped1 = routing::add(&log, &mut mainline.ingredients, mainline.source, &mut new);
+        let swapped1 = routing::add(
+            &log,
+            &mut mainline.ingredients,
+            mainline.source,
+            &mut new,
+            &topo,
+        );
+        topo = mainline.topo_order(&new);
 
         // Merge the swap lists
         for ((dst, src), instead) in swapped1 {
@@ -556,7 +581,7 @@ impl<'a> Migration<'a> {
         }
 
         if let Some(shards) = mainline.sharding {
-            sharding::validate(&log, &mainline.ingredients, mainline.source, &new, shards)
+            sharding::validate(&log, &mainline.ingredients, &topo, shards)
         };
 
         // at this point, we've hooked up the graph such that, for any given domain, the graph
@@ -579,16 +604,29 @@ impl<'a> Migration<'a> {
         // etc.
         // println!("{}", mainline);
 
-        let mut uninformed_domain_nodes = mainline
-            .ingredients
-            .node_indices()
-            .filter(|&ni| ni != mainline.source)
-            .filter(|&ni| !mainline.ingredients[ni].is_dropped())
-            .map(|ni| (mainline.ingredients[ni].domain(), ni, new.contains(&ni)))
-            .fold(HashMap::new(), |mut dns, (d, ni, new)| {
-                dns.entry(d).or_insert_with(Vec::new).push((ni, new));
-                dns
-            });
+        for &ni in &new {
+            let n = &mainline.ingredients[ni];
+            if ni != mainline.source && !n.is_dropped() {
+                let di = n.domain();
+                mainline
+                    .domain_nodes
+                    .entry(di)
+                    .or_insert_with(Vec::new)
+                    .push(ni);
+            }
+        }
+        let mut uninformed_domain_nodes: HashMap<_, _> = changed_domains
+            .iter()
+            .map(|&di| {
+                let mut m = mainline.domain_nodes[&di]
+                    .iter()
+                    .cloned()
+                    .map(|ni| (ni, new.contains(&ni)))
+                    .collect::<Vec<_>>();
+                m.sort();
+                (di, m)
+            })
+            .collect();
 
         fn reset_wis(mainline: &ControllerInner) -> std::vec::IntoIter<WorkerIdentifier> {
             let mut wis_sorted = mainline
@@ -723,7 +761,7 @@ impl<'a> Migration<'a> {
         // And now, the last piece of the puzzle -- set up materializations
         info!(log, "initializing new materializations");
         mainline.materializations.commit(
-            &mainline.ingredients,
+            &mut mainline.ingredients,
             &new,
             &mut mainline.domains,
             &mainline.workers,

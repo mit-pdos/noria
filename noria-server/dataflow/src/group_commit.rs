@@ -30,11 +30,12 @@ impl GroupCommitQueueSet {
 
     /// Find the first queue that has timed out waiting for more packets, and flush it to disk.
     pub fn flush_if_necessary(&mut self) -> Option<Box<Packet>> {
+        let now = time::Instant::now();
         let to = self.params.flush_timeout;
         let node = self
             .pending_packets
             .iter()
-            .find(|(_, &(ref first, ref ps))| first.elapsed() >= to && !ps.is_empty())
+            .find(|(_, &(first, ref ps))| now.duration_since(first) >= to && !ps.is_empty())
             .map(|(n, _)| n);
 
         if let Some(node) = node {
@@ -74,6 +75,7 @@ impl GroupCommitQueueSet {
     pub fn duration_until_flush(&self) -> Option<time::Duration> {
         self.pending_packets
             .values()
+            .filter(|(_, ps)| !ps.is_empty())
             .map(|p| {
                 self.params
                     .flush_timeout

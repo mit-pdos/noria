@@ -56,6 +56,13 @@ if you're using [`rustup.rs`](https://rustup.rs/). To build
 $ cargo build --release --bin noria-server
 ```
 
+You may need to install some dependencies for the above to work:
+
+ - clang
+ - libclang-dev
+ - libssl-dev
+ - liblz4-dev
+
 To start a long-running `noria-server` instance, ensure that ZooKeeper
 is running, and then run:
 
@@ -81,11 +88,12 @@ ZooKeeper is not running on `localhost:2181`).
 
 The [`noria` crate](https://crates.io/crates/noria) provides native Rust
 bindings to interact with `noria-server`. See the [`noria`
-documentation](https://jon.thesquareplanet.com/crates/noria/) for detailed instructions on how
-to use the library. You can also take a look at the [example Noria
-program](noria/examples/basic-recipe.rs). You can also see a
-self-contained version that embeds `noria-server` (and doesn't require
-ZooKeeper) in [this example](noria-server/examples/basic-recipe.rs).
+documentation](https://jon.thesquareplanet.com/crates/noria/) for detailed
+instructions on how to use the library. You can also take a look at the
+[example Noria program](noria/examples/quickstart.rs) using Noria's async client
+API, or the same example using [the synchronous API](noria/examples/basic-distribution.rs).
+You can also see a self-contained version that embeds `noria-server` (and
+doesn't require ZooKeeper) in [this example](noria-server/examples/local-server.rs).
 
 ### MySQL adapter
 
@@ -117,7 +125,7 @@ executing data-flow operators (`noria-server/dataflow`). The code in
 establishing materializations, scheduling data-flow work, orchestrating
 Noria program changes, handling failovers, etc.
 
-[`noria-server/lib.rs`](src/lib.rs) has a pretty extensive comment at
+[`noria-server/lib.rs`](noria-server/src/lib.rs) has a pretty extensive comment at
 the top of it that goes through how the Noria internals fit together at
 an implementation level. While it occasionally lags behind, especially
 following larger changes, it should serve to get you familiarized with

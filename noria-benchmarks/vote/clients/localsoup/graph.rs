@@ -1,4 +1,4 @@
-use noria::{self, LocalAuthority, NodeIndex, PersistenceParameters, SyncHandle};
+use noria::{self, FrontierStrategy, LocalAuthority, NodeIndex, PersistenceParameters, SyncHandle};
 use tokio::prelude::*;
 
 pub(crate) const RECIPE: &str = "# base tables
@@ -6,10 +6,12 @@ CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
 CREATE TABLE Vote (article_id int, user int);
 
 # read queries
+CREATE VIEW VoteCount AS \
+  SELECT Vote.article_id, COUNT(user) AS votes FROM Vote GROUP BY Vote.article_id;
+
 QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
             FROM Article \
-            LEFT JOIN (SELECT Vote.article_id, COUNT(user) AS votes \
-                       FROM Vote GROUP BY Vote.article_id) AS VoteCount \
+            LEFT JOIN VoteCount \
             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
 pub struct Graph {
@@ -26,6 +28,7 @@ pub struct Builder {
     pub sharding: Option<usize>,
     pub logging: bool,
     pub threads: Option<usize>,
+    pub purge: String,
 }
 
 impl Default for Builder {
@@ -36,6 +39,7 @@ impl Default for Builder {
             sharding: None,
             logging: false,
             threads: None,
+            purge: "none".to_string(),
         }
     }
 }
@@ -71,6 +75,16 @@ impl Builder {
         if let Some(threads) = self.threads {
             g.set_threads(threads);
         }
+        match &*self.purge {
+            "all" => {
+                g.set_frontier_strategy(FrontierStrategy::AllPartial);
+            }
+            "reader" => {
+                g.set_frontier_strategy(FrontierStrategy::Readers);
+            }
+            "none" => {}
+            _ => unreachable!(),
+        }
 
         let graph = g
             .start_local()
@@ -79,7 +93,7 @@ impl Builder {
         let logging = self.logging;
         let stupid = self.stupid;
         graph
-            .and_then(|mut graph| graph.handle().install_recipe(RECIPE).map(move |_| graph))
+            .and_then(move |mut graph| graph.handle().install_recipe(RECIPE).map(move |_| graph))
             .and_then(|mut graph| graph.handle().inputs().map(move |x| (graph, x)))
             .and_then(|(mut graph, inputs)| {
                 graph.handle().outputs().map(move |x| (graph, inputs, x))
