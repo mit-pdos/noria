@@ -31,8 +31,6 @@ fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
 }
 
-const MAX_BATCH_TIME_US: u32 = 1000;
-
 mod clients;
 use self::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 
@@ -48,10 +46,7 @@ where
 {
     // zipf takes ~66ns to generate a random number depending on the CPU,
     // so each load generator cannot reasonably generate much more than ~1M reqs/s.
-    let per_generator = 3_000_000;
-    let mut target = value_t_or_exit!(global_args, "ops", f64);
-    let ngen = (target as usize + per_generator - 1) / per_generator; // rounded up
-    target /= ngen as f64;
+    let ngen = 1;
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
@@ -104,7 +99,6 @@ where
                     run_generator(
                         handle,
                         ex,
-                        target,
                         global_args,
                     )
                 })
@@ -137,7 +131,6 @@ where
 fn run_generator<C>(
     mut handle: C,
     ex: tokio::runtime::TaskExecutor,
-    target: f64,
     global_args: clap::ArgMatches,
 ) -> (f64, f64)
 where
@@ -149,30 +142,25 @@ where
     <C as Service<WriteRequest>>::Future: Send,
     <C as Service<WriteRequest>>::Response: Send,
 {
-    let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
 
     let start = time::Instant::now();
     let end = start + warmup + runtime;
 
-    let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
-    let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
-
-    let measure_delay_every = value_t_or_exit!(global_args, "measure-delay-every", u64);
+    let interarrival_time = value_t_or_exit!(global_args, "interarrival-us", u32) * 1_000;
+    let interarrival_time = time::Duration::new(0, interarrival_time);
 
     let mut ops = 0;
 
     let first = time::Instant::now();
     let mut next = time::Instant::now();
-    let mut next_send = None;
 
     let mut queued_w = Vec::new();
     let mut queued_w_keys = Vec::new();
     let mut queued_r = Vec::new();
     let mut queued_r_keys = Vec::new();
 
-    let mut rng = rand::thread_rng();
     let mut task = tokio_mock_task::MockTask::new();
 
     // we *could* use a rayon::scope here to safely access stack variables from inside each job,
@@ -229,17 +217,16 @@ where
                     let actual_count = locks.1.lock().unwrap();
                     if read_count != *actual_count {
                         // haven't read our write yet
-                        // println!("read {}, actual {}", read_count, actual_count);
                         assert!(read_count < *actual_count);
                         continue;
                     }
 
-                    // println!("Read {}th vote at {:?} ({} sent at time {:?})", read_count, done, *actual_count, *w_time);
+                    // println!("Read {}th vote at {:?}", read_count, done);
                     if let Some(w_time) = w_time.take() {
                         let delay = done.duration_since(w_time);
                         let us =
-                            delay.as_secs() * 1_000_000 / measure_delay_every +
-                            u64::from(delay.subsec_nanos()) / 1_000 / measure_delay_every;
+                            delay.as_secs() * 1_000_000 +
+                            u64::from(delay.subsec_nanos()) / 1_000;
                         &WP_DELAY.with(|h| {
                             let mut h = h.borrow_mut();
                             if h.record(us).is_err() {
@@ -266,135 +253,96 @@ where
     'outer: while next < end {
         let now = time::Instant::now();
         // NOTE: while, not if, in case we start falling behind
-        while next <= now {
-            use rand::distributions::Distribution;
-
+        if next <= now {
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
             let locks = (W_TIME.clone(), ACTUAL_COUNT.clone());
             let mut w_time = locks.0.lock().unwrap();
             let mut actual_count = locks.1.lock().unwrap();
             if w_time.is_none() {
-                if queued_w.is_empty() && next_send.is_none() {
-                    next_send = Some(next + max_batch_time);
-                }
                 queued_w_keys.push(id);
                 queued_w.push(next);
                 *actual_count += 1;
-                if *actual_count % measure_delay_every == 0 {
-                    *w_time = Some(now);
-                }
-            } else {
-                if queued_r.is_empty() && next_send.is_none() {
-                    next_send = Some(next + max_batch_time);
-                }
-                queued_r_keys.push(id);
-                queued_r.push(next);
+                *w_time = Some(now);
+                // println!("Wrote {}th vote at {:?}", *actual_count, now);
             }
+            // always queue a read, delay to accuracy of 100 us
+            queued_r_keys.push(id);
+            queued_r.push(next);
 
             // schedule next delivery
-            next += time::Duration::new(0, interarrival.sample(&mut rng) as u32);
+            next += interarrival_time;
         }
 
         // in case that took a while:
         let now = time::Instant::now();
 
-        if let Some(f) = next_send {
-            if f <= now {
-                // time to send at least one batch
-                if !queued_w.is_empty() && now.duration_since(queued_w[0]) >= max_batch_time {
-                    if let Async::Ready(()) =
-                        task.enter(|| Service::<WriteRequest>::poll_ready(&mut handle).unwrap())
-                    {
-                        ops += queued_w.len();
-                        enqueue(
-                            &mut handle,
-                            queued_w.split_off(0),
-                            queued_w_keys.split_off(0),
-                            true,
-                        );
-                    } else {
-                        // we can't send the request yet -- generate a larger batch
-                    }
-                }
+        // time to send at least one batch
+        if !queued_w.is_empty() {
+            if let Async::Ready(()) =
+                task.enter(|| Service::<WriteRequest>::poll_ready(&mut handle).unwrap())
+            {
+                ops += queued_w.len();
+                enqueue(
+                    &mut handle,
+                    queued_w.split_off(0),
+                    queued_w_keys.split_off(0),
+                    true,
+                );
+            } else {
+                // we can't send the request yet -- generate a larger batch
+            }
+        }
 
-                if !queued_r.is_empty() && now.duration_since(queued_r[0]) >= max_batch_time {
-                    if let Async::Ready(()) =
-                        task.enter(|| Service::<ReadRequest>::poll_ready(&mut handle).unwrap())
-                    {
-                        ops += queued_r.len();
-                        enqueue(
-                            &mut handle,
-                            queued_r.split_off(0),
-                            queued_r_keys.split_off(0),
-                            false,
-                        );
-                    } else {
-                        // we can't send the request yet -- generate a larger batch
-                    }
-                }
+        if !queued_r.is_empty() {
+            if let Async::Ready(()) =
+                task.enter(|| Service::<ReadRequest>::poll_ready(&mut handle).unwrap())
+            {
+                ops += queued_r.len();
+                enqueue(
+                    &mut handle,
+                    queued_r.split_off(0),
+                    queued_r_keys.split_off(0),
+                    false,
+                );
+            } else {
+                // we can't send the request yet -- generate a larger batch
+            }
+        }
 
-                // since next_send = Some, we better have sent at least one batch!
-                // if not, the service must have not been ready, so we just continue
-                if !queued_r.is_empty() && !queued_w.is_empty() {
-                    continue 'outer;
-                }
+        // since next_send = Some, we better have sent at least one batch!
+        // if not, the service must have not been ready, so we just continue
+        if !queued_r.is_empty() && !queued_w.is_empty() {
+            continue 'outer;
+        }
 
-                next_send = None;
-                if let Some(&qw) = queued_w.get(0) {
-                    next_send = Some(qw + max_batch_time);
-                }
-                if let Some(&qr) = queued_r.get(0) {
-                    next_send = Some(qr + max_batch_time);
-                }
-
-                // if the clients aren't keeping up, we want to make sure that we'll still
-                // finish around the stipulated end time. we unfortunately can't rely on just
-                // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
-                // we instead need to stop issuing requests earlier than we otherwise would
-                // have. but make sure we're not still in the warmup phase, because the clients
-                // *could* speed up
-                let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
-                let dur = first.elapsed().as_secs();
-                let rate = if dur != seconds {
-                    let diff = clients_completed - last_total;
-                    last_total = clients_completed;
-                    seconds = dur;
-                    Some((diff, clients_completed / seconds))
-                } else {
-                    None
-                };
-                if now.duration_since(start) > warmup {
-                    if let Some(rate) = rate {
-                        println!("{}: current {}, avg {}", seconds, rate.0, rate.1);
-                    }
-                    if worker_ops.is_none() {
-                        worker_ops =
-                            Some((time::Instant::now(), ndone.load(atomic::Ordering::Acquire)));
-                    }
-
-                    if early_exit && now < end {
-                        let queued = ops as u64 - clients_completed;
-                        if dur > 0 {
-                            let client_rate = clients_completed / dur;
-                            if client_rate > 0 {
-                                let client_work_left = queued / client_rate;
-                                if client_work_left > (end - now).as_secs() + 1 {
-                                    // no point in continuing to feed work to the clients
-                                    // they have enough work to keep them busy until the end
-                                    eprintln!(
-                                    "load generator quitting early as clients are falling behind"
-                                );
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if let Some(rate) = rate {
-                        println!("{}: current {}, avg {} (warmup)", seconds, rate.0, rate.1);
-                    }
-                }
+        // if the clients aren't keeping up, we want to make sure that we'll still
+        // finish around the stipulated end time. we unfortunately can't rely on just
+        // dropping the thread pool (https://github.com/rayon-rs/rayon/issues/544), so
+        // we instead need to stop issuing requests earlier than we otherwise would
+        // have. but make sure we're not still in the warmup phase, because the clients
+        // *could* speed up
+        let clients_completed = ndone.load(atomic::Ordering::Acquire) as u64;
+        let dur = first.elapsed().as_secs();
+        let rate = if dur != seconds {
+            let diff = clients_completed - last_total;
+            last_total = clients_completed;
+            seconds = dur;
+            Some((diff, clients_completed / seconds))
+        } else {
+            None
+        };
+        if now.duration_since(start) > warmup {
+            if let Some(rate) = rate {
+                println!("{}: current {}, avg {}", seconds, rate.0, rate.1);
+            }
+            if worker_ops.is_none() {
+                worker_ops =
+                    Some((time::Instant::now(), ndone.load(atomic::Ordering::Acquire)));
+            }
+        } else {
+            if let Some(rate) = rate {
+                println!("{}: current {}, avg {} (warmup)", seconds, rate.0, rate.1);
             }
         }
 
@@ -454,27 +402,16 @@ fn main() {
                 .help("Warmup time in seconds"),
         )
         .arg(
-            Arg::with_name("measure-delay-every")
-                .long("measure-delay-every")
+            Arg::with_name("interarrival-us")
+                .long("interarrival-us")
                 .takes_value(true)
-                .default_value("1")
-                .help("Do reads to measure propagation delay every x writes"),
-        )
-        .arg(
-            Arg::with_name("ops")
-                .long("target")
-                .default_value("1000000")
-                .help("Target operations per second"),
+                .default_value("100")
+                .help("Frequency with which to check read for write propagation article in us"),
         )
         .arg(
             Arg::with_name("no-prime")
                 .long("no-prime")
                 .help("Indicates that the client should not set up the database"),
-        )
-        .arg(
-            Arg::with_name("no-early-exit")
-                .long("no-early-exit")
-                .help("Don't stop generating load when clients fall behind."),
         )
         .subcommand(SubCommand::with_name("null"))
         .subcommand(
