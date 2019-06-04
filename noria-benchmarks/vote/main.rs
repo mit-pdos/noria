@@ -26,6 +26,8 @@ thread_local! {
     static WP_DELAY: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
 }
 
+const RESERVED_KEY: i32 = 1;
+
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
 }
@@ -386,7 +388,12 @@ where
 
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
-            let id = id_rng.sample(&mut rng) as i32;
+            let id = loop {
+                let id = id_rng.sample(&mut rng) as i32;
+                if id != RESERVED_KEY {
+                    break id;
+                }
+            };
             if rng.gen_bool(1.0 / f64::from(every)) {
                 if queued_w.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
