@@ -23,6 +23,7 @@ thread_local! {
     static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static WP_DELAY: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
@@ -76,9 +77,11 @@ where
             deserializer.deserialize(&mut f).unwrap(),
             deserializer.deserialize(&mut f).unwrap(),
             deserializer.deserialize(&mut f).unwrap(),
+            deserializer.deserialize(&mut f).unwrap(),
         )
     } else {
         (
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
             Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
             Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
             Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
@@ -90,6 +93,7 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
+    let wp_delay = Arc::new(Mutex::new(hists.4));
     let finished = Arc::new(Barrier::new(nthreads + ngen));
 
     let ts = (
@@ -97,6 +101,7 @@ where
         sjrn_r_t.clone(),
         rmt_w_t.clone(),
         rmt_r_t.clone(),
+        wp_delay.clone(),
         finished.clone(),
     );
     let mut rt = tokio::runtime::Builder::new()
@@ -113,6 +118,9 @@ where
                 .unwrap();
             RMT_R
                 .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            WP_DELAY
+                .with(|h| ts.4.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
         })
         .build()
@@ -172,6 +180,12 @@ where
     rt.shutdown_on_idle().wait().unwrap();
 
     // all done!
+    let wp_delay = wp_delay.lock().unwrap();
+    println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
+    println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
+    println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
+    println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
+
     println!("# generated ops/s: {:.2}", ops);
     println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
