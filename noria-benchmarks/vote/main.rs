@@ -7,6 +7,7 @@ extern crate clap;
 
 use failure::ResultExt;
 use hdrhistogram::Histogram;
+use noria::DataType;
 use rand::Rng;
 use std::cell::RefCell;
 use std::fs;
@@ -36,8 +37,8 @@ use self::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
     C: VoteClient + 'static,
-    C: Service<ReadRequest, Response = (), Error = failure::Error> + Clone + Send,
-    C: Service<WriteRequest, Response = (), Error = failure::Error> + Clone + Send,
+    C: Service<ReadRequest, Response = Vec<Vec<Vec<DataType>>>, Error = failure::Error> + Clone + Send,
+    C: Service<WriteRequest, Response = Vec<Vec<Vec<DataType>>>, Error = failure::Error> + Clone + Send,
     <C as Service<ReadRequest>>::Future: Send,
     <C as Service<ReadRequest>>::Response: Send,
     <C as Service<WriteRequest>>::Future: Send,
@@ -249,8 +250,8 @@ fn run_generator<C, R>(
 where
     C: VoteClient + 'static,
     R: rand::distributions::Distribution<usize>,
-    C: Service<ReadRequest, Response = (), Error = failure::Error> + Clone + Send,
-    C: Service<WriteRequest, Response = (), Error = failure::Error> + Clone + Send,
+    C: Service<ReadRequest, Response = Vec<Vec<Vec<DataType>>>, Error = failure::Error> + Clone + Send,
+    C: Service<WriteRequest, Response = Vec<Vec<Vec<DataType>>>, Error = failure::Error> + Clone + Send,
     <C as Service<ReadRequest>>::Future: Send,
     <C as Service<ReadRequest>>::Response: Send,
     <C as Service<WriteRequest>>::Future: Send,
@@ -316,7 +317,7 @@ where
                     .then(|r| r.context("failed to handle reads")),
             )
         }
-        .map(move |_| {
+        .map(move |rows| {
             let done = time::Instant::now();
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
@@ -345,6 +346,12 @@ where
                             h.record(m).unwrap();
                         }
                     });
+                }
+
+                if !write {
+                    for row in rows {
+                        let key: i32 = row[0][0].clone().into();
+                    }
                 }
             }
         });

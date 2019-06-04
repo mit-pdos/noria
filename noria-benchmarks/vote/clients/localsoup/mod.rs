@@ -2,6 +2,7 @@ use crate::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
 use failure::ResultExt;
 use noria::{self, TableOperation};
+use noria::DataType;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time;
@@ -121,9 +122,9 @@ impl VoteClient for LocalNoria {
 }
 
 impl Service<ReadRequest> for LocalNoria {
-    type Response = ();
+    type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = (), Error = failure::Error> + Send>;
+    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.r
@@ -149,6 +150,7 @@ impl Service<ReadRequest> for LocalNoria {
                 .map(move |rows| {
                     // TODO: assert_eq!(rows.map(|rows| rows.len()), Ok(1));
                     assert_eq!(rows.len(), len);
+                    rows
                 })
                 .map_err(failure::Error::from),
         )
@@ -156,9 +158,9 @@ impl Service<ReadRequest> for LocalNoria {
 }
 
 impl Service<WriteRequest> for LocalNoria {
-    type Response = ();
+    type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = (), Error = failure::Error> + Send>;
+    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Service::<Vec<TableOperation>>::poll_ready(self.w.as_mut().unwrap())
@@ -177,7 +179,7 @@ impl Service<WriteRequest> for LocalNoria {
                 .as_mut()
                 .unwrap()
                 .call(data)
-                .map(|_| ())
+                .map(|_| vec![])
                 .map_err(failure::Error::from),
         )
     }

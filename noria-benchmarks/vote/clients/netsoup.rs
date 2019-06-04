@@ -3,6 +3,7 @@ use crate::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
 use failure::ResultExt;
 use noria::{self, ControllerHandle, TableOperation, ZookeeperAuthority};
+use noria::DataType;
 use tokio::prelude::*;
 use tower_service::Service;
 
@@ -67,9 +68,9 @@ impl VoteClient for Conn {
 }
 
 impl Service<ReadRequest> for Conn {
-    type Response = ();
+    type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = (), Error = failure::Error> + Send>;
+    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.r
@@ -95,6 +96,7 @@ impl Service<ReadRequest> for Conn {
                 .map(move |rows| {
                     // TODO: assert_eq!(rows.map(|rows| rows.len()), Ok(1));
                     assert_eq!(rows.len(), len);
+                    rows
                 })
                 .map_err(failure::Error::from),
         )
@@ -102,9 +104,9 @@ impl Service<ReadRequest> for Conn {
 }
 
 impl Service<WriteRequest> for Conn {
-    type Response = ();
+    type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = (), Error = failure::Error> + Send>;
+    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Service::<Vec<TableOperation>>::poll_ready(self.w.as_mut().unwrap())
@@ -123,7 +125,7 @@ impl Service<WriteRequest> for Conn {
                 .as_mut()
                 .unwrap()
                 .call(data)
-                .map(|_| ())
+                .map(|_| vec![])
                 .map_err(failure::Error::from),
         )
     }
