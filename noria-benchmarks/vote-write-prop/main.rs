@@ -24,14 +24,14 @@ thread_local! {
 
 lazy_static! {
     static ref W_TIME: Arc<Mutex<Option<time::Instant>>> = Arc::new(Mutex::new(None));
-    static ref ACTUAL_COUNT: Arc<Mutex<i64>> = Arc::new(Mutex::new(0));
+    static ref ACTUAL_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
 }
 
-const MAX_BATCH_TIME_US: u32 = 100;
+const MAX_BATCH_TIME_US: u32 = 1000;
 
 mod clients;
 use self::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
@@ -159,6 +159,8 @@ where
     let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
+    let measure_delay_every = value_t_or_exit!(global_args, "measure-delay-every", u64);
+
     let mut ops = 0;
 
     let first = time::Instant::now();
@@ -213,7 +215,6 @@ where
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
             if sent.duration_since(start) > warmup && !write {
-                // println!("{:?}", rows);
                 for row in rows {
                     let read_count = row[0][2].clone();
                     if read_count == DataType::None {
@@ -221,6 +222,7 @@ where
                         continue;
                     }
                     let read_count: i64 = read_count.into();
+                    let read_count = read_count as u64;
 
                     let locks = (W_TIME.clone(), ACTUAL_COUNT.clone());
                     let mut w_time = locks.0.lock().unwrap();
@@ -236,8 +238,8 @@ where
                     if let Some(w_time) = w_time.take() {
                         let delay = done.duration_since(w_time);
                         let us =
-                            delay.as_secs() * 1_000_000 +
-                            u64::from(delay.subsec_nanos()) / 1_000;
+                            delay.as_secs() * 1_000_000 / measure_delay_every +
+                            u64::from(delay.subsec_nanos()) / 1_000 / measure_delay_every;
                         &WP_DELAY.with(|h| {
                             let mut h = h.borrow_mut();
                             if h.record(us).is_err() {
@@ -278,8 +280,10 @@ where
                 }
                 queued_w_keys.push(id);
                 queued_w.push(next);
-                *w_time = Some(now);
                 *actual_count += 1;
+                if *actual_count % measure_delay_every == 0 {
+                    *w_time = Some(now);
+                }
             } else {
                 if queued_r.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
@@ -448,6 +452,13 @@ fn main() {
                 .takes_value(true)
                 .default_value("0")
                 .help("Warmup time in seconds"),
+        )
+        .arg(
+            Arg::with_name("measure-delay-every")
+                .long("measure-delay-every")
+                .takes_value(true)
+                .default_value("1")
+                .help("Do reads to measure propagation delay every x writes"),
         )
         .arg(
             Arg::with_name("ops")
