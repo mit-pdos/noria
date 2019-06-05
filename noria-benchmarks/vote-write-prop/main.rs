@@ -23,8 +23,8 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref W_TIME: Arc<Mutex<Option<time::Instant>>> = Arc::new(Mutex::new(None));
-    static ref ACTUAL_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+    static ref W_TIME_COUNT: Arc<Mutex<(Option<time::Instant>, u64)>> =
+        Arc::new(Mutex::new((None, 0)));
 }
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
@@ -202,7 +202,7 @@ where
             let done = time::Instant::now();
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
-            if sent.duration_since(start) > warmup && !write {
+            if !write {
                 for row in rows {
                     let read_count = row[0][2].clone();
                     if read_count == DataType::None {
@@ -212,28 +212,29 @@ where
                     let read_count: i64 = read_count.into();
                     let read_count = read_count as u64;
 
-                    let locks = (W_TIME.clone(), ACTUAL_COUNT.clone());
-                    let mut w_time = locks.0.lock().unwrap();
-                    let actual_count = locks.1.lock().unwrap();
-                    if read_count != *actual_count {
+                    let w_time_count = W_TIME_COUNT.clone();
+                    let mut w_time_count = w_time_count.lock().unwrap();
+                    if read_count != w_time_count.1 {
                         // haven't read our write yet
-                        assert!(read_count < *actual_count);
+                        assert!(read_count < w_time_count.1);
                         continue;
                     }
 
                     // println!("Read {}th vote at {:?}", read_count, done);
-                    if let Some(w_time) = w_time.take() {
-                        let delay = done.duration_since(w_time);
-                        let us =
-                            delay.as_secs() * 1_000_000 +
-                            u64::from(delay.subsec_nanos()) / 1_000;
-                        &WP_DELAY.with(|h| {
-                            let mut h = h.borrow_mut();
-                            if h.record(us).is_err() {
-                                let m = h.high();
-                                h.record(m).unwrap();
-                            }
-                        });
+                    if let Some(w_time) = w_time_count.0.take() {
+                        if sent.duration_since(start) > warmup {
+                            let delay = done.duration_since(w_time);
+                            let us =
+                                delay.as_secs() * 1_000_000 +
+                                u64::from(delay.subsec_nanos()) / 1_000;
+                            &WP_DELAY.with(|h| {
+                                let mut h = h.borrow_mut();
+                                if h.record(us).is_err() {
+                                    let m = h.high();
+                                    h.record(m).unwrap();
+                                }
+                            });
+                        }
                     }
                 }
             }
@@ -256,19 +257,19 @@ where
         if next <= now {
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
-            let locks = (W_TIME.clone(), ACTUAL_COUNT.clone());
-            let mut w_time = locks.0.lock().unwrap();
-            let mut actual_count = locks.1.lock().unwrap();
-            if w_time.is_none() {
+            let w_time_count = W_TIME_COUNT.clone();
+            let mut w_time_count = w_time_count.lock().unwrap();
+            if w_time_count.0.is_none() {
                 queued_w_keys.push(id);
-                queued_w.push(next);
-                *actual_count += 1;
-                *w_time = Some(now);
+                queued_w.push(now);
+                *w_time_count = (Some(now), w_time_count.1 + 1);
                 // println!("Wrote {}th vote at {:?}", *actual_count, now);
+            } else {
+                // delay to accuracy of interarrival time
+                queued_r_keys.push(id);
+                queued_r.push(now);
             }
-            // always queue a read, delay to accuracy of 100 us
-            queued_r_keys.push(id);
-            queued_r.push(next);
+            drop(w_time_count);
 
             // schedule next delivery
             next += interarrival_time;
