@@ -19,6 +19,10 @@ use tokio::prelude::*;
 use tower_service::Service;
 
 thread_local! {
+    static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+    static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static WP_DELAY: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
 }
 
@@ -56,19 +60,48 @@ where
         articles,
     };
 
-    let hist = Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap();
-    let wp_delay = Arc::new(Mutex::new(hist));
+    let hists = {
+        (
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+            Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap(),
+        )
+    };
+
+    let sjrn_w_t = Arc::new(Mutex::new(hists.0));
+    let sjrn_r_t = Arc::new(Mutex::new(hists.1));
+    let rmt_w_t = Arc::new(Mutex::new(hists.2));
+    let rmt_r_t = Arc::new(Mutex::new(hists.3));
+    let wp_delay = Arc::new(Mutex::new(hists.4));
     let finished = Arc::new(Barrier::new(nthreads + ngen));
 
     let ts = (
+        sjrn_w_t.clone(),
+        sjrn_r_t.clone(),
+        rmt_w_t.clone(),
+        rmt_r_t.clone(),
         wp_delay.clone(),
         finished.clone(),
     );
     let mut rt = tokio::runtime::Builder::new()
         .name_prefix("vote-")
         .before_stop(move || {
-            WP_DELAY
+            SJRN_W
                 .with(|h| ts.0.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            SJRN_R
+                .with(|h| ts.1.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            RMT_W
+                .with(|h| ts.2.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            RMT_R
+                .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
+                .unwrap();
+            WP_DELAY
+                .with(|h| ts.4.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
 
         })
@@ -118,14 +151,60 @@ where
 
     // all done!
     let wp_delay = wp_delay.lock().unwrap();
-
-    println!("# generated ops/s: {:.2}", ops);
-    println!("# actual ops/s: {:.2}", wops);
-    println!("# op\tpct\tdelay");
     println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
     println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
     println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
     println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
+
+    println!("# generated ops/s: {:.2}", ops);
+    println!("# actual ops/s: {:.2}", wops);
+    println!("# op\tpct\tsojourn\tremote");
+
+    let sjrn_w_t = sjrn_w_t.lock().unwrap();
+    let sjrn_r_t = sjrn_r_t.lock().unwrap();
+    let rmt_w_t = rmt_w_t.lock().unwrap();
+    let rmt_r_t = rmt_r_t.lock().unwrap();
+
+    println!(
+        "write\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.5),
+        rmt_w_t.value_at_quantile(0.5)
+    );
+    println!(
+        "read\t50\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.5),
+        rmt_r_t.value_at_quantile(0.5)
+    );
+    println!(
+        "write\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.95),
+        rmt_w_t.value_at_quantile(0.95)
+    );
+    println!(
+        "read\t95\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.95),
+        rmt_r_t.value_at_quantile(0.95)
+    );
+    println!(
+        "write\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.value_at_quantile(0.99),
+        rmt_w_t.value_at_quantile(0.99)
+    );
+    println!(
+        "read\t99\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.value_at_quantile(0.99),
+        rmt_r_t.value_at_quantile(0.99)
+    );
+    println!(
+        "write\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_w_t.max(),
+        rmt_w_t.max()
+    );
+    println!(
+        "read\t100\t{:.2}\t{:.2}\t(all µs)",
+        sjrn_r_t.max(),
+        rmt_r_t.max()
+    );
 }
 
 fn run_generator<C>(
@@ -200,6 +279,7 @@ where
         }
         .map(move |rows| {
             let done = time::Instant::now();
+            let warmup_done = sent.duration_since(start) > warmup;
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
             if !write {
@@ -222,7 +302,7 @@ where
 
                     // println!("Read {}th vote at {:?}", read_count, done);
                     if let Some(w_time) = w_time_count.0.take() {
-                        if sent.duration_since(start) > warmup {
+                        if warmup_done {
                             let delay = done.duration_since(w_time);
                             let us =
                                 delay.as_secs() * 1_000_000 +
@@ -237,6 +317,20 @@ where
                         }
                     }
                 }
+            }
+
+            if warmup_done {
+                let remote_t = done.duration_since(sent);
+                let rmt = if write { &RMT_W } else { &RMT_R };
+                let us =
+                    remote_t.as_secs() * 1_000_000 + u64::from(remote_t.subsec_nanos()) / 1_000;
+                rmt.with(|h| {
+                    let mut h = h.borrow_mut();
+                    if h.record(us).is_err() {
+                        let m = h.high();
+                        h.record(m).unwrap();
+                    }
+                });
             }
         });
 
@@ -263,7 +357,7 @@ where
                 queued_w_keys.push(id);
                 queued_w.push(now);
                 *w_time_count = (Some(now), w_time_count.1 + 1);
-                // println!("Wrote {}th vote at {:?}", *actual_count, now);
+                // println!("Wrote {}th vote at {:?}", w_time_count.1, now);
             } else {
                 // delay to accuracy of interarrival time
                 queued_r_keys.push(id);
