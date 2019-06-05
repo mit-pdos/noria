@@ -39,8 +39,6 @@ fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
 }
 
-const MAX_BATCH_TIME_US: u32 = 1000;
-
 mod clients;
 use self::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 
@@ -287,7 +285,8 @@ where
     let start = time::Instant::now();
     let end = start + warmup + runtime;
 
-    let max_batch_time = time::Duration::new(0, MAX_BATCH_TIME_US * 1_000);
+    let max_batch_time_us = value_t_or_exit!(global_args, "max-batch-time-us", u32);
+    let max_batch_time = time::Duration::new(0, max_batch_time_us * 1_000);
     let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
@@ -648,6 +647,12 @@ fn main() {
                 .default_value("19")
                 .value_name("N")
                 .help("1-in-N chance of a write"),
+        )
+        .arg(
+            Arg::with_name("max-batch-time-us")
+                .long("max-batch-time-us")
+                .default_value("1000")
+                .help("Time between sending batches to Noria."),
         )
         .arg(
             Arg::with_name("no-prime")
