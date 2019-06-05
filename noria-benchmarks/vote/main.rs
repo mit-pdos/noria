@@ -4,6 +4,8 @@
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate lazy_static;
 
 use failure::ResultExt;
 use hdrhistogram::Histogram;
@@ -24,6 +26,11 @@ thread_local! {
     static RMT_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static RMT_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static WP_DELAY: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
+}
+
+lazy_static! {
+    static ref W_TIME_COUNT: Arc<Mutex<(Option<time::Instant>, u64)>> =
+        Arc::new(Mutex::new((None, 0)));
 }
 
 const RESERVED_KEY: i32 = 1;
@@ -367,6 +374,39 @@ where
                 if !write {
                     for row in rows {
                         let key: i32 = row[0][0].clone().into();
+                        if key != RESERVED_KEY {
+                            continue;
+                        }
+                        let read_count = row[0][2].clone();
+                        if read_count == DataType::None {
+                            // no writes yet
+                            continue;
+                        }
+                        let read_count: i64 = read_count.into();
+                        let read_count = read_count as u64;
+
+                        let w_time_count = W_TIME_COUNT.clone();
+                        let mut w_time_count = w_time_count.lock().unwrap();
+                        if read_count != w_time_count.1 {
+                            // haven't read our write yet
+                            assert!(read_count < w_time_count.1);
+                            continue;
+                        }
+
+                        // println!("Read {}th vote at {:?}", read_count, done);
+                        if let Some(w_time) = w_time_count.0.take() {
+                            let delay = done.duration_since(w_time);
+                            let us =
+                                delay.as_secs() * 1_000_000 +
+                                u64::from(delay.subsec_nanos()) / 1_000;
+                            &WP_DELAY.with(|h| {
+                                let mut h = h.borrow_mut();
+                                if h.record(us).is_err() {
+                                    let m = h.high();
+                                    h.record(m).unwrap();
+                                }
+                            });
+                        }
                     }
                 }
             }
@@ -411,6 +451,30 @@ where
             // schedule next delivery
             next += time::Duration::new(0, interarrival.sample(&mut rng) as u32);
         }
+
+        // send one write or read for the reserved key per batch
+        let w_time_count = W_TIME_COUNT.clone();
+        let mut w_time_count = w_time_count.lock().unwrap();
+        if w_time_count.0.is_none() {
+            if queued_w.is_empty() && next_send.is_none() {
+                next_send = Some(now + max_batch_time);
+            }
+            queued_w_keys.pop();
+            queued_w.pop();
+            queued_w_keys.push(RESERVED_KEY);
+            queued_w.push(now);  // might mess up sojourn time
+            *w_time_count = (Some(now), w_time_count.1 + 1);
+            // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
+        } else {
+            if queued_r.is_empty() && next_send.is_none() {
+                next_send = Some(now + max_batch_time);
+            }
+            queued_r_keys.pop();
+            queued_r.pop();
+            queued_r_keys.push(RESERVED_KEY);
+            queued_r.push(now);  // might mess up sojourn time
+        }
+        drop(w_time_count);
 
         // in case that took a while:
         let now = time::Instant::now();
