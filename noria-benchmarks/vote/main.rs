@@ -341,9 +341,51 @@ where
         }
         .map(move |rows| {
             let done = time::Instant::now();
+            let warmup_done = sent.duration_since(start) > warmup;
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
-            if sent.duration_since(start) > warmup {
+            if !write {
+                for row in rows {
+                    let key: i32 = row[0][0].clone().into();
+                    if key != RESERVED_KEY {
+                        continue;
+                    }
+                    let read_count = row[0][2].clone();
+                    if read_count == DataType::None {
+                        // no writes yet
+                        continue;
+                    }
+                    let read_count: i64 = read_count.into();
+                    let read_count = read_count as u64;
+
+                    let w_time_count = W_TIME_COUNT.clone();
+                    let mut w_time_count = w_time_count.lock().unwrap();
+                    if read_count != w_time_count.1 {
+                        // haven't read our write yet
+                        assert!(read_count < w_time_count.1);
+                        continue;
+                    }
+
+                    // println!("Read {}th vote at {:?}", read_count, done);
+                    if let Some(w_time) = w_time_count.0.take() {
+                        if warmup_done {
+                            let delay = done.duration_since(w_time);
+                            let us =
+                                delay.as_secs() * 1_000_000 +
+                                u64::from(delay.subsec_nanos()) / 1_000;
+                            &WP_DELAY.with(|h| {
+                                let mut h = h.borrow_mut();
+                                if h.record(us).is_err() {
+                                    let m = h.high();
+                                    h.record(m).unwrap();
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
+            if warmup_done {
                 let remote_t = done.duration_since(sent);
                 let rmt = if write { &RMT_W } else { &RMT_R };
                 let us =
@@ -368,45 +410,6 @@ where
                             h.record(m).unwrap();
                         }
                     });
-                }
-
-                if !write {
-                    for row in rows {
-                        let key: i32 = row[0][0].clone().into();
-                        if key != RESERVED_KEY {
-                            continue;
-                        }
-                        let read_count = row[0][2].clone();
-                        if read_count == DataType::None {
-                            // no writes yet
-                            continue;
-                        }
-                        let read_count: i64 = read_count.into();
-                        let read_count = read_count as u64;
-
-                        let w_time_count = W_TIME_COUNT.clone();
-                        let mut w_time_count = w_time_count.lock().unwrap();
-                        if read_count != w_time_count.1 {
-                            // haven't read our write yet
-                            assert!(read_count < w_time_count.1);
-                            continue;
-                        }
-
-                        // println!("Read {}th vote at {:?}", read_count, done);
-                        if let Some(w_time) = w_time_count.0.take() {
-                            let delay = done.duration_since(w_time);
-                            let us =
-                                delay.as_secs() * 1_000_000 +
-                                u64::from(delay.subsec_nanos()) / 1_000;
-                            &WP_DELAY.with(|h| {
-                                let mut h = h.borrow_mut();
-                                if h.record(us).is_err() {
-                                    let m = h.high();
-                                    h.record(m).unwrap();
-                                }
-                            });
-                        }
-                    }
                 }
             }
         });
