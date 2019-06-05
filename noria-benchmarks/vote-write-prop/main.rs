@@ -486,7 +486,7 @@ fn main() {
                 .short("r")
                 .long("runtime")
                 .value_name("N")
-                .default_value("5")
+                .default_value("8")
                 .help("Benchmark runtime in seconds"),
         )
         .arg(
@@ -515,7 +515,7 @@ fn main() {
                     Arg::with_name("shards")
                         .long("shards")
                         .takes_value(true)
-                        .default_value("2")
+                        .default_value("0")
                         .help("Shard the graph this many ways (0 = disable sharding)."),
                 )
                 .arg(
