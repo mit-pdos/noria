@@ -242,14 +242,14 @@ impl Node {
             NodeType::Egress(Some(ref mut e)) => {
                 // TODO(ygina): evictions
                 e.process(
-                    Box::new(Packet::EvictKeys {
+                    &mut Some(Box::new(Packet::EvictKeys {
                         link: Link {
                             src: addr,
                             dst: addr,
                         },
                         tag,
                         keys: keys.to_vec(),
-                    }),
+                    })),
                     0,
                     on_shard.unwrap_or(0),
                     output,

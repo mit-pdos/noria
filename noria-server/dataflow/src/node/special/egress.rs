@@ -87,7 +87,7 @@ impl Egress {
 
     pub fn process(
         &mut self,
-        msg: Box<Packet>,
+        m: &mut Option<Box<Packet>>,
         label: usize,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
@@ -95,32 +95,46 @@ impl Egress {
     ) {
         let &mut Self {
             ref mut txs,
+            ref min_label_to_send,
             ..
         } = self;
 
+        let (mtype, is_replay) = match *m {
+            Some(box Packet::Message { .. }) => ("Message", false),
+            Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", true),
+            _ => unreachable!(),
+        };
+
+        // only send to a node if:
+        // 1) it is requested
+        // 2) the egress knows about it (in min_label_to_send)
+        // 3) the message has a label at least the min label to send, unless it's a replay
+        let to_nodes = to_nodes
+            .iter()
+            .filter(|ni| {
+                if let Some(min_label) = min_label_to_send.get(ni) {
+                    is_replay || label >= *min_label
+                } else {
+                    false
+                }
+            })
+            .collect::<Vec<_>>();
+
         // send any queued updates to all external children
         assert!(!txs.is_empty());
+        let mut sends_left = to_nodes.len();
         for (_, ref mut tx) in txs.iter_mut().enumerate() {
-            if !self.min_label_to_send.contains_key(&tx.node) {
+            if !to_nodes.contains(&&tx.node) {
                 continue;
             }
 
-            if !to_nodes.contains(&tx.node) {
-                continue;
-            }
-
-            let mut m = box msg.clone_data();
-            let (mtype, is_replay) = match *m {
-                Packet::Message { .. } => ("Message", false),
-                Packet::ReplayPiece { .. } => ("ReplayPiece", true),
-                _ => unreachable!(),
+            let mut m = if sends_left > 1 {
+                box m.as_ref().unwrap().clone_data()
+            } else {
+                assert_eq!(sends_left, 1);
+                m.take().unwrap()
             };
-
-            // forward all replays, but only messages with label at least the minimum label
-            let min_label = *self.min_label_to_send.get(&tx.node).unwrap();
-            if !is_replay && label < min_label {
-                continue;
-            }
+            sends_left -= 1;
 
             // src is usually ignored and overwritten by ingress
             // *except* if the ingress is marked as a shard merger
@@ -215,9 +229,8 @@ impl Egress {
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        let m = m.as_ref().map(|m| box m.clone_data()).unwrap();
         let is_replay = match m {
-            box Packet::ReplayPiece { .. } => true,
+            Some(box Packet::ReplayPiece { .. }) => true,
             _ => false,
         };
 
@@ -229,21 +242,21 @@ impl Egress {
         } else {
             self.min_provenance.label() + self.payloads.len() + 1
         };
-        let update = if let Some(diff) = m.as_ref().id() {
+        let update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, label, &[diff.clone()])
         } else {
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
         if !is_replay {
-            self.payloads.push(box m.clone_data());
+            self.payloads.push(box m.as_ref().unwrap().clone_data());
             self.updates.push(self.max_provenance.clone());
         }
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
-        let replay_to = m.as_ref().tag().map(|tag| self.tags.get(&tag).unwrap());
+        let replay_to = m.as_ref().unwrap().tag().map(|tag| self.tags.get(&tag).unwrap());
         let to_nodes = if let Some(ni) = replay_to {
             assert!(is_replay);
             let mut set = HashSet::new();
@@ -350,7 +363,7 @@ impl Egress {
             };
 
             self.process(
-                m,
+                &mut Some(m),
                 label,
                 on_shard.unwrap_or(0),
                 output,
