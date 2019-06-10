@@ -49,19 +49,6 @@ impl Clone for Egress {
 const PROVENANCE_DEPTH: usize = 3;
 
 impl Egress {
-    pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
-        self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
-        self.max_provenance = self.min_provenance.clone();
-    }
-
-    // We initially have sent nothing to each node. Diffs are one depth shorter.
-    fn insert_default_last_provenance(&mut self, ni: NodeIndex) {
-        let mut p = self.min_provenance.clone();
-        p.trim(PROVENANCE_DEPTH - 1);
-        p.zero();
-        self.last_provenance.insert(ni, p);
-    }
-
     pub fn add_tx(&mut self, dst_g: NodeIndex, dst_l: LocalNodeIndex, addr: ReplicaAddr) {
         // avoid adding duplicate egress txs. this happens because we send Update Egress messages
         // both when reconnecting a replicated stateless domain, and so the domain gets the correct
@@ -188,6 +175,19 @@ impl Egress {
         self.tags.remove(&tag);
     }
 
+    pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
+        self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
+        self.max_provenance = self.min_provenance.clone();
+    }
+
+    // We initially have sent nothing to each node. Diffs are one depth shorter.
+    fn insert_default_last_provenance(&mut self, ni: NodeIndex) {
+        let mut p = self.min_provenance.clone();
+        p.trim(PROVENANCE_DEPTH - 1);
+        p.zero();
+        self.last_provenance.insert(ni, p);
+    }
+
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
         if self.min_provenance.new_incoming(old, new) {
             /*
@@ -215,20 +215,7 @@ impl Egress {
         &self.max_provenance
     }
 
-    /// Stores the packet in the buffer and tests whether we should send to each node corresponding
-    /// to an egress tx. Returns the nodes we should actually send to. If a node wasn't returned,
-    /// we are probably waiting for a ResumeAt message from it.
-    ///
-    /// Note that it's ok for the next packet to send to be ahead of the packets that have actually
-    /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
-    /// it is lost anyway on crash.
-    pub fn send_packet(
-        &mut self,
-        m: &mut Option<Box<Packet>>,
-        from: DomainIndex,
-        shard: usize,
-        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) {
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
         let is_replay = match m {
             Some(box Packet::ReplayPiece { .. }) => true,
             _ => false,
@@ -252,10 +239,33 @@ impl Egress {
             self.payloads.push(box m.as_ref().unwrap().clone_data());
             self.updates.push(self.max_provenance.clone());
         }
+    }
+}
+
+impl Egress {
+    /// Stores the packet in the buffer and tests whether we should send to each node corresponding
+    /// to an egress tx. Returns the nodes we should actually send to. If a node wasn't returned,
+    /// we are probably waiting for a ResumeAt message from it.
+    ///
+    /// Note that it's ok for the next packet to send to be ahead of the packets that have actually
+    /// been sent. Either this information is nulled in anticipation of a ResumeAt message, or
+    /// it is lost anyway on crash.
+    pub fn send_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        shard: usize,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        self.preprocess_packet(m, from);
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
+        let is_replay = match m {
+            Some(box Packet::ReplayPiece { .. }) => true,
+            _ => false,
+        };
         let replay_to = m.as_ref().unwrap().tag().map(|tag| self.tags.get(&tag).unwrap());
         let to_nodes = if let Some(ni) = replay_to {
             assert!(is_replay);
