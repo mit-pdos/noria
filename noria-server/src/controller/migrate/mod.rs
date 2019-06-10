@@ -474,6 +474,7 @@ impl<'a> Migration<'a> {
         sorted_new.sort();
 
         // Initialize egress and reader provenance graphs
+        mainline.compute_domain_graph();
         let new_egress = sorted_new
             .iter()
             .filter(|&ni| mainline.ingredients[**ni].is_egress())

@@ -21,7 +21,6 @@ crate use payload::{ReplayPathSegment, SourceChannelIdentifier};
 crate use state::{LookupResult, MemoryState, PersistentState, RecordResult, Row, State};
 crate type StateMap = Map<Box<State>>;
 crate type DomainNodes = Map<cell::RefCell<Node>>;
-crate type ReplicaAddr = (DomainIndex, usize);
 
 use fnv::FnvHashMap;
 use std::collections::VecDeque;
@@ -36,6 +35,8 @@ pub use payload::Packet;
 pub use provenance::{Provenance, ProvenanceUpdate};
 pub use petgraph::graph::NodeIndex;
 pub use Sharding;
+pub type ReplicaAddr = (DomainIndex, usize);
+pub type DomainGraph = petgraph::Graph<ReplicaAddr, Edge>;
 pub type Graph = petgraph::Graph<Node, Edge>;
 pub use DurabilityMode;
 pub use PersistenceParameters;

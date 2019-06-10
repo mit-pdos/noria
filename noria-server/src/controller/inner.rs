@@ -34,6 +34,7 @@ use tokio::prelude::*;
 /// occur at any given point in time.
 pub(super) struct ControllerInner {
     pub(super) ingredients: Graph,
+    pub(super) domain_graph: DomainGraph,
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
@@ -1160,6 +1161,7 @@ impl ControllerInner {
 
         ControllerInner {
             ingredients: g,
+            domain_graph: petgraph::Graph::new(),
             source,
             ndomains: 0,
 
@@ -1760,6 +1762,65 @@ impl ControllerInner {
     fn set_security_config(&mut self, p: String) -> Result<(), String> {
         self.recipe.set_security_config(&p);
         Ok(())
+    }
+
+    // Computes the domain graph from the current ingredients.
+    //
+    // By domain we actually mean a replica address, which includes both the domain index and the
+    // shard. All nodes assigned to the replica address must be contiguous in the original graph.
+    // Typically, shard mergers and sharders are in the same replica. These replicas have multiple
+    // parents (the shards of the parent domain) and multiple children (the shards of the child
+    // domain).
+    pub(crate) fn compute_domain_graph(&mut self) {
+        let ingredients = &self.ingredients;
+        let mut g = petgraph::Graph::new();
+
+        // add all replica addresses as nodes
+        let mut sharding: HashMap<DomainIndex, usize> = HashMap::new();
+        let mut nodes: HashMap<(DomainIndex, usize), _> = HashMap::new();
+        for ni in ingredients.node_indices() {
+            let node = &ingredients[ni];
+            if !node.has_domain() || node.is_ingress() || node.is_egress() {
+                continue;
+            }
+
+            let domain = node.domain();
+            let shards = node.sharded_by().shards().unwrap_or(1);
+            if let Some(shards_old) = sharding.get(&domain) {
+                assert_eq!(shards, *shards_old);
+            } else {
+                sharding.insert(domain, shards);
+                for i in 0..shards {
+                    let ni = g.add_node((domain, i));
+                    nodes.insert((domain, i), ni);
+                }
+            }
+        }
+
+        // create an edge between each shard in a domain to each shard in another domain
+        // if there are nodes in those domains with an edge
+        for ei in ingredients.edge_indices() {
+            let (source_ni, target_ni) = ingredients.edge_endpoints(ei).unwrap();
+            if !ingredients[source_ni].has_domain() || !ingredients[target_ni].has_domain() {
+                continue;
+            }
+
+            let source = ingredients[source_ni].domain();
+            let target = ingredients[target_ni].domain();
+            if source == target {
+                continue;
+            }
+
+            for i in 0..*sharding.get(&source).unwrap() {
+                let s = nodes.get(&(source, i)).unwrap();
+                for j in 0..*sharding.get(&target).unwrap() {
+                    let t = nodes.get(&(target, j)).unwrap();
+                    g.add_edge(*s, *t, ());
+                }
+            }
+        }
+
+        self.domain_graph = g;
     }
 
     fn apply_recipe(&mut self, mut new: Recipe) -> Result<ActivationResult, String> {
