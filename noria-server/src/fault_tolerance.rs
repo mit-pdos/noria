@@ -592,3 +592,83 @@ fn vote_lower_projection_without_replays() {
 fn vote_reader_without_replays() {
     vote(false, vec![6]);
 }
+
+fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
+    let txt = "
+        # base tables
+        CREATE TABLE Article (id int, author_id int, PRIMARY KEY(id));
+        CREATE TABLE Vote (article_id int, user int);
+
+        # read queries
+        CREATE VIEW VoteCount AS \
+                    SELECT Vote.article_id, COUNT(user) AS votes
+                    FROM Vote
+                    GROUP BY Vote.article_id;
+        CREATE VIEW ArticleWithVoteCount AS \
+                    SELECT Article.id, author_id, VoteCount.votes AS votes \
+                    FROM Article \
+                    LEFT JOIN VoteCount \
+                    ON (Article.id = VoteCount.article_id)
+                    WHERE Article.id = ?;
+        QUERY AuthorWithVoteCount: SELECT author_id, SUM(votes) as votes \
+                    FROM ArticleWithVoteCount \
+                    GROUP BY author_id;
+    ";
+
+    let authority = Arc::new(LocalAuthority::new());
+    let mut workers = vec![];
+    for i in 0..4 {
+        let worker = build_authority(authority.clone(), Some(2), i == 0);
+        workers.push(worker);
+    }
+    sleep();
+
+    let mut g = workers.remove(0);
+    g.install_recipe(txt).unwrap();
+    sleep();
+    println!("{}", g.graphviz().unwrap());
+
+    let a = g.table("Article").unwrap().into_sync();
+    let v = g.table("Vote").unwrap().into_sync();
+    let q = g.view("AuthorWithVoteCount").unwrap().into_sync();
+    sleep();
+
+    workers.insert(0, g);
+    (workers, a, v, q)
+}
+
+#[test]
+fn vote_sharding() {
+    let (workers, mut a, mut v, mut q) = setup_vote_sharding();
+
+    // articles 1-9
+    // users 1-9 * 10
+    // authors 1-9 * 100
+    println!("insert article 1");
+    a.insert(vec![1i64.into(), 100.into()]).unwrap();
+    sleep();
+    println!("insert article 2");
+    a.insert(vec![2i64.into(), 100.into()]).unwrap();
+    sleep();
+    println!("insert article 3");
+    a.insert(vec![3i64.into(), 200.into()]).unwrap();
+    sleep();
+
+    let articles_to_vote = vec![1, 2, 3];
+    for article in articles_to_vote {
+        println!("insert vote");
+        v.insert(vec![article.into(), 10.into()]).unwrap();
+        sleep();
+    }
+
+    println!("lookup");
+    let res = q.lookup(&[0i64.into()], true).unwrap();
+    println!("lookup res: {:?}", res);
+
+    println!("vote again");
+    v.insert(vec![1.into(), 10.into()]).unwrap();
+    sleep();
+
+    loop {}
+    println!("success! now clean shutdown...");
+}
