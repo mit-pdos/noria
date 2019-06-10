@@ -77,7 +77,7 @@ impl Node {
                 e.send_packet(m, domain, on_shard.unwrap_or(0), output);
             }
             NodeType::Sharder(ref mut s) => {
-                s.process(m, addr, on_shard.is_some(), output);
+                s.send_packet(m, domain, addr, on_shard.is_some(), output);
             }
             NodeType::Internal(ref mut i) => {
                 let mut captured_full = false;

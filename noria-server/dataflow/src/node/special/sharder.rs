@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use payload;
 use prelude::*;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use vec_map::VecMap;
 
 #[derive(Serialize, Deserialize)]
@@ -14,6 +14,10 @@ pub struct Sharder {
     pub(crate) min_provenance: Provenance,
     /// Base provenance with all diffs applied
     pub(crate) max_provenance: Provenance,
+    /// Provenance updates sent in outgoing packets
+    pub(crate) updates: Vec<ProvenanceUpdate>,
+    /// Packet payloads
+    pub(crate) payloads: Vec<Box<Packet>>,
 }
 
 impl Clone for Sharder {
@@ -26,6 +30,8 @@ impl Clone for Sharder {
             shard_by: self.shard_by,
             min_provenance: self.min_provenance.clone(),
             max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            payloads: self.payloads.clone(),
         }
     }
 }
@@ -38,6 +44,8 @@ impl Sharder {
             sharded: VecMap::default(),
             min_provenance: Default::default(),
             max_provenance: Default::default(),
+            updates: Default::default(),
+            payloads: Default::default(),
         }
     }
 
@@ -50,6 +58,8 @@ impl Sharder {
             shard_by: self.shard_by,
             min_provenance: self.min_provenance.clone(),
             max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            payloads: self.payloads.clone(),
         }
 
     }
@@ -79,6 +89,7 @@ impl Sharder {
     pub fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
+        label: usize,
         index: LocalNodeIndex,
         is_sharded: bool,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
@@ -132,10 +143,21 @@ impl Sharder {
             unimplemented!();
         }
 
+        let (mtype, is_replay) = match m {
+            box Packet::Message { .. } => ("Message", false),
+            box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
+            _ => unreachable!(),
+        };
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
                 shard.link_mut().dst = dst;
+                println!(
+                    "SEND PACKET {} #{} -> ?? {:?}",
+                    mtype,
+                    label,
+                    shard.id().as_ref().unwrap(),
+                );
                 output.entry(addr).or_default().push_back(shard);
             }
         }
@@ -193,6 +215,18 @@ impl Sharder {
             }
         }
     }
+
+    pub fn send_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        index: LocalNodeIndex,
+        is_sharded: bool,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        self.preprocess_packet(m, from);
+        self.process(m, self.max_provenance.label(), index, is_sharded, output);
+    }
 }
 
 const PROVENANCE_DEPTH: usize = 3;
@@ -212,5 +246,33 @@ impl Sharder {
     pub fn init_in_domain(&mut self, shard: usize) {
         self.min_provenance.set_shard(shard);
         self.max_provenance = self.min_provenance.clone();
+    }
+
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
+        // sharders are unsharded
+        let from = (from, 0);
+        let is_replay = match m {
+            Some(box Packet::ReplayPiece { .. }) => true,
+            _ => false,
+        };
+
+        // update packet id to include the correct label, provenance update, and from node.
+        // replays don't get buffered and don't increment their label (they use the last label
+        // sent by this domain - think of replays as a snapshot of what's already been sent).
+        let label = if is_replay {
+            self.min_provenance.label() + self.payloads.len()
+        } else {
+            self.min_provenance.label() + self.payloads.len() + 1
+        };
+        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
+        } else {
+            ProvenanceUpdate::new(from, label)
+        };
+        self.max_provenance.apply_update(&update);
+        if !is_replay {
+            self.payloads.push(box m.as_ref().unwrap().clone_data());
+            self.updates.push(self.max_provenance.clone());
+        }
     }
 }

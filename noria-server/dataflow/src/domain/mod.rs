@@ -702,7 +702,7 @@ impl Domain {
             if child_is_merger {
                 // we need to preserve the egress src (which includes shard identifier)
                 // TODO(ygina): packet labels for mergers
-                unimplemented!();
+                // unimplemented!();
             } else {
                 m.link_mut().src = me;
             }
