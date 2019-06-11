@@ -64,6 +64,7 @@ pub struct Migration<'a> {
 }
 
 impl<'a> Migration<'a> {
+    /*
     /// Link the egress node to the ingress nodes, removing the linear path of nodes in between.
     /// Used during recovery when it's not necessary to throw away all downstream nodes.
     ///
@@ -157,6 +158,7 @@ impl<'a> Migration<'a> {
         let egress = nodes[nodes.len() - 1];
         egress
     }
+    */
 
     /// Add the given `Ingredient` to the Soup.
     ///

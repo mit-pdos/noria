@@ -400,6 +400,7 @@ impl ControllerInner {
     /// Recovers a domain if its state can be reconstructed from the existing graph.
     /// Returns whether the domain was recovered.
     fn recover_domain(&mut self, domain: DomainIndex) -> bool {
+        /*
         let nodes = self.nodes_in_domain(domain);
 
         // domains must be linear with one egress and possibly multiple ingress
@@ -473,6 +474,8 @@ impl ControllerInner {
             // more than one stateful node
             false
         }
+        */
+        unimplemented!();
     }
 
     fn child(&self, ni: NodeIndex) -> NodeIndex {
@@ -493,6 +496,7 @@ impl ControllerInner {
         ni
     }
 
+    /*
     /// Recovers a domain with only stateless nodes.
     /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
     fn recover_stateless_domain(
@@ -593,7 +597,6 @@ impl ControllerInner {
         }
     }
 
-    /*
     /// Consider A -> B1 -> B2 -> C, where we lose B1.
     fn recover_lost_top_replica(
         &mut self,
@@ -895,7 +898,6 @@ impl ControllerInner {
             None => unreachable!(),
         }
     }
-    */
 
     /// Recovers a domain with only an ingress A and a reader B1.
     fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {
@@ -973,6 +975,7 @@ impl ControllerInner {
         };
         dh.send_to_healthy(m, &self.workers).unwrap();
     }
+    */
 
     fn handle_failed_workers(&mut self, wis: Vec<WorkerIdentifier>) {
         let mut failed = Vec::new();
@@ -988,7 +991,7 @@ impl ControllerInner {
         // generate a list of failed domains we still need to handle.
         let failed = failed
             .into_iter()
-            .filter(|&d| !self.recover_domain(d))
+            // .filter(|&d| !self.recover_domain(d))
             .collect::<Vec<DomainIndex>>();
 
         // next, translate from the affected workers to affected data-flow nodes
@@ -1036,6 +1039,7 @@ impl ControllerInner {
     }
 
     pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
+        /*
         assert!(self.waiting_on.len() > 0, "in recovery mode");
 
         // Continue until there is no intersection between the provenance information we know
@@ -1080,9 +1084,12 @@ impl ControllerInner {
 
         // We're no longer waiting on the node that acked the NewIncoming message
         self.handle_ack_resume_at(from);
+        */
+        unimplemented!();
     }
 
     pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
+        /*
         // Update waiting on lists of nodes that were waiting on "from"
         let mut empty = vec![];
         for (waiting, on) in self.waiting_on.iter_mut() {
@@ -1126,6 +1133,8 @@ impl ControllerInner {
             let dh = self.domains.get_mut(&domain).unwrap();
             dh.send_to_healthy(m, &self.workers).unwrap();
         }
+        */
+        unimplemented!();
     }
 
     /// Construct `ControllerInner` with a specified listening interface
