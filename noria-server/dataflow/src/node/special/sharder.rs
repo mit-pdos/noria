@@ -18,6 +18,11 @@ pub struct Sharder {
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Packet payloads
     pub(crate) payloads: Vec<Box<Packet>>,
+
+    /// Nodes it's ok to send packets too and the minimum labels (inclusive)
+    min_label_to_send: HashMap<ReplicaAddr, usize>,
+    /// The provenance of the last packet send to each node
+    last_provenance: HashMap<ReplicaAddr, Provenance>,
 }
 
 impl Clone for Sharder {
@@ -32,6 +37,8 @@ impl Clone for Sharder {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
+            min_label_to_send: self.min_label_to_send.clone(),
+            last_provenance: self.last_provenance.clone(),
         }
     }
 }
@@ -46,6 +53,8 @@ impl Sharder {
             max_provenance: Default::default(),
             updates: Default::default(),
             payloads: Default::default(),
+            min_label_to_send: Default::default(),
+            last_provenance: Default::default(),
         }
     }
 
@@ -60,6 +69,8 @@ impl Sharder {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
+            min_label_to_send: self.min_label_to_send.clone(),
+            last_provenance: self.last_provenance.clone(),
         }
 
     }
@@ -68,6 +79,8 @@ impl Sharder {
         assert_eq!(self.txs.len(), 0);
         // TODO: add support for "shared" sharder?
         for tx in txs {
+            self.min_label_to_send.insert(tx, 1);
+            self.insert_default_last_provenance(tx);
             self.txs.push((dst, tx));
         }
     }
@@ -152,6 +165,16 @@ impl Sharder {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
                 shard.link_mut().dst = dst;
+
+                // set the diff per child right before sending
+                let diff = self.last_provenance
+                    .get(&addr)
+                    .unwrap()
+                    .diff(&self.max_provenance);
+                assert_eq!(label, diff.label());
+                self.last_provenance.get_mut(&addr).unwrap().apply_update(&diff);
+                *shard.id_mut() = Some(diff);
+
                 println!(
                     "SEND PACKET {} #{} -> ?? {:?}",
                     mtype,
@@ -233,6 +256,14 @@ const PROVENANCE_DEPTH: usize = 3;
 
 // fault tolerance
 impl Sharder {
+    // We initially have sent nothing to each node. Diffs are one depth shorter.
+    fn insert_default_last_provenance(&mut self, tx: ReplicaAddr) {
+        let mut p = self.min_provenance.clone();
+        p.trim(PROVENANCE_DEPTH - 1);
+        p.zero();
+        self.last_provenance.insert(tx, p);
+    }
+
     pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
         for ni in graph.node_indices() {
             if graph[ni] == root {
