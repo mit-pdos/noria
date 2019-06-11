@@ -54,6 +54,13 @@ enum DomainMode {
     },
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum DomainExitType {
+    Egress,
+    Reader,
+    Sharder,
+}
+
 impl PartialEq for DomainMode {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -145,17 +152,22 @@ impl DomainBuilder {
             .map(|n| n.borrow().local_addr())
             .collect();
 
-        let egress = self.nodes
+        let exit_ni_type = self.nodes
             .iter()
-            .filter(|(_, node)| node.borrow().is_egress())
-            .map(|(ni, _)| ni)
+            .filter_map(|(ni, node)| {
+                if node.borrow().is_egress() {
+                    Some((ni, DomainExitType::Egress))
+                } else if node.borrow().is_reader() {
+                    Some((ni, DomainExitType::Reader))
+                } else if node.borrow().is_sharder() {
+                    Some((ni, DomainExitType::Sharder))
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
-        let reader = self.nodes
-            .iter()
-            .filter(|(_, node)| node.borrow().is_reader())
-            .map(|(ni, _)| ni)
-            .collect::<Vec<_>>();
-        assert!(egress.len() <= 1);
+        assert_eq!(exit_ni_type.len(), 1);
+        let (exit_ni, exit_type) = exit_ni_type[0];
 
         let log = log.new(o!("domain" => self.index.index(), "shard" => self.shard.unwrap_or(0)));
         let control_reply_tx = TcpSender::connect(&control_addr).unwrap();
@@ -171,8 +183,8 @@ impl DomainBuilder {
             state: StateMap::default(),
             log,
             not_ready,
-            egress: egress.get(0).map(|&e| e),
-            reader: reader.get(0).map(|&r| r),
+            exit_ni,
+            exit_type,
             mode: DomainMode::Forwarding,
             waiting: Default::default(),
             reader_triggered: Default::default(),
@@ -225,8 +237,8 @@ pub struct Domain {
     log: Logger,
 
     not_ready: HashSet<LocalNodeIndex>,
-    egress: Option<LocalNodeIndex>,
-    reader: Option<LocalNodeIndex>,
+    exit_ni: LocalNodeIndex,
+    exit_type: DomainExitType,
 
     ingress_inject: Map<(usize, Vec<DataType>)>,
 
@@ -785,8 +797,9 @@ impl Domain {
                         new_tx,
                         new_tag,
                     } => {
+                        assert_eq!(self.exit_type, DomainExitType::Egress);
                         let domain_index = self.index.index();
-                        let mut n = self.nodes[self.egress.unwrap()].borrow_mut();
+                        let mut n = self.nodes[self.exit_ni].borrow_mut();
                         n.with_egress_mut(move |e| {
                             if let Some((node, local, addr)) = new_tx {
                                 println!("D{}: UpdateEgress {:?} None", domain_index, node);
@@ -1255,9 +1268,9 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::GetStatistics => {
-                        let (min_label, log_size, provenance) = match self.egress {
-                            Some(ni) => {
-                                self.nodes[ni]
+                        let (min_label, log_size, provenance) = match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_egress(|e| (
                                         e.min_provenance.label(),
@@ -1265,10 +1278,11 @@ impl Domain {
                                         e.get_last_provenance().into_debug(),
                                     ))
                             },
-                            None => {
-                                // only domains with reader nodes don't have an egress
-                                assert!(self.reader.is_some());
-                                self.nodes[self.reader.unwrap()]
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            }
+                            DomainExitType::Reader => {
+                                self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_reader(|r| (
                                         r.min_provenance.label(),
@@ -1276,7 +1290,7 @@ impl Domain {
                                         r.get_last_provenance().into_debug(),
                                     ))
                                     .unwrap()
-                            }
+                            },
                         };
 
                         let domain_stats = noria::debug::stats::DomainStats {
@@ -1385,10 +1399,21 @@ impl Domain {
                         unimplemented!();
                     },
                     Packet::RemoveChild { child, domain } => {
-                        // Prevent the egress node from sending messages to the node
-                        let egress = &self.nodes[self.egress.unwrap()];
-                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), egress.borrow().global_addr(), child);
-                        egress.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+                        let node = &self.nodes[self.exit_ni];
+                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
+
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                // Prevent the egress node from sending messages to the node
+                                node.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            }
+                        }
 
                         // Tell the replica to uncache the sender
                         executor.uncache_domain(domain);
@@ -1399,10 +1424,18 @@ impl Domain {
                         self.replay_paths.remove(&old_tag);
                         self.buffered_replay_requests.remove(&old_tag);
 
-                        if let Some(egress) = self.egress {
-                            self.nodes[egress]
-                                .borrow_mut()
-                                .with_egress_mut(|e| e.remove_tag(old_tag));
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_egress_mut(|e| e.remove_tag(old_tag));
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            }
                         }
 
                         if let Some((ni, new_tag)) = new_state {
@@ -1424,19 +1457,20 @@ impl Domain {
 
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
-                        let provenance = match self.egress {
-                            Some(ni) => {
-                                self.nodes[ni]
+                        let provenance = match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
                                         e.get_last_provenance().subgraph(new).clone()
                                     })
                             },
-                            None => {
-                                // only domains with reader nodes don't have an egress
-                                assert!(self.reader.is_some());
-                                self.nodes[self.reader.unwrap()]
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
@@ -1454,7 +1488,7 @@ impl Domain {
                         // update its node state so it knows where to resume from for each child.
                         // then set the label of the first message it expects to produce once
                         // it starts receiving messages from upstream nodes again. (see note below)
-                        let node = &self.nodes[self.egress.unwrap()];
+                        let node = &self.nodes[self.exit_ni];
                         debug!(
                             self.log,
                             "resuming messages from {} to {:?}",
@@ -1462,13 +1496,24 @@ impl Domain {
                             child_labels;
                         );
 
-                        node.borrow_mut().with_egress_mut(|e| {
-                            // if setting the min_label would truncate any messages in the buffer,
-                            // that means there are no dependent upstream failures that will get
-                            // a ResumeAt in response to acking this ResumeAt. we won't set the
-                            // min_label here, letting some other process take truncate logs.
-                            e.resume_at(child_labels, self.shard, sends);
-                        });
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                node.borrow_mut().with_egress_mut(|e| {
+                                    // if setting the min_label would truncate any messages in the
+                                    // buffer, that means there are no dependent upstream failures
+                                    // that will get a ResumeAt in response to acking this
+                                    // ResumeAt. we won't set the min_label here, letting some
+                                    // other process take truncate logs.
+                                    e.resume_at(child_labels, self.shard, sends);
+                                });
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            },
+                        }
 
                         // TODO(ygina): Currently, the value of next_label is the label of the
                         // next OUTGOING packet this domain needs to send. We assume it has a
