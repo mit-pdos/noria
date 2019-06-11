@@ -176,10 +176,11 @@ impl Reader {
         &mut self,
         m: &mut Option<Box<Packet>>,
         from: DomainIndex,
+        shard: usize,
         swap: bool,
     ) {
         if self.writer.is_some() {
-            self.preprocess_packet(m, from);
+            self.preprocess_packet(m, (from, shard));
         }
 
         if let Some(ref mut state) = self.writer {
@@ -295,7 +296,7 @@ impl Reader {
         &self.max_provenance
     }
 
-    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
         // provenance
         let update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, self.num_payloads, &[diff.clone()])

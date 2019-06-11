@@ -1446,6 +1446,7 @@ impl Domain {
                         }
                     },
                     Packet::NewIncoming { old, new } => {
+                        /*
                         println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
                         debug!(
                             self.log,
@@ -1480,6 +1481,8 @@ impl Domain {
                             }
                         };
                         executor.ack_new_incoming(self.index, *provenance);
+                        */
+                        unimplemented!()
                     },
                     Packet::ResumeAt { child_labels } => {
                         println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);

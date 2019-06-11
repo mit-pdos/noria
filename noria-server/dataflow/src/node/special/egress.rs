@@ -215,7 +215,7 @@ impl Egress {
         &self.max_provenance
     }
 
-    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
         let is_replay = match m {
             Some(box Packet::ReplayPiece { .. }) => true,
             _ => false,
@@ -257,7 +257,7 @@ impl Egress {
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        self.preprocess_packet(m, from);
+        self.preprocess_packet(m, (from, shard));
 
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding

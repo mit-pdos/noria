@@ -12,7 +12,7 @@ pub struct Provenance {
     /// Label of the message it represents.
     pub label: usize,
     /// Labels of upstream messages used to construct it.
-    pub edges: HashMap<DomainIndex, Box<Provenance>>,
+    pub edges: HashMap<(DomainIndex, usize), Box<Provenance>>,
 }
 
 impl Provenance {

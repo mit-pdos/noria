@@ -11,15 +11,15 @@ impl fmt::Debug for ProvenanceUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let edges = self.edges.iter().map(|(_, p)| p).collect::<Vec<_>>();
         if edges.is_empty() {
-            write!(f, "D{}:{}", self.root.index(), self.label)
+            write!(f, "D{}.{}:{}", self.root.0.index(), self.root.1, self.label)
         } else {
-            write!(f, "D{}:{} {:?}", self.root.index(), self.label, edges)
+            write!(f, "D{}.{}:{} {:?}", self.root.0.index(), self.root.1, self.label, edges)
         }
     }
 }
 
 impl ProvenanceUpdate {
-    pub fn new(root: DomainIndex, label: usize) -> ProvenanceUpdate {
+    pub fn new(root: ReplicaAddr, label: usize) -> ProvenanceUpdate {
         ProvenanceUpdate {
             root,
             label,
@@ -27,7 +27,7 @@ impl ProvenanceUpdate {
         }
     }
 
-    pub fn new_with(root: DomainIndex, label: usize, children: &[ProvenanceUpdate]) -> ProvenanceUpdate {
+    pub fn new_with(root: ReplicaAddr, label: usize, children: &[ProvenanceUpdate]) -> ProvenanceUpdate {
         let mut p = ProvenanceUpdate::new(root, label);
         for child in children {
             p.add_child(child.clone());
@@ -81,9 +81,9 @@ impl ProvenanceUpdate {
 /// The history of message labels that correspond to the production of the current message.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Provenance {
-    root: DomainIndex,
+    root: ReplicaAddr,
     label: usize,
-    edges: FnvHashMap<DomainIndex, Box<Provenance>>,
+    edges: FnvHashMap<ReplicaAddr, Box<Provenance>>,
 }
 
 impl Default for Provenance {
@@ -93,7 +93,7 @@ impl Default for Provenance {
     // been otherwise initialized and fit into the graph.
     fn default() -> Provenance {
         Provenance {
-            root: 0.into(),
+            root: (0.into(), 0),
             edges: Default::default(),
             label: 0,
         }
@@ -104,6 +104,8 @@ impl Provenance {
     /// Initializes the provenance graph from the root node up to the given depth.
     /// Typically called on a default Provenance struct, compared to an empty one.
     pub fn init(&mut self, graph: &Graph, root: NodeIndex, depth: usize) {
+        unimplemented!();
+        /*
         self.root = graph[root].domain();
         if depth > 1 {
             // TODO(ygina): operate on domain level instead of ingress/egress level
@@ -129,9 +131,10 @@ impl Provenance {
                 self.edges.insert(graph[egress].domain(), box provenance);
             }
         }
+        */
     }
 
-    pub fn root(&self) -> DomainIndex {
+    pub fn root(&self) -> ReplicaAddr {
         self.root
     }
 
@@ -139,7 +142,7 @@ impl Provenance {
         self.label
     }
 
-    pub fn edges(&self) -> &FnvHashMap<DomainIndex, Box<Provenance>> {
+    pub fn edges(&self) -> &FnvHashMap<ReplicaAddr, Box<Provenance>> {
         &self.edges
     }
 
@@ -179,8 +182,7 @@ impl Provenance {
 
     /// Returns whether a replica failed. :P
     pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
-        assert_eq!(old, new);
-        false
+        unimplemented!();
         /*
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
 
@@ -204,7 +206,7 @@ impl Provenance {
     /// Subgraph of this provenance graph with the given domain as the new root. The new root must
     /// be an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of
     /// the given node. There's no reason we should obtain any other subgraph in the protocol.
-    pub fn subgraph(&self, new_root: DomainIndex) -> &Box<Provenance> {
+    pub fn subgraph(&self, new_root: ReplicaAddr) -> &Box<Provenance> {
         if let Some(p) = self.edges.get(&new_root) {
             return p;
         }
@@ -219,8 +221,8 @@ impl Provenance {
 
     pub fn into_debug(&self) -> noria::debug::stats::Provenance {
         let mut p = noria::debug::stats::Provenance::new(self.label);
-        for (&domain, domain_p) in self.edges.iter() {
-            p.edges.insert(domain, box domain_p.into_debug());
+        for (&replica, replica_p) in self.edges.iter() {
+            p.edges.insert(replica, box replica_p.into_debug());
         }
         p
     }
@@ -263,15 +265,19 @@ mod tests {
         g
     }
 
+    fn addr(x: usize) -> ReplicaAddr {
+        (x.into(), 0)
+    }
+
     /// Full provenance for the test graph
     fn default_provenance() -> Provenance {
-        let p0 = Provenance::new(0.into(), 0);
-        let p1 = Provenance::new(1.into(), 0);
-        let p2_left = Provenance::new_with(2.into(), 0, &[p0.clone(), p1.clone()]);
-        let p2_right = Provenance::new_with(2.into(), 0, &[p0, p1]);
-        let p3 = Provenance::new_with(3.into(), 0, &[p2_left]);
-        let p4 = Provenance::new_with(4.into(), 0, &[p2_right]);
-        Provenance::new_with(5.into(), 0, &[p3, p4])
+        let p0 = Provenance::new(addr(0), 0);
+        let p1 = Provenance::new(addr(1), 0);
+        let p2_left = Provenance::new_with(addr(2), 0, &[p0.clone(), p1.clone()]);
+        let p2_right = Provenance::new_with(addr(2), 0, &[p0, p1]);
+        let p3 = Provenance::new_with(addr(3), 0, &[p2_left]);
+        let p4 = Provenance::new_with(addr(4), 0, &[p2_right]);
+        Provenance::new_with(addr(5), 0, &[p3, p4])
     }
 
     const MAX_DEPTH: usize = 10;
@@ -280,8 +286,8 @@ mod tests {
     fn test_graph_init_bases() {
         let g = default_graph();
 
-        let expected0 = Provenance::new(0.into(), 0);
-        let expected1 = Provenance::new(1.into(), 0);
+        let expected0 = Provenance::new(addr(0), 0);
+        let expected1 = Provenance::new(addr(1), 0);
 
         let mut p = Provenance::default();
         p.init(&g, 0.into(), MAX_DEPTH);
@@ -314,12 +320,12 @@ mod tests {
         let mut p = Provenance::default();
         p.init(&g, 5.into(), 3);
         p5
-            .edges.get_mut(&DomainIndex::from(3)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.get_mut(&addr(3)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap()
             .edges.clear();
         p5
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.get_mut(&addr(4)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap()
             .edges.clear();
         assert_eq!(p, p5);
 
@@ -327,10 +333,10 @@ mod tests {
         let mut p = Provenance::default();
         p.init(&g, 5.into(), 2);
         p5
-            .edges.get_mut(&DomainIndex::from(3)).unwrap()
+            .edges.get_mut(&addr(3)).unwrap()
             .edges.clear();
         p5
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
+            .edges.get_mut(&addr(4)).unwrap()
             .edges.clear();
         assert_eq!(p, p5);
 
@@ -354,19 +360,19 @@ mod tests {
         let mut expected = original.clone();
         expected.label = 1;
         expected
-            .edges.get_mut(&DomainIndex::from(4)).unwrap().label = 2;
+            .edges.get_mut(&addr(4)).unwrap().label = 2;
         expected
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap().label = 3;
+            .edges.get_mut(&addr(4)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap().label = 3;
         expected
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap()
-            .edges.get_mut(&DomainIndex::from(0)).unwrap().label = 4;
+            .edges.get_mut(&addr(4)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap()
+            .edges.get_mut(&addr(0)).unwrap().label = 4;
 
-        let p0 = Provenance::new(0.into(), 4);
-        let p2 = Provenance::new_with(2.into(), 3, &[p0]);
-        let p4 = Provenance::new_with(4.into(), 2, &[p2]);
-        let diff = Provenance::new_with(5.into(), 1, &[p4]);
+        let p0 = Provenance::new(addr(0), 4);
+        let p2 = Provenance::new_with(addr(2), 3, &[p0]);
+        let p4 = Provenance::new_with(addr(4), 2, &[p2]);
+        let diff = Provenance::new_with(addr(5), 1, &[p4]);
 
         // expected - original = diff
         // original + diff = expected
@@ -388,17 +394,17 @@ mod tests {
         let mut expected = original.clone();
         expected.label = 3;
         expected
-            .edges.get_mut(&DomainIndex::from(3)).unwrap().label = 2;
+            .edges.get_mut(&addr(3)).unwrap().label = 2;
         expected
-            .edges.get_mut(&DomainIndex::from(4)).unwrap().label = 4;
+            .edges.get_mut(&addr(4)).unwrap().label = 4;
         expected
-            .edges.get_mut(&DomainIndex::from(3)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap().label = 5;
+            .edges.get_mut(&addr(3)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap().label = 5;
 
-        let p2 = Provenance::new(2.into(), 5);
-        let p4 = Provenance::new(4.into(), 4);
-        let p3 = Provenance::new_with(3.into(), 2, &[p2]);
-        let diff = Provenance::new_with(5.into(), 3, &[p3, p4]);
+        let p2 = Provenance::new(addr(2), 5);
+        let p4 = Provenance::new(addr(4), 4);
+        let p3 = Provenance::new_with(addr(3), 2, &[p2]);
+        let diff = Provenance::new_with(addr(5), 3, &[p3, p4]);
 
         // expected - original = diff
         // original + diff = expected
@@ -414,21 +420,21 @@ mod tests {
         // depth 3
         p.trim(3);
         assert!(p
-            .edges.get_mut(&DomainIndex::from(3)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.get_mut(&addr(3)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap()
             .edges.is_empty());
         assert!(p
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
-            .edges.get_mut(&DomainIndex::from(2)).unwrap()
+            .edges.get_mut(&addr(4)).unwrap()
+            .edges.get_mut(&addr(2)).unwrap()
             .edges.is_empty());
 
         // depth 2
         p.trim(2);
         assert!(p
-            .edges.get_mut(&DomainIndex::from(3)).unwrap()
+            .edges.get_mut(&addr(3)).unwrap()
             .edges.is_empty());
         assert!(p
-            .edges.get_mut(&DomainIndex::from(4)).unwrap()
+            .edges.get_mut(&addr(4)).unwrap()
             .edges.is_empty());
 
         // depth 1

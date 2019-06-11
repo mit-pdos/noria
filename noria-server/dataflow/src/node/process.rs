@@ -70,7 +70,7 @@ impl Node {
                 }
             }
             NodeType::Reader(ref mut r) => {
-                r.process(m, domain, swap);
+                r.process(m, domain, on_shard.unwrap_or(0), swap);
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref mut e)) => {
