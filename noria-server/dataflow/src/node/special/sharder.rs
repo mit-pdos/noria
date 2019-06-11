@@ -9,6 +9,11 @@ pub struct Sharder {
     txs: Vec<(LocalNodeIndex, ReplicaAddr)>,
     sharded: VecMap<Box<Packet>>,
     shard_by: usize,
+
+    /// Base provenance, including the label it represents
+    pub(crate) min_provenance: Provenance,
+    /// Base provenance with all diffs applied
+    pub(crate) max_provenance: Provenance,
 }
 
 impl Clone for Sharder {
@@ -19,6 +24,8 @@ impl Clone for Sharder {
             txs: Vec::new(),
             sharded: Default::default(),
             shard_by: self.shard_by,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
         }
     }
 }
@@ -29,6 +36,8 @@ impl Sharder {
             txs: Default::default(),
             shard_by: by,
             sharded: VecMap::default(),
+            min_provenance: Default::default(),
+            max_provenance: Default::default(),
         }
     }
 
@@ -39,7 +48,10 @@ impl Sharder {
             txs,
             sharded: VecMap::default(),
             shard_by: self.shard_by,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
         }
+
     }
 
     pub fn add_sharded_child(&mut self, dst: LocalNodeIndex, txs: Vec<ReplicaAddr>) {
@@ -180,5 +192,25 @@ impl Sharder {
                     }))
             }
         }
+    }
+}
+
+const PROVENANCE_DEPTH: usize = 3;
+
+// fault tolerance
+impl Sharder {
+    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
+        for ni in graph.node_indices() {
+            if graph[ni] == root {
+                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    pub fn init_in_domain(&mut self, shard: usize) {
+        self.min_provenance.set_shard(shard);
+        self.max_provenance = self.min_provenance.clone();
     }
 }

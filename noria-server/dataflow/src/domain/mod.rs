@@ -152,14 +152,18 @@ impl DomainBuilder {
             .map(|n| n.borrow().local_addr())
             .collect();
 
+        let shard = self.shard.unwrap_or(0);
         let exit_ni_type = self.nodes
             .iter()
             .filter_map(|(ni, node)| {
                 if node.borrow().is_egress() {
+                    node.borrow_mut().with_egress_mut(|n| n.init_in_domain(shard));
                     Some((ni, DomainExitType::Egress))
                 } else if node.borrow().is_reader() {
+                    node.borrow_mut().with_reader_mut(|n| n.init_in_domain(shard)).unwrap();
                     Some((ni, DomainExitType::Reader))
                 } else if node.borrow().is_sharder() {
+                    node.borrow_mut().with_sharder_mut(|n| n.init_in_domain(shard));
                     Some((ni, DomainExitType::Sharder))
                 } else {
                     None

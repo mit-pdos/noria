@@ -237,7 +237,7 @@ impl Node {
 
 // derefs
 impl Node {
-    crate fn with_sharder_mut<F>(&mut self, f: F)
+    pub fn with_sharder_mut<F>(&mut self, f: F)
     where
         F: FnOnce(&mut special::Sharder),
     {
@@ -460,7 +460,7 @@ impl Node {
         self.inner = NodeType::Internal(*op);
     }
 
-    pub fn recover(&mut self, graph: &Graph, new_domain: domain::Index) {
+    pub fn recover(&mut self, graph: &DomainGraph, new_domain: domain::Index, shard: usize) {
         assert!(self.domain.is_some());
         assert!(!self.is_dropped());
         self.domain = Some(new_domain);
@@ -472,7 +472,7 @@ impl Node {
             // perspective of the egress node. this is bad since even though the egress's view
             // of the graph may be consistent, downstream affected nodes may still believe, for
             // example, that there exists a replica in the graph even though it just failed.
-            e.init(graph, self.global_addr());
+            e.init(graph, (new_domain, shard));
             self.inner = NodeType::Egress(Some(e));
         }
     }

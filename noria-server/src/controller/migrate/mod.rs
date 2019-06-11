@@ -477,20 +477,26 @@ impl<'a> Migration<'a> {
 
         // Initialize egress and reader provenance graphs
         mainline.compute_domain_graph();
-        let new_egress = sorted_new
+        let new_senders = sorted_new
             .iter()
-            .filter(|&ni| mainline.ingredients[**ni].is_egress())
+            .filter(|&ni| {
+                let node = &mainline.ingredients[**ni];
+                node.is_egress() || node.is_reader() || node.is_sharder()
+            })
             .collect::<Vec<_>>();
-        let new_reader = sorted_new
-            .iter()
-            .filter(|&ni| mainline.ingredients[**ni].is_reader())
-            .collect::<Vec<_>>();
-        let graph_clone = mainline.ingredients.clone();
-        for &&&ni in &new_egress {
-            mainline.ingredients[ni].with_egress_mut(|e| e.init(&graph_clone, ni));
-        }
-        for &&&ni in &new_reader {
-            mainline.ingredients[ni].with_reader_mut(|r| r.init(&graph_clone, ni)).unwrap();
+        let graph_clone = mainline.domain_graph.clone();
+        for &&&ni in &new_senders {
+            let node = &mut mainline.ingredients[ni];
+            let domain = node.domain();
+            if node.is_egress() {
+                node.with_egress_mut(|e| e.init(&graph_clone, (domain, 0)));
+            } else if node.is_sharder() {
+                node.with_sharder_mut(|s| s.init(&graph_clone, (domain, 0)));
+            } else if node.is_reader() {
+                node.with_reader_mut(|r| r.init(&graph_clone, (domain, 0))).unwrap();
+            } else {
+                unreachable!();
+            }
         }
 
         // Find all nodes for domains that have changed

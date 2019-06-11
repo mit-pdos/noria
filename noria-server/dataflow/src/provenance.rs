@@ -101,37 +101,27 @@ impl Default for Provenance {
 }
 
 impl Provenance {
-    /// Initializes the provenance graph from the root node up to the given depth.
+    /// Initializes the provenance graph from the root domain/shard up to the given depth.
     /// Typically called on a default Provenance struct, compared to an empty one.
-    pub fn init(&mut self, graph: &Graph, root: NodeIndex, depth: usize) {
-        unimplemented!();
-        /*
-        self.root = graph[root].domain();
+    pub fn init(
+        &mut self,
+        graph: &DomainGraph,
+        root: ReplicaAddr,
+        root_ni: NodeIndex,
+        depth: usize,
+    ) {
+        assert_eq!(graph[root_ni], root);
+        self.root = root;
         if depth > 1 {
-            // TODO(ygina): operate on domain level instead of ingress/egress level
-            let mut egresses = Vec::new();
-            let mut queue = Vec::new();
-            queue.push(root);
-            while queue.len() > 0 {
-                let ni = queue.pop().unwrap();
-                if graph[ni].is_egress() && ni != root {
-                    egresses.push(ni);
-                    continue;
-                }
-
-                let mut children = graph
-                    .neighbors_directed(ni, petgraph::EdgeDirection::Incoming)
-                    .collect::<Vec<_>>();
-                queue.append(&mut children);
-            }
-
-            for egress in egresses {
+            let children = graph
+                .neighbors_directed(root_ni, petgraph::EdgeDirection::Incoming)
+                .collect::<Vec<_>>();
+            for child_ni in children {
                 let mut provenance = Provenance::default();
-                provenance.init(graph, egress, depth - 1);
-                self.edges.insert(graph[egress].domain(), box provenance);
+                provenance.init(graph, graph[child_ni], child_ni, depth - 1);
+                self.edges.insert(graph[child_ni], box provenance);
             }
         }
-        */
     }
 
     pub fn root(&self) -> ReplicaAddr {
@@ -144,6 +134,10 @@ impl Provenance {
 
     pub fn edges(&self) -> &FnvHashMap<ReplicaAddr, Box<Provenance>> {
         &self.edges
+    }
+
+    pub fn set_shard(&mut self, shard: usize) {
+        self.root.1 = shard;
     }
 
     pub fn set_label(&mut self, label: usize) {
@@ -231,7 +225,6 @@ impl Provenance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use node;
 
     /// 0     1
     ///  \   /
@@ -240,18 +233,12 @@ mod tests {
     /// 3     4
     ///  \   /
     ///    5
-    fn default_graph() -> Graph {
+    fn default_graph() -> DomainGraph {
         // nodes
-        let mut g = Graph::new();
+        let mut g = petgraph::Graph::new();
         let mut nodes = vec![];
         for i in 0..6 {
-            let node = g.add_node(node::Node::new(
-                "a",
-                &["because-type-inference"],
-                node::special::Egress::default(),
-            ));
-            g[node].set_finalized_addr(IndexPair::from(node));
-            g[node].add_to(i.into());
+            let node = g.add_node(addr(i));
             nodes.push(node);
         }
 
@@ -290,16 +277,16 @@ mod tests {
         let expected1 = Provenance::new(addr(1), 0);
 
         let mut p = Provenance::default();
-        p.init(&g, 0.into(), MAX_DEPTH);
+        p.init(&g, addr(0), 0.into(), MAX_DEPTH);
         assert_eq!(p, expected0);
         let mut p = Provenance::default();
-        p.init(&g, 1.into(), MAX_DEPTH);
+        p.init(&g, addr(1), 1.into(), MAX_DEPTH);
         assert_eq!(p, expected1);
         let mut p = Provenance::default();
-        p.init(&g, 0.into(), 1);
+        p.init(&g, addr(0), 0.into(), 1);
         assert_eq!(p, expected0);
         let mut p = Provenance::default();
-        p.init(&g, 1.into(), 1);
+        p.init(&g, addr(1), 1.into(), 1);
         assert_eq!(p, expected1);
     }
 
@@ -310,15 +297,15 @@ mod tests {
 
         // max depth and depth 4 should have a path for each branch
         let mut p = Provenance::default();
-        p.init(&g, 5.into(), MAX_DEPTH);
+        p.init(&g, addr(5), 5.into(), MAX_DEPTH);
         assert_eq!(p, p5);
         let mut p = Provenance::default();
-        p.init(&g, 5.into(), 4);
+        p.init(&g, addr(5), 5.into(), 4);
         assert_eq!(p, p5);
 
         // depth 3 should have one less layer
         let mut p = Provenance::default();
-        p.init(&g, 5.into(), 3);
+        p.init(&g, addr(5), 5.into(), 3);
         p5
             .edges.get_mut(&addr(3)).unwrap()
             .edges.get_mut(&addr(2)).unwrap()
@@ -331,7 +318,7 @@ mod tests {
 
         // depth 2 should have even one less layer
         let mut p = Provenance::default();
-        p.init(&g, 5.into(), 2);
+        p.init(&g, addr(5), 5.into(), 2);
         p5
             .edges.get_mut(&addr(3)).unwrap()
             .edges.clear();
@@ -342,7 +329,7 @@ mod tests {
 
         // depth 1 should be domain 5 by itself
         let mut p = Provenance::default();
-        p.init(&g, 5.into(), 1);
+        p.init(&g, addr(5), 5.into(), 1);
         p5.edges.clear();
         assert_eq!(p, p5);
     }

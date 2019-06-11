@@ -271,8 +271,18 @@ impl Reader {
 
 // fault tolerance (duplicate code from egress.rs)
 impl Reader {
-    pub fn init(&mut self, graph: &Graph, ni: NodeIndex) {
-        self.min_provenance.init(graph, ni, PROVENANCE_DEPTH);
+    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
+        for ni in graph.node_indices() {
+            if graph[ni] == root {
+                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    pub fn init_in_domain(&mut self, shard: usize) {
+        self.min_provenance.set_shard(shard);
         self.max_provenance = self.min_provenance.clone();
     }
 
