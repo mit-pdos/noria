@@ -145,11 +145,6 @@ impl DomainBuilder {
             .map(|n| n.borrow().local_addr())
             .collect();
 
-        let ingress = self.nodes
-            .iter()
-            .filter(|(_, node)| node.borrow().is_ingress())
-            .map(|(ni, _)| ni)
-            .collect::<HashSet<LocalNodeIndex>>();
         let egress = self.nodes
             .iter()
             .filter(|(_, node)| node.borrow().is_egress())
@@ -176,7 +171,6 @@ impl DomainBuilder {
             state: StateMap::default(),
             log,
             not_ready,
-            ingress,
             egress: egress.get(0).map(|&e| e),
             reader: reader.get(0).map(|&r| r),
             mode: DomainMode::Forwarding,
@@ -231,7 +225,6 @@ pub struct Domain {
     log: Logger,
 
     not_ready: HashSet<LocalNodeIndex>,
-    ingress: HashSet<LocalNodeIndex>,
     egress: Option<LocalNodeIndex>,
     reader: Option<LocalNodeIndex>,
 
