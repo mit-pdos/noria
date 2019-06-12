@@ -612,6 +612,7 @@ fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
                     WHERE Article.id = ?;
         QUERY AuthorWithVoteCount: SELECT author_id, SUM(votes) as votes \
                     FROM ArticleWithVoteCount \
+                    WHERE author_id = ? \
                     GROUP BY author_id;
     ";
 
@@ -662,7 +663,7 @@ fn vote_sharding() {
     }
 
     println!("lookup");
-    let res = q.lookup(&[0i64.into()], true).unwrap();
+    let res = q.lookup(&[100i64.into()], true).unwrap();
     println!("lookup res: {:?}", res);
 
     println!("vote again");
