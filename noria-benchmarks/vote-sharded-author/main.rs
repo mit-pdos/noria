@@ -61,10 +61,12 @@ where
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
+    let authors = value_t_or_exit!(global_args, "authors", usize);
 
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
         articles,
+        authors,
     };
 
     let skewed = match global_args.value_of("distribution") {
@@ -598,6 +600,13 @@ fn main() {
                 .help("Number of articles to prepopulate the database with"),
         )
         .arg(
+            Arg::with_name("authors")
+                .long("authors")
+                .value_name("N")
+                .default_value("400")
+                .help("Number of authors to prepopulate the database with"),
+        )
+        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -776,7 +785,7 @@ fn main() {
                     Arg::with_name("shards")
                         .long("shards")
                         .takes_value(true)
-                        .default_value("2")
+                        .default_value("100")
                         .help("Shard the graph this many ways (0 = disable sharding)."),
                 )
                 .arg(

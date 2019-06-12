@@ -5,6 +5,7 @@ use tokio::prelude::*;
 pub(crate) struct Parameters {
     pub(crate) prime: bool,
     pub(crate) articles: usize,
+    pub(crate) authors: usize,
 }
 
 pub(crate) struct WriteRequest(pub Vec<i32>);
