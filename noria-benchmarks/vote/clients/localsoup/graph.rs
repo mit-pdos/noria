@@ -107,7 +107,7 @@ impl Builder {
             .map(move |(graph, inputs, outputs)| Graph {
                 vote: inputs["Vote"],
                 article: inputs["Article"],
-                end: outputs["ArticleWithVoteCount"],
+                end: outputs["AuthorWithVoteCount"],
                 stupid,
                 graph,
             })

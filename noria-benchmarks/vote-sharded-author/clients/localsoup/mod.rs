@@ -70,7 +70,11 @@ impl VoteClient for LocalNoria {
 
         // prepopulate
         if verbose {
-            println!("Prepopulating with {} articles", params.articles);
+            println!(
+                "Prepopulating with {} articles written by {} authors",
+                params.articles,
+                params.authors,
+            );
         }
 
         Box::new(
@@ -80,10 +84,11 @@ impl VoteClient for LocalNoria {
                         a.i_promise_dst_is_same_process();
                     }
 
-                    a.perform_all((0..params.articles).map(|i| {
+                    a.perform_all((0..params.articles).map(move |i| {
                         vec![
                             ((i + 1) as i32).into(),
                             format!("Article #{}", i + 1).into(),
+                            (((i % params.authors) + 1) as i32).into(),
                         ]
                     }))
                     .map(move |_| g)
@@ -102,7 +107,7 @@ impl VoteClient for LocalNoria {
 
                     g.graph
                         .handle()
-                        .view("ArticleWithVoteCount")
+                        .view("AuthorWithVoteCount")
                         .and_then(move |r| {
                             g.graph.handle().table("Vote").map(move |mut w| {
                                 if fudge {

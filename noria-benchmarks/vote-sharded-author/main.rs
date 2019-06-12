@@ -161,6 +161,7 @@ where
                             handle,
                             ex,
                             zipf::ZipfDistribution::new(articles, 1.08).unwrap(),
+                            zipf::ZipfDistribution::new(authors, 1.08).unwrap(),
                             target,
                             global_args,
                         )
@@ -169,6 +170,7 @@ where
                             handle,
                             ex,
                             rand::distributions::Range::new(1, articles + 1),
+                            rand::distributions::Range::new(1, authors + 1),
                             target,
                             global_args,
                         )
@@ -266,7 +268,8 @@ where
 fn run_generator<C, R>(
     mut handle: C,
     ex: tokio::runtime::TaskExecutor,
-    id_rng: R,
+    w_id_rng: R,
+    r_id_rng: R,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> (f64, f64)
@@ -432,19 +435,25 @@ where
 
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
-            let id = loop {
-                let id = id_rng.sample(&mut rng) as i32;
-                if id != RESERVED_KEY {
-                    break id;
-                }
-            };
             if rng.gen_bool(1.0 / f64::from(every)) {
+                let id = loop {
+                    let id = w_id_rng.sample(&mut rng) as i32;
+                    if id != RESERVED_KEY {
+                        break id;
+                    }
+                };
                 if queued_w.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
                 }
                 queued_w_keys.push(id);
                 queued_w.push(next);
             } else {
+                let id = loop {
+                    let id = r_id_rng.sample(&mut rng) as i32;
+                    if id != RESERVED_KEY {
+                        break id;
+                    }
+                };
                 if queued_r.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
                 }
@@ -852,7 +861,7 @@ fn main() {
 
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::LocalNoria>(&args, largs),
-        ("netsoup", Some(largs)) => run::<clients::netsoup::Conn>(&args, largs),
+        //("netsoup", Some(largs)) => run::<clients::netsoup::Conn>(&args, largs),
         //("memcached", Some(largs)) => run::<clients::memcached::Constructor>(&args, largs),
         //("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         //("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
