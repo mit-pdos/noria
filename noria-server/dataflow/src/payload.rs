@@ -114,6 +114,7 @@ pub enum Packet {
     /// Evict the indicated keys from the materialization targed by the replay path `tag` (along
     /// with any other materializations below it).
     EvictKeys {
+        id: Option<ProvenanceUpdate>,
         link: Link,
         tag: Tag,
         keys: Vec<Vec<DataType>>,
@@ -271,6 +272,7 @@ impl Packet {
         match *self {
             Packet::Message { ref id, .. } => id,
             Packet::ReplayPiece { ref id, .. } => id,
+            Packet::EvictKeys { ref id, .. } => id,
             _ => unreachable!(),
         }
     }
@@ -279,6 +281,7 @@ impl Packet {
         match *self {
             Packet::Message { ref mut id, .. } => id,
             Packet::ReplayPiece { ref mut id, .. } => id,
+            Packet::EvictKeys { ref mut id, .. } => id,
             _ => unreachable!(),
         }
     }

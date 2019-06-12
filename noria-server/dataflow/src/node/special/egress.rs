@@ -86,9 +86,10 @@ impl Egress {
             ..
         } = self;
 
-        let (mtype, is_replay) = match *m {
-            Some(box Packet::Message { .. }) => ("Message", false),
-            Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", true),
+        let (mtype, is_message) = match *m {
+            Some(box Packet::Message { .. }) => ("Message", true),
+            Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", false),
+            Some(box Packet::EvictKeys { .. }) => ("EvictKeys", false),
             _ => unreachable!(),
         };
 
@@ -100,7 +101,7 @@ impl Egress {
             .iter()
             .filter(|ni| {
                 if let Some(min_label) = min_label_to_send.get(ni) {
-                    is_replay || label >= *min_label
+                    !is_message || label >= *min_label
                 } else {
                     false
                 }
@@ -226,18 +227,20 @@ impl Egress {
     }
 
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
-        let is_replay = match m {
-            Some(box Packet::ReplayPiece { .. }) => true,
-            _ => false,
+        let is_message = match m {
+            Some(box Packet::Message { .. }) => true,
+            Some(box Packet::ReplayPiece { .. }) => false,
+            Some(box Packet::EvictKeys { .. }) => false,
+            _ => unreachable!(),
         };
 
         // update packet id to include the correct label, provenance update, and from node.
         // replays don't get buffered and don't increment their label (they use the last label
         // sent by this domain - think of replays as a snapshot of what's already been sent).
-        let label = if is_replay {
-            self.min_provenance.label() + self.payloads.len()
-        } else {
+        let label = if is_message {
             self.min_provenance.label() + self.payloads.len() + 1
+        } else {
+            self.min_provenance.label() + self.payloads.len()
         };
         let update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, label, &[diff.clone()])
@@ -245,7 +248,7 @@ impl Egress {
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
-        if !is_replay {
+        if is_message {
             self.payloads.push(box m.as_ref().unwrap().clone_data());
             self.updates.push(self.max_provenance.clone());
         }
@@ -272,18 +275,22 @@ impl Egress {
         // we need to find the ingress node following this egress according to the path
         // with replay.tag, and then forward this message only on the channel corresponding
         // to that ingress node.
-        let is_replay = match m {
-            Some(box Packet::ReplayPiece { .. }) => true,
-            _ => false,
+        let is_message = match m {
+            Some(box Packet::Message { .. }) => true,
+            Some(box Packet::ReplayPiece { .. }) => false,
+            Some(box Packet::EvictKeys { .. }) => false,
+            _ => unreachable!(),
         };
-        let replay_to = m.as_ref().unwrap().tag().map(|tag| self.tags.get(&tag).unwrap());
-        let to_nodes = if let Some(ni) = replay_to {
-            assert!(is_replay);
+        let send_to = m.as_ref().unwrap().tag().map(|tag| {
+            self.tags.get(&tag).unwrap()
+        });
+        let to_nodes = if let Some(ni) = send_to {
+            assert!(!is_message);
             let mut set = HashSet::new();
             set.insert(*ni);
             set
         } else {
-            assert!(!is_replay);
+            assert!(is_message);
             self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
         };
 

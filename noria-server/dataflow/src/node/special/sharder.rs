@@ -188,6 +188,7 @@ impl Sharder {
 
     pub fn process_eviction(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         key_columns: &[usize],
         tag: Tag,
         keys: &[Vec<DataType>],
@@ -206,6 +207,7 @@ impl Sharder {
                     .sharded
                     .entry(shard)
                     .or_insert_with(|| box Packet::EvictKeys {
+                        id: id.clone(),
                         link: Link { src, dst },
                         keys: Vec::new(),
                         tag,
@@ -231,6 +233,7 @@ impl Sharder {
                     .entry(addr)
                     .or_default()
                     .push_back(Box::new(Packet::EvictKeys {
+                        id: id.clone(),
                         link: Link { src, dst },
                         keys: keys.to_vec(),
                         tag,

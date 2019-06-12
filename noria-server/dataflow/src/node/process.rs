@@ -229,10 +229,12 @@ impl Node {
 
     crate fn process_eviction(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         from: LocalNodeIndex,
         key_columns: &[usize],
         keys: &mut Vec<Vec<DataType>>,
         tag: Tag,
+        domain: DomainIndex,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
@@ -240,9 +242,9 @@ impl Node {
         match self.inner {
             NodeType::Base(..) => {}
             NodeType::Egress(Some(ref mut e)) => {
-                // TODO(ygina): evictions
-                e.process(
+                e.send_packet(
                     &mut Some(Box::new(Packet::EvictKeys {
+                        id,
                         link: Link {
                             src: addr,
                             dst: addr,
@@ -250,14 +252,13 @@ impl Node {
                         tag,
                         keys: keys.to_vec(),
                     })),
-                    0,
+                    domain,
                     on_shard.unwrap_or(0),
                     output,
-                    &HashSet::default(),
                 );
             }
             NodeType::Sharder(ref mut s) => {
-                s.process_eviction(key_columns, tag, keys, addr, on_shard.is_some(), output);
+                s.process_eviction(id, key_columns, tag, keys, addr, on_shard.is_some(), output);
             }
             NodeType::Internal(ref mut i) => {
                 i.on_eviction(from, key_columns, keys);
