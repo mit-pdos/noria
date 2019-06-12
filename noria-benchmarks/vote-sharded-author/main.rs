@@ -33,7 +33,10 @@ lazy_static! {
         Arc::new(Mutex::new((None, 0)));
 }
 
-const RESERVED_KEY: i32 = 1;
+// Reserved article id
+const RESERVED_W_KEY: i32 = 1;
+// Reserved author id
+const RESERVED_R_KEY: i32 = 1;
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
@@ -351,11 +354,11 @@ where
 
             if !write {
                 for row in rows {
-                    let key: i32 = row[0][0].clone().into();
-                    if key != RESERVED_KEY {
+                    let author: i32 = row[0][0].clone().into();
+                    if author != RESERVED_R_KEY {
                         continue;
                     }
-                    let read_count = row[0][2].clone();
+                    let read_count = row[0][1].clone();
                     if read_count == DataType::None {
                         // no writes yet
                         continue;
@@ -371,7 +374,7 @@ where
                         continue;
                     }
 
-                    // println!("Read {}th vote at {:?}", read_count, done);
+                    println!("Read {}th vote at {:?}", read_count, done);
                     if let Some(w_time) = w_time_count.0.take() {
                         if warmup_done {
                             let delay = done.duration_since(w_time);
@@ -438,7 +441,7 @@ where
             if rng.gen_bool(1.0 / f64::from(every)) {
                 let id = loop {
                     let id = w_id_rng.sample(&mut rng) as i32;
-                    if id != RESERVED_KEY {
+                    if id != RESERVED_W_KEY {
                         break id;
                     }
                 };
@@ -450,7 +453,7 @@ where
             } else {
                 let id = loop {
                     let id = r_id_rng.sample(&mut rng) as i32;
-                    if id != RESERVED_KEY {
+                    if id != RESERVED_R_KEY {
                         break id;
                     }
                 };
@@ -472,20 +475,26 @@ where
             if queued_w.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
             }
-            queued_w_keys.pop();
-            queued_w.pop();
-            queued_w_keys.push(RESERVED_KEY);
-            queued_w.push(now);  // might mess up sojourn time
+            // might mess up sojourn time
+            if queued_w.is_empty() {
+                queued_w_keys.push(RESERVED_W_KEY);
+                queued_w.push(now);
+            } else {
+                queued_w_keys[0] = RESERVED_W_KEY;
+            }
             *w_time_count = (Some(now), w_time_count.1 + 1);
-            // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
+            println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
         } else {
             if queued_r.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
             }
-            queued_r_keys.pop();
-            queued_r.pop();
-            queued_r_keys.push(RESERVED_KEY);
-            queued_r.push(now);  // might mess up sojourn time
+            // might mess up sojourn time
+            if queued_r.is_empty() {
+                queued_r_keys.push(RESERVED_R_KEY);
+                queued_r.push(now);
+            } else {
+                queued_r_keys[0] = RESERVED_R_KEY;
+            }
         }
         drop(w_time_count);
 
@@ -665,14 +674,14 @@ fn main() {
         .arg(
             Arg::with_name("ratio")
                 .long("write-every")
-                .default_value("19")
+                .default_value("2")
                 .value_name("N")
                 .help("1-in-N chance of a write"),
         )
         .arg(
             Arg::with_name("max-batch-time-us")
                 .long("max-batch-time-us")
-                .default_value("1000")
+                .default_value("200")
                 .help("Time between sending batches to Noria."),
         )
         .arg(
