@@ -618,7 +618,7 @@ fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
     for i in 0..4 {
-        let worker = build_authority(authority.clone(), Some(2), i == 0);
+        let worker = build_authority(authority.clone(), Some(3), false);
         workers.push(worker);
     }
     sleep();
@@ -645,16 +645,16 @@ fn vote_sharding() {
     // users 1-9 * 10
     // authors 1-9 * 100
     println!("insert article 1");
-    a.insert(vec![1i64.into(), 100.into()]).unwrap();
+    a.insert(vec![1i64.into(), 100i64.into()]).unwrap();
     sleep();
     println!("insert article 2");
-    a.insert(vec![2i64.into(), 100.into()]).unwrap();
+    a.insert(vec![2i64.into(), 100i64.into()]).unwrap();
     sleep();
     println!("insert article 3");
-    a.insert(vec![3i64.into(), 200.into()]).unwrap();
+    a.insert(vec![3i64.into(), 200i64.into()]).unwrap();
     sleep();
 
-    let articles_to_vote = vec![1, 2, 3];
+    let articles_to_vote = vec![1i64, 2, 3];
     for article in articles_to_vote {
         println!("insert vote");
         v.insert(vec![article.into(), 10.into()]).unwrap();
