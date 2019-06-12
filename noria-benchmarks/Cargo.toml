@@ -65,6 +65,10 @@ name = "vote-write-prop"
 path = "vote-write-prop/main.rs"
 
 [[bin]]
+name = "vote-sharded-author"
+path = "vote-sharded-author/main.rs"
+
+[[bin]]
 name = "vote-distributed"
 path = "vote/distributed.rs"
 required-features = ["orchestration"]
