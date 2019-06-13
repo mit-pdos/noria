@@ -54,6 +54,13 @@ enum DomainMode {
     },
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum DomainExitType {
+    Egress,
+    Reader,
+    Sharder,
+}
+
 impl PartialEq for DomainMode {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -145,6 +152,27 @@ impl DomainBuilder {
             .map(|n| n.borrow().local_addr())
             .collect();
 
+        let shard = self.shard.unwrap_or(0);
+        let exit_ni_type = self.nodes
+            .iter()
+            .filter_map(|(ni, node)| {
+                if node.borrow().is_egress() {
+                    node.borrow_mut().with_egress_mut(|n| n.init_in_domain(shard));
+                    Some((ni, DomainExitType::Egress))
+                } else if node.borrow().is_reader() {
+                    node.borrow_mut().with_reader_mut(|n| n.init_in_domain(shard)).unwrap();
+                    Some((ni, DomainExitType::Reader))
+                } else if node.borrow().is_sharder() {
+                    node.borrow_mut().with_sharder_mut(|n| n.init_in_domain(shard));
+                    Some((ni, DomainExitType::Sharder))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(exit_ni_type.len(), 1);
+        let (exit_ni, exit_type) = exit_ni_type[0];
+
         let log = log.new(o!("domain" => self.index.index(), "shard" => self.shard.unwrap_or(0)));
         let control_reply_tx = TcpSender::connect(&control_addr).unwrap();
         let group_commit_queues = GroupCommitQueueSet::new(&self.persistence_parameters);
@@ -159,6 +187,8 @@ impl DomainBuilder {
             state: StateMap::default(),
             log,
             not_ready,
+            exit_ni,
+            exit_type,
             mode: DomainMode::Forwarding,
             waiting: Default::default(),
             reader_triggered: Default::default(),
@@ -211,6 +241,8 @@ pub struct Domain {
     log: Logger,
 
     not_ready: HashSet<LocalNodeIndex>,
+    exit_ni: LocalNodeIndex,
+    exit_type: DomainExitType,
 
     ingress_inject: Map<(usize, Vec<DataType>)>,
 
@@ -233,7 +265,8 @@ pub struct Domain {
     control_reply_tx: TcpSender<ControlReplyPacket>,
     channel_coordinator: Arc<ChannelCoordinator>,
 
-    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>)>,
+    // TODO(ygina): buffered replays may be the result of multiple previous updates
+    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<ProvenanceUpdate>)>,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
 
@@ -288,7 +321,7 @@ impl Domain {
                 // and then get back to it after all processing has finished (at the bottom of
                 // `Self::handle()`)
                 self.delayed_for_self
-                    .push_back(box Packet::RequestPartialReplay { tag, key });
+                    .push_back(box Packet::RequestPartialReplay { id: None, tag, key });
                 continue;
             }
 
@@ -372,6 +405,7 @@ impl Domain {
                 for trigger in options {
                     if trigger
                         .send(box Packet::RequestPartialReplay {
+                            id: None, // TODO(ygina): might need id
                             tag,
                             key: key.clone(), // sad to clone here
                         })
@@ -397,7 +431,7 @@ impl Domain {
             "concurrent" => self.concurrent_replays,
             );
             if options[shard]
-                .send(box Packet::RequestPartialReplay { tag, key })
+                .send(box Packet::RequestPartialReplay { id: None, tag, key })
                 .is_err()
             {
                 // we're shutting down -- it's fine.
@@ -511,6 +545,7 @@ impl Domain {
             let mut m = Some(m);
             let (misses, _, captured) = n.process(
                 &mut m,
+                self.index,
                 None,
                 &mut self.state,
                 &self.nodes,
@@ -625,6 +660,7 @@ impl Domain {
             for (tag, keys) in evictions {
                 self.handle_eviction(
                     Box::new(Packet::EvictKeys {
+                        id: None,
                         keys: keys.into_iter().collect(),
                         link: Link::new(src, me),
                         tag,
@@ -646,6 +682,7 @@ impl Domain {
             ref m => unreachable!("dispatch process got {:?}", m),
         }
 
+        // TODO(ygina): forks and merges here -- what will happen to packet id?
         // NOTE: we can't directly iterate over .children due to self.dispatch in the loop
         let nchildren = self.nodes[me].borrow().children().len();
         for i in 0..nchildren {
@@ -665,6 +702,8 @@ impl Domain {
 
             if child_is_merger {
                 // we need to preserve the egress src (which includes shard identifier)
+                // TODO(ygina): packet labels for mergers
+                // unimplemented!();
             } else {
                 m.link_mut().src = me;
             }
@@ -760,16 +799,19 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::UpdateEgress {
-                        node,
                         new_tx,
                         new_tag,
                     } => {
-                        let mut n = self.nodes[node].borrow_mut();
+                        assert_eq!(self.exit_type, DomainExitType::Egress);
+                        let domain_index = self.index.index();
+                        let mut n = self.nodes[self.exit_ni].borrow_mut();
                         n.with_egress_mut(move |e| {
                             if let Some((node, local, addr)) = new_tx {
+                                println!("D{}: UpdateEgress {:?} None", domain_index, node);
                                 e.add_tx(node, local, addr);
                             }
                             if let Some(new_tag) = new_tag {
+                                println!("D{}: UpdateEgress None {:?}", domain_index, new_tag);
                                 e.add_tag(new_tag.0, new_tag.1);
                             }
                         });
@@ -912,11 +954,14 @@ impl Domain {
                         path,
                         notify_done,
                         trigger,
+                        ack,
                     } => {
                         // let coordinator know that we've registered the tagged path
-                        self.control_reply_tx
-                            .send(ControlReplyPacket::ack())
-                            .unwrap();
+                        if ack {
+                            self.control_reply_tx
+                                .send(ControlReplyPacket::ack())
+                                .unwrap();
+                        }
 
                         if notify_done {
                             info!(self.log,
@@ -931,6 +976,14 @@ impl Domain {
                         }
 
                         use payload;
+                        let trigger_str = match &trigger {
+                            payload::TriggerEndpoint::None => "None".into(),
+                            payload::TriggerEndpoint::Start(_) => "Start".into(),
+                            payload::TriggerEndpoint::Local(_) => "Local".into(),
+                            payload::TriggerEndpoint::End(_, domain) => format!("End({:?})", domain),
+                        };
+                        println!("D{}: SetupReplayPath {:?} {}", self.index.index(), tag, trigger_str);
+
                         let trigger = match trigger {
                             payload::TriggerEndpoint::None => TriggerEndpoint::None,
                             payload::TriggerEndpoint::Start(v) => TriggerEndpoint::Start(v),
@@ -988,6 +1041,7 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
+                        println!("D{}: RequestReaderReplay {:?}", self.index.index(), self.nodes[node].borrow().global_addr());
                         let still_miss = self.nodes[node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
@@ -1015,17 +1069,19 @@ impl Domain {
                             self.find_tags_and_replay(key, &cols[..], node);
                         }
                     }
-                    Packet::RequestPartialReplay { tag, key } => {
+                    Packet::RequestPartialReplay { id, tag, key } => {
+                        println!("D{}: RequestPartialReplay {:?}", self.index.index(), tag);
                         trace!(
                             self.log,
                            "got replay request";
                            "tag" => tag.id(),
                            "key" => format!("{:?}", key)
                         );
-                        self.seed_replay(tag, &key[..], sends, executor);
+                        self.seed_replay(id, tag, &key[..], sends, executor);
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
+                        println!("D{}: StartReplay {:?} {:?}", self.index.index(), tag, self.nodes[from].borrow().global_addr());
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
                         let start = time::Instant::now();
@@ -1060,6 +1116,7 @@ impl Domain {
                         // we may already have processed some other messages that are not yet a
                         // part of state.
                         let p = box Packet::ReplayPiece {
+                            id: None,
                             tag,
                             link,
                             context: ReplayPieceContext::Regular {
@@ -1131,6 +1188,7 @@ impl Domain {
                                         let len = chunk.len();
                                         let last = iter.peek().is_none();
                                         let p = box Packet::ReplayPiece {
+                                            id: None,
                                             tag,
                                             link, // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
@@ -1215,10 +1273,38 @@ impl Domain {
                             .unwrap();
                     }
                     Packet::GetStatistics => {
+                        let (min_label, log_size, provenance) = match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
+                                    .borrow()
+                                    .with_egress(|e| (
+                                        e.min_provenance.label(),
+                                        e.payloads.len(),
+                                        e.get_last_provenance().into_debug(),
+                                    ))
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            }
+                            DomainExitType::Reader => {
+                                self.nodes[self.exit_ni]
+                                    .borrow()
+                                    .with_reader(|r| (
+                                        r.min_provenance.label(),
+                                        r.num_payloads,
+                                        r.get_last_provenance().into_debug(),
+                                    ))
+                                    .unwrap()
+                            },
+                        };
+
                         let domain_stats = noria::debug::stats::DomainStats {
                             total_time: self.total_time.num_nanoseconds(),
                             total_ptime: self.total_ptime.num_nanoseconds(),
                             wait_time: self.wait_time.num_nanoseconds(),
+                            min_label,
+                            log_size,
+                            provenance,
                         };
 
                         let node_stats = self
@@ -1296,7 +1382,171 @@ impl Domain {
                     Packet::Quit => unreachable!("Quit messages are handled by event loop"),
                     Packet::Spin => {
                         // spinning as instructed
-                    }
+                    },
+                    Packet::MakeRecovery { node } => {
+                        /*
+                        let node = &self.nodes[node];
+                        println!("D{}: MakeRecovery {:?}", self.index.index(), node.borrow().global_addr());
+
+                        // become a node operator if it is a bottom replica
+                        let replica_type = node.borrow().replica_type();
+                        match replica_type {
+                            Some(ReplicaType::Bottom{ .. }) => {
+                                node.borrow_mut().into_full();
+                            },
+                            Some(ReplicaType::Top{ .. }) => {},
+                            None => unreachable!(),
+                        }
+
+                        // update internal replica type
+                        node.borrow_mut().remove_replica_type();
+                        */
+                        unimplemented!();
+                    },
+                    Packet::RemoveChild { child, domain } => {
+                        let node = &self.nodes[self.exit_ni];
+                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
+
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                // Prevent the egress node from sending messages to the node
+                                node.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            }
+                        }
+
+                        // Tell the replica to uncache the sender
+                        executor.uncache_domain(domain);
+                    },
+                    Packet::RemoveTag { old_tag, new_state } => {
+                        println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
+
+                        self.replay_paths.remove(&old_tag);
+                        self.buffered_replay_requests.remove(&old_tag);
+
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_egress_mut(|e| e.remove_tag(old_tag));
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            }
+                        }
+
+                        if let Some((ni, new_tag)) = new_state {
+                            self.state
+                                .get_mut(ni)
+                                .unwrap()
+                                .replace_tag(old_tag, new_tag);
+                        }
+                    },
+                    Packet::NewIncoming { old, new } => {
+                        /*
+                        println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
+                        debug!(
+                            self.log,
+                            "updated incoming connection to domain {}",
+                            self.index.index();
+                            "old" => old.index(),
+                            "new" => new.index(),
+                        );
+
+                        // tell the controller all the provenance information stored in this domain
+                        // to help the controller decide where to resume sending messages.
+                        let provenance = match self.exit_type {
+                            DomainExitType::Egress => {
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_egress_mut(|e| {
+                                        e.new_incoming(old, new);
+                                        e.get_last_provenance().subgraph(new).clone()
+                                    })
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_reader_mut(|r| {
+                                        r.new_incoming(old, new);
+                                        r.get_last_provenance().subgraph(new).clone()
+                                    })
+                                    .unwrap()
+                            }
+                        };
+                        executor.ack_new_incoming(self.index, *provenance);
+                        */
+                        unimplemented!()
+                    },
+                    Packet::ResumeAt { child_labels } => {
+                        println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
+                        // the domain should have one egress node to resume from
+                        //
+                        // update its node state so it knows where to resume from for each child.
+                        // then set the label of the first message it expects to produce once
+                        // it starts receiving messages from upstream nodes again. (see note below)
+                        let node = &self.nodes[self.exit_ni];
+                        debug!(
+                            self.log,
+                            "resuming messages from {} to {:?}",
+                            node.borrow().global_addr().index(),
+                            child_labels;
+                        );
+
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                node.borrow_mut().with_egress_mut(|e| {
+                                    // if setting the min_label would truncate any messages in the
+                                    // buffer, that means there are no dependent upstream failures
+                                    // that will get a ResumeAt in response to acking this
+                                    // ResumeAt. we won't set the min_label here, letting some
+                                    // other process take truncate logs.
+                                    e.resume_at(child_labels, self.shard, sends);
+                                });
+                            },
+                            DomainExitType::Sharder => {
+                                unimplemented!();
+                            },
+                            DomainExitType::Reader => {
+                                unreachable!();
+                            },
+                        }
+
+                        // TODO(ygina): Currently, the value of next_label is the label of the
+                        // next OUTGOING packet this domain needs to send. We assume it has a
+                        // 1-to-1 correspondence to the labels of INCOMING packets - that is,
+                        // the domain is linear. We need to instead know which multiple incoming
+                        // packet labels compose an outgoing packet label. The plan is to either
+                        // store the provenance of the graph up to a fixed depth, persist the
+                        // mapping, or both.
+                        //
+                        // If this domain has multiple children, we also have to ensure that we
+                        // go through all points in time. For example, if the last packet received
+                        // of child A was 8(3,5) and of child B was 10(3,7). We have to make sure
+                        // in resuming execution that we don't go through the time 9(4,5). Note
+                        // the next labels of the children should be linearizable [sic?].
+                        //
+                        // Theoretically, downstream nodes have this information by composing
+                        // their provenance and a list of updates. (depending on how we store
+                        // updates for replays...)
+
+                        // we ack the ResumeAt to the controller, and the controller takes care
+                        // of any upstream ResumeAts if, for example, this domain does not have
+                        // any messages buffered.
+                        // TODO(ygina): more complicated index for joins, possibly filters
+                        executor.ack_resume_at(self.index);
+                    },
                     _ => unreachable!(),
                 }
             }
@@ -1308,10 +1558,10 @@ impl Domain {
             let elapsed_replays: Vec<_> = {
                 self.buffered_replay_requests
                     .iter_mut()
-                    .filter_map(|(&tag, &mut (first, ref mut keys))| {
+                    .filter_map(|(&tag, &mut (first, ref mut keys, ref id))| {
                         if !keys.is_empty() && now.duration_since(first) > to {
                             // will be removed by retain below
-                            Some((tag, mem::replace(keys, HashSet::new())))
+                            Some((tag, mem::replace(keys, HashSet::new()), id.clone()))
                         } else {
                             None
                         }
@@ -1319,9 +1569,9 @@ impl Domain {
                     .collect()
             };
             self.buffered_replay_requests
-                .retain(|_, (_, ref keys)| !keys.is_empty());
-            for (tag, keys) in elapsed_replays {
-                self.seed_all(tag, keys, sends, executor);
+                .retain(|_, (_, ref keys, _)| !keys.is_empty());
+            for (tag, keys, id) in elapsed_replays {
+                self.seed_all(id, tag, keys, sends, executor);
             }
         }
 
@@ -1390,6 +1640,7 @@ impl Domain {
 
     fn seed_all(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
         sends: &mut EnqueuedSends,
@@ -1425,7 +1676,8 @@ impl Domain {
                 });
 
                 let m = if !keys.is_empty() {
-                    Some(box Packet::ReplayPiece {
+                    let p = box Packet::ReplayPiece {
+                        id,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1433,7 +1685,9 @@ impl Domain {
                             ignore: false,
                         },
                         data: rs.into(),
-                    })
+                    };
+
+                    Some(p)
                 } else {
                     None
                 };
@@ -1483,6 +1737,7 @@ impl Domain {
 
     fn seed_replay(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         key: &[DataType],
         sends: &mut EnqueuedSends,
@@ -1504,12 +1759,15 @@ impl Domain {
             match self.buffered_replay_requests.entry(tag) {
                 Entry::Occupied(o) => {
                     assert!(!o.get().1.is_empty());
-                    o.into_mut().1.insert(key);
+                    let o = o.into_mut();
+                    o.1.insert(key);
+                    // TODO(ygina): insert additional update rather than reassigning
+                    o.2 = id;
                 }
                 Entry::Vacant(v) => {
                     let mut ks = HashSet::new();
                     ks.insert(key);
-                    v.insert((time::Instant::now(), ks));
+                    v.insert((time::Instant::now(), ks, id));
                 }
             }
 
@@ -1542,7 +1800,8 @@ impl Domain {
                     use std::iter::FromIterator;
                     let data = Records::from_iter(rs.into_iter().map(|r| self.seed_row(source, r)));
 
-                    let m = Some(box Packet::ReplayPiece {
+                    let m = box Packet::ReplayPiece {
+                        id,
                         link: Link::new(source, path[0].node),
                         tag,
                         context: ReplayPieceContext::Partial {
@@ -1550,8 +1809,9 @@ impl Domain {
                             ignore: false,
                         },
                         data,
-                    });
-                    (m, source, None)
+                    };
+
+                    (Some(m), source, None)
                 } else {
                     (None, source, Some(cols.clone()))
                 }
@@ -1591,6 +1851,7 @@ impl Domain {
             return;
         }
 
+        let id = m.id().clone();
         let mut finished = None;
         let mut need_replay = Vec::new();
         let mut finished_partial = 0;
@@ -1633,6 +1894,7 @@ impl Domain {
             let m = *m; // workaround for #16223
             match m {
                 Packet::ReplayPiece {
+                    id,
                     tag,
                     link,
                     mut data,
@@ -1701,6 +1963,7 @@ impl Domain {
 
                     // forward the current message through all local nodes.
                     let m = box Packet::ReplayPiece {
+                        id,
                         link,
                         tag,
                         data,
@@ -1764,6 +2027,7 @@ impl Domain {
                         // process the current message in this node
                         let (mut misses, lookups, captured) = n.process(
                             &mut m,
+                            self.index,
                             segment.partial_key.as_ref(),
                             &mut self.state,
                             &self.nodes,
@@ -2255,6 +2519,7 @@ impl Domain {
                     for (tag, replay_key) in replay {
                         self.delayed_for_self
                             .push_back(box Packet::RequestPartialReplay {
+                                id: id.clone(),
                                 tag,
                                 key: replay_key,
                             });
@@ -2376,6 +2641,7 @@ impl Domain {
     pub fn handle_eviction(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
         #[allow(clippy::too_many_arguments)]
         fn trigger_downstream_evictions(
+            id: Option<ProvenanceUpdate>,
             log: &Logger,
             key_columns: &[usize],
             keys: &[Vec<DataType>],
@@ -2383,6 +2649,7 @@ impl Domain {
             sends: &mut EnqueuedSends,
             not_ready: &HashSet<LocalNodeIndex>,
             replay_paths: &HashMap<Tag, ReplayPath>,
+            domain: DomainIndex,
             shard: Option<usize>,
             state: &mut StateMap,
             nodes: &mut DomainNodes,
@@ -2402,7 +2669,7 @@ impl Domain {
                     };
 
                     let mut keys = Vec::from(keys);
-                    walk_path(&path.path[..], &mut keys, *tag, shard, nodes, sends);
+                    walk_path(id.clone(), &path.path[..], &mut keys, *tag, domain, shard, nodes, sends);
 
                     if let TriggerEndpoint::Local(_) = path.trigger {
                         let target = replay_paths[&tag].path.last().unwrap();
@@ -2421,6 +2688,7 @@ impl Domain {
 
                         state[target.node].evict_keys(*tag, &keys[..]);
                         trigger_downstream_evictions(
+                            id.clone(),
                             log,
                             &target.partial_key.as_ref().unwrap()[..],
                             &keys[..],
@@ -2428,6 +2696,7 @@ impl Domain {
                             sends,
                             not_ready,
                             replay_paths,
+                            domain,
                             shard,
                             state,
                             nodes,
@@ -2438,9 +2707,11 @@ impl Domain {
         }
 
         fn walk_path(
+            id: Option<ProvenanceUpdate>,
             path: &[ReplayPathSegment],
             keys: &mut Vec<Vec<DataType>>,
             tag: Tag,
+            domain: DomainIndex,
             shard: Option<usize>,
             nodes: &mut DomainNodes,
             sends: &mut EnqueuedSends,
@@ -2448,10 +2719,12 @@ impl Domain {
             let mut from = path[0].node;
             for segment in path {
                 nodes[segment.node].borrow_mut().process_eviction(
+                    id.clone(),
                     from,
                     &segment.partial_key.as_ref().unwrap()[..],
                     keys,
                     tag,
+                    domain,
                     shard,
                     sends,
                 );
@@ -2518,6 +2791,7 @@ impl Domain {
                             freed += bytes;
 
                             trigger_downstream_evictions(
+                                None,
                                 &self.log,
                                 &key_columns[..],
                                 &keys[..],
@@ -2525,6 +2799,7 @@ impl Domain {
                                 sends,
                                 &self.not_ready,
                                 &self.replay_paths,
+                                self.index,
                                 self.shard,
                                 &mut self.state,
                                 &mut self.nodes,
@@ -2538,6 +2813,7 @@ impl Domain {
                 }
             }
             (Packet::EvictKeys {
+                id,
                 link: Link { dst, .. },
                 mut keys,
                 tag,
@@ -2555,9 +2831,11 @@ impl Domain {
                     .position(|ps| ps.node == dst)
                     .expect("got eviction for non-local node");
                 walk_path(
+                    id.clone(),
                     &path[i..],
                     &mut keys,
                     tag,
+                    self.index,
                     self.shard,
                     &mut self.nodes,
                     sends,
@@ -2579,6 +2857,7 @@ impl Domain {
                         if let Some(evicted) = self.state[target].evict_keys(tag, &keys) {
                             let key_columns = evicted.0.to_vec();
                             trigger_downstream_evictions(
+                                id,
                                 &self.log,
                                 &key_columns[..],
                                 &keys[..],
@@ -2586,6 +2865,7 @@ impl Domain {
                                 sends,
                                 &self.not_ready,
                                 &self.replay_paths,
+                                self.index,
                                 self.shard,
                                 &mut self.state,
                                 &mut self.nodes,
@@ -2660,8 +2940,8 @@ impl Domain {
                 let opt1 = self
                     .buffered_replay_requests
                     .iter()
-                    .filter(|&(_, &(_, ref keys))| !keys.is_empty())
-                    .map(|(_, &(first, _))| {
+                    .filter(|&(_, &(_, ref keys, _))| !keys.is_empty())
+                    .map(|(_, &(first, _, _))| {
                         self.replay_batch_timeout
                             .checked_sub(now.duration_since(first))
                             .unwrap_or(time::Duration::from_millis(0))

@@ -7,6 +7,7 @@ pub mod distinct;
 pub mod filter;
 pub mod grouped;
 pub mod identity;
+pub mod replica;
 pub mod join;
 pub mod latest;
 pub mod project;
@@ -15,7 +16,7 @@ pub mod topk;
 pub mod trigger;
 pub mod union;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum NodeOperator {
     Sum(grouped::GroupedOperator<grouped::aggregate::Aggregator>),
@@ -26,6 +27,7 @@ pub enum NodeOperator {
     Project(project::Project),
     Union(union::Union),
     Identity(identity::Identity),
+    Replica(replica::Replica),
     Filter(filter::Filter),
     TopK(topk::TopK),
     Trigger(trigger::Trigger),
@@ -60,6 +62,7 @@ nodeop_from_impl!(NodeOperator::Latest, latest::Latest);
 nodeop_from_impl!(NodeOperator::Project, project::Project);
 nodeop_from_impl!(NodeOperator::Union, union::Union);
 nodeop_from_impl!(NodeOperator::Identity, identity::Identity);
+nodeop_from_impl!(NodeOperator::Replica, replica::Replica);
 nodeop_from_impl!(NodeOperator::Filter, filter::Filter);
 nodeop_from_impl!(NodeOperator::TopK, topk::TopK);
 nodeop_from_impl!(NodeOperator::Trigger, trigger::Trigger);
@@ -77,6 +80,7 @@ macro_rules! impl_ingredient_fn_mut {
             NodeOperator::Project(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Union(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Identity(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::Replica(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Filter(ref mut i) => i.$fn($($arg),*),
             NodeOperator::TopK(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Trigger(ref mut i) => i.$fn($($arg),*),
@@ -97,6 +101,7 @@ macro_rules! impl_ingredient_fn_ref {
             NodeOperator::Project(ref i) => i.$fn($($arg),*),
             NodeOperator::Union(ref i) => i.$fn($($arg),*),
             NodeOperator::Identity(ref i) => i.$fn($($arg),*),
+            NodeOperator::Replica(ref i) => i.$fn($($arg),*),
             NodeOperator::Filter(ref i) => i.$fn($($arg),*),
             NodeOperator::TopK(ref i) => i.$fn($($arg),*),
             NodeOperator::Trigger(ref i) => i.$fn($($arg),*),
@@ -416,6 +421,9 @@ pub mod test {
 
             impl Executor for Ex {
                 fn ack(&mut self, _: SourceChannelIdentifier) {}
+                fn ack_new_incoming(&mut self, _: DomainIndex, _: Provenance) {}
+                fn ack_resume_at(&mut self, _: DomainIndex) {}
+                fn uncache_domain(&mut self, _: DomainIndex) {}
                 fn create_universe(&mut self, _: HashMap<String, DataType>) {}
             }
 

@@ -90,6 +90,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
+        id: Option<ProvenanceUpdate>,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -97,6 +98,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
+        id: Option<ProvenanceUpdate>,
         link: Link,
         tag: Tag,
         data: Records,
@@ -112,6 +114,7 @@ pub enum Packet {
     /// Evict the indicated keys from the materialization targed by the replay path `tag` (along
     /// with any other materializations below it).
     EvictKeys {
+        id: Option<ProvenanceUpdate>,
         link: Link,
         tag: Tag,
         keys: Vec<Vec<DataType>>,
@@ -150,7 +153,6 @@ pub enum Packet {
 
     /// Update Egress node.
     UpdateEgress {
-        node: LocalNodeIndex,
         new_tx: Option<(NodeIndex, LocalNodeIndex, ReplicaAddr)>,
         new_tag: Option<(Tag, NodeIndex)>,
     },
@@ -189,10 +191,12 @@ pub enum Packet {
         path: Vec<ReplayPathSegment>,
         notify_done: bool,
         trigger: TriggerEndpoint,
+        ack: bool,
     },
 
     /// Ask domain (nicely) to replay a particular key.
     RequestPartialReplay {
+        id: Option<ProvenanceUpdate>,
         tag: Tag,
         key: Vec<DataType>,
     },
@@ -230,9 +234,58 @@ pub enum Packet {
 
     /// Ask domain to log its state size
     UpdateStateSize,
+
+    // Recovery messages
+    //
+    /// Tell the node to become a full node operator, if appropriate, and to get rid of its
+    /// replica status
+    MakeRecovery {
+        node: LocalNodeIndex,
+    },
+
+    /// Tell the node to stop sending messages to this child
+    RemoveChild {
+        child: NodeIndex,
+        domain: DomainIndex,
+    },
+
+    /// Remove the replay path corresponding to the tag in the domain
+    RemoveTag {
+        old_tag: Tag,
+        new_state: Option<(LocalNodeIndex, Tag)>,
+    },
+
+    /// Notify downstream nodes of an incoming connection to replace an existing one
+    NewIncoming {
+        old: DomainIndex,
+        new: DomainIndex,
+    },
+
+    /// Notify the domain to resume sending messages to its children from the given packet labels
+    ResumeAt {
+        child_labels: Vec<(NodeIndex, usize)>,
+    },
 }
 
 impl Packet {
+    crate fn id(&self) -> &Option<ProvenanceUpdate> {
+        match *self {
+            Packet::Message { ref id, .. } => id,
+            Packet::ReplayPiece { ref id, .. } => id,
+            Packet::EvictKeys { ref id, .. } => id,
+            _ => unreachable!(),
+        }
+    }
+
+    crate fn id_mut(&mut self) -> &mut Option<ProvenanceUpdate> {
+        match *self {
+            Packet::Message { ref mut id, .. } => id,
+            Packet::ReplayPiece { ref mut id, .. } => id,
+            Packet::EvictKeys { ref mut id, .. } => id,
+            _ => unreachable!(),
+        }
+    }
+
     crate fn src(&self) -> LocalNodeIndex {
         match *self {
             Packet::Input { ref inner, .. } => {
@@ -321,20 +374,24 @@ impl Packet {
     crate fn clone_data(&self) -> Self {
         match *self {
             Packet::Message {
+                ref id,
                 link,
                 ref data,
                 ref tracer,
             } => Packet::Message {
+                id: id.clone(),
                 link,
                 data: data.clone(),
                 tracer: tracer.clone(),
             },
             Packet::ReplayPiece {
+                ref id,
                 link,
                 tag,
                 ref data,
                 ref context,
             } => Packet::ReplayPiece {
+                id: id.clone(),
                 link,
                 tag,
                 data: data.clone(),

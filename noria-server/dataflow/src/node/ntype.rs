@@ -5,7 +5,7 @@ use processing::Ingredient;
 #[derive(Clone, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum NodeType {
-    Ingress,
+    Ingress(special::Ingress),
     Base(special::Base),
     Internal(ops::NodeOperator),
     Egress(Option<special::Egress>),
@@ -22,7 +22,7 @@ impl NodeType {
             NodeType::Egress(ref mut e) => NodeType::Egress(e.take()),
             NodeType::Reader(ref mut r) => NodeType::Reader(r.take()),
             NodeType::Sharder(ref mut s) => NodeType::Sharder(s.take()),
-            NodeType::Ingress => NodeType::Ingress,
+            NodeType::Ingress(ref mut i) => NodeType::Ingress(i.take()),
             NodeType::Internal(ref mut i) => NodeType::Internal(i.take()),
             NodeType::Source => unreachable!(),
             NodeType::Dropped => unreachable!(),
@@ -55,8 +55,8 @@ impl From<special::Reader> for NodeType {
 }
 
 impl From<special::Ingress> for NodeType {
-    fn from(_: special::Ingress) -> Self {
-        NodeType::Ingress
+    fn from(i: special::Ingress) -> Self {
+        NodeType::Ingress(i)
     }
 }
 

@@ -5,8 +5,9 @@ use crate::controller::schema;
 use crate::controller::{ControllerState, Migration, Recipe};
 use crate::controller::{Worker, WorkerIdentifier};
 use crate::coordination::{CoordinationMessage, CoordinationPayload, DomainDescriptor};
+use dataflow::payload::{ControlReplyPacket, TriggerEndpoint};
 use dataflow::prelude::*;
-use dataflow::{node, payload::ControlReplyPacket, prelude::Packet, DomainBuilder, DomainConfig};
+use dataflow::{node, prelude::Packet, DomainBuilder, DomainConfig};
 use hyper::{self, Method, StatusCode};
 use mio::net::TcpListener;
 use nom_sql::ColumnSpecification;
@@ -33,6 +34,7 @@ use tokio::prelude::*;
 /// occur at any given point in time.
 pub(super) struct ControllerInner {
     pub(super) ingredients: Graph,
+    pub(super) domain_graph: DomainGraph,
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
@@ -70,6 +72,11 @@ pub(super) struct ControllerInner {
     log: slog::Logger,
 
     pub(in crate::controller) replies: DomainReplies,
+
+    // Fault tolerance
+    // TODO(ygina): assumes one recovery process is going on at any time
+    waiting_on: HashMap<DomainIndex, HashSet<DomainIndex>>,
+    resume_ats: HashMap<DomainIndex, Vec<(DomainIndex, usize)>>,
 }
 
 pub(in crate::controller) struct DomainReplies(
@@ -113,10 +120,13 @@ impl DomainReplies {
 
     fn wait_for_statistics(
         &mut self,
-        d: &DomainHandle,
+        num_healthy: usize,
     ) -> Vec<(DomainStats, HashMap<NodeIndex, NodeStats>)> {
-        let mut stats = Vec::with_capacity(d.shards());
-        for r in self.read_n_domain_replies(d.shards()) {
+        if num_healthy == 0 {
+            return vec![];
+        }
+        let mut stats = Vec::with_capacity(num_healthy);
+        for r in self.read_n_domain_replies(num_healthy) {
             match r {
                 ControlReplyPacket::Statistics(d, s) => stats.push((d, s)),
                 r => unreachable!("got unexpected non-stats control reply: {:?}", r),
@@ -309,6 +319,14 @@ impl ControllerInner {
                     self.remove_nodes(vec![args].as_slice())
                         .map(|r| json::to_string(&r).unwrap())
                 }),
+            (Method::POST, "/shutdown_worker") => {
+                json::from_slice(&body)
+                .map_err(|_| StatusCode::BAD_REQUEST)
+                .map(|args| {
+                    self.shutdown_worker(args)
+                        .map(|r| json::to_string(&r).unwrap())
+                })
+            },
             _ => Err(StatusCode::NOT_FOUND),
         }
     }
@@ -379,12 +397,608 @@ impl ControllerInner {
         }
     }
 
-    fn handle_failed_workers(&mut self, failed: Vec<WorkerIdentifier>) {
-        // first, translate from the affected workers to affected data-flow nodes
+    /// Recovers a domain if its state can be reconstructed from the existing graph.
+    /// Returns whether the domain was recovered.
+    fn recover_domain(&mut self, domain: DomainIndex) -> bool {
+        /*
+        let nodes = self.nodes_in_domain(domain);
+
+        // domains must be linear with one egress and possibly multiple ingress
+        let mut ingress = Vec::new();
+        let mut egress = None;
+        let mut stateful = Vec::new();
+        let mut reader = Vec::new();
+        for &ni in &nodes {
+            let node = &self.ingredients[ni];
+            if node.is_ingress() {
+                ingress.push(ni);
+            }
+            if node.is_egress() {
+                assert!(egress.is_none());
+                egress = Some(ni);
+            }
+            if node.is_internal() {
+                let is_stateful = match **node {
+                    NodeOperator::Sum(..)
+                        | NodeOperator::Extremum(..)
+                        | NodeOperator::Concat(..)
+                        | NodeOperator::Replica(..)
+                        | NodeOperator::TopK(..) => true,
+                    NodeOperator::Join(..)
+                        | NodeOperator::Latest(..)
+                        | NodeOperator::Project(..)
+                        | NodeOperator::Union(..)
+                        | NodeOperator::Identity(..)
+                        | NodeOperator::Filter(..)
+                        | NodeOperator::Trigger(..)
+                        | NodeOperator::Rewrite(..)
+                        | NodeOperator::Distinct(..) => false,
+                };
+                if is_stateful {
+                    stateful.push(ni);
+                }
+            }
+            if node.is_reader() {
+                reader.push(ni);
+            }
+            if node.is_source() || node.is_sharder() || node.is_base() {
+                unimplemented!();
+            }
+            if node.is_dropped() {
+                unreachable!();
+            }
+        }
+
+        assert!(ingress.len() > 0);
+        if reader.len() == 1 {
+            // reader leaf
+            assert_eq!(ingress.len(), 1);
+            assert!(stateful.is_empty());
+            assert!(egress.is_none());
+            self.recover_reader(ingress[0], reader[0]);
+            true
+        } else if stateful.len() == 1 {
+            if self.ingredients[stateful[0]].replica_type().is_some() && nodes.len() == 3 {
+                // exactly one ingress, one egress, and one stateful replica
+                // self.recover_hot_spare(stateful[0], ingress, egress.unwrap());
+                // true
+                unimplemented!();
+            } else {
+                // the stateful node does not have a replica
+                false
+            }
+        } else if stateful.len() == 0 {
+            self.recover_stateless_domain(ingress, egress.unwrap());
+            true
+        } else {
+            // more than one stateful node
+            false
+        }
+        */
+        unimplemented!();
+    }
+
+    fn child(&self, ni: NodeIndex) -> NodeIndex {
+        let mut nodes = self
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing);
+        let ni = nodes.next().unwrap();
+        assert_eq!(nodes.count(), 0);
+        ni
+    }
+
+    fn parent(&self, ni: NodeIndex) -> NodeIndex {
+        let mut nodes = self
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Incoming);
+        let ni = nodes.next().unwrap();
+        assert_eq!(nodes.count(), 0);
+        ni
+    }
+
+    /*
+    /// Recovers a domain with only stateless nodes.
+    /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
+    fn recover_stateless_domain(
+        &mut self,
+        failed_ingress: Vec<NodeIndex>,
+        failed_egress: NodeIndex,
+    ) {
+        let domain_b1 = self.ingredients[failed_egress].domain();
+        warn!(
+            self.log,
+            "recovering stateless domain {}",
+            domain_b1.index(),
+        );
+
+        // obtain the (assumed) linear path in the domain
+        let mut path = failed_ingress.clone();
+        let mut ni = self.child(failed_ingress[0]);
+        for &ingress in &failed_ingress {
+            // all ingress nodes are in the same domain and have the same child
+            assert_eq!(domain_b1, self.ingredients[ingress].domain());
+            assert_eq!(ni, self.child(ingress));
+        };
+        while ni != failed_egress {
+            path.push(ni);
+            ni = self.child(ni);
+        }
+        path.push(failed_egress);
+        assert!(path.len() > 0);
+
+        // prevent A from sending messages to B2 even once the connection is regenerated.
+        // B2 won't send messages to C since it'll be a new domain.
+        let mut domain_as = Vec::new();
+        for &ingress in &failed_ingress {
+            let egress_a = self.parent(ingress);
+            let domain_a = self.ingredients[egress_a].domain();
+            domain_as.push(domain_a);
+
+            let m = box Packet::RemoveChild { child: ingress, domain: domain_b1 };
+            self.domains
+                .get_mut(&domain_a)
+                .unwrap()
+                .send_to_healthy(m, &self.workers)
+                .unwrap();
+        }
+
+        // do a migration that regenerates the nodes in domain B2, which has a different index
+        // from domain B1. however, the nodes in B1 and B2 have the same indexes. the domains
+        // can't start sending messages until replay paths have been updated. the network
+        // connections between A and B2, and B2 and C initially exist due to how migrations work.
+        //
+        // dataflow graph: A ---> B2 ---> C
+        self.migrate(|mig| {
+            let new_egress = mig.replicate_nodes(&path);
+            assert_eq!(new_egress, failed_egress);
+        });
+
+        // set replay paths in B2 to the same as those that were in B1.
+        //
+        // dataflow graph: A ---> B2 ---> C
+        let egress_b2 = failed_egress;
+        let domain_b2 = self.ingredients[egress_b2].domain();
+        for m in self.materializations.get_update_egresses(domain_b1) {
+            self.domains
+                .get_mut(&domain_b2)
+                .unwrap()
+                .send_to_healthy(m.clone().into_packet(), &self.workers)
+                .unwrap();
+        }
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            self.domains
+                .get_mut(&domain_b2)
+                .unwrap()
+                .send_to_healthy(m.clone().into_packet(), &self.workers)
+                .unwrap();
+        }
+
+        // initialize the waiting_on field in anticipation of getting resume at messages to
+        // forward. then tell C about the new incoming connection from B2 so that B2 can tell
+        // the controller all the necessary provenance information for recovery.
+        //
+        // dataflow graph: A ---> B2 -o-> C
+        let ingress_cs = self.ingredients
+            .neighbors_directed(failed_egress, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<_>>();
+        let domain_cs = ingress_cs
+            .iter()
+            .map(|&ni| self.ingredients[ni].domain())
+            .collect::<HashSet<_>>();
+        self.waiting_on.insert(domain_b2, domain_cs);
+        for domain_a in domain_as {
+            let mut waiting_on = HashSet::new();
+            waiting_on.insert(domain_b2);
+            self.waiting_on.insert(domain_a, waiting_on);
+        }
+        for ingress_c in ingress_cs {
+            let domain_c = self.ingredients[ingress_c].domain();
+            self.send_new_incoming(domain_c, domain_b2, Some(domain_b1));
+        }
+    }
+
+    /// Consider A -> B1 -> B2 -> C, where we lose B1.
+    fn recover_lost_top_replica(
+        &mut self,
+        top: NodeIndex,
+        ingress_b1: Vec<NodeIndex>,
+        egress_b1: NodeIndex,
+    ) {
+        let ingress_b1 = ingress_b1[0];
+        let domain_b1 = self.ingredients[top].domain();
+        assert_eq!(domain_b1, self.ingredients[ingress_b1].domain());
+        assert_eq!(domain_b1, self.ingredients[egress_b1].domain());
+
+        // STEP 1: Contact the bottom replica B2 to become a node operator
+        let bottom = match self.ingredients[top].replica_type() {
+            Some(node::ReplicaType::Top{ bottom, .. }) => bottom,
+            _ => unreachable!(),
+        };
+        let m = box Packet::MakeRecovery { node: self.ingredients[bottom].local_addr() };
+        let domain_b2 = self.ingredients[bottom].domain();
+        self.domains
+            .get_mut(&domain_b2)
+            .unwrap()
+            .send_to_healthy(m, &self.workers).unwrap();
+
+        // STEP 2: Clean up state in the egress of A about packets to B1.
+        //
+        // No node with multiple parents (UNION, JOIN) is stateful.
+        let egress_a = self
+            .ingredients
+            .neighbors_directed(ingress_b1, petgraph::EdgeDirection::Incoming)
+            .next()
+            .unwrap();
+        let m = box Packet::RemoveChild { child: ingress_b1 };
+        let domain_a = self.ingredients[egress_a].domain();
+        self.domains
+            .get_mut(&domain_a)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 3: Link A and B2 together via a migration, which should create an egress tx from
+        // A to B2 that doesn't have any tag information.
+        //
+        // Top replicas have exactly one child, the ingress of their bottom replica.
+        let ingress_b2 = self
+            .ingredients
+            .neighbors_directed(egress_b1, petgraph::EdgeDirection::Outgoing)
+            .next()
+            .unwrap();
+        let path = self.migrate(|mig| mig.link_nodes(egress_a, &vec![ingress_b2]));
+        self.remove_nodes(&path[..]).unwrap();
+
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2 from the domain
+        // and the egress node. In memory state, replace it with the tag that refers to
+        // the replay path from A to B1, since B2 has a new parent node.
+        let mut old_tag = None;
+        let mut new_tag = None;
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            match m.trigger {
+                TriggerEndpoint::Start(..) => {
+                    assert!(old_tag.is_none());
+                    old_tag = Some(m.tag);
+                },
+                TriggerEndpoint::End(..) => {
+                    assert!(new_tag.is_none());
+                    new_tag = Some(m.tag);
+                },
+                _ => {},
+            }
+        }
+        let m = box Packet::RemoveTag {
+            old_tag: old_tag.unwrap(),
+            new_state: Some((self.ingredients[bottom].local_addr(), new_tag.unwrap())),
+        };
+        self.domains
+            .get_mut(&domain_b2)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 5: Resend any UpdateEgress messages to A that originally involved replay paths
+        // through B1 and B2, but replace instances of the old tag with the new tag.
+        for m in self.materializations.get_update_egresses(domain_b1) {
+            let mut m = m.clone();
+            if let Some((tag, _)) = &mut m.new_tag {
+                assert!(m.new_tx.is_none());
+                if *tag == old_tag.unwrap() {
+                    *tag = new_tag.unwrap();
+                }
+                self.domains
+                    .get_mut(&domain_a)
+                    .unwrap()
+                    .send_to_healthy(m.into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 6: Resend any SetupReplayPath messages originally to B1 and that don't refer to
+        // the tag of the replay path from B1 to B2.
+        for m in self.materializations.get_setup_replay_paths(domain_b1) {
+            if m.tag != old_tag.unwrap() {
+                self.domains
+                    .get_mut(&domain_b2)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 7: Send B2 a NewIncoming message and wait for ResumeAts to propagate.
+        let mut resume_to = HashSet::new();
+        self.send_new_incoming(domain_b2, domain_a, Some(domain_b1));
+        resume_to.insert(domain_b2);
+        self.waiting_on.insert(domain_a, resume_to);
+    }
+
+    /// Consider A -> B1 -> B2 -> C, where we lose B2.
+    fn recover_lost_bottom_replica(
+        &mut self,
+        bottom: NodeIndex,
+        ingress_b2: Vec<NodeIndex>,
+        egress_b2: NodeIndex,
+    ) {
+        let ingress_b2 = ingress_b2[0];
+        let domain_b2 = self.ingredients[bottom].domain();
+        assert_eq!(domain_b2, self.ingredients[ingress_b2].domain());
+        assert_eq!(domain_b2, self.ingredients[egress_b2].domain());
+        // STEP 1: Contact the top replica B1 to no longer be a replica.
+        let top = match self.ingredients[bottom].replica_type() {
+            Some(node::ReplicaType::Bottom{ top, .. }) => top,
+            _ => unreachable!(),
+        };
+        let m = box Packet::MakeRecovery { node: self.ingredients[top].local_addr() };
+        let domain_b1 = self.ingredients[top].domain();
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers).unwrap();
+
+        // STEP 2: Clean up state in the egress of B1 about packets to B2.
+        //
+        // Bottom replicas have exactly one parent, the egress of their top replica.
+        let egress_b1 = self
+            .ingredients
+            .neighbors_directed(ingress_b2, petgraph::EdgeDirection::Incoming)
+            .next()
+            .unwrap();
+        let m = box Packet::RemoveChild { child: ingress_b2 };
+        let domain_b1 = self.ingredients[egress_b1].domain();
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 3: Link B1 and C together via a migration, which should create an egress tx from
+        // B1 to C that doesn't have any tag information.
+        let ingress_cs = self
+            .ingredients
+            .neighbors_directed(egress_b2, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<_>>();
+        let path = self.migrate(|mig| mig.link_nodes(egress_b1, &ingress_cs));
+        self.remove_nodes(&path[..]).unwrap();
+
+        // STEP 4: Remove the tag that refers to the replay path from B1 to B2 from the domain
+        // and the egress node. No replacement tag is necessary since B1 still has the same parent.
+        //
+        // TODO(ygina): If C is materialized, we might need to replace that tag in memory state?
+        let mut old_tag = None;
+        for m in self.materializations.get_setup_replay_paths(domain_b2) {
+            match m.trigger {
+                TriggerEndpoint::End(..) => {
+                    assert!(old_tag.is_none());
+                    old_tag = Some(m.tag);
+                },
+                _ => {},
+            }
+        }
+        let m = box Packet::RemoveTag {
+            old_tag: old_tag.unwrap(),
+            new_state: None,
+        };
+        self.domains
+            .get_mut(&domain_b1)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // STEP 5: Resend any UpdateEgress messages to B1 that originally involved replay paths
+        // through B2 and C, since B1 will setup these replay paths.
+        for m in self.materializations.get_update_egresses(domain_b2) {
+            if let Some(_) = m.new_tag {
+                assert!(m.new_tx.is_none());
+                self.domains
+                    .get_mut(&domain_b1)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 6: Resend any SetupReplayPath messages originally to B2 and that don't refer to
+        // the tag of the replay path from B1 to B2. Use the cached replay paths to find the node
+        // that triggers to B2.
+        //
+        // TODO(ygina): There may be a materialized node between B2 and last_domain.
+        let mut tag_last_domain = vec![];
+        for m in self.materializations.get_setup_replay_paths(domain_b2) {
+            if m.tag != old_tag.unwrap() {
+                match m.trigger {
+                    TriggerEndpoint::Start(_) => {},
+                    _ => unreachable!(),
+                }
+                let path = self.materializations.get_path(m.tag).unwrap();
+                let last_node = path[path.len() - 1];
+                let last_domain = self.ingredients[last_node].domain();
+                tag_last_domain.push((m.tag, last_domain));
+
+                self.domains
+                    .get_mut(&domain_b1)
+                    .unwrap()
+                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // STEP 6.5 (bottom replica case only): Update the trigger endpoint so upqueries to B2
+        // contact B1 directly.
+        for (tag, last_domain) in tag_last_domain {
+            let mut sent = false;
+            for m in self.materializations.get_setup_replay_paths(last_domain) {
+                let mut m = m.clone();
+                match m.trigger {
+                    TriggerEndpoint::End(s, d) => {
+                        if tag != m.tag {
+                            continue;
+                        }
+
+                        assert!(!sent);
+                        assert_eq!(d, domain_b2);
+                        m.trigger = TriggerEndpoint::End(s, domain_b1);
+                        sent = true;
+
+                        self.domains
+                            .get_mut(&last_domain)
+                            .unwrap()
+                            .send_to_healthy(m.into_packet(), &self.workers)
+                            .unwrap();
+                    },
+                    _ => {},
+                }
+            }
+            assert!(sent);
+        }
+
+        // STEP 7: Send all Cs a NewIncoming message and wait for ResumeAts to propagate.
+        let mut resume_to = HashSet::new();
+        for ingress_c in ingress_cs {
+            let domain_c = self.ingredients[ingress_c].domain();
+            self.send_new_incoming(domain_c, domain_b1, Some(domain_b2));
+            resume_to.insert(domain_c);
+        }
+        self.waiting_on.insert(domain_b1, resume_to);
+    }
+
+    /// Recovers a domain with exactly one ingress, one egress, and one stateful replica.
+    ///
+    /// Consider A -> B1 -> B2 -> C. B1 and B2 are always materialized nodes (otherwise there
+    /// is no reason to replicate them), and so there is always a replay path starting at B1 and
+    /// ending at B2. Any domain on a replay path except the END domain will have a NodeIndex of
+    /// an ingress node in the next domain in its egress. For example, A's egress will have the
+    /// NodeIndex of B1's ingress on the reply path through A to B1. The END domain of any replay
+    /// path will have a trigger endpoing to the START domain of that same path.
+    fn recover_hot_spare(
+        &mut self,
+        ni: NodeIndex,
+        failed_ingress: Vec<NodeIndex>,
+        failed_egress: NodeIndex,
+    ) {
+        match self.ingredients[ni].replica_type() {
+            Some(node::ReplicaType::Bottom { top, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed bottom replica";
+                    "bottom" => ni.index(),
+                    "top" => top.index(),
+                );
+                self.recover_lost_bottom_replica(ni, failed_ingress, failed_egress);
+            },
+            Some(node::ReplicaType::Top { bottom, .. }) => {
+                info!(
+                    self.log,
+                    "replacing failed top replica";
+                    "bottom" => bottom.index(),
+                    "top" => ni.index(),
+                );
+                self.recover_lost_top_replica(ni, failed_ingress, failed_egress);
+            },
+            None => unreachable!(),
+        }
+    }
+
+    /// Recovers a domain with only an ingress A and a reader B1.
+    fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {
+        let domain_b = self.ingredients[ingress].domain();
+        assert_eq!(domain_b, self.ingredients[reader].domain());
+
+        // prevent A from sending messages to B1 even once the connection is regenerated.
+        let egress_a = self.parent(ingress);
+        let domain_a = self.ingredients[egress_a].domain();
+        let m = box Packet::RemoveChild { child: ingress, domain: domain_b };
+        self.domains
+            .get_mut(&domain_a)
+            .unwrap()
+            .send_to_healthy(m, &self.workers)
+            .unwrap();
+
+        // remove tags on replay paths involving domain B1 since materializations were
+        // recreated in the previous migration.
+        let tags = self.materializations
+            .get_setup_replay_paths(domain_b)
+            .iter()
+            .map(|m| m.tag)
+            .collect::<Vec<_>>();
+
+        // do a migration that regenerates the nodes from domain B1 in domain B2.
+        self.migrate(|mig| mig.replicate_nodes(&vec![ingress, reader]));
+
+        for tag in tags {
+            let path = self.materializations.get_path(tag).unwrap();
+            let domains = path
+                .iter()
+                .map(|&ni| self.ingredients[ni].domain())
+                .collect::<HashSet<_>>();
+            for domain in &domains {
+                // TODO(ygina): should get ack from RemoveTag before continuing
+                let m = box Packet::RemoveTag { old_tag: tag, new_state: None };
+                self.domains
+                    .get_mut(&domain)
+                    .unwrap()
+                    .send_to_healthy(m, &self.workers)
+                    .unwrap();
+            }
+        }
+
+        // don't bother trying to recover reader state... just let there be a replay
+    }
+
+    /// Generates a new connection between two domains via an egress and ingress node, sometimes
+    /// replacing an old connection from a dropped egress node.
+    ///
+    /// Notifies the bottom nodes which node was replaced with which node (if applicable). The
+    /// bottom nodes are responsible for sending a ResumeAt to these new incoming connections to
+    /// start receiving messages. This means the egress won't pre-emptively send messages to the
+    /// ingress even though there is a working connection until it receives a ResumeAt.
+    fn send_new_incoming(
+        &mut self,
+        to: DomainIndex,
+        new_egress: DomainIndex,
+        old_egress: Option<DomainIndex>,
+    ) {
+        let old_egress = old_egress.unwrap_or(new_egress);
+
+        debug!(
+            self.log,
+            "notifying domain {} of new incoming connection",
+            to.index();
+            "old" => old_egress.index(),
+            "new" => new_egress.index(),
+        );
+
+        let dh = self.domains.get_mut(&to).unwrap();
+        let m = box Packet::NewIncoming {
+            old: old_egress,
+            new: new_egress,
+        };
+        dh.send_to_healthy(m, &self.workers).unwrap();
+    }
+    */
+
+    fn handle_failed_workers(&mut self, wis: Vec<WorkerIdentifier>) {
+        let mut failed = Vec::new();
+        for wi in wis {
+            for (d, dh) in &self.domains {
+                if dh.assigned_to_worker(&wi) {
+                    failed.push(*d);
+                }
+            }
+        }
+
+        // first, detect which domains can be recovered without dropping downstream nodes.
+        // generate a list of failed domains we still need to handle.
+        let failed = failed
+            .into_iter()
+            // .filter(|&d| !self.recover_domain(d))
+            .collect::<Vec<DomainIndex>>();
+
+        // next, translate from the affected workers to affected data-flow nodes
         let mut affected_nodes = Vec::new();
-        for wi in failed {
-            info!(self.log, "handling failure of worker {:?}", wi);
-            affected_nodes.extend(self.get_failed_nodes(&wi));
+        for domain in failed {
+            info!(self.log, "handling failure of domain {:?}", domain);
+            affected_nodes.extend(self.get_failed_nodes(domain));
         }
 
         // then, figure out which queries are affected (and thus must be removed and added again in
@@ -424,6 +1038,105 @@ impl ControllerInner {
         Ok(())
     }
 
+    pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
+        /*
+        assert!(self.waiting_on.len() > 0, "in recovery mode");
+
+        // Continue until there is no intersection between the provenance information we know
+        // and the nodes we need to send ResumeAt messages to.
+        let mut queue = Vec::new();
+        queue.push((from, &provenance));
+        while queue.len() > 0 {
+            let (child_domain, p) = queue.pop().unwrap();
+            if !self.waiting_on.contains_key(&p.root()) {
+                continue;
+            }
+
+            let root = p.root();
+            let resume_ats = self.resume_ats.entry(root).or_insert(vec![]);
+            let mut exists = false;
+            // if an entry from this domain already exists, pick the minimum label
+            for i in 0..resume_ats.len() {
+                let (domain, label) = resume_ats[i];
+                if domain == child_domain {
+                    exists = true;
+                    if p.label() + 1 < label {
+                        resume_ats[i] = (child_domain, p.label() + 1);
+
+                        // we only need to push more onto the queue if the label is smaller
+                        // because earlier labels are constructed from a prefix of later labels
+                        for p_child in p.edges().values() {
+                            queue.push((root, p_child));
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // otherwise, add a new message to send
+            if !exists {
+                resume_ats.push((child_domain, p.label() + 1));
+                for p_child in p.edges().values() {
+                    queue.push((root, p_child));
+                }
+            }
+        }
+
+        // We're no longer waiting on the node that acked the NewIncoming message
+        self.handle_ack_resume_at(from);
+        */
+        unimplemented!();
+    }
+
+    pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
+        /*
+        // Update waiting on lists of nodes that were waiting on "from"
+        let mut empty = vec![];
+        for (waiting, on) in self.waiting_on.iter_mut() {
+            let removed = on.remove(&from);
+            if removed && on.len() == 0 {
+                empty.push(waiting.clone());
+            }
+        }
+
+        // If those nodes aren't waiting on anyone else, send ResumeAts to them. Send ResumeAt
+        // information for all nodes in a single message so the sender domain can update its
+        // state atomically.
+        for domain in empty {
+            assert!(self.waiting_on.remove(&domain).is_some());
+
+            // Get the child ingress nodes of the egress in this domain.
+            // TODO(ygina): is this info cached somewhere?
+            let egress = self.ingredients
+                .node_indices()
+                .filter(|&ni| !self.ingredients[ni].is_source())
+                .filter(|&ni| self.ingredients[ni].domain() == domain)
+                .filter(|&ni| self.ingredients[ni].is_egress())
+                .collect::<Vec<_>>();
+            assert_eq!(egress.len(), 1);
+            let domain_ingress = self.ingredients
+                .neighbors_directed(egress[0], petgraph::EdgeDirection::Outgoing)
+                .filter(|&ni| self.ingredients[ni].is_ingress())
+                .map(|ni| (self.ingredients[ni].domain(), ni))
+                .collect::<HashMap<_, _>>();
+
+            // Convert the indexed resume at information into ResumeAt messages.
+            let child_labels = self.resume_ats
+                .remove(&domain)
+                .unwrap()
+                .iter()
+                .map(|(child_d, label)| (*domain_ingress.get(child_d).unwrap(), *label))
+                .collect::<Vec<_>>();
+            let m = box Packet::ResumeAt { child_labels };
+
+            // Send the message!
+            let dh = self.domains.get_mut(&domain).unwrap();
+            dh.send_to_healthy(m, &self.workers).unwrap();
+        }
+        */
+        unimplemented!();
+    }
+
     /// Construct `ControllerInner` with a specified listening interface
     pub(super) fn new(
         log: slog::Logger,
@@ -457,6 +1170,7 @@ impl ControllerInner {
 
         ControllerInner {
             ingredients: g,
+            domain_graph: petgraph::Graph::new(),
             source,
             ndomains: 0,
 
@@ -485,6 +1199,9 @@ impl ControllerInner {
             last_checked_workers: Instant::now(),
 
             replies: DomainReplies(drx),
+
+            waiting_on: Default::default(),
+            resume_ats: Default::default(),
         }
     }
 
@@ -523,9 +1240,15 @@ impl ControllerInner {
         self.persistence = params;
     }
 
+    // Assigns nodes to this domain, and shards the domain across multiple workers.
+    //
+    // Each worker identifier in `identifiers` corresponds to a single shard in `num_shards`,
+    // thus the logic of which worker gets which shard is determined by the code that calls
+    // this method. That code must also ensure the workers are healthy.
     pub(in crate::controller) fn place_domain(
         &mut self,
         idx: DomainIndex,
+        identifiers: Vec<WorkerIdentifier>,
         num_shards: Option<usize>,
         log: &Logger,
         nodes: Vec<(NodeIndex, bool)>,
@@ -542,9 +1265,6 @@ impl ControllerInner {
                 .map(|nd| (nd.local_addr(), cell::RefCell::new(nd)))
                 .collect(),
         );
-
-        // TODO(malte): simple round-robin placement for the moment
-        let mut wi = self.workers.iter_mut();
 
         // Send `AssignDomain` to each shard of the given domain
         for i in 0..num_shards.unwrap_or(1) {
@@ -563,17 +1283,10 @@ impl ControllerInner {
                 persistence_parameters: self.persistence.clone(),
             };
 
-            let (identifier, w) = loop {
-                if let Some((i, w)) = wi.next() {
-                    if w.healthy {
-                        break (*i, w);
-                    }
-                } else {
-                    wi = self.workers.iter_mut();
-                }
-            };
-
             // send domain to worker
+            let identifier = identifiers.get(i)
+                .expect("number of identifiers should match number of shards");
+            let w = self.workers.get_mut(&identifier).unwrap();
             info!(
                 log,
                 "sending domain {}.{} to worker {:?}",
@@ -582,6 +1295,7 @@ impl ControllerInner {
                 w.sender.peer_addr()
             );
             let src = w.sender.local_addr().unwrap();
+            w.domains.push(domain.index);
             w.sender
                 .send(CoordinationMessage {
                     epoch: self.epoch,
@@ -646,7 +1360,7 @@ impl ControllerInner {
         let shards = assignments
             .into_iter()
             .enumerate()
-            .map(|(i, worker)| {
+            .map(|(i, &worker)| {
                 let tx = txs.remove(&i).unwrap();
                 DomainShardHandle { worker, tx }
             })
@@ -679,8 +1393,11 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            replicated: Default::default(),
+            linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
+            replicas: Default::default(),
             context,
             start: time::Instant::now(),
             log: miglog,
@@ -701,8 +1418,11 @@ impl ControllerInner {
         let mut m = Migration {
             mainline: self,
             added: Default::default(),
+            replicated: Default::default(),
+            linked: Default::default(),
             columns: Default::default(),
             readers: Default::default(),
+            replicas: Default::default(),
             context: Default::default(),
             start: time::Instant::now(),
             log: miglog,
@@ -890,24 +1610,53 @@ impl ControllerInner {
             .iter_mut()
             .flat_map(|(&di, s)| {
                 trace!(log, "requesting stats from domain"; "di" => di.index());
-                s.send_to_healthy(box Packet::GetStatistics, workers)
-                    .unwrap();
-                replies
-                    .wait_for_statistics(&s)
-                    .into_iter()
-                    .enumerate()
-                    .map(move |(i, s)| ((di, i), s))
+                let mut num_healthy = 0;
+                for i in 0..s.shards.len() {
+                    if s.send_to_healthy_shard(i, box Packet::GetStatistics, workers).is_ok() {
+                        num_healthy += 1;
+                    } else {
+                        // ignore unhealthy shards
+                    }
+                }
+
+                replies.wait_for_statistics(num_healthy).into_iter().enumerate().map(
+                    move |(i, (domain_stats, node_stats))| {
+                        let node_map = node_stats
+                            .into_iter()
+                            .map(|(ni, ns)| (ni.into(), ns))
+                            .collect();
+
+                        ((di.clone(), i), (domain_stats, node_map))
+                    },
+                )
             })
             .collect();
 
         GraphStats { domains }
     }
 
-    fn get_instances(&self) -> Vec<(WorkerIdentifier, bool, Duration)> {
+    fn get_instances(&self) -> Vec<(WorkerIdentifier, bool, Duration, Vec<DomainIndex>)> {
         self.workers
             .iter()
-            .map(|(&id, ref status)| (id, status.healthy, status.last_heartbeat.elapsed()))
+            .map(|(&id, ref status)| {
+                (id, status.healthy, status.last_heartbeat.elapsed(), status.domains.clone())
+            })
             .collect()
+    }
+
+    fn shutdown_worker(&mut self, instance_addr: String) -> Result<(), String> {
+        let instance_addr: WorkerIdentifier = instance_addr
+            .parse()
+            .expect("unable to parse socket address");
+        let w = self.workers.get_mut(&instance_addr).unwrap();
+        let src = w.sender.local_addr().unwrap();
+        w.sender
+            .send(CoordinationMessage {
+                epoch: self.epoch,
+                source: src,
+                payload: CoordinationPayload::Shutdown,
+            })
+            .map_err(|_| format!("failed to shutdown {:?}", instance_addr))
     }
 
     fn flush_partial(&mut self) -> u64 {
@@ -922,7 +1671,7 @@ impl ControllerInner {
                 s.send_to_healthy(box Packet::GetStatistics, workers)
                     .unwrap();
                 let to_evict: Vec<(NodeIndex, u64)> = replies
-                    .wait_for_statistics(&s)
+                    .wait_for_statistics(s.shards.len())
                     .into_iter()
                     .flat_map(move |(_, node_stats)| {
                         node_stats
@@ -1022,6 +1771,65 @@ impl ControllerInner {
     fn set_security_config(&mut self, p: String) -> Result<(), String> {
         self.recipe.set_security_config(&p);
         Ok(())
+    }
+
+    // Computes the domain graph from the current ingredients.
+    //
+    // By domain we actually mean a replica address, which includes both the domain index and the
+    // shard. All nodes assigned to the replica address must be contiguous in the original graph.
+    // Typically, shard mergers and sharders are in the same replica. These replicas have multiple
+    // parents (the shards of the parent domain) and multiple children (the shards of the child
+    // domain).
+    pub(crate) fn compute_domain_graph(&mut self) {
+        let ingredients = &self.ingredients;
+        let mut g = petgraph::Graph::new();
+
+        // add all replica addresses as nodes
+        let mut sharding: HashMap<DomainIndex, usize> = HashMap::new();
+        let mut nodes: HashMap<(DomainIndex, usize), _> = HashMap::new();
+        for ni in ingredients.node_indices() {
+            let node = &ingredients[ni];
+            if !node.has_domain() || node.is_ingress() || node.is_egress() {
+                continue;
+            }
+
+            let domain = node.domain();
+            let shards = node.sharded_by().shards().unwrap_or(1);
+            if let Some(shards_old) = sharding.get(&domain) {
+                assert_eq!(shards, *shards_old);
+            } else {
+                sharding.insert(domain, shards);
+                for i in 0..shards {
+                    let ni = g.add_node((domain, i));
+                    nodes.insert((domain, i), ni);
+                }
+            }
+        }
+
+        // create an edge between each shard in a domain to each shard in another domain
+        // if there are nodes in those domains with an edge
+        for ei in ingredients.edge_indices() {
+            let (source_ni, target_ni) = ingredients.edge_endpoints(ei).unwrap();
+            if !ingredients[source_ni].has_domain() || !ingredients[target_ni].has_domain() {
+                continue;
+            }
+
+            let source = ingredients[source_ni].domain();
+            let target = ingredients[target_ni].domain();
+            if source == target {
+                continue;
+            }
+
+            for i in 0..*sharding.get(&source).unwrap() {
+                let s = nodes.get(&(source, i)).unwrap();
+                for j in 0..*sharding.get(&target).unwrap() {
+                    let t = nodes.get(&(target, j)).unwrap();
+                    g.add_edge(*s, *t, ());
+                }
+            }
+        }
+
+        self.domain_graph = g;
     }
 
     fn apply_recipe(&mut self, mut new: Recipe) -> Result<ActivationResult, String> {
@@ -1298,9 +2106,9 @@ impl ControllerInner {
         Ok(())
     }
 
-    fn get_failed_nodes(&self, lost_worker: &WorkerIdentifier) -> Vec<NodeIndex> {
+    fn get_failed_nodes(&self, lost_domain: DomainIndex) -> Vec<NodeIndex> {
         // Find nodes directly impacted by worker failure.
-        let mut nodes: Vec<NodeIndex> = self.nodes_on_worker(Some(lost_worker));
+        let mut nodes: Vec<NodeIndex> = self.nodes_in_domain(lost_domain);
 
         // Add any other downstream nodes.
         let mut failed_nodes = Vec::new();
@@ -1318,32 +2126,32 @@ impl ControllerInner {
         failed_nodes
     }
 
+    /// NOTE(malte): this traverses all graph vertices in order to find those assigned to a
+    /// domain. We do this to avoid keeping separate state that may get out of sync, but it
+    /// could become a performance bottleneck in the future (e.g., when recovergin large
+    /// graphs).
+    fn nodes_in_domain(&self, i: DomainIndex) -> Vec<NodeIndex> {
+        self.ingredients
+            .node_indices()
+            .filter(|&ni| ni != self.source)
+            .filter(|&ni| !self.ingredients[ni].is_dropped())
+            .filter(|&ni| self.ingredients[ni].domain() == i)
+            .collect()
+    }
+
     /// List data-flow nodes, on a specific worker if `worker` specified.
     fn nodes_on_worker(&self, worker: Option<&WorkerIdentifier>) -> Vec<NodeIndex> {
-        // NOTE(malte): this traverses all graph vertices in order to find those assigned to a
-        // domain. We do this to avoid keeping separate state that may get out of sync, but it
-        // could become a performance bottleneck in the future (e.g., when recovering large
-        // graphs).
-        let domain_nodes = |i: DomainIndex| -> Vec<NodeIndex> {
-            self.ingredients
-                .node_indices()
-                .filter(|&ni| ni != self.source)
-                .filter(|&ni| !self.ingredients[ni].is_dropped())
-                .filter(|&ni| self.ingredients[ni].domain() == i)
-                .collect()
-        };
-
         if worker.is_some() {
             self.domains
                 .values()
                 .filter(|dh| dh.assigned_to_worker(worker.unwrap()))
                 .fold(Vec::new(), |mut acc, dh| {
-                    acc.extend(domain_nodes(dh.index()));
+                    acc.extend(self.nodes_in_domain(dh.index()));
                     acc
                 })
         } else {
             self.domains.values().fold(Vec::new(), |mut acc, dh| {
-                acc.extend(domain_nodes(dh.index()));
+                acc.extend(self.nodes_in_domain(dh.index()));
                 acc
             })
         }

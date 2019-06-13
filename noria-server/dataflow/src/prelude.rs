@@ -21,7 +21,6 @@ crate use payload::{ReplayPathSegment, SourceChannelIdentifier};
 crate use state::{LookupResult, MemoryState, PersistentState, RecordResult, Row, State};
 crate type StateMap = Map<Box<State>>;
 crate type DomainNodes = Map<cell::RefCell<Node>>;
-crate type ReplicaAddr = (DomainIndex, usize);
 
 use fnv::FnvHashMap;
 use std::collections::VecDeque;
@@ -29,12 +28,15 @@ crate type EnqueuedSends = FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>;
 
 // public exports
 pub use common::*;
-pub use node::Node;
+pub use node::{Node, ReplicaType};
 pub use noria::internal::*;
 pub use ops::NodeOperator;
 pub use payload::Packet;
+pub use provenance::{Provenance, ProvenanceUpdate};
 pub use petgraph::graph::NodeIndex;
 pub use Sharding;
+pub type ReplicaAddr = (DomainIndex, usize);
+pub type DomainGraph = petgraph::Graph<ReplicaAddr, Edge>;
 pub type Graph = petgraph::Graph<Node, Edge>;
 pub use DurabilityMode;
 pub use PersistenceParameters;
@@ -43,5 +45,8 @@ pub use PersistenceParameters;
 pub type ChannelCoordinator = noria::channel::ChannelCoordinator<(DomainIndex, usize), Box<Packet>>;
 pub trait Executor {
     fn ack(&mut self, tag: SourceChannelIdentifier);
+    fn ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance);
+    fn ack_resume_at(&mut self, from: DomainIndex);
+    fn uncache_domain(&mut self, domain: DomainIndex);
     fn create_universe(&mut self, req: HashMap<String, DataType>);
 }

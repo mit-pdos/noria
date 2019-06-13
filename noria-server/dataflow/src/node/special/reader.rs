@@ -36,6 +36,16 @@ pub struct Reader {
 
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
+
+    /// Base provenance, including the label it represents
+    pub(crate) min_provenance: Provenance,
+    /// Base provenance with all diffs applied
+    pub(crate) max_provenance: Provenance,
+    /// Provenance updates sent in outgoing packets
+    /// We don't have to store payloads in readers because there are no outgoing packets.
+    pub(crate) updates: Vec<ProvenanceUpdate>,
+    /// Number of non-replay messages received.
+    pub(crate) num_payloads: usize,
 }
 
 impl Clone for Reader {
@@ -46,9 +56,15 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            num_payloads: self.num_payloads,
         }
     }
 }
+
+const PROVENANCE_DEPTH: usize = 3;
 
 impl Reader {
     pub fn new(for_node: NodeIndex) -> Self {
@@ -57,6 +73,10 @@ impl Reader {
             streamers: Vec::new(),
             state: None,
             for_node,
+            min_provenance: Default::default(),
+            max_provenance: Default::default(),
+            updates: Default::default(),
+            num_payloads: 0,
         }
     }
 
@@ -82,6 +102,10 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            num_payloads: self.num_payloads,
         }
     }
 
@@ -148,9 +172,20 @@ impl Reader {
         }
     }
 
-    pub(in crate::node) fn process(&mut self, m: &mut Option<Box<Packet>>, swap: bool) {
+    pub(in crate::node) fn process(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        shard: usize,
+        swap: bool,
+    ) {
+        if self.writer.is_some() {
+            self.preprocess_packet(m, (from, shard));
+        }
+
         if let Some(ref mut state) = self.writer {
             let m = m.as_mut().unwrap();
+
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
             if m.is_regular() && state.is_partial() {
@@ -230,6 +265,61 @@ impl Reader {
                 }
                 .is_ok()
             });
+        }
+    }
+}
+
+// fault tolerance (duplicate code from egress.rs)
+impl Reader {
+    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
+        for ni in graph.node_indices() {
+            if graph[ni] == root {
+                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    pub fn init_in_domain(&mut self, shard: usize) {
+        self.min_provenance.set_shard(shard);
+        self.max_provenance = self.min_provenance.clone();
+    }
+
+    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
+        if self.min_provenance.new_incoming(old, new) {
+            /*
+            // Remove the old domain from the updates entirely
+            for update in self.updates.iter_mut() {
+                assert_eq!(update[0].0, old);
+                update.remove(0);
+            }
+            */
+            unimplemented!();
+        } else {
+            // Regenerated domains should have the same index
+        }
+
+    }
+
+    pub fn get_last_provenance(&self) -> &Provenance {
+        &self.max_provenance
+    }
+
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
+        // provenance
+        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+            ProvenanceUpdate::new_with(from, self.num_payloads, &[diff.clone()])
+        } else {
+            ProvenanceUpdate::new(from, self.num_payloads)
+        };
+        self.max_provenance.apply_update(&update);
+        self.updates.push(update);
+
+        // update num_payloads if not a replay
+        if let Some(box Packet::ReplayPiece { .. }) = m {
+        } else {
+            self.num_payloads += 1;
         }
     }
 }

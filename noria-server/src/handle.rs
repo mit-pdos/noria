@@ -163,7 +163,8 @@ impl<A: Authority + 'static> Handle<A> {
             drop(self.c.take());
             drop(self.event_tx.take());
             drop(self.kill.take());
-            io.shutdown_on_idle();
+            io.shutdown();
+            // io.shutdown_on_idle();
         }
     }
 }
@@ -255,7 +256,8 @@ impl<A: Authority + 'static> Drop for SyncHandle<A> {
         drop(self.sh.take());
         self.wh.shutdown();
         if let Some(rt) = self.rt.take() {
-            rt.shutdown_on_idle().wait().unwrap();
+            rt.shutdown_now().wait().unwrap();
+            // rt.shutdown_on_idle().wait().unwrap();
         }
     }
 }

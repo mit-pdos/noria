@@ -379,6 +379,8 @@ mod worker;
 
 #[cfg(test)]
 mod integration;
+#[cfg(test)]
+mod fault_tolerance;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[allow(missing_docs)]

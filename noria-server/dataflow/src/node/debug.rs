@@ -7,7 +7,7 @@ impl fmt::Debug for Node {
         match self.inner {
             NodeType::Dropped => write!(f, "dropped node"),
             NodeType::Source => write!(f, "source node"),
-            NodeType::Ingress => write!(f, "ingress node"),
+            NodeType::Ingress(..) => write!(f, "ingress node"),
             NodeType::Egress { .. } => write!(f, "egress node"),
             NodeType::Sharder(ref s) => write!(f, "sharder [{}] node", s.sharded_by()),
             NodeType::Reader(..) => write!(f, "reader node"),
@@ -41,7 +41,7 @@ impl Node {
                 NodeType::Dropped => {
                     s.push_str("[shape=none]\n");
                 }
-                NodeType::Source | NodeType::Ingress | NodeType::Egress { .. } => {
+                NodeType::Source | NodeType::Ingress(..) | NodeType::Egress { .. } => {
                     s.push_str("[shape=point]\n");
                 }
                 NodeType::Base(..) => {
@@ -165,7 +165,7 @@ impl Node {
                         sharding
                     ));
                 }
-                NodeType::Ingress => s.push_str(&format!(
+                NodeType::Ingress(..) => s.push_str(&format!(
                     "{{ {{ {} {} }} | (ingress) | {} }}",
                     addr, materialized, sharding
                 )),

@@ -15,6 +15,9 @@ pub use self::special::StreamUpdate;
 mod ntype;
 pub use self::ntype::NodeType; // crate viz for tests
 
+mod replica;
+pub use self::replica::ReplicaType;
+
 mod debug;
 
 // NOTE(jfrg): the migration code should probably move into the dataflow crate...
@@ -35,6 +38,7 @@ pub struct Node {
     pub purge: bool,
 
     sharded_by: Sharding,
+    replica: Option<ReplicaType>,
 }
 
 // constructors
@@ -60,15 +64,33 @@ impl Node {
             purge: false,
 
             sharded_by: Sharding::None,
+            replica: None,
         }
     }
 
+    fn new_with_replica<S1, FS, S2, NT>(
+        name: S1,
+        fields: FS,
+        inner: NT,
+        replica: &Option<ReplicaType>,
+    ) -> Node
+    where
+        S1: ToString,
+        S2: ToString,
+        FS: IntoIterator<Item = S2>,
+        NT: Into<NodeType>,
+    {
+        let mut n = Self::new(name, fields, inner);
+        n.replica = replica.clone();
+        n
+    }
+
     pub fn mirror<NT: Into<NodeType>>(&self, n: NT) -> Node {
-        Self::new(&*self.name, &self.fields, n)
+        Self::new_with_replica(&*self.name, &self.fields, n, &self.replica)
     }
 
     pub fn named_mirror<NT: Into<NodeType>>(&self, n: NT, name: String) -> Node {
-        Self::new(name, &self.fields, n)
+        Self::new_with_replica(name, &self.fields, n, &self.replica)
     }
 }
 
@@ -215,7 +237,7 @@ impl Node {
 
 // derefs
 impl Node {
-    crate fn with_sharder_mut<F>(&mut self, f: F)
+    pub fn with_sharder_mut<F>(&mut self, f: F)
     where
         F: FnOnce(&mut special::Sharder),
     {
@@ -236,12 +258,34 @@ impl Node {
         }
     }
 
-    crate fn with_egress_mut<F>(&mut self, f: F)
+    pub fn with_egress_mut<'a, F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut special::Egress),
+        F: FnOnce(&mut special::Egress) -> R,
+        R: 'a,
     {
         match self.inner {
             NodeType::Egress(Some(ref mut e)) => f(e),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn with_egress<'a, F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&special::Egress) -> R,
+        R: 'a,
+    {
+        match self.inner {
+            NodeType::Egress(Some(ref e)) => f(e),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn with_ingress_mut<'a, F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut special::Ingress) -> R,
+    {
+        match self.inner {
+            NodeType::Ingress(ref mut i) => f(i),
             _ => unreachable!(),
         }
     }
@@ -393,6 +437,47 @@ impl Node {
     }
 }
 
+// replication
+impl Node {
+    pub fn replica_type(&self) -> Option<ReplicaType> {
+        self.replica.clone()
+    }
+
+    pub fn set_replica_type(&mut self, rt: ReplicaType) {
+        self.replica = Some(rt);
+    }
+
+    pub fn remove_replica_type(&mut self) {
+        assert!(self.replica.is_some());
+        self.replica = None;
+    }
+
+    pub fn into_full(&mut self) {
+        let op = match **self {
+            NodeOperator::Replica(ref mut r) => r.take_op(),
+            _ => unreachable!(),
+        };
+        self.inner = NodeType::Internal(*op);
+    }
+
+    pub fn recover(&mut self, graph: &DomainGraph, new_domain: domain::Index, shard: usize) {
+        assert!(self.domain.is_some());
+        assert!(!self.is_dropped());
+        self.domain = Some(new_domain);
+        self.taken = false;
+
+        if let NodeType::Egress(None) = self.inner {
+            let mut e = self::special::Egress::default();
+            // TODO(ygina): this is a hacky way to reinitialize the view of the graph from the
+            // perspective of the egress node. this is bad since even though the egress's view
+            // of the graph may be consistent, downstream affected nodes may still believe, for
+            // example, that there exists a replica in the graph even though it just failed.
+            e.init(graph, (new_domain, shard));
+            self.inner = NodeType::Egress(Some(e));
+        }
+    }
+}
+
 // is this or that?
 impl Node {
     pub fn is_dropped(&self) -> bool {
@@ -420,7 +505,7 @@ impl Node {
     }
 
     pub fn is_ingress(&self) -> bool {
-        if let NodeType::Ingress = self.inner {
+        if let NodeType::Ingress(..) = self.inner {
             true
         } else {
             false

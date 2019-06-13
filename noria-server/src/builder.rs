@@ -101,6 +101,18 @@ impl Builder {
     }
 
     /// Start a server instance and return a handle to it.
+    ///
+    /// The returned handle executes all operations synchronously on a tokio runtime.
+    pub fn start_simple_authority<A: Authority + 'static>(
+        &self,
+        authority: Arc<A>,
+    ) -> Result<SyncHandle<A>, failure::Error> {
+        let mut rt = tokio::runtime::Runtime::new()?;
+        let wh = rt.block_on(self.start(authority))?;
+        Ok(SyncHandle::from_existing(rt, wh))
+    }
+
+    /// Start a server instance and return a handle to it.
     #[must_use]
     pub fn start<A: Authority + 'static>(
         &self,

@@ -67,6 +67,9 @@ pub(super) fn main(
                     CoordinationPayload::RemoveDomain => {
                         unimplemented!();
                     }
+                    CoordinationPayload::Shutdown => {
+                        panic!("shutting down...");
+                    }
                     CoordinationPayload::AssignDomain(d) => {
                         if let InstanceState::Active {
                             epoch,

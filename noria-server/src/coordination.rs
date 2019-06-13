@@ -39,6 +39,20 @@ pub enum CoordinationPayload {
     DomainBooted(DomainDescriptor),
     /// Create a new security universe.
     CreateUniverse(HashMap<String, DataType>),
+    /// Shutdown a worker.
+    Shutdown,
+    /// Ack NewIncoming to start sending ResumeAts.
+    AckNewIncoming {
+        /// Who the ack is from.
+        from: DomainIndex,
+        /// Provenance needed to recover the failed subgraph above this domain.
+        provenance: Provenance,
+    },
+    /// Ack ResumeAt so the controller knows who is still waiting for whom.
+    AckResumeAt {
+        /// Who the ack is from.
+        from: DomainIndex,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

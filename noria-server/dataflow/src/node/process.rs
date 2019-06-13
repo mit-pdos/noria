@@ -10,6 +10,7 @@ impl Node {
     crate fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
+        domain: DomainIndex,
         keyed_by: Option<&Vec<usize>>,
         state: &mut StateMap,
         nodes: &DomainNodes,
@@ -22,7 +23,7 @@ impl Node {
 
         let addr = self.local_addr();
         match self.inner {
-            NodeType::Ingress => {
+            NodeType::Ingress(_) => {
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs| {
@@ -53,7 +54,9 @@ impl Node {
                         // it into this merged packet:
                         senders.drain(..).for_each(|src| ex.ack(src));
 
+                        // TODO(ygina): what happens with this packet?
                         *m = Some(Box::new(Packet::Message {
+                            id: None,
                             link: Link::new(dst, dst),
                             data: rs,
                             tracer,
@@ -67,14 +70,14 @@ impl Node {
                 }
             }
             NodeType::Reader(ref mut r) => {
-                r.process(m, swap);
+                r.process(m, domain, on_shard.unwrap_or(0), swap);
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref mut e)) => {
-                e.process(m, on_shard.unwrap_or(0), output);
+                e.send_packet(m, domain, on_shard.unwrap_or(0), output);
             }
             NodeType::Sharder(ref mut s) => {
-                s.process(m, addr, on_shard.is_some(), output);
+                s.send_packet(m, domain, addr, on_shard.is_some(), output);
             }
             NodeType::Internal(ref mut i) => {
                 let mut captured_full = false;
@@ -226,10 +229,12 @@ impl Node {
 
     crate fn process_eviction(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         from: LocalNodeIndex,
         key_columns: &[usize],
         keys: &mut Vec<Vec<DataType>>,
         tag: Tag,
+        domain: DomainIndex,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
@@ -237,8 +242,9 @@ impl Node {
         match self.inner {
             NodeType::Base(..) => {}
             NodeType::Egress(Some(ref mut e)) => {
-                e.process(
+                e.send_packet(
                     &mut Some(Box::new(Packet::EvictKeys {
+                        id,
                         link: Link {
                             src: addr,
                             dst: addr,
@@ -246,12 +252,13 @@ impl Node {
                         tag,
                         keys: keys.to_vec(),
                     })),
+                    domain,
                     on_shard.unwrap_or(0),
                     output,
                 );
             }
             NodeType::Sharder(ref mut s) => {
-                s.process_eviction(key_columns, tag, keys, addr, on_shard.is_some(), output);
+                s.process_eviction(id, key_columns, tag, keys, addr, on_shard.is_some(), output);
             }
             NodeType::Internal(ref mut i) => {
                 i.on_eviction(from, key_columns, keys);
@@ -259,7 +266,7 @@ impl Node {
             NodeType::Reader(ref mut r) => {
                 r.on_eviction(key_columns, &keys[..]);
             }
-            NodeType::Ingress => {}
+            NodeType::Ingress(..) => {}
             NodeType::Dropped => {}
             NodeType::Egress(None) | NodeType::Source => unreachable!(),
         }

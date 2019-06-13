@@ -20,10 +20,11 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
+use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, prelude::Packet};
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 
 use petgraph;
@@ -49,8 +50,11 @@ pub(super) enum ColumnChange {
 pub struct Migration<'a> {
     pub(super) mainline: &'a mut ControllerInner,
     pub(super) added: HashSet<NodeIndex>,
+    pub(super) replicated: Vec<(DomainIndex, Vec<NodeIndex>)>,
+    pub(super) linked: Vec<(NodeIndex, NodeIndex)>,
     pub(super) columns: Vec<(NodeIndex, ColumnChange)>,
     pub(super) readers: HashMap<NodeIndex, NodeIndex>,
+    pub(super) replicas: Vec<(NodeIndex, NodeIndex)>,
 
     pub(super) start: Instant,
     pub(super) log: slog::Logger,
@@ -60,6 +64,102 @@ pub struct Migration<'a> {
 }
 
 impl<'a> Migration<'a> {
+    /*
+    /// Link the egress node to the ingress nodes, removing the linear path of nodes in between.
+    /// Used during recovery when it's not necessary to throw away all downstream nodes.
+    ///
+    /// Returns the nodes on the path.
+    pub(super) fn link_nodes(
+        &mut self,
+        egress: NodeIndex,
+        ingress: &Vec<NodeIndex>,
+    ) -> Vec<NodeIndex> {
+        assert!(self.mainline.ingredients[egress].is_egress());
+        assert!(ingress.len() > 0);
+        for &ingress_ni in ingress {
+            assert!(self.mainline.ingredients[ingress_ni].is_ingress());
+        }
+
+        fn children(mainline: &ControllerInner, ni: NodeIndex) -> Vec<NodeIndex> {
+            mainline
+                .ingredients
+                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing)
+                .collect()
+        }
+
+        // check that there is a path from egress to ingress and that it is linear
+        let mut ni = children(&self.mainline, egress);
+        let mut path = Vec::new();
+        while !ni.contains(&ingress[0]) {
+            assert_eq!(ni.len(), 1);
+            path.push(ni[0]);
+            ni = children(&self.mainline, ni[0]);
+        }
+
+        assert_eq!(ni.len(), ingress.len());
+        for ingress_ni in ingress {
+            assert!(ni.contains(&ingress_ni));
+        }
+
+        // remove old edges
+        if path.len() > 0 {
+            let mut edges = Vec::new();
+            edges.push((egress, path[0]));
+            for &ingress_ni in ingress {
+                edges.push((path[path.len() - 1], ingress_ni));
+            }
+            for (x, y) in edges {
+                let edge = self.mainline.ingredients.find_edge(x, y).unwrap();
+                self.mainline.ingredients.remove_edge(edge);
+            }
+        }
+
+        // link the nodes together
+        for &ingress_ni in ingress {
+            self.mainline.ingredients.add_edge(egress, ingress_ni, ());
+            self.linked.push((egress, ingress_ni));
+
+            debug!(self.log,
+                "linked egress -> ingress";
+                "egress" => egress.index(),
+                "ingress" => ingress_ni.index(),
+            );
+        }
+
+        path
+    }
+
+    /// Creates a replica of the domain, including ingress/egress nodes.
+    ///
+    /// Assumes the domain is a linear sequence of nodes starting with an ingress and ending with
+    /// an egress. Linking the new domain to other domains requires an additional step.
+    pub(super) fn replicate_nodes(&mut self, nodes: &Vec<NodeIndex>) -> NodeIndex {
+        let graph = &mut self.mainline.ingredients;
+
+        warn!(
+            self.log,
+            "replicating failed nodes {:?}",
+            nodes,
+        );
+
+        assert!(nodes.len() > 0);
+        let domain = graph[nodes[0]].domain();
+        for &ni in nodes {
+            assert_eq!(graph[ni].domain(), domain);
+        }
+
+        self.replicated.push((domain, nodes.clone()));
+
+        let graph_clone = graph.clone();
+        for &ni in nodes {
+            graph[ni].recover(&graph_clone, domain);
+        }
+
+        let egress = nodes[nodes.len() - 1];
+        egress
+    }
+    */
+
     /// Add the given `Ingredient` to the Soup.
     ///
     /// The returned identifier can later be used to refer to the added ingredient.
@@ -89,9 +189,19 @@ impl<'a> Migration<'a> {
         // keep track of the fact that it's new
         self.added.insert(ni);
         // insert it into the graph
-        for parent in parents {
-            self.mainline.ingredients.add_edge(parent, ni, ());
+        for parent in &parents {
+            self.mainline.ingredients.add_edge(*parent, ni, ());
         }
+
+        // if the node itself is a replica, add it to the migration
+        match *self.mainline.ingredients[ni] {
+            NodeOperator::Replica(_) => {
+                assert_eq!(parents.len(), 1);
+                self.replicas.push((ni, parents[0]));
+            },
+            _ => {},
+        }
+
         // and tell the caller its id
         ni
     }
@@ -269,7 +379,6 @@ impl<'a> Migration<'a> {
     /// To query into the maintained state, use `ControllerInner::get_getter`.
     pub fn maintain(&mut self, name: String, n: NodeIndex, key: &[usize]) {
         self.ensure_reader_for(n, Some(name));
-
         let ri = self.readers[&n];
 
         self.mainline.ingredients[ri]
@@ -366,6 +475,30 @@ impl<'a> Migration<'a> {
         let mut sorted_new = new.iter().collect::<Vec<_>>();
         sorted_new.sort();
 
+        // Initialize egress and reader provenance graphs
+        mainline.compute_domain_graph();
+        let new_senders = sorted_new
+            .iter()
+            .filter(|&ni| {
+                let node = &mainline.ingredients[**ni];
+                node.is_egress() || node.is_reader() || node.is_sharder()
+            })
+            .collect::<Vec<_>>();
+        let graph_clone = mainline.domain_graph.clone();
+        for &&&ni in &new_senders {
+            let node = &mut mainline.ingredients[ni];
+            let domain = node.domain();
+            if node.is_egress() {
+                node.with_egress_mut(|e| e.init(&graph_clone, (domain, 0)));
+            } else if node.is_sharder() {
+                node.with_sharder_mut(|s| s.init(&graph_clone, (domain, 0)));
+            } else if node.is_reader() {
+                node.with_reader_mut(|r| r.init(&graph_clone, (domain, 0))).unwrap();
+            } else {
+                unreachable!();
+            }
+        }
+
         // Find all nodes for domains that have changed
         let changed_domains: HashSet<DomainIndex> = sorted_new
             .iter()
@@ -446,6 +579,16 @@ impl<'a> Migration<'a> {
             }
         }
 
+        // The replica might become the node operator of its parent one day.
+        // We do it here after its parent is assigned a local index.
+        for &(replica, parent) in &self.replicas {
+            let op = mainline.ingredients[parent].deref().clone();
+            match mainline.ingredients[replica].deref_mut() {
+                NodeOperator::Replica(ref mut r) => r.set_op(box op),
+                _ => unreachable!(),
+            };
+        }
+
         if let Some(shards) = mainline.sharding {
             sharding::validate(&log, &mainline.ingredients, &topo, shards)
         };
@@ -494,6 +637,38 @@ impl<'a> Migration<'a> {
             })
             .collect();
 
+        fn reset_wis(mainline: &ControllerInner) -> std::vec::IntoIter<WorkerIdentifier> {
+            let mut wis_sorted = mainline
+                .workers
+                .keys()
+                .map(|wi| wi.clone())
+                .collect::<Vec<WorkerIdentifier>>();
+            wis_sorted.sort_by(|x, y| x.to_string().cmp(&y.to_string()));
+            wis_sorted.into_iter()
+        }
+
+        // Note: workers and domains are sorted for determinism
+        let mut wis = reset_wis(mainline);
+        let mut changed_domains = changed_domains.into_iter().collect::<Vec<DomainIndex>>();
+        let mut replicated_egress = HashSet::new();
+
+        // These aren't really new nodes since they've already been assigned local indexes and
+        // domains. All we want to do is place the new domain, and fix routing/materializations.
+        for (domain, nodes) in &self.replicated {
+            // Since we're regenerating this domain, remove the old handle with this domain index
+            mainline.domains.remove(domain);
+
+            uninformed_domain_nodes.insert(*domain, nodes.iter().map(|&n| (n, true)).collect());
+            changed_domains.push(*domain);
+            for &ni in nodes {
+                if mainline.ingredients[ni].is_egress() {
+                    replicated_egress.insert(ni);
+                }
+                new.insert(ni);
+            }
+        }
+        changed_domains.sort();
+
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
         for domain in changed_domains {
@@ -502,10 +677,29 @@ impl<'a> Migration<'a> {
                 continue;
             }
 
+            // find a worker identifier for each shard
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let shards = mainline.ingredients[nodes[0].0].sharded_by().shards();
+            let mut identifiers = Vec::new();
+            for _ in 0..shards.unwrap_or(1) {
+                let wi = loop {
+                    if let Some(wi) = wis.next() {
+                        let w = mainline.workers.get(&wi).unwrap();
+                        if w.healthy {
+                            break wi;
+                        }
+                    } else {
+                        wis = reset_wis(mainline);
+                    }
+                };
+                identifiers.push(wi);
+            }
+
+            // TODO(malte): simple round-robin placement for the moment
             let d = mainline.place_domain(
                 domain,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
+                identifiers,
+                shards,
                 &log,
                 nodes,
             );
@@ -569,6 +763,8 @@ impl<'a> Migration<'a> {
             &mut mainline.domains,
             &mainline.workers,
             &new,
+            &replicated_egress,
+            &self.linked,
         );
 
         // And now, the last piece of the puzzle -- set up materializations

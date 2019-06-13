@@ -8,7 +8,7 @@ use bincode;
 use bufstream::BufStream;
 use dataflow::{
     payload::SourceChannelIdentifier,
-    prelude::{DataType, Executor},
+    prelude::{DataType, Executor, Provenance},
     Domain, Packet, PollEvent, ProcessResult,
 };
 use failure::{self, ResultExt};
@@ -162,9 +162,24 @@ impl Replica {
         Ok(())
     }
 
-    fn try_flush(&mut self) -> Result<(), failure::Error> {
+    fn try_flush(&mut self) {
         let cc = &self.coord;
         let outputs = &mut self.outputs;
+
+        // uncache any domains
+        for domain in self.oob.domains.drain() {
+            let mut to_remove = Vec::new();
+            for ri in outputs.keys() {
+                if ri.0 == domain {
+                    to_remove.push(ri.clone());
+                }
+            }
+
+            for ri in to_remove {
+                outputs.remove(&ri);
+            }
+        }
+
 
         // just like in try_oob:
         // first, queue up any additional writes we have to do
@@ -174,12 +189,16 @@ impl Replica {
                 continue;
             }
 
-            let &mut (ref mut tx, ref mut pending) = outputs.entry(ri).or_insert_with(|| {
+            if !outputs.contains_key(&ri) {
                 while !cc.has(&ri) {}
-                let tx = cc.builder_for(&ri).unwrap().build_async().unwrap();
-                (tx, true)
-            });
+                let tx = match cc.builder_for(&ri).unwrap().build_async() {
+                    Ok(tx) => tx,
+                    Err(_) => { return; },
+                };
+                outputs.insert(ri, (tx, true));
+            }
 
+            let &mut (ref mut tx, ref mut pending) = outputs.get_mut(&ri).unwrap();
             while let Some(m) = ms.pop_front() {
                 match tx.start_send(m) {
                     Ok(AsyncSink::Ready) => {
@@ -193,7 +212,7 @@ impl Replica {
                         break;
                     }
                     Err(e) => {
-                        err.push(e);
+                        err.push((ri, e));
                         break;
                     }
                 }
@@ -201,11 +220,16 @@ impl Replica {
         }
 
         if !err.is_empty() {
-            return Err(err.swap_remove(0).into());
+            eprintln!("Failed to start send, removing all queued messages: {:?}", err);
+            for (ri, _) in &err {
+                self.outbox.remove(ri);
+                outputs.remove(ri);
+            }
+            return;
         }
 
         // then, try to do any sends that are still pending
-        for &mut (ref mut tx, ref mut pending) in outputs.values_mut() {
+        for (&ri, &mut (ref mut tx, ref mut pending)) in outputs.iter_mut() {
             if !*pending {
                 continue;
             }
@@ -215,15 +239,17 @@ impl Replica {
                     *pending = false;
                 }
                 Ok(Async::NotReady) => {}
-                Err(e) => err.push(e),
+                Err(e) => err.push((ri, e)),
             }
         }
 
         if !err.is_empty() {
-            return Err(err.swap_remove(0).into());
+            eprintln!("Failed pending send, removing all queued messages: {:?}", err);
+            for (ri, _) in &err {
+                self.outbox.remove(ri);
+                outputs.remove(ri);
+            }
         }
-
-        Ok(())
     }
 
     fn try_new(&mut self) -> io::Result<bool> {
@@ -290,6 +316,9 @@ struct OutOfBand {
     back: FnvHashMap<usize, Vec<u32>>,
     pending: FnvHashSet<usize>,
 
+    // for uncaching deleted domains
+    domains: FnvHashSet<DomainIndex>,
+
     // for sending messages to the controller
     ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
 }
@@ -299,6 +328,7 @@ impl OutOfBand {
         OutOfBand {
             back: Default::default(),
             pending: Default::default(),
+            domains: Default::default(),
             ctrl_tx,
         }
     }
@@ -307,6 +337,22 @@ impl OutOfBand {
 impl Executor for OutOfBand {
     fn ack(&mut self, id: SourceChannelIdentifier) {
         self.back.entry(id.token).or_default().push(id.tag);
+    }
+
+    fn ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
+        self.ctrl_tx
+            .unbounded_send(CoordinationPayload::AckNewIncoming { from, provenance })
+            .expect("asked to send to controller, but controller has gone away");
+    }
+
+    fn ack_resume_at(&mut self, from: DomainIndex) {
+        self.ctrl_tx
+            .unbounded_send(CoordinationPayload::AckResumeAt { from })
+            .expect("asked to send to controller, but controller has gone away");
+    }
+
+    fn uncache_domain(&mut self, domain: DomainIndex) {
+        self.domains.insert(domain);
     }
 
     fn create_universe(&mut self, universe: HashMap<String, DataType>) {
@@ -461,7 +507,7 @@ impl Future for Replica {
 
                     // send to downstream
                     // TODO: send fail == exiting?
-                    self.try_flush().context("downstream flush (after)")?;
+                    self.try_flush();
 
                     // send acks
                     self.try_oob()?;

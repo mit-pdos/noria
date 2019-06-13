@@ -85,6 +85,7 @@ fn mir_node_to_flow_parts(
                     ref on,
                     ref group_by,
                     ref kind,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -117,6 +118,7 @@ fn mir_node_to_flow_parts(
                     ref on,
                     ref group_by,
                     ref kind,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -139,6 +141,7 @@ fn mir_node_to_flow_parts(
                 MirNodeType::GroupConcat {
                     ref on,
                     ref separator,
+                    ..
                 } => {
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
@@ -158,6 +161,11 @@ fn mir_node_to_flow_parts(
                     assert_eq!(mir_node.ancestors.len(), 1);
                     let parent = mir_node.ancestors[0].clone();
                     make_identity_node(&name, parent, mir_node.columns.as_slice(), mig)
+                }
+                MirNodeType::Replica => {
+                    assert_eq!(mir_node.ancestors.len(), 1);
+                    let parent = mir_node.ancestors[0].clone();
+                    make_replica_node(&name, parent, mir_node.columns.as_slice(), mig)
                 }
                 MirNodeType::Join {
                     ref on_left,
@@ -568,6 +576,30 @@ fn make_identity_node(
         column_names.as_slice(),
         ops::identity::Identity::new(parent_na),
     );
+
+    FlowNode::New(node)
+}
+
+fn make_replica_node(
+    name: &str,
+    parent: MirNodeRef,
+    columns: &[Column],
+    mig: &mut Migration,
+) -> FlowNode {
+    let parent_na = parent.borrow().flow_node_addr().unwrap();
+    let column_names = column_names(columns);
+
+    let node = mig.add_ingredient(
+        String::from(name),
+        column_names.as_slice(),
+        ops::replica::Replica::new(parent_na),
+    );
+
+    mig.mainline.ingredients[node].set_replica_type(
+        node::ReplicaType::Bottom { top: parent_na });
+    mig.mainline.ingredients[parent_na].set_replica_type(
+        node::ReplicaType::Top { bottom: node });
+
     FlowNode::New(node)
 }
 

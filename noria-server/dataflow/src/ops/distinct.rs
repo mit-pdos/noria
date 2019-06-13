@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use prelude::*;
 
 /// This will get distinct records from a set of records compared over a given set of columns
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Distinct {
     // Parent Node
     src: IndexPair,

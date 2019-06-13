@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use payload;
 use prelude::*;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use vec_map::VecMap;
 
 #[derive(Serialize, Deserialize)]
@@ -9,6 +9,20 @@ pub struct Sharder {
     txs: Vec<(LocalNodeIndex, ReplicaAddr)>,
     sharded: VecMap<Box<Packet>>,
     shard_by: usize,
+
+    /// Base provenance, including the label it represents
+    pub(crate) min_provenance: Provenance,
+    /// Base provenance with all diffs applied
+    pub(crate) max_provenance: Provenance,
+    /// Provenance updates sent in outgoing packets
+    pub(crate) updates: Vec<ProvenanceUpdate>,
+    /// Packet payloads
+    pub(crate) payloads: Vec<Box<Packet>>,
+
+    /// Nodes it's ok to send packets too and the minimum labels (inclusive)
+    min_label_to_send: HashMap<ReplicaAddr, usize>,
+    /// The provenance of the last packet send to each node
+    last_provenance: HashMap<ReplicaAddr, Provenance>,
 }
 
 impl Clone for Sharder {
@@ -19,6 +33,12 @@ impl Clone for Sharder {
             txs: Vec::new(),
             sharded: Default::default(),
             shard_by: self.shard_by,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            payloads: self.payloads.clone(),
+            min_label_to_send: self.min_label_to_send.clone(),
+            last_provenance: self.last_provenance.clone(),
         }
     }
 }
@@ -29,6 +49,12 @@ impl Sharder {
             txs: Default::default(),
             shard_by: by,
             sharded: VecMap::default(),
+            min_provenance: Default::default(),
+            max_provenance: Default::default(),
+            updates: Default::default(),
+            payloads: Default::default(),
+            min_label_to_send: Default::default(),
+            last_provenance: Default::default(),
         }
     }
 
@@ -39,13 +65,22 @@ impl Sharder {
             txs,
             sharded: VecMap::default(),
             shard_by: self.shard_by,
+            min_provenance: self.min_provenance.clone(),
+            max_provenance: self.max_provenance.clone(),
+            updates: self.updates.clone(),
+            payloads: self.payloads.clone(),
+            min_label_to_send: self.min_label_to_send.clone(),
+            last_provenance: self.last_provenance.clone(),
         }
+
     }
 
     pub fn add_sharded_child(&mut self, dst: LocalNodeIndex, txs: Vec<ReplicaAddr>) {
         assert_eq!(self.txs.len(), 0);
         // TODO: add support for "shared" sharder?
         for tx in txs {
+            self.min_label_to_send.insert(tx, 1);
+            self.insert_default_last_provenance(tx);
             self.txs.push((dst, tx));
         }
     }
@@ -67,6 +102,7 @@ impl Sharder {
     pub fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
+        label: usize,
         index: LocalNodeIndex,
         is_sharded: bool,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
@@ -120,10 +156,31 @@ impl Sharder {
             unimplemented!();
         }
 
+        let (mtype, is_replay) = match m {
+            box Packet::Message { .. } => ("Message", false),
+            box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
+            _ => unreachable!(),
+        };
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
                 shard.link_mut().dst = dst;
+
+                // set the diff per child right before sending
+                let diff = self.last_provenance
+                    .get(&addr)
+                    .unwrap()
+                    .diff(&self.max_provenance);
+                assert_eq!(label, diff.label());
+                self.last_provenance.get_mut(&addr).unwrap().apply_update(&diff);
+                *shard.id_mut() = Some(diff);
+
+                println!(
+                    "SEND PACKET {} #{} -> ?? {:?}",
+                    mtype,
+                    label,
+                    shard.id().as_ref().unwrap(),
+                );
                 output.entry(addr).or_default().push_back(shard);
             }
         }
@@ -131,6 +188,7 @@ impl Sharder {
 
     pub fn process_eviction(
         &mut self,
+        id: Option<ProvenanceUpdate>,
         key_columns: &[usize],
         tag: Tag,
         keys: &[Vec<DataType>],
@@ -149,6 +207,7 @@ impl Sharder {
                     .sharded
                     .entry(shard)
                     .or_insert_with(|| box Packet::EvictKeys {
+                        id: id.clone(),
                         link: Link { src, dst },
                         keys: Vec::new(),
                         tag,
@@ -174,11 +233,80 @@ impl Sharder {
                     .entry(addr)
                     .or_default()
                     .push_back(Box::new(Packet::EvictKeys {
+                        id: id.clone(),
                         link: Link { src, dst },
                         keys: keys.to_vec(),
                         tag,
                     }))
             }
+        }
+    }
+
+    pub fn send_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        index: LocalNodeIndex,
+        is_sharded: bool,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        self.preprocess_packet(m, from);
+        self.process(m, self.max_provenance.label(), index, is_sharded, output);
+    }
+}
+
+const PROVENANCE_DEPTH: usize = 3;
+
+// fault tolerance
+impl Sharder {
+    // We initially have sent nothing to each node. Diffs are one depth shorter.
+    fn insert_default_last_provenance(&mut self, tx: ReplicaAddr) {
+        let mut p = self.min_provenance.clone();
+        p.trim(PROVENANCE_DEPTH - 1);
+        p.zero();
+        self.last_provenance.insert(tx, p);
+    }
+
+    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
+        for ni in graph.node_indices() {
+            if graph[ni] == root {
+                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    pub fn init_in_domain(&mut self, shard: usize) {
+        self.min_provenance.set_shard(shard);
+        self.max_provenance = self.min_provenance.clone();
+    }
+
+    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
+        // sharders are unsharded
+        let from = (from, 0);
+        let is_replay = match m {
+            Some(box Packet::ReplayPiece { .. }) => true,
+            _ => false,
+        };
+
+        // update packet id to include the correct label, provenance update, and from node.
+        // replays don't get buffered and don't increment their label (they use the last label
+        // sent by this domain - think of replays as a snapshot of what's already been sent).
+        let label = if is_replay {
+            self.min_provenance.label() + self.payloads.len()
+        } else {
+            self.min_provenance.label() + self.payloads.len() + 1
+        };
+        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
+        } else {
+            ProvenanceUpdate::new(from, label)
+        };
+        self.max_provenance.apply_update(&update);
+        if !is_replay {
+            self.payloads.push(box m.as_ref().unwrap().clone_data());
+            self.updates.push(self.max_provenance.clone());
         }
     }
 }

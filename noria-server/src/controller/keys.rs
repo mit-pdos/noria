@@ -238,7 +238,7 @@ mod tests {
     fn internal_passthrough() {
         let (mut g, a, _) = bases();
 
-        let x = g.add_node(node::Node::new("x", &["x1", "x2"], node::special::Ingress));
+        let x = g.add_node(node::Node::new("x", &["x1", "x2"], node::special::Ingress::new()));
         g.add_edge(a, x, ());
 
         assert_eq!(

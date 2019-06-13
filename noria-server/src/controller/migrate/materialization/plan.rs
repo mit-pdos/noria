@@ -6,6 +6,43 @@ use dataflow::payload::{ReplayPathSegment, SourceSelection, TriggerEndpoint};
 use dataflow::prelude::*;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
+crate struct SetupReplayPath {
+    pub tag: Tag,
+    pub source: Option<LocalNodeIndex>,
+    pub path: Vec<ReplayPathSegment>,
+    pub notify_done: bool,
+    pub trigger: TriggerEndpoint,
+}
+
+impl SetupReplayPath {
+    pub(crate) fn into_packet(self) -> Box<Packet> {
+        box Packet::SetupReplayPath {
+            tag: self.tag,
+            source: self.source,
+            path: self.path,
+            notify_done: self.notify_done,
+            trigger: self.trigger,
+            ack: false,
+        }
+    }
+}
+
+#[derive(Clone)]
+crate struct UpdateEgress {
+    pub new_tx: Option<(NodeIndex, LocalNodeIndex, (DomainIndex, usize))>,
+    pub new_tag: Option<(Tag, NodeIndex)>,
+}
+
+impl UpdateEgress {
+    pub(crate) fn into_packet(self) -> Box<Packet> {
+        box Packet::UpdateEgress {
+            new_tx: self.new_tx,
+            new_tag: self.new_tag,
+        }
+    }
+}
+
 pub(super) struct Plan<'a> {
     m: &'a mut super::Materializations,
     graph: &'a Graph,
@@ -16,6 +53,8 @@ pub(super) struct Plan<'a> {
 
     tags: HashMap<Vec<usize>, Vec<(Tag, DomainIndex)>>,
     paths: HashMap<Tag, Vec<NodeIndex>>,
+    setup_replay_paths: HashMap<DomainIndex, Vec<SetupReplayPath>>,
+    update_egresses: HashMap<DomainIndex, Vec<UpdateEgress>>,
     pending: Vec<PendingReplay>,
 }
 
@@ -48,6 +87,8 @@ impl<'a> Plan<'a> {
             pending: Vec::new(),
             tags: Default::default(),
             paths: Default::default(),
+            setup_replay_paths: Default::default(),
+            update_egresses: Default::default(),
         }
     }
 
@@ -196,6 +237,7 @@ impl<'a> Plan<'a> {
                     path: locals,
                     notify_done: false,
                     trigger: TriggerEndpoint::None,
+                    ack: true,
                 };
 
                 // the first domain also gets to know source node
@@ -305,6 +347,26 @@ impl<'a> Plan<'a> {
                     }
                 }
 
+                if let box Packet::SetupReplayPath {
+                    tag,
+                    source,
+                    path,
+                    notify_done,
+                    trigger,
+                    ..
+                } = &setup {
+                    self.setup_replay_paths
+                        .entry(domain)
+                        .or_insert(Vec::new())
+                        .push(SetupReplayPath {
+                            tag: tag.clone(),
+                            source: source.clone(),
+                            path: path.clone(),
+                            notify_done: notify_done.clone(),
+                            trigger: trigger.clone(),
+                        });
+                }
+
                 if i != segments.len() - 1 {
                     // since there is a later domain, the last node of any non-final domain
                     // must either be an egress or a Sharder. If it's an egress, we need
@@ -313,17 +375,20 @@ impl<'a> Plan<'a> {
                     let n = &self.graph[nodes.last().unwrap().0];
                     let workers = &self.workers;
                     if n.is_egress() {
+                        let m = UpdateEgress {
+                            new_tx: None,
+                            new_tag: Some((tag, segments[i + 1].1[0].0)),
+                        };
+
+                        self.update_egresses
+                            .entry(domain)
+                            .or_insert(Vec::new())
+                            .push(m.clone());
+
                         self.domains
                             .get_mut(&domain)
                             .unwrap()
-                            .send_to_healthy(
-                                box Packet::UpdateEgress {
-                                    node: n.local_addr(),
-                                    new_tx: None,
-                                    new_tag: Some((tag, segments[i + 1].1[0].0)),
-                                },
-                                workers,
-                            )
+                            .send_to_healthy(m.into_packet(), workers)
                             .unwrap();
                     } else {
                         assert!(n.is_sharder());
@@ -352,8 +417,14 @@ impl<'a> Plan<'a> {
     /// re-indexing has to happen), whereas for new indices to partial views it should be nearly
     /// instantaneous.
     ///
-    /// Returns a list of backfill replays that need to happen before the migration is complete.
-    pub(super) fn finalize(mut self) -> Vec<PendingReplay> {
+    /// Returns a list of backfill replays that need to happen before the migration is complete
+    /// and the new replay segments for each domain.
+    pub(super) fn finalize(mut self) -> (
+        Vec<PendingReplay>,
+        HashMap<DomainIndex, Vec<SetupReplayPath>>,
+        HashMap<DomainIndex, Vec<UpdateEgress>>,
+        HashMap<Tag, Vec<NodeIndex>>,
+    ) {
         use dataflow::payload::InitialState;
 
         // NOTE: we cannot use the impl of DerefMut here, since it (reasonably) disallows getting
@@ -431,7 +502,7 @@ impl<'a> Plan<'a> {
         } else {
             assert!(self.pending.is_empty());
         }
-        self.pending
+        (self.pending, self.setup_replay_paths, self.update_egresses, self.paths)
     }
 
     pub(super) fn on_join<'b>(

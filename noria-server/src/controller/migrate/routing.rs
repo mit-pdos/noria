@@ -101,7 +101,7 @@ pub fn add(
 
             let ingress = ingress.unwrap_or_else(|| {
                 // we need to make a new ingress
-                let mut i = graph[parent].mirror(node::special::Ingress);
+                let mut i = graph[parent].mirror(node::special::Ingress::new());
 
                 // it belongs to this domain, not that of the parent
                 i.add_to(domain);
@@ -190,6 +190,8 @@ pub fn add(
 
             if graph[sender].is_sender() {
                 // all good -- we're already hooked up with an egress or sharder!
+                let domain = graph[sender].domain();
+                graph[ingress].with_ingress_mut(|i| i.set_src(domain));
                 if graph[sender].is_egress() {
                     trace!(log,
                            "re-using cross-domain egress to new node";
@@ -248,6 +250,8 @@ pub fn add(
                 let old = graph.find_edge(sender, ingress).unwrap();
                 let was_materialized = graph.remove_edge(old).unwrap();
                 graph.add_edge(egress, ingress, was_materialized);
+                let domain = graph[egress].domain();
+                graph[ingress].with_ingress_mut(|i| i.set_src(domain));
             }
 
             // NOTE: we *don't* need to update swaps here, because ingress doesn't care
@@ -263,89 +267,139 @@ pub(super) fn connect(
     domains: &mut HashMap<DomainIndex, DomainHandle>,
     workers: &HashMap<WorkerIdentifier, Worker>,
     new: &HashSet<NodeIndex>,
+    replicated_egress: &HashSet<NodeIndex>,
+    linked: &Vec<(NodeIndex, NodeIndex)>,
 ) {
+    // link the given nodes by replacing the old egress tx connection
+    for &(eni, ini) in linked {
+        let egress = &graph[eni];
+        let ingress = &graph[ini];
+
+        assert!(egress.is_egress());
+        assert!(ingress.is_ingress());
+
+        let shards = domains[&egress.domain()].shards();
+        let domain = domains.get_mut(&egress.domain()).unwrap();
+        if shards != 1 && !egress.sharded_by().is_none() {
+            for i in 0..shards {
+                domain.send_to_healthy_shard(
+                    i,
+                    box Packet::UpdateEgress {
+                        new_tx: Some((ini.into(), ingress.local_addr(), (ingress.domain(), i))),
+                        new_tag: None,
+                    },
+                    workers,
+                ).unwrap();
+            }
+        } else {
+            assert_eq!(shards, 1);
+            domain.send_to_healthy(
+                box Packet::UpdateEgress {
+                    new_tx: Some((ini.into(), ingress.local_addr(), (ingress.domain(), 0))),
+                    new_tag: None,
+                },
+                workers,
+            ).unwrap();
+        }
+    }
+
     // ensure all egress nodes contain the tx channel of the domains of their child ingress nodes
+    let mut sender_nodes = Vec::new();
+    for &sender in replicated_egress {
+        let n = &graph[sender];
+        assert!(n.is_egress());
+
+        for ni in graph.neighbors_directed(sender, petgraph::EdgeDirection::Outgoing) {
+            let node = &graph[ni];
+            if node.is_ingress() {
+                sender_nodes.push((sender, ni));
+            }
+        }
+    }
+
     for &node in new {
         let n = &graph[node];
         if n.is_ingress() {
             // check the egress or sharder connected to this ingress
-        } else {
-            continue;
+            for sender in graph.neighbors_directed(node, petgraph::EdgeDirection::Incoming) {
+                sender_nodes.push((sender, node));
+            }
         }
+    }
 
-        for sender in graph.neighbors_directed(node, petgraph::EdgeDirection::Incoming) {
-            let sender_node = &graph[sender];
-            if sender_node.is_egress() {
-                trace!(log,
-                       "connecting";
-                       "egress" => sender.index(),
-                       "ingress" => node.index()
-                );
+    for (sender, node) in sender_nodes {
+        let n = &graph[node];
+        let sender_node = &graph[sender];
+        assert!(n.is_ingress());
 
-                let shards = domains[&n.domain()].shards();
-                let domain = domains.get_mut(&sender_node.domain()).unwrap();
-                if shards != 1 && !sender_node.sharded_by().is_none() {
-                    // we need to be a bit careful here in the particular case where we have a
-                    // sharded egress that sends to another domain sharded by the same key.
-                    // specifically, in that case we shouldn't have each shard of domain A send to
-                    // all the shards of B. instead A[0] should send to B[0], A[1] to B[1], etc.
-                    // note that we don't have to check the sharding of both src and dst here,
-                    // because an egress implies that no shuffle was necessary, which again means
-                    // that the sharding must be the same.
-                    for i in 0..shards {
-                        domain
-                            .send_to_healthy_shard(
-                                i,
-                                box Packet::UpdateEgress {
-                                    node: sender_node.local_addr(),
-                                    new_tx: Some((node, n.local_addr(), (n.domain(), i))),
-                                    new_tag: None,
-                                },
-                                workers,
-                            )
-                            .unwrap();
-                    }
-                } else {
-                    // consider the case where len != 1. that must mean that the
-                    // sender_node.sharded_by() == Sharding::None. so, we have an unsharded egress
-                    // sending to a sharded child. but that shouldn't be allowed -- such a node
-                    // *must* be a Sharder.
-                    assert_eq!(shards, 1);
+        if sender_node.is_egress() {
+            trace!(log,
+                   "connecting";
+                   "egress" => sender.index(),
+                   "ingress" => node.index()
+            );
+
+            let shards = domains[&n.domain()].shards();
+            let domain = domains.get_mut(&sender_node.domain()).unwrap();
+            if shards != 1 && !sender_node.sharded_by().is_none() {
+                // we need to be a bit careful here in the particular case where we have a
+                // sharded egress that sends to another domain sharded by the same key.
+                // specifically, in that case we shouldn't have each shard of domain A send to
+                // all the shards of B. instead A[0] should send to B[0], A[1] to B[1], etc.
+                // note that we don't have to check the sharding of both src and dst here,
+                // because an egress implies that no shuffle was necessary, which again means
+                // that the sharding must be the same.
+                for i in 0..shards {
                     domain
-                        .send_to_healthy(
+                        .send_to_healthy_shard(
+                            i,
                             box Packet::UpdateEgress {
-                                node: sender_node.local_addr(),
-                                new_tx: Some((node, n.local_addr(), (n.domain(), 0))),
+                                new_tx: Some((node, n.local_addr(), (n.domain(), i))),
                                 new_tag: None,
                             },
                             workers,
                         )
                         .unwrap();
                 }
-            } else if sender_node.is_sharder() {
-                trace!(log,
-                       "connecting";
-                       "sharder" => sender.index(),
-                       "ingress" => node.index()
-                );
-
-                let shards = domains[&n.domain()].shards();
-                let txs = (0..shards).map(|i| (n.domain(), i)).collect();
-                domains
-                    .get_mut(&sender_node.domain())
-                    .unwrap()
+            } else {
+                // consider the case where len != 1. that must mean that the
+                // sender_node.sharded_by() == Sharding::None. so, we have an unsharded egress
+                // sending to a sharded child. but that shouldn't be allowed -- such a node
+                // *must* be a Sharder.
+                assert_eq!(shards, 1);
+                domain
                     .send_to_healthy(
-                        box Packet::UpdateSharder {
-                            node: sender_node.local_addr(),
-                            new_txs: (n.local_addr(), txs),
+                        box Packet::UpdateEgress {
+                            new_tx: Some((node, n.local_addr(), (n.domain(), 0))),
+                            new_tag: None,
                         },
                         workers,
                     )
                     .unwrap();
-            } else if sender_node.is_source() {
-            } else {
-                unreachable!("ingress parent is not a sender");
             }
+        } else if sender_node.is_sharder() {
+            trace!(log,
+                   "connecting";
+                   "sharder" => sender.index(),
+                   "ingress" => node.index()
+            );
+
+            let shards = domains[&n.domain()].shards();
+            let txs = (0..shards).map(|i| (n.domain(), i)).collect();
+            domains
+                .get_mut(&sender_node.domain())
+                .unwrap()
+                .send_to_healthy(
+                    box Packet::UpdateSharder {
+                        node: sender_node.local_addr(),
+                        new_txs: (n.local_addr(), txs),
+                    },
+                    workers,
+                )
+                .unwrap();
+        } else if sender_node.is_source() {
+        } else {
+            unreachable!("ingress parent is not a sender");
         }
     }
 }
