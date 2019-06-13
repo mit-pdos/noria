@@ -90,10 +90,16 @@ impl VoteClient for LocalNoria {
                     a.i_promise_dst_is_same_process();
                 }
 
-                a.perform_all((0..params.articles).map(|i| {
+                a.perform_all((0..params.articles).map(move |i| {
+                    let author = if i == 0 {
+                        1i32
+                    } else {
+                        ((i % (params.authors - 1)) + 2) as i32
+                    };
                     vec![
                         ((i + 1) as i32).into(),
                         format!("Article #{}", i + 1).into(),
+                        author.into(),
                     ]
                 }))
                 .map(move |_| g)
