@@ -78,55 +78,56 @@ impl VoteClient for LocalNoria {
         }
 
         Box::new(
-            g.and_then(|mut g| g.graph.handle().table("Article").map(move |a| (g, a)))
-                .and_then(move |(g, mut a)| {
-                    if fudge {
-                        a.i_promise_dst_is_same_process();
-                    }
+            g.and_then(|mut g| {
+                g.graph
+                    .handle()
+                    .unwrap()
+                    .table("Article")
+                    .map(move |a| (g, a))
+            })
+            .and_then(move |(g, mut a)| {
+                if fudge {
+                    a.i_promise_dst_is_same_process();
+                }
 
-                    a.perform_all((0..params.articles).map(move |i| {
-                        let author = if i == 0 {
-                            1i32
-                        } else {
-                            ((i % (params.authors - 1)) + 2) as i32
-                        };
-                        vec![
-                            ((i + 1) as i32).into(),
-                            format!("Article #{}", i + 1).into(),
-                            author.into(),
-                        ]
-                    }))
-                    .map(move |_| g)
-                    .map_err(|e| e.error)
-                    .then(|r| {
-                        r.context("failed to do article prepopulation")
-                            .map_err(failure::Error::from)
-                    })
+                a.perform_all((0..params.articles).map(|i| {
+                    vec![
+                        ((i + 1) as i32).into(),
+                        format!("Article #{}", i + 1).into(),
+                    ]
+                }))
+                .map(move |_| g)
+                .map_err(|e| e.error)
+                .then(|r| {
+                    r.context("failed to do article prepopulation")
+                        .map_err(failure::Error::from)
                 })
-                .and_then(move |mut g| {
-                    if verbose {
-                        println!("Done with prepopulation");
-                    }
+            })
+            .and_then(move |mut g| {
+                if verbose {
+                    println!("Done with prepopulation");
+                }
 
-                    // TODO: allow writes to propagate
+                // TODO: allow writes to propagate
 
-                    g.graph
-                        .handle()
-                        .view("AuthorWithVoteCount")
-                        .and_then(move |r| {
-                            g.graph.handle().table("Vote").map(move |mut w| {
-                                if fudge {
-                                    // fudge write rpcs by sending just the pointer over tcp
-                                    w.i_promise_dst_is_same_process();
-                                }
-                                LocalNoria {
-                                    _g: Arc::new(g),
-                                    r: Some(r),
-                                    w: Some(w),
-                                }
-                            })
+                g.graph
+                    .handle()
+                    .unwrap()
+                    .view("AuthorWithVoteCount")
+                    .and_then(move |r| {
+                        g.graph.handle().unwrap().table("Vote").map(move |mut w| {
+                            if fudge {
+                                // fudge write rpcs by sending just the pointer over tcp
+                                w.i_promise_dst_is_same_process();
+                            }
+                            LocalNoria {
+                                _g: Arc::new(g),
+                                r: Some(r),
+                                w: Some(w),
+                            }
                         })
-                }),
+                    })
+            }),
         )
     }
 }
