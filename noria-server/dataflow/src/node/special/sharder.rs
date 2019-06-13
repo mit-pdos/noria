@@ -175,12 +175,12 @@ impl Sharder {
                 self.last_provenance.get_mut(&addr).unwrap().apply_update(&diff);
                 *shard.id_mut() = Some(diff);
 
-                println!(
-                    "SEND PACKET {} #{} -> ?? {:?}",
-                    mtype,
-                    label,
-                    shard.id().as_ref().unwrap(),
-                );
+                // println!(
+                //     "SEND PACKET {} #{} -> ?? {:?}",
+                //     mtype,
+                //     label,
+                //     shard.id().as_ref().unwrap(),
+                // );
                 output.entry(addr).or_default().push_back(shard);
             }
         }

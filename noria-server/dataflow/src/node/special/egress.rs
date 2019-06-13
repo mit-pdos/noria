@@ -141,13 +141,13 @@ impl Egress {
             self.last_provenance.get_mut(&tx.node).unwrap().apply_update(&diff);
             *m.id_mut() = Some(diff);
 
-            println!(
-                "SEND PACKET {} #{} -> {} {:?}",
-                mtype,
-                label,
-                tx.node.index(),
-                m.id().as_ref().unwrap(),
-            );
+            // println!(
+            //     "SEND PACKET {} #{} -> {} {:?}",
+            //     mtype,
+            //     label,
+            //     tx.node.index(),
+            //     m.id().as_ref().unwrap(),
+            // );
 
             // TODO(ygina): don't clone the last send
             output.entry(tx.dest).or_default().push_back(m);

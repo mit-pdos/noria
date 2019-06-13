@@ -807,11 +807,11 @@ impl Domain {
                         let mut n = self.nodes[self.exit_ni].borrow_mut();
                         n.with_egress_mut(move |e| {
                             if let Some((node, local, addr)) = new_tx {
-                                println!("D{}: UpdateEgress {:?} None", domain_index, node);
+                                // println!("D{}: UpdateEgress {:?} None", domain_index, node);
                                 e.add_tx(node, local, addr);
                             }
                             if let Some(new_tag) = new_tag {
-                                println!("D{}: UpdateEgress None {:?}", domain_index, new_tag);
+                                // println!("D{}: UpdateEgress None {:?}", domain_index, new_tag);
                                 e.add_tag(new_tag.0, new_tag.1);
                             }
                         });
@@ -982,7 +982,7 @@ impl Domain {
                             payload::TriggerEndpoint::Local(_) => "Local".into(),
                             payload::TriggerEndpoint::End(_, domain) => format!("End({:?})", domain),
                         };
-                        println!("D{}: SetupReplayPath {:?} {}", self.index.index(), tag, trigger_str);
+                        // println!("D{}: SetupReplayPath {:?} {}", self.index.index(), tag, trigger_str);
 
                         let trigger = match trigger {
                             payload::TriggerEndpoint::None => TriggerEndpoint::None,
@@ -1041,7 +1041,7 @@ impl Domain {
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
-                        println!("D{}: RequestReaderReplay {:?}", self.index.index(), self.nodes[node].borrow().global_addr());
+                        // println!("D{}: RequestReaderReplay {:?}", self.index.index(), self.nodes[node].borrow().global_addr());
                         let still_miss = self.nodes[node]
                             .borrow_mut()
                             .with_reader_mut(|r| {
@@ -1070,7 +1070,7 @@ impl Domain {
                         }
                     }
                     Packet::RequestPartialReplay { id, tag, key } => {
-                        println!("D{}: RequestPartialReplay {:?}", self.index.index(), tag);
+                        // println!("D{}: RequestPartialReplay {:?}", self.index.index(), tag);
                         trace!(
                             self.log,
                            "got replay request";
@@ -1081,7 +1081,7 @@ impl Domain {
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
-                        println!("D{}: StartReplay {:?} {:?}", self.index.index(), tag, self.nodes[from].borrow().global_addr());
+                        // println!("D{}: StartReplay {:?} {:?}", self.index.index(), tag, self.nodes[from].borrow().global_addr());
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
                         let start = time::Instant::now();
@@ -1405,7 +1405,7 @@ impl Domain {
                     },
                     Packet::RemoveChild { child, domain } => {
                         let node = &self.nodes[self.exit_ni];
-                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
+                        // println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
 
                         match self.exit_type {
                             DomainExitType::Egress => {
@@ -1424,7 +1424,7 @@ impl Domain {
                         executor.uncache_domain(domain);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
-                        println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
+                        // println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
 
                         self.replay_paths.remove(&old_tag);
                         self.buffered_replay_requests.remove(&old_tag);
@@ -1490,7 +1490,7 @@ impl Domain {
                         unimplemented!()
                     },
                     Packet::ResumeAt { child_labels } => {
-                        println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
+                        // println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
