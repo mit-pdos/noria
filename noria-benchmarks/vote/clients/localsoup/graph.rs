@@ -104,7 +104,7 @@ impl Builder {
             .map(move |(wh, inputs, outputs)| Graph {
                 vote: inputs["Vote"],
                 article: inputs["Article"],
-                end: outputs["AuthorWithVoteCount"],
+                end: outputs["ArticleWithVoteCount"],
                 stupid,
                 graph: SyncHandle::from_executor(ex, wh),
             })
