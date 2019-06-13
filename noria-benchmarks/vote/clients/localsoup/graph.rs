@@ -2,17 +2,24 @@ use noria::{self, FrontierStrategy, LocalAuthority, NodeIndex, PersistenceParame
 use tokio::prelude::*;
 
 pub(crate) const RECIPE: &str = "# base tables
-CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
+CREATE TABLE Article (id int, title varchar(255), author_id int, PRIMARY KEY(id));
 CREATE TABLE Vote (article_id int, user int);
 
 # read queries
 CREATE VIEW VoteCount AS \
-  SELECT Vote.article_id, COUNT(user) AS votes FROM Vote GROUP BY Vote.article_id;
-
-QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+            SELECT Vote.article_id, COUNT(user) AS votes
+            FROM Vote
+            GROUP BY Vote.article_id;
+CREATE VIEW ArticleWithVoteCount AS \
+            SELECT Article.id, author_id, VoteCount.votes AS votes \
             FROM Article \
             LEFT JOIN VoteCount \
-            ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
+            ON (Article.id = VoteCount.article_id)
+            WHERE Article.id = ?;
+QUERY AuthorWithVoteCount: SELECT author_id, SUM(votes) as votes \
+            FROM ArticleWithVoteCount \
+            WHERE author_id = ? \
+            GROUP BY author_id;";
 
 pub struct Graph {
     stupid: bool,
@@ -104,7 +111,7 @@ impl Builder {
             .map(move |(wh, inputs, outputs)| Graph {
                 vote: inputs["Vote"],
                 article: inputs["Article"],
-                end: outputs["ArticleWithVoteCount"],
+                end: outputs["AuthorWithVoteCount"],
                 stupid,
                 graph: SyncHandle::from_executor(ex, wh),
             })

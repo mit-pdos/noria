@@ -33,7 +33,10 @@ lazy_static! {
         Arc::new(Mutex::new((None, 0)));
 }
 
-const RESERVED_KEY: i32 = 1;
+// Reserved article id
+const RESERVED_W_KEY: i32 = 1;
+// Reserved author id
+const RESERVED_R_KEY: i32 = 1;
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
@@ -61,10 +64,12 @@ where
 
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
+    let authors = value_t_or_exit!(global_args, "authors", usize);
 
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
         articles,
+        authors,
     };
 
     let skewed = match global_args.value_of("distribution") {
@@ -159,6 +164,7 @@ where
                             handle,
                             ex,
                             zipf::ZipfDistribution::new(articles, 1.08).unwrap(),
+                            zipf::ZipfDistribution::new(authors, 1.08).unwrap(),
                             target,
                             global_args,
                         )
@@ -167,6 +173,7 @@ where
                             handle,
                             ex,
                             rand::distributions::Range::new(1, articles + 1),
+                            rand::distributions::Range::new(1, authors + 1),
                             target,
                             global_args,
                         )
@@ -264,7 +271,8 @@ where
 fn run_generator<C, R>(
     mut handle: C,
     ex: tokio::runtime::TaskExecutor,
-    id_rng: R,
+    w_id_rng: R,
+    r_id_rng: R,
     target: f64,
     global_args: clap::ArgMatches,
 ) -> (f64, f64)
@@ -346,11 +354,11 @@ where
 
             if !write {
                 for row in rows {
-                    let key: i32 = row[0][0].clone().into();
-                    if key != RESERVED_KEY {
+                    let author: i32 = row[0][0].clone().into();
+                    if author != RESERVED_R_KEY {
                         continue;
                     }
-                    let read_count = row[0][2].clone();
+                    let read_count = row[0][1].clone();
                     if read_count == DataType::None {
                         // no writes yet
                         continue;
@@ -430,19 +438,25 @@ where
 
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
-            let id = loop {
-                let id = id_rng.sample(&mut rng) as i32;
-                if id != RESERVED_KEY {
-                    break id;
-                }
-            };
             if rng.gen_bool(1.0 / f64::from(every)) {
+                let id = loop {
+                    let id = w_id_rng.sample(&mut rng) as i32;
+                    if id != RESERVED_W_KEY {
+                        break id;
+                    }
+                };
                 if queued_w.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
                 }
                 queued_w_keys.push(id);
                 queued_w.push(next);
             } else {
+                let id = loop {
+                    let id = r_id_rng.sample(&mut rng) as i32;
+                    if id != RESERVED_R_KEY {
+                        break id;
+                    }
+                };
                 if queued_r.is_empty() && next_send.is_none() {
                     next_send = Some(next + max_batch_time);
                 }
@@ -461,20 +475,26 @@ where
             if queued_w.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
             }
-            queued_w_keys.pop();
-            queued_w.pop();
-            queued_w_keys.push(RESERVED_KEY);
-            queued_w.push(now);  // might mess up sojourn time
+            // might mess up sojourn time
+            if queued_w.is_empty() {
+                queued_w_keys.push(RESERVED_W_KEY);
+                queued_w.push(now);
+            } else {
+                queued_w_keys[0] = RESERVED_W_KEY;
+            }
             *w_time_count = (Some(now), w_time_count.1 + 1);
             // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
         } else {
             if queued_r.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
             }
-            queued_r_keys.pop();
-            queued_r.pop();
-            queued_r_keys.push(RESERVED_KEY);
-            queued_r.push(now);  // might mess up sojourn time
+            // might mess up sojourn time
+            if queued_r.is_empty() {
+                queued_r_keys.push(RESERVED_R_KEY);
+                queued_r.push(now);
+            } else {
+                queued_r_keys[0] = RESERVED_R_KEY;
+            }
         }
         drop(w_time_count);
 
@@ -598,6 +618,13 @@ fn main() {
                 .help("Number of articles to prepopulate the database with"),
         )
         .arg(
+            Arg::with_name("authors")
+                .long("authors")
+                .value_name("N")
+                .default_value("400")
+                .help("Number of authors to prepopulate the database with"),
+        )
+        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -647,14 +674,14 @@ fn main() {
         .arg(
             Arg::with_name("ratio")
                 .long("write-every")
-                .default_value("19")
+                .default_value("2")
                 .value_name("N")
                 .help("1-in-N chance of a write"),
         )
         .arg(
             Arg::with_name("max-batch-time-us")
                 .long("max-batch-time-us")
-                .default_value("1000")
+                .default_value("200")
                 .help("Time between sending batches to Noria."),
         )
         .arg(
@@ -776,7 +803,7 @@ fn main() {
                     Arg::with_name("shards")
                         .long("shards")
                         .takes_value(true)
-                        .default_value("2")
+                        .default_value("100")
                         .help("Shard the graph this many ways (0 = disable sharding)."),
                 )
                 .arg(
@@ -843,7 +870,7 @@ fn main() {
 
     match args.subcommand() {
         ("localsoup", Some(largs)) => run::<clients::localsoup::LocalNoria>(&args, largs),
-        ("netsoup", Some(largs)) => run::<clients::netsoup::Conn>(&args, largs),
+        //("netsoup", Some(largs)) => run::<clients::netsoup::Conn>(&args, largs),
         //("memcached", Some(largs)) => run::<clients::memcached::Constructor>(&args, largs),
         //("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         //("mysql", Some(largs)) => run::<clients::mysql::Conf>(&args, largs),
