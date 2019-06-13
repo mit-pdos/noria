@@ -374,7 +374,7 @@ where
                         continue;
                     }
 
-                    println!("Read {}th vote at {:?}", read_count, done);
+                    // println!("Read {}th vote at {:?}", read_count, done);
                     if let Some(w_time) = w_time_count.0.take() {
                         if warmup_done {
                             let delay = done.duration_since(w_time);
@@ -483,7 +483,7 @@ where
                 queued_w_keys[0] = RESERVED_W_KEY;
             }
             *w_time_count = (Some(now), w_time_count.1 + 1);
-            println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
+            // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
         } else {
             if queued_r.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
