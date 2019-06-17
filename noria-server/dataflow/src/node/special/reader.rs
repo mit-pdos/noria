@@ -307,6 +307,12 @@ impl Reader {
     }
 
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
+        let (mtype, is_replay) = match m {
+            Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", true),
+            Some(box Packet::Message { .. }) => ("Message", false),
+            _ => unreachable!(),
+        };
+
         // provenance
         let update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, self.num_payloads, &[diff.clone()])
@@ -317,8 +323,7 @@ impl Reader {
         self.updates.push(update);
 
         // update num_payloads if not a replay
-        if let Some(box Packet::ReplayPiece { .. }) = m {
-        } else {
+        if !is_replay {
             self.num_payloads += 1;
         }
     }

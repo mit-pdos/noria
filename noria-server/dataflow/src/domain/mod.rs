@@ -2519,7 +2519,11 @@ impl Domain {
                     for (tag, replay_key) in replay {
                         self.delayed_for_self
                             .push_back(box Packet::RequestPartialReplay {
-                                id: id.clone(),
+                                // TODO(ygina): Unclear what the id should be here. If we use
+                                // id: id.clone(), then since we're delaying this packet, we may
+                                // process another message at a future provenance before getting
+                                // to this packet again, causing a panic in provenance.rs:163.
+                                id: None,
                                 tag,
                                 key: replay_key,
                             });
