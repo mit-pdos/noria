@@ -176,9 +176,11 @@ impl Sharder {
                 *shard.id_mut() = Some(diff);
 
                 // println!(
-                //     "SEND PACKET {} #{} -> ?? {:?}",
+                //     "SEND PACKET {} #{} -> D{}.{} {:?}",
                 //     mtype,
                 //     label,
+                //     addr.0.index(),
+                //     addr.1,
                 //     shard.id().as_ref().unwrap(),
                 // );
                 output.entry(addr).or_default().push_back(shard);
@@ -287,7 +289,8 @@ impl Sharder {
         let from = (from, 0);
         let is_replay = match m {
             Some(box Packet::ReplayPiece { .. }) => true,
-            _ => false,
+            Some(box Packet::Message { .. }) => false,
+            _ => unreachable!(),
         };
 
         // update packet id to include the correct label, provenance update, and from node.
