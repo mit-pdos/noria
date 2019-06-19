@@ -401,6 +401,35 @@ impl Packet {
         }
     }
 
+    crate fn size_of_id(&self) -> u64 {
+        match *self {
+            Packet::Message { ref id, .. } => {
+                // A provenance struct has 16 for the root, 8 for the label, and 40 for the hashmap.
+                // Each entry in the hashmap is 16 for the key, 8 for the provenance pointer, and
+                // 64 for each provenance struct. Total is 64+88n where n is the number of edges.
+                if let Some(id) = id {
+                    64 + 88 * id.edges().len() as u64
+                } else {
+                    unreachable!()
+                }
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    crate fn size_of_data(&self) -> u64 {
+        match *self {
+            Packet::Message { ref data, .. } => {
+                // Records(Vec<Record>) is 24 for the Vec. Each Record is 24+8=32 because 24 is
+                // the Vec<DataType> and 8 is to distinguish which enum it is, positive or
+                // negative. Each DataType is 16. Let k=3 be the number of data types in each
+                // record. Thus each Records is 24+(32+16k)n=24+80n
+                24 + 80 * data.len() as u64
+            },
+            _ => unreachable!(),
+        }
+    }
+
     crate fn trace(&self, event: PacketEvent) {
         if let Packet::Message {
             tracer: Some((tag, Some(ref sender))),

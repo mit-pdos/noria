@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use hdrhistogram::Histogram;
 use payload;
 use prelude::*;
 use std::collections::{HashMap, VecDeque};
@@ -23,6 +24,38 @@ pub struct Sharder {
     min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// The provenance of the last packet send to each node
     last_provenance: HashMap<ReplicaAddr, Provenance>,
+
+    /// Number of shards each message is sharded into by author id
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    shards_hist: Option<Histogram<u64>>,
+    /// Size of packet id in bytes
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    id_size_hist: Option<Histogram<u64>>,
+    /// Size of packet data in bytes
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    data_size_hist: Option<Histogram<u64>>,
+}
+
+impl Default for Sharder {
+    fn default() -> Sharder {
+        Sharder {
+            txs: Default::default(),
+            sharded: Default::default(),
+            shard_by: Default::default(),
+            min_provenance: Default::default(),
+            max_provenance: Default::default(),
+            updates: Default::default(),
+            payloads: Default::default(),
+            min_label_to_send: Default::default(),
+            last_provenance: Default::default(),
+            shards_hist: None,
+            id_size_hist: None,
+            data_size_hist: None,
+        }
+    }
 }
 
 impl Clone for Sharder {
@@ -39,6 +72,7 @@ impl Clone for Sharder {
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
+            ..Default::default()
         }
     }
 }
@@ -55,6 +89,7 @@ impl Sharder {
             payloads: Default::default(),
             min_label_to_send: Default::default(),
             last_provenance: Default::default(),
+            ..Default::default()
         }
     }
 
@@ -71,6 +106,7 @@ impl Sharder {
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
+            ..Default::default()
         }
 
     }
@@ -83,6 +119,10 @@ impl Sharder {
             self.insert_default_last_provenance(tx);
             self.txs.push((dst, tx));
         }
+        // ygina: ugh, just want to put this here so the histogram exists
+        self.shards_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
+        self.id_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
+        self.data_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
     }
 
     pub fn sharded_by(&self) -> usize {
@@ -161,6 +201,20 @@ impl Sharder {
             box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
             _ => unreachable!(),
         };
+
+        if !is_replay {
+            self.shards_hist.as_mut().unwrap().record(self.sharded.len() as u64).unwrap();
+            if self.shards_hist.as_ref().unwrap().len() == 100000 {
+                println!(
+                    "Num shards by author_id: [{}, {}, {}, {}]",
+                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.5),
+                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.95),
+                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.99),
+                    self.shards_hist.as_ref().unwrap().max(),
+                );
+            }
+        }
+
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
@@ -174,6 +228,30 @@ impl Sharder {
                 assert_eq!(label, diff.label());
                 self.last_provenance.get_mut(&addr).unwrap().apply_update(&diff);
                 *shard.id_mut() = Some(diff);
+
+                // Benchmark packet size if it is a message
+                if !is_replay {
+                    self.id_size_hist.as_mut().unwrap().record(shard.size_of_id()).unwrap();
+                    self.data_size_hist.as_mut().unwrap().record(shard.size_of_data()).unwrap();
+                    if self.id_size_hist.as_ref().unwrap().len() == 400000 {
+                        println!(
+                            "Size of packet id: [{}, {}, {}, {}]",
+                            self.id_size_hist.as_ref().unwrap().value_at_quantile(0.5),
+                            self.id_size_hist.as_ref().unwrap().value_at_quantile(0.95),
+                            self.id_size_hist.as_ref().unwrap().value_at_quantile(0.99),
+                            self.id_size_hist.as_ref().unwrap().max(),
+                        );
+                    }
+                    if self.data_size_hist.as_ref().unwrap().len() == 400000 {
+                        println!(
+                            "Size of packet data: [{}, {}, {}, {}]",
+                            self.data_size_hist.as_ref().unwrap().value_at_quantile(0.5),
+                            self.data_size_hist.as_ref().unwrap().value_at_quantile(0.95),
+                            self.data_size_hist.as_ref().unwrap().value_at_quantile(0.99),
+                            self.data_size_hist.as_ref().unwrap().max(),
+                        );
+                    }
+                }
 
                 // println!(
                 //     "SEND PACKET {} #{} -> D{}.{} {:?}",
