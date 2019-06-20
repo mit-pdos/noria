@@ -130,17 +130,6 @@ impl Egress {
             m.link_mut().src = unsafe { LocalNodeIndex::make(shard as u32) };
             m.link_mut().dst = tx.local;
 
-            // set the diff per child right before sending
-            let diff = self.last_provenance
-                .get(&tx.node)
-                .unwrap()
-                .diff(&self.max_provenance);
-            // TODO(ygina): is this valid if the sender domain just restarted? what if we
-            // are sending from an earlier point in time? uphold this assertion later.
-            assert_eq!(label, diff.label());
-            self.last_provenance.get_mut(&tx.node).unwrap().apply_update(&diff);
-            *m.id_mut() = Some(diff);
-
             println!(
                 "SEND PACKET {} #{} -> {} {:?}",
                 mtype,
@@ -234,7 +223,6 @@ impl Egress {
             _ => unreachable!(),
         };
 
-        // update packet id to include the correct label, provenance update, and from node.
         // replays don't get buffered and don't increment their label (they use the last label
         // sent by this domain - think of replays as a snapshot of what's already been sent).
         let label = if is_message {
@@ -242,15 +230,34 @@ impl Egress {
         } else {
             self.min_provenance.label() + self.payloads.len()
         };
-        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+
+        // Construct the provenance from the provenance of the incoming packet. In most cases
+        // we just add the label of the next packet to send of this domain as the root of the
+        // new provenance.
+        let mut update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, label, &[diff.clone()])
         } else {
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
+
+        // Keep a list of these updates in case a parent domain with multiple parents needs to be
+        // reconstructed, but only for messages and not replays. Buffer messages but not replays.
         if is_message {
+            // TODO(ygina): Might want to trim more efficiently with sharding, especially if we
+            // know it doesn't have to be trimmed.
+            self.updates.push(update.clone());
+            update.trim(PROVENANCE_DEPTH - 1);
+            *m.as_mut().unwrap().id_mut() = Some(update);
+            // buffer
             self.payloads.push(box m.as_ref().unwrap().clone_data());
-            self.updates.push(self.max_provenance.clone());
+        } else {
+            // TODO(ygina): Replays don't send just the linear path of the message, but the
+            // entire provenance. As evidenced below, the root only has one child, which seems
+            // insufficient, so I don't think this correctly considers replays.
+            update = self.max_provenance.clone();
+            update.trim(PROVENANCE_DEPTH - 1);
+            *m.as_mut().unwrap().id_mut() = Some(update);
         }
     }
 }
