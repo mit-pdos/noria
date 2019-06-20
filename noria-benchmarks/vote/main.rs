@@ -469,34 +469,34 @@ where
         }
 
         // send one write or read for the reserved key per batch
-        // let w_time_count = W_TIME_COUNT.clone();
-        // let mut w_time_count = w_time_count.lock().unwrap();
-        // if w_time_count.0.is_none() {
-        //     if queued_w.is_empty() && next_send.is_none() {
-        //         next_send = Some(now + max_batch_time);
-        //     }
-        //     // might mess up sojourn time
-        //     if queued_w.is_empty() {
-        //         queued_w_keys.push(RESERVED_W_KEY);
-        //         queued_w.push(now);
-        //     } else {
-        //         queued_w_keys[0] = RESERVED_W_KEY;
-        //     }
-        //     *w_time_count = (Some(now), w_time_count.1 + 1);
-        //     // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
-        // } else {
-        //     if queued_r.is_empty() && next_send.is_none() {
-        //         next_send = Some(now + max_batch_time);
-        //     }
-        //     // might mess up sojourn time
-        //     if queued_r.is_empty() {
-        //         queued_r_keys.push(RESERVED_R_KEY);
-        //         queued_r.push(now);
-        //     } else {
-        //         queued_r_keys[0] = RESERVED_R_KEY;
-        //     }
-        // }
-        // drop(w_time_count);
+        let w_time_count = W_TIME_COUNT.clone();
+        let mut w_time_count = w_time_count.lock().unwrap();
+        if w_time_count.0.is_none() {
+            if queued_w.is_empty() && next_send.is_none() {
+                next_send = Some(now + max_batch_time);
+            }
+            // might mess up sojourn time
+            if queued_w.is_empty() {
+                queued_w_keys.push(RESERVED_W_KEY);
+                queued_w.push(now);
+            } else {
+                queued_w_keys[0] = RESERVED_W_KEY;
+            }
+            *w_time_count = (Some(now), w_time_count.1 + 1);
+            // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
+        } else {
+            if queued_r.is_empty() && next_send.is_none() {
+                next_send = Some(now + max_batch_time);
+            }
+            // might mess up sojourn time
+            if queued_r.is_empty() {
+                queued_r_keys.push(RESERVED_R_KEY);
+                queued_r.push(now);
+            } else {
+                queued_r_keys[0] = RESERVED_R_KEY;
+            }
+        }
+        drop(w_time_count);
 
         // in case that took a while:
         let now = time::Instant::now();

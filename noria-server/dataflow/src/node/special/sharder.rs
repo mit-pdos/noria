@@ -83,7 +83,7 @@ impl Clone for Sharder {
     }
 }
 
-const CHECK_EVERY: u64 = 100_000;
+const CHECK_EVERY: u64 = 500_000;
 
 impl Sharder {
     pub fn new(by: usize) -> Self {
@@ -219,15 +219,6 @@ impl Sharder {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
                 shard.link_mut().dst = dst;
-
-                // set the diff per child right before sending
-                let diff = self.last_provenance
-                    .get(&addr)
-                    .unwrap()
-                    .diff(&self.max_provenance);
-                assert_eq!(label, diff.label());
-                self.last_provenance.get_mut(&addr).unwrap().apply_update(&diff);
-                *shard.id_mut() = Some(diff);
 
                 // Benchmark packet size if it is a message
                 if !is_replay {
@@ -386,29 +377,48 @@ impl Sharder {
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
         // sharders are unsharded
         let from = (from, 0);
-        let is_replay = match m {
-            Some(box Packet::ReplayPiece { .. }) => true,
-            Some(box Packet::Message { .. }) => false,
+        let is_message = match m {
+            Some(box Packet::Message { .. }) => true,
+            Some(box Packet::ReplayPiece { .. }) => false,
+            Some(box Packet::EvictKeys { .. }) => false,
             _ => unreachable!(),
         };
 
-        // update packet id to include the correct label, provenance update, and from node.
         // replays don't get buffered and don't increment their label (they use the last label
         // sent by this domain - think of replays as a snapshot of what's already been sent).
-        let label = if is_replay {
-            self.min_provenance.label() + self.payloads.len()
-        } else {
+        let label = if is_message {
             self.min_provenance.label() + self.payloads.len() + 1
+        } else {
+            self.min_provenance.label() + self.payloads.len()
         };
-        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+
+        // Construct the provenance from the provenance of the incoming packet. In most cases
+        // we just add the label of the next packet to send of this domain as the root of the
+        // new provenance.
+        let mut update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, label, &[diff.clone()])
         } else {
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
-        if !is_replay {
+
+        // Keep a list of these updates in case a parent domain with multiple parents needs to be
+        // reconstructed, but only for messages and not replays. Buffer messages but not replays.
+        if is_message {
+            // TODO(ygina): Might want to trim more efficiently with sharding, especially if we
+            // know it doesn't have to be trimmed.
+            self.updates.push(update.clone());
+            update.trim(PROVENANCE_DEPTH - 1);
+            *m.as_mut().unwrap().id_mut() = Some(update);
+            // buffer
             self.payloads.push(box m.as_ref().unwrap().clone_data());
-            self.updates.push(self.max_provenance.clone());
+        } else {
+            // TODO(ygina): Replays don't send just the linear path of the message, but the
+            // entire provenance. As evidenced below, the root only has one child, which seems
+            // insufficient, so I don't think this correctly considers replays.
+            update = self.max_provenance.clone();
+            update.trim(PROVENANCE_DEPTH - 1);
+            *m.as_mut().unwrap().id_mut() = Some(update);
         }
     }
 }
