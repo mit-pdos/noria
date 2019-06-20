@@ -1438,6 +1438,7 @@ dependencies = [
  "tokio 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-sync 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tower 0.1.1 (git+https://github.com/tower-rs/tokio-tower.git?branch=tokio-trace)",
+ "tokio-trace 0.1.0 (git+https://github.com/tokio-rs/tokio)",
  "tower 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-balance 0.1.0 (git+https://github.com/tower-rs/tower.git)",
  "tower-buffer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1528,6 +1529,8 @@ dependencies = [
  "tokio-sync 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-threadpool 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tower 0.1.1 (git+https://github.com/tower-rs/tokio-tower.git)",
+ "tokio-trace 0.1.0 (git+https://github.com/tokio-rs/tokio)",
+ "tokio-trace-fmt 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery.git)",
  "toml 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-util 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2659,7 +2662,7 @@ dependencies = [
 [[package]]
 name = "tokio-tower"
 version = "0.1.1"
-source = "git+https://github.com/tower-rs/tokio-tower.git?branch=tokio-trace#d0877324050d49aff930610309102f1cce06545a"
+source = "git+https://github.com/tower-rs/tokio-tower.git?branch=tokio-trace#ee7b46cf65c22ec26687595793742e97e015fef0"
 dependencies = [
  "crossbeam 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2685,6 +2688,20 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tokio-trace-fmt"
+version = "0.1.0"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery.git#7b88fe9e44ef5f85203b34a06b5ceb0ef18b2dcc"
+dependencies = [
+ "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-trace-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3447,6 +3464,7 @@ dependencies = [
 "checksum tokio-tower 0.1.1 (git+https://github.com/tower-rs/tokio-tower.git?branch=tokio-trace)" = "<none>"
 "checksum tokio-trace 0.1.0 (git+https://github.com/tokio-rs/tokio)" = "<none>"
 "checksum tokio-trace-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a9c8a256d6956f7cb5e2bdfe8b1e8022f1a09206c6c2b1ba00f3b746b260c613"
+"checksum tokio-trace-fmt 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery.git)" = "<none>"
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
 "checksum toml 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b8c96d7873fa7ef8bdeb3a9cda3ac48389b4154f32b9803b4bc26220b677b039"
