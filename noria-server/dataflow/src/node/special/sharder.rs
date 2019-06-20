@@ -2,6 +2,7 @@ use fnv::FnvHashMap;
 use hdrhistogram::Histogram;
 use payload;
 use prelude::*;
+use std::time;
 use std::collections::{HashMap, VecDeque};
 use vec_map::VecMap;
 
@@ -37,6 +38,10 @@ pub struct Sharder {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     data_size_hist: Option<Histogram<u64>>,
+    /// Time the sharder started existing
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    start: Option<time::Instant>,
 }
 
 impl Default for Sharder {
@@ -54,6 +59,7 @@ impl Default for Sharder {
             shards_hist: None,
             id_size_hist: None,
             data_size_hist: None,
+            start: None,
         }
     }
 }
@@ -76,6 +82,8 @@ impl Clone for Sharder {
         }
     }
 }
+
+const CHECK_EVERY: u64 = 100_000;
 
 impl Sharder {
     pub fn new(by: usize) -> Self {
@@ -123,6 +131,7 @@ impl Sharder {
         self.shards_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
         self.id_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
         self.data_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
+        self.start = Some(time::Instant::now());
     }
 
     pub fn sharded_by(&self) -> usize {
@@ -204,15 +213,6 @@ impl Sharder {
 
         if !is_replay {
             self.shards_hist.as_mut().unwrap().record(self.sharded.len() as u64).unwrap();
-            if self.shards_hist.as_ref().unwrap().len() == 100000 {
-                println!(
-                    "Num shards by author_id: [{}, {}, {}, {}]",
-                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.5),
-                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.95),
-                    self.shards_hist.as_ref().unwrap().value_at_quantile(0.99),
-                    self.shards_hist.as_ref().unwrap().max(),
-                );
-            }
         }
 
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
@@ -233,7 +233,23 @@ impl Sharder {
                 if !is_replay {
                     self.id_size_hist.as_mut().unwrap().record(shard.size_of_id()).unwrap();
                     self.data_size_hist.as_mut().unwrap().record(shard.size_of_data()).unwrap();
-                    if self.id_size_hist.as_ref().unwrap().len() == 400000 {
+                    let total = self.id_size_hist.as_ref().unwrap().len();
+                    if total % CHECK_EVERY == 0 {
+                        let now = time::Instant::now();
+                        let dur = now.duration_since(self.start.unwrap()) / 1_000;
+                        let total_unsharded = self.shards_hist.as_ref().unwrap().len();
+                        println!(
+                            "Sent {} unsharded messages in {:?} for {:?} messages / ms",
+                            total_unsharded,
+                            dur,
+                            (total_unsharded as u128) / dur.as_millis(),
+                        );
+                        println!(
+                            "Sent {} sharded messages in {:?} for {:?} messages / ms",
+                            total,
+                            dur,
+                            (total as u128) / dur.as_millis(),
+                        );
                         println!(
                             "Size of packet id: [{}, {}, {}, {}]",
                             self.id_size_hist.as_ref().unwrap().value_at_quantile(0.5),
@@ -241,14 +257,19 @@ impl Sharder {
                             self.id_size_hist.as_ref().unwrap().value_at_quantile(0.99),
                             self.id_size_hist.as_ref().unwrap().max(),
                         );
-                    }
-                    if self.data_size_hist.as_ref().unwrap().len() == 400000 {
                         println!(
                             "Size of packet data: [{}, {}, {}, {}]",
                             self.data_size_hist.as_ref().unwrap().value_at_quantile(0.5),
                             self.data_size_hist.as_ref().unwrap().value_at_quantile(0.95),
                             self.data_size_hist.as_ref().unwrap().value_at_quantile(0.99),
                             self.data_size_hist.as_ref().unwrap().max(),
+                        );
+                        println!(
+                            "Num shards by author_id: [{}, {}, {}, {}]",
+                            self.shards_hist.as_ref().unwrap().value_at_quantile(0.5),
+                            self.shards_hist.as_ref().unwrap().value_at_quantile(0.95),
+                            self.shards_hist.as_ref().unwrap().value_at_quantile(0.99),
+                            self.shards_hist.as_ref().unwrap().max(),
                         );
                     }
                 }
