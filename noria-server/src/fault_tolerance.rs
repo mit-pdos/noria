@@ -619,7 +619,7 @@ fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
     for i in 0..4 {
-        let worker = build_authority(authority.clone(), Some(3), false);
+        let worker = build_authority(authority.clone(), Some(3), i == 0);
         workers.push(worker);
     }
     sleep();
@@ -640,36 +640,53 @@ fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
 
 #[test]
 fn vote_sharding() {
-    let (workers, mut a, mut v, mut q) = setup_vote_sharding();
+    let (mut workers, mut a, mut v, mut q) = setup_vote_sharding();
 
     // articles 1-9
     // users 1-9 * 10
     // authors 1-9 * 100
-    println!("insert article 1");
+    println!("check 1: insert articles");
     a.insert(vec![1i64.into(), 100i64.into()]).unwrap();
-    sleep();
-    println!("insert article 2");
     a.insert(vec![2i64.into(), 100i64.into()]).unwrap();
-    sleep();
-    println!("insert article 3");
     a.insert(vec![3i64.into(), 200i64.into()]).unwrap();
     sleep();
 
+    println!("check 2: vote for each article once");
     let articles_to_vote = vec![1i64, 2, 3];
     for article in articles_to_vote {
-        println!("insert vote");
         v.insert(vec![article.into(), 10.into()]).unwrap();
         sleep();
     }
 
-    println!("lookup");
-    let res = q.lookup(&[100i64.into()], true).unwrap();
-    println!("lookup res: {:?}", res);
-
-    println!("vote again");
-    v.insert(vec![1.into(), 10.into()]).unwrap();
+    println!("check 3: initialize replay pieces");
+    assert_eq!(q.lookup(&[100i64.into()], true).unwrap()[0][1], 2.into());
+    assert_eq!(q.lookup(&[200i64.into()], true).unwrap()[0][1], 1.into());
+    println!("check 4: vote after initialization");
+    v.insert(vec![1i64.into(), 10.into()]).unwrap();
     sleep();
 
-    loop {}
+    // shutdown the worker with the shard merger and sharder
+    println!("check 5: drop worker 3");
+    let worker = workers.remove(3);
+    drop(worker);
+    thread::sleep(Duration::from_secs(3));
+
+    // vote again before recovery
+    println!("check 6: vote again before recovery");
+    let articles_to_vote = vec![1i64, 2, 3];
+    for article in articles_to_vote {
+        v.insert(vec![article.into(), 10.into()]).unwrap();
+        sleep();
+    }
+
+    println!("check 7: wait for recovery");
+    thread::sleep(Duration::from_secs(8));
+    println!("check 8: send votes after recovery");
+    v.insert(vec![1i64.into(), 10.into()]).unwrap();
+    sleep();
+    println!("check 9: lookup after recovery");
+    assert_eq!(q.lookup(&[100i64.into()], true).unwrap()[0][1], 6.into());
+    assert_eq!(q.lookup(&[200i64.into()], true).unwrap()[0][1], 2.into());
+
     println!("success! now clean shutdown...");
 }
