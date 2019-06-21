@@ -212,7 +212,11 @@ impl Sharder {
         };
 
         if !is_replay {
-            self.shards_hist.as_mut().unwrap().record(self.sharded.len() as u64).unwrap();
+            let h = self.shards_hist.as_mut().unwrap();
+            if h.record(self.sharded.len() as u64).is_err() {
+                let m = h.high();
+                h.record(m).unwrap();
+            }
         }
 
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
@@ -222,8 +226,16 @@ impl Sharder {
 
                 // Benchmark packet size if it is a message
                 if !is_replay {
-                    self.id_size_hist.as_mut().unwrap().record(shard.size_of_id()).unwrap();
-                    self.data_size_hist.as_mut().unwrap().record(shard.size_of_data()).unwrap();
+                    let h = self.id_size_hist.as_mut().unwrap();
+                    if h.record(shard.size_of_id()).is_err() {
+                        let m = h.high();
+                        h.record(m).unwrap();
+                    }
+                    let h = self.data_size_hist.as_mut().unwrap();
+                    if h.record(shard.size_of_data()).is_err() {
+                        let m = h.high();
+                        h.record(m).unwrap();
+                    }
                     let total = self.id_size_hist.as_ref().unwrap().len();
                     if total % CHECK_EVERY == 0 {
                         let now = time::Instant::now();
