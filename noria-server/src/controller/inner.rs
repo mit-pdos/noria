@@ -1789,7 +1789,7 @@ impl ControllerInner {
         let mut nodes: HashMap<(DomainIndex, usize), _> = HashMap::new();
         for ni in ingredients.node_indices() {
             let node = &ingredients[ni];
-            if !node.has_domain() || node.is_ingress() || node.is_egress() {
+            if !node.has_domain() || node.is_ingress() || node.is_egress() || node.is_dropped() {
                 continue;
             }
 
