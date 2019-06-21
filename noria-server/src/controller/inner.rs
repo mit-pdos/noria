@@ -954,24 +954,26 @@ impl ControllerInner {
         new_incoming: ReplicaAddr,
         old_incoming: Option<ReplicaAddr>,
     ) {
-        /*
         let old_incoming = old_incoming.unwrap_or(new_incoming);
 
         debug!(
             self.log,
-            "notifying domain {} of new incoming connection",
-            to.index();
-            "old" => old_incoming.index(),
-            "new" => new_incoming.index(),
+            "notifying domain {}.{} of new incoming connection {}.{} to replace {}.{}",
+            to.0.index(),
+            to.1,
+            old_incoming.0.index(),
+            old_incoming.1,
+            new_incoming.0.index(),
+            new_incoming.1,
         );
 
-        let dh = self.domains.get_mut(&to).unwrap();
+        let (domain, shard) = to;
+        let dh = self.domains.get_mut(&domain).unwrap();
         let m = box Packet::NewIncoming {
             old: old_incoming,
             new: new_incoming,
         };
-        dh.send_to_healthy(m, &self.workers).unwrap();
-        */
+        dh.send_to_healthy_shard(shard, m, &self.workers).unwrap();
     }
 
     fn handle_failed_workers(&mut self, wis: Vec<WorkerIdentifier>) {

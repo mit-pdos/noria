@@ -257,8 +257,8 @@ pub enum Packet {
 
     /// Notify downstream nodes of an incoming connection to replace an existing one
     NewIncoming {
-        old: DomainIndex,
-        new: DomainIndex,
+        old: ReplicaAddr,
+        new: ReplicaAddr,
     },
 
     /// Notify the domain to resume sending messages to its children from the given packet labels

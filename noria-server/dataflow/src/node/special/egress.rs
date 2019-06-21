@@ -188,7 +188,7 @@ impl Egress {
         self.last_provenance.insert(ni, p);
     }
 
-    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
+    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
         if self.min_provenance.new_incoming(old, new) {
             /*
             // Remove the old domain from the updates entirely
@@ -209,10 +209,6 @@ impl Egress {
         } else {
             // Regenerated domains should have the same index
         }
-    }
-
-    pub fn get_last_provenance(&self) -> &Provenance {
-        &self.max_provenance
     }
 
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {

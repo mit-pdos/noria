@@ -286,7 +286,7 @@ impl Reader {
         self.max_provenance = self.min_provenance.clone();
     }
 
-    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) {
+    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
         if self.min_provenance.new_incoming(old, new) {
             /*
             // Remove the old domain from the updates entirely
@@ -300,10 +300,6 @@ impl Reader {
             // Regenerated domains should have the same index
         }
 
-    }
-
-    pub fn get_last_provenance(&self) -> &Provenance {
-        &self.max_provenance
     }
 
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {

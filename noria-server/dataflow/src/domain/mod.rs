@@ -1281,7 +1281,7 @@ impl Domain {
                                     .with_egress(|e| (
                                         e.min_provenance.label(),
                                         e.payloads.len(),
-                                        e.get_last_provenance().into_debug(),
+                                        e.max_provenance.into_debug(),
                                     ))
                             },
                             DomainExitType::Sharder => {
@@ -1293,7 +1293,7 @@ impl Domain {
                                     .with_reader(|r| (
                                         r.min_provenance.label(),
                                         r.num_payloads,
-                                        r.get_last_provenance().into_debug(),
+                                        r.max_provenance.into_debug(),
                                     ))
                                     .unwrap()
                             },
@@ -1452,14 +1452,14 @@ impl Domain {
                         }
                     },
                     Packet::NewIncoming { old, new } => {
-                        /*
-                        println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
+                        println!("D{}.{}: NewIncoming old {}.{} new {}.{}", self.index.index(), self.shard.unwrap_or(0), old.0.index(), old.1, new.0.index(), new.1);
                         debug!(
                             self.log,
-                            "updated incoming connection to domain {}",
-                            self.index.index();
-                            "old" => old.index(),
-                            "new" => new.index(),
+                            "updated incoming connection to domain {}.{}",
+                            self.index.index(),
+                            self.shard.unwrap_or(0);
+                            "old" => old.0.index(),
+                            "new" => new.0.index(),
                         );
 
                         // tell the controller all the provenance information stored in this domain
@@ -1470,25 +1470,28 @@ impl Domain {
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        e.get_last_provenance().subgraph(new).clone()
+                                        e.max_provenance.subgraph(new).clone()
                                     })
                             },
                             DomainExitType::Sharder => {
-                                unimplemented!();
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_sharder_mut(|s| {
+                                        s.new_incoming(old, new);
+                                        s.max_provenance.subgraph(new).clone()
+                                    })
                             },
                             DomainExitType::Reader => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
-                                        r.get_last_provenance().subgraph(new).clone()
+                                        r.max_provenance.subgraph(new).clone()
                                     })
                                     .unwrap()
                             }
                         };
                         executor.ack_new_incoming(self.index, *provenance);
-                        */
-                        unimplemented!()
                     },
                     Packet::ResumeAt { child_labels } => {
                         println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);

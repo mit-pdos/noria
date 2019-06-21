@@ -275,6 +275,29 @@ impl Sharder {
         self.max_provenance = self.min_provenance.clone();
     }
 
+    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+        if self.min_provenance.new_incoming(old, new) {
+            /*
+            // Remove the old domain from the updates entirely
+            for update in self.updates.iter_mut() {
+                if update.len() == 0 {
+                    panic!(format!(
+                        "empty update: {:?}, old: {}, new: {}",
+                        self.updates,
+                        old.index(),
+                        new.index(),
+                    ));
+                }
+                assert_eq!(update[0].0, old);
+                update.remove(0);
+            }
+            */
+            unimplemented!();
+        } else {
+            // Regenerated domains should have the same index
+        }
+    }
+
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
         // sharders are unsharded
         let from = (from, 0);

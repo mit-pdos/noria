@@ -176,9 +176,7 @@ impl Provenance {
     }
 
     /// Returns whether a replica failed. :P
-    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
-        unimplemented!();
-        /*
+    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
 
         if let Some(new_p) = provenance.edges.remove(&new){
@@ -195,7 +193,6 @@ impl Provenance {
             self.edges.insert(new, provenance);
             false
         }
-        */
     }
 
     /// Subgraph of this provenance graph with the given domain as the new root. The new root must
