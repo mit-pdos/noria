@@ -519,7 +519,7 @@ impl ControllerInner {
                 domain_as.insert((domain_a, shard));
             }
 
-            let m = box Packet::RemoveChild { child: ingress_b1, domain: domain_b1.0 };
+            let m = box Packet::RemoveChild { addr: domain_b1 };
             self.domains
                 .get_mut(&domain_a)
                 .unwrap()

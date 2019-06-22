@@ -253,11 +253,11 @@ const PROVENANCE_DEPTH: usize = 3;
 // fault tolerance
 impl Sharder {
     // We initially have sent nothing to each node. Diffs are one depth shorter.
-    fn insert_default_last_provenance(&mut self, tx: ReplicaAddr) {
+    fn insert_default_last_provenance(&mut self, addr: ReplicaAddr) {
         let mut p = self.min_provenance.clone();
         p.trim(PROVENANCE_DEPTH - 1);
         p.zero();
-        self.last_provenance.insert(tx, p);
+        self.last_provenance.insert(addr, p);
     }
 
     pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {

@@ -24,9 +24,9 @@ pub struct Egress {
     pub(crate) payloads: Vec<Box<Packet>>,
 
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
-    min_label_to_send: HashMap<NodeIndex, usize>,
+    min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// The provenance of the last packet send to each node
-    last_provenance: HashMap<NodeIndex, Provenance>,
+    last_provenance: HashMap<ReplicaAddr, Provenance>,
 }
 
 impl Clone for Egress {
@@ -64,8 +64,8 @@ impl Egress {
             local: dst_l,
             dest: addr,
         });
-        self.min_label_to_send.insert(dst_g, 1);
-        self.insert_default_last_provenance(dst_g);
+        self.min_label_to_send.insert(addr, 1);
+        self.insert_default_last_provenance(addr);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -78,7 +78,7 @@ impl Egress {
         label: usize,
         shard: usize,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-        to_nodes: &HashSet<NodeIndex>,
+        to_addrs: &HashSet<ReplicaAddr>,
     ) {
         let &mut Self {
             ref mut txs,
@@ -97,10 +97,10 @@ impl Egress {
         // 1) it is requested
         // 2) the egress knows about it (in min_label_to_send)
         // 3) the message has a label at least the min label to send, unless it's a replay
-        let to_nodes = to_nodes
+        let to_addrs = to_addrs
             .iter()
-            .filter(|ni| {
-                if let Some(min_label) = min_label_to_send.get(ni) {
+            .filter(|addr| {
+                if let Some(min_label) = min_label_to_send.get(addr) {
                     !is_message || label >= *min_label
                 } else {
                     false
@@ -110,9 +110,9 @@ impl Egress {
 
         // send any queued updates to all external children
         assert!(!txs.is_empty());
-        let mut sends_left = to_nodes.len();
+        let mut sends_left = to_addrs.len();
         for (_, ref mut tx) in txs.iter_mut().enumerate() {
-            if !to_nodes.contains(&&tx.node) {
+            if !to_addrs.contains(&&tx.dest) {
                 continue;
             }
 
@@ -131,16 +131,17 @@ impl Egress {
             m.link_mut().dst = tx.local;
 
             println!(
-                "SEND PACKET {} #{} -> {} {:?}",
+                "SEND PACKET {} #{} -> D{}.{} {:?}",
                 mtype,
                 label,
-                tx.node.index(),
+                tx.dest.0.index(),
+                tx.dest.1,
                 m.id().as_ref().unwrap(),
             );
 
             // TODO(ygina): don't clone the last send
             output.entry(tx.dest).or_default().push_back(m);
-            if to_nodes.len() == 1 {
+            if to_addrs.len() == 1 {
                 break;
             }
         }
@@ -150,15 +151,15 @@ impl Egress {
 // fault tolerance
 impl Egress {
     /// Stop sending messages to this child.
-    pub fn remove_child(&mut self, child: NodeIndex) {
+    pub fn remove_child(&mut self, addr: ReplicaAddr) {
         for i in 0..self.txs.len() {
-            if self.txs[i].node == child {
+            if self.txs[i].dest == addr {
                 self.txs.swap_remove(i);
                 break;
             }
         }
 
-        self.min_label_to_send.remove(&child);
+        self.min_label_to_send.remove(&addr);
     }
 
     pub fn remove_tag(&mut self, tag: Tag) {
@@ -181,11 +182,11 @@ impl Egress {
     }
 
     // We initially have sent nothing to each node. Diffs are one depth shorter.
-    fn insert_default_last_provenance(&mut self, ni: NodeIndex) {
+    fn insert_default_last_provenance(&mut self, addr: ReplicaAddr) {
         let mut p = self.min_provenance.clone();
         p.trim(PROVENANCE_DEPTH - 1);
         p.zero();
-        self.last_provenance.insert(ni, p);
+        self.last_provenance.insert(addr, p);
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
@@ -287,18 +288,20 @@ impl Egress {
         let send_to = m.as_ref().unwrap().tag().map(|tag| {
             self.tags.get(&tag).unwrap()
         });
-        let to_nodes = if let Some(ni) = send_to {
+        let to_addrs = if let Some(ni) = send_to {
             assert!(!is_message);
-            let mut set = HashSet::new();
-            set.insert(*ni);
-            set
+            self.txs
+                .iter()
+                .filter(|tx| tx.node == *ni)
+                .map(|tx| tx.dest)
+                .collect::<HashSet<_>>()
         } else {
             assert!(is_message);
-            self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
+            self.txs.iter().map(|tx| tx.dest).collect::<HashSet<_>>()
         };
 
         // finally, send the message
-        self.process(m, self.max_provenance.label(), shard, output, &to_nodes);
+        self.process(m, self.max_provenance.label(), shard, output, &to_addrs);
     }
 
     /// Set the minimum label of the provenance, which represents the label of the first
@@ -325,22 +328,22 @@ impl Egress {
     /// Resume sending messages to these children at the given labels.
     pub fn resume_at(
         &mut self,
-        node_labels: Vec<(NodeIndex, usize)>,
+        addr_labels: Vec<(ReplicaAddr, usize)>,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         let mut min_label = std::usize::MAX;
-        for &(node, label) in &node_labels {
+        for &(addr, label) in &addr_labels {
             // calculate the min label
             if label < min_label {
                 min_label = label;
             }
             // don't duplicate sent messages
-            self.min_label_to_send.insert(node, label);
+            self.min_label_to_send.insert(addr, label);
         }
 
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
-        for &(_, label) in &node_labels {
+        for &(_, label) in &addr_labels {
             // we don't have the messages we need to send
             // we must have lost a stateless domain
             if label > next_label {
@@ -371,9 +374,9 @@ impl Egress {
             let update = &self.updates[i];
             self.max_provenance.apply_update(update);
         }
-        for &(node, label) in &node_labels {
-            println!("RESUME [#{}, #{}) -> {:?}", label, next_label, node.index());
-            self.insert_default_last_provenance(node);
+        for &(addr, label) in &addr_labels {
+            println!("RESUME [#{}, #{}) -> D{}.{}", label, next_label, addr.0.index(), addr.1);
+            self.insert_default_last_provenance(addr);
         }
 
         // Resend all messages from the minimum label.
@@ -385,11 +388,11 @@ impl Egress {
 
             // Who would this message normally be sent to?
             let replay_to = m.tag().map(|tag| self.tags.get(&tag).unwrap());
-            let to_nodes = if let Some(_) = replay_to {
+            let to_addrs = if let Some(_) = replay_to {
                 // TODO(ygina): may be more selective with sharding
                 unreachable!()
             } else {
-                self.txs.iter().map(|tx| tx.node).collect::<HashSet<NodeIndex>>()
+                self.txs.iter().map(|tx| tx.dest).collect::<HashSet<_>>()
             };
 
             self.process(
@@ -397,7 +400,7 @@ impl Egress {
                 label,
                 on_shard.unwrap_or(0),
                 output,
-                &to_nodes,
+                &to_addrs,
             );
         }
     }

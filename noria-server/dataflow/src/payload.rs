@@ -245,8 +245,7 @@ pub enum Packet {
 
     /// Tell the node to stop sending messages to this child
     RemoveChild {
-        child: NodeIndex,
-        domain: DomainIndex,
+        addr: ReplicaAddr,
     },
 
     /// Remove the replay path corresponding to the tag in the domain
@@ -263,7 +262,7 @@ pub enum Packet {
 
     /// Notify the domain to resume sending messages to its children from the given packet labels
     ResumeAt {
-        child_labels: Vec<(NodeIndex, usize)>,
+        addr_labels: Vec<(ReplicaAddr, usize)>,
     },
 }
 

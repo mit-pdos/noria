@@ -1404,14 +1404,14 @@ impl Domain {
                         */
                         unimplemented!();
                     },
-                    Packet::RemoveChild { child, domain } => {
+                    Packet::RemoveChild { addr } => {
                         let node = &self.nodes[self.exit_ni];
-                        println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
+                        println!("D{}.{}: RemoveChild {:?} -> D{}.{}", self.index.index(), self.shard.unwrap_or(0), node.borrow().global_addr(), addr.0.index(), addr.1);
 
                         match self.exit_type {
                             DomainExitType::Egress => {
                                 // Prevent the egress node from sending messages to the node
-                                node.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+                                node.borrow_mut().with_egress_mut(|e| e.remove_child(addr));
                             },
                             DomainExitType::Sharder => {
                                 unimplemented!();
@@ -1422,7 +1422,7 @@ impl Domain {
                         }
 
                         // Tell the replica to uncache the sender
-                        executor.uncache_domain(domain);
+                        executor.uncache_domain(addr.0);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
                         println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
@@ -1493,8 +1493,8 @@ impl Domain {
                         };
                         executor.ack_new_incoming(self.index, *provenance);
                     },
-                    Packet::ResumeAt { child_labels } => {
-                        println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
+                    Packet::ResumeAt { addr_labels } => {
+                        println!("D{}: ResumeAt {:?}", self.index.index(), addr_labels);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
@@ -1505,7 +1505,7 @@ impl Domain {
                             self.log,
                             "resuming messages from {} to {:?}",
                             node.borrow().global_addr().index(),
-                            child_labels;
+                            addr_labels;
                         );
 
                         match self.exit_type {
@@ -1516,7 +1516,7 @@ impl Domain {
                                     // that will get a ResumeAt in response to acking this
                                     // ResumeAt. we won't set the min_label here, letting some
                                     // other process take truncate logs.
-                                    e.resume_at(child_labels, self.shard, sends);
+                                    e.resume_at(addr_labels, self.shard, sends);
                                 });
                             },
                             DomainExitType::Sharder => {
