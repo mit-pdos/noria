@@ -1491,7 +1491,10 @@ impl Domain {
                                     .unwrap()
                             }
                         };
-                        executor.ack_new_incoming(self.index, *provenance);
+                        executor.ack_new_incoming(
+                            (self.index, self.shard.unwrap_or(0)),
+                            *provenance,
+                        );
                     },
                     Packet::ResumeAt { addr_labels } => {
                         println!("D{}: ResumeAt {:?}", self.index.index(), addr_labels);
@@ -1503,8 +1506,9 @@ impl Domain {
                         let node = &self.nodes[self.exit_ni];
                         debug!(
                             self.log,
-                            "resuming messages from {} to {:?}",
-                            node.borrow().global_addr().index(),
+                            "resuming messages from D{}.{} to {:?}",
+                            self.index.index(),
+                            self.shard.unwrap_or(0),
                             addr_labels;
                         );
 
@@ -1520,7 +1524,9 @@ impl Domain {
                                 });
                             },
                             DomainExitType::Sharder => {
-                                unimplemented!();
+                                node.borrow_mut().with_sharder_mut(|s| {
+                                    s.resume_at(addr_labels, self.shard, sends);
+                                });
                             },
                             DomainExitType::Reader => {
                                 unreachable!();
@@ -1549,7 +1555,7 @@ impl Domain {
                         // of any upstream ResumeAts if, for example, this domain does not have
                         // any messages buffered.
                         // TODO(ygina): more complicated index for joins, possibly filters
-                        executor.ack_resume_at(self.index);
+                        executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
                     _ => unreachable!(),
                 }

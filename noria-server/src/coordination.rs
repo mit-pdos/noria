@@ -44,14 +44,14 @@ pub enum CoordinationPayload {
     /// Ack NewIncoming to start sending ResumeAts.
     AckNewIncoming {
         /// Who the ack is from.
-        from: DomainIndex,
+        from: ReplicaAddr,
         /// Provenance needed to recover the failed subgraph above this domain.
         provenance: Provenance,
     },
     /// Ack ResumeAt so the controller knows who is still waiting for whom.
     AckResumeAt {
         /// Who the ack is from.
-        from: DomainIndex,
+        from: ReplicaAddr,
     },
 }
 

@@ -161,6 +161,7 @@ impl Sharder {
             box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
             _ => unreachable!(),
         };
+
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
                 shard.link_mut().src = index;
@@ -296,6 +297,51 @@ impl Sharder {
         } else {
             // Regenerated domains should have the same index
         }
+    }
+
+    /// Resume sending messages to these children at the given labels.
+    pub fn resume_at(
+        &mut self,
+        addr_labels: Vec<(ReplicaAddr, usize)>,
+        on_shard: Option<usize>,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        let mut min_label = std::usize::MAX;
+        for &(addr, label) in &addr_labels {
+            // calculate the min label
+            if label < min_label {
+                min_label = label;
+            }
+            // don't duplicate sent messages
+            self.min_label_to_send.insert(addr, label);
+        }
+
+        let next_label = self.min_provenance.label() + self.payloads.len() + 1;
+        for &(_, label) in &addr_labels {
+            // we don't have the messages we need to send
+            // we must have lost a stateless domain
+            if label > next_label {
+                println!("{} > {}", label, next_label);
+                assert!(self.payloads.is_empty());
+                assert!(self.updates.is_empty());
+                self.min_provenance.set_label(min_label - 1);
+                self.max_provenance.set_label(min_label - 1);
+                return;
+            }
+            // if this is a stateless domain that was just regenerated, then it must not have sent
+            // any messages at all. otherwise, it just means no new messages were sent since the
+            // connection went down. only return in the first case since other children might not
+            // be as up to date.
+            if label == next_label && label == 1 {
+                println!("{} == {}", label, next_label);
+                return;
+            }
+        }
+
+        // If we made it this far, it means we have all the messages we need to send (assuming
+        // log truncation works correctly). Roll back provenance state to the minimum label and
+        // replay each message and diff as if they were just received.
+        unimplemented!();
     }
 
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {

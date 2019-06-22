@@ -1037,8 +1037,7 @@ impl ControllerInner {
         Ok(())
     }
 
-    pub(crate) fn handle_ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
-        /*
+    pub(crate) fn handle_ack_new_incoming(&mut self, from: ReplicaAddr, provenance: Provenance) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
 
         // Continue until there is no intersection between the provenance information we know
@@ -1083,12 +1082,9 @@ impl ControllerInner {
 
         // We're no longer waiting on the node that acked the NewIncoming message
         self.handle_ack_resume_at(from);
-        */
-        unimplemented!();
     }
 
-    pub(crate) fn handle_ack_resume_at(&mut self, from: DomainIndex) {
-        /*
+    pub(crate) fn handle_ack_resume_at(&mut self, from: ReplicaAddr) {
         // Update waiting on lists of nodes that were waiting on "from"
         let mut empty = vec![];
         for (waiting, on) in self.waiting_on.iter_mut() {
@@ -1101,39 +1097,21 @@ impl ControllerInner {
         // If those nodes aren't waiting on anyone else, send ResumeAts to them. Send ResumeAt
         // information for all nodes in a single message so the sender domain can update its
         // state atomically.
-        for domain in empty {
-            assert!(self.waiting_on.remove(&domain).is_some());
-
-            // Get the child ingress nodes of the egress in this domain.
-            // TODO(ygina): is this info cached somewhere?
-            let egress = self.ingredients
-                .node_indices()
-                .filter(|&ni| !self.ingredients[ni].is_source())
-                .filter(|&ni| self.ingredients[ni].domain() == domain)
-                .filter(|&ni| self.ingredients[ni].is_egress())
-                .collect::<Vec<_>>();
-            assert_eq!(egress.len(), 1);
-            let domain_ingress = self.ingredients
-                .neighbors_directed(egress[0], petgraph::EdgeDirection::Outgoing)
-                .filter(|&ni| self.ingredients[ni].is_ingress())
-                .map(|ni| (self.ingredients[ni].domain(), ni))
-                .collect::<HashMap<_, _>>();
+        for addr in empty {
+            assert!(self.waiting_on.remove(&addr).is_some());
 
             // Convert the indexed resume at information into ResumeAt messages.
-            let child_labels = self.resume_ats
-                .remove(&domain)
-                .unwrap()
-                .iter()
-                .map(|(child_d, label)| (*domain_ingress.get(child_d).unwrap(), *label))
-                .collect::<Vec<_>>();
-            let m = box Packet::ResumeAt { child_labels };
+            let m = box Packet::ResumeAt {
+                addr_labels: self.resume_ats.remove(&addr).unwrap(),
+            };
 
             // Send the message!
-            let dh = self.domains.get_mut(&domain).unwrap();
-            dh.send_to_healthy(m, &self.workers).unwrap();
+            self.domains
+                .get_mut(&addr.0)
+                .unwrap()
+                .send_to_healthy_shard(addr.1, m, &self.workers)
+                .unwrap();
         }
-        */
-        unimplemented!();
     }
 
     /// Construct `ControllerInner` with a specified listening interface
