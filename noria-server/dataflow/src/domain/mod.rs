@@ -818,7 +818,7 @@ impl Domain {
                     }
                     Packet::UpdateSharder { node, new_txs } => {
                         let mut n = self.nodes[node].borrow_mut();
-                        println!("D{}: UpdateSharder {:?}", self.index.index(), n.global_addr());
+                        println!("D{}: UpdateSharder {:?} {:?}", self.index.index(), n.global_addr(), new_txs);
                         n.with_sharder_mut(move |s| {
                             s.add_sharded_child(new_txs.0, new_txs.1);
                         });

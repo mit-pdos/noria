@@ -555,8 +555,27 @@ impl ControllerInner {
                     .send_to_healthy(m.clone().into_packet(), &self.workers)
                     .unwrap();
             }
-        } else {
-            assert!(graph[exit_b2].is_sharder());
+        }
+        let ingress_cs = self.ingredients
+            .neighbors_directed(exit_b2, petgraph::EdgeDirection::Outgoing)
+            .collect::<Vec<_>>();
+        if graph[exit_b2].is_sharder() {
+            for &ingress_c in &ingress_cs {
+                let domain_c = graph[ingress_c].domain();
+                let shards = self.domains.get(&domain_c).unwrap().shards.len();
+                let txs = (0..shards)
+                    .map(move |shard| (domain_c, shard))
+                    .collect::<Vec<_>>();
+                let m = box Packet::UpdateSharder {
+                    node: graph[exit_b2].local_addr(),
+                    new_txs: (graph[ingress_c].local_addr(), txs),
+                };
+                self.domains
+                    .get_mut(&domain_b2.0)
+                    .unwrap()
+                    .send_to_healthy(m, &self.workers)
+                    .unwrap();
+            }
         }
         for m in self.materializations.get_setup_replay_paths(domain_b1.0) {
             self.domains
@@ -571,9 +590,9 @@ impl ControllerInner {
         // the controller all the necessary provenance information for recovery.
         //
         // dataflow graph: A ---> B2 -o-> C
-        let domain_cs = self.ingredients
-            .neighbors_directed(exit_b2, petgraph::EdgeDirection::Outgoing)
-            .map(|ni| self.ingredients[ni].domain())
+        let domain_cs = ingress_cs
+            .iter()
+            .map(|&ni| self.ingredients[ni].domain())
             .map(|domain| (domain, self.domains.get(&domain).unwrap().shards.len()))
             .flat_map(|(domain, shards)| (0..shards).map(move |shard| (domain, shard)))
             .collect::<HashSet<_>>();
