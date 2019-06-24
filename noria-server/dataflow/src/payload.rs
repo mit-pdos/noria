@@ -263,6 +263,7 @@ pub enum Packet {
     /// Notify the domain to resume sending messages to its children from the given packet labels
     ResumeAt {
         addr_labels: Vec<(ReplicaAddr, usize)>,
+        provenance: Vec<ProvenanceUpdate>,
     },
 }
 

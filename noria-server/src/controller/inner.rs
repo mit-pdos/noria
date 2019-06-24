@@ -75,6 +75,7 @@ pub(super) struct ControllerInner {
 
     // Fault tolerance
     // TODO(ygina): assumes one recovery process is going on at any time
+    provenance: Option<Vec<ProvenanceUpdate>>,
     waiting_on: HashMap<ReplicaAddr, HashSet<ReplicaAddr>>,
     resume_ats: HashMap<ReplicaAddr, Vec<(ReplicaAddr, usize)>>,
 }
@@ -590,6 +591,7 @@ impl ControllerInner {
         // the controller all the necessary provenance information for recovery.
         //
         // dataflow graph: A ---> B2 -o-> C
+        self.provenance = Some(vec![]);
         let domain_cs = ingress_cs
             .iter()
             .map(|&ni| self.ingredients[ni].domain())
@@ -1059,10 +1061,11 @@ impl ControllerInner {
     pub(crate) fn handle_ack_new_incoming(
         &mut self,
         from: ReplicaAddr,
-        updates: Vec<Provenance>,
+        mut updates: Vec<Provenance>,
         provenance: Provenance,
     ) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
+        self.provenance.as_mut().unwrap().append(&mut updates);
 
         // Continue until there is no intersection between the provenance information we know
         // and the nodes we need to send ResumeAt messages to.
@@ -1124,12 +1127,44 @@ impl ControllerInner {
         for addr in empty {
             assert!(self.waiting_on.remove(&addr).is_some());
 
-            // Convert the indexed resume at information into ResumeAt messages.
-            let m = box Packet::ResumeAt {
-                addr_labels: self.resume_ats.remove(&addr).unwrap(),
+            // Use the list of provenance updates to compile a provenance history for lost domains
+            // with multiple children.
+            // TODO(ygina): provenance depths greater than 3.
+            let provenance = if let Some(updates) = self.provenance.take() {
+                let mut map: HashMap<usize, Provenance> = HashMap::new();
+                for p in updates {
+                    if let Some(main_p) = map.get_mut(&p.label()) {
+                        main_p.union(p);
+                    } else {
+                        assert_eq!(p.root(), addr);
+                        map.insert(p.label(), p);
+                    }
+                }
+                let mut provenance = map.into_iter().map(|(_, p)| p).collect::<Vec<_>>();
+                provenance.sort_by_key(|p| p.label());
+                provenance
+            } else {
+                vec![]
             };
 
+            // Convert the indexed resume at information into ResumeAt messages.
+            let addr_labels = self.resume_ats.remove(&addr).unwrap();
+            let min_label = *addr_labels.iter().map(|(_, label)| label).min().unwrap();
+            let mut provenance = provenance.clone();
+            loop {
+                if let Some(first) = provenance.get(0) {
+                    if first.label() < min_label {
+                        provenance.pop().unwrap();
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
             // Send the message!
+            let m = box Packet::ResumeAt { addr_labels, provenance };
             self.domains
                 .get_mut(&addr.0)
                 .unwrap()
@@ -1201,6 +1236,7 @@ impl ControllerInner {
 
             replies: DomainReplies(drx),
 
+            provenance: Default::default(),
             waiting_on: Default::default(),
             resume_ats: Default::default(),
         }

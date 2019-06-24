@@ -175,6 +175,18 @@ impl Provenance {
         }
     }
 
+    pub fn union(&mut self, other: Provenance) {
+        assert_eq!(self.root, other.root);
+        assert_eq!(self.label, other.label);
+        for (child, other_p) in other.edges.into_iter() {
+            if let Some(p) = self.edges.get_mut(&child) {
+                p.union(*other_p);
+            } else {
+                self.edges.insert(child, other_p);
+            }
+        }
+    }
+
     /// Returns whether a replica failed. :P
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");

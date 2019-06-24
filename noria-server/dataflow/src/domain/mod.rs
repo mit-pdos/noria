@@ -1524,8 +1524,8 @@ impl Domain {
                             *provenance,
                         );
                     },
-                    Packet::ResumeAt { addr_labels } => {
-                        println!("D{}: ResumeAt {:?}", self.index.index(), addr_labels);
+                    Packet::ResumeAt { addr_labels, provenance } => {
+                        println!("D{}: ResumeAt {:?} {:?}", self.index.index(), addr_labels, provenance);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
