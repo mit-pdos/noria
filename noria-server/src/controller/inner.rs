@@ -1056,7 +1056,12 @@ impl ControllerInner {
         Ok(())
     }
 
-    pub(crate) fn handle_ack_new_incoming(&mut self, from: ReplicaAddr, provenance: Provenance) {
+    pub(crate) fn handle_ack_new_incoming(
+        &mut self,
+        from: ReplicaAddr,
+        updates: Vec<Provenance>,
+        provenance: Provenance,
+    ) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
 
         // Continue until there is no intersection between the provenance information we know

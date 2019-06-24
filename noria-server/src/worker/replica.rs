@@ -339,9 +339,14 @@ impl Executor for OutOfBand {
         self.back.entry(id.token).or_default().push(id.tag);
     }
 
-    fn ack_new_incoming(&mut self, from: ReplicaAddr, provenance: Provenance) {
+    fn ack_new_incoming(
+        &mut self,
+        from: ReplicaAddr,
+        updates: Vec<Provenance>,
+        provenance: Provenance,
+    ) {
         self.ctrl_tx
-            .unbounded_send(CoordinationPayload::AckNewIncoming { from, provenance })
+            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, provenance })
             .expect("asked to send to controller, but controller has gone away");
     }
 

@@ -619,7 +619,7 @@ fn setup_vote_sharding() -> (Vec<Worker>, SyncTable, SyncTable, SyncView) {
     let authority = Arc::new(LocalAuthority::new());
     let mut workers = vec![];
     for i in 0..4 {
-        let worker = build_authority(authority.clone(), Some(3), i == 0);
+        let worker = build_authority(authority.clone(), Some(3), false);
         workers.push(worker);
     }
     sleep();

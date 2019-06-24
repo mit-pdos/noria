@@ -45,7 +45,12 @@ pub use PersistenceParameters;
 pub type ChannelCoordinator = noria::channel::ChannelCoordinator<(DomainIndex, usize), Box<Packet>>;
 pub trait Executor {
     fn ack(&mut self, tag: SourceChannelIdentifier);
-    fn ack_new_incoming(&mut self, from: ReplicaAddr, provenance: Provenance);
+    fn ack_new_incoming(
+        &mut self,
+        from: ReplicaAddr,
+        updates: Vec<Provenance>,
+        provenance: Provenance,
+    );
     fn ack_resume_at(&mut self, from: ReplicaAddr);
     fn uncache_domain(&mut self, domain: DomainIndex);
     fn create_universe(&mut self, req: HashMap<String, DataType>);

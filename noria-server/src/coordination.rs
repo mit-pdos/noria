@@ -45,6 +45,8 @@ pub enum CoordinationPayload {
     AckNewIncoming {
         /// Who the ack is from.
         from: ReplicaAddr,
+        /// All provenance updates with the new incoming domain as the root.
+        updates: Vec<ProvenanceUpdate>,
         /// Provenance needed to recover the failed subgraph above this domain.
         provenance: Provenance,
     },

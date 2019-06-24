@@ -1464,13 +1464,22 @@ impl Domain {
 
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
-                        let provenance = match self.exit_type {
+                        let (provenance, updates) = match self.exit_type {
                             DomainExitType::Egress => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        e.max_provenance.subgraph(new).clone()
+                                        let provenance = e.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = e.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
                                     })
                             },
                             DomainExitType::Sharder => {
@@ -1478,7 +1487,16 @@ impl Domain {
                                     .borrow_mut()
                                     .with_sharder_mut(|s| {
                                         s.new_incoming(old, new);
-                                        s.max_provenance.subgraph(new).clone()
+                                        let provenance = s.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = s.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
                                     })
                             },
                             DomainExitType::Reader => {
@@ -1486,13 +1504,23 @@ impl Domain {
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
-                                        r.max_provenance.subgraph(new).clone()
+                                        let provenance = r.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = r.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
                                     })
                                     .unwrap()
                             }
                         };
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
+                            updates,
                             *provenance,
                         );
                     },
