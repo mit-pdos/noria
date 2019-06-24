@@ -23,6 +23,10 @@ pub struct Sharder {
     min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// The provenance of the last packet send to each node
     last_provenance: HashMap<ReplicaAddr, Provenance>,
+    /// Target provenances to hit as we're generating new messages
+    targets: Vec<Provenance>,
+    /// Buffered messages per parent for when we can't hit the next target provenance
+    parent_buffer: HashMap<ReplicaAddr, Vec<(usize, Box<Packet>)>>,
 }
 
 impl Clone for Sharder {
@@ -39,6 +43,8 @@ impl Clone for Sharder {
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
+            targets: self.targets.clone(),
+            parent_buffer: self.parent_buffer.clone(),
         }
     }
 }
@@ -55,6 +61,8 @@ impl Sharder {
             payloads: Default::default(),
             min_label_to_send: Default::default(),
             last_provenance: Default::default(),
+            targets: Default::default(),
+            parent_buffer: Default::default(),
         }
     }
 
@@ -71,6 +79,8 @@ impl Sharder {
             payloads: self.payloads.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
+            targets: self.targets.clone(),
+            parent_buffer: self.parent_buffer.clone(),
         }
 
     }
@@ -236,7 +246,7 @@ impl Sharder {
         }
     }
 
-    pub fn send_packet(
+    fn send_packet_internal(
         &mut self,
         m: &mut Option<Box<Packet>>,
         from: DomainIndex,
@@ -303,6 +313,7 @@ impl Sharder {
     pub fn resume_at(
         &mut self,
         addr_labels: Vec<(ReplicaAddr, usize)>,
+        targets: Vec<Provenance>,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
@@ -316,6 +327,7 @@ impl Sharder {
             self.min_label_to_send.insert(addr, label);
         }
 
+        self.targets = targets;
         let next_label = self.min_provenance.label() + self.payloads.len() + 1;
         for &(_, label) in &addr_labels {
             // we don't have the messages we need to send
@@ -344,6 +356,78 @@ impl Sharder {
         unimplemented!();
     }
 
+    pub fn send_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+        index: LocalNodeIndex,
+        is_sharded: bool,
+        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+    ) {
+        // With no targets, all messages are forwarded.
+        if self.targets.is_empty() {
+            self.send_packet_internal(m, from, index, is_sharded, output);
+            return;
+        }
+
+        let next = m.as_ref().unwrap().id().as_ref().expect("message must have id if targets exist");
+        // TODO(ygina): can we not clone here?
+        self.parent_buffer
+            .entry(next.root())
+            .or_insert(vec![])
+            .push((next.label(), m.as_ref().unwrap().clone()));
+
+        loop {
+            // Look in the buffer for any messages we can forward to reach the current target.
+            // Forward a packet if it is from a parent noted in the target provenance, and if the
+            // packet label is at most the label of the parent in the target provenance.
+            let target_provenance = self.targets.get(0).unwrap().clone();
+            for (addr, p) in target_provenance.edges().iter() {
+                let max_label = p.label();
+                if self.parent_buffer.contains_key(&addr) {
+                    while !self.parent_buffer.get(&addr).unwrap().is_empty() {
+                        let label = self.parent_buffer.get(&addr).unwrap()[0].0;
+                        if label > max_label {
+                            break;
+                        }
+                        let (_, m) = self.parent_buffer.get_mut(&addr).unwrap().pop().unwrap();
+                        self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
+                    }
+                }
+            }
+
+            // If we did not just send the target, wait for the next packet to arrive.
+            if self.max_provenance.label() < target_provenance.label() {
+                return;
+            }
+
+            // If we have sent the target, assert that all the non-root labels also match. Then set
+            // the target to the next one, and if there is no packet, forward all remaining messages.
+            // Otherwise, restart the process.
+            assert_eq!(target_provenance.label(), self.max_provenance.label());
+            for (addr, p) in target_provenance.edges().iter() {
+                let label = p.label();
+                assert_eq!(label, self.max_provenance.edges().get(addr).unwrap().label());
+            }
+            self.targets.pop().unwrap();
+            if self.targets.is_empty() {
+                let ms = self.parent_buffer
+                    .drain()
+                    .flat_map(|(_, buffer)| buffer)
+                    .map(|(_, ms)| ms)
+                    .collect::<Vec<_>>();
+                for m in ms {
+                    self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
+                }
+                return;
+            }
+        }
+    }
+
+    // Prepare the packet to be sent. Update the packet provenance to be from the domain of _this_
+    // egress mode using the packet's existing provenance. Set the label according to the packet
+    // type and current packet buffer. Apply this new packet provenance to the domain-wide
+    // provenance, and store the update in our provenance history.
     pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
         // sharders are unsharded
         let from = (from, 0);
@@ -368,6 +452,7 @@ impl Sharder {
         let mut update = if let Some(diff) = m.as_ref().unwrap().id() {
             ProvenanceUpdate::new_with(from, label, &[diff.clone()])
         } else {
+            assert!(self.targets.is_empty());
             ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);

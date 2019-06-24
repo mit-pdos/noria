@@ -1548,12 +1548,12 @@ impl Domain {
                                     // that will get a ResumeAt in response to acking this
                                     // ResumeAt. we won't set the min_label here, letting some
                                     // other process take truncate logs.
-                                    e.resume_at(addr_labels, self.shard, sends);
+                                    e.resume_at(addr_labels, provenance, self.shard, sends);
                                 });
                             },
                             DomainExitType::Sharder => {
                                 node.borrow_mut().with_sharder_mut(|s| {
-                                    s.resume_at(addr_labels, self.shard, sends);
+                                    s.resume_at(addr_labels, provenance, self.shard, sends);
                                 });
                             },
                             DomainExitType::Reader => {
