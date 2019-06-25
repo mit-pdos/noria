@@ -38,10 +38,16 @@ impl VoteClient for Conn {
                             c.install_recipe(RECIPE)
                                 .and_then(move |_| c.table("Article").map(move |a| (c, a)))
                                 .and_then(move |(c, a)| {
-                                    a.perform_all((0..params.articles).map(|i| {
+                                    a.perform_all((0..params.articles).map(move |i| {
+                                        let author = if i == 0 {
+                                            1i32
+                                        } else {
+                                            ((i % (params.authors - 1)) + 2) as i32
+                                        };
                                         vec![
                                             ((i + 1) as i32).into(),
                                             format!("Article #{}", i).into(),
+                                            author.into(),
                                         ]
                                     }))
                                     .map(move |_| c)
@@ -57,7 +63,7 @@ impl VoteClient for Conn {
                     }
                 })
                 .and_then(|mut c| c.table("Vote").map(move |v| (c, v)))
-                .and_then(|(mut c, v)| c.view("ArticleWithVoteCount").map(move |awvc| (c, v, awvc)))
+                .and_then(|(mut c, v)| c.view("AuthorWithVoteCount").map(move |awvc| (c, v, awvc)))
                 .map(|(c, v, awvc)| Conn {
                     ch: c,
                     r: Some(awvc),
