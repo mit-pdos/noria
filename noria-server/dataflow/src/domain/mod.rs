@@ -807,18 +807,18 @@ impl Domain {
                         let mut n = self.nodes[self.exit_ni].borrow_mut();
                         n.with_egress_mut(move |e| {
                             if let Some((node, local, addr)) = new_tx {
-                                // println!("D{}: UpdateEgress {:?} None", domain_index, node);
+                                println!("D{}: UpdateEgress {:?} None", domain_index, node);
                                 e.add_tx(node, local, addr);
                             }
                             if let Some(new_tag) = new_tag {
-                                // println!("D{}: UpdateEgress None {:?}", domain_index, new_tag);
+                                println!("D{}: UpdateEgress None {:?}", domain_index, new_tag);
                                 e.add_tag(new_tag.0, new_tag.1);
                             }
                         });
                     }
                     Packet::UpdateSharder { node, new_txs } => {
                         let mut n = self.nodes[node].borrow_mut();
-                        // println!("D{}: UpdateSharder {:?} {:?}", self.index.index(), n.global_addr(), new_txs);
+                        println!("D{}: UpdateSharder {:?} {:?}", self.index.index(), n.global_addr(), new_txs);
                         n.with_sharder_mut(move |s| {
                             s.add_sharded_child(new_txs.0, new_txs.1);
                         });
@@ -983,7 +983,7 @@ impl Domain {
                             payload::TriggerEndpoint::Local(_) => "Local".into(),
                             payload::TriggerEndpoint::End(_, domain) => format!("End({:?})", domain),
                         };
-                        // println!("D{}: SetupReplayPath {:?} {}", self.index.index(), tag, trigger_str);
+                        println!("D{}: SetupReplayPath {:?} {}", self.index.index(), tag, trigger_str);
 
                         let trigger = match trigger {
                             payload::TriggerEndpoint::None => TriggerEndpoint::None,
@@ -1406,7 +1406,7 @@ impl Domain {
                     },
                     Packet::RemoveChild { addr } => {
                         let node = &self.nodes[self.exit_ni];
-                        // println!("D{}.{}: RemoveChild {:?} -> D{}.{}", self.index.index(), self.shard.unwrap_or(0), node.borrow().global_addr(), addr.0.index(), addr.1);
+                        println!("D{}.{}: RemoveChild {:?} -> D{}.{}", self.index.index(), self.shard.unwrap_or(0), node.borrow().global_addr(), addr.0.index(), addr.1);
 
                         match self.exit_type {
                             DomainExitType::Egress => {
@@ -1425,7 +1425,7 @@ impl Domain {
                         executor.uncache_domain(addr.0);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
-                        // println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
+                        println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
 
                         self.replay_paths.remove(&old_tag);
                         self.buffered_replay_requests.remove(&old_tag);
