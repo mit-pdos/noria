@@ -1422,7 +1422,7 @@ impl Domain {
                         }
 
                         // Tell the replica to uncache the sender
-                        executor.uncache_domain(addr.0);
+                        executor.uncache_replica(addr);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
                         println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);

@@ -166,18 +166,10 @@ impl Replica {
         let cc = &self.coord;
         let outputs = &mut self.outputs;
 
-        // uncache any domains
-        for domain in self.oob.domains.drain() {
-            let mut to_remove = Vec::new();
-            for ri in outputs.keys() {
-                if ri.0 == domain {
-                    to_remove.push(ri.clone());
-                }
-            }
-
-            for ri in to_remove {
-                outputs.remove(&ri);
-            }
+        // uncache any replicas and clear their outboxes
+        for ri in self.oob.replicas.drain() {
+            self.outbox.remove(&ri);
+            outputs.remove(&ri);
         }
 
 
@@ -316,8 +308,8 @@ struct OutOfBand {
     back: FnvHashMap<usize, Vec<u32>>,
     pending: FnvHashSet<usize>,
 
-    // for uncaching deleted domains
-    domains: FnvHashSet<DomainIndex>,
+    // for uncaching deleted replicas
+    replicas: FnvHashSet<ReplicaIndex>,
 
     // for sending messages to the controller
     ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
@@ -328,7 +320,7 @@ impl OutOfBand {
         OutOfBand {
             back: Default::default(),
             pending: Default::default(),
-            domains: Default::default(),
+            replicas: Default::default(),
             ctrl_tx,
         }
     }
@@ -356,8 +348,8 @@ impl Executor for OutOfBand {
             .expect("asked to send to controller, but controller has gone away");
     }
 
-    fn uncache_domain(&mut self, domain: DomainIndex) {
-        self.domains.insert(domain);
+    fn uncache_replica(&mut self, replica: ReplicaIndex) {
+        self.replicas.insert(replica);
     }
 
     fn create_universe(&mut self, universe: HashMap<String, DataType>) {
