@@ -174,6 +174,13 @@ impl Sharder {
 
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
+                // Don't send messages that are not at least the min label to send.
+                // This happens on recovery when replaying old messages.
+                let min_label = *self.min_label_to_send.get(&addr).unwrap();
+                if !is_replay && label < min_label {
+                    continue;
+                }
+
                 shard.link_mut().src = index;
                 shard.link_mut().dst = dst;
 
