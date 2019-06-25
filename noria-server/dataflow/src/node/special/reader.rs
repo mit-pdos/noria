@@ -310,10 +310,15 @@ impl Reader {
         };
 
         // provenance
-        let update = if let Some(diff) = m.as_ref().unwrap().id() {
-            ProvenanceUpdate::new_with(from, self.num_payloads, &[diff.clone()])
+        let label = if is_replay {
+            self.num_payloads
         } else {
-            ProvenanceUpdate::new(from, self.num_payloads)
+            self.num_payloads + 1
+        };
+        let update = if let Some(diff) = m.as_ref().unwrap().id() {
+            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
+        } else {
+            ProvenanceUpdate::new(from, label)
         };
         self.max_provenance.apply_update(&update);
         self.updates.push(update);
