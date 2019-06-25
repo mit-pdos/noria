@@ -174,10 +174,20 @@ impl Provenance {
         }
     }
 
+    pub fn union(&mut self, other: Provenance) {
+        assert_eq!(self.root, other.root);
+        assert_eq!(self.label, other.label);
+        for (child, other_p) in other.edges.into_iter() {
+            if let Some(p) = self.edges.get_mut(&child) {
+                p.union(*other_p);
+            } else {
+                self.edges.insert(child, other_p);
+            }
+        }
+    }
+
     /// Returns whether a replica failed. :P
-    pub fn new_incoming(&mut self, old: DomainIndex, new: DomainIndex) -> bool {
-        unimplemented!();
-        /*
+    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
 
         if let Some(new_p) = provenance.edges.remove(&new){
@@ -194,23 +204,24 @@ impl Provenance {
             self.edges.insert(new, provenance);
             false
         }
-        */
     }
 
     /// Subgraph of this provenance graph with the given domain as the new root. The new root must
     /// be an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of
-    /// the given node. There's no reason we should obtain any other subgraph in the protocol.
-    pub fn subgraph(&self, new_root: ReplicaAddr) -> &Box<Provenance> {
+    /// the given node. There's no reason we should obtain any other subgraph in the protocol...
+    /// Actually there is. We may be getting the subgraph of an update rather than the total graph.
+    pub fn subgraph(&self, new_root: ReplicaAddr) -> Option<&Box<Provenance>> {
         if let Some(p) = self.edges.get(&new_root) {
-            return p;
+            return Some(p);
         }
         // replicas
         for (_, p) in &self.edges {
             if let Some(p) = p.edges.get(&new_root){
-                return p;
+                return Some(p);
             }
         }
-        unreachable!("must be ancestor or grand-ancestor");
+        None
+        // unreachable!("must be ancestor or grand-ancestor");
     }
 
     pub fn into_debug(&self) -> noria::debug::stats::Provenance {

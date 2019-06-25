@@ -8,7 +8,7 @@ use bincode;
 use bufstream::BufStream;
 use dataflow::{
     payload::SourceChannelIdentifier,
-    prelude::{DataType, Executor, Provenance},
+    prelude::{DataType, Executor, Provenance, ReplicaAddr},
     Domain, Packet, PollEvent, ProcessResult,
 };
 use failure::{self, ResultExt};
@@ -339,13 +339,18 @@ impl Executor for OutOfBand {
         self.back.entry(id.token).or_default().push(id.tag);
     }
 
-    fn ack_new_incoming(&mut self, from: DomainIndex, provenance: Provenance) {
+    fn ack_new_incoming(
+        &mut self,
+        from: ReplicaAddr,
+        updates: Vec<Provenance>,
+        provenance: Provenance,
+    ) {
         self.ctrl_tx
-            .unbounded_send(CoordinationPayload::AckNewIncoming { from, provenance })
+            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, provenance })
             .expect("asked to send to controller, but controller has gone away");
     }
 
-    fn ack_resume_at(&mut self, from: DomainIndex) {
+    fn ack_resume_at(&mut self, from: ReplicaAddr) {
         self.ctrl_tx
             .unbounded_send(CoordinationPayload::AckResumeAt { from })
             .expect("asked to send to controller, but controller has gone away");

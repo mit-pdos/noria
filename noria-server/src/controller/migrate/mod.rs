@@ -128,37 +128,32 @@ impl<'a> Migration<'a> {
 
         path
     }
+    */
 
     /// Creates a replica of the domain, including ingress/egress nodes.
     ///
     /// Assumes the domain is a linear sequence of nodes starting with an ingress and ending with
     /// an egress. Linking the new domain to other domains requires an additional step.
-    pub(super) fn replicate_nodes(&mut self, nodes: &Vec<NodeIndex>) -> NodeIndex {
+    pub(super) fn replicate_domain(
+        &mut self,
+        domain: DomainIndex,
+        shard: usize,
+        nodes: &Vec<NodeIndex>,
+    ) {
         let graph = &mut self.mainline.ingredients;
+        let domain_graph = &mut self.mainline.domain_graph;
 
         warn!(
             self.log,
             "replicating failed nodes {:?}",
             nodes,
         );
-
-        assert!(nodes.len() > 0);
-        let domain = graph[nodes[0]].domain();
-        for &ni in nodes {
-            assert_eq!(graph[ni].domain(), domain);
-        }
-
         self.replicated.push((domain, nodes.clone()));
-
-        let graph_clone = graph.clone();
+        let graph_clone = domain_graph.clone();
         for &ni in nodes {
-            graph[ni].recover(&graph_clone, domain);
+            graph[ni].recover(&graph_clone, domain, shard);
         }
-
-        let egress = nodes[nodes.len() - 1];
-        egress
     }
-    */
 
     /// Add the given `Ingredient` to the Soup.
     ///

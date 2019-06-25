@@ -818,6 +818,7 @@ impl Domain {
                     }
                     Packet::UpdateSharder { node, new_txs } => {
                         let mut n = self.nodes[node].borrow_mut();
+                        // println!("D{}: UpdateSharder {:?} {:?}", self.index.index(), n.global_addr(), new_txs);
                         n.with_sharder_mut(move |s| {
                             s.add_sharded_child(new_txs.0, new_txs.1);
                         });
@@ -1280,7 +1281,7 @@ impl Domain {
                                     .with_egress(|e| (
                                         e.min_provenance.label(),
                                         e.payloads.len(),
-                                        e.get_last_provenance().into_debug(),
+                                        e.max_provenance.into_debug(),
                                     ))
                             },
                             DomainExitType::Sharder => {
@@ -1292,7 +1293,7 @@ impl Domain {
                                     .with_reader(|r| (
                                         r.min_provenance.label(),
                                         r.num_payloads,
-                                        r.get_last_provenance().into_debug(),
+                                        r.max_provenance.into_debug(),
                                     ))
                                     .unwrap()
                             },
@@ -1403,14 +1404,14 @@ impl Domain {
                         */
                         unimplemented!();
                     },
-                    Packet::RemoveChild { child, domain } => {
+                    Packet::RemoveChild { addr } => {
                         let node = &self.nodes[self.exit_ni];
-                        // println!("D{}: RemoveChild {:?} -> {:?}", self.index.index(), node.borrow().global_addr(), child);
+                        // println!("D{}.{}: RemoveChild {:?} -> D{}.{}", self.index.index(), self.shard.unwrap_or(0), node.borrow().global_addr(), addr.0.index(), addr.1);
 
                         match self.exit_type {
                             DomainExitType::Egress => {
                                 // Prevent the egress node from sending messages to the node
-                                node.borrow_mut().with_egress_mut(|e| e.remove_child(child));
+                                node.borrow_mut().with_egress_mut(|e| e.remove_child(addr));
                             },
                             DomainExitType::Sharder => {
                                 unimplemented!();
@@ -1421,7 +1422,7 @@ impl Domain {
                         }
 
                         // Tell the replica to uncache the sender
-                        executor.uncache_domain(domain);
+                        executor.uncache_domain(addr.0);
                     },
                     Packet::RemoveTag { old_tag, new_state } => {
                         // println!("D{}: RemoveTag old {:?} new {:?}", self.index.index(), old_tag, new_state);
@@ -1451,46 +1452,80 @@ impl Domain {
                         }
                     },
                     Packet::NewIncoming { old, new } => {
-                        /*
-                        println!("D{}: NewIncoming old {:?} new {:?}", self.index.index(), old, new);
+                        println!("D{}.{}: NewIncoming old {}.{} new {}.{}", self.index.index(), self.shard.unwrap_or(0), old.0.index(), old.1, new.0.index(), new.1);
                         debug!(
                             self.log,
-                            "updated incoming connection to domain {}",
-                            self.index.index();
-                            "old" => old.index(),
-                            "new" => new.index(),
+                            "updated incoming connection to domain {}.{}",
+                            self.index.index(),
+                            self.shard.unwrap_or(0);
+                            "old" => old.0.index(),
+                            "new" => new.0.index(),
                         );
 
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
-                        let provenance = match self.exit_type {
+                        let (provenance, updates) = match self.exit_type {
                             DomainExitType::Egress => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        e.get_last_provenance().subgraph(new).clone()
+                                        let provenance = e.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = e.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
                                     })
                             },
                             DomainExitType::Sharder => {
-                                unimplemented!();
+                                self.nodes[self.exit_ni]
+                                    .borrow_mut()
+                                    .with_sharder_mut(|s| {
+                                        s.new_incoming(old, new);
+                                        let provenance = s.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = s.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
+                                    })
                             },
                             DomainExitType::Reader => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
-                                        r.get_last_provenance().subgraph(new).clone()
+                                        let provenance = r.max_provenance
+                                            .subgraph(new)
+                                            .unwrap()
+                                            .clone();
+                                        let updates = r.updates
+                                            .iter()
+                                            .filter_map(|update| update.subgraph(new))
+                                            .map(|update| *update.clone())
+                                            .collect::<Vec<_>>();
+                                        (provenance, updates)
                                     })
                                     .unwrap()
                             }
                         };
-                        executor.ack_new_incoming(self.index, *provenance);
-                        */
-                        unimplemented!()
+                        executor.ack_new_incoming(
+                            (self.index, self.shard.unwrap_or(0)),
+                            updates,
+                            *provenance,
+                        );
                     },
-                    Packet::ResumeAt { child_labels } => {
-                        // println!("D{}: ResumeAt {:?}", self.index.index(), child_labels);
+                    Packet::ResumeAt { addr_labels, provenance } => {
+                        // println!("D{}: ResumeAt {:?} {:?}", self.index.index(), addr_labels, provenance);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
@@ -1499,9 +1534,10 @@ impl Domain {
                         let node = &self.nodes[self.exit_ni];
                         debug!(
                             self.log,
-                            "resuming messages from {} to {:?}",
-                            node.borrow().global_addr().index(),
-                            child_labels;
+                            "resuming messages from D{}.{} to {:?}",
+                            self.index.index(),
+                            self.shard.unwrap_or(0),
+                            addr_labels;
                         );
 
                         match self.exit_type {
@@ -1512,11 +1548,13 @@ impl Domain {
                                     // that will get a ResumeAt in response to acking this
                                     // ResumeAt. we won't set the min_label here, letting some
                                     // other process take truncate logs.
-                                    e.resume_at(child_labels, self.shard, sends);
+                                    e.resume_at(addr_labels, provenance, self.shard, sends);
                                 });
                             },
                             DomainExitType::Sharder => {
-                                unimplemented!();
+                                node.borrow_mut().with_sharder_mut(|s| {
+                                    s.resume_at(addr_labels, provenance, self.shard, sends);
+                                });
                             },
                             DomainExitType::Reader => {
                                 unreachable!();
@@ -1545,7 +1583,7 @@ impl Domain {
                         // of any upstream ResumeAts if, for example, this domain does not have
                         // any messages buffered.
                         // TODO(ygina): more complicated index for joins, possibly filters
-                        executor.ack_resume_at(self.index);
+                        executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
                     _ => unreachable!(),
                 }

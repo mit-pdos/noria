@@ -237,9 +237,10 @@ impl Node {
 
 // derefs
 impl Node {
-    pub fn with_sharder_mut<F>(&mut self, f: F)
+    pub fn with_sharder_mut<'a, F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut special::Sharder),
+        F: FnOnce(&mut special::Sharder) -> R,
+        R: 'a,
     {
         match self.inner {
             NodeType::Sharder(ref mut s) => f(s),
