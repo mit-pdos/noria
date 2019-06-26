@@ -423,7 +423,7 @@ pub mod test {
                 fn ack(&mut self, _: SourceChannelIdentifier) {}
                 fn ack_new_incoming(&mut self, _: ReplicaAddr, _: Vec<Provenance>, _: Provenance) {}
                 fn ack_resume_at(&mut self, _: ReplicaAddr) {}
-                fn uncache_domain(&mut self, _: DomainIndex) {}
+                fn uncache_replica(&mut self, _: ReplicaAddr) {}
                 fn create_universe(&mut self, _: HashMap<String, DataType>) {}
             }
 

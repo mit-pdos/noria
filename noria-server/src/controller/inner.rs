@@ -498,19 +498,20 @@ impl ControllerInner {
 
     /// Recovers a domain with only stateless nodes.
     /// TODO(ygina): handle disjoint node chains, merges and splits, source and sink
-    fn recover_stateless_domain(&mut self, domain_b1: ReplicaAddr) {
+    fn recover_stateless_domain(&mut self, domain_b: ReplicaAddr) {
         warn!(
             self.log,
             "recovering stateless domain {}.{}",
-            domain_b1.0.index(),
-            domain_b1.1,
+            domain_b.0.index(),
+            domain_b.1,
         );
 
-        let nodes = self.nodes_in_domain(domain_b1.0);
+        let nodes = self.nodes_in_domain(domain_b.0);
         let graph = &self.ingredients;
 
-        // prevent all shards of A from sending messages to B2 even once the connection is
-        // regenerated. B2 won't send messages to C since it'll be a new domain.
+        // Prevent all shards of A from sending messages to B even once the connection is
+        // regenerated. B won't send messages without receiving any messages from A first.
+        // A will only start sending messages to B once it receives a ResumeAt.
         let mut domain_as = HashSet::new();
         let ingress_b1s = nodes.iter().filter(|&&ni| graph[ni].is_ingress());
         for &ingress_b1 in ingress_b1s {
@@ -520,7 +521,7 @@ impl ControllerInner {
                 domain_as.insert((domain_a, shard));
             }
 
-            let m = box Packet::RemoveChild { addr: domain_b1 };
+            let m = box Packet::RemoveChild { addr: domain_b };
             self.domains
                 .get_mut(&domain_a)
                 .unwrap()
@@ -528,39 +529,35 @@ impl ControllerInner {
                 .unwrap();
         }
 
-        // do a migration that regenerates the nodes in domain B2, which has a different index
-        // from domain B1. however, the nodes in B1 and B2 have the same indexes. the domains
-        // can't start sending messages until replay paths have been updated. the network
-        // connections between A and B2, and B2 and C initially exist due to how migrations work.
-        //
-        // dataflow graph: A ---> B2 ---> C
-        self.migrate(|mig| mig.replicate_domain(domain_b1.0, domain_b1.1, &nodes));
+        // Do a migration that regenerates the nodes from domain B in a new domain, which has the
+        // same domain index as before. The nodes in the old and new domains also have the same
+        // indexes. The domains can't start sending messages until tags and txs have been updated,
+        // which the new domain B does not have.
+        self.migrate(|mig| mig.replicate_domain(domain_b.0, domain_b.1, &nodes));
 
-        // set replay paths in B2 to the same as those that were in B1. UpdateSharder messages
-        // should have been resent in the above migration.
-        //
-        // dataflow graph: A ---> B2 ---> C
+        // Set replay paths (tags) and information about which children the domain has (txs)
+        // in B to the same as they were before.
         let graph = &self.ingredients;
-        let exit_b2 = *nodes
+        let exit_b = *nodes
             .iter()
             .filter(|&&ni| graph[ni].is_egress() || graph[ni].is_sharder())
             .next()
             .unwrap();
-        // TODO(ygina): use an actual shard number
-        let domain_b2 = (graph[exit_b2].domain(), 0);
-        if graph[exit_b2].is_egress() {
-            for m in self.materializations.get_update_egresses(domain_b1.0) {
+        if graph[exit_b].is_egress() {
+            // TODO(ygina): shouldn't just be new_tag but also new_tx
+            // TODO(ygina): also consider case where 2 sharded domains send to each other
+            for m in self.materializations.get_update_egresses(domain_b.0) {
                 self.domains
-                    .get_mut(&domain_b2.0)
+                    .get_mut(&domain_b.0)
                     .unwrap()
-                    .send_to_healthy(m.clone().into_packet(), &self.workers)
+                    .send_to_healthy_shard(domain_b.1, m.clone().into_packet(), &self.workers)
                     .unwrap();
             }
         }
         let ingress_cs = self.ingredients
-            .neighbors_directed(exit_b2, petgraph::EdgeDirection::Outgoing)
+            .neighbors_directed(exit_b, petgraph::EdgeDirection::Outgoing)
             .collect::<Vec<_>>();
-        if graph[exit_b2].is_sharder() {
+        if graph[exit_b].is_sharder() {
             for &ingress_c in &ingress_cs {
                 let domain_c = graph[ingress_c].domain();
                 let shards = self.domains.get(&domain_c).unwrap().shards.len();
@@ -568,29 +565,28 @@ impl ControllerInner {
                     .map(move |shard| (domain_c, shard))
                     .collect::<Vec<_>>();
                 let m = box Packet::UpdateSharder {
-                    node: graph[exit_b2].local_addr(),
+                    node: graph[exit_b].local_addr(),
                     new_txs: (graph[ingress_c].local_addr(), txs),
                 };
+                // Sharders only have one shard themselves.
                 self.domains
-                    .get_mut(&domain_b2.0)
+                    .get_mut(&domain_b.0)
                     .unwrap()
                     .send_to_healthy(m, &self.workers)
                     .unwrap();
             }
         }
-        for m in self.materializations.get_setup_replay_paths(domain_b1.0) {
+        for m in self.materializations.get_setup_replay_paths(domain_b.0) {
             self.domains
-                .get_mut(&domain_b2.0)
+                .get_mut(&domain_b.0)
                 .unwrap()
-                .send_to_healthy(m.clone().into_packet(), &self.workers)
+                .send_to_healthy_shard(domain_b.1, m.clone().into_packet(), &self.workers)
                 .unwrap();
         }
 
-        // initialize the waiting_on field in anticipation of getting resume at messages to
-        // forward. then tell C about the new incoming connection from B2 so that B2 can tell
+        // Initialize the waiting_on field in anticipation of getting ResumeAt messages to
+        // forward. Then tell C about the NewIncoming connection from B so that B can tell
         // the controller all the necessary provenance information for recovery.
-        //
-        // dataflow graph: A ---> B2 -o-> C
         self.provenance = Some(vec![]);
         let domain_cs = ingress_cs
             .iter()
@@ -598,14 +594,14 @@ impl ControllerInner {
             .map(|domain| (domain, self.domains.get(&domain).unwrap().shards.len()))
             .flat_map(|(domain, shards)| (0..shards).map(move |shard| (domain, shard)))
             .collect::<HashSet<_>>();
-        self.waiting_on.insert(domain_b2, domain_cs.clone());
+        self.waiting_on.insert(domain_b, domain_cs.clone());
         for domain_a in domain_as {
             let mut waiting_on = HashSet::new();
-            waiting_on.insert(domain_b2);
+            waiting_on.insert(domain_b);
             self.waiting_on.insert(domain_a, waiting_on);
         }
         for domain_c in domain_cs {
-            self.send_new_incoming(domain_c, domain_b2, Some(domain_b1));
+            self.send_new_incoming(domain_c, domain_b, Some(domain_b));
         }
     }
 

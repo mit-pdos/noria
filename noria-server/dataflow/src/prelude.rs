@@ -52,6 +52,6 @@ pub trait Executor {
         provenance: Provenance,
     );
     fn ack_resume_at(&mut self, from: ReplicaAddr);
-    fn uncache_domain(&mut self, domain: DomainIndex);
+    fn uncache_replica(&mut self, replica: ReplicaAddr);
     fn create_universe(&mut self, req: HashMap<String, DataType>);
 }
