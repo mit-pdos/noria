@@ -549,6 +549,7 @@ impl ControllerInner {
         // TODO(ygina): use an actual shard number
         let domain_b2 = (graph[exit_b2].domain(), 0);
         if graph[exit_b2].is_egress() {
+            // TODO(ygina): shouldn't just be new_tag but also new_tx
             for m in self.materializations.get_update_egresses(domain_b1.0) {
                 self.domains
                     .get_mut(&domain_b2.0)

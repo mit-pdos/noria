@@ -23,7 +23,9 @@ pub struct Egress {
     /// Packet payloads
     pub(crate) payloads: Vec<Box<Packet>>,
 
-    /// Nodes it's ok to send packets too and the minimum labels (inclusive)
+    /// Replicas that should not be sent to
+    do_not_send: HashSet<ReplicaAddr>,
+    /// The minimum label that should be sent to each replica (inclusive)
     min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// The provenance of the last packet send to each node
     last_provenance: HashMap<ReplicaAddr, Provenance>,
@@ -44,6 +46,7 @@ impl Clone for Egress {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
+            do_not_send: self.do_not_send.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
@@ -89,6 +92,7 @@ impl Egress {
         let &mut Self {
             ref mut txs,
             ref min_label_to_send,
+            ref do_not_send,
             ..
         } = self;
 
@@ -101,16 +105,13 @@ impl Egress {
 
         // only send to a node if:
         // 1) it is requested
-        // 2) the egress knows about it (in min_label_to_send)
+        // 2) the egress has not been told NOT to send
         // 3) the message has a label at least the min label to send, unless it's a replay
         let to_addrs = to_addrs
             .iter()
             .filter(|addr| {
-                if let Some(min_label) = min_label_to_send.get(addr) {
-                    !is_message || label >= *min_label
-                } else {
-                    false
-                }
+                let min_label = *min_label_to_send.get(addr).unwrap();
+                !(do_not_send.contains(&addr) || (is_message && label < min_label))
             })
             .collect::<Vec<_>>();
 
@@ -158,14 +159,7 @@ impl Egress {
 impl Egress {
     /// Stop sending messages to this child.
     pub fn remove_child(&mut self, addr: ReplicaAddr) {
-        for i in 0..self.txs.len() {
-            if self.txs[i].dest == addr {
-                self.txs.swap_remove(i);
-                break;
-            }
-        }
-
-        self.min_label_to_send.remove(&addr);
+        self.do_not_send.insert(addr);
     }
 
     pub fn remove_tag(&mut self, tag: Tag) {
@@ -418,6 +412,7 @@ impl Egress {
                 min_label = label;
             }
             // don't duplicate sent messages
+            self.do_not_send.remove(&addr);
             self.min_label_to_send.insert(addr, label);
         }
 
