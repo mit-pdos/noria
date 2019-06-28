@@ -397,7 +397,7 @@ impl Sharder {
                         if label > max_label {
                             break;
                         }
-                        let (_, m) = self.parent_buffer.get_mut(&addr).unwrap().pop().unwrap();
+                        let (_, m) = self.parent_buffer.get_mut(&addr).unwrap().remove(0);
                         self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
                     }
                 }
@@ -416,7 +416,7 @@ impl Sharder {
                 let label = p.label();
                 assert_eq!(label, self.max_provenance.edges().get(addr).unwrap().label());
             }
-            self.targets.pop().unwrap();
+            self.targets.remove(0);
             if self.targets.is_empty() {
                 let ms = self.parent_buffer
                     .drain()

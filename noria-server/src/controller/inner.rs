@@ -1150,7 +1150,7 @@ impl ControllerInner {
             loop {
                 if let Some(first) = provenance.get(0) {
                     if first.label() < min_label {
-                        provenance.pop().unwrap();
+                        provenance.remove(0);
                     } else {
                         break;
                     }
