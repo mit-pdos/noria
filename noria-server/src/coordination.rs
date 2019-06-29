@@ -47,8 +47,8 @@ pub enum CoordinationPayload {
         from: ReplicaAddr,
         /// All provenance updates with the new incoming domain as the root.
         updates: Vec<ProvenanceUpdate>,
-        /// Provenance needed to recover the failed subgraph above this domain.
-        provenance: Provenance,
+        /// The minimum provenance.
+        min_provenance: Provenance,
     },
     /// Ack ResumeAt so the controller knows who is still waiting for whom.
     AckResumeAt {

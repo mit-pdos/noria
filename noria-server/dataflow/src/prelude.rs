@@ -49,7 +49,7 @@ pub trait Executor {
         &mut self,
         from: ReplicaAddr,
         updates: Vec<Provenance>,
-        provenance: Provenance,
+        min_provenance: Provenance,
     );
     fn ack_resume_at(&mut self, from: ReplicaAddr);
     fn uncache_replica(&mut self, replica: ReplicaAddr);

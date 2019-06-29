@@ -1464,13 +1464,13 @@ impl Domain {
 
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
-                        let (provenance, updates) = match self.exit_type {
+                        let (min_provenance, updates) = match self.exit_type {
                             DomainExitType::Egress => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        let provenance = e.max_provenance
+                                        let provenance = e.min_provenance
                                             .subgraph(new)
                                             .unwrap()
                                             .clone();
@@ -1487,7 +1487,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_sharder_mut(|s| {
                                         s.new_incoming(old, new);
-                                        let provenance = s.max_provenance
+                                        let provenance = s.min_provenance
                                             .subgraph(new)
                                             .unwrap()
                                             .clone();
@@ -1504,7 +1504,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
-                                        let provenance = r.max_provenance
+                                        let provenance = r.min_provenance
                                             .subgraph(new)
                                             .unwrap()
                                             .clone();
@@ -1521,7 +1521,7 @@ impl Domain {
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
                             updates,
-                            *provenance,
+                            *min_provenance,
                         );
                     },
                     Packet::ResumeAt { addr_labels, provenance } => {
