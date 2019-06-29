@@ -75,8 +75,13 @@ pub(super) struct ControllerInner {
 
     // Fault tolerance
     // TODO(ygina): assumes one recovery process is going on at any time
-    provenance: Option<Vec<ProvenanceUpdate>>,
+    /// Map from replica to its minimum provenance and provenance updates.
+    provenance: HashMap<ReplicaAddr, (Provenance, Vec<ProvenanceUpdate>)>,
+    /// Map from replica to a collection of replicas it is waiting to receive an ack from
+    /// before we can send a ResumeAt message to the key.
     waiting_on: HashMap<ReplicaAddr, HashSet<ReplicaAddr>>,
+    /// Map from replica to the children and labels that should be included in the ResumeAt
+    /// message sent to the key.
     resume_ats: HashMap<ReplicaAddr, Vec<(ReplicaAddr, usize)>>,
 }
 
@@ -587,7 +592,6 @@ impl ControllerInner {
         // Initialize the waiting_on field in anticipation of getting ResumeAt messages to
         // forward. Then tell C about the NewIncoming connection from B so that B can tell
         // the controller all the necessary provenance information for recovery.
-        self.provenance = Some(vec![]);
         let domain_cs = ingress_cs
             .iter()
             .map(|&ni| self.ingredients[ni].domain())
@@ -1057,54 +1061,100 @@ impl ControllerInner {
     pub(crate) fn handle_ack_new_incoming(
         &mut self,
         from: ReplicaAddr,
-        mut updates: Vec<Provenance>,
-        provenance: Provenance,
+        updates: Vec<Provenance>,
+        min_provenance: Provenance,
     ) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
-        self.provenance.as_mut().unwrap().append(&mut updates);
-
-        // Continue until there is no intersection between the provenance information we know
-        // and the nodes we need to send ResumeAt messages to.
-        let mut queue = Vec::new();
-        queue.push((from, &provenance));
-        while queue.len() > 0 {
-            let (child_domain, p) = queue.pop().unwrap();
-            if !self.waiting_on.contains_key(&p.root()) {
-                continue;
-            }
-
-            let root = p.root();
-            let resume_ats = self.resume_ats.entry(root).or_insert(vec![]);
-            let mut exists = false;
-            // if an entry from this domain already exists, pick the minimum label
-            for i in 0..resume_ats.len() {
-                let (domain, label) = resume_ats[i];
-                if domain == child_domain {
-                    exists = true;
-                    if p.label() + 1 < label {
-                        resume_ats[i] = (child_domain, p.label() + 1);
-
-                        // we only need to push more onto the queue if the label is smaller
-                        // because earlier labels are constructed from a prefix of later labels
-                        for p_child in p.edges().values() {
-                            queue.push((root, p_child));
-                        }
-                    }
-                    break;
-                }
-            }
-
-            // otherwise, add a new message to send
-            if !exists {
-                resume_ats.push((child_domain, p.label() + 1));
-                for p_child in p.edges().values() {
-                    queue.push((root, p_child));
-                }
-            }
-        }
+        self.provenance.insert(from, (min_provenance, updates));
 
         // We're no longer waiting on the node that acked the NewIncoming message
         self.handle_ack_resume_at(from);
+    }
+
+    /// Populate recovery fields using provenance and update information received in AckNewIncoming
+    /// messages once all such messages have been received.
+    ///
+    /// Returns the updates to send with this message... basically an empty vec unless we just
+    /// populated the fields.
+    fn acked_all_new_incoming(&mut self) -> Vec<Provenance> {
+        if self.provenance.is_empty() {
+            // This function has already been called.
+            return vec![];
+        }
+
+        // Determine the limiting factor for which we request upstream replicas to resume.
+        // Then apply all updates up to the minimum max_label, inclusive.
+        let mut min_max_label = std::usize::MAX;
+        for (_, updates) in self.provenance.values() {
+            let last_update = &updates[updates.len() - 1];
+            let max_label = last_update.label();
+            if max_label < min_max_label {
+                min_max_label = max_label;
+            }
+        }
+        for (_, (min_provenance, updates)) in self.provenance.iter_mut() {
+            while !updates.is_empty() {
+                if updates[0].label() > min_max_label {
+                    break;
+                }
+                min_provenance.apply_update(&updates.remove(0));
+            }
+        }
+
+        // Use the values of the remaining min_provenances to determine which values to resume at.
+        // Since we applied the updates from the min_provenance, the min_provenances here should
+        // reflect the total provenance of the graph (even though some upstream updates are
+        // dropped). Though I'm not really sure what replays do. We might need to store those in
+        // the updates too? Anyway, resume at 1+ all the labels of the provenance with no updates
+        // remaining, and from the failed replica, resume at 1+ the max_label for each child.
+        for (&child, (min_provenance, updates)) in self.provenance.iter() {
+            if updates.is_empty() {
+                assert!(min_provenance.label() >= min_max_label);
+                if min_provenance.label() == min_max_label && self.resume_ats.len() <= 1 {
+                    // The (first) limiting replica
+                    let mut queue = vec![];
+                    let original_parent_root = min_provenance.root();
+                    queue.push((child, min_provenance));
+                    while !queue.is_empty() {
+                        let (addr, parent) = queue.remove(0);
+                        let parent_root = parent.root();
+                        if !self.waiting_on.contains_key(&parent_root)
+                                && parent_root != original_parent_root {
+                            continue;
+                        }
+                        self.resume_ats
+                            .entry(parent_root)
+                            .or_insert(vec![])
+                            .push((addr, parent.label() + 1));
+                        for grandparent in parent.edges().values() {
+                            queue.push((parent_root, grandparent));
+                        }
+                    }
+                } else {
+                    // Not the limiting replica but no updates remaining
+                    self.resume_ats
+                        .entry(min_provenance.root())
+                        .or_insert(vec![])
+                        .push((child, min_provenance.label() + 1));
+                }
+            } else {
+                // Not the limiting replica
+                let last_update = &updates[updates.len() - 1];
+                self.resume_ats
+                    .entry(min_provenance.root())
+                    .or_insert(vec![])
+                    .push((child, last_update.label() + 1));
+            }
+        }
+
+        // Consolidate all remaining updates to send to the limiting replica.
+        let mut updates_to_send = self.provenance
+            .drain()
+            .flat_map(|(_, (_, updates))| updates)
+            .collect::<Vec<_>>();
+        updates_to_send.sort_by_key(|p| p.label());
+        updates_to_send.dedup_by_key(|update| update.label());
+        updates_to_send
     }
 
     pub(crate) fn handle_ack_resume_at(&mut self, from: ReplicaAddr) {
@@ -1123,41 +1173,9 @@ impl ControllerInner {
         for addr in empty {
             assert!(self.waiting_on.remove(&addr).is_some());
 
-            // Use the list of provenance updates to compile a provenance history for lost domains
-            // with multiple children.
-            // TODO(ygina): provenance depths greater than 3.
-            let provenance = if let Some(updates) = self.provenance.take() {
-                let mut map: HashMap<usize, Provenance> = HashMap::new();
-                for p in updates {
-                    if let Some(main_p) = map.get_mut(&p.label()) {
-                        main_p.union(p);
-                    } else {
-                        assert_eq!(p.root(), addr);
-                        map.insert(p.label(), p);
-                    }
-                }
-                let mut provenance = map.into_iter().map(|(_, p)| p).collect::<Vec<_>>();
-                provenance.sort_by_key(|p| p.label());
-                provenance
-            } else {
-                vec![]
-            };
-
             // Convert the indexed resume at information into ResumeAt messages.
+            let provenance = self.acked_all_new_incoming();
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
-            let min_label = *addr_labels.iter().map(|(_, label)| label).min().unwrap();
-            let mut provenance = provenance.clone();
-            loop {
-                if let Some(first) = provenance.get(0) {
-                    if first.label() < min_label {
-                        provenance.remove(0);
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
 
             // Send the message!
             let m = box Packet::ResumeAt { addr_labels, provenance };

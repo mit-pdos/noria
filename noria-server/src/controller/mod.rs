@@ -102,12 +102,12 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.create_universe(universe).unwrap());
                         }
                     }
-                    CoordinationPayload::AckNewIncoming { from, updates, provenance } => {
+                    CoordinationPayload::AckNewIncoming { from, updates, min_provenance } => {
                         if let Some(ref mut ctrl) = controller {
                             crate::block_on(|| ctrl.handle_ack_new_incoming(
                                 from,
                                 updates,
-                                provenance,
+                                min_provenance,
                             ));
                         }
                     }
