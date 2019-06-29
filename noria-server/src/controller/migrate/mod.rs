@@ -635,10 +635,11 @@ impl<'a> Migration<'a> {
         fn reset_wis(mainline: &ControllerInner) -> std::vec::IntoIter<WorkerIdentifier> {
             let mut wis_sorted = mainline
                 .workers
-                .keys()
-                .map(|wi| wi.clone())
+                .iter()
+                .filter(|(_, w)| w.healthy)
+                .map(|(wi, _)| wi.clone())
                 .collect::<Vec<WorkerIdentifier>>();
-            wis_sorted.sort_by(|x, y| x.to_string().cmp(&y.to_string()));
+            wis_sorted.sort_by_key(|wi| wi.to_string());
             wis_sorted.into_iter()
         }
 
@@ -675,10 +676,7 @@ impl<'a> Migration<'a> {
             for _ in 0..shards.unwrap_or(1) {
                 let wi = loop {
                     if let Some(wi) = wis.next() {
-                        let w = mainline.workers.get(&wi).unwrap();
-                        if w.healthy {
-                            break wi;
-                        }
+                        break wi;
                     } else {
                         wis = reset_wis(mainline);
                     }

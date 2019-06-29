@@ -335,10 +335,10 @@ impl Executor for OutOfBand {
         &mut self,
         from: ReplicaAddr,
         updates: Vec<Provenance>,
-        provenance: Provenance,
+        min_provenance: Provenance,
     ) {
         self.ctrl_tx
-            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, provenance })
+            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, min_provenance })
             .expect("asked to send to controller, but controller has gone away");
     }
 
