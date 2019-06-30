@@ -168,6 +168,8 @@ impl Replica {
 
         // uncache any replicas and clear their outboxes
         for ri in self.oob.replicas.drain() {
+            let domain_name = format!("D{}.{}", self.domain.id().0.index(), self.domain.id().1);
+            println!("{}: uncache {:?}", domain_name, ri);
             self.outbox.remove(&ri);
             outputs.remove(&ri);
         }
@@ -365,11 +367,13 @@ impl Future for Replica {
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         let r: Result<Async<Self::Item>, failure::Error> = try {
             loop {
+                let domain_name = format!("D{}.{}", self.domain.id().0.index(), self.domain.id().1);
                 // FIXME: check if we should call update_state_sizes (every evict_every)
 
                 // are there are any new connections?
                 if !self.try_new().context("check for new connections")? {
                     // incoming socket closed -- no more clients will arrive
+                    println!("{}: incoming socket closed, no more clients will arrive", domain_name);
                     return Ok(Async::Ready(()));
                 }
 
@@ -410,6 +414,7 @@ impl Future for Replica {
                                 Ok(Async::Ready(ProcessResult::StopPolling)) => {
                                     // domain got a message to quit
                                     // TODO: should we finish up remaining work?
+                                    println!("{}: quitting because controller dropped", domain_name);
                                     return Ok(Async::Ready(()));
                                 }
                                 Ok(Async::Ready(_)) => {}
@@ -445,6 +450,7 @@ impl Future for Replica {
                                 Ok(Async::Ready(None)) => {
                                     // local input stream finished?
                                     // TODO: should we finish up remaining work?
+                                    println!("{}: local input stream finished", domain_name);
                                     return Ok(Async::Ready(()));
                                 }
                                 Ok(Async::NotReady) => {

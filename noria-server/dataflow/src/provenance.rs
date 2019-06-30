@@ -158,6 +158,9 @@ impl Provenance {
         //
         // We should be able to add this assertion back once we optimize how much provenance
         // we send per message.
+        if self.label > update.label {
+            println!("gonna panic because applying update {:?} to self {:?}", update, self);
+        }
         assert!(self.label <= update.label);
         if self.label >= update.label {
             // short circuit since all domain-label combinations mean the same thing everywhere,

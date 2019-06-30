@@ -517,6 +517,7 @@ impl ControllerInner {
         // Prevent all shards of A from sending messages to B even once the connection is
         // regenerated. B won't send messages without receiving any messages from A first.
         // A will only start sending messages to B once it receives a ResumeAt.
+        println!("check 1");
         let mut domain_as = HashSet::new();
         let ingress_b1s = nodes.iter().filter(|&&ni| graph[ni].is_ingress());
         for &ingress_b1 in ingress_b1s {
@@ -538,10 +539,12 @@ impl ControllerInner {
         // same domain index as before. The nodes in the old and new domains also have the same
         // indexes. The domains can't start sending messages until tags and txs have been updated,
         // which the new domain B does not have.
+        println!("check 2");
         self.migrate(|mig| mig.replicate_domain(domain_b.0, domain_b.1, &nodes));
 
         // Set replay paths (tags) and information about which children the domain has (txs)
         // in B to the same as they were before.
+        println!("check 3");
         let graph = &self.ingredients;
         let exit_b = *nodes
             .iter()
@@ -559,6 +562,7 @@ impl ControllerInner {
                     .unwrap();
             }
         }
+        println!("check 4");
         let ingress_cs = self.ingredients
             .neighbors_directed(exit_b, petgraph::EdgeDirection::Outgoing)
             .collect::<Vec<_>>();
@@ -581,6 +585,7 @@ impl ControllerInner {
                     .unwrap();
             }
         }
+        println!("check 5");
         for m in self.materializations.get_setup_replay_paths(domain_b.0) {
             self.domains
                 .get_mut(&domain_b.0)
@@ -592,6 +597,7 @@ impl ControllerInner {
         // Initialize the waiting_on field in anticipation of getting ResumeAt messages to
         // forward. Then tell C about the NewIncoming connection from B so that B can tell
         // the controller all the necessary provenance information for recovery.
+        println!("check 6");
         let domain_cs = ingress_cs
             .iter()
             .map(|&ni| self.ingredients[ni].domain())
@@ -1178,6 +1184,7 @@ impl ControllerInner {
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
 
             // Send the message!
+            println!("sending resume at to {:?} {:?} {:?}", addr, addr_labels, provenance);
             let m = box Packet::ResumeAt { addr_labels, provenance };
             self.domains
                 .get_mut(&addr.0)
@@ -1367,6 +1374,7 @@ impl ControllerInner {
                 ControlReplyPacket::Booted(shard, addr) => {
                     self.channel_coordinator.insert_remote((idx, shard), addr);
                     announce.push(DomainDescriptor::new(idx, shard, addr));
+                    println!("might fail: D{}.{}", idx.index(), shard);
                     txs.insert(
                         shard,
                         self.channel_coordinator

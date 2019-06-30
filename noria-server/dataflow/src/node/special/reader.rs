@@ -320,6 +320,7 @@ impl Reader {
         } else {
             ProvenanceUpdate::new(from, label)
         };
+        println!("reader apply {:?} to {:?}", update, self.max_provenance);
         self.max_provenance.apply_update(&update);
         self.updates.push(update);
 

@@ -237,6 +237,7 @@ impl Sharder {
                 // This happens on recovery when replaying old messages.
                 let min_label = *self.min_label_to_send.get(&addr).unwrap();
                 if !is_replay && label < min_label {
+                    println!("skipping {:?} label={} min_label={} is_replay? {}", addr, label, min_label, is_replay);
                     continue;
                 }
 
@@ -511,6 +512,7 @@ impl Sharder {
                         }
                         let (_, m) = self.parent_buffer.get_mut(&addr).unwrap().remove(0);
                         self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
+                        println!("SHARDER: sent {:?}", self.max_provenance);
                     }
                 }
             }
@@ -528,13 +530,15 @@ impl Sharder {
                 let label = p.label();
                 assert_eq!(label, self.max_provenance.edges().get(addr).unwrap().label());
             }
-            self.targets.remove(0);
+            let target = self.targets.remove(0);
+            println!("SHARDER: sent {:?}, hit target {:?}", self.max_provenance, target);
             if self.targets.is_empty() {
                 let ms = self.parent_buffer
                     .drain()
                     .flat_map(|(_, buffer)| buffer)
                     .map(|(_, ms)| ms)
                     .collect::<Vec<_>>();
+                println!("targets done! draining {} messages in buffer", ms.len());
                 for m in ms {
                     self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
                 }

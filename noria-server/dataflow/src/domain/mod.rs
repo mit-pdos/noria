@@ -1518,6 +1518,7 @@ impl Domain {
                                     .unwrap()
                             }
                         };
+                        println!("D{}.{}: NewIncoming respond with {} updates and {:?}", self.index.index(), self.shard.unwrap_or(0), updates.len(), min_provenance);
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
                             updates,
@@ -1525,7 +1526,7 @@ impl Domain {
                         );
                     },
                     Packet::ResumeAt { addr_labels, provenance } => {
-                        // println!("D{}: ResumeAt {:?} {:?}", self.index.index(), addr_labels, provenance);
+                        println!("D{}.{}: ResumeAt {:?} {:?}", self.index.index(), self.shard.unwrap_or(0), addr_labels, provenance);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
