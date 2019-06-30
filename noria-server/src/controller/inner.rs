@@ -1113,11 +1113,13 @@ impl ControllerInner {
                 if min_provenance.label() == min_max_label && self.resume_ats.len() <= 1 {
                     // The (first) limiting replica
                     let mut queue = vec![];
+                    let original_parent_root = min_provenance.root();
                     queue.push((child, min_provenance));
                     while !queue.is_empty() {
                         let (addr, parent) = queue.remove(0);
                         let parent_root = parent.root();
-                        if !self.waiting_on.contains_key(&parent_root) {
+                        if !self.waiting_on.contains_key(&parent_root)
+                                && parent_root != original_parent_root {
                             continue;
                         }
                         self.resume_ats
