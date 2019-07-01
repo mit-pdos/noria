@@ -596,7 +596,6 @@ impl Sharder {
             // entire provenance. As evidenced below, the root only has one child, which seems
             // insufficient, so I don't think this correctly considers replays.
             update = self.max_provenance.clone();
-            self.updates.push(update.clone());
             update.trim(PROVENANCE_DEPTH - 1);
             *m.as_mut().unwrap().id_mut() = Some(update);
         }

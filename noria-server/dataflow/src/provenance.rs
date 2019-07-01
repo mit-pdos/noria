@@ -189,6 +189,20 @@ impl Provenance {
         }
     }
 
+    pub fn max_union(&mut self, other: &Provenance) {
+        assert_eq!(self.root, other.root);
+        if other.label > self.label {
+            self.label = other.label;
+        }
+        for (child, other_p) in other.edges.iter() {
+            if let Some(p) = self.edges.get_mut(&child) {
+                p.max_union(other_p);
+            } else {
+                self.edges.insert(*child, other_p.clone());
+            }
+        }
+    }
+
     /// Returns whether a replica failed. :P
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
