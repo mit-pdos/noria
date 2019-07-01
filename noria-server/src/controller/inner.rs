@@ -1085,9 +1085,12 @@ impl ControllerInner {
         // Determine the limiting factor for which we request upstream replicas to resume.
         // Then apply all updates up to the minimum max_label, inclusive.
         let mut min_max_label = std::usize::MAX;
-        for (_, updates) in self.provenance.values() {
-            let last_update = &updates[updates.len() - 1];
-            let max_label = last_update.label();
+        for (min_provenance, updates) in self.provenance.values() {
+            let max_label = if updates.is_empty() {
+                min_provenance.label()
+            } else {
+                updates[updates.len() - 1].label()
+            };
             if max_label < min_max_label {
                 min_max_label = max_label;
             }
