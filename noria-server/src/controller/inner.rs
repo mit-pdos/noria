@@ -1105,45 +1105,44 @@ impl ControllerInner {
         // Since we applied the updates from the min_provenance, the min_provenances here should
         // reflect the total provenance of the graph (even though some upstream updates are
         // dropped). Though I'm not really sure what replays do. We might need to store those in
-        // the updates too? Anyway, resume at 1+ all the labels of the provenance with no updates
-        // remaining, and from the failed replica, resume at 1+ the max_label for each child.
+        // the updates too?
+        //
+        // For each child of the failed domain, resume at 1+ the max_label using the last update.
         for (&child, (min_provenance, updates)) in self.provenance.iter() {
-            if updates.is_empty() {
-                assert!(min_provenance.label() >= min_max_label);
-                if min_provenance.label() == min_max_label && self.resume_ats.len() <= 1 {
-                    // The (first) limiting replica
-                    let mut queue = vec![];
-                    let original_parent_root = min_provenance.root();
-                    queue.push((child, min_provenance));
-                    while !queue.is_empty() {
-                        let (addr, parent) = queue.remove(0);
-                        let parent_root = parent.root();
-                        if !self.waiting_on.contains_key(&parent_root)
-                                && parent_root != original_parent_root {
-                            continue;
-                        }
-                        self.resume_ats
-                            .entry(parent_root)
-                            .or_insert(vec![])
-                            .push((addr, parent.label() + 1));
-                        for grandparent in parent.edges().values() {
-                            queue.push((parent_root, grandparent));
-                        }
-                    }
-                } else {
-                    // Not the limiting replica but no updates remaining
-                    self.resume_ats
-                        .entry(min_provenance.root())
-                        .or_insert(vec![])
-                        .push((child, min_provenance.label() + 1));
-                }
+            let resume_at = if updates.is_empty() {
+                min_provenance.label() + 1
             } else {
-                // Not the limiting replica
-                let last_update = &updates[updates.len() - 1];
-                self.resume_ats
-                    .entry(min_provenance.root())
-                    .or_insert(vec![])
-                    .push((child, last_update.label() + 1));
+                updates[updates.len() - 1].label() + 1
+            };
+            self.resume_ats
+                .entry(min_provenance.root())
+                .or_insert(vec![])
+                .push((child, resume_at));
+        }
+
+        // For upstream nodes, resume at 1+ the maximum label of the unions of all min_provenance.
+        assert_eq!(self.resume_ats.len(), 1);
+        let failed_replica = *self.resume_ats.keys().next().unwrap();
+        let mut max_union = Provenance::new(failed_replica, 0);
+        for (min_provenance, _) in self.provenance.values() {
+            max_union.max_union(min_provenance);
+        }
+        let mut queue = vec![];
+        for grandparent in max_union.edges().values() {
+            queue.push((failed_replica, grandparent));
+        }
+        while !queue.is_empty() {
+            let (addr, parent) = queue.remove(0);
+            let parent_root = parent.root();
+            if !self.waiting_on.contains_key(&parent_root) {
+                continue;
+            }
+            self.resume_ats
+                .entry(parent_root)
+                .or_insert(vec![])
+                .push((addr, parent.label() + 1));
+            for grandparent in parent.edges().values() {
+                queue.push((parent_root, grandparent));
             }
         }
 
