@@ -1114,7 +1114,9 @@ impl ControllerInner {
         // the updates too?
         //
         // For each child of the failed domain, resume at 1+ the max_label using the last update.
+        println!("INSIDE acked_all_new_incoming");
         for (&child, (min_provenance, updates)) in self.provenance.iter() {
+            println!("{:?} {:?} {:?}", child, min_provenance, updates);
             let resume_at = if updates.is_empty() {
                 min_provenance.label() + 1
             } else {
@@ -1183,7 +1185,6 @@ impl ControllerInner {
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
 
             // Send the message!
-            println!("sending resume at to {:?} {:?} {:?}", addr, addr_labels, provenance);
             let m = box Packet::ResumeAt { addr_labels, provenance };
             self.domains
                 .get_mut(&addr.0)

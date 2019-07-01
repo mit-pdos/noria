@@ -237,7 +237,6 @@ impl Sharder {
                 // This happens on recovery when replaying old messages.
                 let min_label = *self.min_label_to_send.get(&addr).unwrap();
                 if !is_replay && label < min_label {
-                    println!("skipping {:?} label={} min_label={} is_replay? {}", addr, label, min_label, is_replay);
                     continue;
                 }
 
@@ -519,7 +518,6 @@ impl Sharder {
 
             // If we did not just send the target, wait for the next packet to arrive.
             if self.max_provenance.label() < target_provenance.label() {
-                println!("not at target {:?} + {:?} != {:?}", self.max_provenance, next, target_provenance);
                 return;
             }
 
@@ -543,6 +541,7 @@ impl Sharder {
                 for m in ms {
                     self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
                 }
+                println!("done draining... {:?} resume normal op", self.max_provenance);
                 return;
             }
         }
