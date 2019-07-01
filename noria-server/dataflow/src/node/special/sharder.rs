@@ -519,6 +519,7 @@ impl Sharder {
 
             // If we did not just send the target, wait for the next packet to arrive.
             if self.max_provenance.label() < target_provenance.label() {
+                println!("not at target {:?} + {:?} != {:?}", self.max_provenance, next, target_provenance);
                 return;
             }
 
