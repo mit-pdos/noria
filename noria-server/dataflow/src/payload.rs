@@ -265,6 +265,10 @@ pub enum Packet {
         addr_labels: Vec<(ReplicaAddr, usize)>,
         provenance: Vec<ProvenanceUpdate>,
     },
+
+    Dummy {
+        id: Option<ProvenanceUpdate>,
+    },
 }
 
 impl Packet {
@@ -273,6 +277,7 @@ impl Packet {
             Packet::Message { ref id, .. } => id,
             Packet::ReplayPiece { ref id, .. } => id,
             Packet::EvictKeys { ref id, .. } => id,
+            Packet::Dummy { ref id } => id,
             _ => unreachable!(),
         }
     }
@@ -282,6 +287,7 @@ impl Packet {
             Packet::Message { ref mut id, .. } => id,
             Packet::ReplayPiece { ref mut id, .. } => id,
             Packet::EvictKeys { ref mut id, .. } => id,
+            Packet::Dummy { ref mut id } => id,
             _ => unreachable!(),
         }
     }
@@ -396,6 +402,11 @@ impl Packet {
                 tag,
                 data: data.clone(),
                 context: context.clone(),
+            },
+            Packet::Dummy {
+                ref id,
+            } => Packet::Dummy {
+                id: id.clone(),
             },
             _ => unreachable!(),
         }

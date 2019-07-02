@@ -117,8 +117,15 @@ impl Sharder {
         is_sharded: bool,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        // we need to shard the records inside `m` by their key,
         let mut m = m.take().unwrap();
+        let (mtype, is_replay) = match m {
+            box Packet::Message { .. } => ("Message", false),
+            box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
+            box Packet::Dummy { .. } => { return; },
+            _ => unreachable!(),
+        };
+
+        // we need to shard the records inside `m` by their key,
         for record in m.take_data() {
             let shard = self.to_shard(&record);
             let p = self
@@ -165,12 +172,6 @@ impl Sharder {
             // it's unclear how we do that.
             unimplemented!();
         }
-
-        let (mtype, is_replay) = match m {
-            box Packet::Message { .. } => ("Message", false),
-            box Packet::ReplayPiece { .. } => ("ReplayPiece", true),
-            _ => unreachable!(),
-        };
 
         for (i, &mut (dst, addr)) in self.txs.iter_mut().enumerate() {
             if let Some(mut shard) = self.sharded.remove(i) {
@@ -418,16 +419,27 @@ impl Sharder {
                             // this branch. But we don't want to generate ANY packet in case it
                             // gets sent out-of-order to children who have already received
                             // following packets, so we must skip the packet.
-                            if target_provenance.label() - self.max_provenance.label() > 1 {
-                                // TODO(ygina): one-to-one update to packet assumption might be
-                                // broken here. might want to insert dummy packet that is not sent
-                                // to anyone for continuity.
+                            let target_label = target_provenance.label();
+                            let next_label = self.max_provenance.label() + 1;
+                            if next_label < target_label {
                                 println!(
                                     "WARNING: increasing next label to send from {} to {}",
-                                    self.max_provenance.label() + 1,
-                                    target_provenance.label(),
+                                    next_label,
+                                    target_label,
                                 );
-                                self.max_provenance.set_label(target_provenance.label() - 1);
+
+                                // Insert dummy packets that are not sent to anyone so that packets
+                                // can be indexed directly based on their labels.
+                                let num_dummy_packets = target_label - next_label;
+                                for _ in 0..num_dummy_packets {
+                                    self.send_packet_internal(
+                                        &mut Some(box Packet::Dummy { id: None }),
+                                        from,
+                                        index,
+                                        is_sharded,
+                                        output,
+                                    );
+                                }
                             }
                         }
                         self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
@@ -474,6 +486,7 @@ impl Sharder {
             Some(box Packet::Message { .. }) => true,
             Some(box Packet::ReplayPiece { .. }) => false,
             Some(box Packet::EvictKeys { .. }) => false,
+            Some(box Packet::Dummy { .. }) => true,  // because we want to store it in payloads
             _ => unreachable!(),
         };
 
