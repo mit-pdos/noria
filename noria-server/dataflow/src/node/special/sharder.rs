@@ -433,16 +433,12 @@ impl Sharder {
     pub fn resume_at(
         &mut self,
         addr_labels: Vec<(ReplicaAddr, usize)>,
+        mut min_provenance: Option<Provenance>,
         targets: Vec<Provenance>,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
-        let mut min_label = std::usize::MAX;
         for &(addr, label) in &addr_labels {
-            // calculate the min label
-            if label < min_label {
-                min_label = label;
-            }
             // don't duplicate sent messages
             self.min_label_to_send.insert(addr, label);
         }
@@ -456,8 +452,10 @@ impl Sharder {
                 println!("{} > {}", label, next_label);
                 assert!(self.payloads.is_empty());
                 assert!(self.updates.is_empty());
-                self.min_provenance.set_label(min_label - 1);
-                self.max_provenance.set_label(min_label - 1);
+                assert_eq!(self.min_provenance.label(), 0);
+                assert_eq!(self.max_provenance.label(), 0);
+                self.min_provenance = min_provenance.take().unwrap();
+                self.max_provenance = self.min_provenance.clone();
                 return;
             }
             // if this is a stateless domain that was just regenerated, then it must not have sent
@@ -473,6 +471,8 @@ impl Sharder {
         // If we made it this far, it means we have all the messages we need to send (assuming
         // log truncation works correctly). Roll back provenance state to the minimum label and
         // replay each message and diff as if they were just received.
+        assert!(self.targets.is_empty());
+        assert!(min_provenance.is_none());
         unimplemented!();
     }
 

@@ -1525,8 +1525,8 @@ impl Domain {
                             *min_provenance,
                         );
                     },
-                    Packet::ResumeAt { addr_labels, provenance } => {
-                        println!("D{}.{}: ResumeAt {:?} {:?}", self.index.index(), self.shard.unwrap_or(0), addr_labels, provenance);
+                    Packet::ResumeAt { addr_labels, min_provenance, targets } => {
+                        println!("D{}: ResumeAt {:?} {:?} {:?}", self.index.index(), addr_labels, min_provenance, targets);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
@@ -1549,12 +1549,24 @@ impl Domain {
                                     // that will get a ResumeAt in response to acking this
                                     // ResumeAt. we won't set the min_label here, letting some
                                     // other process take truncate logs.
-                                    e.resume_at(addr_labels, provenance, self.shard, sends);
+                                    e.resume_at(
+                                        addr_labels,
+                                        min_provenance,
+                                        targets,
+                                        self.shard,
+                                        sends,
+                                    );
                                 });
                             },
                             DomainExitType::Sharder => {
                                 node.borrow_mut().with_sharder_mut(|s| {
-                                    s.resume_at(addr_labels, provenance, self.shard, sends);
+                                    s.resume_at(
+                                        addr_labels,
+                                        min_provenance,
+                                        targets,
+                                        self.shard,
+                                        sends,
+                                    );
                                 });
                             },
                             DomainExitType::Reader => {
