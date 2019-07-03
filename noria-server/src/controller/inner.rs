@@ -1076,10 +1076,10 @@ impl ControllerInner {
     ///
     /// Returns the updates to send with this message... basically an empty vec unless we just
     /// populated the fields.
-    fn acked_all_new_incoming(&mut self) -> Vec<Provenance> {
+    fn acked_all_new_incoming(&mut self) -> (Option<Provenance>, Vec<Provenance>) {
         if self.provenance.is_empty() {
             // This function has already been called.
-            return vec![];
+            return (None, vec![]);
         }
 
         // Determine the limiting factor for which we request upstream replicas to resume.
@@ -1156,7 +1156,7 @@ impl ControllerInner {
             .collect::<Vec<_>>();
         updates_to_send.sort_by_key(|p| p.label());
         updates_to_send.dedup_by_key(|update| update.label());
-        updates_to_send
+        (Some(max_union), updates_to_send)
     }
 
     pub(crate) fn handle_ack_resume_at(&mut self, from: ReplicaAddr) {
@@ -1176,11 +1176,11 @@ impl ControllerInner {
             assert!(self.waiting_on.remove(&addr).is_some());
 
             // Convert the indexed resume at information into ResumeAt messages.
-            let provenance = self.acked_all_new_incoming();
+            let (min_provenance, targets) = self.acked_all_new_incoming();
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
 
             // Send the message!
-            let m = box Packet::ResumeAt { addr_labels, provenance };
+            let m = box Packet::ResumeAt { addr_labels, min_provenance, targets };
             self.domains
                 .get_mut(&addr.0)
                 .unwrap()

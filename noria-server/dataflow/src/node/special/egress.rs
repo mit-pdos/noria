@@ -401,6 +401,7 @@ impl Egress {
     pub fn resume_at(
         &mut self,
         addr_labels: Vec<(ReplicaAddr, usize)>,
+        mut min_provenance: Option<Provenance>,
         targets: Vec<Provenance>,
         on_shard: Option<usize>,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
@@ -425,8 +426,10 @@ impl Egress {
                 println!("{} > {}", label, next_label);
                 assert!(self.payloads.is_empty());
                 assert!(self.updates.is_empty());
-                self.min_provenance.set_label(min_label - 1);
-                self.max_provenance.set_label(min_label - 1);
+                assert_eq!(self.min_provenance.label(), 0);
+                assert_eq!(self.max_provenance.label(), 0);
+                self.min_provenance = min_provenance.take().unwrap();
+                self.max_provenance = self.min_provenance.clone();
                 return;
             }
             // if this is a stateless domain that was just regenerated, then it must not have sent
@@ -444,6 +447,7 @@ impl Egress {
         // replay each message and diff as if they were just received.
         // TODO(ygina): we can probably also just truncate up to min label
         assert!(self.targets.is_empty());
+        assert!(min_provenance.is_none());
         self.max_provenance = self.min_provenance.clone();
         let min_label_index = min_label - self.min_provenance.label() - 1;
         for i in 0..min_label_index {
