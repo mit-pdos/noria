@@ -1,6 +1,6 @@
 dist: trusty
 language: rust
-cache: false
+cache: cargo
 rust:
   - nightly-2019-06-18
 env:
@@ -15,3 +15,10 @@ addons:
 before_cache:
   - rm -rf /home/travis/.cargo/registry
   - rm -rf $TRAVIS_BUILD_DIR/target/incremental
+  - >-
+    cd $TRAVIS_BUILD_DIR/target
+    PACKAGES=("noria" "noria-server" "common" "mir" "dataflow" "vote" "replay" "securecrp" "piazza" "hotsoup" "evict-o-rama" "extract_hotcrp_queries" "lobsters")
+    for pack in $PACKAGES ; do
+        rm deps/${pack//"-"/"_"}-* || true
+    done
+    find -maxdepth 1 -type f -not -name ".*" -delete
