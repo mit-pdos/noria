@@ -31,6 +31,15 @@ thread_local! {
 lazy_static! {
     static ref W_TIME_COUNT: Arc<Mutex<(Option<time::Instant>, u64)>> =
         Arc::new(Mutex::new((None, 0)));
+
+    // The interval with which to write to the reserved key, in nanonseconds
+    static ref WRITE_RESERVED_EVERY_US: time::Duration = time::Duration::new(0, 200_000_000);
+    // The time after which to do the next write to the reserved key
+    static ref NEXT_RESERVED_W: Arc<Mutex<time::Instant>> = Arc::new(Mutex::new(time::Instant::now()));
+    // The write time of the reserved key
+    static ref W_RESERVED_TIME: Arc<Mutex<Vec<time::Instant>>> = Arc::new(Mutex::new(vec![]));
+    // The time each write was first observed of the reserved key
+    static ref R_RESERVED_TIME: Arc<Mutex<Vec<time::Instant>>> = Arc::new(Mutex::new(vec![]));
 }
 
 // Reserved article id
@@ -194,12 +203,38 @@ where
     rt.shutdown_on_idle().wait().unwrap();
 
     // all done!
+
+    // write propagation delay over time
+    let w_reserved_time = W_RESERVED_TIME.clone();
+    let r_reserved_time = R_RESERVED_TIME.clone();
+    let w_reserved_time = w_reserved_time.lock().unwrap();
+    let r_reserved_time = r_reserved_time.lock().unwrap();
+    println!("(write #, relative write time (us since start), delay (us))");
+    println!("[");
+    let start = w_reserved_time[0];
+    for i in 0..r_reserved_time.len() {
+        let w_time = w_reserved_time[i];
+        let r_time = r_reserved_time[i];
+        let relative_w_time = w_time.duration_since(start);
+        let relative_w_time_us =
+            relative_w_time.as_secs() * 1_000_000 +
+            u64::from(relative_w_time.subsec_nanos()) / 1_000;
+        let delay = r_time.duration_since(w_time);
+        let delay_us =
+            delay.as_secs() * 1_000_000 +
+            u64::from(delay.subsec_nanos()) / 1_000;
+        println!("[{},{},{}]", i + 1, relative_w_time_us, delay_us);
+    }
+    println!("]\n");
+
+    // write propagation delay
     let wp_delay = wp_delay.lock().unwrap();
     println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
     println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
     println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
     println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
 
+    // sojourn/remote write/read time
     println!("# generated ops/s: {:.2}", ops);
     println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
@@ -364,32 +399,21 @@ where
                         continue;
                     }
                     let read_count: i64 = read_count.into();
-                    let read_count = read_count as u64;
+                    let read_count = read_count as usize;
 
-                    let w_time_count = W_TIME_COUNT.clone();
-                    let mut w_time_count = w_time_count.lock().unwrap();
-                    if read_count != w_time_count.1 {
-                        // haven't read our write yet
-                        assert!(read_count < w_time_count.1);
-                        continue;
+                    let r_reserved_time = R_RESERVED_TIME.clone();
+                    let mut r_reserved_time = r_reserved_time.lock().unwrap();
+                    while r_reserved_time.len() < read_count - 1 {
+                        // for some reason, missed a read of a write.
+                        // are writes happening too frequently?
+                        println!("WARNING: missed read of vote {}", r_reserved_time.len() + 1);
+                        r_reserved_time.push(done);
                     }
-
-                    // println!("Read {}th vote at {:?}", read_count, done);
-                    if let Some(w_time) = w_time_count.0.take() {
-                        if warmup_done {
-                            let delay = done.duration_since(w_time);
-                            let us =
-                                delay.as_secs() * 1_000_000 +
-                                u64::from(delay.subsec_nanos()) / 1_000;
-                            &WP_DELAY.with(|h| {
-                                let mut h = h.borrow_mut();
-                                if h.record(us).is_err() {
-                                    let m = h.high();
-                                    h.record(m).unwrap();
-                                }
-                            });
-                        }
+                    if r_reserved_time.len() == read_count - 1 {
+                        // println!("Read {}th vote at {:?}", read_count, done);
+                        r_reserved_time.push(done);
                     }
+                    assert_eq!(r_reserved_time.len(), read_count);
                 }
             }
 
@@ -468,38 +492,43 @@ where
             next += time::Duration::new(0, interarrival.sample(&mut rng) as u32);
         }
 
-        // send one write or read for the reserved key per batch
-        let w_time_count = W_TIME_COUNT.clone();
-        let mut w_time_count = w_time_count.lock().unwrap();
-        if w_time_count.0.is_none() {
+        // in case that took a while:
+        let now = time::Instant::now();
+
+        // send one write for the reserved key
+        let next_reserved_w = NEXT_RESERVED_W.clone();
+        let mut next_reserved_w = next_reserved_w.lock().unwrap();
+        if now >= *next_reserved_w {
+            // write down the time of write
+            let w_reserved_time = W_RESERVED_TIME.clone();
+            let mut w_reserved_time = w_reserved_time.lock().unwrap();
+            w_reserved_time.push(now);
+
+            // then queue the write
             if queued_w.is_empty() && next_send.is_none() {
                 next_send = Some(now + max_batch_time);
             }
-            // might mess up sojourn time
             if queued_w.is_empty() {
                 queued_w_keys.push(RESERVED_W_KEY);
                 queued_w.push(now);
             } else {
                 queued_w_keys[0] = RESERVED_W_KEY;
             }
-            *w_time_count = (Some(now), w_time_count.1 + 1);
-            // println!("Wrote {}th vote at {:?}", w_time_count.1, w_time_count.0);
-        } else {
-            if queued_r.is_empty() && next_send.is_none() {
-                next_send = Some(now + max_batch_time);
-            }
-            // might mess up sojourn time
-            if queued_r.is_empty() {
-                queued_r_keys.push(RESERVED_R_KEY);
-                queued_r.push(now);
-            } else {
-                queued_r_keys[0] = RESERVED_R_KEY;
-            }
-        }
-        drop(w_time_count);
 
-        // in case that took a while:
-        let now = time::Instant::now();
+            // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+            *next_reserved_w += *WRITE_RESERVED_EVERY_US;
+        }
+
+        // send one read for the reserved key per batch
+        if queued_r.is_empty() && next_send.is_none() {
+            next_send = Some(now + max_batch_time);
+        }
+        if queued_r.is_empty() {
+            queued_r_keys.push(RESERVED_R_KEY);
+            queued_r.push(now);
+        } else {
+            queued_r_keys[0] = RESERVED_R_KEY;
+        }
 
         if let Some(f) = next_send {
             if f <= now {
