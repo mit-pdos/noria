@@ -18,7 +18,7 @@ before_cache:
   - |
     cd $TRAVIS_BUILD_DIR/target
     PACKAGES=("noria" "noria-server" "common" "mir" "dataflow" "vote" "replay" "securecrp" "piazza" "hotsoup" "evict-o-rama" "extract_hotcrp_queries" "lobsters")
-    for pack in $PACKAGES ; do
-        rm deps/${pack//"-"/"_"}-* || true
+    for PACK in $PACKAGES ; do
+        find -regextype posix-extended -maxdepth 3 -regex "./(debug|target)/deps/${PACK//"-"/"_"}-(\\d|\\w)+(\\.d)?" -print -delete
     done
     find -maxdepth 1 -type f -not -name ".*" -delete
