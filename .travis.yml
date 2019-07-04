@@ -15,7 +15,7 @@ addons:
 before_cache:
   - rm -rf /home/travis/.cargo/registry
   - rm -rf $TRAVIS_BUILD_DIR/target/incremental
-  - >-
+  - |
     cd $TRAVIS_BUILD_DIR/target
     PACKAGES=("noria" "noria-server" "common" "mir" "dataflow" "vote" "replay" "securecrp" "piazza" "hotsoup" "evict-o-rama" "extract_hotcrp_queries" "lobsters")
     for pack in $PACKAGES ; do
