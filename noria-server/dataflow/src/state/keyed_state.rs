@@ -17,52 +17,6 @@ pub(super) enum KeyedState {
     Sex(FnvHashMap<(DataType, DataType, DataType, DataType, DataType, DataType), Vec<Row>>),
 }
 
-
-#[inline]
-pub fn vec2_as_tup<'a, A>(v: &'a [A]) -> &'a (A,A) {
-    debug_assert_eq!(v.len(), 2);
-    unsafe {
-        let p = v.as_ptr() as *const (A,A);
-        p.as_ref().unwrap()
-    }
-}
-
-#[inline]
-pub fn vec3_as_tup<'a, A>(v: &'a [A]) -> &'a (A,A,A) {
-    debug_assert_eq!(v.len(), 3);
-    unsafe {
-        let p = v.as_ptr() as *const (A,A,A);
-        p.as_ref().unwrap()
-    }
-}
-
-#[inline]
-pub fn vec4_as_tup<'a, A>(v: &'a [A]) -> &'a (A,A,A,A) {
-    debug_assert_eq!(v.len(), 4);
-    unsafe {
-        let p = v.as_ptr() as *const (A,A,A,A);
-        p.as_ref().unwrap()
-    }
-}
-
-#[inline]
-pub fn vec5_as_tup<'a, A>(v: &'a [A]) -> &'a (A,A,A,A,A) {
-    debug_assert_eq!(v.len(), 5);
-    unsafe {
-        let p = v.as_ptr() as *const (A,A,A,A,A);
-        p.as_ref().unwrap()
-    }
-}
-
-#[inline]
-pub fn vec6_as_tup<'a, A>(v: &'a [A]) -> &'a (A,A,A,A,A,A) {
-    debug_assert_eq!(v.len(), 6);
-    unsafe {
-        let p = v.as_ptr() as *const (A,A,A,A,A,A);
-        p.as_ref().unwrap()
-    }
-}
-
 impl KeyedState {
     pub(super) fn lookup<'a>(&'a self, key: &KeyType) -> Option<&'a Vec<Row>> {
         match (self, key) {
@@ -110,46 +64,31 @@ impl KeyedState {
     pub(super) fn evict(&mut self, key: &[DataType]) -> u64 {
         match *self {
             KeyedState::Single(ref mut m) => m.remove(&(key[0])),
-            KeyedState::Double(ref mut m) => m.remove(
-                vec2_as_tup(key)
-                // &(key[0].clone(), key[1].clone())
-            ),
+            KeyedState::Double(ref mut m) => m.remove(&(key[0].clone(), key[1].clone())),
             KeyedState::Tri(ref mut m) => {
-                m.remove(
-                    vec3_as_tup(key)
-                    // &(key[0].clone(), key[1].clone(), key[2].clone())
-                )
+                m.remove(&(key[0].clone(), key[1].clone(), key[2].clone()))
             }
-            KeyedState::Quad(ref mut m) => m.remove(
-                vec4_as_tup(key)
-                // &(
-                // key[0].clone(),
-                // key[1].clone(),
-                // key[2].clone(),
-                // key[3].clone(),
-                // )
-            ),
-            KeyedState::Quin(ref mut m) => m.remove(
-                vec5_as_tup(key)
-                // &(
-                // key[0].clone(),
-                // key[1].clone(),
-                // key[2].clone(),
-                // key[3].clone(),
-                // key[4].clone(),
-                // )
-            ),
-            KeyedState::Sex(ref mut m) => m.remove(
-                vec6_as_tup(key)
-            //     &(
-            //     key[0].clone(),
-            //     key[1].clone(),
-            //     key[2].clone(),
-            //     key[3].clone(),
-            //     key[4].clone(),
-            //     key[5].clone(),
-            // )
-            ),
+            KeyedState::Quad(ref mut m) => m.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+            )),
+            KeyedState::Quin(ref mut m) => m.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+                key[4].clone(),
+            )),
+            KeyedState::Sex(ref mut m) => m.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+                key[4].clone(),
+                key[5].clone(),
+            )),
         }
         .map(|rows| {
             rows.iter()

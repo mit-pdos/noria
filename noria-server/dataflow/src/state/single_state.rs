@@ -1,7 +1,7 @@
 use common::SizeOf;
 use prelude::*;
 use rand::prelude::*;
-use state::keyed_state::*;
+use state::keyed_state::KeyedState;
 use std::rc::Rc;
 
 pub(super) struct SingleState {
@@ -243,46 +243,31 @@ impl SingleState {
     pub(super) fn mark_hole(&mut self, key: &[DataType]) -> u64 {
         let removed = match self.state {
             KeyedState::Single(ref mut map) => map.remove(&key[0]),
-            KeyedState::Double(ref mut map) => map.remove(
-                vec2_as_tup(key)
-                // &(key[0].clone(), key[1].clone())
-            ),
+            KeyedState::Double(ref mut map) => map.remove(&(key[0].clone(), key[1].clone())),
             KeyedState::Tri(ref mut map) => {
-                map.remove(
-                    vec3_as_tup(key)
-                    // &(key[0].clone(), key[1].clone(), key[2].clone())
-                )
+                map.remove(&(key[0].clone(), key[1].clone(), key[2].clone()))
             }
-            KeyedState::Quad(ref mut map) => map.remove(
-                vec4_as_tup(key)
-                // &(
-                // key[0].clone(),
-                // key[1].clone(),
-                // key[2].clone(),
-                // key[3].clone(),
-                // )
-            ),
-            KeyedState::Quin(ref mut map) => map.remove(
-                vec5_as_tup(key)
-                // &(
-                // key[0].clone(),
-                // key[1].clone(),
-                // key[2].clone(),
-                // key[3].clone(),
-                // key[4].clone(),
-                // )
-            ),
-            KeyedState::Sex(ref mut map) => map.remove(
-                vec6_as_tup(key)
-                // &(
-                // key[0].clone(),
-                // key[1].clone(),
-                // key[2].clone(),
-                // key[3].clone(),
-                // key[4].clone(),
-                // key[5].clone(),
-                // )
-            ),
+            KeyedState::Quad(ref mut map) => map.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+            )),
+            KeyedState::Quin(ref mut map) => map.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+                key[4].clone(),
+            )),
+            KeyedState::Sex(ref mut map) => map.remove(&(
+                key[0].clone(),
+                key[1].clone(),
+                key[2].clone(),
+                key[3].clone(),
+                key[4].clone(),
+                key[5].clone(),
+            )),
         };
         // mark_hole should only be called on keys we called mark_filled on
         removed
