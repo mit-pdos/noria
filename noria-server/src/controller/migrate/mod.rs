@@ -20,7 +20,7 @@
 //!
 //! Beware, Here be dragons™
 
-use crate::controller::ControllerInner;
+use crate::controller::{ControllerInner, WorkerIdentifier};
 use dataflow::prelude::*;
 use dataflow::{node, prelude::Packet};
 use std::collections::{HashMap, HashSet};
@@ -494,6 +494,22 @@ impl<'a> Migration<'a> {
             })
             .collect();
 
+        fn reset_wis(mainline: &ControllerInner) -> std::vec::IntoIter<WorkerIdentifier> {
+            let mut wis_sorted = mainline
+                .workers
+                .iter()
+                .filter(|(_, w)| w.healthy)
+                .map(|(wi, _)| wi.clone())
+                .collect::<Vec<WorkerIdentifier>>();
+            wis_sorted.sort_by_key(|wi| wi.to_string());
+            wis_sorted.into_iter()
+        }
+
+        // Note: workers and domains are sorted for determinism
+        let mut wis = reset_wis(mainline);
+        let mut changed_domains = changed_domains.into_iter().collect::<Vec<DomainIndex>>();
+        changed_domains.sort();
+
         // Boot up new domains (they'll ignore all updates for now)
         debug!(log, "booting new domains");
         for domain in changed_domains {
@@ -502,10 +518,26 @@ impl<'a> Migration<'a> {
                 continue;
             }
 
+            // find a worker identifier for each shard
             let nodes = uninformed_domain_nodes.remove(&domain).unwrap();
+            let shards = mainline.ingredients[nodes[0].0].sharded_by().shards();
+            let mut identifiers = Vec::new();
+            for _ in 0..shards.unwrap_or(1) {
+                let wi = loop {
+                    if let Some(wi) = wis.next() {
+                        break wi;
+                    } else {
+                        wis = reset_wis(mainline);
+                    }
+                };
+                identifiers.push(wi);
+            }
+
+            // TODO(malte): simple round-robin placement for the moment
             let d = mainline.place_domain(
                 domain,
-                mainline.ingredients[nodes[0].0].sharded_by().shards(),
+                identifiers,
+                shards,
                 &log,
                 nodes,
             );
