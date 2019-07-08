@@ -209,23 +209,28 @@ where
     let r_reserved_time = R_RESERVED_TIME.clone();
     let w_reserved_time = w_reserved_time.lock().unwrap();
     let r_reserved_time = r_reserved_time.lock().unwrap();
-    println!("(write #, relative write time (us since start), delay (us))");
-    println!("[");
+    println!("(relative write time (ms since start), delay (us))");
+    print!("data = [");
     let start = w_reserved_time[0];
     for i in 0..r_reserved_time.len() {
         let w_time = w_reserved_time[i];
         let r_time = r_reserved_time[i];
         let relative_w_time = w_time.duration_since(start);
-        let relative_w_time_us =
-            relative_w_time.as_secs() * 1_000_000 +
-            u64::from(relative_w_time.subsec_nanos()) / 1_000;
-        let delay = r_time.duration_since(w_time);
-        let delay_us =
-            delay.as_secs() * 1_000_000 +
-            u64::from(delay.subsec_nanos()) / 1_000;
-        println!("[{},{},{}]", i + 1, relative_w_time_us, delay_us);
+        let relative_w_time_ms =
+            relative_w_time.as_secs() * 1_000 +
+            u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
+        let delay_us = if r_time == w_time {
+            0
+        } else {
+            let delay = r_time.duration_since(w_time);
+            delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000
+        };
+        if i == r_reserved_time.len() - 1 {
+            print!("[{},{}]]\n", relative_w_time_ms, delay_us);
+        } else {
+            print!("[{},{}],", relative_w_time_ms, delay_us);
+        }
     }
-    println!("]\n");
 
     // write propagation delay
     let wp_delay = wp_delay.lock().unwrap();
@@ -389,6 +394,9 @@ where
 
             if !write {
                 for row in rows {
+                    if row.is_empty() {
+                        continue;
+                    }
                     let author: i32 = row[0][0].clone().into();
                     if author != RESERVED_R_KEY {
                         continue;
@@ -403,14 +411,17 @@ where
 
                     let r_reserved_time = R_RESERVED_TIME.clone();
                     let mut r_reserved_time = r_reserved_time.lock().unwrap();
+                    let w_reserved_time = W_RESERVED_TIME.clone();
+                    let w_reserved_time = w_reserved_time.lock().unwrap();
                     while r_reserved_time.len() < read_count - 1 {
                         // for some reason, missed a read of a write.
                         // are writes happening too frequently?
                         println!("WARNING: missed read of vote {}", r_reserved_time.len() + 1);
-                        r_reserved_time.push(done);
+                        let i = r_reserved_time.len();
+                        r_reserved_time.push(w_reserved_time[i]);
                     }
                     if r_reserved_time.len() == read_count - 1 {
-                        // println!("Read {}th vote at {:?}", read_count, done);
+                        println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
                     }
                     assert_eq!(r_reserved_time.len(), read_count);
@@ -515,7 +526,7 @@ where
                 queued_w_keys[0] = RESERVED_W_KEY;
             }
 
-            // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+            println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
             *next_reserved_w += *WRITE_RESERVED_EVERY_US;
         }
 
