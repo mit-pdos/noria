@@ -46,6 +46,8 @@ lazy_static! {
 const RESERVED_W_KEY: i32 = 1;
 // Reserved author id
 const RESERVED_R_KEY: i32 = 1;
+// Max write propagation delay
+const MAX_DELAY_US: u64 = 2000;
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
@@ -74,6 +76,7 @@ where
     let nthreads = value_t_or_exit!(global_args, "threads", usize);
     let articles = value_t_or_exit!(global_args, "articles", usize);
     let authors = value_t_or_exit!(global_args, "authors", usize);
+    let warmup_ms = value_t_or_exit!(global_args, "warmup", u64) * 1_000;
 
     let params = Parameters {
         prime: !global_args.is_present("no-prime"),
@@ -209,9 +212,10 @@ where
     let r_reserved_time = R_RESERVED_TIME.clone();
     let w_reserved_time = w_reserved_time.lock().unwrap();
     let r_reserved_time = r_reserved_time.lock().unwrap();
-    println!("(relative write time (ms since start), delay (us))");
-    print!("data = [");
+    println!("\n(relative write time (ms since start), delay (us))");
+    print!("[");
     let start = w_reserved_time[0];
+    let mut down = vec![];
     for i in 0..r_reserved_time.len() {
         let w_time = w_reserved_time[i];
         let r_time = r_reserved_time[i];
@@ -219,17 +223,33 @@ where
         let relative_w_time_ms =
             relative_w_time.as_secs() * 1_000 +
             u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
+        if relative_w_time_ms < warmup_ms {
+            // don't use data from warmup time
+            continue;
+        }
+        let relative_w_time_ms = relative_w_time_ms - warmup_ms;
+
         let delay_us = if r_time == w_time {
-            0
+            down.push(relative_w_time_ms);
+            MAX_DELAY_US
         } else {
             let delay = r_time.duration_since(w_time);
-            delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000
+            let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
+            if us > MAX_DELAY_US {
+                down.push(relative_w_time_ms);
+                MAX_DELAY_US
+            } else {
+                us
+            }
         };
         if i == r_reserved_time.len() - 1 {
             print!("[{},{}]]\n", relative_w_time_ms, delay_us);
         } else {
             print!("[{},{}],", relative_w_time_ms, delay_us);
         }
+    }
+    if !down.is_empty() {
+        println!("downtime: {}ms\n", down[down.len() - 1] - down[0]);
     }
 
     // write propagation delay
@@ -425,10 +445,10 @@ where
                         r_reserved_time.push(w_reserved_time[i]);
                     }
                     if r_reserved_time.len() == read_count - 1 {
-                        println!("Read {}th vote at {:?}", read_count, done);
+                        // println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
                     }
-                    assert_eq!(r_reserved_time.len(), read_count);
+                    // assert_eq!(r_reserved_time.len(), read_count);
                 }
             }
 
@@ -530,7 +550,7 @@ where
                 queued_w_keys[0] = RESERVED_W_KEY;
             }
 
-            println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+            // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
             *next_reserved_w += *WRITE_RESERVED_EVERY_US;
         }
 
