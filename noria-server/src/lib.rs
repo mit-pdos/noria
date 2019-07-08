@@ -447,7 +447,7 @@ impl Default for Config {
             },
             persistence: Default::default(),
             heartbeat_every: time::Duration::from_secs(1),
-            healthcheck_every: time::Duration::from_secs(10),
+            healthcheck_every: time::Duration::from_secs(1),
             quorum: 1,
             reuse: ReuseConfigType::Finkelstein,
             #[cfg(any(debug_assertions, test))]
