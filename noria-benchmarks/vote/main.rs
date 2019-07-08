@@ -408,6 +408,10 @@ where
                     }
                     let read_count: i64 = read_count.into();
                     let read_count = read_count as usize;
+                    if read_count == 0 {
+                        // no writes yet
+                        continue;
+                    }
 
                     let r_reserved_time = R_RESERVED_TIME.clone();
                     let mut r_reserved_time = r_reserved_time.lock().unwrap();
