@@ -162,7 +162,7 @@ impl Replica {
         Ok(())
     }
 
-    fn try_flush(&mut self) -> Result<(), failure::Error> {
+    fn try_flush(&mut self) {
         let cc = &self.coord;
         let outputs = &mut self.outputs;
 
@@ -174,12 +174,16 @@ impl Replica {
                 continue;
             }
 
-            let &mut (ref mut tx, ref mut pending) = outputs.entry(ri).or_insert_with(|| {
+            if !outputs.contains_key(&ri) {
                 while !cc.has(&ri) {}
-                let tx = cc.builder_for(&ri).unwrap().build_async().unwrap();
-                (tx, true)
-            });
+                let tx = match cc.builder_for(&ri).unwrap().build_async() {
+                    Ok(tx) => tx,
+                    Err(_) => { return; },
+                };
+                outputs.insert(ri, (tx, true));
+            }
 
+            let &mut (ref mut tx, ref mut pending) = outputs.get_mut(&ri).unwrap();
             while let Some(m) = ms.pop_front() {
                 match tx.start_send(m) {
                     Ok(AsyncSink::Ready) => {
@@ -193,7 +197,7 @@ impl Replica {
                         break;
                     }
                     Err(e) => {
-                        err.push(e);
+                        err.push((ri, e));
                         break;
                     }
                 }
@@ -201,11 +205,16 @@ impl Replica {
         }
 
         if !err.is_empty() {
-            return Err(err.swap_remove(0).into());
+            eprintln!("Failed to start send, removing all queued messages: {:?}", err);
+            for (ri, _) in &err {
+                self.outbox.remove(ri);
+                outputs.remove(ri);
+            }
+            return;
         }
 
         // then, try to do any sends that are still pending
-        for &mut (ref mut tx, ref mut pending) in outputs.values_mut() {
+        for (&ri, &mut (ref mut tx, ref mut pending)) in outputs.iter_mut() {
             if !*pending {
                 continue;
             }
@@ -215,15 +224,17 @@ impl Replica {
                     *pending = false;
                 }
                 Ok(Async::NotReady) => {}
-                Err(e) => err.push(e),
+                Err(e) => err.push((ri, e)),
             }
         }
 
         if !err.is_empty() {
-            return Err(err.swap_remove(0).into());
+            eprintln!("Failed pending send, removing all queued messages: {:?}", err);
+            for (ri, _) in &err {
+                self.outbox.remove(ri);
+                outputs.remove(ri);
+            }
         }
-
-        Ok(())
     }
 
     fn try_new(&mut self) -> io::Result<bool> {
@@ -461,7 +472,7 @@ impl Future for Replica {
 
                     // send to downstream
                     // TODO: send fail == exiting?
-                    self.try_flush().context("downstream flush (after)")?;
+                    self.try_flush();
 
                     // send acks
                     self.try_oob()?;

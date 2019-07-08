@@ -621,16 +621,24 @@ impl ControllerInner {
         // with the migration waiting for a domain to become ready when trying to send
         // the information. (We used to do this in the controller thread, with the
         // result of a nasty deadlock.)
-        for endpoint in self.workers.values_mut() {
+        for (wid, endpoint) in self.workers.iter_mut() {
             for &dd in &announce {
-                endpoint
+                if endpoint
                     .sender
                     .send(CoordinationMessage {
                         epoch: self.epoch,
                         source: endpoint.sender.local_addr().unwrap(),
                         payload: CoordinationPayload::DomainBooted(dd),
                     })
-                    .unwrap();
+                    .is_err() {
+                    warn!(
+                        log,
+                        "failed to tell worker {} about new domain {}.{}",
+                        wid,
+                        dd.domain().index(),
+                        dd.shard(),
+                    );
+                }
             }
         }
 
