@@ -335,6 +335,25 @@ impl<A: Authority + 'static> ControllerHandle<A> {
             })
     }
 
+    /// Obtain a `ViewBuilder` that allows you to build a handle to an external view.
+    pub fn view_builder(
+        &mut self,
+        name: &str,
+    ) -> impl Future<Item = ViewBuilder, Error = failure::Error> + Send {
+        self.handle
+            .call(ControllerRequest::new("view_builder", name).unwrap())
+            .map_err(|e| format_err!("failed to fetch view builder: {:?}", e))
+            .and_then(move |body: hyper::Chunk| {
+                match serde_json::from_slice::<Option<ViewBuilder>>(&body) {
+                    Ok(Some(vb)) => future::Either::A(future::ok(vb)),
+                    Ok(None) => {
+                        future::Either::B(future::err(failure::err_msg("view does not exist")))
+                    }
+                    Err(e) => future::Either::B(future::err(failure::Error::from(e))),
+                }
+            })
+    }
+
     /// Obtain a `Table` that allows you to perform writes, deletes, and other operations on the
     /// given base table.
     ///

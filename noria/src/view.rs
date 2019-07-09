@@ -53,6 +53,20 @@ impl Service<()> for ViewEndpoint {
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
+        let name = &self.name;
+        let shard = self.shard;
+
+        println!("try to reset {}.{} {:?}", name, shard, self.addr);
+        let addr = self.c
+            .as_mut()
+            .unwrap()
+            .view_builder(name)
+            .map(|vb| vb.shards[shard])
+            .wait()
+            .expect("view exists in controller");
+        println!("old {:?} new {:?}", self.addr, addr);
+        self.addr = addr;
+
         tokio::net::TcpStream::connect(&self.addr)
             .and_then(|s| {
                 s.set_nodelay(true)?;

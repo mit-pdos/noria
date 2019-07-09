@@ -571,7 +571,7 @@ where
                         task.enter(|| Service::<WriteRequest>::poll_ready(&mut handle).unwrap())
                     {
                         ops += queued_w.len();
-                        print!("w");
+                        // print!("w");
                         enqueue(
                             &mut handle,
                             queued_w.split_off(0),
@@ -579,7 +579,7 @@ where
                             true,
                         );
                     } else {
-                        print!("a");
+                        // print!("a");
                         // we can't send the request yet -- generate a larger batch
                     }
                 }
@@ -589,7 +589,7 @@ where
                         task.enter(|| Service::<ReadRequest>::poll_ready(&mut handle).unwrap())
                     {
                         ops += queued_r.len();
-                        print!("r");
+                        // print!("r");
                         enqueue(
                             &mut handle,
                             queued_r.split_off(0),
@@ -597,7 +597,7 @@ where
                             false,
                         );
                     } else {
-                        print!("b");
+                        // print!("b");
                         // we can't send the request yet -- generate a larger batch
                     }
                 }
