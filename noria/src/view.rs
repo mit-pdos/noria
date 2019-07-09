@@ -1,5 +1,6 @@
 use crate::data::*;
 use crate::BoxDynError;
+use crate::{ControllerHandle, ZookeeperAuthority};
 use crate::{Tagged, Tagger};
 use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use nom_sql::ColumnSpecification;
@@ -23,10 +24,14 @@ type Transport = AsyncBincodeStream<
     AsyncDestination,
 >;
 
-#[derive(Debug)]
 #[doc(hidden)]
 // only pub because we use it to figure out the error type for ViewError
-pub struct ViewEndpoint(SocketAddr);
+pub struct ViewEndpoint {
+    addr: SocketAddr,
+    name: String,
+    shard: usize,
+    c: Option<ControllerHandle<ZookeeperAuthority>>,
+}
 
 impl Service<()> for ViewEndpoint {
     type Response = multiplex::MultiplexTransport<Transport, Tagger>;
@@ -42,7 +47,7 @@ impl Service<()> for ViewEndpoint {
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
-        tokio::net::TcpStream::connect(&self.0)
+        tokio::net::TcpStream::connect(&self.addr)
             .and_then(|s| {
                 s.set_nodelay(true)?;
                 Ok(s)
@@ -135,6 +140,7 @@ pub enum ReadReply {
 #[doc(hidden)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewBuilder {
+    pub name: String,
     pub node: NodeIndex,
     pub columns: Vec<String>,
     pub schema: Option<Vec<ColumnSpecification>>,
@@ -147,11 +153,13 @@ impl ViewBuilder {
     pub fn build(
         &self,
         rpcs: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
+        controller: Option<ControllerHandle<ZookeeperAuthority>>,
     ) -> impl Future<Item = View, Error = io::Error> + Send {
         let node = self.node;
         let columns = self.columns.clone();
         let shards = self.shards.clone();
         let schema = self.schema.clone();
+        let name = self.name.clone();
         future::join_all(shards.into_iter().enumerate().map(move |(shardi, addr)| {
             use std::collections::hash_map::Entry;
 
@@ -162,13 +170,19 @@ impl ViewBuilder {
                 Entry::Occupied(e) => Ok((addr, e.get().clone())),
                 Entry::Vacant(h) => {
                     // TODO: maybe always use the same local port?
+                    let endpoint = ViewEndpoint {
+                        addr,
+                        name: name.clone(),
+                        shard: shardi,
+                        c: controller.clone(),
+                    };
                     let c = Buffer::new(
                         pool::Builder::new()
                             .urgency(0.03)
                             .loaded_above(0.2)
                             .underutilized_below(0.00001)
                             .max_services(Some(32))
-                            .build(multiplex::client::Maker::new(ViewEndpoint(addr)), ()),
+                            .build(multiplex::client::Maker::new(endpoint), ()),
                         1,
                     );
                     h.insert(c.clone());

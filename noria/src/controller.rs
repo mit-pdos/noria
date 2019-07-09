@@ -3,6 +3,7 @@ use crate::debug::stats;
 use crate::table::{Table, TableBuilder, TableRpc};
 use crate::view::{View, ViewBuilder, ViewRpc};
 use crate::ActivationResult;
+use crate::ZookeeperAuthority;
 #[cfg(debug_assertions)]
 use assert_infrequent;
 use failure::{self, ResultExt};
@@ -292,7 +293,11 @@ impl<A: Authority + 'static> ControllerHandle<A> {
     /// Obtain a `View` that allows you to query the given external view.
     ///
     /// `Self::poll_ready` must have returned `Async::Ready` before you call this method.
-    pub fn view(&mut self, name: &str) -> impl Future<Item = View, Error = failure::Error> + Send {
+    pub fn view(
+        &mut self,
+        name: &str,
+        controller: Option<ControllerHandle<ZookeeperAuthority>>,
+    ) -> impl Future<Item = View, Error = failure::Error> + Send {
         // This call attempts to detect if this function is being called in a loop. If this is
         // getting false positives, then it is safe to increase the allowed hit count, however, the
         // limit_mutator_creation test in src/controller/handle.rs should then be updated as well.
@@ -307,7 +312,7 @@ impl<A: Authority + 'static> ControllerHandle<A> {
             .and_then(move |body: hyper::Chunk| {
                 match serde_json::from_slice::<Option<ViewBuilder>>(&body) {
                     Ok(Some(vb)) => {
-                        future::Either::A(vb.build(views).map_err(failure::Error::from))
+                        future::Either::A(vb.build(views, controller).map_err(failure::Error::from))
                     }
                     Ok(None) => {
                         future::Either::B(future::err(failure::err_msg("view does not exist")))
@@ -588,7 +593,7 @@ where
     ///
     /// See [`ControllerHandle::view`].
     pub fn view<S: AsRef<str>>(&mut self, view: S) -> Result<View, failure::Error> {
-        let fut = self.handle()?.view(view.as_ref());
+        let fut = self.handle()?.view(view.as_ref(), None);
         self.run(fut)
     }
 

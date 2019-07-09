@@ -63,7 +63,11 @@ impl VoteClient for Conn {
                     }
                 })
                 .and_then(|mut c| c.table("Vote").map(move |v| (c, v)))
-                .and_then(|(mut c, v)| c.view("AuthorWithVoteCount").map(move |awvc| (c, v, awvc)))
+                .and_then(|(mut c, v)| {
+                    c
+                        .view("AuthorWithVoteCount", Some(c.clone()))
+                        .map(move |awvc| (c, v, awvc))
+                })
                 .map(|(c, v, awvc)| Conn {
                     ch: c,
                     r: Some(awvc),

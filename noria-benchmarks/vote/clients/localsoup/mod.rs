@@ -119,7 +119,7 @@ impl VoteClient for LocalNoria {
                 g.graph
                     .handle()
                     .unwrap()
-                    .view("AuthorWithVoteCount")
+                    .view("AuthorWithVoteCount", None)
                     .and_then(move |r| {
                         g.graph.handle().unwrap().table("Vote").map(move |mut w| {
                             if fudge {
