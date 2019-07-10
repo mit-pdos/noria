@@ -33,6 +33,12 @@ pub struct ViewEndpoint {
     c: Option<ControllerHandle<ZookeeperAuthority>>,
 }
 
+impl Drop for ViewEndpoint {
+    fn drop(&mut self) {
+        drop(self.c.take());
+    }
+}
+
 impl Service<()> for ViewEndpoint {
     type Response = multiplex::MultiplexTransport<Transport, Tagger>;
     type Error = tokio::io::Error;
