@@ -10,7 +10,7 @@ extern crate lazy_static;
 use failure::ResultExt;
 use hdrhistogram::Histogram;
 use noria::DataType;
-use rand::Rng;
+use rand::prelude::*;
 use std::cell::RefCell;
 use std::fs;
 use std::mem;
@@ -184,8 +184,8 @@ where
                         run_generator(
                             handle,
                             ex,
-                            rand::distributions::Range::new(1, articles + 1),
-                            rand::distributions::Range::new(1, authors + 1),
+                            rand::distributions::Uniform::new(1, articles + 1),
+                            rand::distributions::Uniform::new(1, authors + 1),
                             target,
                             global_args,
                         )
@@ -355,7 +355,7 @@ where
 
     let max_batch_time_us = value_t_or_exit!(global_args, "max-batch-time-us", u32);
     let max_batch_time = time::Duration::new(0, max_batch_time_us * 1_000);
-    let interarrival = rand::distributions::exponential::Exp::new(target * 1e-9);
+    let interarrival = rand::distributions::Exp::new(target * 1e-9);
 
     let every = value_t_or_exit!(global_args, "ratio", u32);
 
@@ -493,8 +493,6 @@ where
         let now = time::Instant::now();
         // NOTE: while, not if, in case we start falling behind
         while next <= now {
-            use rand::distributions::Distribution;
-
             // only queue a new request if we're told to. if this is not the case, we've
             // just been woken up so we can realize we need to send a batch
             if rng.gen_bool(1.0 / f64::from(every)) {

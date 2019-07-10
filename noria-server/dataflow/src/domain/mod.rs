@@ -189,6 +189,9 @@ impl DomainBuilder {
             wait_time: Timer::new(),
             process_times: TimerSet::new(),
             process_ptimes: TimerSet::new(),
+
+            total_replay_time: Timer::new(),
+            total_forward_time: Timer::new(),
         }
     }
 }
@@ -245,6 +248,11 @@ pub struct Domain {
     wait_time: Timer<SimpleTracker, RealTime>,
     process_times: TimerSet<LocalNodeIndex, SimpleTracker, RealTime>,
     process_ptimes: TimerSet<LocalNodeIndex, SimpleTracker, ThreadTime>,
+
+    /// time spent processing replays
+    total_replay_time: Timer<SimpleTracker, RealTime>,
+    /// time spent processing ordinary, forward updates
+    total_forward_time: Timer<SimpleTracker, RealTime>,
 }
 
 impl Domain {
@@ -483,7 +491,7 @@ impl Domain {
         }
     }
 
-    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut Executor) {
+    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut dyn Executor) {
         let src = m.src();
         let me = m.dst();
 
@@ -679,19 +687,25 @@ impl Domain {
         &mut self,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         top: bool,
     ) {
-        self.wait_time.stop();
+        if self.wait_time.is_running() {
+            self.wait_time.stop();
+        }
         m.trace(PacketEvent::Handle);
 
         match *m {
             Packet::Message { .. } | Packet::Input { .. } => {
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
+                self.total_forward_time.start();
                 self.dispatch(m, sends, executor);
+                self.total_forward_time.stop();
             }
             Packet::ReplayPiece { .. } => {
+                self.total_replay_time.start();
                 self.handle_replay(m, sends, executor);
+                self.total_replay_time.stop();
             }
             Packet::Evict { .. } | Packet::EvictKeys { .. } => {
                 self.handle_eviction(m, sends);
@@ -985,6 +999,7 @@ impl Domain {
                         );
                     }
                     Packet::RequestReaderReplay { key, cols, node } => {
+                        self.total_replay_time.start();
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
@@ -1014,6 +1029,7 @@ impl Domain {
                         {
                             self.find_tags_and_replay(key, &cols[..], node);
                         }
+                        self.total_replay_time.stop();
                     }
                     Packet::RequestPartialReplay { tag, key } => {
                         trace!(
@@ -1022,13 +1038,16 @@ impl Domain {
                            "tag" => tag.id(),
                            "key" => format!("{:?}", key)
                         );
+                        self.total_replay_time.start();
                         self.seed_replay(tag, &key[..], sends, executor);
+                        self.total_replay_time.stop();
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
                         let start = time::Instant::now();
+                        self.total_replay_time.start();
                         info!(self.log, "starting replay");
 
                         // we know that the node is materialized, as the migration coordinator
@@ -1152,11 +1171,14 @@ impl Domain {
                                 })
                                 .unwrap();
                         }
-
                         self.handle_replay(p, sends, executor);
+
+                        self.total_replay_time.stop();
                     }
                     Packet::Finish(tag, ni) => {
+                        self.total_replay_time.start();
                         self.finish_replay(tag, ni, sends, executor);
+                        self.total_replay_time.stop();
                     }
                     Packet::Ready { node, purge, index } => {
                         assert_eq!(self.mode, DomainMode::Forwarding);
@@ -1164,7 +1186,7 @@ impl Domain {
                         self.nodes[node].borrow_mut().purge = purge;
 
                         if !index.is_empty() {
-                            let mut s: Box<State> = {
+                            let mut s: Box<dyn State> = {
                                 let n = self.nodes[node].borrow();
                                 let params = &self.persistence_parameters;
                                 match (n.get_base(), &params.mode) {
@@ -1218,6 +1240,8 @@ impl Domain {
                         let domain_stats = noria::debug::stats::DomainStats {
                             total_time: self.total_time.num_nanoseconds(),
                             total_ptime: self.total_ptime.num_nanoseconds(),
+                            total_replay_time: self.total_replay_time.num_nanoseconds(),
+                            total_forward_time: self.total_forward_time.num_nanoseconds(),
                             wait_time: self.wait_time.num_nanoseconds(),
                         };
 
@@ -1303,6 +1327,7 @@ impl Domain {
         }
 
         if !self.buffered_replay_requests.is_empty() {
+            self.total_replay_time.start();
             let now = time::Instant::now();
             let to = self.replay_batch_timeout;
             let elapsed_replays: Vec<_> = {
@@ -1323,6 +1348,7 @@ impl Domain {
             for (tag, keys) in elapsed_replays {
                 self.seed_all(tag, keys, sends, executor);
             }
+            self.total_replay_time.stop();
         }
 
         let mut swap = HashSet::new();
@@ -1367,7 +1393,9 @@ impl Domain {
                 self.handle(m, sends, executor, false);
             }
         }
-        self.wait_time.start();
+        if !self.wait_time.is_running() {
+            self.wait_time.start();
+        }
     }
 
     fn seed_row<'a>(&self, source: LocalNodeIndex, row: Cow<'a, [DataType]>) -> Record {
@@ -1393,7 +1421,7 @@ impl Domain {
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         let (m, source, is_miss) = match self.replay_paths[&tag] {
             ReplayPath {
@@ -1486,7 +1514,7 @@ impl Domain {
         tag: Tag,
         key: &[DataType],
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         if let ReplayPath {
             trigger: TriggerEndpoint::Start(..),
@@ -1582,7 +1610,7 @@ impl Domain {
     }
 
     #[allow(clippy::cognitive_complexity)]
-    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
+    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut dyn Executor) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
             .borrow()
@@ -2290,7 +2318,7 @@ impl Domain {
         tag: Tag,
         node: LocalNodeIndex,
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         let mut was = mem::replace(&mut self.mode, DomainMode::Forwarding);
         let finished = if let DomainMode::Replaying {
@@ -2608,7 +2636,6 @@ impl Domain {
         self.control_reply_tx
             .send(ControlReplyPacket::Booted(self.shard.unwrap_or(0), addr))
             .unwrap();
-        self.wait_time.start();
     }
 
     pub fn update_state_sizes(&mut self) {
@@ -2646,11 +2673,13 @@ impl Domain {
 
     pub fn on_event(
         &mut self,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         event: PollEvent,
         sends: &mut EnqueuedSends,
     ) -> ProcessResult {
-        self.wait_time.stop();
+        if self.wait_time.is_running() {
+            self.wait_time.stop();
+        }
         //self.total_time.start();
         //self.total_ptime.start();
         let res = match event {
@@ -2719,7 +2748,9 @@ impl Domain {
                 ProcessResult::Processed
             }
         };
-        self.wait_time.start();
+        if !self.wait_time.is_running() {
+            self.wait_time.start();
+        }
         res
     }
 }
