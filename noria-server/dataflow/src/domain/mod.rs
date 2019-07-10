@@ -833,7 +833,7 @@ impl Domain {
                                 }
                             }
                             InitialState::PartialGlobal {
-                                gid,
+                                gid: _,
                                 cols,
                                 key,
                                 trigger_domain: (trigger_domain, shards),
@@ -887,12 +887,16 @@ impl Domain {
                                     });
 
                                 let mut n = self.nodes[node].borrow_mut();
+                                let name = n.name().to_string();
                                 n.with_reader_mut(|r| {
                                     assert!(self
                                         .readers
                                         .lock()
                                         .unwrap()
-                                        .insert((gid, *self.shard.as_ref().unwrap_or(&0)), r_part)
+                                        .insert(
+                                            (name, *self.shard.as_ref().unwrap_or(&0)),
+                                            r_part,
+                                        )
                                         .is_none());
 
                                     // make sure Reader is actually prepared to receive state
@@ -900,17 +904,21 @@ impl Domain {
                                 })
                                 .unwrap();
                             }
-                            InitialState::Global { gid, cols, key } => {
+                            InitialState::Global { gid: _, cols, key } => {
                                 use backlog;
                                 let (r_part, w_part) = backlog::new(cols, &key[..]);
 
                                 let mut n = self.nodes[node].borrow_mut();
+                                let name = n.name().to_string();
                                 n.with_reader_mut(|r| {
                                     assert!(self
                                         .readers
                                         .lock()
                                         .unwrap()
-                                        .insert((gid, *self.shard.as_ref().unwrap_or(&0)), r_part)
+                                        .insert(
+                                            (name, *self.shard.as_ref().unwrap_or(&0)),
+                                            r_part,
+                                        )
                                         .is_none());
 
                                     // make sure Reader is actually prepared to receive state

@@ -135,7 +135,7 @@ pub enum ReadQuery {
     /// Read from a leaf view
     Normal {
         /// Where to read from
-        target: (NodeIndex, usize),
+        target: (String, usize),
         /// Keys to read with
         keys: Vec<Vec<DataType>>,
         /// Whether to block if a partial replay is triggered
@@ -144,7 +144,7 @@ pub enum ReadQuery {
     /// Read the size of a leaf view
     Size {
         /// Where to read from
-        target: (NodeIndex, usize),
+        target: (String, usize),
     },
 }
 
@@ -175,11 +175,11 @@ impl ViewBuilder {
         rpcs: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
         controller: Option<ControllerHandle<ZookeeperAuthority>>,
     ) -> impl Future<Item = View, Error = io::Error> + Send {
-        let node = self.node;
         let columns = self.columns.clone();
         let shards = self.shards.clone();
         let schema = self.schema.clone();
         let name = self.name.clone();
+        let view_name = self.name.clone();
         future::join_all(shards.into_iter().enumerate().map(move |(shardi, addr)| {
             use std::collections::hash_map::Entry;
 
@@ -213,7 +213,7 @@ impl ViewBuilder {
         .map(move |shards| {
             let (addrs, conns) = shards.into_iter().unzip();
             View {
-                node,
+                name: view_name,
                 schema,
                 columns,
                 shard_addrs: addrs,
@@ -229,7 +229,7 @@ impl ViewBuilder {
 /// share connections to the Soup workers.
 #[derive(Clone)]
 pub struct View {
-    node: NodeIndex,
+    name: String,
     columns: Vec<String>,
     schema: Option<Vec<ColumnSpecification>>,
 
@@ -240,7 +240,7 @@ pub struct View {
 impl fmt::Debug for View {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
-            .field("node", &self.node)
+            .field("name", &self.name)
             .field("columns", &self.columns)
             .field("shard_addrs", &self.shard_addrs)
             .finish()
@@ -267,7 +267,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                 self.shards[0]
                     .call(
                         ReadQuery::Normal {
-                            target: (self.node, 0),
+                            target: (self.name.clone(), 0),
                             keys,
                             block,
                         }
@@ -289,7 +289,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
             shard_queries[shard].push(key);
         }
 
-        let node = self.node;
+        let name = self.name.clone();
         future::Either::B(
             futures::stream::futures_ordered(
                 self.shards
@@ -311,7 +311,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                         shard
                             .call(
                                 ReadQuery::Normal {
-                                    target: (node, shardi),
+                                    target: (name.clone(), shardi),
                                     keys: shard_queries,
                                     block,
                                 }
@@ -346,7 +346,7 @@ impl View {
     ///
     /// Note that you must also continue to poll this `View` for the returned future to resolve.
     pub fn len(mut self) -> impl Future<Item = (Self, usize), Error = AsyncViewError> + Send {
-        let node = self.node;
+        let name = self.name.clone();
         futures::stream::futures_ordered(self.shards.drain(..).enumerate().map(
             |(shardi, shard)| {
                 shard
@@ -355,7 +355,8 @@ impl View {
                     .and_then(move |mut svc| {
                         svc.call(
                             ReadQuery::Size {
-                                target: (node, shardi),
+                                // TODO(ygina): use actual name
+                                target: ("AuthorWithVoteCount".to_string(), shardi),
                             }
                             .into(),
                         )

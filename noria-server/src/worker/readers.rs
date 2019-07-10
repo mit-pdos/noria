@@ -26,7 +26,7 @@ const TRIGGER_TIMEOUT_US: u64 = 50_000;
 
 thread_local! {
     static READERS: RefCell<HashMap<
-        (NodeIndex, usize),
+        (String, usize),
         SingleReadHandle,
     >> = Default::default();
 }
@@ -95,7 +95,7 @@ fn handle_message(
         } => {
             let immediate = READERS.with(|readers_cache| {
                 let mut readers_cache = readers_cache.borrow_mut();
-                let reader = readers_cache.entry(target).or_insert_with(|| {
+                let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
                     readers.get(&target).unwrap().clone()
                 });
@@ -188,7 +188,7 @@ fn handle_message(
         ReadQuery::Size { target } => {
             let size = READERS.with(|readers_cache| {
                 let mut readers_cache = readers_cache.borrow_mut();
-                let reader = readers_cache.entry(target).or_insert_with(|| {
+                let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
                     readers.get(&target).unwrap().clone()
                 });
@@ -207,7 +207,7 @@ fn handle_message(
 struct BlockingRead {
     tag: u32,
     read: Vec<Vec<Vec<DataType>>>,
-    target: (NodeIndex, usize),
+    target: (String, usize),
     keys: Vec<Vec<DataType>>,
     truth: Readers,
     retry: tokio_os_timer::Interval,
@@ -229,7 +229,7 @@ impl Future for BlockingRead {
                 let mut readers_cache = readers_cache.borrow_mut();
                 let s = &self.truth;
                 let target = &self.target;
-                let reader = readers_cache.entry(self.target).or_insert_with(|| {
+                let reader = readers_cache.entry(self.target.clone()).or_insert_with(|| {
                     let readers = s.lock().unwrap();
                     readers.get(target).unwrap().clone()
                 });
