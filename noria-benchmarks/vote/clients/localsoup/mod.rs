@@ -25,7 +25,7 @@ pub(crate) struct LocalNoria {
 unsafe impl Send for LocalNoria {}
 
 impl VoteClient for LocalNoria {
-    type Future = Box<Future<Item = Self, Error = failure::Error> + Send>;
+    type Future = Box<dyn Future<Item = Self, Error = failure::Error> + Send>;
     fn new(
         ex: tokio::runtime::TaskExecutor,
         params: Parameters,
@@ -141,7 +141,7 @@ impl VoteClient for LocalNoria {
 impl Service<ReadRequest> for LocalNoria {
     type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
+    type Future = Box<dyn Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.r
@@ -177,7 +177,7 @@ impl Service<ReadRequest> for LocalNoria {
 impl Service<WriteRequest> for LocalNoria {
     type Response = Vec<Vec<Vec<DataType>>>;
     type Error = failure::Error;
-    type Future = Box<Future<Item = Self::Response, Error = failure::Error> + Send>;
+    type Future = Box<dyn Future<Item = Self::Response, Error = failure::Error> + Send>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Service::<Vec<TableOperation>>::poll_ready(self.w.as_mut().unwrap())
