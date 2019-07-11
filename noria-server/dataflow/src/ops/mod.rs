@@ -141,7 +141,7 @@ impl Ingredient for NodeOperator {
     }
     fn on_input(
         &mut self,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -163,7 +163,7 @@ impl Ingredient for NodeOperator {
     }
     fn on_input_raw(
         &mut self,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -201,7 +201,7 @@ impl Ingredient for NodeOperator {
         key: &KeyType,
         nodes: &DomainNodes,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+    ) -> Option<Option<Box<dyn Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         impl_ingredient_fn_ref!(self, query_through, columns, key, nodes, states)
     }
     #[allow(clippy::type_complexity)]
@@ -212,7 +212,7 @@ impl Ingredient for NodeOperator {
         key: &KeyType,
         domain: &DomainNodes,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+    ) -> Option<Option<Box<dyn Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         impl_ingredient_fn_ref!(self, lookup, parent, columns, key, domain, states)
     }
     fn parent_columns(&self, column: usize) -> Vec<(NodeIndex, Option<usize>)> {
