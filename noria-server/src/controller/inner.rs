@@ -1070,6 +1070,7 @@ impl ControllerInner {
         updates: Vec<Provenance>,
         min_provenance: Provenance,
     ) {
+        warn!(self.log, "Acked NewIncoming from D{}.{}", from.0.index(), from.1);
         assert!(self.waiting_on.len() > 0, "in recovery mode");
         self.provenance.insert(from, (min_provenance, updates));
 
@@ -1189,6 +1190,9 @@ impl ControllerInner {
 
             // Send the message!
             let m = box Packet::ResumeAt { addr_labels, min_provenance, targets };
+
+            warn!(self.log, "Sending ResumeAt to D{}.{}", addr.0.index(), addr.1);
+
             self.domains
                 .get_mut(&addr.0)
                 .unwrap()

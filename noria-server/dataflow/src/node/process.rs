@@ -2,6 +2,7 @@ use fnv::FnvHashMap;
 use node::NodeType;
 use payload;
 use prelude::*;
+use slog::Logger;
 use std::collections::{HashSet, VecDeque};
 use std::mem;
 
@@ -10,6 +11,7 @@ impl Node {
     crate fn process(
         &mut self,
         m: &mut Option<Box<Packet>>,
+        log: &Logger,
         domain: DomainIndex,
         keyed_by: Option<&Vec<usize>>,
         state: &mut StateMap,
@@ -77,7 +79,9 @@ impl Node {
                 e.send_packet(m, domain, on_shard.unwrap_or(0), output);
             }
             NodeType::Sharder(ref mut s) => {
+                warn!(log, "start processing sharder");
                 s.send_packet(m, domain, addr, on_shard.is_some(), output);
+                warn!(log, "finish processing sharder");
             }
             NodeType::Internal(ref mut i) => {
                 let mut captured_full = false;

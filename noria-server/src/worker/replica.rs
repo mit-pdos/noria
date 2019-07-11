@@ -214,6 +214,12 @@ impl Replica {
         }
 
         if !err.is_empty() {
+            error!(
+                self.log,
+                "Failed to start send, removing all queued messages: {:?}",
+                err,
+            );
+
             eprintln!("Failed to start send, removing all queued messages: {:?}", err);
             for (ri, _) in &err {
                 self.outbox.remove(ri);
@@ -238,6 +244,12 @@ impl Replica {
         }
 
         if !err.is_empty() {
+            error!(
+                self.log,
+                "Failed pending send, removing all queued messages: {:?}",
+                err,
+            );
+
             eprintln!("Failed pending send, removing all queued messages: {:?}", err);
             for (ri, _) in &err {
                 self.outbox.remove(ri);

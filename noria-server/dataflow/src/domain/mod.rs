@@ -553,6 +553,7 @@ impl Domain {
             let mut m = Some(m);
             let (misses, _, captured) = n.process(
                 &mut m,
+                &self.log,
                 self.index,
                 None,
                 &mut self.state,
@@ -1477,7 +1478,7 @@ impl Domain {
                     },
                     Packet::NewIncoming { old, new } => {
                         println!("D{}.{}: NewIncoming old {}.{} new {}.{}", self.index.index(), self.shard.unwrap_or(0), old.0.index(), old.1, new.0.index(), new.1);
-                        debug!(
+                        info!(
                             self.log,
                             "updated incoming connection to domain {}.{}",
                             self.index.index(),
@@ -1542,6 +1543,12 @@ impl Domain {
                                     .unwrap()
                             }
                         };
+
+                        info!(
+                            self.log,
+                            "responding to new incoming",
+                        );
+
                         println!("D{}.{}: NewIncoming respond with {} updates and {:?}", self.index.index(), self.shard.unwrap_or(0), updates.len(), min_provenance);
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
@@ -1557,7 +1564,7 @@ impl Domain {
                         // then set the label of the first message it expects to produce once
                         // it starts receiving messages from upstream nodes again. (see note below)
                         let node = &self.nodes[self.exit_ni];
-                        debug!(
+                        info!(
                             self.log,
                             "resuming messages from D{}.{} to {:?}",
                             self.index.index(),
@@ -2106,6 +2113,7 @@ impl Domain {
                         // process the current message in this node
                         let (mut misses, lookups, captured) = n.process(
                             &mut m,
+                            &self.log,
                             self.index,
                             segment.partial_key.as_ref(),
                             &mut self.state,
