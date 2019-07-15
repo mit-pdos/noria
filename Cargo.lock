@@ -1280,7 +1280,7 @@ dependencies = [
 [[package]]
 name = "mysql_async"
 version = "0.19.1"
-source = "git+https://github.com/udoprog/mysql_async.git?rev=f923dec2f2c2efbdcab0df6db275468a2be23fd4#f923dec2f2c2efbdcab0df6db275468a2be23fd4"
+source = "git+https://github.com/blackbeam/mysql_async.git#3e1560c304d738063af51fa0d65338ad41938eab"
 dependencies = [
  "bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2911,7 +2911,7 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "mysql_async 0.19.1 (git+https://github.com/udoprog/mysql_async.git?rev=f923dec2f2c2efbdcab0df6db275468a2be23fd4)",
+ "mysql_async 0.19.1 (git+https://github.com/blackbeam/mysql_async.git)",
  "rusoto_core 0.39.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_sts 0.39.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2946,7 +2946,7 @@ name = "twox-hash"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3328,7 +3328,7 @@ dependencies = [
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum miow 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "396aa0f2003d7df8395cb93e09871561ccc3e785f0acb369170e8cc74ddf9226"
 "checksum mysql 16.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "67664b7093272a4e5e084ef8a3adf7f34217c3ca4b80498a9c6cda83ecec1304"
-"checksum mysql_async 0.19.1 (git+https://github.com/udoprog/mysql_async.git?rev=f923dec2f2c2efbdcab0df6db275468a2be23fd4)" = "<none>"
+"checksum mysql_async 0.19.1 (git+https://github.com/blackbeam/mysql_async.git)" = "<none>"
 "checksum mysql_common 0.17.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c30560f469165dc692160f58a0e89919e705300a53f3b0de069301a1ee37395c"
 "checksum named_pipe 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ad9c443cce91fc3e12f017290db75dde490d685cdaaf508d7159d7cf41f0eb2b"
 "checksum native-tls 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4b2df1a4c22fd44a62147fd8f13dd0f95c9d8ca7b2610299b2a2f9cf8964274e"
