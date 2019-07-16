@@ -48,6 +48,13 @@ impl Service<()> for ViewEndpoint {
     >;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        try_ready!(
+            self.c
+                .as_mut()
+                .unwrap()
+                .poll_ready()
+                .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+        );
         Ok(Async::Ready(()))
     }
 
