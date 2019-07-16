@@ -95,10 +95,18 @@ fn handle_message(
         } => {
             let immediate = READERS.with(|readers_cache| {
                 let mut readers_cache = readers_cache.borrow_mut();
-                let reader = readers_cache.entry(target.clone()).or_insert_with(|| {
+                let reader = if let Some(reader) = readers_cache.get_mut(&target) {
+                    reader
+                } else {
                     let readers = s.lock().unwrap();
-                    readers.get(&target).unwrap().clone()
-                });
+                    if let Some(reader) = readers.get(&target) {
+                        readers_cache.entry(target.clone()).or_insert(reader.clone())
+                    } else {
+                        // the reader isn't in our local cache or the global map so the target
+                        // must have been removed, or it must be invalid
+                        return Err(None);
+                    }
+                };
 
                 let mut ret = Vec::with_capacity(keys.len());
                 ret.resize(keys.len(), Vec::new());
@@ -135,10 +143,12 @@ fn handle_message(
                 }
 
                 if !ready {
-                    return Ok(Tagged {
-                        tag,
-                        v: ReadReply::Normal(Err(())),
-                    });
+                    // we should maybe only remove if it went from ready to unready. but it seems
+                    // harmless enough if we access the global map multiple times while the reader
+                    // is still getting ready. otherwise, not being ready also means the reader
+                    // went away and is not available anymore.
+                    readers_cache.remove(&target);
+                    return Err(None);
                 }
 
                 if !replaying {
@@ -156,12 +166,12 @@ fn handle_message(
                     }
                 }
 
-                Err((keys, ret))
+                Err(Some((keys, ret)))
             });
 
             match immediate {
                 Ok(reply) => Either::A(Either::A(future::ok(reply))),
-                Err((keys, ret)) => {
+                Err(Some((keys, ret))) => {
                     if !block {
                         Either::A(Either::A(future::ok(Tagged {
                             tag,
@@ -182,6 +192,9 @@ fn handle_message(
                             next_trigger: now,
                         }))
                     }
+                }
+                Err(None) => {
+                    Either::A(Either::A(future::err(())))
                 }
             }
         }

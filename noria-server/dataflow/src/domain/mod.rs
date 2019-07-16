@@ -728,7 +728,26 @@ impl Domain {
                         trace!(self.log, "new node incorporated"; "local" => addr.id());
                     }
                     Packet::RemoveNodes { nodes } => {
+                        let mut readers = self.readers.lock().unwrap();
                         for &node in &nodes {
+                            let mut targets_to_remove = vec![];
+                            if self.nodes[node].borrow().is_reader() {
+                                let name = self.nodes[node].borrow().name().to_string();
+                                let mut targets = readers
+                                    .keys()
+                                    .filter(|target| target.0 == name)
+                                    .map(|target| target.clone())
+                                    .collect::<Vec<_>>();
+                                targets_to_remove.append(&mut targets);
+                            }
+                            for target in &targets_to_remove {
+                                trace!(self.log,
+                                    "remove reader from global cache";
+                                    "name" => target.0.clone(),
+                                    "shard" => target.1);
+                                readers.remove(&target);
+                            }
+
                             self.nodes[node].borrow_mut().remove();
                             self.state.remove(node);
                             trace!(self.log, "node removed"; "local" => node.id());
