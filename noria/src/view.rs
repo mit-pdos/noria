@@ -27,7 +27,6 @@ type Transport = AsyncBincodeStream<
 #[doc(hidden)]
 // only pub because we use it to figure out the error type for ViewError
 pub struct ViewEndpoint {
-    addr: SocketAddr,
     name: String,
     shard: usize,
     c: Option<ControllerHandle<ZookeeperAuthority>>,
@@ -56,18 +55,16 @@ impl Service<()> for ViewEndpoint {
         let name = &self.name;
         let shard = self.shard;
 
-        println!("try to reset {}.{} {:?}", name, shard, self.addr);
-        let addr = self.c
+        self.c
             .as_mut()
             .unwrap()
             .view_builder(name)
-            .map(|vb| vb.shards[shard])
-            .wait()
-            .expect("view exists in controller");
-        println!("old {:?} new {:?}", self.addr, addr);
-        self.addr = addr;
-
-        tokio::net::TcpStream::connect(&self.addr)
+            .map(move |vb| vb.shards[shard])
+            .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+            .and_then(|addr| {
+                println!("ViewEndpoint connecting to {:?}", addr);
+                tokio::net::TcpStream::connect(&addr)
+            })
             .and_then(|s| {
                 s.set_nodelay(true)?;
                 Ok(s)
@@ -191,7 +188,6 @@ impl ViewBuilder {
                 Entry::Vacant(h) => {
                     // TODO: maybe always use the same local port?
                     let endpoint = ViewEndpoint {
-                        addr,
                         name: name.clone(),
                         shard: shardi,
                         c: controller.clone(),
