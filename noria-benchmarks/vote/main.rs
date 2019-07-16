@@ -47,7 +47,7 @@ const RESERVED_W_KEY: i32 = 1;
 // Reserved author id
 const RESERVED_R_KEY: i32 = 1;
 // Max write propagation delay
-const MAX_DELAY_US: u64 = 2000;
+const MAX_DELAY_US: u64 = 5000;
 
 fn throughput(ops: usize, took: time::Duration) -> f64 {
     ops as f64 / took.as_secs_f64()
