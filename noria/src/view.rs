@@ -1,5 +1,6 @@
 use crate::data::*;
 use crate::BoxDynError;
+use crate::{ControllerHandle, ZookeeperAuthority};
 use crate::{Tagged, Tagger};
 use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use nom_sql::ColumnSpecification;
@@ -23,10 +24,19 @@ type Transport = AsyncBincodeStream<
     AsyncDestination,
 >;
 
-#[derive(Debug)]
 #[doc(hidden)]
 // only pub because we use it to figure out the error type for ViewError
-pub struct ViewEndpoint(SocketAddr);
+pub struct ViewEndpoint {
+    name: String,
+    shard: usize,
+    c: Option<ControllerHandle<ZookeeperAuthority>>,
+}
+
+impl Drop for ViewEndpoint {
+    fn drop(&mut self) {
+        drop(self.c.take());
+    }
+}
 
 impl Service<()> for ViewEndpoint {
     type Response = multiplex::MultiplexTransport<Transport, Tagger>;
@@ -38,11 +48,30 @@ impl Service<()> for ViewEndpoint {
     >;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        try_ready!(
+            self.c
+                .as_mut()
+                .unwrap()
+                .poll_ready()
+                .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+        );
         Ok(Async::Ready(()))
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
-        tokio::net::TcpStream::connect(&self.0)
+        let name = &self.name;
+        let shard = self.shard;
+
+        self.c
+            .as_mut()
+            .unwrap()
+            .view_builder(name)
+            .map(move |vb| vb.shards[shard])
+            .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+            .and_then(|addr| {
+                println!("ViewEndpoint connecting to {:?}", addr);
+                tokio::net::TcpStream::connect(&addr)
+            })
             .and_then(|s| {
                 s.set_nodelay(true)?;
                 Ok(s)
@@ -110,7 +139,7 @@ pub enum ReadQuery {
     /// Read from a leaf view
     Normal {
         /// Where to read from
-        target: (NodeIndex, usize),
+        target: (String, usize),
         /// Keys to read with
         keys: Vec<Vec<DataType>>,
         /// Whether to block if a partial replay is triggered
@@ -119,7 +148,7 @@ pub enum ReadQuery {
     /// Read the size of a leaf view
     Size {
         /// Where to read from
-        target: (NodeIndex, usize),
+        target: (String, usize),
     },
 }
 
@@ -135,6 +164,7 @@ pub enum ReadReply {
 #[doc(hidden)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewBuilder {
+    pub name: String,
     pub node: NodeIndex,
     pub columns: Vec<String>,
     pub schema: Option<Vec<ColumnSpecification>>,
@@ -147,11 +177,13 @@ impl ViewBuilder {
     pub fn build(
         &self,
         rpcs: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
+        controller: Option<ControllerHandle<ZookeeperAuthority>>,
     ) -> impl Future<Item = View, Error = io::Error> + Send {
-        let node = self.node;
         let columns = self.columns.clone();
         let shards = self.shards.clone();
         let schema = self.schema.clone();
+        let name = self.name.clone();
+        let view_name = self.name.clone();
         future::join_all(shards.into_iter().enumerate().map(move |(shardi, addr)| {
             use std::collections::hash_map::Entry;
 
@@ -162,13 +194,18 @@ impl ViewBuilder {
                 Entry::Occupied(e) => Ok((addr, e.get().clone())),
                 Entry::Vacant(h) => {
                     // TODO: maybe always use the same local port?
+                    let endpoint = ViewEndpoint {
+                        name: name.clone(),
+                        shard: shardi,
+                        c: controller.clone(),
+                    };
                     let c = Buffer::new(
                         pool::Builder::new()
                             .urgency(0.03)
                             .loaded_above(0.2)
                             .underutilized_below(0.000000001)
                             .max_services(Some(32))
-                            .build(multiplex::client::Maker::new(ViewEndpoint(addr)), ()),
+                            .build(multiplex::client::Maker::new(endpoint), ()),
                         50,
                     );
                     h.insert(c.clone());
@@ -179,7 +216,7 @@ impl ViewBuilder {
         .map(move |shards| {
             let (addrs, conns) = shards.into_iter().unzip();
             View {
-                node,
+                name: view_name,
                 schema,
                 columns,
                 shard_addrs: addrs,
@@ -195,7 +232,7 @@ impl ViewBuilder {
 /// share connections to the Soup workers.
 #[derive(Clone)]
 pub struct View {
-    node: NodeIndex,
+    name: String,
     columns: Vec<String>,
     schema: Option<Vec<ColumnSpecification>>,
 
@@ -206,7 +243,7 @@ pub struct View {
 impl fmt::Debug for View {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
-            .field("node", &self.node)
+            .field("name", &self.name)
             .field("columns", &self.columns)
             .field("shard_addrs", &self.shard_addrs)
             .finish()
@@ -233,7 +270,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                 self.shards[0]
                     .call(
                         ReadQuery::Normal {
-                            target: (self.node, 0),
+                            target: (self.name.clone(), 0),
                             keys,
                             block,
                         }
@@ -255,7 +292,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
             shard_queries[shard].push(key);
         }
 
-        let node = self.node;
+        let name = self.name.clone();
         future::Either::B(
             futures::stream::futures_ordered(
                 self.shards
@@ -277,7 +314,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                         shard
                             .call(
                                 ReadQuery::Normal {
-                                    target: (node, shardi),
+                                    target: (name.clone(), shardi),
                                     keys: shard_queries,
                                     block,
                                 }
@@ -312,7 +349,7 @@ impl View {
     ///
     /// Note that you must also continue to poll this `View` for the returned future to resolve.
     pub fn len(mut self) -> impl Future<Item = (Self, usize), Error = AsyncViewError> + Send {
-        let node = self.node;
+        let name = self.name.clone();
         futures::stream::futures_ordered(self.shards.drain(..).enumerate().map(
             |(shardi, shard)| {
                 shard
@@ -321,7 +358,8 @@ impl View {
                     .and_then(move |mut svc| {
                         svc.call(
                             ReadQuery::Size {
-                                target: (node, shardi),
+                                // TODO(ygina): use actual name
+                                target: ("AuthorWithVoteCount".to_string(), shardi),
                             }
                             .into(),
                         )

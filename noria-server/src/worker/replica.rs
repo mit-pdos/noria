@@ -184,10 +184,15 @@ impl Replica {
             }
 
             if !outputs.contains_key(&ri) {
+                trace!(self.log, "building tx"; "domain" => ri.0.index(), "shard" => ri.1);
                 while !cc.has(&ri) {}
                 let tx = match cc.builder_for(&ri).unwrap().build_async() {
                     Ok(tx) => tx,
-                    Err(_) => { return; },
+                    Err(_) => {
+                        let new_ms = ms.split_off(0);
+                        trace!(self.log, "throwing away {} messages", new_ms.len());
+                        return;
+                    },
                 };
                 outputs.insert(ri, (tx, true));
             }
@@ -214,13 +219,7 @@ impl Replica {
         }
 
         if !err.is_empty() {
-            error!(
-                self.log,
-                "Failed to start send, removing all queued messages: {:?}",
-                err,
-            );
-
-            eprintln!("Failed to start send, removing all queued messages: {:?}", err);
+            error!(self.log, "Failed to start send, removing all queued messages: {:?}", err);
             for (ri, _) in &err {
                 self.outbox.remove(ri);
                 outputs.remove(ri);
@@ -244,13 +243,7 @@ impl Replica {
         }
 
         if !err.is_empty() {
-            error!(
-                self.log,
-                "Failed pending send, removing all queued messages: {:?}",
-                err,
-            );
-
-            eprintln!("Failed pending send, removing all queued messages: {:?}", err);
+            error!(self.log, "Failed pending send, removing all queued messages: {:?}", err);
             for (ri, _) in &err {
                 self.outbox.remove(ri);
                 outputs.remove(ri);

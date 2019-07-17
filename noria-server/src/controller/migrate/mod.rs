@@ -685,7 +685,7 @@ impl<'a> Migration<'a> {
             }
 
             // TODO(malte): simple round-robin placement for the moment
-            println!("placing {:?} with {:?} shards on {:?}", domain, shards, identifiers);
+            info!(log, "placing {:?} with {:?} shards on {:?}", domain, shards, identifiers);
             let d = mainline.place_domain(
                 domain,
                 identifiers,

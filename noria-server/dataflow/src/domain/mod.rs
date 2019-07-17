@@ -768,7 +768,26 @@ impl Domain {
                         trace!(self.log, "new node incorporated"; "local" => addr.id());
                     }
                     Packet::RemoveNodes { nodes } => {
+                        let mut readers = self.readers.lock().unwrap();
                         for &node in &nodes {
+                            let mut targets_to_remove = vec![];
+                            if self.nodes[node].borrow().is_reader() {
+                                let name = self.nodes[node].borrow().name().to_string();
+                                let mut targets = readers
+                                    .keys()
+                                    .filter(|target| target.0 == name)
+                                    .map(|target| target.clone())
+                                    .collect::<Vec<_>>();
+                                targets_to_remove.append(&mut targets);
+                            }
+                            for target in &targets_to_remove {
+                                trace!(self.log,
+                                    "remove reader from global cache";
+                                    "name" => target.0.clone(),
+                                    "shard" => target.1);
+                                readers.remove(&target);
+                            }
+
                             self.nodes[node].borrow_mut().remove();
                             self.state.remove(node);
                             trace!(self.log, "node removed"; "local" => node.id());
@@ -877,7 +896,7 @@ impl Domain {
                                 }
                             }
                             InitialState::PartialGlobal {
-                                gid,
+                                gid: _,
                                 cols,
                                 key,
                                 trigger_domain: (trigger_domain, shards),
@@ -931,12 +950,16 @@ impl Domain {
                                     });
 
                                 let mut n = self.nodes[node].borrow_mut();
+                                let name = n.name().to_string();
                                 n.with_reader_mut(|r| {
                                     assert!(self
                                         .readers
                                         .lock()
                                         .unwrap()
-                                        .insert((gid, *self.shard.as_ref().unwrap_or(&0)), r_part)
+                                        .insert(
+                                            (name, *self.shard.as_ref().unwrap_or(&0)),
+                                            r_part,
+                                        )
                                         .is_none());
 
                                     // make sure Reader is actually prepared to receive state
@@ -944,17 +967,21 @@ impl Domain {
                                 })
                                 .unwrap();
                             }
-                            InitialState::Global { gid, cols, key } => {
+                            InitialState::Global { gid: _, cols, key } => {
                                 use backlog;
                                 let (r_part, w_part) = backlog::new(cols, &key[..]);
 
                                 let mut n = self.nodes[node].borrow_mut();
+                                let name = n.name().to_string();
                                 n.with_reader_mut(|r| {
                                     assert!(self
                                         .readers
                                         .lock()
                                         .unwrap()
-                                        .insert((gid, *self.shard.as_ref().unwrap_or(&0)), r_part)
+                                        .insert(
+                                            (name, *self.shard.as_ref().unwrap_or(&0)),
+                                            r_part,
+                                        )
                                         .is_none());
 
                                     // make sure Reader is actually prepared to receive state

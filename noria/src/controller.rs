@@ -3,6 +3,7 @@ use crate::debug::stats;
 use crate::table::{Table, TableBuilder, TableRpc};
 use crate::view::{View, ViewBuilder, ViewRpc};
 use crate::ActivationResult;
+use crate::ZookeeperAuthority;
 #[cfg(debug_assertions)]
 use assert_infrequent;
 use failure::{self, ResultExt};
@@ -175,6 +176,18 @@ where
     views: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
 }
 
+impl<A> Drop for ControllerHandle<A>
+where
+    A: 'static + Authority,
+{
+    fn drop(&mut self) {
+        let views = self.views.clone();
+        for (_, rpc) in views.lock().unwrap().drain() {
+            drop(rpc);
+        }
+    }
+}
+
 impl<A> Clone for ControllerHandle<A>
 where
     A: 'static + Authority,
@@ -292,7 +305,11 @@ impl<A: Authority + 'static> ControllerHandle<A> {
     /// Obtain a `View` that allows you to query the given external view.
     ///
     /// `Self::poll_ready` must have returned `Async::Ready` before you call this method.
-    pub fn view(&mut self, name: &str) -> impl Future<Item = View, Error = failure::Error> + Send {
+    pub fn view(
+        &mut self,
+        name: &str,
+        controller: Option<ControllerHandle<ZookeeperAuthority>>,
+    ) -> impl Future<Item = View, Error = failure::Error> + Send {
         // This call attempts to detect if this function is being called in a loop. If this is
         // getting false positives, then it is safe to increase the allowed hit count, however, the
         // limit_mutator_creation test in src/controller/handle.rs should then be updated as well.
@@ -307,7 +324,7 @@ impl<A: Authority + 'static> ControllerHandle<A> {
             .and_then(move |body: hyper::Chunk| {
                 match serde_json::from_slice::<Option<ViewBuilder>>(&body) {
                     Ok(Some(vb)) => {
-                        future::Either::A(vb.build(views).map_err(failure::Error::from))
+                        future::Either::A(vb.build(views, controller).map_err(failure::Error::from))
                     }
                     Ok(None) => {
                         future::Either::B(future::err(failure::err_msg("view does not exist")))
@@ -315,6 +332,25 @@ impl<A: Authority + 'static> ControllerHandle<A> {
                     Err(e) => future::Either::B(future::err(failure::Error::from(e))),
                 }
                 .map_err(move |e| e.context(format!("building view for {}", name)).into())
+            })
+    }
+
+    /// Obtain a `ViewBuilder` that allows you to build a handle to an external view.
+    pub fn view_builder(
+        &mut self,
+        name: &str,
+    ) -> impl Future<Item = ViewBuilder, Error = failure::Error> + Send {
+        self.handle
+            .call(ControllerRequest::new("view_builder", name).unwrap())
+            .map_err(|e| format_err!("failed to fetch view builder: {:?}", e))
+            .and_then(move |body: hyper::Chunk| {
+                match serde_json::from_slice::<Option<ViewBuilder>>(&body) {
+                    Ok(Some(vb)) => future::Either::A(future::ok(vb)),
+                    Ok(None) => {
+                        future::Either::B(future::err(failure::err_msg("view does not exist")))
+                    }
+                    Err(e) => future::Either::B(future::err(failure::Error::from(e))),
+                }
             })
     }
 
@@ -588,7 +624,7 @@ where
     ///
     /// See [`ControllerHandle::view`].
     pub fn view<S: AsRef<str>>(&mut self, view: S) -> Result<View, failure::Error> {
-        let fut = self.handle()?.view(view.as_ref());
+        let fut = self.handle()?.view(view.as_ref(), None);
         self.run(fut)
     }
 

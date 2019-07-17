@@ -215,7 +215,6 @@ where
     println!("\n(relative write time (ms since start), delay (us))");
     print!("[");
     let start = w_reserved_time[0];
-    let mut down = vec![];
     for i in 0..r_reserved_time.len() {
         let w_time = w_reserved_time[i];
         let r_time = r_reserved_time[i];
@@ -230,26 +229,17 @@ where
         let relative_w_time_ms = relative_w_time_ms - warmup_ms;
 
         let delay_us = if r_time == w_time {
-            down.push(relative_w_time_ms);
-            MAX_DELAY_US
+            0
         } else {
             let delay = r_time.duration_since(w_time);
             let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
-            if us > MAX_DELAY_US {
-                down.push(relative_w_time_ms);
-                MAX_DELAY_US
-            } else {
-                us
-            }
+            us
         };
         if i == r_reserved_time.len() - 1 {
             print!("[{},{}]]\n", relative_w_time_ms, delay_us);
         } else {
             print!("[{},{}],", relative_w_time_ms, delay_us);
         }
-    }
-    if !down.is_empty() {
-        println!("downtime: {}ms\n", down[down.len() - 1] - down[0]);
     }
 
     // write propagation delay
@@ -571,6 +561,7 @@ where
                         task.enter(|| Service::<WriteRequest>::poll_ready(&mut handle).unwrap())
                     {
                         ops += queued_w.len();
+                        // print!("w");
                         enqueue(
                             &mut handle,
                             queued_w.split_off(0),
@@ -578,6 +569,7 @@ where
                             true,
                         );
                     } else {
+                        // print!("a");
                         // we can't send the request yet -- generate a larger batch
                     }
                 }
@@ -587,6 +579,7 @@ where
                         task.enter(|| Service::<ReadRequest>::poll_ready(&mut handle).unwrap())
                     {
                         ops += queued_r.len();
+                        // print!("r");
                         enqueue(
                             &mut handle,
                             queued_r.split_off(0),
@@ -594,6 +587,7 @@ where
                             false,
                         );
                     } else {
+                        // print!("b");
                         // we can't send the request yet -- generate a larger batch
                     }
                 }
