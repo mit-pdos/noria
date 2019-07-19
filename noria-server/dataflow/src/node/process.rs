@@ -18,7 +18,7 @@ impl Node {
         swap: bool,
         output: &mut EnqueuedSends,
         ex: &mut dyn Executor,
-    ) -> (Vec<Miss>, Vec<Lookup>, HashSet<Vec<DataType>>) {
+    ) -> (Vec<Miss>, Vec<Lookup>, HashSet<Vec<DataType>>, AddrLabel) {
         m.as_mut().unwrap().trace(PacketEvent::Process);
 
         let addr = self.local_addr();
@@ -74,7 +74,8 @@ impl Node {
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref mut e)) => {
-                e.send_packet(m, domain, on_shard.unwrap_or(0), output);
+                let changed = e.send_packet(m, domain, on_shard.unwrap_or(0), output);
+                return (Default::default(), Default::default(), Default::default(), changed);
             }
             NodeType::Sharder(ref mut s) => {
                 s.send_packet(m, domain, addr, on_shard.is_some(), output);
@@ -217,7 +218,7 @@ impl Node {
                     }
                 }
 
-                return (misses, lookups, captured);
+                return (misses, lookups, captured, Default::default());
             }
             NodeType::Dropped => {
                 *m = None;

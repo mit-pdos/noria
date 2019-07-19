@@ -1,11 +1,18 @@
 use fnv::FnvHashMap;
 use prelude::*;
+use std::collections::HashMap;
 use std::fmt;
 
 /// The upstream branch of domains and message labels that was updated to produce the current
 /// message, starting at the node above the payload's "from" node. The number of nodes in the
 /// update is linear in the depth of the update.
 pub type ProvenanceUpdate = Provenance;
+
+/// Map from replica address to a collection of corresponding labels.
+pub type AddrLabels = HashMap<ReplicaAddr, Vec<usize>>;
+
+/// Map from replica address to a single label.
+pub type AddrLabel = HashMap<ReplicaAddr, usize>;
 
 impl fmt::Debug for ProvenanceUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -77,6 +84,20 @@ impl ProvenanceUpdate {
             p.zero();
         }
     }
+
+    /// Convert provenance into a map from address to all labels associated with that address.
+    pub fn into_addr_labels(&self) -> AddrLabels {
+        let mut map = AddrLabels::default();
+        let mut queue = vec![];
+        queue.push(self);
+        while let Some(p) = queue.pop() {
+            map.entry(p.root()).or_insert(vec![]).push(p.label());
+            for child in p.edges.values() {
+                queue.push(&(**child))
+            }
+        }
+        map
+    }
 }
 
 /// The history of message labels that correspond to the production of the current message.
@@ -147,7 +168,21 @@ impl Provenance {
 
     /// The diff must have the same root and label as the provenance it's being applied to.
     /// The diff should strictly be ahead in time in comparison.
-    pub fn apply_update(&mut self, update: &ProvenanceUpdate) {
+    /// Returns the labels that were replaced for each address.
+    pub fn apply_update(&mut self, update: &ProvenanceUpdate) -> (AddrLabels, AddrLabels) {
+        let mut changed_old = AddrLabels::default();
+        let mut changed_new = AddrLabels::default();
+        self.apply_update_internal(update, &mut changed_old, &mut changed_new);
+        assert_eq!(changed_old.keys().len(), changed_new.keys().len());
+        (changed_old, changed_new)
+    }
+
+    pub fn apply_update_internal(
+        &mut self,
+        update: &ProvenanceUpdate,
+        changed_old: &mut AddrLabels,
+        changed_new: &mut AddrLabels,
+    ) {
         assert_eq!(self.root, update.root);
         // Ignore the assertion below in the very specific case that a stateless domain with
         // multiple parents is reconstructed but without being able to recover its lost provenance
@@ -166,11 +201,13 @@ impl Provenance {
             return;
         }
 
+        changed_old.entry(self.root).or_insert(vec![]).push(self.label);
+        changed_new.entry(self.root).or_insert(vec![]).push(update.label);
         self.label = update.label;
 
         for (domain, p_diff) in &update.edges {
             if let Some(p) = self.edges.get_mut(domain) {
-                p.apply_update(p_diff);
+                p.apply_update_internal(p_diff, changed_old, changed_new);
             }
         }
     }

@@ -551,7 +551,7 @@ impl Domain {
             self.process_times.start(me);
             self.process_ptimes.start(me);
             let mut m = Some(m);
-            let (misses, _, captured) = n.process(
+            let (misses, _, captured, changed) = n.process(
                 &mut m,
                 self.index,
                 None,
@@ -2103,7 +2103,7 @@ impl Domain {
                         }
 
                         // process the current message in this node
-                        let (mut misses, lookups, captured) = n.process(
+                        let (mut misses, lookups, captured, changed) = n.process(
                             &mut m,
                             self.index,
                             segment.partial_key.as_ref(),
