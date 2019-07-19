@@ -19,6 +19,12 @@ pub struct Sharder {
     /// Packet payloads
     pub(crate) payloads: Vec<Box<Packet>>,
 
+    // Log truncation
+    /// All labels associated with an address
+    labels: AddrLabels,
+    /// The minimum label associated with an address
+    min_labels: AddrLabel,
+
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// The provenance of the last packet send to each node
@@ -41,6 +47,8 @@ impl Clone for Sharder {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
+            labels: self.labels.clone(),
+            min_labels: self.min_labels.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
@@ -59,6 +67,8 @@ impl Sharder {
             max_provenance: Default::default(),
             updates: Default::default(),
             payloads: Default::default(),
+            labels: Default::default(),
+            min_labels: Default::default(),
             min_label_to_send: Default::default(),
             last_provenance: Default::default(),
             targets: Default::default(),
@@ -77,6 +87,8 @@ impl Sharder {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
+            labels: self.labels.clone(),
+            min_labels: self.min_labels.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
             last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
@@ -261,9 +273,49 @@ impl Sharder {
         index: LocalNodeIndex,
         is_sharded: bool,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) {
-        self.preprocess_packet(m, from);
+    ) -> AddrLabel {
+        let (mut old, mut new) = self.preprocess_packet(m, from);
         self.process(m, self.max_provenance.label(), index, is_sharded, output);
+
+        // Use the changed labels to determine if there is a new minimum label associated
+        // with a replica address in this particular replica.
+        let mut changed = HashMap::new();
+        for (addr, old_labels) in old.drain() {
+            // TODO(ygina): do this more efficiently with a min heap
+            // Remove labels that were replaced by the update
+            let labels = self.labels.get_mut(&addr).unwrap();
+            let mut new_labels = new.remove(&addr).expect("old and new have the same keys");
+            println!("sharder {:?} {:?} {:?}", labels, old_labels, new_labels);
+            for label in old_labels {
+                let mut removed = false;
+                for i in 0..labels.len() {
+                    if labels[i] == label {
+                        labels.swap_remove(i);
+                        removed = true;
+                        break;
+                    }
+                }
+                if !removed {
+                    println!("ALERT");
+                }
+                assert!(removed);
+            }
+
+            // Replace removed labels with the update
+
+            labels.append(&mut new_labels);
+            let min = labels.iter().fold(std::usize::MAX, |mut min, &val| {
+                if val < min {
+                    min = val;
+                }
+                min
+            });
+            if min > *self.min_labels.get(&addr).unwrap() {
+                *self.min_labels.get_mut(&addr).unwrap() = min;
+                changed.insert(addr, min);
+            }
+        }
+        changed
     }
 }
 
@@ -292,6 +344,12 @@ impl Sharder {
     pub fn init_in_domain(&mut self, shard: usize) {
         self.min_provenance.set_shard(shard);
         self.max_provenance = self.min_provenance.clone();
+        self.labels = self.min_provenance.into_addr_labels();
+        self.min_labels = self
+            .labels
+            .keys()
+            .map(|&addr| (addr, 0))
+            .collect();
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
@@ -344,6 +402,20 @@ impl Sharder {
                 assert_eq!(self.max_provenance.label(), 0);
                 self.min_provenance = min_provenance.take().unwrap();
                 self.max_provenance = self.min_provenance.clone();
+                self.labels = self.min_provenance.into_addr_labels();
+                self.min_labels = self
+                    .labels
+                    .iter()
+                    .map(|(addr, labels)| {
+                        let min = labels.iter().fold(std::usize::MAX, |mut min, &val| {
+                            if val < min {
+                                min = val;
+                            }
+                            min
+                        });
+                        (*addr, min)
+                    })
+                    .collect();
                 return;
             }
             // if this is a stateless domain that was just regenerated, then it must not have sent
@@ -371,11 +443,10 @@ impl Sharder {
         index: LocalNodeIndex,
         is_sharded: bool,
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
-    ) {
+    ) -> AddrLabel {
         // With no targets, all messages are forwarded.
         if self.targets.is_empty() {
-            self.send_packet_internal(m, from, index, is_sharded, output);
-            return;
+            return self.send_packet_internal(m, from, index, is_sharded, output);
         }
 
         let next = m.as_ref().unwrap().id().as_ref().expect("message must have id if targets exist");
@@ -390,6 +461,13 @@ impl Sharder {
             assert_eq!(target.edges().len(), 1);
             let p = target.edges().values().next().unwrap();
             return p.root() == update.root() && p.label() == update.label();
+        }
+
+        let mut changed = AddrLabel::default();
+        fn merge_changed(acc: &mut AddrLabel, x: AddrLabel) {
+            for (addr, label) in x.into_iter() {
+                acc.insert(addr, label);
+            }
         }
 
         loop {
@@ -442,14 +520,21 @@ impl Sharder {
                                 }
                             }
                         }
-                        self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
+                        let x = self.send_packet_internal(
+                            &mut Some(m),
+                            from,
+                            index,
+                            is_sharded,
+                            output,
+                        );
+                        merge_changed(&mut changed, x);
                     }
                 }
             }
 
             // If we did not just send the target, wait for the next packet to arrive.
             if !hit {
-                return;
+                return changed;
             }
 
             // If we have sent the target, assert that all the non-root labels also match. Then set
@@ -468,9 +553,16 @@ impl Sharder {
                     .map(|(_, ms)| ms)
                     .collect::<Vec<_>>();
                 for m in ms {
-                    self.send_packet_internal(&mut Some(m), from, index, is_sharded, output);
+                    let x = self.send_packet_internal(
+                        &mut Some(m),
+                        from,
+                        index,
+                        is_sharded,
+                        output,
+                    );
+                    merge_changed(&mut changed, x);
                 }
-                return;
+                return changed;
             }
         }
     }
@@ -479,7 +571,11 @@ impl Sharder {
     // egress mode using the packet's existing provenance. Set the label according to the packet
     // type and current packet buffer. Apply this new packet provenance to the domain-wide
     // provenance, and store the update in our provenance history.
-    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: DomainIndex) {
+    pub fn preprocess_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: DomainIndex,
+    ) -> (AddrLabels, AddrLabels) {
         // sharders are unsharded
         let from = (from, 0);
         let is_message = match m {
@@ -507,7 +603,7 @@ impl Sharder {
             assert!(self.targets.is_empty());
             ProvenanceUpdate::new(from, label)
         };
-        self.max_provenance.apply_update(&update);
+        let (old, new) = self.max_provenance.apply_update(&update);
 
         // Keep a list of these updates in case a parent domain with multiple parents needs to be
         // reconstructed, but only for messages and not replays. Buffer messages but not replays.
@@ -527,5 +623,6 @@ impl Sharder {
             update.trim(PROVENANCE_DEPTH - 1);
             *m.as_mut().unwrap().id_mut() = Some(update);
         }
+        (old, new)
     }
 }

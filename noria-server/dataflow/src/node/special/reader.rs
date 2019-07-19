@@ -1,6 +1,7 @@
 use backlog;
 use noria::channel;
 use prelude::*;
+use std::collections::HashMap;
 
 /// A StreamUpdate reflects the addition or deletion of a row from a reader node.
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +47,12 @@ pub struct Reader {
     pub(crate) updates: Vec<ProvenanceUpdate>,
     /// Number of non-replay messages received.
     pub(crate) num_payloads: usize,
+
+    // Log truncation
+    /// All labels associated with an address
+    labels: AddrLabels,
+    /// The minimum label associated with an address
+    min_labels: AddrLabel,
 }
 
 impl Clone for Reader {
@@ -60,6 +67,8 @@ impl Clone for Reader {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
+            labels: self.labels.clone(),
+            min_labels: self.min_labels.clone(),
         }
     }
 }
@@ -77,6 +86,8 @@ impl Reader {
             max_provenance: Default::default(),
             updates: Default::default(),
             num_payloads: 0,
+            labels: Default::default(),
+            min_labels: Default::default(),
         }
     }
 
@@ -106,6 +117,8 @@ impl Reader {
             max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
+            labels: self.labels.clone(),
+            min_labels: self.min_labels.clone(),
         }
     }
 
@@ -178,10 +191,47 @@ impl Reader {
         from: DomainIndex,
         shard: usize,
         swap: bool,
-    ) {
-        if self.writer.is_some() {
-            self.preprocess_packet(m, (from, shard));
-        }
+    ) -> AddrLabel {
+        let changed = if self.writer.is_some() {
+            let (mut old, mut new) = self.preprocess_packet(m, (from, shard));
+
+            // Use the changed labels to determine if there is a new minimum label associated
+            // with a replica address in this particular replica.
+            let mut changed = HashMap::new();
+            for (addr, old_labels) in old.drain() {
+                // TODO(ygina): do this more efficiently with a min heap
+                // Remove labels that were replaced by the update
+                let labels = self.labels.get_mut(&addr).unwrap();
+                for label in old_labels {
+                    let mut removed = false;
+                    for i in 0..labels.len() {
+                        if labels[i] == label {
+                            labels.swap_remove(i);
+                            removed = true;
+                            break;
+                        }
+                    }
+                    assert!(removed);
+                }
+
+                // Replace removed labels with the update
+                let mut new_labels = new.remove(&addr).expect("old and new have the same keys");
+                labels.append(&mut new_labels);
+                let min = labels.iter().fold(std::usize::MAX, |mut min, &val| {
+                    if val < min {
+                        min = val;
+                    }
+                    min
+                });
+                if min > *self.min_labels.get(&addr).unwrap() {
+                    *self.min_labels.get_mut(&addr).unwrap() = min;
+                    changed.insert(addr, min);
+                }
+            }
+            changed
+        } else {
+            AddrLabel::default()
+        };
 
         if let Some(ref mut state) = self.writer {
             let m = m.as_mut().unwrap();
@@ -266,6 +316,7 @@ impl Reader {
                 .is_ok()
             });
         }
+        changed
     }
 }
 
@@ -284,6 +335,12 @@ impl Reader {
     pub fn init_in_domain(&mut self, shard: usize) {
         self.min_provenance.set_shard(shard);
         self.max_provenance = self.min_provenance.clone();
+        self.labels = self.min_provenance.into_addr_labels();
+        self.min_labels = self
+            .labels
+            .keys()
+            .map(|&addr| (addr, 0))
+            .collect();
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
@@ -302,7 +359,11 @@ impl Reader {
 
     }
 
-    pub fn preprocess_packet(&mut self, m: &mut Option<Box<Packet>>, from: ReplicaAddr) {
+    pub fn preprocess_packet(
+        &mut self,
+        m: &mut Option<Box<Packet>>,
+        from: ReplicaAddr,
+    ) -> (AddrLabels, AddrLabels) {
         let (mtype, is_replay) = match m {
             Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", true),
             Some(box Packet::Message { .. }) => ("Message", false),
@@ -320,12 +381,13 @@ impl Reader {
         } else {
             ProvenanceUpdate::new(from, label)
         };
-        self.max_provenance.apply_update(&update);
+        let (old, new) = self.max_provenance.apply_update(&update);
         self.updates.push(update);
 
         // update num_payloads if not a replay
         if !is_replay {
             self.num_payloads += 1;
         }
+        (old, new)
     }
 }

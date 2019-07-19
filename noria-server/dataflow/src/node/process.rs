@@ -70,7 +70,8 @@ impl Node {
                 }
             }
             NodeType::Reader(ref mut r) => {
-                r.process(m, domain, on_shard.unwrap_or(0), swap);
+                let changed = r.process(m, domain, on_shard.unwrap_or(0), swap);
+                return (Default::default(), Default::default(), Default::default(), changed);
             }
             NodeType::Egress(None) => unreachable!(),
             NodeType::Egress(Some(ref mut e)) => {
@@ -78,7 +79,8 @@ impl Node {
                 return (Default::default(), Default::default(), Default::default(), changed);
             }
             NodeType::Sharder(ref mut s) => {
-                s.send_packet(m, domain, addr, on_shard.is_some(), output);
+                let changed = s.send_packet(m, domain, addr, on_shard.is_some(), output);
+                return (Default::default(), Default::default(), Default::default(), changed);
             }
             NodeType::Internal(ref mut i) => {
                 let mut captured_full = false;
