@@ -376,27 +376,6 @@ impl Egress {
         self.process(m, self.max_provenance.label(), shard, output, &to_addrs);
     }
 
-    /// Set the minimum label of the provenance, which represents the label of the first
-    /// packet payload we have that is not stored, but don't truncate the payload buffer.
-    ///
-    /// If the label is beyond the label of the payloads we actually have, just set the label
-    /// as given and clear the payload buffer. There's no reason the label should be beyond what
-    /// we actually have if we have a non-zero number of packets.
-    pub fn set_min_label(&mut self, label: usize) {
-        assert!(label >= self.min_provenance.label());
-        let num_to_truncate = label - self.min_provenance.label();
-        if num_to_truncate > self.payloads.len() {
-            assert!(self.payloads.is_empty());
-            self.payloads = Vec::new();
-            // WARNING: setting the label here without setting the rest of the provenance might
-            // cause some issues, since the min provenance won't represent the actual provenance
-            // of that message label
-            self.min_provenance.set_label(label);
-        } else {
-            // self.payloads.drain(0..num_to_truncate);
-        }
-    }
-
     /// Resume sending messages to these children at the given labels.
     pub fn resume_at(
         &mut self,
