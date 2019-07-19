@@ -29,6 +29,8 @@ use tokio_io_pool;
 mod readers;
 mod replica;
 
+type AddrLabel = HashMap<ReplicaIndex, usize>;
+
 type ChannelCoordinator = channel::ChannelCoordinator<ReplicaIndex, Box<Packet>>;
 
 enum InstanceState {
@@ -215,8 +217,10 @@ fn listen_df(
     // extract important things from state config
     let epoch = state.epoch;
     let heartbeat_every = state.config.heartbeat_every;
+    let truncate_every = state.config.truncate_every;
 
     let (ctrl_tx, ctrl_rx) = futures::sync::mpsc::unbounded();
+    let (worker_tx, worker_rx) = futures::sync::mpsc::unbounded();
 
     // reader setup
     let readers = Arc::new(Mutex::new(HashMap::new()));
@@ -290,6 +294,44 @@ fn listen_df(
         );
     }
 
+    // Start worker-domain message handler
+    // let last_truncated = time::Instant::now();
+    // let labels: HashMap<ReplicaIndex, AddrLabel> = HashMap::new();
+    tokio::spawn(
+        worker_rx
+            .fold((time::Instant::now(), HashMap::new()), move |
+                (last_truncated, mut labels): (time::Instant, HashMap<ReplicaIndex, AddrLabel>),
+                (from, min_labels): (ReplicaIndex, AddrLabel)
+            | {
+                // process the incoming message
+                for (addr, label) in min_labels.into_iter() {
+                    labels.entry(addr).or_insert(Default::default()).insert(from, label);
+                }
+
+                // it has been a while since we last sent a truncate message to the controller
+                if last_truncated.elapsed() > truncate_every {
+                    let min_labels = labels
+                        .iter()
+                        .map(|(from, labels)| {
+                            let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
+                                if val < min {
+                                    min = val;
+                                }
+                                min
+                            });
+                            (from, min_label)
+                        })
+                        .collect::<HashMap<_, _>>();
+                    println!("truncate {:?}", min_labels);
+                    futures::future::ok((time::Instant::now(), labels))
+                } else {
+                    futures::future::ok((last_truncated, labels))
+                }
+            })
+            .and_then(|(_, _)| Ok(()))
+            .map_err(|e| panic!("{:?}", e))
+    );
+
     // Now we're ready to accept new domains.
     let dcaddr = desc.domain_addr;
     tokio::spawn(
@@ -330,6 +372,7 @@ fn listen_df(
                         on,
                         rx,
                         ctrl_tx.clone(),
+                        worker_tx.clone(),
                         log.clone(),
                         coord.clone(),
                     ));

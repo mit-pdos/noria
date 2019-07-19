@@ -53,5 +53,6 @@ pub trait Executor {
     );
     fn ack_resume_at(&mut self, from: ReplicaAddr);
     fn uncache_replica(&mut self, replica: ReplicaAddr);
+    fn send_min_label(&mut self, labels: AddrLabel);
     fn create_universe(&mut self, req: HashMap<String, DataType>);
 }

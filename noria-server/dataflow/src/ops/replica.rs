@@ -40,7 +40,7 @@ impl Ingredient for Replica {
 
     fn on_input(
         &mut self,
-        _: &mut Executor,
+        _: &mut dyn Executor,
         _: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
