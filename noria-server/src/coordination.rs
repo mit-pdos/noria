@@ -41,6 +41,13 @@ pub enum CoordinationPayload {
     CreateUniverse(HashMap<String, DataType>),
     /// Shutdown a worker.
     Shutdown,
+    /// The minimum maximum labels of this worker for truncating logs.
+    TruncateLogs {
+        /// Who this is from.
+        from: SocketAddr,
+        /// Minimum maximum labels.
+        labels: HashMap<ReplicaAddr, usize>,
+    },
     /// Ack NewIncoming to start sending ResumeAts.
     AckNewIncoming {
         /// Who the ack is from.

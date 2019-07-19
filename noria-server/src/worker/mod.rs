@@ -295,12 +295,14 @@ fn listen_df(
     }
 
     // Start worker-domain message handler
-    // let last_truncated = time::Instant::now();
-    // let labels: HashMap<ReplicaIndex, AddrLabel> = HashMap::new();
     tokio::spawn(
         worker_rx
-            .fold((time::Instant::now(), HashMap::new()), move |
-                (last_truncated, mut labels): (time::Instant, HashMap<ReplicaIndex, AddrLabel>),
+            .fold((time::Instant::now(), HashMap::new(), ctrl_tx.clone()), move |
+                (last_truncated, mut labels, ctrl_tx): (
+                    time::Instant,
+                    HashMap<ReplicaIndex, AddrLabel>,
+                    futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
+                ),
                 (from, min_labels): (ReplicaIndex, AddrLabel)
             | {
                 // process the incoming message
@@ -308,7 +310,8 @@ fn listen_df(
                     labels.entry(addr).or_insert(Default::default()).insert(from, label);
                 }
 
-                // it has been a while since we last sent a truncate message to the controller
+                // it has been a while since we last sent a truncate message to the controller.
+                // aggregate the minimum labels and send a message.
                 if last_truncated.elapsed() > truncate_every {
                     let min_labels = labels
                         .iter()
@@ -319,16 +322,28 @@ fn listen_df(
                                 }
                                 min
                             });
-                            (from, min_label)
+                            (*from, min_label)
                         })
                         .collect::<HashMap<_, _>>();
-                    println!("truncate {:?}", min_labels);
-                    futures::future::ok((time::Instant::now(), labels))
+                    let m = CoordinationPayload::TruncateLogs {
+                        from: waddr,
+                        labels: min_labels,
+                    };
+                    tokio::spawn(ctrl_tx
+                        .clone()
+                        .send(m)
+                        .map_err(|_| {
+                            // controller went away -- exit?
+                            eprintln!("controller went away during log truncation");
+                        })
+                        .map(|_| ()),
+                    );
+                    futures::future::ok((time::Instant::now(), labels, ctrl_tx))
                 } else {
-                    futures::future::ok((last_truncated, labels))
+                    futures::future::ok((last_truncated, labels, ctrl_tx))
                 }
             })
-            .and_then(|(_, _)| Ok(()))
+            .and_then(|(_, _, _)| Ok(()))
             .map_err(|e| panic!("{:?}", e))
     );
 

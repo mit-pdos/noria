@@ -102,6 +102,11 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.create_universe(universe).unwrap());
                         }
                     }
+                    CoordinationPayload::TruncateLogs { from, labels } => {
+                        if let Some(ref mut ctrl) = controller {
+                            crate::block_on(|| ctrl.handle_truncate_logs(from, labels));
+                        }
+                    }
                     CoordinationPayload::AckNewIncoming { from, updates, min_provenance } => {
                         if let Some(ref mut ctrl) = controller {
                             crate::block_on(|| ctrl.handle_ack_new_incoming(

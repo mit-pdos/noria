@@ -138,6 +138,7 @@ pub(super) fn start_instance<A: Authority + 'static>(
                         CoordinationPayload::Register { .. } => fw(e, true),
                         CoordinationPayload::Heartbeat => fw(e, true),
                         CoordinationPayload::CreateUniverse(..) => fw(e, true),
+                        CoordinationPayload::TruncateLogs { .. } => fw(e, true),
                         CoordinationPayload::AckNewIncoming { .. } => fw(e, true),
                         CoordinationPayload::AckResumeAt { .. } => fw(e, true),
                     },

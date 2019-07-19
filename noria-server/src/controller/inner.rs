@@ -83,6 +83,9 @@ pub(super) struct ControllerInner {
     /// Map from replica to the children and labels that should be included in the ResumeAt
     /// message sent to the key.
     resume_ats: HashMap<ReplicaAddr, Vec<(ReplicaAddr, usize)>>,
+
+    /// Log truncation: the minimum label owned by each worker for each address
+    truncate: HashMap<ReplicaAddr, HashMap<WorkerIdentifier, usize>>,
 }
 
 pub(in crate::controller) struct DomainReplies(
@@ -372,6 +375,17 @@ impl ControllerInner {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn handle_truncate_logs(
+        &mut self,
+        from: WorkerIdentifier,
+        labels: HashMap<ReplicaAddr, usize>,
+    ) {
+        println!("received {:?} {:?}", from, labels);
+        for (addr, label) in labels.into_iter() {
+            self.truncate.entry(addr).or_insert(Default::default()).insert(from, label);
+        }
     }
 
     fn check_worker_liveness(&mut self) {
@@ -1255,6 +1269,7 @@ impl ControllerInner {
             provenance: Default::default(),
             waiting_on: Default::default(),
             resume_ats: Default::default(),
+            truncate: Default::default(),
         }
     }
 
