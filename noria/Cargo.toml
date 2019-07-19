@@ -45,8 +45,8 @@ tower = "0.1"
 slab = "0.4"
 
 # consensus/
-slog = "2.4.0"
-#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_debug"] }
+#slog = "2.4.0"
+slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_trace"] }
 slog-term = "2.4.0"
 zookeeper = "0.5.3"
 

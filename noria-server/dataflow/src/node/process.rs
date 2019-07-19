@@ -79,9 +79,7 @@ impl Node {
                 e.send_packet(m, domain, on_shard.unwrap_or(0), output);
             }
             NodeType::Sharder(ref mut s) => {
-                warn!(log, "start processing sharder");
                 s.send_packet(m, domain, addr, on_shard.is_some(), output);
-                warn!(log, "finish processing sharder");
             }
             NodeType::Internal(ref mut i) => {
                 let mut captured_full = false;
