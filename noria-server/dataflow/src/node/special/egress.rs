@@ -33,8 +33,6 @@ pub struct Egress {
     do_not_send: HashSet<ReplicaAddr>,
     /// The minimum label that should be sent to each replica (inclusive)
     min_label_to_send: HashMap<ReplicaAddr, usize>,
-    /// The provenance of the last packet send to each node
-    last_provenance: HashMap<ReplicaAddr, Provenance>,
     /// Target provenances to hit as we're generating new messages
     targets: Vec<Provenance>,
     /// Buffered messages per parent for when we can't hit the next target provenance
@@ -56,7 +54,6 @@ impl Clone for Egress {
             min_labels: self.min_labels.clone(),
             do_not_send: self.do_not_send.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
-            last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
             parent_buffer: self.parent_buffer.clone(),
         }
@@ -82,7 +79,6 @@ impl Egress {
             dest: addr,
         });
         self.min_label_to_send.insert(addr, 1);
-        self.insert_default_last_provenance(addr);
     }
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
@@ -193,14 +189,6 @@ impl Egress {
             .keys()
             .map(|&addr| (addr, 0))
             .collect();
-    }
-
-    // We initially have sent nothing to each node. Diffs are one depth shorter.
-    fn insert_default_last_provenance(&mut self, addr: ReplicaAddr) {
-        let mut p = self.min_provenance.clone();
-        p.trim(PROVENANCE_DEPTH - 1);
-        p.zero();
-        self.last_provenance.insert(addr, p);
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
@@ -564,7 +552,6 @@ impl Egress {
         }
         for &(addr, label) in &addr_labels {
             println!("RESUME [#{}, #{}) -> D{}.{}", label, next_label, addr.0.index(), addr.1);
-            self.insert_default_last_provenance(addr);
         }
 
         // Resend all messages from the minimum label.

@@ -27,8 +27,6 @@ pub struct Sharder {
 
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<ReplicaAddr, usize>,
-    /// The provenance of the last packet send to each node
-    last_provenance: HashMap<ReplicaAddr, Provenance>,
     /// Target provenances to hit as we're generating new messages
     targets: Vec<Provenance>,
     /// Buffered messages per parent for when we can't hit the next target provenance
@@ -50,7 +48,6 @@ impl Clone for Sharder {
             labels: self.labels.clone(),
             min_labels: self.min_labels.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
-            last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
             parent_buffer: self.parent_buffer.clone(),
         }
@@ -70,7 +67,6 @@ impl Sharder {
             labels: Default::default(),
             min_labels: Default::default(),
             min_label_to_send: Default::default(),
-            last_provenance: Default::default(),
             targets: Default::default(),
             parent_buffer: Default::default(),
         }
@@ -90,7 +86,6 @@ impl Sharder {
             labels: self.labels.clone(),
             min_labels: self.min_labels.clone(),
             min_label_to_send: self.min_label_to_send.clone(),
-            last_provenance: self.last_provenance.clone(),
             targets: self.targets.clone(),
             parent_buffer: self.parent_buffer.clone(),
         }
@@ -102,7 +97,6 @@ impl Sharder {
         // TODO: add support for "shared" sharder?
         for tx in txs {
             self.min_label_to_send.insert(tx, 1);
-            self.insert_default_last_provenance(tx);
             self.txs.push((dst, tx));
         }
     }
@@ -323,14 +317,6 @@ const PROVENANCE_DEPTH: usize = 3;
 
 // fault tolerance
 impl Sharder {
-    // We initially have sent nothing to each node. Diffs are one depth shorter.
-    fn insert_default_last_provenance(&mut self, addr: ReplicaAddr) {
-        let mut p = self.min_provenance.clone();
-        p.trim(PROVENANCE_DEPTH - 1);
-        p.zero();
-        self.last_provenance.insert(addr, p);
-    }
-
     pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
         for ni in graph.node_indices() {
             if graph[ni] == root {

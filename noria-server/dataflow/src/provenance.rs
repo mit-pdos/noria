@@ -58,26 +58,6 @@ impl ProvenanceUpdate {
         }
     }
 
-    pub fn diff(&self, other: &ProvenanceUpdate) -> ProvenanceUpdate {
-        assert_eq!(self.root, other.root);
-        other.clone()
-        // if self.label == other.label {
-        //     ProvenanceUpdate::new(self.root, self.label)
-        // } else if self.label < other.label {
-        //     let mut diff = ProvenanceUpdate::new(other.root, other.label);
-        //     for (domain, p_other) in &other.edges {
-        //         if let Some(p_self) = self.edges.get(domain) {
-        //             if p_self.label < p_other.label {
-        //                 diff.add_child(p_self.diff(p_other));
-        //             }
-        //         }
-        //     }
-        //     diff
-        // } else {
-        //     unreachable!();
-        // }
-    }
-
     pub fn zero(&mut self) {
         self.label = 0;
         for (_, p) in self.edges.iter_mut() {
