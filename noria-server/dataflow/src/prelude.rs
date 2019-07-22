@@ -32,7 +32,7 @@ pub use node::{Node, ReplicaType};
 pub use noria::internal::*;
 pub use ops::NodeOperator;
 pub use payload::Packet;
-pub use provenance::*;
+pub use recovery::{provenance::*, log::*};
 pub use petgraph::graph::NodeIndex;
 pub use Sharding;
 pub type ReplicaAddr = (DomainIndex, usize);

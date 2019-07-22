@@ -1330,9 +1330,11 @@ impl Domain {
                                 self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_egress(|e| (
-                                        e.min_provenance.label(),
-                                        e.payloads.len(),
-                                        e.max_provenance.into_debug(),
+                                        // e.min_provenance.label(),
+                                        // e.payloads.len(),
+                                        0,
+                                        0,
+                                        e.updates.max().into_debug(),
                                     ))
                             },
                             DomainExitType::Sharder => {
@@ -1342,9 +1344,11 @@ impl Domain {
                                 self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_reader(|r| (
-                                        r.min_provenance.label(),
-                                        r.num_payloads,
-                                        r.max_provenance.into_debug(),
+                                        // r.min_provenance.label(),
+                                        // r.num_payloads,
+                                        0,
+                                        0,
+                                        r.updates.max().into_debug(),
                                     ))
                                     .unwrap()
                             },
@@ -1523,16 +1527,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        let provenance = e.min_provenance
-                                            .subgraph(new)
-                                            .unwrap()
-                                            .clone();
-                                        let updates = e.updates
-                                            .iter()
-                                            .filter_map(|update| update.subgraph(new))
-                                            .map(|update| *update.clone())
-                                            .collect::<Vec<_>>();
-                                        (provenance, updates)
+                                        e.updates.ack_new_incoming(new)
                                     })
                             },
                             DomainExitType::Sharder => {
@@ -1540,16 +1535,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_sharder_mut(|s| {
                                         s.new_incoming(old, new);
-                                        let provenance = s.min_provenance
-                                            .subgraph(new)
-                                            .unwrap()
-                                            .clone();
-                                        let updates = s.updates
-                                            .iter()
-                                            .filter_map(|update| update.subgraph(new))
-                                            .map(|update| *update.clone())
-                                            .collect::<Vec<_>>();
-                                        (provenance, updates)
+                                        s.updates.ack_new_incoming(new)
                                     })
                             },
                             DomainExitType::Reader => {
@@ -1557,16 +1543,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_reader_mut(|r| {
                                         r.new_incoming(old, new);
-                                        let provenance = r.min_provenance
-                                            .subgraph(new)
-                                            .unwrap()
-                                            .clone();
-                                        let updates = r.updates
-                                            .iter()
-                                            .filter_map(|update| update.subgraph(new))
-                                            .map(|update| *update.clone())
-                                            .collect::<Vec<_>>();
-                                        (provenance, updates)
+                                        r.updates.ack_new_incoming(new)
                                     })
                                     .unwrap()
                             }

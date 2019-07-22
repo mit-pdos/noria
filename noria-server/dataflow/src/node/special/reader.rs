@@ -38,15 +38,9 @@ pub struct Reader {
     for_node: NodeIndex,
     state: Option<Vec<usize>>,
 
-    /// Base provenance, including the label it represents
-    pub(crate) min_provenance: Provenance,
-    /// Base provenance with all diffs applied
-    pub(crate) max_provenance: Provenance,
-    /// Provenance updates sent in outgoing packets
-    /// We don't have to store payloads in readers because there are no outgoing packets.
-    pub(crate) updates: Vec<ProvenanceUpdate>,
+    pub(crate) updates: Updates,
     /// Number of non-replay messages received.
-    pub(crate) num_payloads: usize,
+    num_payloads: usize,
 
     // Log truncation
     /// All labels associated with an address
@@ -63,8 +57,6 @@ impl Clone for Reader {
             streamers: self.streamers.clone(),
             state: self.state.clone(),
             for_node: self.for_node,
-            min_provenance: self.min_provenance.clone(),
-            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
             labels: self.labels.clone(),
@@ -73,8 +65,6 @@ impl Clone for Reader {
     }
 }
 
-const PROVENANCE_DEPTH: usize = 3;
-
 impl Reader {
     pub fn new(for_node: NodeIndex) -> Self {
         Reader {
@@ -82,8 +72,6 @@ impl Reader {
             streamers: Vec::new(),
             state: None,
             for_node,
-            min_provenance: Default::default(),
-            max_provenance: Default::default(),
             updates: Default::default(),
             num_payloads: 0,
             labels: Default::default(),
@@ -113,8 +101,6 @@ impl Reader {
             streamers: mem::replace(&mut self.streamers, Vec::new()),
             state: self.state.clone(),
             for_node: self.for_node,
-            min_provenance: self.min_provenance.clone(),
-            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             num_payloads: self.num_payloads,
             labels: self.labels.clone(),
@@ -323,19 +309,11 @@ impl Reader {
 // fault tolerance (duplicate code from egress.rs)
 impl Reader {
     pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
-        for ni in graph.node_indices() {
-            if graph[ni] == root {
-                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
-                return;
-            }
-        }
-        unreachable!();
+        self.updates.init(graph, root);
     }
 
     pub fn init_in_domain(&mut self, shard: usize) {
-        self.min_provenance.set_shard(shard);
-        self.max_provenance = self.min_provenance.clone();
-        self.labels = self.min_provenance.into_addr_labels();
+        self.labels = self.updates.init_in_domain(shard);
         self.min_labels = self
             .labels
             .keys()
@@ -344,19 +322,18 @@ impl Reader {
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+        /*
         if self.min_provenance.new_incoming(old, new) {
-            /*
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 assert_eq!(update[0].0, old);
                 update.remove(0);
             }
-            */
             unimplemented!();
         } else {
             // Regenerated domains should have the same index
         }
-
+        */
     }
 
     pub fn preprocess_packet(
@@ -381,8 +358,7 @@ impl Reader {
         } else {
             ProvenanceUpdate::new(from, label)
         };
-        let (old, new) = self.max_provenance.apply_update(&update);
-        self.updates.push(update);
+        let (old, new) = self.updates.add_update(&update);
 
         // update num_payloads if not a replay
         if !is_replay {
