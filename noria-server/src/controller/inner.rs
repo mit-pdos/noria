@@ -67,7 +67,9 @@ pub(super) struct ControllerInner {
     quorum: usize,
     heartbeat_every: Duration,
     healthcheck_every: Duration,
+    truncate_every: Duration,
     last_checked_workers: Instant,
+    last_truncated_logs: Instant,
 
     log: slog::Logger,
 
@@ -83,6 +85,9 @@ pub(super) struct ControllerInner {
     /// Map from replica to the children and labels that should be included in the ResumeAt
     /// message sent to the key.
     resume_ats: HashMap<ReplicaAddr, Vec<(ReplicaAddr, usize)>>,
+
+    /// Log truncation: the minimum label owned by each worker for each address
+    truncate: HashMap<ReplicaAddr, HashMap<WorkerIdentifier, usize>>,
 }
 
 pub(in crate::controller) struct DomainReplies(
@@ -372,6 +377,39 @@ impl ControllerInner {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn handle_truncate_logs(
+        &mut self,
+        from: WorkerIdentifier,
+        labels: HashMap<ReplicaAddr, usize>,
+    ) {
+        for (addr, label) in labels.into_iter() {
+            self.truncate.entry(addr).or_insert(Default::default()).insert(from, label);
+        }
+    }
+
+    fn truncate_logs(&mut self) {
+        // check if we need to truncate logs
+        if self.last_truncated_logs.elapsed() > self.truncate_every {
+            for (addr, labels) in self.truncate.iter() {
+                let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
+                    if val < min {
+                        min = val;
+                    }
+                    min
+                });
+                let m = box Packet::TruncateAt(min_label);
+                let res = self.domains
+                    .get_mut(&addr.0)
+                    .unwrap()
+                    .send_to_healthy_shard(addr.1, m, &self.workers);
+                if res.is_err() {
+                    error!(self.log, "couldn't truncate logs: {:?}", addr);
+                }
+            }
+            self.last_truncated_logs = Instant::now();
+        }
     }
 
     fn check_worker_liveness(&mut self) {
@@ -1060,6 +1098,7 @@ impl ControllerInner {
             }
         }
 
+        self.truncate_logs();
         self.check_worker_liveness();
         Ok(())
     }
@@ -1244,6 +1283,7 @@ impl ControllerInner {
             persistence: state.config.persistence,
             heartbeat_every: state.config.heartbeat_every,
             healthcheck_every: state.config.healthcheck_every,
+            truncate_every: state.config.truncate_every,
             recipe,
             quorum: state.config.quorum,
             log,
@@ -1261,12 +1301,14 @@ impl ControllerInner {
 
             pending_recovery,
             last_checked_workers: Instant::now(),
+            last_truncated_logs: Instant::now(),
 
             replies: DomainReplies(drx),
 
             provenance: Default::default(),
             waiting_on: Default::default(),
             resume_ats: Default::default(),
+            truncate: Default::default(),
         }
     }
 

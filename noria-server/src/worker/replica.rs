@@ -8,7 +8,7 @@ use bincode;
 use bufstream::BufStream;
 use dataflow::{
     payload::SourceChannelIdentifier,
-    prelude::{DataType, Executor, Provenance, ReplicaAddr},
+    prelude::{DataType, Executor, Provenance, ReplicaAddr, AddrLabel},
     Domain, Packet, PollEvent, ProcessResult,
 };
 use failure::{self, ResultExt};
@@ -68,12 +68,14 @@ impl Replica {
         on: tokio::net::TcpListener,
         locals: tokio_sync::mpsc::UnboundedReceiver<Box<Packet>>,
         ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
+        worker_tx: futures::sync::mpsc::UnboundedSender<(ReplicaIndex, AddrLabel)>,
         log: slog::Logger,
         cc: Arc<ChannelCoordinator>,
     ) -> Self {
         let id = domain.id();
         let id = format!("{}.{}", id.0.index(), id.1);
         domain.booted(on.local_addr().unwrap());
+        let oob = OutOfBand::new(domain.id(), ctrl_tx, worker_tx);
         Replica {
             coord: cc,
             domain,
@@ -85,7 +87,7 @@ impl Replica {
             inputs: Default::default(),
             outputs: Default::default(),
             outbox: Default::default(),
-            oob: OutOfBand::new(ctrl_tx),
+            oob,
             timeout: None,
         }
     }
@@ -184,13 +186,11 @@ impl Replica {
             }
 
             if !outputs.contains_key(&ri) {
-                trace!(self.log, "building tx"; "domain" => ri.0.index(), "shard" => ri.1);
                 while !cc.has(&ri) {}
                 let tx = match cc.builder_for(&ri).unwrap().build_async() {
                     Ok(tx) => tx,
                     Err(_) => {
-                        let new_ms = ms.split_off(0);
-                        trace!(self.log, "throwing away {} messages", new_ms.len());
+                        ms.split_off(0);
                         return;
                     },
                 };
@@ -311,6 +311,8 @@ impl Replica {
 }
 
 struct OutOfBand {
+    id: ReplicaIndex,
+
     // map from inputi to number of (empty) ACKs
     back: FnvHashMap<usize, Vec<u32>>,
     pending: FnvHashSet<usize>,
@@ -320,15 +322,23 @@ struct OutOfBand {
 
     // for sending messages to the controller
     ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
+    // for sending messages to the worker
+    worker_tx: futures::sync::mpsc::UnboundedSender<(ReplicaIndex, AddrLabel)>,
 }
 
 impl OutOfBand {
-    fn new(ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>) -> Self {
+    fn new(
+        id: ReplicaIndex,
+        ctrl_tx: futures::sync::mpsc::UnboundedSender<CoordinationPayload>,
+        worker_tx: futures::sync::mpsc::UnboundedSender<(ReplicaIndex, AddrLabel)>,
+    ) -> Self {
         OutOfBand {
+            id,
             back: Default::default(),
             pending: Default::default(),
             replicas: Default::default(),
             ctrl_tx,
+            worker_tx,
         }
     }
 }
@@ -357,6 +367,12 @@ impl Executor for OutOfBand {
 
     fn uncache_replica(&mut self, replica: ReplicaIndex) {
         self.replicas.insert(replica);
+    }
+
+    fn send_min_label(&mut self, labels: AddrLabel) {
+        self.worker_tx
+            .unbounded_send((self.id, labels))
+            .expect("asked to send to worker, but worker has gone away");
     }
 
     fn create_universe(&mut self, universe: HashMap<String, DataType>) {

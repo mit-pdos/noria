@@ -430,6 +430,7 @@ crate struct Config {
     crate persistence: PersistenceParameters,
     crate heartbeat_every: time::Duration,
     crate healthcheck_every: time::Duration,
+    crate truncate_every: time::Duration,
     crate quorum: usize,
     crate reuse: ReuseConfigType,
     crate threads: Option<usize>,
@@ -450,6 +451,7 @@ impl Default for Config {
             persistence: Default::default(),
             heartbeat_every: time::Duration::from_secs(1),
             healthcheck_every: time::Duration::from_secs(1),
+            truncate_every: time::Duration::from_secs(2),
             quorum: 1,
             reuse: ReuseConfigType::Finkelstein,
             #[cfg(any(debug_assertions, test))]

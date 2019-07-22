@@ -551,7 +551,7 @@ impl Domain {
             self.process_times.start(me);
             self.process_ptimes.start(me);
             let mut m = Some(m);
-            let (misses, _, captured) = n.process(
+            let (misses, _, captured, changed) = n.process(
                 &mut m,
                 &self.log,
                 self.index,
@@ -566,6 +566,7 @@ impl Domain {
             assert_eq!(captured.len(), 0);
             self.process_ptimes.stop();
             self.process_times.stop();
+            executor.send_min_label(changed);
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
@@ -1656,6 +1657,20 @@ impl Domain {
                         // TODO(ygina): more complicated index for joins, possibly filters
                         executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
+                    Packet::TruncateAt(label) => {
+                        info!(self.log, "truncating logs at {}", label);
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                // TODO
+                            },
+                            DomainExitType::Sharder => {
+                                // TODO
+                            },
+                            DomainExitType::Reader => {
+                                // TODO
+                            },
+                        }
+                    },
                     _ => unreachable!(),
                 }
             }
@@ -2138,7 +2153,7 @@ impl Domain {
                         }
 
                         // process the current message in this node
-                        let (mut misses, lookups, captured) = n.process(
+                        let (mut misses, lookups, captured, changed) = n.process(
                             &mut m,
                             &self.log,
                             self.index,
@@ -2150,6 +2165,7 @@ impl Domain {
                             sends,
                             ex,
                         );
+                        ex.send_min_label(changed);
 
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {
