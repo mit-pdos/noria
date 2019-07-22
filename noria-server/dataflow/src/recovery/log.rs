@@ -17,8 +17,8 @@ pub struct Updates {
 }
 
 impl Updates {
-    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
-        self.store_updates = true;
+    pub fn init(&mut self, graph: &DomainGraph, store_updates: bool, root: ReplicaAddr) {
+        self.store_updates = store_updates;
         for ni in graph.node_indices() {
             if graph[ni] == root {
                 self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
