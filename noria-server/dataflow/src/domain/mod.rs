@@ -1601,15 +1601,16 @@ impl Domain {
                     },
                     Packet::TruncateAt(label) => {
                         info!(self.log, "truncating logs at {}", label);
+                        let node = &self.nodes[self.exit_ni];
                         match self.exit_type {
                             DomainExitType::Egress => {
-                                // TODO
+                                node.borrow_mut().with_egress_mut(|e| e.payloads.truncate(label));
                             },
                             DomainExitType::Sharder => {
-                                // TODO
+                                node.borrow_mut().with_sharder_mut(|s| s.payloads.truncate(label));
                             },
                             DomainExitType::Reader => {
-                                // TODO
+                                // TODO(ygina): readers don't have payloads
                             },
                         }
                     },

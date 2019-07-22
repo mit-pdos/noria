@@ -116,4 +116,18 @@ impl Payloads {
                 .collect()
         }
     }
+
+    pub fn init_after_resume_at(&mut self, min_label: usize) {
+        self.min_label = min_label;
+    }
+
+    /// Truncate payloads - the label in the argument will _not_ remain in the payloads
+    pub fn truncate(&mut self, at: usize) {
+        if at >= self.min_label {
+            self.payloads = self.payloads.split_off(at - self.min_label);
+            self.min_label = at;
+        } else {
+            // log truncation was sent during recovery
+        }
+    }
 }
