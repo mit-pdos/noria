@@ -267,6 +267,9 @@ pub enum Packet {
         targets: Vec<ProvenanceUpdate>,
     },
 
+    /// Truncate logs
+    TruncateAt(usize),
+
     Dummy {
         id: Option<ProvenanceUpdate>,
     },

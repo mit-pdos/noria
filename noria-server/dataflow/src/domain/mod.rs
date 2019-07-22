@@ -1622,6 +1622,20 @@ impl Domain {
                         // TODO(ygina): more complicated index for joins, possibly filters
                         executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
+                    Packet::TruncateAt(label) => {
+                        info!(self.log, "truncating logs at {}", label);
+                        match self.exit_type {
+                            DomainExitType::Egress => {
+                                // TODO
+                            },
+                            DomainExitType::Sharder => {
+                                // TODO
+                            },
+                            DomainExitType::Reader => {
+                                // TODO
+                            },
+                        }
+                    },
                     _ => unreachable!(),
                 }
             }
