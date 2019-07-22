@@ -10,14 +10,8 @@ pub struct Sharder {
     sharded: VecMap<Box<Packet>>,
     shard_by: usize,
 
-    /// Base provenance, including the label it represents
-    pub(crate) min_provenance: Provenance,
-    /// Base provenance with all diffs applied
-    pub(crate) max_provenance: Provenance,
-    /// Provenance updates sent in outgoing packets
-    pub(crate) updates: Vec<ProvenanceUpdate>,
-    /// Packet payloads
-    pub(crate) payloads: Vec<Box<Packet>>,
+    pub(crate) updates: Updates,
+    payloads: Payloads,
 
     // Log truncation
     /// All labels associated with an address
@@ -41,8 +35,6 @@ impl Clone for Sharder {
             txs: Vec::new(),
             sharded: Default::default(),
             shard_by: self.shard_by,
-            min_provenance: self.min_provenance.clone(),
-            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
             labels: self.labels.clone(),
@@ -60,8 +52,6 @@ impl Sharder {
             txs: Default::default(),
             shard_by: by,
             sharded: VecMap::default(),
-            min_provenance: Default::default(),
-            max_provenance: Default::default(),
             updates: Default::default(),
             payloads: Default::default(),
             labels: Default::default(),
@@ -79,8 +69,6 @@ impl Sharder {
             txs,
             sharded: VecMap::default(),
             shard_by: self.shard_by,
-            min_provenance: self.min_provenance.clone(),
-            max_provenance: self.max_provenance.clone(),
             updates: self.updates.clone(),
             payloads: self.payloads.clone(),
             labels: self.labels.clone(),
@@ -269,7 +257,7 @@ impl Sharder {
         output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) -> AddrLabel {
         let (mut old, mut new) = self.preprocess_packet(m, from);
-        self.process(m, self.max_provenance.label(), index, is_sharded, output);
+        self.process(m, self.updates.max().label(), index, is_sharded, output);
 
         // Use the changed labels to determine if there is a new minimum label associated
         // with a replica address in this particular replica.
@@ -313,24 +301,14 @@ impl Sharder {
     }
 }
 
-const PROVENANCE_DEPTH: usize = 3;
-
 // fault tolerance
 impl Sharder {
     pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
-        for ni in graph.node_indices() {
-            if graph[ni] == root {
-                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
-                return;
-            }
-        }
-        unreachable!();
+        self.updates.init(graph, root);
     }
 
     pub fn init_in_domain(&mut self, shard: usize) {
-        self.min_provenance.set_shard(shard);
-        self.max_provenance = self.min_provenance.clone();
-        self.labels = self.min_provenance.into_addr_labels();
+        self.labels = self.updates.init_in_domain(shard);
         self.min_labels = self
             .labels
             .keys()
@@ -339,8 +317,8 @@ impl Sharder {
     }
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+        /*
         if self.min_provenance.new_incoming(old, new) {
-            /*
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 if update.len() == 0 {
@@ -354,11 +332,11 @@ impl Sharder {
                 assert_eq!(update[0].0, old);
                 update.remove(0);
             }
-            */
             unimplemented!();
         } else {
             // Regenerated domains should have the same index
         }
+        */
     }
 
     /// Resume sending messages to these children at the given labels.
@@ -376,19 +354,13 @@ impl Sharder {
         }
 
         self.targets = targets;
-        let next_label = self.min_provenance.label() + self.payloads.len() + 1;
+        let next_label = self.updates.next_label_to_send(true);
         for &(_, label) in &addr_labels {
             // we don't have the messages we need to send
             // we must have lost a stateless domain
             if label > next_label {
                 println!("{} > {}", label, next_label);
-                assert!(self.payloads.is_empty());
-                assert!(self.updates.is_empty());
-                assert_eq!(self.min_provenance.label(), 0);
-                assert_eq!(self.max_provenance.label(), 0);
-                self.min_provenance = min_provenance.take().unwrap();
-                self.max_provenance = self.min_provenance.clone();
-                self.labels = self.min_provenance.into_addr_labels();
+                self.labels = self.updates.init_after_resume_at(min_provenance.take().unwrap());
                 self.min_labels = self
                     .labels
                     .iter()
@@ -415,8 +387,7 @@ impl Sharder {
         }
 
         // If we made it this far, it means we have all the messages we need to send (assuming
-        // log truncation works correctly). Roll back provenance state to the minimum label and
-        // replay each message and diff as if they were just received.
+        // log truncation works correctly).
         assert!(self.targets.is_empty());
         assert!(min_provenance.is_none());
         unimplemented!();
@@ -484,7 +455,7 @@ impl Sharder {
                             // gets sent out-of-order to children who have already received
                             // following packets, so we must skip the packet.
                             let target_label = target_provenance.label();
-                            let next_label = self.max_provenance.label() + 1;
+                            let next_label = self.updates.next_label_to_send(true);
                             if next_label < target_label {
                                 println!(
                                     "WARNING: increasing next label to send from {} to {}",
@@ -526,10 +497,10 @@ impl Sharder {
             // If we have sent the target, assert that all the non-root labels also match. Then set
             // the target to the next one, and if there is no packet, forward all remaining messages.
             // Otherwise, restart the process.
-            assert_eq!(target_provenance.label(), self.max_provenance.label());
+            assert_eq!(target_provenance.label(), self.updates.max().label());
             for (addr, p) in target_provenance.edges().iter() {
                 let label = p.label();
-                assert_eq!(label, self.max_provenance.edges().get(addr).unwrap().label());
+                assert_eq!(label, self.updates.max().edges().get(addr).unwrap().label());
             }
             self.targets.remove(0);
             if self.targets.is_empty() {
@@ -572,13 +543,7 @@ impl Sharder {
             _ => unreachable!(),
         };
 
-        // replays don't get buffered and don't increment their label (they use the last label
-        // sent by this domain - think of replays as a snapshot of what's already been sent).
-        let label = if is_message {
-            self.min_provenance.label() + self.payloads.len() + 1
-        } else {
-            self.min_provenance.label() + self.payloads.len()
-        };
+        let label = self.updates.next_label_to_send(is_message);
 
         // Construct the provenance from the provenance of the incoming packet. In most cases
         // we just add the label of the next packet to send of this domain as the root of the
@@ -589,23 +554,20 @@ impl Sharder {
             assert!(self.targets.is_empty());
             ProvenanceUpdate::new(from, label)
         };
-        let (old, new) = self.max_provenance.apply_update(&update);
+        let (old, new) = self.updates.add_update(&update);
 
         // Keep a list of these updates in case a parent domain with multiple parents needs to be
         // reconstructed, but only for messages and not replays. Buffer messages but not replays.
         if is_message {
-            // TODO(ygina): Might want to trim more efficiently with sharding, especially if we
-            // know it doesn't have to be trimmed.
-            self.updates.push(update.clone());
             update.trim(PROVENANCE_DEPTH - 1);
             *m.as_mut().unwrap().id_mut() = Some(update);
             // buffer
-            self.payloads.push(box m.as_ref().unwrap().clone_data());
+            self.payloads.add_payload(box m.as_ref().unwrap().clone_data());
         } else {
             // TODO(ygina): Replays don't send just the linear path of the message, but the
             // entire provenance. As evidenced below, the root only has one child, which seems
             // insufficient, so I don't think this correctly considers replays.
-            update = self.max_provenance.clone();
+            update = self.updates.max().clone();
             update.trim(PROVENANCE_DEPTH - 1);
             *m.as_mut().unwrap().id_mut() = Some(update);
         }
