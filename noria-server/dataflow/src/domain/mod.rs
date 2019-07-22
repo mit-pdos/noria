@@ -1599,8 +1599,8 @@ impl Domain {
                         // TODO(ygina): more complicated index for joins, possibly filters
                         executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
-                    Packet::TruncateAt(label) => {
-                        info!(self.log, "truncating logs at {}", label);
+                    Packet::TruncatePayload(label) => {
+                        info!(self.log, "truncating payloads at {}", label);
                         let node = &self.nodes[self.exit_ni];
                         match self.exit_type {
                             DomainExitType::Egress => {
@@ -1613,6 +1613,25 @@ impl Domain {
                                 // TODO(ygina): readers don't have payloads
                             },
                         }
+                    },
+                    Packet::TruncateUpdates(map) => {
+                        let node = &self.nodes[self.exit_ni];
+                        let label = match self.exit_type {
+                            DomainExitType::Egress => {
+                                node.borrow_mut()
+                                    .with_egress_mut(|e| e.updates.truncate(map))
+                            },
+                            DomainExitType::Sharder => {
+                                node.borrow_mut()
+                                    .with_sharder_mut(|s| s.updates.truncate(map))
+                            },
+                            DomainExitType::Reader => {
+                                node.borrow_mut()
+                                    .with_reader_mut(|r| r.updates.truncate(map))
+                                    .unwrap()
+                            },
+                        };
+                        info!(self.log, "truncated updates at {}", label);
                     },
                     _ => unreachable!(),
                 }
