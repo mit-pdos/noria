@@ -483,12 +483,13 @@ impl<'a> Migration<'a> {
         for &&&ni in &new_senders {
             let node = &mut mainline.ingredients[ni];
             let domain = node.domain();
+            let store_updates = mainline.store_updates.contains(&domain);
             if node.is_egress() {
-                node.with_egress_mut(|e| e.init(&graph_clone, (domain, 0)));
+                node.with_egress_mut(|e| e.init(&graph_clone, store_updates, (domain, 0)));
             } else if node.is_sharder() {
-                node.with_sharder_mut(|s| s.init(&graph_clone, (domain, 0)));
+                node.with_sharder_mut(|s| s.init(&graph_clone, store_updates, (domain, 0)));
             } else if node.is_reader() {
-                node.with_reader_mut(|r| r.init(&graph_clone, (domain, 0))).unwrap();
+                node.with_reader_mut(|r| r.init(&graph_clone, store_updates, (domain, 0))).unwrap();
             } else {
                 unreachable!();
             }

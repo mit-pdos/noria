@@ -159,8 +159,8 @@ impl Egress {
         self.tags.remove(&tag);
     }
 
-    pub fn init(&mut self, graph: &DomainGraph, root: ReplicaAddr) {
-        self.updates.init(graph, root);
+    pub fn init(&mut self, graph: &DomainGraph, store_updates: bool, root: ReplicaAddr) {
+        self.updates.init(graph, store_updates, root);
     }
 
     pub fn init_in_domain(&mut self, shard: usize) {

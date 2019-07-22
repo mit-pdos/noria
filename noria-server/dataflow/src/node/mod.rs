@@ -473,8 +473,9 @@ impl Node {
             // perspective of the egress node. this is bad since even though the egress's view
             // of the graph may be consistent, downstream affected nodes may still believe, for
             // example, that there exists a replica in the graph even though it just failed.
-            e.init(graph, (new_domain, shard));
-            self.inner = NodeType::Egress(Some(e));
+            // e.init(graph, (new_domain, shard));
+            // self.inner = NodeType::Egress(Some(e));
+            unimplemented!();
         }
     }
 }

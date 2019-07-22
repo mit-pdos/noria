@@ -35,6 +35,7 @@ use tokio::prelude::*;
 pub(super) struct ControllerInner {
     pub(super) ingredients: Graph,
     pub(super) domain_graph: DomainGraph,
+    pub(super) store_updates: HashSet<DomainIndex>,
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
@@ -405,7 +406,12 @@ impl ControllerInner {
                     .unwrap()
                     .send_to_healthy_shard(addr.1, m, &self.workers);
                 if res.is_err() {
-                    error!(self.log, "couldn't truncate logs: {:?}", addr);
+                    error!(
+                        self.log,
+                        "failed to send truncate logs to D{}.{}",
+                        addr.0.index(),
+                        addr.1,
+                    );
                 }
             }
             self.last_truncated_logs = Instant::now();
@@ -1274,6 +1280,7 @@ impl ControllerInner {
         ControllerInner {
             ingredients: g,
             domain_graph: petgraph::Graph::new(),
+            store_updates: HashSet::new(),
             source,
             ndomains: 0,
 
@@ -1946,7 +1953,23 @@ impl ControllerInner {
             }
         }
 
+        // mark the domains that must store updates because they have a parent with multiple
+        // parents and multiple children. TODO(ygina): different if larger provenance depth
+        let mut store_updates = HashSet::new();
+        for &ni in nodes.values() {
+            let num_parents = g.neighbors_directed(ni, petgraph::EdgeDirection::Incoming).count();
+            let num_children = g.neighbors_directed(ni, petgraph::EdgeDirection::Outgoing).count();
+            if num_parents > 1 && num_children > 1 {
+                for child_ni in g.neighbors_directed(ni, petgraph::EdgeDirection::Outgoing) {
+                    let addr = g[child_ni];
+                    let domain = addr.0;
+                    store_updates.insert(domain);
+                }
+            }
+        }
+
         self.domain_graph = g;
+        self.store_updates = store_updates;
     }
 
     fn apply_recipe(&mut self, mut new: Recipe) -> Result<ActivationResult, String> {
