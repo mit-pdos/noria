@@ -1302,9 +1302,11 @@ impl Domain {
                                 self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_egress(|e| (
-                                        e.min_provenance.label(),
-                                        e.payloads.len(),
-                                        e.max_provenance.into_debug(),
+                                        // e.min_provenance.label(),
+                                        // e.payloads.len(),
+                                        0,
+                                        0,
+                                        e.updates.max().into_debug(),
                                     ))
                             },
                             DomainExitType::Sharder => {
@@ -1495,16 +1497,7 @@ impl Domain {
                                     .borrow_mut()
                                     .with_egress_mut(|e| {
                                         e.new_incoming(old, new);
-                                        let provenance = e.min_provenance
-                                            .subgraph(new)
-                                            .unwrap()
-                                            .clone();
-                                        let updates = e.updates
-                                            .iter()
-                                            .filter_map(|update| update.subgraph(new))
-                                            .map(|update| *update.clone())
-                                            .collect::<Vec<_>>();
-                                        (provenance, updates)
+                                        e.updates.ack_new_incoming(new)
                                     })
                             },
                             DomainExitType::Sharder => {
