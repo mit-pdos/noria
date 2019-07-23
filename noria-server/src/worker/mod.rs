@@ -326,7 +326,7 @@ fn listen_df(
                         })
                         .collect::<HashMap<_, _>>();
                     let m = CoordinationPayload::TruncateLogs {
-                        from: waddr,
+                        from: ctrl_addr,
                         labels: min_labels,
                     };
                     tokio::spawn(ctrl_tx
