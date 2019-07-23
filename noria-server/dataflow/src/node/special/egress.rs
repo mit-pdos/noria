@@ -14,7 +14,7 @@ pub struct Egress {
     txs: Vec<EgressTx>,
     tags: HashMap<Tag, NodeIndex>,
     pub(crate) updates: Updates,
-    payloads: Payloads,
+    pub(crate) payloads: Payloads,
 
     // Log truncation
     /// All labels associated with an address
@@ -477,7 +477,9 @@ impl Egress {
             // we must have lost a stateless domain
             if label > next_label {
                 println!("{} > {}", label, next_label);
-                self.labels = self.updates.init_after_resume_at(min_provenance.take().unwrap());
+                let p = min_provenance.take().unwrap();
+                self.payloads.init_after_resume_at(p.label());
+                self.labels = self.updates.init_after_resume_at(p);
                 self.min_labels = self
                     .labels
                     .iter()

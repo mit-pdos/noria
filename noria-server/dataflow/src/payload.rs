@@ -267,8 +267,11 @@ pub enum Packet {
         targets: Vec<ProvenanceUpdate>,
     },
 
-    /// Truncate logs
-    TruncateAt(usize),
+    /// Truncate payloads
+    TruncatePayload(usize),
+
+    /// Truncate updates
+    TruncateUpdates(HashMap<ReplicaAddr, usize>),
 
     Dummy {
         id: Option<ProvenanceUpdate>,

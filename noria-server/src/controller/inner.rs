@@ -36,6 +36,8 @@ pub(super) struct ControllerInner {
     pub(super) ingredients: Graph,
     pub(super) domain_graph: DomainGraph,
     pub(super) store_updates: HashSet<DomainIndex>,
+    replica_to_ni: HashMap<ReplicaAddr, NodeIndex>,
+
     pub(super) source: NodeIndex,
     pub(super) ndomains: usize,
     pub(super) sharding: Option<usize>,
@@ -393,14 +395,46 @@ impl ControllerInner {
     fn truncate_logs(&mut self) {
         // check if we need to truncate logs
         if self.last_truncated_logs.elapsed() > self.truncate_every {
-            for (addr, labels) in self.truncate.iter() {
-                let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
-                    if val < min {
-                        min = val;
+            let min_labels = self.truncate
+                .iter()
+                .map(|(addr, labels)| {
+                    let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
+                        if val < min {
+                            min = val;
+                        }
+                        min
+                    });
+                    (addr, min_label)
+                })
+                .collect::<HashMap<_, _>>();
+
+            // truncate updates
+            let domain_graph = &self.domain_graph;
+            for &domain in &self.store_updates {
+                let domain_ni = self.replica_to_ni.get(&(domain, 0)).unwrap();
+                let at = domain_graph
+                    .neighbors_directed(*domain_ni, petgraph::EdgeDirection::Incoming)
+                    .map(|ni| domain_graph[ni])
+                    .map(|addr| (addr, *min_labels.get(&addr).unwrap()))
+                    .collect::<HashMap<_, _>>();
+                let m = box Packet::TruncateUpdates(at);
+                let dh = self.domains.get_mut(&domain).unwrap();
+                for i in 0..dh.shards.len() {
+                    let res = dh.send_to_healthy_shard(i, m.clone(), &self.workers);
+                    if res.is_err() {
+                        error!(
+                            self.log,
+                            "failed to send truncate updates to D{}.{}",
+                            domain.index(),
+                            i,
+                        );
                     }
-                    min
-                });
-                let m = box Packet::TruncateAt(min_label);
+                }
+            }
+
+            // truncate payloads
+            for (addr, min_label) in min_labels.into_iter() {
+                let m = box Packet::TruncatePayload(min_label);
                 let res = self.domains
                     .get_mut(&addr.0)
                     .unwrap()
@@ -408,12 +442,13 @@ impl ControllerInner {
                 if res.is_err() {
                     error!(
                         self.log,
-                        "failed to send truncate logs to D{}.{}",
+                        "failed to send truncate payload to D{}.{}",
                         addr.0.index(),
                         addr.1,
                     );
                 }
             }
+
             self.last_truncated_logs = Instant::now();
         }
     }
@@ -1281,6 +1316,7 @@ impl ControllerInner {
             ingredients: g,
             domain_graph: petgraph::Graph::new(),
             store_updates: HashSet::new(),
+            replica_to_ni: HashMap::new(),
             source,
             ndomains: 0,
 
@@ -1970,6 +2006,7 @@ impl ControllerInner {
 
         self.domain_graph = g;
         self.store_updates = store_updates;
+        self.replica_to_ni = nodes;
     }
 
     fn apply_recipe(&mut self, mut new: Recipe) -> Result<ActivationResult, String> {

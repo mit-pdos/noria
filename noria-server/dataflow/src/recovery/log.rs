@@ -1,4 +1,5 @@
 use prelude::*;
+use std::collections::HashMap;
 
 pub const PROVENANCE_DEPTH: usize = 3;
 
@@ -87,6 +88,32 @@ impl Updates {
             (provenance, vec![])
         }
     }
+
+    /// Truncate updates based on the parent node in the provenance update -- we can truncate any
+    /// update where the parent's label is at most the corresponding parent's label in the map.
+    pub fn truncate(&mut self, at: HashMap<ReplicaAddr, usize>) -> usize {
+        assert!(self.store_updates);
+
+        // Find the index at which we'd like to keep all proceeding updates
+        let mut i_to_keep = 0;
+        for (i, update) in self.updates.iter().enumerate() {
+            if let Some(parent) = update.parent() {
+                let max_label = at.get(&parent.root()).expect("truncation map includes all parents");
+                if parent.label() <= *max_label {
+                    i_to_keep = i;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Drain and apply the rest of the updates to min_provenance
+        println!("TRUNCATING {} UPDATES", i_to_keep);
+        for update in self.updates.drain(..i_to_keep) {
+            self.min_provenance.apply_update(&update);
+        }
+        self.min_provenance.label()
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -114,6 +141,20 @@ impl Payloads {
                 .iter()
                 .map(|m| box m.clone_data())
                 .collect()
+        }
+    }
+
+    pub fn init_after_resume_at(&mut self, min_label: usize) {
+        self.min_label = min_label;
+    }
+
+    /// Truncate payloads - the label in the argument will _not_ remain in the payloads
+    pub fn truncate(&mut self, at: usize) {
+        if at >= self.min_label {
+            self.payloads = self.payloads.split_off(at - self.min_label);
+            self.min_label = at;
+        } else {
+            // log truncation was sent during recovery
         }
     }
 }

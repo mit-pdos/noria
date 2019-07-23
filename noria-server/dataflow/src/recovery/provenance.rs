@@ -65,6 +65,11 @@ impl ProvenanceUpdate {
         }
     }
 
+    pub fn parent(&self) -> Option<&Box<ProvenanceUpdate>> {
+        assert!(self.edges.len() <= 1);
+        self.edges.values().next()
+    }
+
     /// Convert provenance into a map from address to all labels associated with that address.
     pub fn into_addr_labels(&self) -> AddrLabels {
         let mut map = AddrLabels::default();
