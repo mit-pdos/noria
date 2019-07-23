@@ -72,6 +72,12 @@ impl Builder {
         self.config.quorum = quorum;
     }
 
+    /// Set the time to wait between log truncation messages, in seconds.
+    pub fn set_truncate_every(&mut self, truncate_every: u64) {
+        assert_ne!(truncate_every, 0);
+        self.config.truncate_every = time::Duration::from_secs(truncate_every);
+    }
+
     /// Set the memory limit (target) and how often we check it (in millis).
     pub fn set_memory_limit(&mut self, limit: usize, check_freq: time::Duration) {
         assert_ne!(limit, 0);

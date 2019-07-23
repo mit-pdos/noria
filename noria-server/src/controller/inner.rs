@@ -1094,6 +1094,11 @@ impl ControllerInner {
                     failed.push(*d);
                 }
             }
+
+            // these workers are no longer relevant for log truncation
+            for (_, labels) in self.truncate.iter_mut() {
+                labels.remove(&wi);
+            }
         }
 
         // first, detect which domains can be recovered without dropping downstream nodes.

@@ -105,6 +105,13 @@ fn main() {
                 .help("Shard the graph this many ways (0 = disable sharding)."),
         )
         .arg(
+            Arg::with_name("truncate-every")
+                .long("truncate-every")
+                .takes_value(true)
+                .default_value("5")
+                .help("Time to wait between truncating logs, in seconds."),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
@@ -123,6 +130,7 @@ fn main() {
     let quorum = value_t_or_exit!(matches, "quorum", usize);
     let persistence_threads = value_t_or_exit!(matches, "persistence-threads", i32);
     let flush_ns = value_t_or_exit!(matches, "flush-timeout", u32);
+    let truncate_every = value_t_or_exit!(matches, "truncate-every", u64);
     let sharding = match value_t_or_exit!(matches, "shards", usize) {
         0 => None,
         x => Some(x),
@@ -139,6 +147,7 @@ fn main() {
     }
     builder.set_sharding(sharding);
     builder.set_quorum(quorum);
+    builder.set_truncate_every(truncate_every);
     if matches.is_present("nopartial") {
         builder.disable_partial();
     }

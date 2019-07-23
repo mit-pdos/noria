@@ -551,7 +551,7 @@ impl Domain {
             self.process_times.start(me);
             self.process_ptimes.start(me);
             let mut m = Some(m);
-            let (misses, _, captured, changed) = n.process(
+            let (misses, _, captured) = n.process(
                 &mut m,
                 &self.log,
                 self.index,
@@ -566,7 +566,6 @@ impl Domain {
             assert_eq!(captured.len(), 0);
             self.process_ptimes.stop();
             self.process_times.stop();
-            executor.send_min_label(changed);
 
             if m.is_none() {
                 // no need to deal with our children if we're not sending them anything
@@ -2150,7 +2149,7 @@ impl Domain {
                         }
 
                         // process the current message in this node
-                        let (mut misses, lookups, captured, changed) = n.process(
+                        let (mut misses, lookups, captured) = n.process(
                             &mut m,
                             &self.log,
                             self.index,
@@ -2162,7 +2161,6 @@ impl Domain {
                             sends,
                             ex,
                         );
-                        ex.send_min_label(changed);
 
                         // ignore duplicate misses
                         misses.sort_unstable_by(|a, b| {
