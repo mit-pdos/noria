@@ -159,6 +159,8 @@ impl Provenance {
         let mut changed_new = AddrLabels::default();
         self.apply_update_internal(update, &mut changed_old, &mut changed_new);
         assert_eq!(changed_old.keys().len(), changed_new.keys().len());
+        changed_old.remove(&self.root);
+        changed_new.remove(&self.root);
         (changed_old, changed_new)
     }
 

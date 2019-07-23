@@ -398,12 +398,16 @@ impl ControllerInner {
             let min_labels = self.truncate
                 .iter()
                 .map(|(addr, labels)| {
-                    let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
-                        if val < min {
-                            min = val;
-                        }
-                        min
-                    });
+                    let min_label = if labels.is_empty() {
+                        0
+                    } else {
+                        labels.values().fold(std::usize::MAX, |mut min, &val| {
+                            if val < min {
+                                min = val;
+                            }
+                            min
+                        })
+                    };
                     (addr, min_label)
                 })
                 .collect::<HashMap<_, _>>();
@@ -1962,6 +1966,9 @@ impl ControllerInner {
                 for i in 0..shards {
                     let ni = g.add_node((domain, i));
                     nodes.insert((domain, i), ni);
+
+                    // create an entry for log truncation
+                    self.truncate.entry((domain, i)).or_insert(Default::default());
                 }
             }
         }
