@@ -2508,9 +2508,9 @@ fn correct_nested_view_schema() {
     let q = g.view("swvc").unwrap().into_sync();
 
     let expected_schema = vec![
-        ColumnSpecification::new("swvc.id".into(), SqlType::Int(32, true)),
+        ColumnSpecification::new("swvc.id".into(), SqlType::Int(32)),
         ColumnSpecification::new("swvc.content".into(), SqlType::Text),
-        ColumnSpecification::new("swvc.vc".into(), SqlType::Bigint(64, true)),
+        ColumnSpecification::new("swvc.vc".into(), SqlType::Bigint(64)),
     ];
     assert_eq!(q.schema(), Some(&expected_schema[..]));
 }
