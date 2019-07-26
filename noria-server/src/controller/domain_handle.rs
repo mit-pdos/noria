@@ -41,15 +41,16 @@ impl DomainHandle {
         workers: &HashMap<WorkerIdentifier, Worker>,
     ) -> Result<(), tcp::SendError> {
         for shard in self.shards.iter_mut() {
-            if workers[&shard.worker].healthy {
-                shard.tx.send(p.clone())?;
-            } else {
-                error!(
-                    self.log,
-                    "Tried to send packet to failed worker {:?}; ignoring!", shard.worker
-                );
-                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "worker failed").into());
-            }
+            shard.tx.send(p.clone());
+            // if workers[&shard.worker].healthy {
+            //     shard.tx.send(p.clone())?;
+            // } else {
+            //     error!(
+            //         self.log,
+            //         "Tried to send packet to failed worker {:?}; ignoring!", shard.worker
+            //     );
+            //     return Err(io::Error::new(io::ErrorKind::BrokenPipe, "worker failed").into());
+            // }
         }
         Ok(())
     }
@@ -60,15 +61,16 @@ impl DomainHandle {
         p: Box<Packet>,
         workers: &HashMap<WorkerIdentifier, Worker>,
     ) -> Result<(), tcp::SendError> {
-        if workers[&self.shards[i].worker].healthy {
-            self.shards[i].tx.send(p)?;
-        } else {
-            error!(
-                self.log,
-                "Tried to send packet to failed worker {:?}; ignoring!", &self.shards[i].worker
-            );
-            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "worker failed").into());
-        }
+        self.shards[i].tx.send(p);
+        // if workers[&self.shards[i].worker].healthy {
+        //     self.shards[i].tx.send(p)?;
+        // } else {
+        //     error!(
+        //         self.log,
+        //         "Tried to send packet to failed worker {:?}; ignoring!", &self.shards[i].worker
+        //     );
+        //     return Err(io::Error::new(io::ErrorKind::BrokenPipe, "worker failed").into());
+        // }
         Ok(())
     }
 }

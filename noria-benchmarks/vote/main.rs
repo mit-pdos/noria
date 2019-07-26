@@ -29,11 +29,8 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref W_TIME_COUNT: Arc<Mutex<(Option<time::Instant>, u64)>> =
-        Arc::new(Mutex::new((None, 0)));
-
     // The interval with which to write to the reserved key, in nanonseconds
-    static ref WRITE_RESERVED_EVERY_US: time::Duration = time::Duration::new(0, 200_000_000);
+    static ref WRITE_RESERVED_EVERY_US: time::Duration = time::Duration::new(0, 1_000_000_000);
     // The time after which to do the next write to the reserved key
     static ref NEXT_RESERVED_W: Arc<Mutex<time::Instant>> = Arc::new(Mutex::new(time::Instant::now()));
     // The write time of the reserved key
@@ -150,6 +147,7 @@ where
         .build()
         .unwrap();
 
+    let start = time::Instant::now();
     let handle: C = {
         let local_args = local_args.clone();
         // we know that we won't drop the original args until the runtime has exited
@@ -214,7 +212,6 @@ where
     let r_reserved_time = r_reserved_time.lock().unwrap();
     println!("\n(relative write time (ms since start), delay (us))");
     print!("[");
-    let start = w_reserved_time[0];
     for i in 0..r_reserved_time.len() {
         let w_time = w_reserved_time[i];
         let r_time = r_reserved_time[i];
@@ -423,22 +420,21 @@ where
                         continue;
                     }
 
-                    let r_reserved_time = R_RESERVED_TIME.clone();
-                    let mut r_reserved_time = r_reserved_time.lock().unwrap();
-                    let w_reserved_time = W_RESERVED_TIME.clone();
-                    let w_reserved_time = w_reserved_time.lock().unwrap();
-                    while r_reserved_time.len() < read_count - 1 {
-                        // for some reason, missed a read of a write.
-                        // are writes happening too frequently?
-                        println!("WARNING: missed read of vote {}", r_reserved_time.len() + 1);
-                        let i = r_reserved_time.len();
-                        r_reserved_time.push(w_reserved_time[i]);
-                    }
-                    if r_reserved_time.len() == read_count - 1 {
-                        // println!("Read {}th vote at {:?}", read_count, done);
+                    {
+                        let w_reserved_time = Arc::clone(&W_RESERVED_TIME);
+                        let r_reserved_time = Arc::clone(&R_RESERVED_TIME);
+                        let num_writes = w_reserved_time.lock().unwrap().len();
+                        let mut r_reserved_time = r_reserved_time.lock().unwrap();
+                        if r_reserved_time.len() == read_count {
+                            // already read this author count
+                            continue;
+                        }
+
+                        assert_eq!(r_reserved_time.len() + 1, read_count);
+                        assert_eq!(num_writes, read_count);
+                        println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
                     }
-                    // assert_eq!(r_reserved_time.len(), read_count);
                 }
             }
 
@@ -478,6 +474,9 @@ where
         }));
     };
 
+    let next_reserved_w = NEXT_RESERVED_W.clone();
+    let w_reserved_time = W_RESERVED_TIME.clone();
+    let r_reserved_time = R_RESERVED_TIME.clone();
     let mut worker_ops = None;
     'outer: while next < end {
         let now = time::Instant::now();
@@ -518,39 +517,39 @@ where
         // in case that took a while:
         let now = time::Instant::now();
 
-        // send one write for the reserved key
-        let next_reserved_w = NEXT_RESERVED_W.clone();
-        let mut next_reserved_w = next_reserved_w.lock().unwrap();
-        if now >= *next_reserved_w {
-            // write down the time of write
-            let w_reserved_time = W_RESERVED_TIME.clone();
+        {
+            let mut next_reserved_w = next_reserved_w.lock().unwrap();
             let mut w_reserved_time = w_reserved_time.lock().unwrap();
-            w_reserved_time.push(now);
+            let num_reads = r_reserved_time.lock().unwrap().len();
+            if w_reserved_time.len() == num_reads && now >= *next_reserved_w {
+                // if our previous write has been read and we haven't sent a write in a while,
+                // note down the time of write, then queue it
+                w_reserved_time.push(now);
+                if queued_w.is_empty() && next_send.is_none() {
+                    next_send = Some(now + max_batch_time);
+                }
+                if queued_w.is_empty() {
+                    queued_w_keys.push(RESERVED_W_KEY);
+                    queued_w.push(now);
+                } else {
+                    queued_w_keys[0] = RESERVED_W_KEY;
+                }
 
-            // then queue the write
-            if queued_w.is_empty() && next_send.is_none() {
-                next_send = Some(now + max_batch_time);
+                println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+                *next_reserved_w = now + *WRITE_RESERVED_EVERY_US;
+            } else if w_reserved_time.len() > num_reads {
+                // if the previous write has not been read, queue a read
+                assert_eq!(w_reserved_time.len() - 1, num_reads);
+                if queued_r.is_empty() && next_send.is_none() {
+                    next_send = Some(now + max_batch_time);
+                }
+                if queued_r.is_empty() {
+                    queued_r_keys.push(RESERVED_R_KEY);
+                    queued_r.push(now);
+                } else {
+                    queued_r_keys[0] = RESERVED_R_KEY;
+                }
             }
-            if queued_w.is_empty() {
-                queued_w_keys.push(RESERVED_W_KEY);
-                queued_w.push(now);
-            } else {
-                queued_w_keys[0] = RESERVED_W_KEY;
-            }
-
-            // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
-            *next_reserved_w += *WRITE_RESERVED_EVERY_US;
-        }
-
-        // send one read for the reserved key per batch
-        if queued_r.is_empty() && next_send.is_none() {
-            next_send = Some(now + max_batch_time);
-        }
-        if queued_r.is_empty() {
-            queued_r_keys.push(RESERVED_R_KEY);
-            queued_r.push(now);
-        } else {
-            queued_r_keys[0] = RESERVED_R_KEY;
         }
 
         if let Some(f) = next_send {
