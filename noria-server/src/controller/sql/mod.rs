@@ -916,6 +916,7 @@ impl SqlIncorporator {
             q => panic!("unhandled query type in recipe: {:?}", q),
         };
 
+
         // record info about query
         self.leaf_addresses
             .insert(String::from(query_name.as_str()), qfp.query_leaf);

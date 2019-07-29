@@ -120,3 +120,7 @@ path = "piazza/mysql.rs"
 [[bin]]
 name = "piazza-write"
 path = "piazza/piazza-write.rs"
+
+[[bin]]
+name = "wp"
+path = "piazza/write-policies.rs"

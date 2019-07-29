@@ -297,7 +297,6 @@ impl Recipe {
         universe_groups: HashMap<String, Vec<DataType>>,
     ) -> Result<ActivationResult, String> {
         use crate::controller::sql::security::Multiverse;
-
         let mut result = ActivationResult {
             new_nodes: HashMap::default(),
             removed_leaves: Vec::default(),
@@ -318,7 +317,7 @@ impl Recipe {
                 universe_groups,
                 mig,
             )?;
-
+            
             for qfp in qfps {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }
@@ -356,7 +355,6 @@ impl Recipe {
                 mig,
                 n.clone(),
             )?;
-
             // If the user provided us with a query name, use that.
             // If not, use the name internally used by the QFP.
             let query_name = match n {

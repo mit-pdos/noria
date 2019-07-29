@@ -3,11 +3,20 @@
 #[macro_use]
 extern crate clap;
 
-use noria::{Builder, DataType, LocalAuthority, ReuseConfigType, SyncHandle};
+use noria::{ControllerHandle, ZookeeperAuthority, DataType, Builder, LocalAuthority, ReuseConfigType, SyncHandle, Handle};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
+use std::net::IpAddr;
+use futures::future::Future;
+use std::sync::Arc;
+use zookeeper::ZooKeeper;
+use noria::SyncControllerHandle;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::runtime::Runtime;
+use tokio::prelude::*;
+use tokio::executor::Executor;
 
 #[macro_use]
 mod populate;
@@ -25,57 +34,70 @@ enum PopulateType {
     NoPopulate,
 }
 
+pub enum DataflowType {
+    Write,
+    Read,
+}
+
+
 impl Backend {
-    pub fn new(partial: bool, _shard: bool, reuse: &str) -> Backend {
-        let mut cb = Builder::default();
+    pub fn new(partial: bool, _shard: bool, reuse: &str, dftype: DataflowType) -> Backend {
+        match dftype {
+            DataflowType::Read => {
+                println!("in backend new. read");
+                let zk_address = "127.0.0.1:2181/read";
+                let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let authority = Arc::new(ZookeeperAuthority::new(zk_address).unwrap());
+                let mut cb = Builder::default();
+                let log = noria::logger_pls();
+                let blender_log = log.clone();
+                cb.set_reuse(ReuseConfigType::NoReuse);
+                let g = rt.block_on(cb.start(authority)).unwrap();
+                cb.log_with(blender_log);
+                Backend { g, rt }
+            },
+            DataflowType::Write => {
+                println!("in backend new. write");
+                let zk_address = "127.0.0.1:2181/write";
+                let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        if !partial {
-            cb.disable_partial();
+                let authority = Arc::new(ZookeeperAuthority::new(zk_address).unwrap());
+                let mut cb = Builder::default();
+                let log = noria::logger_pls();
+                let blender_log = log.clone();
+
+                cb.set_reuse(ReuseConfigType::NoReuse);
+
+                let g = rt.block_on(cb.start(authority)).unwrap();
+
+                cb.log_with(blender_log);
+                Backend { g, rt }
+            }
         }
-
-        cb.set_sharding(None);
-
-        match reuse {
-            "finkelstein" => cb.set_reuse(ReuseConfigType::Finkelstein),
-            "full" => cb.set_reuse(ReuseConfigType::Full),
-            "noreuse" => cb.set_reuse(ReuseConfigType::NoReuse),
-            "relaxed" => cb.set_reuse(ReuseConfigType::Relaxed),
-            _ => panic!("reuse configuration not supported"),
-        }
-
-        // cb.log_with(blender_log);
-
-        let g = cb.start_simple().unwrap();
-
-        Backend { g }
     }
 
-    pub fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
-        let mut mutator = self.g.table(name).unwrap().into_sync();
+    pub fn populate<T>(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>, mut db: SyncControllerHandle<ZookeeperAuthority, T>)
+    where T : tokio::executor::Executor
+    {
+        let get_table = move |b: &mut SyncControllerHandle<_, _>, n| loop {
+            match b.table(n) {
+                Ok(v) => return v.into_sync(),
+                Err(_) => {
+                    panic!("tried to get table via controller handle and failed. should not happen!");
+                    // thread::sleep(Duration::from_millis(50));
+                    // *b = SyncControllerHandle::from_zk("127.0.0.1:2181/write", executor.clone())
+                    //     .unwrap();
+                }
+            }
+        };
 
-        let start = time::Instant::now();
-
-        let i = records.len();
-        mutator.perform_all(records).unwrap();
-
-        let dur = start.elapsed().as_secs_f64();
-        println!(
-            "Inserted {} {} in {:.2}s ({:.2} PUTs/sec)!",
-            i,
-            name,
-            dur,
-            i as f64 / dur
-        );
-
-        i
-    }
-
-    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
-        self.g
-            .on_worker(|w| w.create_universe(user_context.clone()))
-            .unwrap();
-
-        Ok(())
+        // Get mutators and getter.
+        let mut table = get_table(&mut db, name);
+        for r in records.drain(..) {
+            table
+                .insert(r)
+                .unwrap();
+        }
     }
 
     fn set_security_config(&mut self, config_file: &str) {
@@ -85,10 +107,12 @@ impl Backend {
         cf.read_to_string(&mut config).unwrap();
 
         // Install recipe with policies
-        self.g.on_worker(|w| w.set_security_config(config)).unwrap();
+        self.g.set_security_config(config);
     }
 
-    fn migrate(&mut self, schema_file: &str, query_file: Option<&str>) -> Result<(), String> {
+    fn migrate<T>(&mut self, schema_file: &str, query_file: Option<&str>, db: &mut SyncControllerHandle<ZookeeperAuthority, T>) -> Result<(), String>
+    where T : tokio::executor::Executor
+    {
         use std::io::Read;
 
         // Read schema file
@@ -110,9 +134,12 @@ impl Backend {
             }
         }
 
-        // Install recipe
-        self.g.install_recipe(&rs).unwrap();
+        db.extend_recipe(&rs).is_ok(); 
+        Ok(()) 
+    }
 
+    fn login(&mut self, user_context: HashMap<String, DataType>) -> Result<(), String> {
+        self.g.create_universe(user_context.clone()); 
         Ok(())
     }
 }
@@ -265,10 +292,17 @@ fn main() {
     );
 
     println!("Initializing database schema...");
-    let mut backend = Backend::new(partial, shard, reuse);
-    backend.migrate(sloc, None).unwrap();
-    backend.set_security_config(ploc);
-    backend.migrate(sloc, Some(qloc)).unwrap();
+    // let mut backend = Backend::new(partial, shard, reuse);
+    // backend.migrate(sloc, None).unwrap();
+    // backend.set_security_config(ploc);
+    // backend.migrate(sloc, Some(qloc)).unwrap();
+    let mut write_df = Backend::new(partial, shard, reuse, DataflowType::Write);
+    let wexecutor = write_df.rt.executor();
+    let mut write_db = SyncControllerHandle::from_zk("127.0.0.1:2181/write", wexecutor.clone()).unwrap();
+    write_df.migrate(sloc, None, &mut write_db).unwrap();
+    write_df.set_security_config(wploc);
+    write_df.migrate(sloc, Some(qloc), &mut write_db).unwrap();
+
 
     let populate = match populate {
         "before" => PopulateType::Before,
@@ -285,16 +319,16 @@ fn main() {
     let roles = p.get_roles();
     let posts = p.get_posts();
 
-    backend.populate("Role", roles);
+    write_df.populate("Role", roles);
     println!("Waiting for groups to be constructed...");
     thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
 
-    backend.populate("User", users);
-    backend.populate("Class", classes);
+    write_df.populate("User", users);
+    write_df.populate("Class", classes);
 
     if !correctness_test {
         if populate == PopulateType::Before {
-            backend.populate("Post", posts.clone());
+            write_df.populate("Post", posts.clone());
             println!("Waiting for posts to propagate...");
             thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
         }
@@ -303,61 +337,60 @@ fn main() {
         thread::sleep(time::Duration::from_millis(2000));
 
         // if partial, read 25% of the keys
-        if partial && query_type == "posts" {
-            let leaf = "posts".to_string();
-            let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-            for author in 0..nusers / 4 {
-                getter.lookup(&[author.into()], false).unwrap();
-            }
-        }
+        // if partial && query_type == "posts" {
+        //     let leaf = "posts".to_string();
+        //     let mut getter = write_df.g.view(&leaf).unwrap().into_sync();
+        //     for author in 0..nusers / 4 {
+        //         getter.lookup(&[author.into()], false).unwrap();
+        //     }
+        // }
 
-        if partial && query_type == "post_count" {
-            let leaf = "post_count".to_string();
-            let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-            for author in 0..nusers / 4 {
-                getter.lookup(&[author.into()], false).unwrap();
-            }
-        }
-
-        let graph_fname = "graph.gv";
-        let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-        
+        // if partial && query_type == "post_count" {
+        //     let leaf = "post_count".to_string();
+        //     let mut getter = backend.g.view(&leaf).unwrap().into_sync();
+        //     for author in 0..nusers / 4 {
+        //         getter.lookup(&[author.into()], false).unwrap();
+        //     }
+        // }
 
         // Login a user
         println!("Login users...");
         for i in 0..nlogged {
             let start = time::Instant::now();
-            backend.login(make_user(i)).is_ok();
+            write_df.login(make_user(i)).is_ok();
             let dur = start.elapsed().as_secs_f64();
             println!("Migration {} took {:.2}s!", i, dur,);
 
             // if partial, read 25% of the keys
-            if partial && query_type == "posts" {
-                let leaf = format!("posts_u{}", i);
-                let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-                for author in 0..nusers / 4 {
-                    getter.lookup(&[author.into()], false).unwrap();
-                }
-            }
-            if partial && query_type == "post_count" {
-                let leaf = format!("post_count_u{}", i);
-                let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-                for author in 0..nusers / 4 {
-                    getter.lookup(&[author.into()], false).unwrap();
-                }
-            }
+            // if partial && query_type == "posts" {
+            //     let leaf = format!("posts_u{}", i);
+            //     let mut getter = backend.g.view(&leaf).unwrap().into_sync();
+            //     for author in 0..nusers / 4 {
+            //         getter.lookup(&[author.into()], false).unwrap();
+            //     }
+            // }
+            // if partial && query_type == "post_count" {
+            //     let leaf = format!("post_count_u{}", i);
+            //     let mut getter = backend.g.view(&leaf).unwrap().into_sync();
+            //     for author in 0..nusers / 4 {
+            //         getter.lookup(&[author.into()], false).unwrap();
+            //     }
+            // }
 
-            if iloc.is_some() && i % 50 == 0 {
-                use std::fs;
-                let fname = format!("{}-{}", iloc.unwrap(), i);
-                fs::copy("/proc/self/status", fname).unwrap();
-            }
+            // if iloc.is_some() && i % 50 == 0 {
+            //     use std::fs;
+            //     let fname = format!("{}-{}", iloc.unwrap(), i);
+            //     fs::copy("/proc/self/status", fname).unwrap();
+            // }
         }
 
-        if populate == PopulateType::After {
-            backend.populate("Post", posts);
-        }
+        // if populate == PopulateType::After {
+        //     backend.populate("Post", posts);
+        // }
+
+        let graph_fname = "graph.gv";
+        let mut gf = File::create(graph_fname).unwrap();
+        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
 
         // let mut dur = time::Duration::from_millis(0);
 

@@ -233,6 +233,7 @@ impl<'a> Migration<'a> {
     }
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
+        println!("ENSURE READER FOR: {:?}, {:?}", name, self.context()); 
         use std::collections::hash_map::Entry;
         if let Entry::Vacant(e) = self.readers.entry(n) {
             // make a reader
@@ -336,7 +337,6 @@ impl<'a> Migration<'a> {
         self.ensure_reader_for(n, Some(name));
 
         let ri = self.readers[&n];
-
         let uid: String = self.universe().0.into();
 
         let uint = if uid == "global" {

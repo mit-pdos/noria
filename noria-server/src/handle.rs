@@ -114,7 +114,7 @@ impl<A: Authority + 'static> Handle<A> {
         context: HashMap<String, DataType>,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let mut c = self.c.clone().unwrap();
-
+        println!("creating user universe");
         let uid = context
             .get("id")
             .expect("Universe context must have id")
