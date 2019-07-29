@@ -119,7 +119,7 @@ impl Backend {
 
 fn make_user(id: i32) -> HashMap<String, DataType> {
     let mut user = HashMap::new();
-    user.insert(String::from("id"), id.into());
+    user.insert(String::from("id"), id.to_string().into());
 
     user
 }
