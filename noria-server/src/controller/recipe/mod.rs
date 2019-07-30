@@ -309,7 +309,7 @@ impl Recipe {
             self.log,
             "Universe groups (in create_universe): {:?}", universe_groups
         );
-
+        println!("create universe 2");
         if self.security_config.is_some() {
             mig.security_config = self.security_config.clone();
             let qfps = self.inc.as_mut().unwrap().prepare_universe(
@@ -317,7 +317,7 @@ impl Recipe {
                 universe_groups,
                 mig,
             )?;
-            
+            println!("QFPS: {:?}", qfps); 
             for qfp in qfps {
                 result.new_nodes.insert(qfp.name.clone(), qfp.query_leaf);
             }

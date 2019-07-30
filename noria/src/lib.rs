@@ -112,7 +112,7 @@
 #![feature(bufreader_buffer)]
 #![feature(try_blocks)]
 #![feature(existential_type)]
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 #![deny(unused_extern_crates)]
 
 #[macro_use]

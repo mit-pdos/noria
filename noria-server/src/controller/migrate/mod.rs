@@ -59,6 +59,7 @@ pub struct Migration<'a> {
     /// Additional migration information provided by the client
     pub(super) context: HashMap<String, DataType>,
     pub(super) security_config: Option<SecurityConfig>,
+    pub(super) fwd: Option<DataType>, 
 }
 
 impl<'a> Migration<'a> {
@@ -160,6 +161,11 @@ impl<'a> Migration<'a> {
         &self.context
     }
 
+    /// Returns the context of this migration
+    pub(super) fn fwd(&self) -> &Option<DataType> {
+        &self.fwd
+    }
+
     /// Returns the universe in which this migration is operating in.
     /// If not specified, assumes `global` universe.
     pub(super) fn universe(&self) -> (DataType, Option<DataType>) {
@@ -233,7 +239,8 @@ impl<'a> Migration<'a> {
     }
 
     fn ensure_reader_for(&mut self, n: NodeIndex, name: Option<String>) {
-        println!("ENSURE READER FOR: {:?}, {:?}", name, self.context()); 
+
+        println!("ENSURE READER FOR: {:?}, {:?}", name, self.fwd()); 
         use std::collections::hash_map::Entry;
         if let Entry::Vacant(e) = self.readers.entry(n) {
             // make a reader

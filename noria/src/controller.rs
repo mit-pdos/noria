@@ -374,6 +374,13 @@ impl<A: Authority + 'static> ControllerHandle<A> {
         self.rpc("install_recipe", new_recipe, "failed to install recipe")
     }
 
+    pub fn install_recipe_write(
+        &mut self,
+        new_recipe: &str,
+    ) -> impl Future<Item = ActivationResult, Error = failure::Error> + Send {
+        self.rpc("install_recipe_write", new_recipe, "failed to install recipe")
+    }
+
     /// Fetch a graphviz description of the dataflow graph.
     pub fn graphviz(&mut self) -> impl Future<Item = String, Error = failure::Error> + Send {
         self.rpc("graphviz", (), "failed to fetch graphviz output")
@@ -547,6 +554,14 @@ where
         r: S,
     ) -> Result<ActivationResult, failure::Error> {
         let fut = self.handle.install_recipe(r.as_ref());
+        self.run(fut)
+    }
+
+    pub fn install_recipe_write<S: AsRef<str>>(
+        &mut self,
+        r: S,
+    ) -> Result<ActivationResult, failure::Error> {
+        let fut = self.handle.install_recipe_write(r.as_ref());
         self.run(fut)
     }
 

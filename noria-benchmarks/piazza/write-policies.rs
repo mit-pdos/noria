@@ -24,7 +24,8 @@ mod populate;
 use crate::populate::Populate;
 
 pub struct Backend {
-    g: SyncHandle<LocalAuthority>,
+    g: Handle<ZookeeperAuthority>,
+    rt: tokio::runtime::Runtime,
 }
 
 #[derive(PartialEq)]
@@ -76,13 +77,14 @@ impl Backend {
         }
     }
 
-    pub fn populate<T>(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>, mut db: SyncControllerHandle<ZookeeperAuthority, T>)
+    pub fn populate<T>(&mut self, name: &'static str, mut records: Vec<Vec<DataType>>, db: &mut SyncControllerHandle<ZookeeperAuthority, T>)
     where T : tokio::executor::Executor
     {
         let get_table = move |b: &mut SyncControllerHandle<_, _>, n| loop {
             match b.table(n) {
                 Ok(v) => return v.into_sync(),
-                Err(_) => {
+                Err(x) => {
+                    println!("{}", x);
                     panic!("tried to get table via controller handle and failed. should not happen!");
                     // thread::sleep(Duration::from_millis(50));
                     // *b = SyncControllerHandle::from_zk("127.0.0.1:2181/write", executor.clone())
@@ -92,7 +94,7 @@ impl Backend {
         };
 
         // Get mutators and getter.
-        let mut table = get_table(&mut db, name);
+        let mut table = get_table(db, name);
         for r in records.drain(..) {
             table
                 .insert(r)
@@ -300,7 +302,7 @@ fn main() {
     let wexecutor = write_df.rt.executor();
     let mut write_db = SyncControllerHandle::from_zk("127.0.0.1:2181/write", wexecutor.clone()).unwrap();
     write_df.migrate(sloc, None, &mut write_db).unwrap();
-    write_df.set_security_config(wploc);
+    write_df.set_security_config(ploc);
     write_df.migrate(sloc, Some(qloc), &mut write_db).unwrap();
 
 
@@ -319,16 +321,16 @@ fn main() {
     let roles = p.get_roles();
     let posts = p.get_posts();
 
-    write_df.populate("Role", roles);
+    write_df.populate("Role", roles, &mut write_db);
     println!("Waiting for groups to be constructed...");
     thread::sleep(time::Duration::from_millis(120 * (nclasses as u64)));
 
-    write_df.populate("User", users);
-    write_df.populate("Class", classes);
+    write_df.populate("User", users, &mut write_db);
+    write_df.populate("Class", classes, &mut write_db);
 
     if !correctness_test {
         if populate == PopulateType::Before {
-            write_df.populate("Post", posts.clone());
+            write_df.populate("Post", posts.clone(), &mut write_db);
             println!("Waiting for posts to propagate...");
             thread::sleep(time::Duration::from_millis((nposts / 10) as u64));
         }
@@ -388,10 +390,7 @@ fn main() {
         //     backend.populate("Post", posts);
         // }
 
-        let graph_fname = "graph.gv";
-        let mut gf = File::create(graph_fname).unwrap();
-        assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
-
+      
         // let mut dur = time::Duration::from_millis(0);
 
         // // --- Posts Query ---
@@ -469,91 +468,7 @@ fn main() {
         //     let mut gf = File::create(graph_fname).unwrap();
         //     assert!(write!(gf, "{}", backend.g.graphviz().unwrap()).is_ok());
         // }
-    } else {
-        // for each class a student is part of, write some number of public + private posts.
-        // assert that each user has consistent post_counts for public posts for all classes.
-        let enrollment_info = p.get_enrollment();
-        let mut class_to_pub_posts = HashMap::new();
-        let mut user_class_to_priv_posts = HashMap::new();
-
-        // populate
-        for uid in 0..nlogged {
-            match enrollment_info.get(&uid.into()) {
-                Some(classes) => {
-                    for class in classes {
-                        let (posts, npriv, npub) = p.get_user_posts(uid, class.clone(), 2);
-                        backend.populate("Post", posts.clone());
-                        let mut insert = false;
-                        match class_to_pub_posts.get_mut(&class.clone()) {
-                            Some(count) => {
-                                *count += npub;
-                            }
-                            None => {
-                                insert = true;
-                            }
-                        }
-                        println!("updating class: {:?} posts: {:?}", class, npub);
-                        if insert {
-                            class_to_pub_posts.insert(class.clone(), npub);
-                        }
-                        user_class_to_priv_posts.insert((uid, class), npriv);
-                    }
-                }
-                None => println!("why isn't user {:?} enrolled in any classes?", uid),
-            }
-        }
-
-        // log in users
-        for i in 0..nlogged {
-            let start = time::Instant::now();
-            backend.login(make_user(i)).is_ok();
-            let dur = start.elapsed().as_secs_f64();
-            println!("Migration {} took {:.2}s!", i, dur,);
-
-            // if partial, read 25% of the keys
-            if partial && query_type == "posts" {
-                let leaf = format!("posts_u{}", i);
-                let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-                for author in 0..nusers / 4 {
-                    getter.lookup(&[author.into()], false).unwrap();
-                }
-            }
-            if partial && query_type == "post_count" {
-                let leaf = format!("post_count_u{}", i);
-                let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-                for author in 0..nusers / 4 {
-                    getter.lookup(&[author.into()], false).unwrap();
-                }
-            }
-        }
-
-        println!("class to pub posts: {:?}", class_to_pub_posts);
-
-        // test post_count query
-        for uid in 0..nlogged {
-            match enrollment_info.get(&uid.into()) {
-                Some(classes) => {
-                    let mut class_vec = Vec::new();
-                    let mut expected_count = Vec::new();
-                    for class in classes {
-                        class_vec.push([class.clone()].to_vec());
-                        let mut expected_num_posts = *class_to_pub_posts.get(&class).unwrap();
-                        expected_num_posts += user_class_to_priv_posts.get(&(uid, class)).unwrap();
-                        expected_count.push(expected_num_posts);
-                    }
-
-                    let leaf = format!("post_count_u{}", uid);
-
-                    let mut getter = backend.g.view(&leaf).unwrap().into_sync();
-                    println!("looking up vec: {:?}", class_vec);
-                    let res = getter.multi_lookup(class_vec.clone(), true);
-                    println!("results: {:?}", res);
-                    println!("expected counts: {:?}", expected_count);
-                }
-                None => println!("why isn't user {:?} enrolled in any classes?", uid),
-            }
-        }
-    }
+    } 
 }
 
 // author version of post count query

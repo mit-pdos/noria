@@ -302,6 +302,7 @@ impl ControllerInner {
                     self.install_recipe(authority, args)
                         .map(|r| json::to_string(&r).unwrap())
                 }),
+            
             (Method::POST, "/set_security_config") => json::from_slice(&body)
                 .map_err(|_| StatusCode::BAD_REQUEST)
                 .map(|args| {
@@ -696,6 +697,7 @@ impl ControllerInner {
             start: time::Instant::now(),
             log: miglog,
             security_config: None,
+            fwd: None,
         };
         let r = f(&mut m);
         m.commit();
@@ -708,6 +710,7 @@ impl ControllerInner {
     where
         F: FnOnce(&mut Migration) -> T,
     {
+        println!("starting migration");
         info!(self.log, "starting migration");
         let miglog = self.log.new(o!());
         let mut m = Migration {
@@ -719,6 +722,32 @@ impl ControllerInner {
             start: time::Instant::now(),
             log: miglog,
             security_config: None,
+            fwd: None, 
+        };
+        let r = f(&mut m);
+        m.commit();
+        r
+    }
+
+    /// Perform a new query schema migration.
+    // crate viz for tests
+    crate fn migrate_write<F, T>(&mut self, f: F) -> T
+    where
+        F: FnOnce(&mut Migration) -> T,
+    {
+        println!("starting migration");
+        info!(self.log, "starting migration");
+        let miglog = self.log.new(o!());
+        let mut m = Migration {
+            mainline: self,
+            added: Default::default(),
+            columns: Default::default(),
+            readers: Default::default(),
+            context: Default::default(),
+            start: time::Instant::now(),
+            log: miglog,
+            security_config: None,
+            fwd: Some("127.0.0.1/read".into()),
         };
         let r = f(&mut m);
         m.commit();
@@ -981,6 +1010,7 @@ impl ControllerInner {
         &mut self,
         context: HashMap<String, DataType>,
     ) -> Result<(), String> {
+        println!("in create universe rpc");
         let log = self.log.clone();
         let mut r = self.recipe.clone();
         let groups = self.recipe.security_groups();
@@ -1075,7 +1105,7 @@ impl ControllerInner {
     }
 
     fn apply_recipe(&mut self, mut new: Recipe) -> Result<ActivationResult, String> {
-        let r = self.migrate(|mig| {
+        let r = self.migrate_write(|mig| {
             new.activate(mig)
                 .map_err(|e| format!("failed to activate recipe: {}", e))
         });
