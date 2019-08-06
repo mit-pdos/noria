@@ -8,10 +8,3 @@ members = [
 
 [profile.release]
 debug=true
-
-[patch.'https://github.com/tower-rs/tower.git']
-tower-balance = { path = '/home/gina/tower/tower-balance' }
-tower-load = { path = '/home/gina/tower/tower-load' }
-
-[patch.crates-io]
-tower-buffer = { path = '/home/gina/tower/tower-buffer' }
