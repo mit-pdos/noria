@@ -427,9 +427,10 @@ where
                     {
                         let w_reserved_time = Arc::clone(&W_RESERVED_TIME);
                         let r_reserved_time = Arc::clone(&R_RESERVED_TIME);
-                        let num_writes = w_reserved_time.lock().unwrap().len();
+                        let w_reserved_time = w_reserved_time.lock().unwrap();
                         let mut r_reserved_time = r_reserved_time.lock().unwrap();
-                        if r_reserved_time.len() == read_count {
+                        let num_writes = w_reserved_time.len();
+                        if read_count <= r_reserved_time.len() {
                             // already read this author count
                             continue;
                         }
@@ -524,7 +525,8 @@ where
         {
             let mut next_reserved_w = next_reserved_w.lock().unwrap();
             let mut w_reserved_time = w_reserved_time.lock().unwrap();
-            let num_reads = r_reserved_time.lock().unwrap().len();
+            let r_reserved_time = r_reserved_time.lock().unwrap();
+            let num_reads = r_reserved_time.len();
             if w_reserved_time.len() == num_reads && now >= *next_reserved_w {
                 // if our previous write has been read and we haven't sent a write in a while,
                 // note down the time of write, then queue it
