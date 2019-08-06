@@ -29,6 +29,7 @@ type Transport = AsyncBincodeStream<
 pub struct ViewEndpoint {
     name: String,
     shard: usize,
+    addr: SocketAddr,
     c: Option<ControllerHandle<ZookeeperAuthority>>,
 }
 
@@ -48,13 +49,11 @@ impl Service<()> for ViewEndpoint {
     >;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        try_ready!(
-            self.c
-                .as_mut()
-                .unwrap()
-                .poll_ready()
-                .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
-        );
+        if let Some(ref mut c) = &mut self.c {
+            try_ready!(
+                c.poll_ready().map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+            );
+        }
         Ok(Async::Ready(()))
     }
 
@@ -62,23 +61,27 @@ impl Service<()> for ViewEndpoint {
         let name = &self.name;
         let shard = self.shard;
 
-        self.c
-            .as_mut()
-            .unwrap()
-            .view_builder(name)
-            .map(move |vb| vb.shards[shard])
-            .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
-            .and_then(|addr| {
-                println!("ViewEndpoint connecting to {:?}", addr);
-                tokio::net::TcpStream::connect(&addr)
-            })
-            .and_then(|s| {
-                s.set_nodelay(true)?;
-                Ok(s)
-            })
-            .map(AsyncBincodeStream::from)
-            .map(AsyncBincodeStream::for_async)
-            .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default()))
+        if let Some(ref mut c) = &mut self.c {
+            future::Either::A(
+                c
+                    .view_builder(name)
+                    .map(move |vb| vb.shards[shard])
+                    .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))
+                    .and_then(|addr| {
+                        println!("ViewEndpoint connecting to {:?}", addr);
+                        tokio::net::TcpStream::connect(&addr)
+                    })
+            )
+        } else {
+            future::Either::B(tokio::net::TcpStream::connect(&self.addr))
+        }
+        .and_then(|s| {
+            s.set_nodelay(true)?;
+            Ok(s)
+        })
+        .map(AsyncBincodeStream::from)
+        .map(AsyncBincodeStream::for_async)
+        .map(|t| multiplex::MultiplexTransport::new(t, Tagger::default()))
     }
 }
 
@@ -197,6 +200,7 @@ impl ViewBuilder {
                     let endpoint = ViewEndpoint {
                         name: name.clone(),
                         shard: shardi,
+                        addr,
                         c: controller.clone(),
                     };
                     let c = Buffer::new(
