@@ -864,6 +864,13 @@ fn main() {
                         .help("Shard the graph this many ways (0 = disable sharding)."),
                 )
                 .arg(
+                    Arg::with_name("truncate-every")
+                        .long("truncate-every")
+                        .takes_value(true)
+                        .default_value("2")
+                        .help("Truncate logs every this many seconds."),
+                )
+                .arg(
                     Arg::with_name("durability")
                         .long("durability")
                         .takes_value(false)

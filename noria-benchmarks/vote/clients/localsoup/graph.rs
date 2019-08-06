@@ -36,6 +36,7 @@ pub struct Builder {
     pub logging: bool,
     pub threads: Option<usize>,
     pub purge: String,
+    pub truncate_every: u64,
 }
 
 impl Default for Builder {
@@ -47,6 +48,7 @@ impl Default for Builder {
             logging: false,
             threads: None,
             purge: "none".to_string(),
+            truncate_every: 2,
         }
     }
 }
@@ -82,6 +84,7 @@ impl Builder {
         if let Some(threads) = self.threads {
             g.set_threads(threads);
         }
+        g.set_truncate_every(self.truncate_every);
         match &*self.purge {
             "all" => {
                 g.set_frontier_strategy(FrontierStrategy::AllPartial);
