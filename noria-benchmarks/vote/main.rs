@@ -30,7 +30,7 @@ thread_local! {
 
 lazy_static! {
     // The interval with which to write to the reserved key, in nanonseconds
-    static ref WRITE_RESERVED_EVERY_US: time::Duration = time::Duration::new(0, 1_000_000_000);
+    static ref WRITE_RESERVED_EVERY_US: time::Duration = time::Duration::new(0, 50_000_000);
     // The time after which to do the next write to the reserved key
     static ref NEXT_RESERVED_W: Arc<Mutex<time::Instant>> = Arc::new(Mutex::new(time::Instant::now()));
     // The write time of the reserved key
