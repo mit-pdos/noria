@@ -208,6 +208,7 @@ where
     let r_reserved_time = R_RESERVED_TIME.clone();
     let w_reserved_time = w_reserved_time.lock().unwrap();
     let r_reserved_time = r_reserved_time.lock().unwrap();
+    let mut wp_delay = wp_delay.lock().unwrap();
     println!("\n(relative write time (ms since start), delay (us))");
     print!("[");
     for i in 0..r_reserved_time.len() {
@@ -228,6 +229,10 @@ where
         } else {
             let delay = r_time.duration_since(w_time);
             let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
+            if wp_delay.record(us).is_err() {
+                let m = wp_delay.high();
+                wp_delay.record(m).unwrap();
+            };
             us
         };
         if i == r_reserved_time.len() - 1 {
@@ -238,7 +243,6 @@ where
     }
 
     // write propagation delay
-    let wp_delay = wp_delay.lock().unwrap();
     println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
     println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
     println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
