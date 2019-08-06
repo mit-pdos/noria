@@ -63,6 +63,7 @@ impl VoteClient for LocalNoria {
             0 => None,
             x => Some(x),
         };
+        s.truncate_every = value_t_or_exit!(args, "truncate-every", u64);
         s.stupid = args.is_present("stupid");
         let purge = args.value_of("purge").unwrap().to_string();
         s.purge = purge.clone();
