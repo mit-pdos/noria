@@ -1475,7 +1475,7 @@ impl ControllerInner {
                 ControlReplyPacket::Booted(shard, addr) => {
                     self.channel_coordinator.insert_remote((idx, shard), addr);
                     announce.push(DomainDescriptor::new(idx, shard, addr));
-                    println!("might fail: D{}.{}", idx.index(), shard);
+                    // println!("might fail: D{}.{}", idx.index(), shard);
                     txs.insert(
                         shard,
                         self.channel_coordinator
