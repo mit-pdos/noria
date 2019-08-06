@@ -428,7 +428,7 @@ where
                         let w_reserved_time = w_reserved_time.lock().unwrap();
                         let mut r_reserved_time = r_reserved_time.lock().unwrap();
                         let num_writes = w_reserved_time.len();
-                        if r_reserved_time.len() == read_count {
+                        if read_count <= r_reserved_time.len() {
                             // already read this author count
                             continue;
                         }
