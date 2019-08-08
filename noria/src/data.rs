@@ -516,13 +516,20 @@ macro_rules! arithmetic_operation (
         match ($first, $second) {
             (&DataType::None, _) | (_, &DataType::None) => DataType::None,
             (&DataType::Int(a), &DataType::Int(b)) => (a $op b).into(),
+            (&DataType::UnsignedInt(a), &DataType::UnsignedInt(b)) => (a $op b).into(),
             (&DataType::BigInt(a), &DataType::BigInt(b)) => (a $op b).into(),
+            (&DataType::UnsignedBigInt(a), &DataType::UnsignedBigInt(b)) => (a $op b).into(),
             (&DataType::Int(a), &DataType::BigInt(b)) => (i64::from(a) $op b).into(),
+            (&DataType::Int(a), &DataType::UnsignedBigInt(b)) => (i128::from(a) $op i128::from(b)).into(),
             (&DataType::BigInt(a), &DataType::Int(b)) => (a $op i64::from(b)).into(),
-            // TODO ADD SUPPORT FOR MATHS ON SIGNED (Big)Int
+            (&DataType::UnsignedBigInt(a), &DataType::Int(b)) => (i128::from(a) $op i128::from(b)).into(),
+            (&DataType::UnsignedBigInt(a), &DataType::UnsignedInt(b)) => (a $op u64::from(b)).into(),
+            (&DataType::UnsignedInt(a), &DataType::UnsignedBigInt(b)) => (u64::from(a) $op b).into(),
 
             (first @ &DataType::Int(..), second @ &DataType::Real(..)) |
+            (first @ &DataType::UnsignedInt(..), second @ &DataType::Real(..)) |
             (first @ &DataType::Real(..), second @ &DataType::Int(..)) |
+            (first @ &DataType::Real(..), second @ &DataType::UnsignedInt(..)) |
             (first @ &DataType::Real(..), second @ &DataType::Real(..)) => {
                 let a: f64 = first.into();
                 let b: f64 = second.into();
