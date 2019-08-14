@@ -310,38 +310,39 @@ fn listen_df(
                     labels.entry(addr).or_insert(Default::default()).insert(from, label);
                 }
 
-                // it has been a while since we last sent a truncate message to the controller.
-                // aggregate the minimum labels and send a message.
-                if last_truncated.elapsed() > truncate_every {
-                    let min_labels = labels
-                        .iter()
-                        .map(|(from, labels)| {
-                            let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
-                                if val < min {
-                                    min = val;
-                                }
-                                min
-                            });
-                            (*from, min_label)
-                        })
-                        .collect::<HashMap<_, _>>();
-                    let m = CoordinationPayload::TruncateLogs {
-                        from: ctrl_addr,
-                        labels: min_labels,
-                    };
-                    tokio::spawn(ctrl_tx
-                        .clone()
-                        .send(m)
-                        .map_err(|_| {
-                            // controller went away -- exit?
-                            eprintln!("controller went away during log truncation");
-                        })
-                        .map(|_| ()),
-                    );
-                    futures::future::ok((time::Instant::now(), labels, ctrl_tx))
-                } else {
-                    futures::future::ok((last_truncated, labels, ctrl_tx))
-                }
+                // // it has been a while since we last sent a truncate message to the controller.
+                // // aggregate the minimum labels and send a message.
+                // if last_truncated.elapsed() > truncate_every {
+                //     let min_labels = labels
+                //         .iter()
+                //         .map(|(from, labels)| {
+                //             let min_label = labels.values().fold(std::usize::MAX, |mut min, &val| {
+                //                 if val < min {
+                //                     min = val;
+                //                 }
+                //                 min
+                //             });
+                //             (*from, min_label)
+                //         })
+                //         .collect::<HashMap<_, _>>();
+                //     let m = CoordinationPayload::TruncateLogs {
+                //         from: ctrl_addr,
+                //         labels: min_labels,
+                //     };
+                //     tokio::spawn(ctrl_tx
+                //         .clone()
+                //         .send(m)
+                //         .map_err(|_| {
+                //             // controller went away -- exit?
+                //             eprintln!("controller went away during log truncation");
+                //         })
+                //         .map(|_| ()),
+                //     );
+                //     futures::future::ok((time::Instant::now(), labels, ctrl_tx))
+                // } else {
+                //     futures::future::ok((last_truncated, labels, ctrl_tx))
+                // }
+                futures::future::ok((last_truncated, labels, ctrl_tx))
             })
             .and_then(|(_, _, _)| Ok(()))
             .map_err(|e| panic!("{:?}", e))
