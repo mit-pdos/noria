@@ -394,67 +394,67 @@ impl ControllerInner {
 
     fn truncate_logs(&mut self) {
         // check if we need to truncate logs
-        // if self.last_truncated_logs.elapsed() > self.truncate_every {
-        //     let min_labels = self.truncate
-        //         .iter()
-        //         .map(|(addr, labels)| {
-        //             let min_label = if labels.is_empty() {
-        //                 0
-        //             } else {
-        //                 labels.values().fold(std::usize::MAX, |mut min, &val| {
-        //                     if val < min {
-        //                         min = val;
-        //                     }
-        //                     min
-        //                 })
-        //             };
-        //             (addr, min_label)
-        //         })
-        //         .collect::<HashMap<_, _>>();
+        if self.last_truncated_logs.elapsed() > self.truncate_every {
+            let min_labels = self.truncate
+                .iter()
+                .map(|(addr, labels)| {
+                    let min_label = if labels.is_empty() {
+                        0
+                    } else {
+                        labels.values().fold(std::usize::MAX, |mut min, &val| {
+                            if val < min {
+                                min = val;
+                            }
+                            min
+                        })
+                    };
+                    (addr, min_label)
+                })
+                .collect::<HashMap<_, _>>();
 
-        //     // truncate updates
-        //     let domain_graph = &self.domain_graph;
-        //     for &domain in &self.store_updates {
-        //         let domain_ni = self.replica_to_ni.get(&(domain, 0)).unwrap();
-        //         let at = domain_graph
-        //             .neighbors_directed(*domain_ni, petgraph::EdgeDirection::Incoming)
-        //             .map(|ni| domain_graph[ni])
-        //             .map(|addr| (addr, *min_labels.get(&addr).unwrap()))
-        //             .collect::<HashMap<_, _>>();
-        //         let m = box Packet::TruncateUpdates(at);
-        //         let dh = self.domains.get_mut(&domain).unwrap();
-        //         for i in 0..dh.shards.len() {
-        //             let res = dh.send_to_healthy_shard(i, m.clone(), &self.workers);
-        //             if res.is_err() {
-        //                 error!(
-        //                     self.log,
-        //                     "failed to send truncate updates to D{}.{}",
-        //                     domain.index(),
-        //                     i,
-        //                 );
-        //             }
-        //         }
-        //     }
+            // truncate updates
+            let domain_graph = &self.domain_graph;
+            for &domain in &self.store_updates {
+                let domain_ni = self.replica_to_ni.get(&(domain, 0)).unwrap();
+                let at = domain_graph
+                    .neighbors_directed(*domain_ni, petgraph::EdgeDirection::Incoming)
+                    .map(|ni| domain_graph[ni])
+                    .map(|addr| (addr, *min_labels.get(&addr).unwrap()))
+                    .collect::<HashMap<_, _>>();
+                let m = box Packet::TruncateUpdates(at);
+                let dh = self.domains.get_mut(&domain).unwrap();
+                for i in 0..dh.shards.len() {
+                    let res = dh.send_to_healthy_shard(i, m.clone(), &self.workers);
+                    if res.is_err() {
+                        error!(
+                            self.log,
+                            "failed to send truncate updates to D{}.{}",
+                            domain.index(),
+                            i,
+                        );
+                    }
+                }
+            }
 
-        //     // truncate payloads
-        //     for (addr, min_label) in min_labels.into_iter() {
-        //         let m = box Packet::TruncatePayload(min_label);
-        //         let res = self.domains
-        //             .get_mut(&addr.0)
-        //             .unwrap()
-        //             .send_to_healthy_shard(addr.1, m, &self.workers);
-        //         if res.is_err() {
-        //             error!(
-        //                 self.log,
-        //                 "failed to send truncate payload to D{}.{}",
-        //                 addr.0.index(),
-        //                 addr.1,
-        //             );
-        //         }
-        //     }
+            // truncate payloads
+            for (addr, min_label) in min_labels.into_iter() {
+                let m = box Packet::TruncatePayload(min_label);
+                let res = self.domains
+                    .get_mut(&addr.0)
+                    .unwrap()
+                    .send_to_healthy_shard(addr.1, m, &self.workers);
+                if res.is_err() {
+                    error!(
+                        self.log,
+                        "failed to send truncate payload to D{}.{}",
+                        addr.0.index(),
+                        addr.1,
+                    );
+                }
+            }
 
-        //     self.last_truncated_logs = Instant::now();
-        // }
+            self.last_truncated_logs = Instant::now();
+        }
     }
 
     fn check_worker_liveness(&mut self) {
