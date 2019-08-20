@@ -272,7 +272,11 @@ impl Hash for DataType {
 impl From<i128> for DataType {
     fn from(s: i128) -> Self {
         if s < 0 {
-            DataType::BigInt(s as i64)
+            if s >= std::i64::MIN.into() {
+                DataType::BigInt(s as i64)
+            } else {
+                panic!(format!("can't fit {:?} in a DataType::BigInt", s))
+            }
         } else {
             DataType::UnsignedBigInt(s as u64)
         }
@@ -527,9 +531,13 @@ macro_rules! arithmetic_operation (
             (&DataType::UnsignedInt(a), &DataType::UnsignedBigInt(b)) => (u64::from(a) $op b).into(),
 
             (first @ &DataType::Int(..), second @ &DataType::Real(..)) |
+            (first @ &DataType::BigInt(..), second @ &DataType::Real(..)) |
             (first @ &DataType::UnsignedInt(..), second @ &DataType::Real(..)) |
+            (first @ &DataType::UnsignedBigInt(..), second @ &DataType::Real(..)) |
             (first @ &DataType::Real(..), second @ &DataType::Int(..)) |
+            (first @ &DataType::Real(..), second @ &DataType::BigInt(..)) |
             (first @ &DataType::Real(..), second @ &DataType::UnsignedInt(..)) |
+            (first @ &DataType::Real(..), second @ &DataType::UnsignedBigInt(..)) |
             (first @ &DataType::Real(..), second @ &DataType::Real(..)) => {
                 let a: f64 = first.into();
                 let b: f64 = second.into();
