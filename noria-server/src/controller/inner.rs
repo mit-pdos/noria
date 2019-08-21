@@ -1146,6 +1146,14 @@ impl ControllerInner {
         min_clock: TreeClock,
     ) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
+        info!(
+            self.log,
+            "received ack new incoming from domain {}.{}",
+            from.0.index(),
+            from.1;
+            "num_updates" => updates.len(),
+        );
+
         self.provenance.insert(from, (min_clock, updates));
 
         // We're no longer waiting on the node that acked the NewIncoming message
@@ -1237,6 +1245,8 @@ impl ControllerInner {
             .collect::<Vec<_>>();
         updates_to_send.sort_by_key(|p| p.label());
         updates_to_send.dedup_by_key(|update| update.label());
+
+        info!(self.log, "all ack new incoming messages received");
         (Some(max_union), updates_to_send)
     }
 
