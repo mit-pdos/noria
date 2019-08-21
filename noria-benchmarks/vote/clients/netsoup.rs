@@ -44,6 +44,9 @@ impl VoteClient for Conn {
                                         } else {
                                             ((i % (params.authors - 1)) + 2) as i32
                                         };
+                                        if i % 1000000 == 0 {
+                                            println!("{} million articles", i / 1000000);
+                                        }
                                         vec![
                                             ((i + 1) as i32).into(),
                                             format!("Article #{}", i).into(),
