@@ -321,7 +321,7 @@ impl Reader {
             .collect();
     }
 
-    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+    pub fn new_incoming(&mut self, _old: ReplicaAddr, _new: ReplicaAddr) {
         /*
         if self.min_clock.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
@@ -341,9 +341,9 @@ impl Reader {
         m: &mut Option<Box<Packet>>,
         from: ReplicaAddr,
     ) -> (AddrLabels, AddrLabels) {
-        let (mtype, is_replay) = match m {
-            Some(box Packet::ReplayPiece { .. }) => ("ReplayPiece", true),
-            Some(box Packet::Message { .. }) => ("Message", false),
+        let is_replay = match m {
+            Some(box Packet::ReplayPiece { .. }) => true,
+            Some(box Packet::Message { .. }) => false,
             _ => unreachable!(),
         };
 

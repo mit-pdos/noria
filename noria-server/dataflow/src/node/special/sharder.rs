@@ -316,7 +316,7 @@ impl Sharder {
             .collect();
     }
 
-    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+    pub fn new_incoming(&mut self, _old: ReplicaAddr, _new: ReplicaAddr) {
         /*
         if self.min_clock.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
@@ -345,8 +345,8 @@ impl Sharder {
         addr_labels: Vec<(ReplicaAddr, usize)>,
         mut min_clock: Option<TreeClock>,
         targets: Vec<TreeClock>,
-        on_shard: Option<usize>,
-        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+        _on_shard: Option<usize>,
+        _output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         for &(addr, label) in &addr_labels {
             // don't duplicate sent messages

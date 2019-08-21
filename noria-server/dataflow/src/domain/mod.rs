@@ -1412,7 +1412,7 @@ impl Domain {
                     Packet::Spin => {
                         // spinning as instructed
                     },
-                    Packet::MakeRecovery { node } => {
+                    Packet::MakeRecovery { node: _ } => {
                         /*
                         let node = &self.nodes[node];
                         println!("D{}: MakeRecovery {:?}", self.index.index(), node.borrow().global_addr());
@@ -1940,7 +1940,6 @@ impl Domain {
             return;
         }
 
-        let id = m.id().clone();
         let mut finished = None;
         let mut need_replay = Vec::new();
         let mut finished_partial = 0;

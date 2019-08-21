@@ -5,7 +5,7 @@ use crate::controller::schema;
 use crate::controller::{ControllerState, Migration, Recipe};
 use crate::controller::{Worker, WorkerIdentifier};
 use crate::coordination::{CoordinationMessage, CoordinationPayload, DomainDescriptor};
-use dataflow::payload::{ControlReplyPacket, TriggerEndpoint};
+use dataflow::payload::ControlReplyPacket;
 use dataflow::prelude::*;
 use dataflow::{node, prelude::Packet, DomainBuilder, DomainConfig};
 use hyper::{self, Method, StatusCode};
@@ -567,15 +567,6 @@ impl ControllerInner {
         }
     }
 
-    fn child(&self, ni: NodeIndex) -> NodeIndex {
-        let mut nodes = self
-                .ingredients
-                .neighbors_directed(ni, petgraph::EdgeDirection::Outgoing);
-        let ni = nodes.next().unwrap();
-        assert_eq!(nodes.count(), 0);
-        ni
-    }
-
     fn parent(&self, ni: NodeIndex) -> NodeIndex {
         let mut nodes = self
                 .ingredients
@@ -998,7 +989,7 @@ impl ControllerInner {
     */
 
     /// Recovers a domain with only an ingress A and a reader B1.
-    fn recover_reader(&mut self, ingress: NodeIndex, reader: NodeIndex) {
+    fn recover_reader(&mut self, _ingress: NodeIndex, _reader: NodeIndex) {
         /*
         let domain_b = self.ingredients[ingress].domain();
         assert_eq!(domain_b, self.ingredients[reader].domain());

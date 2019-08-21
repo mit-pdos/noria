@@ -172,7 +172,7 @@ impl Egress {
             .collect();
     }
 
-    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+    pub fn new_incoming(&mut self, _old: ReplicaAddr, _new: ReplicaAddr) {
         /*
         if self.min_clock.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
@@ -300,7 +300,7 @@ impl Egress {
                 let label = p.label();
                 assert_eq!(label, self.updates.max().edges().get(addr).unwrap().label());
             }
-            let target = self.targets.remove(0);
+            self.targets.remove(0);
             if self.targets.is_empty() {
                 let ms = self.parent_buffer
                     .drain()

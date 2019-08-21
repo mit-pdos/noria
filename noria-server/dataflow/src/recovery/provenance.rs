@@ -229,7 +229,7 @@ impl TreeClock {
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) -> bool {
         let mut provenance = self.edges.remove(&old).expect("old connection should exist");
 
-        if let Some(new_p) = provenance.edges.remove(&new){
+        if let Some(_new_p) = provenance.edges.remove(&new){
             // check if a replica failed. if so, make the grand-ancestor an ancestor
             /*
             assert!(provenance.edges.is_empty());
