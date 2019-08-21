@@ -66,6 +66,7 @@ pub(super) struct ControllerInner {
     pub(super) epoch: Epoch,
 
     pending_recovery: Option<(Vec<String>, usize)>,
+    failed_once: bool,
 
     quorum: usize,
     heartbeat_every: Duration,
@@ -458,12 +459,20 @@ impl ControllerInner {
     }
 
     fn check_worker_liveness(&mut self) {
+        // HACK: only handle one failure in an instance of Noria to deal with recoveries
+        // that take a long time. Otherwise, while a node is recovering it doesn't respond
+        // to heartbeats and Noria will think another worker has failed.
+        if self.failed_once {
+            return;
+        }
+
         let mut any_failed = false;
 
         // check if there are any newly failed workers
         if self.last_checked_workers.elapsed() > self.healthcheck_every {
             for (_addr, ws) in self.workers.iter() {
                 if ws.healthy && ws.last_heartbeat.elapsed() > self.heartbeat_every * 4 {
+                    self.failed_once = true;
                     any_failed = true;
                 }
             }
@@ -1352,6 +1361,7 @@ impl ControllerInner {
             workers: HashMap::default(),
 
             pending_recovery,
+            failed_once: false,
             last_checked_workers: Instant::now(),
             last_truncated_logs: Instant::now(),
 
