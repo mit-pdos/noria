@@ -1599,7 +1599,7 @@ impl Domain {
                         executor.ack_resume_at((self.index, self.shard.unwrap_or(0)));
                     },
                     Packet::TruncatePayload(label) => {
-                        info!(self.log, "truncating payloads at {}", label);
+                        debug!(self.log, "truncating payloads at {}", label);
                         let node = &self.nodes[self.exit_ni];
                         match self.exit_type {
                             DomainExitType::Egress => {
@@ -1630,7 +1630,7 @@ impl Domain {
                                     .unwrap()
                             },
                         };
-                        info!(self.log, "truncated updates at {}", label);
+                        debug!(self.log, "truncated updates at {}", label);
                     },
                     _ => unreachable!(),
                 }
