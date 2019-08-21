@@ -8,7 +8,7 @@ use bincode;
 use bufstream::BufStream;
 use dataflow::{
     payload::SourceChannelIdentifier,
-    prelude::{DataType, Executor, Provenance, ReplicaAddr, AddrLabel},
+    prelude::{DataType, Executor, TreeClock, ReplicaAddr, AddrLabel},
     Domain, Packet, PollEvent, ProcessResult,
 };
 use failure::{self, ResultExt};
@@ -346,11 +346,11 @@ impl Executor for OutOfBand {
     fn ack_new_incoming(
         &mut self,
         from: ReplicaAddr,
-        updates: Vec<Provenance>,
-        min_provenance: Provenance,
+        updates: Vec<TreeClock>,
+        min_clock: TreeClock,
     ) {
         self.ctrl_tx
-            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, min_provenance })
+            .unbounded_send(CoordinationPayload::AckNewIncoming { from, updates, min_clock })
             .expect("asked to send to controller, but controller has gone away");
     }
 

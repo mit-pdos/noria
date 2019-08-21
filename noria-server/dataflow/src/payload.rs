@@ -90,7 +90,7 @@ pub enum Packet {
 
     /// Regular data-flow update.
     Message {
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         link: Link,
         data: Records,
         tracer: Tracer,
@@ -98,7 +98,7 @@ pub enum Packet {
 
     /// Update that is part of a tagged data-flow replay path.
     ReplayPiece {
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         link: Link,
         tag: Tag,
         data: Records,
@@ -114,7 +114,7 @@ pub enum Packet {
     /// Evict the indicated keys from the materialization targed by the replay path `tag` (along
     /// with any other materializations below it).
     EvictKeys {
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         link: Link,
         tag: Tag,
         keys: Vec<Vec<DataType>>,
@@ -196,7 +196,7 @@ pub enum Packet {
 
     /// Ask domain (nicely) to replay a particular key.
     RequestPartialReplay {
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         tag: Tag,
         key: Vec<DataType>,
     },
@@ -263,8 +263,8 @@ pub enum Packet {
     /// Notify the domain to resume sending messages to its children from the given packet labels
     ResumeAt {
         addr_labels: Vec<(ReplicaAddr, usize)>,
-        min_provenance: Option<Provenance>,
-        targets: Vec<ProvenanceUpdate>,
+        min_clock: Option<TreeClock>,
+        targets: Vec<TreeClockDiff>,
     },
 
     /// Truncate payloads
@@ -274,12 +274,12 @@ pub enum Packet {
     TruncateUpdates(HashMap<ReplicaAddr, usize>),
 
     Dummy {
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
     },
 }
 
 impl Packet {
-    crate fn id(&self) -> &Option<ProvenanceUpdate> {
+    crate fn id(&self) -> &Option<TreeClockDiff> {
         match *self {
             Packet::Message { ref id, .. } => id,
             Packet::ReplayPiece { ref id, .. } => id,
@@ -289,7 +289,7 @@ impl Packet {
         }
     }
 
-    crate fn id_mut(&mut self) -> &mut Option<ProvenanceUpdate> {
+    crate fn id_mut(&mut self) -> &mut Option<TreeClockDiff> {
         match *self {
             Packet::Message { ref mut id, .. } => id,
             Packet::ReplayPiece { ref mut id, .. } => id,

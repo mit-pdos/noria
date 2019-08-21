@@ -81,7 +81,7 @@ pub(super) struct ControllerInner {
     // Fault tolerance
     // TODO(ygina): assumes one recovery process is going on at any time
     /// Map from replica to its minimum provenance and provenance updates.
-    provenance: HashMap<ReplicaAddr, (Provenance, Vec<ProvenanceUpdate>)>,
+    provenance: HashMap<ReplicaAddr, (TreeClock, Vec<TreeClockDiff>)>,
     /// Map from replica to a collection of replicas it is waiting to receive an ack from
     /// before we can send a ResumeAt message to the key.
     waiting_on: HashMap<ReplicaAddr, HashSet<ReplicaAddr>>,
@@ -1151,11 +1151,11 @@ impl ControllerInner {
     pub(crate) fn handle_ack_new_incoming(
         &mut self,
         from: ReplicaAddr,
-        updates: Vec<Provenance>,
-        min_provenance: Provenance,
+        updates: Vec<TreeClock>,
+        min_clock: TreeClock,
     ) {
         assert!(self.waiting_on.len() > 0, "in recovery mode");
-        self.provenance.insert(from, (min_provenance, updates));
+        self.provenance.insert(from, (min_clock, updates));
 
         // We're no longer waiting on the node that acked the NewIncoming message
         self.handle_ack_resume_at(from);
@@ -1166,7 +1166,7 @@ impl ControllerInner {
     ///
     /// Returns the updates to send with this message... basically an empty vec unless we just
     /// populated the fields.
-    fn acked_all_new_incoming(&mut self) -> (Option<Provenance>, Vec<Provenance>) {
+    fn acked_all_new_incoming(&mut self) -> (Option<TreeClock>, Vec<TreeClock>) {
         if self.provenance.is_empty() {
             // This function has already been called.
             return (None, vec![]);
@@ -1175,9 +1175,9 @@ impl ControllerInner {
         // Determine the limiting factor for which we request upstream replicas to resume.
         // Then apply all updates up to the minimum max_label, inclusive.
         let mut min_max_label = std::usize::MAX;
-        for (min_provenance, updates) in self.provenance.values() {
+        for (min_clock, updates) in self.provenance.values() {
             let max_label = if updates.is_empty() {
-                min_provenance.label()
+                min_clock.label()
             } else {
                 updates[updates.len() - 1].label()
             };
@@ -1185,40 +1185,40 @@ impl ControllerInner {
                 min_max_label = max_label;
             }
         }
-        for (_, (min_provenance, updates)) in self.provenance.iter_mut() {
+        for (_, (min_clock, updates)) in self.provenance.iter_mut() {
             while !updates.is_empty() {
                 if updates[0].label() > min_max_label {
                     break;
                 }
-                min_provenance.apply_update(&updates.remove(0));
+                min_clock.apply_update(&updates.remove(0));
             }
         }
 
-        // Use the values of the remaining min_provenances to determine which values to resume at.
-        // Since we applied the updates from the min_provenance, the min_provenances here should
+        // Use the values of the remaining min_clocks to determine which values to resume at.
+        // Since we applied the updates from the min_clock, the min_clocks here should
         // reflect the total provenance of the graph (even though some upstream updates are
         // dropped). Though I'm not really sure what replays do. We might need to store those in
         // the updates too?
         //
         // For each child of the failed domain, resume at 1+ the max_label using the last update.
-        for (&child, (min_provenance, updates)) in self.provenance.iter() {
+        for (&child, (min_clock, updates)) in self.provenance.iter() {
             let resume_at = if updates.is_empty() {
-                min_provenance.label() + 1
+                min_clock.label() + 1
             } else {
                 updates[updates.len() - 1].label() + 1
             };
             self.resume_ats
-                .entry(min_provenance.root())
+                .entry(min_clock.root())
                 .or_insert(vec![])
                 .push((child, resume_at));
         }
 
-        // For upstream nodes, resume at 1+ the maximum label of the unions of all min_provenance.
+        // For upstream nodes, resume at 1+ the maximum label of the unions of all min_clock.
         assert_eq!(self.resume_ats.len(), 1);
         let failed_replica = *self.resume_ats.keys().next().unwrap();
-        let mut max_union = Provenance::new(failed_replica, 0);
-        for (min_provenance, _) in self.provenance.values() {
-            max_union.max_union(min_provenance);
+        let mut max_union = TreeClock::new(failed_replica, 0);
+        for (min_clock, _) in self.provenance.values() {
+            max_union.max_union(min_clock);
         }
         let mut queue = vec![];
         for grandparent in max_union.edges().values() {
@@ -1266,11 +1266,11 @@ impl ControllerInner {
             assert!(self.waiting_on.remove(&addr).is_some());
 
             // Convert the indexed resume at information into ResumeAt messages.
-            let (min_provenance, targets) = self.acked_all_new_incoming();
+            let (min_clock, targets) = self.acked_all_new_incoming();
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
 
             // Send the message!
-            let m = box Packet::ResumeAt { addr_labels, min_provenance, targets };
+            let m = box Packet::ResumeAt { addr_labels, min_clock, targets };
             self.domains
                 .get_mut(&addr.0)
                 .unwrap()

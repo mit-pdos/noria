@@ -323,7 +323,7 @@ impl Reader {
 
     pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
         /*
-        if self.min_provenance.new_incoming(old, new) {
+        if self.min_clock.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 assert_eq!(update[0].0, old);
@@ -354,9 +354,9 @@ impl Reader {
             self.num_payloads + 1
         };
         let update = if let Some(diff) = m.as_ref().unwrap().id() {
-            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
+            TreeClockDiff::new_with(from, label, &[diff.clone()])
         } else {
-            ProvenanceUpdate::new(from, label)
+            TreeClockDiff::new(from, label)
         };
         let (old, new) = self.updates.add_update(&update);
 

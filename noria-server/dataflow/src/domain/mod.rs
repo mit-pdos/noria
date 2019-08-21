@@ -269,7 +269,7 @@ pub struct Domain {
     channel_coordinator: Arc<ChannelCoordinator>,
 
     // TODO(ygina): buffered replays may be the result of multiple previous updates
-    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<ProvenanceUpdate>)>,
+    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, Option<TreeClockDiff>)>,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
 
@@ -1301,7 +1301,7 @@ impl Domain {
                                 self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_egress(|e| (
-                                        // e.min_provenance.label(),
+                                        // e.min_clock.label(),
                                         // e.payloads.len(),
                                         0,
                                         0,
@@ -1315,7 +1315,7 @@ impl Domain {
                                 self.nodes[self.exit_ni]
                                     .borrow()
                                     .with_reader(|r| (
-                                        // r.min_provenance.label(),
+                                        // r.min_clock.label(),
                                         // r.num_payloads,
                                         0,
                                         0,
@@ -1492,7 +1492,7 @@ impl Domain {
 
                         // tell the controller all the provenance information stored in this domain
                         // to help the controller decide where to resume sending messages.
-                        let (min_provenance, updates) = match self.exit_type {
+                        let (min_clock, updates) = match self.exit_type {
                             DomainExitType::Egress => {
                                 self.nodes[self.exit_ni]
                                     .borrow_mut()
@@ -1522,11 +1522,11 @@ impl Domain {
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
                             updates,
-                            *min_provenance,
+                            *min_clock,
                         );
                     },
-                    Packet::ResumeAt { addr_labels, min_provenance, targets } => {
-                        println!("D{}: ResumeAt {:?} {:?} {:?}", self.index.index(), addr_labels, min_provenance, targets);
+                    Packet::ResumeAt { addr_labels, min_clock, targets } => {
+                        println!("D{}: ResumeAt {:?} {:?} {:?}", self.index.index(), addr_labels, min_clock, targets);
                         // the domain should have one egress node to resume from
                         //
                         // update its node state so it knows where to resume from for each child.
@@ -1551,7 +1551,7 @@ impl Domain {
                                     // other process take truncate logs.
                                     e.resume_at(
                                         addr_labels,
-                                        min_provenance,
+                                        min_clock,
                                         targets,
                                         self.shard,
                                         sends,
@@ -1562,7 +1562,7 @@ impl Domain {
                                 node.borrow_mut().with_sharder_mut(|s| {
                                     s.resume_at(
                                         addr_labels,
-                                        min_provenance,
+                                        min_clock,
                                         targets,
                                         self.shard,
                                         sends,
@@ -1729,7 +1729,7 @@ impl Domain {
 
     fn seed_all(
         &mut self,
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
         sends: &mut EnqueuedSends,
@@ -1826,7 +1826,7 @@ impl Domain {
 
     fn seed_replay(
         &mut self,
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         tag: Tag,
         key: &[DataType],
         sends: &mut EnqueuedSends,
@@ -2734,7 +2734,7 @@ impl Domain {
     pub fn handle_eviction(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends) {
         #[allow(clippy::too_many_arguments)]
         fn trigger_downstream_evictions(
-            id: Option<ProvenanceUpdate>,
+            id: Option<TreeClockDiff>,
             log: &Logger,
             key_columns: &[usize],
             keys: &[Vec<DataType>],
@@ -2800,7 +2800,7 @@ impl Domain {
         }
 
         fn walk_path(
-            id: Option<ProvenanceUpdate>,
+            id: Option<TreeClockDiff>,
             path: &[ReplayPathSegment],
             keys: &mut Vec<Vec<DataType>>,
             tag: Tag,

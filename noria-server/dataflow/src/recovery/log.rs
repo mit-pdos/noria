@@ -8,13 +8,13 @@ pub struct Updates {
     /// Whether updates should be stored or just max provenance
     store_updates: bool,
     /// Base provenance with all diffs applied
-    max_provenance: Provenance,
+    max_clock: TreeClock,
 
     // The following fields are only used if we are storing updates
     /// Base provenance, including the label it represents
-    min_provenance: Provenance,
-    /// Provenance updates sent in outgoing packets
-    updates: Vec<ProvenanceUpdate>,
+    min_clock: TreeClock,
+    /// TreeClock updates sent in outgoing packets
+    updates: Vec<TreeClockDiff>,
 }
 
 impl Updates {
@@ -22,7 +22,7 @@ impl Updates {
         self.store_updates = store_updates;
         for ni in graph.node_indices() {
             if graph[ni] == root {
-                self.min_provenance.init(graph, root, ni, PROVENANCE_DEPTH);
+                self.min_clock.init(graph, root, ni, PROVENANCE_DEPTH);
                 return;
             }
         }
@@ -30,18 +30,18 @@ impl Updates {
     }
 
     pub fn init_in_domain(&mut self, shard: usize) -> AddrLabels {
-        self.min_provenance.set_shard(shard);
-        self.max_provenance = self.min_provenance.clone();
-        self.max_provenance.into_addr_labels()
+        self.min_clock.set_shard(shard);
+        self.max_clock = self.min_clock.clone();
+        self.max_clock.into_addr_labels()
     }
 
-    pub fn init_after_resume_at(&mut self, provenance: Provenance) -> AddrLabels {
+    pub fn init_after_resume_at(&mut self, provenance: TreeClock) -> AddrLabels {
         assert!(self.updates.is_empty());
-        assert_eq!(self.min_provenance.label(), 0);
-        assert_eq!(self.max_provenance.label(), 0);
-        self.min_provenance = provenance;
-        self.max_provenance = self.min_provenance.clone();
-        self.max_provenance.into_addr_labels()
+        assert_eq!(self.min_clock.label(), 0);
+        assert_eq!(self.max_clock.label(), 0);
+        self.min_clock = provenance;
+        self.max_clock = self.min_clock.clone();
+        self.max_clock.into_addr_labels()
     }
 
     /// The label of the next message to send
@@ -50,32 +50,32 @@ impl Updates {
     /// sent by this domain - think of replays as a snapshot of what's already been sent).
     pub fn next_label_to_send(&self, is_message: bool) -> usize {
         if is_message {
-            self.max_provenance.label() + 1
+            self.max_clock.label() + 1
         } else {
-            self.max_provenance.label()
+            self.max_clock.label()
         }
     }
 
     /// Add the update of the next message we're about to send to our state
-    pub fn add_update(&mut self, update: &ProvenanceUpdate) -> (AddrLabels, AddrLabels) {
+    pub fn add_update(&mut self, update: &TreeClockDiff) -> (AddrLabels, AddrLabels) {
         if self.store_updates {
             self.updates.push(update.clone());
         }
-        self.max_provenance.apply_update(update)
+        self.max_clock.apply_update(update)
     }
 
     /// Max provenance
-    pub fn max(&self) -> &Provenance {
-        &self.max_provenance
+    pub fn max(&self) -> &TreeClock {
+        &self.max_clock
     }
 
     /// The provenance and updates that should be sent to ack a new incoming message
     pub fn ack_new_incoming(
         &self,
         incoming: ReplicaAddr,
-    ) -> (Box<Provenance>, Vec<ProvenanceUpdate>) {
+    ) -> (Box<TreeClock>, Vec<TreeClockDiff>) {
         if self.store_updates {
-            let provenance = self.min_provenance.subgraph(incoming).unwrap().clone();
+            let provenance = self.min_clock.subgraph(incoming).unwrap().clone();
             let updates = self.updates
                 .iter()
                 .filter_map(|update| update.subgraph(incoming))
@@ -84,7 +84,7 @@ impl Updates {
             (provenance, updates)
         } else {
             assert!(self.updates.is_empty());
-            let provenance = self.max_provenance.subgraph(incoming).unwrap().clone();
+            let provenance = self.max_clock.subgraph(incoming).unwrap().clone();
             (provenance, vec![])
         }
     }
@@ -107,12 +107,12 @@ impl Updates {
             }
         }
 
-        // Drain and apply the rest of the updates to min_provenance
+        // Drain and apply the rest of the updates to min_clock
         println!("TRUNCATING {} UPDATES", i_to_keep);
         for update in self.updates.drain(..i_to_keep) {
-            self.min_provenance.apply_update(&update);
+            self.min_clock.apply_update(&update);
         }
-        self.min_provenance.label()
+        self.min_clock.label()
     }
 }
 

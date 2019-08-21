@@ -48,8 +48,8 @@ pub trait Executor {
     fn ack_new_incoming(
         &mut self,
         from: ReplicaAddr,
-        updates: Vec<Provenance>,
-        min_provenance: Provenance,
+        updates: Vec<TreeClock>,
+        min_clock: TreeClock,
     );
     fn ack_resume_at(&mut self, from: ReplicaAddr);
     fn uncache_replica(&mut self, replica: ReplicaAddr);

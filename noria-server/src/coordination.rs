@@ -53,9 +53,9 @@ pub enum CoordinationPayload {
         /// Who the ack is from.
         from: ReplicaAddr,
         /// All provenance updates with the new incoming domain as the root.
-        updates: Vec<ProvenanceUpdate>,
+        updates: Vec<TreeClockDiff>,
         /// The minimum provenance.
-        min_provenance: Provenance,
+        min_clock: TreeClock,
     },
     /// Ack ResumeAt so the controller knows who is still waiting for whom.
     AckResumeAt {

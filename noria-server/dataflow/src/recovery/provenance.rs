@@ -6,7 +6,7 @@ use std::fmt;
 /// The upstream branch of domains and message labels that was updated to produce the current
 /// message, starting at the node above the payload's "from" node. The number of nodes in the
 /// update is linear in the depth of the update.
-pub type ProvenanceUpdate = Provenance;
+pub type TreeClockDiff = TreeClock;
 
 /// Map from replica address to a collection of corresponding labels.
 pub type AddrLabels = HashMap<ReplicaAddr, Vec<usize>>;
@@ -14,7 +14,7 @@ pub type AddrLabels = HashMap<ReplicaAddr, Vec<usize>>;
 /// Map from replica address to a single label.
 pub type AddrLabel = HashMap<ReplicaAddr, usize>;
 
-impl fmt::Debug for ProvenanceUpdate {
+impl fmt::Debug for TreeClockDiff {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let edges = self.edges.iter().map(|(_, p)| p).collect::<Vec<_>>();
         if edges.is_empty() {
@@ -25,24 +25,24 @@ impl fmt::Debug for ProvenanceUpdate {
     }
 }
 
-impl ProvenanceUpdate {
-    pub fn new(root: ReplicaAddr, label: usize) -> ProvenanceUpdate {
-        ProvenanceUpdate {
+impl TreeClockDiff {
+    pub fn new(root: ReplicaAddr, label: usize) -> TreeClockDiff {
+        TreeClockDiff {
             root,
             label,
             edges: Default::default(),
         }
     }
 
-    pub fn new_with(root: ReplicaAddr, label: usize, children: &[ProvenanceUpdate]) -> ProvenanceUpdate {
-        let mut p = ProvenanceUpdate::new(root, label);
+    pub fn new_with(root: ReplicaAddr, label: usize, children: &[TreeClockDiff]) -> TreeClockDiff {
+        let mut p = TreeClockDiff::new(root, label);
         for child in children {
             p.add_child(child.clone());
         }
         p
     }
 
-    pub fn add_child(&mut self, child: ProvenanceUpdate) {
+    pub fn add_child(&mut self, child: TreeClockDiff) {
         self.edges.insert(child.root, box child);
     }
 
@@ -65,7 +65,7 @@ impl ProvenanceUpdate {
         }
     }
 
-    pub fn parent(&self) -> Option<&Box<ProvenanceUpdate>> {
+    pub fn parent(&self) -> Option<&Box<TreeClockDiff>> {
         assert!(self.edges.len() <= 1);
         self.edges.values().next()
     }
@@ -87,19 +87,19 @@ impl ProvenanceUpdate {
 
 /// The history of message labels that correspond to the production of the current message.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Provenance {
+pub struct TreeClock {
     root: ReplicaAddr,
     label: usize,
-    edges: FnvHashMap<ReplicaAddr, Box<Provenance>>,
+    edges: FnvHashMap<ReplicaAddr, Box<TreeClock>>,
 }
 
-impl Default for Provenance {
+impl Default for TreeClock {
     // TODO(ygina): it doesn't really make sense to have a provenance for imaginary domain index 0,
     // so maybe we should use options here. this is hacky and gross. the reason we have a default
     // implementation is hack to intiialize the provenance graph in the egress AFTER it has
     // been otherwise initialized and fit into the graph.
-    fn default() -> Provenance {
-        Provenance {
+    fn default() -> TreeClock {
+        TreeClock {
             root: (0.into(), 0),
             edges: Default::default(),
             label: 0,
@@ -107,9 +107,9 @@ impl Default for Provenance {
     }
 }
 
-impl Provenance {
+impl TreeClock {
     /// Initializes the provenance graph from the root domain/shard up to the given depth.
-    /// Typically called on a default Provenance struct, compared to an empty one.
+    /// Typically called on a default TreeClock struct, compared to an empty one.
     pub fn init(
         &mut self,
         graph: &DomainGraph,
@@ -124,7 +124,7 @@ impl Provenance {
                 .neighbors_directed(root_ni, petgraph::EdgeDirection::Incoming)
                 .collect::<Vec<_>>();
             for child_ni in children {
-                let mut provenance = Provenance::default();
+                let mut provenance = TreeClock::default();
                 provenance.init(graph, graph[child_ni], child_ni, depth - 1);
                 self.edges.insert(graph[child_ni], box provenance);
             }
@@ -139,7 +139,7 @@ impl Provenance {
         self.label
     }
 
-    pub fn edges(&self) -> &FnvHashMap<ReplicaAddr, Box<Provenance>> {
+    pub fn edges(&self) -> &FnvHashMap<ReplicaAddr, Box<TreeClock>> {
         &self.edges
     }
 
@@ -154,7 +154,7 @@ impl Provenance {
     /// The diff must have the same root and label as the provenance it's being applied to.
     /// The diff should strictly be ahead in time in comparison.
     /// Returns the labels that were replaced for each address.
-    pub fn apply_update(&mut self, update: &ProvenanceUpdate) -> (AddrLabels, AddrLabels) {
+    pub fn apply_update(&mut self, update: &TreeClockDiff) -> (AddrLabels, AddrLabels) {
         let mut changed_old = AddrLabels::default();
         let mut changed_new = AddrLabels::default();
         self.apply_update_internal(update, &mut changed_old, &mut changed_new);
@@ -166,7 +166,7 @@ impl Provenance {
 
     pub fn apply_update_internal(
         &mut self,
-        update: &ProvenanceUpdate,
+        update: &TreeClockDiff,
         changed_old: &mut AddrLabels,
         changed_new: &mut AddrLabels,
     ) {
@@ -199,7 +199,7 @@ impl Provenance {
         }
     }
 
-    pub fn union(&mut self, other: Provenance) {
+    pub fn union(&mut self, other: TreeClock) {
         assert_eq!(self.root, other.root);
         assert_eq!(self.label, other.label);
         for (child, other_p) in other.edges.into_iter() {
@@ -211,7 +211,7 @@ impl Provenance {
         }
     }
 
-    pub fn max_union(&mut self, other: &Provenance) {
+    pub fn max_union(&mut self, other: &TreeClock) {
         assert_eq!(self.root, other.root);
         if other.label > self.label {
             self.label = other.label;
@@ -249,7 +249,7 @@ impl Provenance {
     /// be an ancestor (stateless domain recovery) or grand-ancestor (stateful domain recovery) of
     /// the given node. There's no reason we should obtain any other subgraph in the protocol...
     /// Actually there is. We may be getting the subgraph of an update rather than the total graph.
-    pub fn subgraph(&self, new_root: ReplicaAddr) -> Option<&Box<Provenance>> {
+    pub fn subgraph(&self, new_root: ReplicaAddr) -> Option<&Box<TreeClock>> {
         if let Some(p) = self.edges.get(&new_root) {
             return Some(p);
         }
@@ -263,8 +263,8 @@ impl Provenance {
         // unreachable!("must be ancestor or grand-ancestor");
     }
 
-    pub fn into_debug(&self) -> noria::debug::stats::Provenance {
-        let mut p = noria::debug::stats::Provenance::new(self.label);
+    pub fn into_debug(&self) -> noria::debug::stats::TreeClock {
+        let mut p = noria::debug::stats::TreeClock::new(self.label);
         for (&replica, replica_p) in self.edges.iter() {
             p.edges.insert(replica, box replica_p.into_debug());
         }
@@ -307,14 +307,14 @@ mod tests {
     }
 
     /// Full provenance for the test graph
-    fn default_provenance() -> Provenance {
-        let p0 = Provenance::new(addr(0), 0);
-        let p1 = Provenance::new(addr(1), 0);
-        let p2_left = Provenance::new_with(addr(2), 0, &[p0.clone(), p1.clone()]);
-        let p2_right = Provenance::new_with(addr(2), 0, &[p0, p1]);
-        let p3 = Provenance::new_with(addr(3), 0, &[p2_left]);
-        let p4 = Provenance::new_with(addr(4), 0, &[p2_right]);
-        Provenance::new_with(addr(5), 0, &[p3, p4])
+    fn default_provenance() -> TreeClock {
+        let p0 = TreeClock::new(addr(0), 0);
+        let p1 = TreeClock::new(addr(1), 0);
+        let p2_left = TreeClock::new_with(addr(2), 0, &[p0.clone(), p1.clone()]);
+        let p2_right = TreeClock::new_with(addr(2), 0, &[p0, p1]);
+        let p3 = TreeClock::new_with(addr(3), 0, &[p2_left]);
+        let p4 = TreeClock::new_with(addr(4), 0, &[p2_right]);
+        TreeClock::new_with(addr(5), 0, &[p3, p4])
     }
 
     const MAX_DEPTH: usize = 10;
@@ -323,19 +323,19 @@ mod tests {
     fn test_graph_init_bases() {
         let g = default_graph();
 
-        let expected0 = Provenance::new(addr(0), 0);
-        let expected1 = Provenance::new(addr(1), 0);
+        let expected0 = TreeClock::new(addr(0), 0);
+        let expected1 = TreeClock::new(addr(1), 0);
 
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(0), 0.into(), MAX_DEPTH);
         assert_eq!(p, expected0);
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(1), 1.into(), MAX_DEPTH);
         assert_eq!(p, expected1);
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(0), 0.into(), 1);
         assert_eq!(p, expected0);
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(1), 1.into(), 1);
         assert_eq!(p, expected1);
     }
@@ -346,15 +346,15 @@ mod tests {
         let mut p5 = default_provenance();
 
         // max depth and depth 4 should have a path for each branch
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(5), 5.into(), MAX_DEPTH);
         assert_eq!(p, p5);
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(5), 5.into(), 4);
         assert_eq!(p, p5);
 
         // depth 3 should have one less layer
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(5), 5.into(), 3);
         p5
             .edges.get_mut(&addr(3)).unwrap()
@@ -367,7 +367,7 @@ mod tests {
         assert_eq!(p, p5);
 
         // depth 2 should have even one less layer
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(5), 5.into(), 2);
         p5
             .edges.get_mut(&addr(3)).unwrap()
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(p, p5);
 
         // depth 1 should be domain 5 by itself
-        let mut p = Provenance::default();
+        let mut p = TreeClock::default();
         p.init(&g, addr(5), 5.into(), 1);
         p5.edges.clear();
         assert_eq!(p, p5);
@@ -406,10 +406,10 @@ mod tests {
             .edges.get_mut(&addr(2)).unwrap()
             .edges.get_mut(&addr(0)).unwrap().label = 4;
 
-        let p0 = Provenance::new(addr(0), 4);
-        let p2 = Provenance::new_with(addr(2), 3, &[p0]);
-        let p4 = Provenance::new_with(addr(4), 2, &[p2]);
-        let diff = Provenance::new_with(addr(5), 1, &[p4]);
+        let p0 = TreeClock::new(addr(0), 4);
+        let p2 = TreeClock::new_with(addr(2), 3, &[p0]);
+        let p4 = TreeClock::new_with(addr(4), 2, &[p2]);
+        let diff = TreeClock::new_with(addr(5), 1, &[p4]);
 
         // expected - original = diff
         // original + diff = expected
@@ -438,10 +438,10 @@ mod tests {
             .edges.get_mut(&addr(3)).unwrap()
             .edges.get_mut(&addr(2)).unwrap().label = 5;
 
-        let p2 = Provenance::new(addr(2), 5);
-        let p4 = Provenance::new(addr(4), 4);
-        let p3 = Provenance::new_with(addr(3), 2, &[p2]);
-        let diff = Provenance::new_with(addr(5), 3, &[p3, p4]);
+        let p2 = TreeClock::new(addr(2), 5);
+        let p4 = TreeClock::new(addr(4), 4);
+        let p3 = TreeClock::new_with(addr(3), 2, &[p2]);
+        let diff = TreeClock::new_with(addr(5), 3, &[p3, p4]);
 
         // expected - original = diff
         // original + diff = expected
