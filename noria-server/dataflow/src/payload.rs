@@ -394,7 +394,7 @@ impl Packet {
             } => Packet::Message {
                 id: id.clone(),
                 link,
-                data: Default::default(),
+                data: data.clone(),
                 tracer: tracer.clone(),
             },
             Packet::ReplayPiece {
