@@ -338,6 +338,7 @@ where
     let early_exit = !global_args.is_present("no-early-exit");
     let runtime = time::Duration::from_secs(value_t_or_exit!(global_args, "runtime", u64));
     let warmup = time::Duration::from_secs(value_t_or_exit!(global_args, "warmup", u64));
+    let warmup_ms = value_t_or_exit!(global_args, "warmup", u64) * 1_000;
 
     let start = time::Instant::now();
     let end = start + warmup + runtime;
@@ -437,6 +438,29 @@ where
                         assert_eq!(num_writes, read_count);
                         println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
+
+                        if !warmup_done {
+                            // don't use data from warmup time
+                            continue;
+                        }
+
+                        // Calculate write propagation time
+                        let i = num_writes - 1;
+                        let w_time = w_reserved_time[i];
+                        let r_time = r_reserved_time[i];
+                        let relative_w_time = w_time.duration_since(start);
+                        let relative_w_time_ms =
+                            relative_w_time.as_secs() * 1_000 +
+                            u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
+                        let relative_w_time_ms = relative_w_time_ms - warmup_ms;
+
+                        let delay_us = if r_time == w_time {
+                            0
+                        } else {
+                            let delay = r_time.duration_since(w_time);
+                            delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000
+                        };
+                        println!("WPT [{},{},{:?}]", read_count, relative_w_time_ms, delay_us);
                     }
                 }
             }
