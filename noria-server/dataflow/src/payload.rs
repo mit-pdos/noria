@@ -344,6 +344,19 @@ impl Packet {
         }
     }
 
+    crate fn size_of_data(&self) -> u64 {
+        match *self {
+            Packet::Message { ref data, .. } => {
+                // Records(Vec<Record>) is 24 for the Vec. Each Record is 24+8=32 because 24 is
+                // the Vec<DataType> and 8 is to distinguish which enum it is, positive or
+                // negative. Each DataType is 16. Let k=3 be the number of data types in each
+                // record. Thus each Records is 24+(32+16k)n=24+80n
+                24 + 80 * data.len() as u64
+            },
+            _ => unreachable!(),
+        }
+    }
+
     crate fn trace(&self, event: PacketEvent) {
         if let Packet::Message {
             tracer: Some((tag, Some(ref sender))),

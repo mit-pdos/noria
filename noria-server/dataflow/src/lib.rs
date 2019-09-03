@@ -18,6 +18,7 @@ extern crate common;
 extern crate evmap;
 extern crate fnv;
 extern crate futures;
+extern crate hdrhistogram;
 extern crate itertools;
 extern crate nom_sql;
 extern crate noria;
