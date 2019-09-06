@@ -1,0 +1,450 @@
+Wrote 1th vote at Instant { tv_sec: 1397534, tv_nsec: 851010818 }
+TRUNCATING 0 UPDATES
+TRUNCATING 346 UPDATES
+TRUNCATING 237 UPDATES
+TRUNCATING 349 UPDATES
+TRUNCATING 307 UPDATES
+TRUNCATING 349 UPDATES
+TRUNCATING 303 UPDATES
+TRUNCATING 350 UPDATES
+TRUNCATING 301 UPDATES
+TRUNCATING 349 UPDATES
+TRUNCATING 350 UPDATES
+TRUNCATING 280 UPDATES
+TRUNCATING 284 UPDATES
+TRUNCATING 304 UPDATES
+TRUNCATING 347 UPDATES
+TRUNCATING 347 UPDATES
+TRUNCATING 301 UPDATES
+TRUNCATING 303 UPDATES
+TRUNCATING 351 UPDATES
+TRUNCATING 350 UPDATES
+Read 1th vote at Instant { tv_sec: 1397536, tv_nsec: 405326067 }
+Wrote 2th vote at Instant { tv_sec: 1397536, tv_nsec: 405663219 }
+Read 2th vote at Instant { tv_sec: 1397536, tv_nsec: 925473427 }
+Wrote 3th vote at Instant { tv_sec: 1397536, tv_nsec: 925479509 }
+Read 3th vote at Instant { tv_sec: 1397537, tv_nsec: 485493761 }
+Wrote 4th vote at Instant { tv_sec: 1397537, tv_nsec: 488464649 }
+Read 4th vote at Instant { tv_sec: 1397538, tv_nsec: 261159329 }
+Wrote 5th vote at Instant { tv_sec: 1397538, tv_nsec: 261246007 }
+Read 5th vote at Instant { tv_sec: 1397539, tv_nsec: 141692840 }
+Wrote 6th vote at Instant { tv_sec: 1397539, tv_nsec: 143703421 }
+TRUNCATING 11517 UPDATES
+TRUNCATING 11509 UPDATES
+TRUNCATING 11512 UPDATES
+TRUNCATING 11513 UPDATES
+TRUNCATING 11502 UPDATES
+TRUNCATING 11526 UPDATES
+TRUNCATING 11516 UPDATES
+TRUNCATING 11508 UPDATES
+TRUNCATING 11531 UPDATES
+TRUNCATING 11524 UPDATES
+TRUNCATING 11526 UPDATES
+TRUNCATING 11514 UPDATES
+TRUNCATING 11506 UPDATES
+TRUNCATING 11525 UPDATES
+TRUNCATING 11521 UPDATES
+TRUNCATING 11517 UPDATES
+TRUNCATING 11540 UPDATES
+TRUNCATING 11526 UPDATES
+TRUNCATING 11519 UPDATES
+TRUNCATING 11512 UPDATES
+Read 6th vote at Instant { tv_sec: 1397540, tv_nsec: 196145090 }
+Wrote 7th vote at Instant { tv_sec: 1397540, tv_nsec: 196589846 }
+Sent 25197 unsharded messages in 6.275374ms for 4199 messages / ms
+Sent 500000 sharded messages in 6.275374ms for 83333 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1304, 3544, 22104, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+Read 7th vote at Instant { tv_sec: 1397541, tv_nsec: 106101125 }
+Wrote 8th vote at Instant { tv_sec: 1397541, tv_nsec: 106371759 }
+Read 8th vote at Instant { tv_sec: 1397541, tv_nsec: 983385883 }
+Wrote 9th vote at Instant { tv_sec: 1397541, tv_nsec: 984183586 }
+TRUNCATING 28112 UPDATES
+TRUNCATING 28087 UPDATES
+TRUNCATING 28090 UPDATES
+TRUNCATING 28108 UPDATES
+TRUNCATING 28086 UPDATES
+TRUNCATING 28092 UPDATES
+TRUNCATING 28107 UPDATES
+TRUNCATING 28096 UPDATES
+TRUNCATING 28120 UPDATES
+TRUNCATING 28109 UPDATES
+TRUNCATING 28115 UPDATES
+TRUNCATING 28111 UPDATES
+TRUNCATING 28096 UPDATES
+TRUNCATING 28104 UPDATES
+TRUNCATING 28103 UPDATES
+TRUNCATING 28124 UPDATES
+TRUNCATING 28104 UPDATES
+TRUNCATING 28121 UPDATES
+TRUNCATING 28105 UPDATES
+TRUNCATING 28105 UPDATES
+Read 9th vote at Instant { tv_sec: 1397542, tv_nsec: 946326482 }
+Wrote 10th vote at Instant { tv_sec: 1397542, tv_nsec: 946729300 }
+Sent 50327 unsharded messages in 9.393758ms for 5591 messages / ms
+Sent 1000000 sharded messages in 9.393758ms for 111111 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2744, 9784, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+Read 10th vote at Instant { tv_sec: 1397543, tv_nsec: 926656111 }
+Wrote 11th vote at Instant { tv_sec: 1397543, tv_nsec: 927130044 }
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+Read 11th vote at Instant { tv_sec: 1397545, tv_nsec: 65960445 }
+Wrote 12th vote at Instant { tv_sec: 1397545, tv_nsec: 66234976 }
+Read 12th vote at Instant { tv_sec: 1397546, tv_nsec: 299628686 }
+Wrote 13th vote at Instant { tv_sec: 1397546, tv_nsec: 300089375 }
+Sent 75442 unsharded messages in 12.687043ms for 6286 messages / ms
+Sent 1500000 sharded messages in 12.687043ms for 125000 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2584, 6264, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 29181 UPDATES
+TRUNCATING 29175 UPDATES
+TRUNCATING 29154 UPDATES
+TRUNCATING 29137 UPDATES
+TRUNCATING 29186 UPDATES
+TRUNCATING 29180 UPDATES
+TRUNCATING 29173 UPDATES
+TRUNCATING 29174 UPDATES
+TRUNCATING 29152 UPDATES
+TRUNCATING 29165 UPDATES
+TRUNCATING 29165 UPDATES
+TRUNCATING 29146 UPDATES
+TRUNCATING 29164 UPDATES
+TRUNCATING 29151 UPDATES
+TRUNCATING 29164 UPDATES
+TRUNCATING 29181 UPDATES
+TRUNCATING 29180 UPDATES
+TRUNCATING 29179 UPDATES
+TRUNCATING 29169 UPDATES
+TRUNCATING 29199 UPDATES
+Read 13th vote at Instant { tv_sec: 1397547, tv_nsec: 677431597 }
+Wrote 14th vote at Instant { tv_sec: 1397547, tv_nsec: 677854852 }
+Read 14th vote at Instant { tv_sec: 1397548, tv_nsec: 859456485 }
+Wrote 15th vote at Instant { tv_sec: 1397548, tv_nsec: 859701606 }
+Read 15th vote at Instant { tv_sec: 1397550, tv_nsec: 20619311 }
+Wrote 16th vote at Instant { tv_sec: 1397550, tv_nsec: 20622997 }
+Sent 100573 unsharded messages in 15.814853ms for 6704 messages / ms
+Sent 2000000 sharded messages in 15.814853ms for 133333 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2584, 5624, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 15611 UPDATES
+TRUNCATING 15612 UPDATES
+TRUNCATING 15601 UPDATES
+TRUNCATING 15617 UPDATES
+TRUNCATING 15599 UPDATES
+TRUNCATING 15595 UPDATES
+TRUNCATING 15605 UPDATES
+TRUNCATING 15598 UPDATES
+TRUNCATING 15612 UPDATES
+TRUNCATING 15599 UPDATES
+TRUNCATING 15607 UPDATES
+TRUNCATING 15609 UPDATES
+TRUNCATING 15602 UPDATES
+TRUNCATING 15614 UPDATES
+TRUNCATING 15605 UPDATES
+TRUNCATING 15604 UPDATES
+TRUNCATING 15607 UPDATES
+TRUNCATING 15616 UPDATES
+TRUNCATING 15610 UPDATES
+TRUNCATING 15622 UPDATES
+Read 16th vote at Instant { tv_sec: 1397551, tv_nsec: 201149986 }
+Wrote 17th vote at Instant { tv_sec: 1397551, tv_nsec: 201154168 }
+Read 17th vote at Instant { tv_sec: 1397552, tv_nsec: 337183348 }
+Wrote 18th vote at Instant { tv_sec: 1397552, tv_nsec: 337395159 }
+Sent 125708 unsharded messages in 18.683895ms for 6983 messages / ms
+Sent 2500000 sharded messages in 18.683895ms for 138888 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2424, 4984, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 33541 UPDATES
+TRUNCATING 33548 UPDATES
+TRUNCATING 33547 UPDATES
+TRUNCATING 33550 UPDATES
+TRUNCATING 33531 UPDATES
+TRUNCATING 33549 UPDATES
+TRUNCATING 33552 UPDATES
+TRUNCATING 33544 UPDATES
+TRUNCATING 33528 UPDATES
+TRUNCATING 33527 UPDATES
+TRUNCATING 33554 UPDATES
+TRUNCATING 33531 UPDATES
+TRUNCATING 33546 UPDATES
+TRUNCATING 33543 UPDATES
+TRUNCATING 33552 UPDATES
+TRUNCATING 33560 UPDATES
+TRUNCATING 33560 UPDATES
+TRUNCATING 33544 UPDATES
+TRUNCATING 33540 UPDATES
+TRUNCATING 33557 UPDATES
+Read 18th vote at Instant { tv_sec: 1397553, tv_nsec: 579060030 }
+Wrote 19th vote at Instant { tv_sec: 1397553, tv_nsec: 579276717 }
+Read 19th vote at Instant { tv_sec: 1397554, tv_nsec: 742890309 }
+Wrote 20th vote at Instant { tv_sec: 1397554, tv_nsec: 742897070 }
+Read 20th vote at Instant { tv_sec: 1397555, tv_nsec: 889530669 }
+Wrote 21th vote at Instant { tv_sec: 1397555, tv_nsec: 890062262 }
+Sent 150845 unsharded messages in 21.713403ms for 7183 messages / ms
+Sent 3000000 sharded messages in 21.713403ms for 142857 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2424, 4664, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 33740 UPDATES
+TRUNCATING 33709 UPDATES
+TRUNCATING 33761 UPDATES
+TRUNCATING 33742 UPDATES
+TRUNCATING 33751 UPDATES
+TRUNCATING 33733 UPDATES
+TRUNCATING 33715 UPDATES
+TRUNCATING 33707 UPDATES
+TRUNCATING 33746 UPDATES
+TRUNCATING 33736 UPDATES
+TRUNCATING 33753 UPDATES
+TRUNCATING 33734 UPDATES
+TRUNCATING 33738 UPDATES
+TRUNCATING 33746 UPDATES
+TRUNCATING 33726 UPDATES
+TRUNCATING 33716 UPDATES
+TRUNCATING 33730 UPDATES
+TRUNCATING 33749 UPDATES
+TRUNCATING 33703 UPDATES
+TRUNCATING 33766 UPDATES
+Read 21th vote at Instant { tv_sec: 1397557, tv_nsec: 166913706 }
+Wrote 22th vote at Instant { tv_sec: 1397557, tv_nsec: 166918038 }
+Read 22th vote at Instant { tv_sec: 1397558, tv_nsec: 389590890 }
+Wrote 23th vote at Instant { tv_sec: 1397558, tv_nsec: 389595740 }
+Sent 175978 unsharded messages in 24.782768ms for 7332 messages / ms
+Sent 3500000 sharded messages in 24.782768ms for 145833 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2424, 4504, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 15607 UPDATES
+TRUNCATING 15596 UPDATES
+TRUNCATING 15619 UPDATES
+TRUNCATING 15608 UPDATES
+TRUNCATING 15616 UPDATES
+TRUNCATING 15608 UPDATES
+TRUNCATING 15621 UPDATES
+TRUNCATING 15601 UPDATES
+TRUNCATING 15615 UPDATES
+TRUNCATING 15612 UPDATES
+TRUNCATING 15593 UPDATES
+TRUNCATING 15626 UPDATES
+TRUNCATING 15610 UPDATES
+TRUNCATING 15601 UPDATES
+TRUNCATING 15593 UPDATES
+TRUNCATING 15615 UPDATES
+TRUNCATING 15604 UPDATES
+TRUNCATING 15617 UPDATES
+TRUNCATING 15614 UPDATES
+TRUNCATING 15612 UPDATES
+Read 23th vote at Instant { tv_sec: 1397559, tv_nsec: 668346153 }
+Wrote 24th vote at Instant { tv_sec: 1397559, tv_nsec: 668597094 }
+Read 24th vote at Instant { tv_sec: 1397560, tv_nsec: 923289039 }
+Wrote 25th vote at Instant { tv_sec: 1397560, tv_nsec: 923697441 }
+Sent 201113 unsharded messages in 27.710067ms for 7448 messages / ms
+Sent 4000000 sharded messages in 27.710067ms for 148148 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2424, 4184, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+Read 25th vote at Instant { tv_sec: 1397562, tv_nsec: 209510973 }
+Wrote 26th vote at Instant { tv_sec: 1397562, tv_nsec: 209606090 }
+TRUNCATING 34386 UPDATES
+TRUNCATING 34341 UPDATES
+TRUNCATING 34371 UPDATES
+TRUNCATING 34385 UPDATES
+TRUNCATING 34343 UPDATES
+TRUNCATING 34382 UPDATES
+TRUNCATING 34339 UPDATES
+TRUNCATING 34369 UPDATES
+TRUNCATING 34365 UPDATES
+TRUNCATING 34360 UPDATES
+TRUNCATING 34362 UPDATES
+TRUNCATING 34352 UPDATES
+TRUNCATING 34374 UPDATES
+TRUNCATING 34389 UPDATES
+TRUNCATING 34365 UPDATES
+TRUNCATING 34367 UPDATES
+TRUNCATING 34340 UPDATES
+TRUNCATING 34367 UPDATES
+TRUNCATING 34363 UPDATES
+TRUNCATING 34356 UPDATES
+Read 26th vote at Instant { tv_sec: 1397563, tv_nsec: 576014528 }
+Wrote 27th vote at Instant { tv_sec: 1397563, tv_nsec: 576016883 }
+Read 27th vote at Instant { tv_sec: 1397564, tv_nsec: 930776465 }
+Wrote 28th vote at Instant { tv_sec: 1397564, tv_nsec: 930778895 }
+Sent 226241 unsharded messages in 30.779608ms for 7541 messages / ms
+Sent 4500000 sharded messages in 30.779608ms for 150000 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2424, 4184, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 15901 UPDATES
+TRUNCATING 15890 UPDATES
+TRUNCATING 15889 UPDATES
+TRUNCATING 15905 UPDATES
+TRUNCATING 15912 UPDATES
+TRUNCATING 15889 UPDATES
+TRUNCATING 15890 UPDATES
+TRUNCATING 15890 UPDATES
+TRUNCATING 15894 UPDATES
+TRUNCATING 15904 UPDATES
+TRUNCATING 15898 UPDATES
+TRUNCATING 15889 UPDATES
+TRUNCATING 15875 UPDATES
+TRUNCATING 15901 UPDATES
+TRUNCATING 15887 UPDATES
+TRUNCATING 15905 UPDATES
+TRUNCATING 15876 UPDATES
+TRUNCATING 15896 UPDATES
+TRUNCATING 15892 UPDATES
+TRUNCATING 15908 UPDATES
+Read 28th vote at Instant { tv_sec: 1397566, tv_nsec: 252229947 }
+Wrote 29th vote at Instant { tv_sec: 1397566, tv_nsec: 252355306 }
+Read 29th vote at Instant { tv_sec: 1397567, tv_nsec: 532937038 }
+Wrote 30th vote at Instant { tv_sec: 1397567, tv_nsec: 533244773 }
+Sent 251374 unsharded messages in 33.677167ms for 7617 messages / ms
+Sent 5000000 sharded messages in 33.677167ms for 151515 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2264, 4184, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 17375 UPDATES
+TRUNCATING 17369 UPDATES
+TRUNCATING 17368 UPDATES
+TRUNCATING 17390 UPDATES
+TRUNCATING 17370 UPDATES
+TRUNCATING 17362 UPDATES
+TRUNCATING 17367 UPDATES
+TRUNCATING 17371 UPDATES
+TRUNCATING 17361 UPDATES
+TRUNCATING 17380 UPDATES
+TRUNCATING 17371 UPDATES
+TRUNCATING 17379 UPDATES
+TRUNCATING 17375 UPDATES
+TRUNCATING 17361 UPDATES
+TRUNCATING 17330 UPDATES
+TRUNCATING 17371 UPDATES
+TRUNCATING 17379 UPDATES
+TRUNCATING 17370 UPDATES
+TRUNCATING 17387 UPDATES
+TRUNCATING 17379 UPDATES
+Read 30th vote at Instant { tv_sec: 1397568, tv_nsec: 890983298 }
+Wrote 31th vote at Instant { tv_sec: 1397568, tv_nsec: 890986786 }
+Read 31th vote at Instant { tv_sec: 1397570, tv_nsec: 227819860 }
+Wrote 32th vote at Instant { tv_sec: 1397570, tv_nsec: 227987475 }
+Sent 276508 unsharded messages in 36.609966ms for 7680 messages / ms
+Sent 5500000 sharded messages in 36.609966ms for 152777 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2264, 4024, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 33783 UPDATES
+TRUNCATING 33770 UPDATES
+TRUNCATING 33780 UPDATES
+TRUNCATING 33763 UPDATES
+TRUNCATING 33786 UPDATES
+TRUNCATING 33761 UPDATES
+TRUNCATING 33736 UPDATES
+TRUNCATING 33770 UPDATES
+TRUNCATING 33792 UPDATES
+TRUNCATING 33796 UPDATES
+TRUNCATING 33767 UPDATES
+TRUNCATING 33765 UPDATES
+TRUNCATING 33788 UPDATES
+TRUNCATING 33747 UPDATES
+TRUNCATING 33710 UPDATES
+TRUNCATING 33774 UPDATES
+TRUNCATING 33776 UPDATES
+TRUNCATING 33791 UPDATES
+TRUNCATING 33755 UPDATES
+TRUNCATING 33783 UPDATES
+Read 32th vote at Instant { tv_sec: 1397571, tv_nsec: 663395095 }
+Wrote 33th vote at Instant { tv_sec: 1397571, tv_nsec: 663398992 }
+Read 33th vote at Instant { tv_sec: 1397573, tv_nsec: 69535981 }
+Wrote 34th vote at Instant { tv_sec: 1397573, tv_nsec: 69624188 }
+Sent 301640 unsharded messages in 39.649421ms for 7734 messages / ms
+Sent 6000000 sharded messages in 39.649421ms for 153846 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [1144, 2264, 4024, 78744]
+Num shards by author_id: [20, 20, 20, 20]
+TRUNCATING 16903 UPDATES
+TRUNCATING 16872 UPDATES
+TRUNCATING 16916 UPDATES
+TRUNCATING 16900 UPDATES
+TRUNCATING 16903 UPDATES
+TRUNCATING 16895 UPDATES
+TRUNCATING 16892 UPDATES
+TRUNCATING 16899 UPDATES
+TRUNCATING 16896 UPDATES
+TRUNCATING 16902 UPDATES
+TRUNCATING 16913 UPDATES
+TRUNCATING 16908 UPDATES
+TRUNCATING 16911 UPDATES
+TRUNCATING 16883 UPDATES
+TRUNCATING 16912 UPDATES
+TRUNCATING 16894 UPDATES
+TRUNCATING 16886 UPDATES
+TRUNCATING 16906 UPDATES
+TRUNCATING 16905 UPDATES
+TRUNCATING 16894 UPDATES
+Read 34th vote at Instant { tv_sec: 1397574, tv_nsec: 532730392 }
+Wrote 35th vote at Instant { tv_sec: 1397574, tv_nsec: 532870473 }
+D0.19: incoming socket closed, no more clients will arrive
+D0.17: incoming socket closed, no more clients will arrive
+D2.2: incoming socket closed, no more clients will arrive
+D0.4: incoming socket closed, no more clients will arrive
+D0.15: incoming socket closed, no more clients will arrive
+D0.2: quitting because controller dropped
+D0.5: incoming socket closed, no more clients will arrive
+D0.12: incoming socket closed, no more clients will arrive
+D0.10: incoming socket closed, no more clients will arrive
+D0.0: incoming socket closed, no more clients will arrive
+D2.16: incoming socket closed, no more clients will arrive
+D2.11: incoming socket closed, no more clients will arrive
+D0.7: incoming socket closed, no more clients will arrive
+D0.11: incoming socket closed, no more clients will arrive
+D0.3: incoming socket closed, no more clients will arrive
+D0.1: incoming socket closed, no more clients will arrive
+D0.8: incoming socket closed, no more clients will arrive
+D2.14: incoming socket closed, no more clients will arrive
+D2.9: incoming socket closed, no more clients will arrive
+D0.18: quitting because controller dropped
+D2.18: incoming socket closed, no more clients will arrive
+D2.13: incoming socket closed, no more clients will arrive
+D0.9: quitting because controller dropped
+D2.10: incoming socket closed, no more clients will arrive
+D2.15: incoming socket closed, no more clients will arrive
+D0.16: quitting because controller dropped
+D2.6: incoming socket closed, no more clients will arrive
+D0.13: quitting because controller dropped
+D2.17: incoming socket closed, no more clients will arrive
+D2.19: incoming socket closed, no more clients will arrive
+D2.8: incoming socket closed, no more clients will arrive
+D2.0: incoming socket closed, no more clients will arrive
+D0.14: quitting because controller dropped
+D2.3: incoming socket closed, no more clients will arrive
+D2.5: incoming socket closed, no more clients will arrive
+D2.12: incoming socket closed, no more clients will arrive
+D2.1: incoming socket closed, no more clients will arrive
+D0.6: quitting because controller dropped
+D2.4: incoming socket closed, no more clients will arrive
+D2.7: incoming socket closed, no more clients will arrive
+D1.0: incoming socket closed, no more clients will arrive
