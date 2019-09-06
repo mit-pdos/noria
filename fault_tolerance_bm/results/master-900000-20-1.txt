@@ -1,0 +1,2462 @@
+Wrote 1th vote at Instant { tv_sec: 1147436, tv_nsec: 858783278 }
+Read 1th vote at Instant { tv_sec: 1147437, tv_nsec: 859894244 }
+Wrote 2th vote at Instant { tv_sec: 1147437, tv_nsec: 859897373 }
+Read 2th vote at Instant { tv_sec: 1147437, tv_nsec: 909843259 }
+Wrote 3th vote at Instant { tv_sec: 1147437, tv_nsec: 909897444 }
+Read 3th vote at Instant { tv_sec: 1147437, tv_nsec: 913580637 }
+Wrote 4th vote at Instant { tv_sec: 1147437, tv_nsec: 959967847 }
+Read 4th vote at Instant { tv_sec: 1147437, tv_nsec: 962748533 }
+Wrote 5th vote at Instant { tv_sec: 1147438, tv_nsec: 10032614 }
+Read 5th vote at Instant { tv_sec: 1147438, tv_nsec: 14417923 }
+Wrote 6th vote at Instant { tv_sec: 1147438, tv_nsec: 60188783 }
+Read 6th vote at Instant { tv_sec: 1147438, tv_nsec: 62962607 }
+Wrote 7th vote at Instant { tv_sec: 1147438, tv_nsec: 110281619 }
+Read 7th vote at Instant { tv_sec: 1147438, tv_nsec: 114000854 }
+Wrote 8th vote at Instant { tv_sec: 1147438, tv_nsec: 160361544 }
+Read 8th vote at Instant { tv_sec: 1147438, tv_nsec: 163897190 }
+Wrote 9th vote at Instant { tv_sec: 1147438, tv_nsec: 210436386 }
+Read 9th vote at Instant { tv_sec: 1147438, tv_nsec: 214004117 }
+Sent 5795 unsharded messages in 1.928032ms for 5795 messages / ms
+Sent 100000 sharded messages in 1.928032ms for 100000 messages / ms
+Size of packet data: [344, 1464, 21304, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 10th vote at Instant { tv_sec: 1147438, tv_nsec: 260586084 }
+Read 10th vote at Instant { tv_sec: 1147438, tv_nsec: 264119546 }
+Wrote 11th vote at Instant { tv_sec: 1147438, tv_nsec: 310878898 }
+Read 11th vote at Instant { tv_sec: 1147438, tv_nsec: 322624184 }
+Wrote 12th vote at Instant { tv_sec: 1147438, tv_nsec: 360879183 }
+Read 12th vote at Instant { tv_sec: 1147438, tv_nsec: 366674694 }
+Wrote 13th vote at Instant { tv_sec: 1147438, tv_nsec: 410956811 }
+Read 13th vote at Instant { tv_sec: 1147438, tv_nsec: 412813180 }
+Wrote 14th vote at Instant { tv_sec: 1147438, tv_nsec: 461070333 }
+Read 14th vote at Instant { tv_sec: 1147438, tv_nsec: 462902090 }
+Wrote 15th vote at Instant { tv_sec: 1147438, tv_nsec: 511211604 }
+Read 15th vote at Instant { tv_sec: 1147438, tv_nsec: 513005647 }
+Wrote 16th vote at Instant { tv_sec: 1147438, tv_nsec: 561314207 }
+Read 16th vote at Instant { tv_sec: 1147438, tv_nsec: 564127029 }
+Wrote 17th vote at Instant { tv_sec: 1147438, tv_nsec: 611405854 }
+Read 17th vote at Instant { tv_sec: 1147438, tv_nsec: 614194244 }
+Wrote 18th vote at Instant { tv_sec: 1147438, tv_nsec: 661598336 }
+Read 18th vote at Instant { tv_sec: 1147438, tv_nsec: 664431255 }
+Wrote 19th vote at Instant { tv_sec: 1147438, tv_nsec: 711677955 }
+Read 19th vote at Instant { tv_sec: 1147438, tv_nsec: 715449273 }
+Wrote 20th vote at Instant { tv_sec: 1147438, tv_nsec: 761766158 }
+Read 20th vote at Instant { tv_sec: 1147438, tv_nsec: 765507531 }
+Sent 11564 unsharded messages in 2.478642ms for 5782 messages / ms
+Sent 200000 sharded messages in 2.478642ms for 100000 messages / ms
+Size of packet data: [344, 984, 12504, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 21th vote at Instant { tv_sec: 1147438, tv_nsec: 811847538 }
+Read 21th vote at Instant { tv_sec: 1147438, tv_nsec: 814755291 }
+Wrote 22th vote at Instant { tv_sec: 1147438, tv_nsec: 861945149 }
+Read 22th vote at Instant { tv_sec: 1147438, tv_nsec: 864847076 }
+Wrote 23th vote at Instant { tv_sec: 1147438, tv_nsec: 912031549 }
+Read 23th vote at Instant { tv_sec: 1147438, tv_nsec: 914851043 }
+Wrote 24th vote at Instant { tv_sec: 1147438, tv_nsec: 962179518 }
+Read 24th vote at Instant { tv_sec: 1147438, tv_nsec: 964974783 }
+Wrote 25th vote at Instant { tv_sec: 1147439, tv_nsec: 12226502 }
+Read 25th vote at Instant { tv_sec: 1147439, tv_nsec: 16139831 }
+Wrote 26th vote at Instant { tv_sec: 1147439, tv_nsec: 62391570 }
+Read 26th vote at Instant { tv_sec: 1147439, tv_nsec: 65297323 }
+Wrote 27th vote at Instant { tv_sec: 1147439, tv_nsec: 112573587 }
+Read 27th vote at Instant { tv_sec: 1147439, tv_nsec: 127820722 }
+Wrote 28th vote at Instant { tv_sec: 1147439, tv_nsec: 162651914 }
+Read 28th vote at Instant { tv_sec: 1147439, tv_nsec: 165444915 }
+Wrote 29th vote at Instant { tv_sec: 1147439, tv_nsec: 212797889 }
+Read 29th vote at Instant { tv_sec: 1147439, tv_nsec: 217769809 }
+Wrote 30th vote at Instant { tv_sec: 1147439, tv_nsec: 262972248 }
+Read 30th vote at Instant { tv_sec: 1147439, tv_nsec: 266827494 }
+Sent 17360 unsharded messages in 3.021715ms for 5786 messages / ms
+Sent 300000 sharded messages in 3.021715ms for 100000 messages / ms
+Size of packet data: [344, 984, 3384, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 31th vote at Instant { tv_sec: 1147439, tv_nsec: 313005685 }
+Read 31th vote at Instant { tv_sec: 1147439, tv_nsec: 322278115 }
+Wrote 32th vote at Instant { tv_sec: 1147439, tv_nsec: 363005712 }
+Read 32th vote at Instant { tv_sec: 1147439, tv_nsec: 365627185 }
+Wrote 33th vote at Instant { tv_sec: 1147439, tv_nsec: 413005828 }
+Read 33th vote at Instant { tv_sec: 1147439, tv_nsec: 415736903 }
+Wrote 34th vote at Instant { tv_sec: 1147439, tv_nsec: 463005939 }
+Read 34th vote at Instant { tv_sec: 1147439, tv_nsec: 465775172 }
+Wrote 35th vote at Instant { tv_sec: 1147439, tv_nsec: 513005942 }
+Read 35th vote at Instant { tv_sec: 1147439, tv_nsec: 515607178 }
+Wrote 36th vote at Instant { tv_sec: 1147439, tv_nsec: 563006132 }
+Read 36th vote at Instant { tv_sec: 1147439, tv_nsec: 565888731 }
+Wrote 37th vote at Instant { tv_sec: 1147439, tv_nsec: 613006282 }
+Read 37th vote at Instant { tv_sec: 1147439, tv_nsec: 615736138 }
+Wrote 38th vote at Instant { tv_sec: 1147439, tv_nsec: 663089105 }
+Read 38th vote at Instant { tv_sec: 1147439, tv_nsec: 671112744 }
+Wrote 39th vote at Instant { tv_sec: 1147439, tv_nsec: 713138808 }
+Read 39th vote at Instant { tv_sec: 1147439, tv_nsec: 717357105 }
+Wrote 40th vote at Instant { tv_sec: 1147439, tv_nsec: 763322388 }
+Read 40th vote at Instant { tv_sec: 1147439, tv_nsec: 767150300 }
+Wrote 41th vote at Instant { tv_sec: 1147439, tv_nsec: 813384122 }
+Read 41th vote at Instant { tv_sec: 1147439, tv_nsec: 817790854 }
+Wrote 42th vote at Instant { tv_sec: 1147439, tv_nsec: 863523146 }
+Read 42th vote at Instant { tv_sec: 1147439, tv_nsec: 866558438 }
+Sent 23119 unsharded messages in 3.582428ms for 7706 messages / ms
+Sent 400000 sharded messages in 3.582428ms for 133333 messages / ms
+Size of packet data: [344, 984, 2104, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 43th vote at Instant { tv_sec: 1147439, tv_nsec: 913523253 }
+Read 43th vote at Instant { tv_sec: 1147439, tv_nsec: 916543268 }
+Wrote 44th vote at Instant { tv_sec: 1147439, tv_nsec: 963570555 }
+Read 44th vote at Instant { tv_sec: 1147439, tv_nsec: 966517036 }
+Wrote 45th vote at Instant { tv_sec: 1147440, tv_nsec: 13570612 }
+Read 45th vote at Instant { tv_sec: 1147440, tv_nsec: 21123963 }
+Wrote 46th vote at Instant { tv_sec: 1147440, tv_nsec: 63599123 }
+Read 46th vote at Instant { tv_sec: 1147440, tv_nsec: 65877086 }
+Wrote 47th vote at Instant { tv_sec: 1147440, tv_nsec: 113711731 }
+Read 47th vote at Instant { tv_sec: 1147440, tv_nsec: 116938649 }
+Wrote 48th vote at Instant { tv_sec: 1147440, tv_nsec: 163814859 }
+Read 48th vote at Instant { tv_sec: 1147440, tv_nsec: 168567295 }
+Wrote 49th vote at Instant { tv_sec: 1147440, tv_nsec: 213815135 }
+Read 49th vote at Instant { tv_sec: 1147440, tv_nsec: 216433517 }
+Wrote 50th vote at Instant { tv_sec: 1147440, tv_nsec: 263815189 }
+Read 50th vote at Instant { tv_sec: 1147440, tv_nsec: 271222009 }
+Wrote 51th vote at Instant { tv_sec: 1147440, tv_nsec: 313818491 }
+Read 51th vote at Instant { tv_sec: 1147440, tv_nsec: 321185918 }
+Wrote 52th vote at Instant { tv_sec: 1147440, tv_nsec: 363838585 }
+Read 52th vote at Instant { tv_sec: 1147440, tv_nsec: 369312624 }
+Wrote 53th vote at Instant { tv_sec: 1147440, tv_nsec: 413925997 }
+Read 53th vote at Instant { tv_sec: 1147440, tv_nsec: 417821883 }
+Sent 28894 unsharded messages in 4.129051ms for 7223 messages / ms
+Sent 500000 sharded messages in 4.129051ms for 125000 messages / ms
+Size of packet data: [344, 824, 1624, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 54th vote at Instant { tv_sec: 1147440, tv_nsec: 464049939 }
+Read 54th vote at Instant { tv_sec: 1147440, tv_nsec: 467966497 }
+Wrote 55th vote at Instant { tv_sec: 1147440, tv_nsec: 514135738 }
+Read 55th vote at Instant { tv_sec: 1147440, tv_nsec: 516075560 }
+Wrote 56th vote at Instant { tv_sec: 1147440, tv_nsec: 564135830 }
+Read 56th vote at Instant { tv_sec: 1147440, tv_nsec: 567240948 }
+Wrote 57th vote at Instant { tv_sec: 1147440, tv_nsec: 614136199 }
+Read 57th vote at Instant { tv_sec: 1147440, tv_nsec: 617413181 }
+Wrote 58th vote at Instant { tv_sec: 1147440, tv_nsec: 664214390 }
+Read 58th vote at Instant { tv_sec: 1147440, tv_nsec: 667387031 }
+Wrote 59th vote at Instant { tv_sec: 1147440, tv_nsec: 714256462 }
+Read 59th vote at Instant { tv_sec: 1147440, tv_nsec: 717573797 }
+Wrote 60th vote at Instant { tv_sec: 1147440, tv_nsec: 764349098 }
+Read 60th vote at Instant { tv_sec: 1147440, tv_nsec: 767644240 }
+Wrote 61th vote at Instant { tv_sec: 1147440, tv_nsec: 814533931 }
+Read 61th vote at Instant { tv_sec: 1147440, tv_nsec: 817796177 }
+Wrote 62th vote at Instant { tv_sec: 1147440, tv_nsec: 864648602 }
+Read 62th vote at Instant { tv_sec: 1147440, tv_nsec: 865799345 }
+Wrote 63th vote at Instant { tv_sec: 1147440, tv_nsec: 914786835 }
+Read 63th vote at Instant { tv_sec: 1147440, tv_nsec: 918030058 }
+Sent 34683 unsharded messages in 4.672017ms for 8670 messages / ms
+Sent 600000 sharded messages in 4.672017ms for 150000 messages / ms
+Size of packet data: [344, 824, 1464, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 64th vote at Instant { tv_sec: 1147440, tv_nsec: 964924982 }
+Read 64th vote at Instant { tv_sec: 1147440, tv_nsec: 967099842 }
+Wrote 65th vote at Instant { tv_sec: 1147441, tv_nsec: 15106570 }
+Read 65th vote at Instant { tv_sec: 1147441, tv_nsec: 18255353 }
+Wrote 66th vote at Instant { tv_sec: 1147441, tv_nsec: 65184904 }
+Read 66th vote at Instant { tv_sec: 1147441, tv_nsec: 67823893 }
+Wrote 67th vote at Instant { tv_sec: 1147441, tv_nsec: 115310546 }
+Read 67th vote at Instant { tv_sec: 1147441, tv_nsec: 118501020 }
+Wrote 68th vote at Instant { tv_sec: 1147441, tv_nsec: 165392487 }
+Read 68th vote at Instant { tv_sec: 1147441, tv_nsec: 166739687 }
+Wrote 69th vote at Instant { tv_sec: 1147441, tv_nsec: 215542748 }
+Read 69th vote at Instant { tv_sec: 1147441, tv_nsec: 217723551 }
+Wrote 70th vote at Instant { tv_sec: 1147441, tv_nsec: 265632403 }
+Read 70th vote at Instant { tv_sec: 1147441, tv_nsec: 267811674 }
+Wrote 71th vote at Instant { tv_sec: 1147441, tv_nsec: 315748237 }
+Read 71th vote at Instant { tv_sec: 1147441, tv_nsec: 317990429 }
+Wrote 72th vote at Instant { tv_sec: 1147441, tv_nsec: 365858553 }
+Read 72th vote at Instant { tv_sec: 1147441, tv_nsec: 368065745 }
+Wrote 73th vote at Instant { tv_sec: 1147441, tv_nsec: 415958778 }
+Read 73th vote at Instant { tv_sec: 1147441, tv_nsec: 418187341 }
+Wrote 74th vote at Instant { tv_sec: 1147441, tv_nsec: 466296619 }
+Read 74th vote at Instant { tv_sec: 1147441, tv_nsec: 470727677 }
+Sent 40477 unsharded messages in 5.216238ms for 8095 messages / ms
+Sent 700000 sharded messages in 5.216238ms for 140000 messages / ms
+Size of packet data: [344, 824, 1304, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 75th vote at Instant { tv_sec: 1147441, tv_nsec: 516296752 }
+Read 75th vote at Instant { tv_sec: 1147441, tv_nsec: 519291959 }
+Wrote 76th vote at Instant { tv_sec: 1147441, tv_nsec: 566296876 }
+Read 76th vote at Instant { tv_sec: 1147441, tv_nsec: 567573167 }
+Wrote 77th vote at Instant { tv_sec: 1147441, tv_nsec: 616310264 }
+Read 77th vote at Instant { tv_sec: 1147441, tv_nsec: 619542611 }
+Wrote 78th vote at Instant { tv_sec: 1147441, tv_nsec: 666520506 }
+Read 78th vote at Instant { tv_sec: 1147441, tv_nsec: 668771655 }
+Wrote 79th vote at Instant { tv_sec: 1147441, tv_nsec: 716543001 }
+Read 79th vote at Instant { tv_sec: 1147441, tv_nsec: 719767813 }
+Wrote 80th vote at Instant { tv_sec: 1147441, tv_nsec: 766663335 }
+Read 80th vote at Instant { tv_sec: 1147441, tv_nsec: 768831912 }
+Wrote 81th vote at Instant { tv_sec: 1147441, tv_nsec: 816770028 }
+Read 81th vote at Instant { tv_sec: 1147441, tv_nsec: 818976149 }
+Wrote 82th vote at Instant { tv_sec: 1147441, tv_nsec: 866921173 }
+Read 82th vote at Instant { tv_sec: 1147441, tv_nsec: 869834391 }
+Wrote 83th vote at Instant { tv_sec: 1147441, tv_nsec: 916966098 }
+Read 83th vote at Instant { tv_sec: 1147441, tv_nsec: 919225886 }
+Wrote 84th vote at Instant { tv_sec: 1147441, tv_nsec: 967103178 }
+Read 84th vote at Instant { tv_sec: 1147441, tv_nsec: 970359611 }
+Wrote 85th vote at Instant { tv_sec: 1147442, tv_nsec: 17214515 }
+Read 85th vote at Instant { tv_sec: 1147442, tv_nsec: 20488871 }
+Sent 46264 unsharded messages in 5.757517ms for 9252 messages / ms
+Sent 800000 sharded messages in 5.757517ms for 160000 messages / ms
+Size of packet data: [344, 824, 1304, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 86th vote at Instant { tv_sec: 1147442, tv_nsec: 67384715 }
+Read 86th vote at Instant { tv_sec: 1147442, tv_nsec: 72382079 }
+Wrote 87th vote at Instant { tv_sec: 1147442, tv_nsec: 117441683 }
+Read 87th vote at Instant { tv_sec: 1147442, tv_nsec: 120694418 }
+Wrote 88th vote at Instant { tv_sec: 1147442, tv_nsec: 167512028 }
+Read 88th vote at Instant { tv_sec: 1147442, tv_nsec: 174489028 }
+Wrote 89th vote at Instant { tv_sec: 1147442, tv_nsec: 217655287 }
+Read 89th vote at Instant { tv_sec: 1147442, tv_nsec: 219798098 }
+Wrote 90th vote at Instant { tv_sec: 1147442, tv_nsec: 267820363 }
+Read 90th vote at Instant { tv_sec: 1147442, tv_nsec: 269950029 }
+Wrote 91th vote at Instant { tv_sec: 1147442, tv_nsec: 317949135 }
+Read 91th vote at Instant { tv_sec: 1147442, tv_nsec: 320324133 }
+Wrote 92th vote at Instant { tv_sec: 1147442, tv_nsec: 368019182 }
+Read 92th vote at Instant { tv_sec: 1147442, tv_nsec: 374475084 }
+Wrote 93th vote at Instant { tv_sec: 1147442, tv_nsec: 418106803 }
+Read 93th vote at Instant { tv_sec: 1147442, tv_nsec: 420399993 }
+Wrote 94th vote at Instant { tv_sec: 1147442, tv_nsec: 468265778 }
+Read 94th vote at Instant { tv_sec: 1147442, tv_nsec: 471495030 }
+Wrote 95th vote at Instant { tv_sec: 1147442, tv_nsec: 518376876 }
+Read 95th vote at Instant { tv_sec: 1147442, tv_nsec: 520629429 }
+Wrote 96th vote at Instant { tv_sec: 1147442, tv_nsec: 568506097 }
+Read 96th vote at Instant { tv_sec: 1147442, tv_nsec: 571697542 }
+Sent 52057 unsharded messages in 6.299721ms for 8676 messages / ms
+Sent 900000 sharded messages in 6.299721ms for 150000 messages / ms
+Size of packet data: [344, 824, 1304, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 97th vote at Instant { tv_sec: 1147442, tv_nsec: 618590086 }
+Read 97th vote at Instant { tv_sec: 1147442, tv_nsec: 621874060 }
+Wrote 98th vote at Instant { tv_sec: 1147442, tv_nsec: 668715666 }
+Read 98th vote at Instant { tv_sec: 1147442, tv_nsec: 677767293 }
+Wrote 99th vote at Instant { tv_sec: 1147442, tv_nsec: 718823708 }
+Read 99th vote at Instant { tv_sec: 1147442, tv_nsec: 731120582 }
+Wrote 100th vote at Instant { tv_sec: 1147442, tv_nsec: 768963515 }
+Read 100th vote at Instant { tv_sec: 1147442, tv_nsec: 772249280 }
+Wrote 101th vote at Instant { tv_sec: 1147442, tv_nsec: 819075885 }
+Read 101th vote at Instant { tv_sec: 1147442, tv_nsec: 820267840 }
+Wrote 102th vote at Instant { tv_sec: 1147442, tv_nsec: 869188946 }
+Read 102th vote at Instant { tv_sec: 1147442, tv_nsec: 871425233 }
+Wrote 103th vote at Instant { tv_sec: 1147442, tv_nsec: 919188972 }
+Read 103th vote at Instant { tv_sec: 1147442, tv_nsec: 925569609 }
+Wrote 104th vote at Instant { tv_sec: 1147442, tv_nsec: 969189043 }
+Read 104th vote at Instant { tv_sec: 1147442, tv_nsec: 972134388 }
+Wrote 105th vote at Instant { tv_sec: 1147443, tv_nsec: 19269212 }
+Read 105th vote at Instant { tv_sec: 1147443, tv_nsec: 22041198 }
+Wrote 106th vote at Instant { tv_sec: 1147443, tv_nsec: 69403289 }
+Read 106th vote at Instant { tv_sec: 1147443, tv_nsec: 72058853 }
+Wrote 107th vote at Instant { tv_sec: 1147443, tv_nsec: 119503408 }
+Read 107th vote at Instant { tv_sec: 1147443, tv_nsec: 124511882 }
+Sent 57827 unsharded messages in 6.874455ms for 9637 messages / ms
+Sent 1000000 sharded messages in 6.874455ms for 166666 messages / ms
+Size of packet data: [344, 824, 1304, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 108th vote at Instant { tv_sec: 1147443, tv_nsec: 169610241 }
+Read 108th vote at Instant { tv_sec: 1147443, tv_nsec: 173473813 }
+Wrote 109th vote at Instant { tv_sec: 1147443, tv_nsec: 219773461 }
+Read 109th vote at Instant { tv_sec: 1147443, tv_nsec: 222629193 }
+Wrote 110th vote at Instant { tv_sec: 1147443, tv_nsec: 269828384 }
+Read 110th vote at Instant { tv_sec: 1147443, tv_nsec: 272833325 }
+Wrote 111th vote at Instant { tv_sec: 1147443, tv_nsec: 319829244 }
+Read 111th vote at Instant { tv_sec: 1147443, tv_nsec: 322841408 }
+Wrote 112th vote at Instant { tv_sec: 1147443, tv_nsec: 369830963 }
+Read 112th vote at Instant { tv_sec: 1147443, tv_nsec: 372939097 }
+Wrote 113th vote at Instant { tv_sec: 1147443, tv_nsec: 419831145 }
+Read 113th vote at Instant { tv_sec: 1147443, tv_nsec: 422129612 }
+Wrote 114th vote at Instant { tv_sec: 1147443, tv_nsec: 470015346 }
+Read 114th vote at Instant { tv_sec: 1147443, tv_nsec: 471188377 }
+Wrote 115th vote at Instant { tv_sec: 1147443, tv_nsec: 520149404 }
+Read 115th vote at Instant { tv_sec: 1147443, tv_nsec: 522330012 }
+Wrote 116th vote at Instant { tv_sec: 1147443, tv_nsec: 570274024 }
+Read 116th vote at Instant { tv_sec: 1147443, tv_nsec: 573611160 }
+Wrote 117th vote at Instant { tv_sec: 1147443, tv_nsec: 620361399 }
+Read 117th vote at Instant { tv_sec: 1147443, tv_nsec: 621633844 }
+Wrote 118th vote at Instant { tv_sec: 1147443, tv_nsec: 670511338 }
+Read 118th vote at Instant { tv_sec: 1147443, tv_nsec: 671819605 }
+Sent 63618 unsharded messages in 7.417535ms for 9088 messages / ms
+Sent 1100000 sharded messages in 7.417535ms for 157142 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 119th vote at Instant { tv_sec: 1147443, tv_nsec: 720511412 }
+Read 119th vote at Instant { tv_sec: 1147443, tv_nsec: 724449188 }
+Wrote 120th vote at Instant { tv_sec: 1147443, tv_nsec: 770511455 }
+Read 120th vote at Instant { tv_sec: 1147443, tv_nsec: 777766410 }
+Wrote 121th vote at Instant { tv_sec: 1147443, tv_nsec: 820512233 }
+Read 121th vote at Instant { tv_sec: 1147443, tv_nsec: 823737407 }
+Wrote 122th vote at Instant { tv_sec: 1147443, tv_nsec: 870634968 }
+Read 122th vote at Instant { tv_sec: 1147443, tv_nsec: 872898791 }
+Wrote 123th vote at Instant { tv_sec: 1147443, tv_nsec: 920635013 }
+Read 123th vote at Instant { tv_sec: 1147443, tv_nsec: 923776597 }
+Wrote 124th vote at Instant { tv_sec: 1147443, tv_nsec: 970710017 }
+Read 124th vote at Instant { tv_sec: 1147443, tv_nsec: 974250231 }
+Wrote 125th vote at Instant { tv_sec: 1147444, tv_nsec: 20916875 }
+Read 125th vote at Instant { tv_sec: 1147444, tv_nsec: 27800467 }
+Wrote 126th vote at Instant { tv_sec: 1147444, tv_nsec: 71075448 }
+Read 126th vote at Instant { tv_sec: 1147444, tv_nsec: 74444150 }
+Wrote 127th vote at Instant { tv_sec: 1147444, tv_nsec: 121180456 }
+Read 127th vote at Instant { tv_sec: 1147444, tv_nsec: 124493643 }
+Wrote 128th vote at Instant { tv_sec: 1147444, tv_nsec: 171255074 }
+Read 128th vote at Instant { tv_sec: 1147444, tv_nsec: 173836376 }
+Wrote 129th vote at Instant { tv_sec: 1147444, tv_nsec: 221347705 }
+Read 129th vote at Instant { tv_sec: 1147444, tv_nsec: 224693938 }
+Sent 69400 unsharded messages in 7.962064ms for 9914 messages / ms
+Sent 1200000 sharded messages in 7.962064ms for 171428 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 130th vote at Instant { tv_sec: 1147444, tv_nsec: 271347865 }
+Read 130th vote at Instant { tv_sec: 1147444, tv_nsec: 275126459 }
+Wrote 131th vote at Instant { tv_sec: 1147444, tv_nsec: 321347908 }
+Read 131th vote at Instant { tv_sec: 1147444, tv_nsec: 323116338 }
+Wrote 132th vote at Instant { tv_sec: 1147444, tv_nsec: 371409339 }
+Read 132th vote at Instant { tv_sec: 1147444, tv_nsec: 374406128 }
+Wrote 133th vote at Instant { tv_sec: 1147444, tv_nsec: 421503115 }
+Read 133th vote at Instant { tv_sec: 1147444, tv_nsec: 425398071 }
+Wrote 134th vote at Instant { tv_sec: 1147444, tv_nsec: 471636679 }
+Read 134th vote at Instant { tv_sec: 1147444, tv_nsec: 477775974 }
+Wrote 135th vote at Instant { tv_sec: 1147444, tv_nsec: 521700427 }
+Read 135th vote at Instant { tv_sec: 1147444, tv_nsec: 525615101 }
+Wrote 136th vote at Instant { tv_sec: 1147444, tv_nsec: 571839126 }
+Read 136th vote at Instant { tv_sec: 1147444, tv_nsec: 574783366 }
+Wrote 137th vote at Instant { tv_sec: 1147444, tv_nsec: 621839155 }
+Read 137th vote at Instant { tv_sec: 1147444, tv_nsec: 624972007 }
+Wrote 138th vote at Instant { tv_sec: 1147444, tv_nsec: 671839346 }
+Read 138th vote at Instant { tv_sec: 1147444, tv_nsec: 674980136 }
+Wrote 139th vote at Instant { tv_sec: 1147444, tv_nsec: 721972208 }
+Read 139th vote at Instant { tv_sec: 1147444, tv_nsec: 724643458 }
+Wrote 140th vote at Instant { tv_sec: 1147444, tv_nsec: 771972288 }
+Read 140th vote at Instant { tv_sec: 1147444, tv_nsec: 775456013 }
+Sent 75207 unsharded messages in 8.504333ms for 9400 messages / ms
+Sent 1300000 sharded messages in 8.504333ms for 162500 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 141th vote at Instant { tv_sec: 1147444, tv_nsec: 821972412 }
+Read 141th vote at Instant { tv_sec: 1147444, tv_nsec: 824604352 }
+Wrote 142th vote at Instant { tv_sec: 1147444, tv_nsec: 871972425 }
+Read 142th vote at Instant { tv_sec: 1147444, tv_nsec: 874860800 }
+Wrote 143th vote at Instant { tv_sec: 1147444, tv_nsec: 921972445 }
+Read 143th vote at Instant { tv_sec: 1147444, tv_nsec: 924870974 }
+Wrote 144th vote at Instant { tv_sec: 1147444, tv_nsec: 971982253 }
+Read 144th vote at Instant { tv_sec: 1147444, tv_nsec: 975017542 }
+Wrote 145th vote at Instant { tv_sec: 1147445, tv_nsec: 22152664 }
+Read 145th vote at Instant { tv_sec: 1147445, tv_nsec: 25046166 }
+Wrote 146th vote at Instant { tv_sec: 1147445, tv_nsec: 72227439 }
+Read 146th vote at Instant { tv_sec: 1147445, tv_nsec: 76210516 }
+Wrote 147th vote at Instant { tv_sec: 1147445, tv_nsec: 122381830 }
+Read 147th vote at Instant { tv_sec: 1147445, tv_nsec: 124313579 }
+Wrote 148th vote at Instant { tv_sec: 1147445, tv_nsec: 172381998 }
+Read 148th vote at Instant { tv_sec: 1147445, tv_nsec: 174417004 }
+Wrote 149th vote at Instant { tv_sec: 1147445, tv_nsec: 222431164 }
+Read 149th vote at Instant { tv_sec: 1147445, tv_nsec: 225597666 }
+Wrote 150th vote at Instant { tv_sec: 1147445, tv_nsec: 272457669 }
+Read 150th vote at Instant { tv_sec: 1147445, tv_nsec: 274795140 }
+Wrote 151th vote at Instant { tv_sec: 1147445, tv_nsec: 322579678 }
+Read 151th vote at Instant { tv_sec: 1147445, tv_nsec: 323753410 }
+Sent 81003 unsharded messages in 9.047868ms for 9000 messages / ms
+Sent 1400000 sharded messages in 9.047868ms for 155555 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 152th vote at Instant { tv_sec: 1147445, tv_nsec: 372700404 }
+Read 152th vote at Instant { tv_sec: 1147445, tv_nsec: 374513244 }
+Wrote 153th vote at Instant { tv_sec: 1147445, tv_nsec: 422832688 }
+Read 153th vote at Instant { tv_sec: 1147445, tv_nsec: 425031921 }
+Wrote 154th vote at Instant { tv_sec: 1147445, tv_nsec: 472940706 }
+Read 154th vote at Instant { tv_sec: 1147445, tv_nsec: 475113772 }
+Wrote 155th vote at Instant { tv_sec: 1147445, tv_nsec: 523022930 }
+Read 155th vote at Instant { tv_sec: 1147445, tv_nsec: 526454231 }
+Wrote 156th vote at Instant { tv_sec: 1147445, tv_nsec: 573136770 }
+Read 156th vote at Instant { tv_sec: 1147445, tv_nsec: 575378454 }
+Wrote 157th vote at Instant { tv_sec: 1147445, tv_nsec: 623244044 }
+Read 157th vote at Instant { tv_sec: 1147445, tv_nsec: 627745414 }
+Wrote 158th vote at Instant { tv_sec: 1147445, tv_nsec: 673329522 }
+Read 158th vote at Instant { tv_sec: 1147445, tv_nsec: 676581279 }
+Wrote 159th vote at Instant { tv_sec: 1147445, tv_nsec: 723463982 }
+Read 159th vote at Instant { tv_sec: 1147445, tv_nsec: 726680025 }
+Wrote 160th vote at Instant { tv_sec: 1147445, tv_nsec: 773563980 }
+Read 160th vote at Instant { tv_sec: 1147445, tv_nsec: 775856270 }
+Wrote 161th vote at Instant { tv_sec: 1147445, tv_nsec: 823712505 }
+Read 161th vote at Instant { tv_sec: 1147445, tv_nsec: 825988881 }
+Wrote 162th vote at Instant { tv_sec: 1147445, tv_nsec: 873820708 }
+Sent 86789 unsharded messages in 9.587892ms for 9643 messages / ms
+Sent 1500000 sharded messages in 9.587892ms for 166666 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Read 162th vote at Instant { tv_sec: 1147445, tv_nsec: 880979159 }
+Wrote 163th vote at Instant { tv_sec: 1147445, tv_nsec: 923952745 }
+Read 163th vote at Instant { tv_sec: 1147445, tv_nsec: 927240676 }
+Wrote 164th vote at Instant { tv_sec: 1147445, tv_nsec: 974071214 }
+Read 164th vote at Instant { tv_sec: 1147445, tv_nsec: 977750095 }
+Wrote 165th vote at Instant { tv_sec: 1147446, tv_nsec: 24071381 }
+Read 165th vote at Instant { tv_sec: 1147446, tv_nsec: 27624178 }
+Wrote 166th vote at Instant { tv_sec: 1147446, tv_nsec: 74071630 }
+Read 166th vote at Instant { tv_sec: 1147446, tv_nsec: 77921752 }
+Wrote 167th vote at Instant { tv_sec: 1147446, tv_nsec: 124071788 }
+Read 167th vote at Instant { tv_sec: 1147446, tv_nsec: 126921130 }
+Wrote 168th vote at Instant { tv_sec: 1147446, tv_nsec: 174100016 }
+Read 168th vote at Instant { tv_sec: 1147446, tv_nsec: 178037851 }
+Wrote 169th vote at Instant { tv_sec: 1147446, tv_nsec: 224171652 }
+Read 169th vote at Instant { tv_sec: 1147446, tv_nsec: 227144570 }
+Wrote 170th vote at Instant { tv_sec: 1147446, tv_nsec: 274221059 }
+Read 170th vote at Instant { tv_sec: 1147446, tv_nsec: 278358972 }
+Wrote 171th vote at Instant { tv_sec: 1147446, tv_nsec: 324221093 }
+Read 171th vote at Instant { tv_sec: 1147446, tv_nsec: 325320892 }
+Wrote 172th vote at Instant { tv_sec: 1147446, tv_nsec: 374289893 }
+Read 172th vote at Instant { tv_sec: 1147446, tv_nsec: 380921623 }
+Sent 92580 unsharded messages in 10.12837ms for 9258 messages / ms
+Sent 1600000 sharded messages in 10.12837ms for 160000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 173th vote at Instant { tv_sec: 1147446, tv_nsec: 424418733 }
+Read 173th vote at Instant { tv_sec: 1147446, tv_nsec: 427607972 }
+Wrote 174th vote at Instant { tv_sec: 1147446, tv_nsec: 474538379 }
+Read 174th vote at Instant { tv_sec: 1147446, tv_nsec: 475880882 }
+Wrote 175th vote at Instant { tv_sec: 1147446, tv_nsec: 524672690 }
+Read 175th vote at Instant { tv_sec: 1147446, tv_nsec: 526862678 }
+Wrote 176th vote at Instant { tv_sec: 1147446, tv_nsec: 574786853 }
+Read 176th vote at Instant { tv_sec: 1147446, tv_nsec: 578090671 }
+Wrote 177th vote at Instant { tv_sec: 1147446, tv_nsec: 624848799 }
+Read 177th vote at Instant { tv_sec: 1147446, tv_nsec: 627103011 }
+Wrote 178th vote at Instant { tv_sec: 1147446, tv_nsec: 674941931 }
+Read 178th vote at Instant { tv_sec: 1147446, tv_nsec: 681082001 }
+Wrote 179th vote at Instant { tv_sec: 1147446, tv_nsec: 724942064 }
+Read 179th vote at Instant { tv_sec: 1147446, tv_nsec: 727122615 }
+Wrote 180th vote at Instant { tv_sec: 1147446, tv_nsec: 774975191 }
+Read 180th vote at Instant { tv_sec: 1147446, tv_nsec: 777443674 }
+Wrote 181th vote at Instant { tv_sec: 1147446, tv_nsec: 825025088 }
+Read 181th vote at Instant { tv_sec: 1147446, tv_nsec: 834534195 }
+Wrote 182th vote at Instant { tv_sec: 1147446, tv_nsec: 875103302 }
+Read 182th vote at Instant { tv_sec: 1147446, tv_nsec: 880039422 }
+WPT [182,16,4936]
+Wrote 183th vote at Instant { tv_sec: 1147446, tv_nsec: 925103681 }
+Read 183th vote at Instant { tv_sec: 1147446, tv_nsec: 928611242 }
+WPT [183,66,3507]
+Sent 98359 unsharded messages in 10.67382ms for 9835 messages / ms
+Sent 1700000 sharded messages in 10.67382ms for 170000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 184th vote at Instant { tv_sec: 1147446, tv_nsec: 975146705 }
+Read 184th vote at Instant { tv_sec: 1147446, tv_nsec: 977852465 }
+WPT [184,116,2705]
+Wrote 185th vote at Instant { tv_sec: 1147447, tv_nsec: 25203501 }
+Read 185th vote at Instant { tv_sec: 1147447, tv_nsec: 28817149 }
+WPT [185,166,3613]
+Wrote 186th vote at Instant { tv_sec: 1147447, tv_nsec: 75278382 }
+Read 186th vote at Instant { tv_sec: 1147447, tv_nsec: 79072281 }
+WPT [186,216,3793]
+Wrote 187th vote at Instant { tv_sec: 1147447, tv_nsec: 125392274 }
+Read 187th vote at Instant { tv_sec: 1147447, tv_nsec: 129302859 }
+WPT [187,266,3910]
+Wrote 188th vote at Instant { tv_sec: 1147447, tv_nsec: 175522269 }
+Read 188th vote at Instant { tv_sec: 1147447, tv_nsec: 179189763 }
+WPT [188,316,3667]
+Wrote 189th vote at Instant { tv_sec: 1147447, tv_nsec: 225522576 }
+Read 189th vote at Instant { tv_sec: 1147447, tv_nsec: 228369591 }
+WPT [189,366,2847]
+Wrote 190th vote at Instant { tv_sec: 1147447, tv_nsec: 275522647 }
+Read 190th vote at Instant { tv_sec: 1147447, tv_nsec: 278606760 }
+WPT [190,416,3084]
+Wrote 191th vote at Instant { tv_sec: 1147447, tv_nsec: 325522895 }
+Read 191th vote at Instant { tv_sec: 1147447, tv_nsec: 328578744 }
+WPT [191,466,3055]
+Wrote 192th vote at Instant { tv_sec: 1147447, tv_nsec: 375522966 }
+Read 192th vote at Instant { tv_sec: 1147447, tv_nsec: 378969062 }
+WPT [192,516,3446]
+Wrote 193th vote at Instant { tv_sec: 1147447, tv_nsec: 425628698 }
+Read 193th vote at Instant { tv_sec: 1147447, tv_nsec: 428930545 }
+WPT [193,567,3301]
+Wrote 194th vote at Instant { tv_sec: 1147447, tv_nsec: 475687043 }
+Read 194th vote at Instant { tv_sec: 1147447, tv_nsec: 481120999 }
+WPT [194,617,5433]
+Sent 104143 unsharded messages in 11.219354ms for 9467 messages / ms
+Sent 1800000 sharded messages in 11.219354ms for 163636 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 195th vote at Instant { tv_sec: 1147447, tv_nsec: 525829414 }
+Read 195th vote at Instant { tv_sec: 1147447, tv_nsec: 529130533 }
+WPT [195,667,3301]
+Wrote 196th vote at Instant { tv_sec: 1147447, tv_nsec: 575894982 }
+Read 196th vote at Instant { tv_sec: 1147447, tv_nsec: 588320217 }
+WPT [196,717,12425]
+Wrote 197th vote at Instant { tv_sec: 1147447, tv_nsec: 626073901 }
+Read 197th vote at Instant { tv_sec: 1147447, tv_nsec: 629285004 }
+WPT [197,767,3211]
+Wrote 198th vote at Instant { tv_sec: 1147447, tv_nsec: 676164961 }
+Read 198th vote at Instant { tv_sec: 1147447, tv_nsec: 684445897 }
+WPT [198,817,8280]
+Wrote 199th vote at Instant { tv_sec: 1147447, tv_nsec: 726201353 }
+Read 199th vote at Instant { tv_sec: 1147447, tv_nsec: 729585541 }
+WPT [199,867,3384]
+Wrote 200th vote at Instant { tv_sec: 1147447, tv_nsec: 776201428 }
+Read 200th vote at Instant { tv_sec: 1147447, tv_nsec: 779708697 }
+WPT [200,917,3507]
+Wrote 201th vote at Instant { tv_sec: 1147447, tv_nsec: 826210406 }
+Read 201th vote at Instant { tv_sec: 1147447, tv_nsec: 829814165 }
+WPT [201,967,3603]
+Wrote 202th vote at Instant { tv_sec: 1147447, tv_nsec: 876331470 }
+Read 202th vote at Instant { tv_sec: 1147447, tv_nsec: 878978160 }
+WPT [202,1017,2646]
+Wrote 203th vote at Instant { tv_sec: 1147447, tv_nsec: 926486287 }
+Read 203th vote at Instant { tv_sec: 1147447, tv_nsec: 928665287 }
+WPT [203,1067,2179]
+Wrote 204th vote at Instant { tv_sec: 1147447, tv_nsec: 976589222 }
+Read 204th vote at Instant { tv_sec: 1147447, tv_nsec: 981086117 }
+WPT [204,1117,4496]
+Wrote 205th vote at Instant { tv_sec: 1147448, tv_nsec: 26714704 }
+Read 205th vote at Instant { tv_sec: 1147448, tv_nsec: 27925194 }
+WPT [205,1168,1210]
+Sent 109939 unsharded messages in 11.785747ms for 9994 messages / ms
+Sent 1900000 sharded messages in 11.785747ms for 172727 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 206th vote at Instant { tv_sec: 1147448, tv_nsec: 76823292 }
+Read 206th vote at Instant { tv_sec: 1147448, tv_nsec: 80046325 }
+WPT [206,1218,3223]
+Wrote 207th vote at Instant { tv_sec: 1147448, tv_nsec: 126956322 }
+Read 207th vote at Instant { tv_sec: 1147448, tv_nsec: 129252372 }
+WPT [207,1268,2296]
+Wrote 208th vote at Instant { tv_sec: 1147448, tv_nsec: 177076646 }
+Read 208th vote at Instant { tv_sec: 1147448, tv_nsec: 179228107 }
+WPT [208,1318,2151]
+Wrote 209th vote at Instant { tv_sec: 1147448, tv_nsec: 227166815 }
+Read 209th vote at Instant { tv_sec: 1147448, tv_nsec: 228526686 }
+WPT [209,1368,1359]
+Wrote 210th vote at Instant { tv_sec: 1147448, tv_nsec: 277250562 }
+Read 210th vote at Instant { tv_sec: 1147448, tv_nsec: 281151093 }
+WPT [210,1418,3900]
+Wrote 211th vote at Instant { tv_sec: 1147448, tv_nsec: 327250698 }
+Read 211th vote at Instant { tv_sec: 1147448, tv_nsec: 329664100 }
+WPT [211,1468,2413]
+Wrote 212th vote at Instant { tv_sec: 1147448, tv_nsec: 377250826 }
+Read 212th vote at Instant { tv_sec: 1147448, tv_nsec: 380730431 }
+WPT [212,1518,3479]
+Wrote 213th vote at Instant { tv_sec: 1147448, tv_nsec: 427250944 }
+Read 213th vote at Instant { tv_sec: 1147448, tv_nsec: 430864629 }
+WPT [213,1568,3613]
+Wrote 214th vote at Instant { tv_sec: 1147448, tv_nsec: 477250976 }
+Read 214th vote at Instant { tv_sec: 1147448, tv_nsec: 479027219 }
+WPT [214,1618,1776]
+Wrote 215th vote at Instant { tv_sec: 1147448, tv_nsec: 527251119 }
+Read 215th vote at Instant { tv_sec: 1147448, tv_nsec: 529103874 }
+WPT [215,1668,1852]
+Wrote 216th vote at Instant { tv_sec: 1147448, tv_nsec: 577268869 }
+Read 216th vote at Instant { tv_sec: 1147448, tv_nsec: 581241514 }
+WPT [216,1718,3972]
+Sent 115729 unsharded messages in 12.328228ms for 9644 messages / ms
+Sent 2000000 sharded messages in 12.328228ms for 166666 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 217th vote at Instant { tv_sec: 1147448, tv_nsec: 627409620 }
+Read 217th vote at Instant { tv_sec: 1147448, tv_nsec: 630352311 }
+WPT [217,1768,2942]
+Wrote 218th vote at Instant { tv_sec: 1147448, tv_nsec: 677519312 }
+Read 218th vote at Instant { tv_sec: 1147448, tv_nsec: 680458948 }
+WPT [218,1818,2939]
+Wrote 219th vote at Instant { tv_sec: 1147448, tv_nsec: 727673333 }
+Read 219th vote at Instant { tv_sec: 1147448, tv_nsec: 729590053 }
+WPT [219,1869,1916]
+Wrote 220th vote at Instant { tv_sec: 1147448, tv_nsec: 777693767 }
+Read 220th vote at Instant { tv_sec: 1147448, tv_nsec: 779888693 }
+WPT [220,1919,2194]
+Wrote 221th vote at Instant { tv_sec: 1147448, tv_nsec: 827804564 }
+Read 221th vote at Instant { tv_sec: 1147448, tv_nsec: 831813744 }
+WPT [221,1969,4009]
+Wrote 222th vote at Instant { tv_sec: 1147448, tv_nsec: 877905193 }
+Read 222th vote at Instant { tv_sec: 1147448, tv_nsec: 881502625 }
+WPT [222,2019,3597]
+Wrote 223th vote at Instant { tv_sec: 1147448, tv_nsec: 928053944 }
+Read 223th vote at Instant { tv_sec: 1147448, tv_nsec: 931106361 }
+WPT [223,2069,3052]
+Wrote 224th vote at Instant { tv_sec: 1147448, tv_nsec: 978053958 }
+Read 224th vote at Instant { tv_sec: 1147448, tv_nsec: 979466688 }
+WPT [224,2119,1412]
+Wrote 225th vote at Instant { tv_sec: 1147449, tv_nsec: 28095417 }
+Read 225th vote at Instant { tv_sec: 1147449, tv_nsec: 31546200 }
+WPT [225,2169,3450]
+Wrote 226th vote at Instant { tv_sec: 1147449, tv_nsec: 78215928 }
+Read 226th vote at Instant { tv_sec: 1147449, tv_nsec: 81413110 }
+WPT [226,2219,3197]
+Wrote 227th vote at Instant { tv_sec: 1147449, tv_nsec: 128298541 }
+Read 227th vote at Instant { tv_sec: 1147449, tv_nsec: 130554409 }
+WPT [227,2269,2255]
+Sent 121512 unsharded messages in 12.869275ms for 10126 messages / ms
+Sent 2100000 sharded messages in 12.869275ms for 175000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 228th vote at Instant { tv_sec: 1147449, tv_nsec: 178518014 }
+Read 228th vote at Instant { tv_sec: 1147449, tv_nsec: 181662454 }
+WPT [228,2319,3144]
+Wrote 229th vote at Instant { tv_sec: 1147449, tv_nsec: 228518576 }
+Read 229th vote at Instant { tv_sec: 1147449, tv_nsec: 231114775 }
+WPT [229,2369,2596]
+Wrote 230th vote at Instant { tv_sec: 1147449, tv_nsec: 278638771 }
+Read 230th vote at Instant { tv_sec: 1147449, tv_nsec: 279767798 }
+WPT [230,2420,1129]
+Wrote 231th vote at Instant { tv_sec: 1147449, tv_nsec: 328709155 }
+Read 231th vote at Instant { tv_sec: 1147449, tv_nsec: 331956178 }
+WPT [231,2470,3247]
+Wrote 232th vote at Instant { tv_sec: 1147449, tv_nsec: 378855352 }
+Read 232th vote at Instant { tv_sec: 1147449, tv_nsec: 381046560 }
+WPT [232,2520,2191]
+Wrote 233th vote at Instant { tv_sec: 1147449, tv_nsec: 428984381 }
+Read 233th vote at Instant { tv_sec: 1147449, tv_nsec: 431242360 }
+WPT [233,2570,2257]
+Wrote 234th vote at Instant { tv_sec: 1147449, tv_nsec: 479130959 }
+Read 234th vote at Instant { tv_sec: 1147449, tv_nsec: 482325945 }
+WPT [234,2620,3194]
+Wrote 235th vote at Instant { tv_sec: 1147449, tv_nsec: 529222749 }
+Read 235th vote at Instant { tv_sec: 1147449, tv_nsec: 531156914 }
+WPT [235,2670,1934]
+Wrote 236th vote at Instant { tv_sec: 1147449, tv_nsec: 579326771 }
+Read 236th vote at Instant { tv_sec: 1147449, tv_nsec: 580587329 }
+WPT [236,2720,1260]
+Wrote 237th vote at Instant { tv_sec: 1147449, tv_nsec: 629472485 }
+Read 237th vote at Instant { tv_sec: 1147449, tv_nsec: 630722834 }
+WPT [237,2770,1250]
+Wrote 238th vote at Instant { tv_sec: 1147449, tv_nsec: 679576956 }
+Read 238th vote at Instant { tv_sec: 1147449, tv_nsec: 680794660 }
+WPT [238,2820,1217]
+Sent 127294 unsharded messages in 13.411697ms for 9791 messages / ms
+Sent 2200000 sharded messages in 13.411697ms for 169230 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 239th vote at Instant { tv_sec: 1147449, tv_nsec: 729717533 }
+Read 239th vote at Instant { tv_sec: 1147449, tv_nsec: 731943782 }
+WPT [239,2871,2226]
+Wrote 240th vote at Instant { tv_sec: 1147449, tv_nsec: 779789817 }
+Read 240th vote at Instant { tv_sec: 1147449, tv_nsec: 784440389 }
+WPT [240,2921,4650]
+Wrote 241th vote at Instant { tv_sec: 1147449, tv_nsec: 829887483 }
+Read 241th vote at Instant { tv_sec: 1147449, tv_nsec: 833123180 }
+WPT [241,2971,3235]
+Wrote 242th vote at Instant { tv_sec: 1147449, tv_nsec: 880018269 }
+Read 242th vote at Instant { tv_sec: 1147449, tv_nsec: 883404449 }
+WPT [242,3021,3386]
+Wrote 243th vote at Instant { tv_sec: 1147449, tv_nsec: 930134035 }
+Read 243th vote at Instant { tv_sec: 1147449, tv_nsec: 932477115 }
+WPT [243,3071,2343]
+Wrote 244th vote at Instant { tv_sec: 1147449, tv_nsec: 980239977 }
+Read 244th vote at Instant { tv_sec: 1147449, tv_nsec: 983446776 }
+WPT [244,3121,3206]
+Wrote 245th vote at Instant { tv_sec: 1147450, tv_nsec: 30378807 }
+Read 245th vote at Instant { tv_sec: 1147450, tv_nsec: 34439029 }
+WPT [245,3171,4060]
+Wrote 246th vote at Instant { tv_sec: 1147450, tv_nsec: 80506770 }
+Read 246th vote at Instant { tv_sec: 1147450, tv_nsec: 82739311 }
+WPT [246,3221,2232]
+Wrote 247th vote at Instant { tv_sec: 1147450, tv_nsec: 130621926 }
+Read 247th vote at Instant { tv_sec: 1147450, tv_nsec: 133901759 }
+WPT [247,3272,3279]
+Wrote 248th vote at Instant { tv_sec: 1147450, tv_nsec: 180730065 }
+Read 248th vote at Instant { tv_sec: 1147450, tv_nsec: 184073199 }
+WPT [248,3322,3343]
+Wrote 249th vote at Instant { tv_sec: 1147450, tv_nsec: 230881749 }
+Read 249th vote at Instant { tv_sec: 1147450, tv_nsec: 234280419 }
+WPT [249,3372,3398]
+Sent 133069 unsharded messages in 13.954397ms for 10236 messages / ms
+Sent 2300000 sharded messages in 13.954397ms for 176923 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 250th vote at Instant { tv_sec: 1147450, tv_nsec: 281040700 }
+Read 250th vote at Instant { tv_sec: 1147450, tv_nsec: 284260191 }
+WPT [250,3422,3219]
+Wrote 251th vote at Instant { tv_sec: 1147450, tv_nsec: 331135600 }
+Read 251th vote at Instant { tv_sec: 1147450, tv_nsec: 334345714 }
+WPT [251,3472,3210]
+Wrote 252th vote at Instant { tv_sec: 1147450, tv_nsec: 381237204 }
+Read 252th vote at Instant { tv_sec: 1147450, tv_nsec: 383496250 }
+WPT [252,3522,2259]
+Wrote 253th vote at Instant { tv_sec: 1147450, tv_nsec: 431329236 }
+Read 253th vote at Instant { tv_sec: 1147450, tv_nsec: 434605569 }
+WPT [253,3572,3276]
+Wrote 254th vote at Instant { tv_sec: 1147450, tv_nsec: 481440776 }
+Read 254th vote at Instant { tv_sec: 1147450, tv_nsec: 483723216 }
+WPT [254,3622,2282]
+Wrote 255th vote at Instant { tv_sec: 1147450, tv_nsec: 531541701 }
+Read 255th vote at Instant { tv_sec: 1147450, tv_nsec: 534428851 }
+WPT [255,3672,2887]
+Wrote 256th vote at Instant { tv_sec: 1147450, tv_nsec: 581628231 }
+Read 256th vote at Instant { tv_sec: 1147450, tv_nsec: 583799996 }
+WPT [256,3723,2171]
+Wrote 257th vote at Instant { tv_sec: 1147450, tv_nsec: 631740549 }
+Read 257th vote at Instant { tv_sec: 1147450, tv_nsec: 634090583 }
+WPT [257,3773,2350]
+Wrote 258th vote at Instant { tv_sec: 1147450, tv_nsec: 681833799 }
+Read 258th vote at Instant { tv_sec: 1147450, tv_nsec: 684180309 }
+WPT [258,3823,2346]
+Wrote 259th vote at Instant { tv_sec: 1147450, tv_nsec: 731977848 }
+Read 259th vote at Instant { tv_sec: 1147450, tv_nsec: 734215651 }
+WPT [259,3873,2237]
+Wrote 260th vote at Instant { tv_sec: 1147450, tv_nsec: 782090261 }
+Read 260th vote at Instant { tv_sec: 1147450, tv_nsec: 784423192 }
+WPT [260,3923,2332]
+Sent 138843 unsharded messages in 14.497498ms for 9917 messages / ms
+Sent 2400000 sharded messages in 14.497498ms for 171428 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 261th vote at Instant { tv_sec: 1147450, tv_nsec: 832205048 }
+Read 261th vote at Instant { tv_sec: 1147450, tv_nsec: 837777095 }
+WPT [261,3973,5572]
+Wrote 262th vote at Instant { tv_sec: 1147450, tv_nsec: 882318821 }
+Read 262th vote at Instant { tv_sec: 1147450, tv_nsec: 884803165 }
+WPT [262,4023,2484]
+Wrote 263th vote at Instant { tv_sec: 1147450, tv_nsec: 932465853 }
+Read 263th vote at Instant { tv_sec: 1147450, tv_nsec: 935758549 }
+WPT [263,4073,3292]
+Wrote 264th vote at Instant { tv_sec: 1147450, tv_nsec: 982594312 }
+Read 264th vote at Instant { tv_sec: 1147450, tv_nsec: 985872565 }
+WPT [264,4123,3278]
+Wrote 265th vote at Instant { tv_sec: 1147451, tv_nsec: 32691647 }
+Read 265th vote at Instant { tv_sec: 1147451, tv_nsec: 34877402 }
+WPT [265,4174,2185]
+Wrote 266th vote at Instant { tv_sec: 1147451, tv_nsec: 82816952 }
+Read 266th vote at Instant { tv_sec: 1147451, tv_nsec: 86035091 }
+WPT [266,4224,3218]
+Wrote 267th vote at Instant { tv_sec: 1147451, tv_nsec: 132954368 }
+Read 267th vote at Instant { tv_sec: 1147451, tv_nsec: 135152072 }
+WPT [267,4274,2197]
+Wrote 268th vote at Instant { tv_sec: 1147451, tv_nsec: 183097971 }
+Read 268th vote at Instant { tv_sec: 1147451, tv_nsec: 185520589 }
+WPT [268,4324,2422]
+Wrote 269th vote at Instant { tv_sec: 1147451, tv_nsec: 233160504 }
+Read 269th vote at Instant { tv_sec: 1147451, tv_nsec: 235418147 }
+WPT [269,4374,2257]
+Wrote 270th vote at Instant { tv_sec: 1147451, tv_nsec: 283296170 }
+Read 270th vote at Instant { tv_sec: 1147451, tv_nsec: 286517975 }
+WPT [270,4424,3221]
+Sent 144625 unsharded messages in 15.039709ms for 9641 messages / ms
+Sent 2500000 sharded messages in 15.039709ms for 166666 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 271th vote at Instant { tv_sec: 1147451, tv_nsec: 333432487 }
+Read 271th vote at Instant { tv_sec: 1147451, tv_nsec: 336703862 }
+WPT [271,4474,3271]
+Wrote 272th vote at Instant { tv_sec: 1147451, tv_nsec: 383546957 }
+Read 272th vote at Instant { tv_sec: 1147451, tv_nsec: 386822176 }
+WPT [272,4524,3275]
+Wrote 273th vote at Instant { tv_sec: 1147451, tv_nsec: 433600507 }
+Read 273th vote at Instant { tv_sec: 1147451, tv_nsec: 436944792 }
+WPT [273,4574,3344]
+Wrote 274th vote at Instant { tv_sec: 1147451, tv_nsec: 483733370 }
+Read 274th vote at Instant { tv_sec: 1147451, tv_nsec: 486968367 }
+WPT [274,4625,3234]
+Wrote 275th vote at Instant { tv_sec: 1147451, tv_nsec: 533841299 }
+Read 275th vote at Instant { tv_sec: 1147451, tv_nsec: 541081929 }
+WPT [275,4675,7240]
+Wrote 276th vote at Instant { tv_sec: 1147451, tv_nsec: 583954218 }
+Read 276th vote at Instant { tv_sec: 1147451, tv_nsec: 587186149 }
+WPT [276,4725,3231]
+Wrote 277th vote at Instant { tv_sec: 1147451, tv_nsec: 634075451 }
+Read 277th vote at Instant { tv_sec: 1147451, tv_nsec: 637405307 }
+WPT [277,4775,3329]
+Wrote 278th vote at Instant { tv_sec: 1147451, tv_nsec: 684169573 }
+Read 278th vote at Instant { tv_sec: 1147451, tv_nsec: 687428825 }
+WPT [278,4825,3259]
+Wrote 279th vote at Instant { tv_sec: 1147451, tv_nsec: 734254920 }
+Read 279th vote at Instant { tv_sec: 1147451, tv_nsec: 737451720 }
+WPT [279,4875,3196]
+Wrote 280th vote at Instant { tv_sec: 1147451, tv_nsec: 784375888 }
+Read 280th vote at Instant { tv_sec: 1147451, tv_nsec: 786685437 }
+WPT [280,4925,2309]
+Wrote 281th vote at Instant { tv_sec: 1147451, tv_nsec: 834609007 }
+Read 281th vote at Instant { tv_sec: 1147451, tv_nsec: 836706883 }
+WPT [281,4975,2097]
+Sent 150407 unsharded messages in 15.581104ms for 10027 messages / ms
+Sent 2600000 sharded messages in 15.581104ms for 173333 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 282th vote at Instant { tv_sec: 1147451, tv_nsec: 884635386 }
+Read 282th vote at Instant { tv_sec: 1147451, tv_nsec: 887897201 }
+WPT [282,5026,3261]
+Wrote 283th vote at Instant { tv_sec: 1147451, tv_nsec: 934719961 }
+Read 283th vote at Instant { tv_sec: 1147451, tv_nsec: 935946923 }
+WPT [283,5076,1226]
+Wrote 284th vote at Instant { tv_sec: 1147451, tv_nsec: 984841844 }
+Read 284th vote at Instant { tv_sec: 1147451, tv_nsec: 986006519 }
+WPT [284,5126,1164]
+Wrote 285th vote at Instant { tv_sec: 1147452, tv_nsec: 34987361 }
+Read 285th vote at Instant { tv_sec: 1147452, tv_nsec: 37185497 }
+WPT [285,5176,2198]
+Wrote 286th vote at Instant { tv_sec: 1147452, tv_nsec: 85061398 }
+Read 286th vote at Instant { tv_sec: 1147452, tv_nsec: 87439928 }
+WPT [286,5226,2378]
+Wrote 287th vote at Instant { tv_sec: 1147452, tv_nsec: 135061809 }
+Read 287th vote at Instant { tv_sec: 1147452, tv_nsec: 137057355 }
+WPT [287,5276,1995]
+Wrote 288th vote at Instant { tv_sec: 1147452, tv_nsec: 185061960 }
+Read 288th vote at Instant { tv_sec: 1147452, tv_nsec: 188242429 }
+WPT [288,5326,3180]
+Wrote 289th vote at Instant { tv_sec: 1147452, tv_nsec: 235062062 }
+Read 289th vote at Instant { tv_sec: 1147452, tv_nsec: 238707220 }
+WPT [289,5376,3645]
+Wrote 290th vote at Instant { tv_sec: 1147452, tv_nsec: 285202368 }
+Read 290th vote at Instant { tv_sec: 1147452, tv_nsec: 287604102 }
+WPT [290,5426,2401]
+Wrote 291th vote at Instant { tv_sec: 1147452, tv_nsec: 335260680 }
+Read 291th vote at Instant { tv_sec: 1147452, tv_nsec: 338452769 }
+WPT [291,5476,3192]
+Wrote 292th vote at Instant { tv_sec: 1147452, tv_nsec: 385379330 }
+Read 292th vote at Instant { tv_sec: 1147452, tv_nsec: 387544856 }
+WPT [292,5526,2165]
+Sent 156175 unsharded messages in 16.123198ms for 9760 messages / ms
+Sent 2700000 sharded messages in 16.123198ms for 168750 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 293th vote at Instant { tv_sec: 1147452, tv_nsec: 435535101 }
+Read 293th vote at Instant { tv_sec: 1147452, tv_nsec: 437761729 }
+WPT [293,5576,2226]
+Wrote 294th vote at Instant { tv_sec: 1147452, tv_nsec: 485638023 }
+Read 294th vote at Instant { tv_sec: 1147452, tv_nsec: 488092076 }
+WPT [294,5627,2454]
+Wrote 295th vote at Instant { tv_sec: 1147452, tv_nsec: 535802554 }
+Read 295th vote at Instant { tv_sec: 1147452, tv_nsec: 538269533 }
+WPT [295,5677,2466]
+Wrote 296th vote at Instant { tv_sec: 1147452, tv_nsec: 585802829 }
+Read 296th vote at Instant { tv_sec: 1147452, tv_nsec: 588423996 }
+WPT [296,5727,2621]
+Wrote 297th vote at Instant { tv_sec: 1147452, tv_nsec: 635856383 }
+Read 297th vote at Instant { tv_sec: 1147452, tv_nsec: 638366806 }
+WPT [297,5777,2510]
+Wrote 298th vote at Instant { tv_sec: 1147452, tv_nsec: 685857893 }
+Read 298th vote at Instant { tv_sec: 1147452, tv_nsec: 688570211 }
+WPT [298,5827,2712]
+Wrote 299th vote at Instant { tv_sec: 1147452, tv_nsec: 736002658 }
+Read 299th vote at Instant { tv_sec: 1147452, tv_nsec: 738595564 }
+WPT [299,5877,2592]
+Wrote 300th vote at Instant { tv_sec: 1147452, tv_nsec: 786204421 }
+Read 300th vote at Instant { tv_sec: 1147452, tv_nsec: 790731434 }
+WPT [300,5927,4527]
+Wrote 301th vote at Instant { tv_sec: 1147452, tv_nsec: 836301902 }
+Read 301th vote at Instant { tv_sec: 1147452, tv_nsec: 839884129 }
+WPT [301,5977,3582]
+Wrote 302th vote at Instant { tv_sec: 1147452, tv_nsec: 886359547 }
+Read 302th vote at Instant { tv_sec: 1147452, tv_nsec: 891084452 }
+WPT [302,6027,4724]
+Wrote 303th vote at Instant { tv_sec: 1147452, tv_nsec: 936359776 }
+Read 303th vote at Instant { tv_sec: 1147452, tv_nsec: 938724496 }
+WPT [303,6077,2364]
+Sent 161929 unsharded messages in 16.693124ms for 10120 messages / ms
+Sent 2800000 sharded messages in 16.693124ms for 175000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 304th vote at Instant { tv_sec: 1147452, tv_nsec: 986426489 }
+Read 304th vote at Instant { tv_sec: 1147452, tv_nsec: 991085727 }
+WPT [304,6127,4659]
+Wrote 305th vote at Instant { tv_sec: 1147453, tv_nsec: 36542696 }
+Read 305th vote at Instant { tv_sec: 1147453, tv_nsec: 39929719 }
+WPT [305,6177,3387]
+Wrote 306th vote at Instant { tv_sec: 1147453, tv_nsec: 86542760 }
+Read 306th vote at Instant { tv_sec: 1147453, tv_nsec: 89179458 }
+WPT [306,6227,2636]
+Wrote 307th vote at Instant { tv_sec: 1147453, tv_nsec: 136575270 }
+Read 307th vote at Instant { tv_sec: 1147453, tv_nsec: 139383321 }
+WPT [307,6277,2808]
+Wrote 308th vote at Instant { tv_sec: 1147453, tv_nsec: 186715823 }
+Read 308th vote at Instant { tv_sec: 1147453, tv_nsec: 188454299 }
+WPT [308,6328,1738]
+Wrote 309th vote at Instant { tv_sec: 1147453, tv_nsec: 236818076 }
+Read 309th vote at Instant { tv_sec: 1147453, tv_nsec: 239699262 }
+WPT [309,6378,2881]
+Wrote 310th vote at Instant { tv_sec: 1147453, tv_nsec: 286898081 }
+Read 310th vote at Instant { tv_sec: 1147453, tv_nsec: 290399706 }
+WPT [310,6428,3501]
+Wrote 311th vote at Instant { tv_sec: 1147453, tv_nsec: 337052689 }
+Read 311th vote at Instant { tv_sec: 1147453, tv_nsec: 344522908 }
+WPT [311,6478,7470]
+Wrote 312th vote at Instant { tv_sec: 1147453, tv_nsec: 387180735 }
+Read 312th vote at Instant { tv_sec: 1147453, tv_nsec: 390904745 }
+WPT [312,6528,3724]
+Wrote 313th vote at Instant { tv_sec: 1147453, tv_nsec: 437180799 }
+Read 313th vote at Instant { tv_sec: 1147453, tv_nsec: 438907198 }
+WPT [313,6578,1726]
+Wrote 314th vote at Instant { tv_sec: 1147453, tv_nsec: 487180799 }
+Read 314th vote at Instant { tv_sec: 1147453, tv_nsec: 489137422 }
+WPT [314,6628,1956]
+Sent 167722 unsharded messages in 17.234497ms for 9866 messages / ms
+Sent 2900000 sharded messages in 17.234497ms for 170588 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 315th vote at Instant { tv_sec: 1147453, tv_nsec: 537180859 }
+Read 315th vote at Instant { tv_sec: 1147453, tv_nsec: 539317791 }
+WPT [315,6678,2136]
+Wrote 316th vote at Instant { tv_sec: 1147453, tv_nsec: 587181037 }
+Read 316th vote at Instant { tv_sec: 1147453, tv_nsec: 589372588 }
+WPT [316,6728,2191]
+Wrote 317th vote at Instant { tv_sec: 1147453, tv_nsec: 637326236 }
+Read 317th vote at Instant { tv_sec: 1147453, tv_nsec: 640547972 }
+WPT [317,6778,3221]
+Wrote 318th vote at Instant { tv_sec: 1147453, tv_nsec: 687432607 }
+Read 318th vote at Instant { tv_sec: 1147453, tv_nsec: 690001848 }
+WPT [318,6828,2569]
+Wrote 319th vote at Instant { tv_sec: 1147453, tv_nsec: 737578526 }
+Read 319th vote at Instant { tv_sec: 1147453, tv_nsec: 740722624 }
+WPT [319,6878,3144]
+Wrote 320th vote at Instant { tv_sec: 1147453, tv_nsec: 787645315 }
+Read 320th vote at Instant { tv_sec: 1147453, tv_nsec: 789894018 }
+WPT [320,6929,2248]
+Wrote 321th vote at Instant { tv_sec: 1147453, tv_nsec: 837645396 }
+Read 321th vote at Instant { tv_sec: 1147453, tv_nsec: 841020941 }
+WPT [321,6979,3375]
+Wrote 322th vote at Instant { tv_sec: 1147453, tv_nsec: 887645418 }
+Read 322th vote at Instant { tv_sec: 1147453, tv_nsec: 890184205 }
+WPT [322,7029,2538]
+Wrote 323th vote at Instant { tv_sec: 1147453, tv_nsec: 937650768 }
+Read 323th vote at Instant { tv_sec: 1147453, tv_nsec: 941262054 }
+WPT [323,7079,3611]
+Wrote 324th vote at Instant { tv_sec: 1147453, tv_nsec: 987818632 }
+Read 324th vote at Instant { tv_sec: 1147453, tv_nsec: 990340581 }
+WPT [324,7129,2521]
+Wrote 325th vote at Instant { tv_sec: 1147454, tv_nsec: 37839110 }
+Read 325th vote at Instant { tv_sec: 1147454, tv_nsec: 40572017 }
+WPT [325,7179,2732]
+Sent 173498 unsharded messages in 17.780869ms for 10205 messages / ms
+Sent 3000000 sharded messages in 17.780869ms for 176470 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 326th vote at Instant { tv_sec: 1147454, tv_nsec: 87969449 }
+Read 326th vote at Instant { tv_sec: 1147454, tv_nsec: 91139128 }
+WPT [326,7229,3169]
+Wrote 327th vote at Instant { tv_sec: 1147454, tv_nsec: 138078962 }
+Read 327th vote at Instant { tv_sec: 1147454, tv_nsec: 144536860 }
+WPT [327,7279,6457]
+Wrote 328th vote at Instant { tv_sec: 1147454, tv_nsec: 188164704 }
+Read 328th vote at Instant { tv_sec: 1147454, tv_nsec: 190932361 }
+WPT [328,7329,2767]
+Wrote 329th vote at Instant { tv_sec: 1147454, tv_nsec: 238285157 }
+Read 329th vote at Instant { tv_sec: 1147454, tv_nsec: 242023021 }
+WPT [329,7379,3737]
+Wrote 330th vote at Instant { tv_sec: 1147454, tv_nsec: 288409689 }
+Read 330th vote at Instant { tv_sec: 1147454, tv_nsec: 291207820 }
+WPT [330,7429,2798]
+Wrote 331th vote at Instant { tv_sec: 1147454, tv_nsec: 338540339 }
+Read 331th vote at Instant { tv_sec: 1147454, tv_nsec: 340311760 }
+WPT [331,7479,1771]
+Wrote 332th vote at Instant { tv_sec: 1147454, tv_nsec: 388638110 }
+Read 332th vote at Instant { tv_sec: 1147454, tv_nsec: 391372257 }
+WPT [332,7530,2734]
+Wrote 333th vote at Instant { tv_sec: 1147454, tv_nsec: 438795744 }
+Read 333th vote at Instant { tv_sec: 1147454, tv_nsec: 441417773 }
+WPT [333,7580,2622]
+Wrote 334th vote at Instant { tv_sec: 1147454, tv_nsec: 488838104 }
+Read 334th vote at Instant { tv_sec: 1147454, tv_nsec: 492578536 }
+WPT [334,7630,3740]
+Wrote 335th vote at Instant { tv_sec: 1147454, tv_nsec: 539004318 }
+Read 335th vote at Instant { tv_sec: 1147454, tv_nsec: 542696223 }
+WPT [335,7680,3691]
+Wrote 336th vote at Instant { tv_sec: 1147454, tv_nsec: 589124217 }
+Read 336th vote at Instant { tv_sec: 1147454, tv_nsec: 592892723 }
+WPT [336,7730,3768]
+Sent 179249 unsharded messages in 18.322975ms for 9958 messages / ms
+Sent 3100000 sharded messages in 18.322975ms for 172222 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 337th vote at Instant { tv_sec: 1147454, tv_nsec: 639264047 }
+Read 337th vote at Instant { tv_sec: 1147454, tv_nsec: 641924395 }
+WPT [337,7780,2660]
+Wrote 338th vote at Instant { tv_sec: 1147454, tv_nsec: 689377884 }
+Read 338th vote at Instant { tv_sec: 1147454, tv_nsec: 692095931 }
+WPT [338,7830,2718]
+Wrote 339th vote at Instant { tv_sec: 1147454, tv_nsec: 739509848 }
+Read 339th vote at Instant { tv_sec: 1147454, tv_nsec: 743117693 }
+WPT [339,7880,3607]
+Wrote 340th vote at Instant { tv_sec: 1147454, tv_nsec: 789609451 }
+Read 340th vote at Instant { tv_sec: 1147454, tv_nsec: 792277481 }
+WPT [340,7930,2668]
+Wrote 341th vote at Instant { tv_sec: 1147454, tv_nsec: 839718625 }
+Read 341th vote at Instant { tv_sec: 1147454, tv_nsec: 842343250 }
+WPT [341,7981,2624]
+Wrote 342th vote at Instant { tv_sec: 1147454, tv_nsec: 889801760 }
+Read 342th vote at Instant { tv_sec: 1147454, tv_nsec: 892559534 }
+WPT [342,8031,2757]
+Wrote 343th vote at Instant { tv_sec: 1147454, tv_nsec: 939943569 }
+Read 343th vote at Instant { tv_sec: 1147454, tv_nsec: 942661960 }
+WPT [343,8081,2718]
+Wrote 344th vote at Instant { tv_sec: 1147454, tv_nsec: 990068413 }
+Read 344th vote at Instant { tv_sec: 1147454, tv_nsec: 993695446 }
+WPT [344,8131,3627]
+Wrote 345th vote at Instant { tv_sec: 1147455, tv_nsec: 40183863 }
+Read 345th vote at Instant { tv_sec: 1147455, tv_nsec: 43809023 }
+WPT [345,8181,3625]
+Wrote 346th vote at Instant { tv_sec: 1147455, tv_nsec: 90310803 }
+Read 346th vote at Instant { tv_sec: 1147455, tv_nsec: 92960151 }
+WPT [346,8231,2649]
+Wrote 347th vote at Instant { tv_sec: 1147455, tv_nsec: 140452649 }
+Read 347th vote at Instant { tv_sec: 1147455, tv_nsec: 143019517 }
+WPT [347,8281,2566]
+Sent 185037 unsharded messages in 18.867133ms for 10279 messages / ms
+Sent 3200000 sharded messages in 18.867133ms for 177777 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 348th vote at Instant { tv_sec: 1147455, tv_nsec: 190611337 }
+Read 348th vote at Instant { tv_sec: 1147455, tv_nsec: 194336331 }
+WPT [348,8331,3724]
+Wrote 349th vote at Instant { tv_sec: 1147455, tv_nsec: 240707299 }
+Read 349th vote at Instant { tv_sec: 1147455, tv_nsec: 244422844 }
+WPT [349,8382,3715]
+Wrote 350th vote at Instant { tv_sec: 1147455, tv_nsec: 290850640 }
+Read 350th vote at Instant { tv_sec: 1147455, tv_nsec: 293338519 }
+WPT [350,8432,2487]
+Wrote 351th vote at Instant { tv_sec: 1147455, tv_nsec: 341003501 }
+Read 351th vote at Instant { tv_sec: 1147455, tv_nsec: 343457279 }
+WPT [351,8482,2453]
+Wrote 352th vote at Instant { tv_sec: 1147455, tv_nsec: 391050840 }
+Read 352th vote at Instant { tv_sec: 1147455, tv_nsec: 394644117 }
+WPT [352,8532,3593]
+Wrote 353th vote at Instant { tv_sec: 1147455, tv_nsec: 441198065 }
+Read 353th vote at Instant { tv_sec: 1147455, tv_nsec: 444828653 }
+WPT [353,8582,3630]
+Wrote 354th vote at Instant { tv_sec: 1147455, tv_nsec: 491310310 }
+Read 354th vote at Instant { tv_sec: 1147455, tv_nsec: 494864649 }
+WPT [354,8632,3554]
+Wrote 355th vote at Instant { tv_sec: 1147455, tv_nsec: 541369959 }
+Read 355th vote at Instant { tv_sec: 1147455, tv_nsec: 545041325 }
+WPT [355,8682,3671]
+Wrote 356th vote at Instant { tv_sec: 1147455, tv_nsec: 591369981 }
+Read 356th vote at Instant { tv_sec: 1147455, tv_nsec: 594430697 }
+WPT [356,8732,3060]
+Wrote 357th vote at Instant { tv_sec: 1147455, tv_nsec: 641370011 }
+Read 357th vote at Instant { tv_sec: 1147455, tv_nsec: 644244234 }
+WPT [357,8782,2874]
+Wrote 358th vote at Instant { tv_sec: 1147455, tv_nsec: 691370075 }
+Read 358th vote at Instant { tv_sec: 1147455, tv_nsec: 693410016 }
+WPT [358,8832,2039]
+Sent 190808 unsharded messages in 19.411569ms for 10042 messages / ms
+Sent 3300000 sharded messages in 19.411569ms for 173684 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 359th vote at Instant { tv_sec: 1147455, tv_nsec: 741370166 }
+Read 359th vote at Instant { tv_sec: 1147455, tv_nsec: 743620944 }
+WPT [359,8882,2250]
+Wrote 360th vote at Instant { tv_sec: 1147455, tv_nsec: 791432229 }
+Read 360th vote at Instant { tv_sec: 1147455, tv_nsec: 794732510 }
+WPT [360,8932,3300]
+Wrote 361th vote at Instant { tv_sec: 1147455, tv_nsec: 841514913 }
+Read 361th vote at Instant { tv_sec: 1147455, tv_nsec: 844816376 }
+WPT [361,8982,3301]
+Wrote 362th vote at Instant { tv_sec: 1147455, tv_nsec: 891610252 }
+Read 362th vote at Instant { tv_sec: 1147455, tv_nsec: 894901697 }
+WPT [362,9032,3291]
+Wrote 363th vote at Instant { tv_sec: 1147455, tv_nsec: 941735508 }
+Read 363th vote at Instant { tv_sec: 1147455, tv_nsec: 944016173 }
+WPT [363,9083,2280]
+Wrote 364th vote at Instant { tv_sec: 1147455, tv_nsec: 991868225 }
+Read 364th vote at Instant { tv_sec: 1147455, tv_nsec: 994107883 }
+WPT [364,9133,2239]
+Wrote 365th vote at Instant { tv_sec: 1147456, tv_nsec: 41996066 }
+Read 365th vote at Instant { tv_sec: 1147456, tv_nsec: 45228426 }
+WPT [365,9183,3232]
+Wrote 366th vote at Instant { tv_sec: 1147456, tv_nsec: 92079652 }
+Read 366th vote at Instant { tv_sec: 1147456, tv_nsec: 95401727 }
+WPT [366,9233,3322]
+Wrote 367th vote at Instant { tv_sec: 1147456, tv_nsec: 142079662 }
+Read 367th vote at Instant { tv_sec: 1147456, tv_nsec: 143642413 }
+WPT [367,9283,1562]
+Wrote 368th vote at Instant { tv_sec: 1147456, tv_nsec: 192080066 }
+Read 368th vote at Instant { tv_sec: 1147456, tv_nsec: 204741027 }
+WPT [368,9333,12660]
+Wrote 369th vote at Instant { tv_sec: 1147456, tv_nsec: 242080074 }
+Sent 196581 unsharded messages in 19.953679ms for 10346 messages / ms
+Sent 3400000 sharded messages in 19.953679ms for 178947 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Read 369th vote at Instant { tv_sec: 1147456, tv_nsec: 251103187 }
+WPT [369,9383,9023]
+Wrote 370th vote at Instant { tv_sec: 1147456, tv_nsec: 292080514 }
+Read 370th vote at Instant { tv_sec: 1147456, tv_nsec: 293915890 }
+WPT [370,9433,1835]
+Wrote 371th vote at Instant { tv_sec: 1147456, tv_nsec: 342191898 }
+Read 371th vote at Instant { tv_sec: 1147456, tv_nsec: 344044195 }
+WPT [371,9483,1852]
+Wrote 372th vote at Instant { tv_sec: 1147456, tv_nsec: 392223347 }
+Read 372th vote at Instant { tv_sec: 1147456, tv_nsec: 395154656 }
+WPT [372,9533,2931]
+Wrote 373th vote at Instant { tv_sec: 1147456, tv_nsec: 442329511 }
+Read 373th vote at Instant { tv_sec: 1147456, tv_nsec: 447781666 }
+WPT [373,9583,5452]
+Wrote 374th vote at Instant { tv_sec: 1147456, tv_nsec: 492498238 }
+Read 374th vote at Instant { tv_sec: 1147456, tv_nsec: 495454932 }
+WPT [374,9633,2956]
+Wrote 375th vote at Instant { tv_sec: 1147456, tv_nsec: 542653425 }
+Read 375th vote at Instant { tv_sec: 1147456, tv_nsec: 546470269 }
+WPT [375,9684,3816]
+Wrote 376th vote at Instant { tv_sec: 1147456, tv_nsec: 592761268 }
+Read 376th vote at Instant { tv_sec: 1147456, tv_nsec: 595690867 }
+WPT [376,9734,2929]
+Wrote 377th vote at Instant { tv_sec: 1147456, tv_nsec: 642916288 }
+Read 377th vote at Instant { tv_sec: 1147456, tv_nsec: 646689865 }
+WPT [377,9784,3773]
+Wrote 378th vote at Instant { tv_sec: 1147456, tv_nsec: 693102196 }
+Read 378th vote at Instant { tv_sec: 1147456, tv_nsec: 695848613 }
+WPT [378,9834,2746]
+Wrote 379th vote at Instant { tv_sec: 1147456, tv_nsec: 743176420 }
+Read 379th vote at Instant { tv_sec: 1147456, tv_nsec: 747026290 }
+WPT [379,9884,3849]
+Sent 202379 unsharded messages in 20.498051ms for 10118 messages / ms
+Sent 3500000 sharded messages in 20.498051ms for 175000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 380th vote at Instant { tv_sec: 1147456, tv_nsec: 793246735 }
+Read 380th vote at Instant { tv_sec: 1147456, tv_nsec: 796259028 }
+WPT [380,9934,3012]
+Wrote 381th vote at Instant { tv_sec: 1147456, tv_nsec: 843343944 }
+Read 381th vote at Instant { tv_sec: 1147456, tv_nsec: 845296432 }
+WPT [381,9984,1952]
+Wrote 382th vote at Instant { tv_sec: 1147456, tv_nsec: 893495526 }
+Read 382th vote at Instant { tv_sec: 1147456, tv_nsec: 896589759 }
+WPT [382,10034,3094]
+Wrote 383th vote at Instant { tv_sec: 1147456, tv_nsec: 943541730 }
+Read 383th vote at Instant { tv_sec: 1147456, tv_nsec: 947485581 }
+WPT [383,10084,3943]
+Wrote 384th vote at Instant { tv_sec: 1147456, tv_nsec: 993674081 }
+Read 384th vote at Instant { tv_sec: 1147456, tv_nsec: 997529738 }
+WPT [384,10135,3855]
+Wrote 385th vote at Instant { tv_sec: 1147457, tv_nsec: 43771134 }
+Read 385th vote at Instant { tv_sec: 1147457, tv_nsec: 47750828 }
+WPT [385,10185,3979]
+Wrote 386th vote at Instant { tv_sec: 1147457, tv_nsec: 93894218 }
+Read 386th vote at Instant { tv_sec: 1147457, tv_nsec: 97786326 }
+WPT [386,10235,3892]
+Wrote 387th vote at Instant { tv_sec: 1147457, tv_nsec: 144046392 }
+Read 387th vote at Instant { tv_sec: 1147457, tv_nsec: 147902576 }
+WPT [387,10285,3856]
+Wrote 388th vote at Instant { tv_sec: 1147457, tv_nsec: 194109799 }
+Read 388th vote at Instant { tv_sec: 1147457, tv_nsec: 198031788 }
+WPT [388,10335,3921]
+Wrote 389th vote at Instant { tv_sec: 1147457, tv_nsec: 244263624 }
+Read 389th vote at Instant { tv_sec: 1147457, tv_nsec: 247006632 }
+WPT [389,10385,2743]
+Wrote 390th vote at Instant { tv_sec: 1147457, tv_nsec: 294380899 }
+Read 390th vote at Instant { tv_sec: 1147457, tv_nsec: 297232387 }
+WPT [390,10435,2851]
+Sent 208168 unsharded messages in 21.039018ms for 9912 messages / ms
+Sent 3600000 sharded messages in 21.039018ms for 171428 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 391th vote at Instant { tv_sec: 1147457, tv_nsec: 344544153 }
+Read 391th vote at Instant { tv_sec: 1147457, tv_nsec: 347290500 }
+WPT [391,10485,2746]
+Wrote 392th vote at Instant { tv_sec: 1147457, tv_nsec: 394589186 }
+Read 392th vote at Instant { tv_sec: 1147457, tv_nsec: 401191119 }
+WPT [392,10535,6601]
+Wrote 393th vote at Instant { tv_sec: 1147457, tv_nsec: 444680951 }
+Read 393th vote at Instant { tv_sec: 1147457, tv_nsec: 451214887 }
+WPT [393,10586,6533]
+Wrote 394th vote at Instant { tv_sec: 1147457, tv_nsec: 494779588 }
+Read 394th vote at Instant { tv_sec: 1147457, tv_nsec: 496692242 }
+WPT [394,10636,1912]
+Wrote 395th vote at Instant { tv_sec: 1147457, tv_nsec: 544847950 }
+Read 395th vote at Instant { tv_sec: 1147457, tv_nsec: 548784693 }
+WPT [395,10686,3936]
+Wrote 396th vote at Instant { tv_sec: 1147457, tv_nsec: 594848120 }
+Read 396th vote at Instant { tv_sec: 1147457, tv_nsec: 595868592 }
+WPT [396,10736,1020]
+Wrote 397th vote at Instant { tv_sec: 1147457, tv_nsec: 644848258 }
+Read 397th vote at Instant { tv_sec: 1147457, tv_nsec: 647014638 }
+WPT [397,10786,2166]
+Wrote 398th vote at Instant { tv_sec: 1147457, tv_nsec: 694904495 }
+Read 398th vote at Instant { tv_sec: 1147457, tv_nsec: 697162717 }
+WPT [398,10836,2258]
+Wrote 399th vote at Instant { tv_sec: 1147457, tv_nsec: 745017247 }
+Read 399th vote at Instant { tv_sec: 1147457, tv_nsec: 747250601 }
+WPT [399,10886,2233]
+Wrote 400th vote at Instant { tv_sec: 1147457, tv_nsec: 795172171 }
+Read 400th vote at Instant { tv_sec: 1147457, tv_nsec: 798454248 }
+WPT [400,10936,3282]
+Wrote 401th vote at Instant { tv_sec: 1147457, tv_nsec: 845264800 }
+Read 401th vote at Instant { tv_sec: 1147457, tv_nsec: 847457662 }
+WPT [401,10986,2192]
+Sent 213948 unsharded messages in 21.582545ms for 10188 messages / ms
+Sent 3700000 sharded messages in 21.582545ms for 176190 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 402th vote at Instant { tv_sec: 1147457, tv_nsec: 895390016 }
+Read 402th vote at Instant { tv_sec: 1147457, tv_nsec: 907793731 }
+WPT [402,11036,12403]
+Wrote 403th vote at Instant { tv_sec: 1147457, tv_nsec: 945499730 }
+Read 403th vote at Instant { tv_sec: 1147457, tv_nsec: 947917274 }
+WPT [403,11086,2417]
+Wrote 404th vote at Instant { tv_sec: 1147457, tv_nsec: 995600045 }
+Read 404th vote at Instant { tv_sec: 1147457, tv_nsec: 999069955 }
+WPT [404,11136,3469]
+Wrote 405th vote at Instant { tv_sec: 1147458, tv_nsec: 45734114 }
+Read 405th vote at Instant { tv_sec: 1147458, tv_nsec: 49148172 }
+WPT [405,11187,3414]
+Wrote 406th vote at Instant { tv_sec: 1147458, tv_nsec: 95867011 }
+Read 406th vote at Instant { tv_sec: 1147458, tv_nsec: 99201892 }
+WPT [406,11237,3334]
+Wrote 407th vote at Instant { tv_sec: 1147458, tv_nsec: 145867023 }
+Read 407th vote at Instant { tv_sec: 1147458, tv_nsec: 148983103 }
+WPT [407,11287,3116]
+Wrote 408th vote at Instant { tv_sec: 1147458, tv_nsec: 195867059 }
+Read 408th vote at Instant { tv_sec: 1147458, tv_nsec: 199486741 }
+WPT [408,11337,3619]
+Wrote 409th vote at Instant { tv_sec: 1147458, tv_nsec: 245867175 }
+Read 409th vote at Instant { tv_sec: 1147458, tv_nsec: 251137855 }
+WPT [409,11387,5270]
+Wrote 410th vote at Instant { tv_sec: 1147458, tv_nsec: 295867317 }
+Read 410th vote at Instant { tv_sec: 1147458, tv_nsec: 297781615 }
+WPT [410,11437,1914]
+Wrote 411th vote at Instant { tv_sec: 1147458, tv_nsec: 345961366 }
+Read 411th vote at Instant { tv_sec: 1147458, tv_nsec: 348841964 }
+WPT [411,11487,2880]
+Wrote 412th vote at Instant { tv_sec: 1147458, tv_nsec: 396066272 }
+Read 412th vote at Instant { tv_sec: 1147458, tv_nsec: 398933674 }
+WPT [412,11537,2867]
+Sent 219734 unsharded messages in 22.144955ms for 9987 messages / ms
+Sent 3800000 sharded messages in 22.144955ms for 172727 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 413th vote at Instant { tv_sec: 1147458, tv_nsec: 446212976 }
+Read 413th vote at Instant { tv_sec: 1147458, tv_nsec: 448124396 }
+WPT [413,11587,1911]
+Wrote 414th vote at Instant { tv_sec: 1147458, tv_nsec: 496354971 }
+Read 414th vote at Instant { tv_sec: 1147458, tv_nsec: 499324667 }
+WPT [414,11637,2969]
+Wrote 415th vote at Instant { tv_sec: 1147458, tv_nsec: 546481327 }
+Read 415th vote at Instant { tv_sec: 1147458, tv_nsec: 549374853 }
+WPT [415,11687,2893]
+Wrote 416th vote at Instant { tv_sec: 1147458, tv_nsec: 596603182 }
+Read 416th vote at Instant { tv_sec: 1147458, tv_nsec: 601092451 }
+WPT [416,11737,4489]
+Wrote 417th vote at Instant { tv_sec: 1147458, tv_nsec: 646686233 }
+Read 417th vote at Instant { tv_sec: 1147458, tv_nsec: 648813441 }
+WPT [417,11788,2127]
+Wrote 418th vote at Instant { tv_sec: 1147458, tv_nsec: 696856174 }
+Read 418th vote at Instant { tv_sec: 1147458, tv_nsec: 700828137 }
+WPT [418,11838,3971]
+Wrote 419th vote at Instant { tv_sec: 1147458, tv_nsec: 747005937 }
+Read 419th vote at Instant { tv_sec: 1147458, tv_nsec: 749949500 }
+WPT [419,11888,2943]
+Wrote 420th vote at Instant { tv_sec: 1147458, tv_nsec: 797158477 }
+Read 420th vote at Instant { tv_sec: 1147458, tv_nsec: 800077276 }
+WPT [420,11938,2918]
+Wrote 421th vote at Instant { tv_sec: 1147458, tv_nsec: 847306830 }
+Read 421th vote at Instant { tv_sec: 1147458, tv_nsec: 851161881 }
+WPT [421,11988,3855]
+Wrote 422th vote at Instant { tv_sec: 1147458, tv_nsec: 897423463 }
+Read 422th vote at Instant { tv_sec: 1147458, tv_nsec: 899284871 }
+WPT [422,12038,1861]
+Wrote 423th vote at Instant { tv_sec: 1147458, tv_nsec: 947552937 }
+Read 423th vote at Instant { tv_sec: 1147458, tv_nsec: 951448877 }
+WPT [423,12088,3895]
+Sent 225502 unsharded messages in 22.685386ms for 10250 messages / ms
+Sent 3900000 sharded messages in 22.685386ms for 177272 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 424th vote at Instant { tv_sec: 1147458, tv_nsec: 997679384 }
+Read 424th vote at Instant { tv_sec: 1147459, tv_nsec: 491053 }
+WPT [424,12139,2811]
+Wrote 425th vote at Instant { tv_sec: 1147459, tv_nsec: 47830704 }
+Read 425th vote at Instant { tv_sec: 1147459, tv_nsec: 50579130 }
+WPT [425,12189,2748]
+Wrote 426th vote at Instant { tv_sec: 1147459, tv_nsec: 97909104 }
+Read 426th vote at Instant { tv_sec: 1147459, tv_nsec: 104450720 }
+WPT [426,12239,6541]
+Wrote 427th vote at Instant { tv_sec: 1147459, tv_nsec: 147959238 }
+Read 427th vote at Instant { tv_sec: 1147459, tv_nsec: 150849898 }
+WPT [427,12289,2890]
+Wrote 428th vote at Instant { tv_sec: 1147459, tv_nsec: 198147266 }
+Read 428th vote at Instant { tv_sec: 1147459, tv_nsec: 200910182 }
+WPT [428,12339,2762]
+Wrote 429th vote at Instant { tv_sec: 1147459, tv_nsec: 248231192 }
+Read 429th vote at Instant { tv_sec: 1147459, tv_nsec: 251114184 }
+WPT [429,12389,2882]
+Wrote 430th vote at Instant { tv_sec: 1147459, tv_nsec: 298324781 }
+Read 430th vote at Instant { tv_sec: 1147459, tv_nsec: 301249626 }
+WPT [430,12439,2924]
+Wrote 431th vote at Instant { tv_sec: 1147459, tv_nsec: 348408141 }
+Read 431th vote at Instant { tv_sec: 1147459, tv_nsec: 351134166 }
+WPT [431,12489,2726]
+Wrote 432th vote at Instant { tv_sec: 1147459, tv_nsec: 398577241 }
+Read 432th vote at Instant { tv_sec: 1147459, tv_nsec: 404437415 }
+WPT [432,12539,5860]
+Wrote 433th vote at Instant { tv_sec: 1147459, tv_nsec: 448703090 }
+Read 433th vote at Instant { tv_sec: 1147459, tv_nsec: 451532195 }
+WPT [433,12590,2829]
+Wrote 434th vote at Instant { tv_sec: 1147459, tv_nsec: 498768245 }
+Read 434th vote at Instant { tv_sec: 1147459, tv_nsec: 502663815 }
+WPT [434,12640,3895]
+Sent 231285 unsharded messages in 23.227354ms for 10055 messages / ms
+Sent 4000000 sharded messages in 23.227354ms for 173913 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 435th vote at Instant { tv_sec: 1147459, tv_nsec: 548878801 }
+Read 435th vote at Instant { tv_sec: 1147459, tv_nsec: 551787150 }
+WPT [435,12690,2908]
+Wrote 436th vote at Instant { tv_sec: 1147459, tv_nsec: 598998895 }
+Read 436th vote at Instant { tv_sec: 1147459, tv_nsec: 604439301 }
+WPT [436,12740,5440]
+Wrote 437th vote at Instant { tv_sec: 1147459, tv_nsec: 649091993 }
+Read 437th vote at Instant { tv_sec: 1147459, tv_nsec: 651256423 }
+WPT [437,12790,2164]
+Wrote 438th vote at Instant { tv_sec: 1147459, tv_nsec: 699164255 }
+Read 438th vote at Instant { tv_sec: 1147459, tv_nsec: 704497287 }
+WPT [438,12840,5333]
+Wrote 439th vote at Instant { tv_sec: 1147459, tv_nsec: 749308167 }
+Read 439th vote at Instant { tv_sec: 1147459, tv_nsec: 753264306 }
+WPT [439,12890,3956]
+Wrote 440th vote at Instant { tv_sec: 1147459, tv_nsec: 799408797 }
+Read 440th vote at Instant { tv_sec: 1147459, tv_nsec: 803283335 }
+WPT [440,12940,3874]
+Wrote 441th vote at Instant { tv_sec: 1147459, tv_nsec: 849619414 }
+Read 441th vote at Instant { tv_sec: 1147459, tv_nsec: 853418126 }
+WPT [441,12991,3798]
+Wrote 442th vote at Instant { tv_sec: 1147459, tv_nsec: 899697743 }
+Read 442th vote at Instant { tv_sec: 1147459, tv_nsec: 902529683 }
+WPT [442,13041,2831]
+Wrote 443th vote at Instant { tv_sec: 1147459, tv_nsec: 949863696 }
+Read 443th vote at Instant { tv_sec: 1147459, tv_nsec: 952631717 }
+WPT [443,13091,2768]
+Wrote 444th vote at Instant { tv_sec: 1147460, tv_nsec: 24227 }
+Read 444th vote at Instant { tv_sec: 1147460, tv_nsec: 2756715 }
+WPT [444,13141,2732]
+Wrote 445th vote at Instant { tv_sec: 1147460, tv_nsec: 50089843 }
+Read 445th vote at Instant { tv_sec: 1147460, tv_nsec: 52867457 }
+WPT [445,13191,2777]
+Sent 237070 unsharded messages in 23.7698ms for 10307 messages / ms
+Sent 4100000 sharded messages in 23.7698ms for 178260 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 446th vote at Instant { tv_sec: 1147460, tv_nsec: 100267364 }
+Read 446th vote at Instant { tv_sec: 1147460, tv_nsec: 102973565 }
+WPT [446,13241,2706]
+Wrote 447th vote at Instant { tv_sec: 1147460, tv_nsec: 150267371 }
+Read 447th vote at Instant { tv_sec: 1147460, tv_nsec: 152162186 }
+WPT [447,13291,1894]
+Wrote 448th vote at Instant { tv_sec: 1147460, tv_nsec: 200267484 }
+Read 448th vote at Instant { tv_sec: 1147460, tv_nsec: 204473387 }
+WPT [448,13341,4205]
+Wrote 449th vote at Instant { tv_sec: 1147460, tv_nsec: 250267745 }
+Read 449th vote at Instant { tv_sec: 1147460, tv_nsec: 253359561 }
+WPT [449,13391,3091]
+Wrote 450th vote at Instant { tv_sec: 1147460, tv_nsec: 300267858 }
+Read 450th vote at Instant { tv_sec: 1147460, tv_nsec: 303466980 }
+WPT [450,13441,3199]
+Wrote 451th vote at Instant { tv_sec: 1147460, tv_nsec: 350402443 }
+Read 451th vote at Instant { tv_sec: 1147460, tv_nsec: 361200724 }
+WPT [451,13491,10798]
+Wrote 452th vote at Instant { tv_sec: 1147460, tv_nsec: 400472414 }
+Read 452th vote at Instant { tv_sec: 1147460, tv_nsec: 403736384 }
+WPT [452,13541,3263]
+Wrote 453th vote at Instant { tv_sec: 1147460, tv_nsec: 450644761 }
+Read 453th vote at Instant { tv_sec: 1147460, tv_nsec: 453043349 }
+WPT [453,13592,2398]
+Wrote 454th vote at Instant { tv_sec: 1147460, tv_nsec: 500753008 }
+Read 454th vote at Instant { tv_sec: 1147460, tv_nsec: 504418140 }
+WPT [454,13642,3665]
+Wrote 455th vote at Instant { tv_sec: 1147460, tv_nsec: 550857957 }
+Read 455th vote at Instant { tv_sec: 1147460, tv_nsec: 553252393 }
+WPT [455,13692,2394]
+Wrote 456th vote at Instant { tv_sec: 1147460, tv_nsec: 600951622 }
+Read 456th vote at Instant { tv_sec: 1147460, tv_nsec: 604480492 }
+WPT [456,13742,3528]
+Sent 242838 unsharded messages in 24.316577ms for 10118 messages / ms
+Sent 4200000 sharded messages in 24.316577ms for 175000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 457th vote at Instant { tv_sec: 1147460, tv_nsec: 651068072 }
+Read 457th vote at Instant { tv_sec: 1147460, tv_nsec: 654345663 }
+WPT [457,13792,3277]
+Wrote 458th vote at Instant { tv_sec: 1147460, tv_nsec: 701068191 }
+Read 458th vote at Instant { tv_sec: 1147460, tv_nsec: 703479182 }
+WPT [458,13842,2410]
+Wrote 459th vote at Instant { tv_sec: 1147460, tv_nsec: 751068314 }
+Read 459th vote at Instant { tv_sec: 1147460, tv_nsec: 753723805 }
+WPT [459,13892,2655]
+Wrote 460th vote at Instant { tv_sec: 1147460, tv_nsec: 801152780 }
+Read 460th vote at Instant { tv_sec: 1147460, tv_nsec: 803813511 }
+WPT [460,13942,2660]
+Wrote 461th vote at Instant { tv_sec: 1147460, tv_nsec: 851278269 }
+Read 461th vote at Instant { tv_sec: 1147460, tv_nsec: 853889316 }
+WPT [461,13992,2611]
+Wrote 462th vote at Instant { tv_sec: 1147460, tv_nsec: 901393922 }
+Read 462th vote at Instant { tv_sec: 1147460, tv_nsec: 904998035 }
+WPT [462,14042,3604]
+Wrote 463th vote at Instant { tv_sec: 1147460, tv_nsec: 951470334 }
+Read 463th vote at Instant { tv_sec: 1147460, tv_nsec: 954134868 }
+WPT [463,14092,2664]
+Wrote 464th vote at Instant { tv_sec: 1147461, tv_nsec: 1595077 }
+Read 464th vote at Instant { tv_sec: 1147461, tv_nsec: 5284459 }
+WPT [464,14142,3689]
+Wrote 465th vote at Instant { tv_sec: 1147461, tv_nsec: 51721780 }
+Read 465th vote at Instant { tv_sec: 1147461, tv_nsec: 53562602 }
+WPT [465,14193,1840]
+Wrote 466th vote at Instant { tv_sec: 1147461, tv_nsec: 101752351 }
+Read 466th vote at Instant { tv_sec: 1147461, tv_nsec: 104404994 }
+WPT [466,14243,2652]
+Sent 248617 unsharded messages in 24.859391ms for 10359 messages / ms
+Sent 4300000 sharded messages in 24.859391ms for 179166 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 467th vote at Instant { tv_sec: 1147461, tv_nsec: 151873200 }
+Read 467th vote at Instant { tv_sec: 1147461, tv_nsec: 154521570 }
+WPT [467,14293,2648]
+Wrote 468th vote at Instant { tv_sec: 1147461, tv_nsec: 202025926 }
+Read 468th vote at Instant { tv_sec: 1147461, tv_nsec: 204866011 }
+WPT [468,14343,2840]
+Wrote 469th vote at Instant { tv_sec: 1147461, tv_nsec: 252122311 }
+Read 469th vote at Instant { tv_sec: 1147461, tv_nsec: 254741486 }
+WPT [469,14393,2619]
+Wrote 470th vote at Instant { tv_sec: 1147461, tv_nsec: 302265113 }
+Read 470th vote at Instant { tv_sec: 1147461, tv_nsec: 305838059 }
+WPT [470,14443,3572]
+Wrote 471th vote at Instant { tv_sec: 1147461, tv_nsec: 352321658 }
+Read 471th vote at Instant { tv_sec: 1147461, tv_nsec: 357761795 }
+WPT [471,14493,5440]
+Wrote 472th vote at Instant { tv_sec: 1147461, tv_nsec: 402467014 }
+Read 472th vote at Instant { tv_sec: 1147461, tv_nsec: 406291130 }
+WPT [472,14543,3824]
+Wrote 473th vote at Instant { tv_sec: 1147461, tv_nsec: 452575445 }
+Read 473th vote at Instant { tv_sec: 1147461, tv_nsec: 456356568 }
+WPT [473,14593,3781]
+Wrote 474th vote at Instant { tv_sec: 1147461, tv_nsec: 502713872 }
+Read 474th vote at Instant { tv_sec: 1147461, tv_nsec: 504333495 }
+WPT [474,14644,1619]
+Wrote 475th vote at Instant { tv_sec: 1147461, tv_nsec: 552839525 }
+Read 475th vote at Instant { tv_sec: 1147461, tv_nsec: 556532871 }
+WPT [475,14694,3693]
+Wrote 476th vote at Instant { tv_sec: 1147461, tv_nsec: 602921567 }
+Read 476th vote at Instant { tv_sec: 1147461, tv_nsec: 605608237 }
+WPT [476,14744,2686]
+Wrote 477th vote at Instant { tv_sec: 1147461, tv_nsec: 653037204 }
+Read 477th vote at Instant { tv_sec: 1147461, tv_nsec: 656674803 }
+WPT [477,14794,3637]
+Sent 254394 unsharded messages in 25.401939ms for 10175 messages / ms
+Sent 4400000 sharded messages in 25.401939ms for 176000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 478th vote at Instant { tv_sec: 1147461, tv_nsec: 703180156 }
+Read 478th vote at Instant { tv_sec: 1147461, tv_nsec: 705735210 }
+WPT [478,14844,2555]
+Wrote 479th vote at Instant { tv_sec: 1147461, tv_nsec: 753330460 }
+Read 479th vote at Instant { tv_sec: 1147461, tv_nsec: 757074170 }
+WPT [479,14894,3743]
+Wrote 480th vote at Instant { tv_sec: 1147461, tv_nsec: 803430275 }
+Read 480th vote at Instant { tv_sec: 1147461, tv_nsec: 807032033 }
+WPT [480,14944,3601]
+Wrote 481th vote at Instant { tv_sec: 1147461, tv_nsec: 853557845 }
+Read 481th vote at Instant { tv_sec: 1147461, tv_nsec: 857213049 }
+WPT [481,14994,3655]
+Wrote 482th vote at Instant { tv_sec: 1147461, tv_nsec: 903626129 }
+Read 482th vote at Instant { tv_sec: 1147461, tv_nsec: 911112970 }
+WPT [482,15045,7486]
+Wrote 483th vote at Instant { tv_sec: 1147461, tv_nsec: 953741359 }
+Read 483th vote at Instant { tv_sec: 1147461, tv_nsec: 956386289 }
+WPT [483,15095,2644]
+Wrote 484th vote at Instant { tv_sec: 1147462, tv_nsec: 3859021 }
+Read 484th vote at Instant { tv_sec: 1147462, tv_nsec: 11162837 }
+WPT [484,15145,7303]
+Wrote 485th vote at Instant { tv_sec: 1147462, tv_nsec: 53971297 }
+Read 485th vote at Instant { tv_sec: 1147462, tv_nsec: 56898155 }
+WPT [485,15195,2926]
+Wrote 486th vote at Instant { tv_sec: 1147462, tv_nsec: 104063107 }
+Read 486th vote at Instant { tv_sec: 1147462, tv_nsec: 106625480 }
+WPT [486,15245,2562]
+Wrote 487th vote at Instant { tv_sec: 1147462, tv_nsec: 154232961 }
+Read 487th vote at Instant { tv_sec: 1147462, tv_nsec: 157799609 }
+WPT [487,15295,3566]
+Wrote 488th vote at Instant { tv_sec: 1147462, tv_nsec: 204361629 }
+Read 488th vote at Instant { tv_sec: 1147462, tv_nsec: 207991334 }
+WPT [488,15345,3629]
+Sent 260181 unsharded messages in 25.94703ms for 10407 messages / ms
+Sent 4500000 sharded messages in 25.94703ms for 180000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 489th vote at Instant { tv_sec: 1147462, tv_nsec: 254448706 }
+Read 489th vote at Instant { tv_sec: 1147462, tv_nsec: 258124093 }
+WPT [489,15395,3675]
+Wrote 490th vote at Instant { tv_sec: 1147462, tv_nsec: 304628020 }
+Read 490th vote at Instant { tv_sec: 1147462, tv_nsec: 314465457 }
+WPT [490,15446,9837]
+Wrote 491th vote at Instant { tv_sec: 1147462, tv_nsec: 354713440 }
+Read 491th vote at Instant { tv_sec: 1147462, tv_nsec: 358260421 }
+WPT [491,15496,3546]
+Wrote 492th vote at Instant { tv_sec: 1147462, tv_nsec: 404835800 }
+Read 492th vote at Instant { tv_sec: 1147462, tv_nsec: 407406212 }
+WPT [492,15546,2570]
+Wrote 493th vote at Instant { tv_sec: 1147462, tv_nsec: 454971039 }
+Read 493th vote at Instant { tv_sec: 1147462, tv_nsec: 457854721 }
+WPT [493,15596,2883]
+Wrote 494th vote at Instant { tv_sec: 1147462, tv_nsec: 505049196 }
+Read 494th vote at Instant { tv_sec: 1147462, tv_nsec: 508894345 }
+WPT [494,15646,3845]
+Wrote 495th vote at Instant { tv_sec: 1147462, tv_nsec: 555154445 }
+Read 495th vote at Instant { tv_sec: 1147462, tv_nsec: 557013161 }
+WPT [495,15696,1858]
+Wrote 496th vote at Instant { tv_sec: 1147462, tv_nsec: 605154524 }
+Read 496th vote at Instant { tv_sec: 1147462, tv_nsec: 608182743 }
+WPT [496,15746,3028]
+Wrote 497th vote at Instant { tv_sec: 1147462, tv_nsec: 655154688 }
+Read 497th vote at Instant { tv_sec: 1147462, tv_nsec: 658412912 }
+WPT [497,15796,3258]
+Wrote 498th vote at Instant { tv_sec: 1147462, tv_nsec: 705161691 }
+Read 498th vote at Instant { tv_sec: 1147462, tv_nsec: 707390330 }
+WPT [498,15846,2228]
+Wrote 499th vote at Instant { tv_sec: 1147462, tv_nsec: 755280820 }
+Read 499th vote at Instant { tv_sec: 1147462, tv_nsec: 758485657 }
+WPT [499,15896,3204]
+Sent 265966 unsharded messages in 26.489314ms for 10229 messages / ms
+Sent 4600000 sharded messages in 26.489314ms for 176923 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 500th vote at Instant { tv_sec: 1147462, tv_nsec: 805398277 }
+Read 500th vote at Instant { tv_sec: 1147462, tv_nsec: 807825763 }
+WPT [500,15946,2427]
+Wrote 501th vote at Instant { tv_sec: 1147462, tv_nsec: 855550267 }
+Read 501th vote at Instant { tv_sec: 1147462, tv_nsec: 857752626 }
+WPT [501,15996,2202]
+Wrote 502th vote at Instant { tv_sec: 1147462, tv_nsec: 905550362 }
+Read 502th vote at Instant { tv_sec: 1147462, tv_nsec: 908021344 }
+WPT [502,16046,2470]
+Wrote 503th vote at Instant { tv_sec: 1147462, tv_nsec: 955550541 }
+Read 503th vote at Instant { tv_sec: 1147462, tv_nsec: 958330901 }
+WPT [503,16096,2780]
+Wrote 504th vote at Instant { tv_sec: 1147463, tv_nsec: 5550542 }
+Read 504th vote at Instant { tv_sec: 1147463, tv_nsec: 8313095 }
+WPT [504,16146,2762]
+Wrote 505th vote at Instant { tv_sec: 1147463, tv_nsec: 55550603 }
+Read 505th vote at Instant { tv_sec: 1147463, tv_nsec: 59349164 }
+WPT [505,16196,3798]
+Wrote 506th vote at Instant { tv_sec: 1147463, tv_nsec: 105591318 }
+Read 506th vote at Instant { tv_sec: 1147463, tv_nsec: 114468268 }
+WPT [506,16246,8876]
+Wrote 507th vote at Instant { tv_sec: 1147463, tv_nsec: 155591371 }
+Read 507th vote at Instant { tv_sec: 1147463, tv_nsec: 158549711 }
+WPT [507,16296,2958]
+Wrote 508th vote at Instant { tv_sec: 1147463, tv_nsec: 205591433 }
+Read 508th vote at Instant { tv_sec: 1147463, tv_nsec: 208708159 }
+WPT [508,16346,3116]
+Wrote 509th vote at Instant { tv_sec: 1147463, tv_nsec: 255591491 }
+Read 509th vote at Instant { tv_sec: 1147463, tv_nsec: 258810420 }
+WPT [509,16396,3218]
+Wrote 510th vote at Instant { tv_sec: 1147463, tv_nsec: 305660203 }
+Read 510th vote at Instant { tv_sec: 1147463, tv_nsec: 308886759 }
+WPT [510,16447,3226]
+Sent 271758 unsharded messages in 27.031139ms for 10065 messages / ms
+Sent 4700000 sharded messages in 27.031139ms for 174074 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 511th vote at Instant { tv_sec: 1147463, tv_nsec: 355660299 }
+Read 511th vote at Instant { tv_sec: 1147463, tv_nsec: 359106008 }
+WPT [511,16497,3445]
+Wrote 512th vote at Instant { tv_sec: 1147463, tv_nsec: 405672185 }
+Read 512th vote at Instant { tv_sec: 1147463, tv_nsec: 411097002 }
+WPT [512,16547,5424]
+Wrote 513th vote at Instant { tv_sec: 1147463, tv_nsec: 455813938 }
+Read 513th vote at Instant { tv_sec: 1147463, tv_nsec: 458361691 }
+WPT [513,16597,2547]
+Wrote 514th vote at Instant { tv_sec: 1147463, tv_nsec: 505814062 }
+Read 514th vote at Instant { tv_sec: 1147463, tv_nsec: 508300665 }
+WPT [514,16647,2486]
+Wrote 515th vote at Instant { tv_sec: 1147463, tv_nsec: 555814112 }
+Read 515th vote at Instant { tv_sec: 1147463, tv_nsec: 558353994 }
+WPT [515,16697,2539]
+Wrote 516th vote at Instant { tv_sec: 1147463, tv_nsec: 605988378 }
+Read 516th vote at Instant { tv_sec: 1147463, tv_nsec: 608612906 }
+WPT [516,16747,2624]
+Wrote 517th vote at Instant { tv_sec: 1147463, tv_nsec: 656043684 }
+Read 517th vote at Instant { tv_sec: 1147463, tv_nsec: 658879649 }
+WPT [517,16797,2835]
+Wrote 518th vote at Instant { tv_sec: 1147463, tv_nsec: 706207244 }
+Read 518th vote at Instant { tv_sec: 1147463, tv_nsec: 708786371 }
+WPT [518,16847,2579]
+Wrote 519th vote at Instant { tv_sec: 1147463, tv_nsec: 756207254 }
+Read 519th vote at Instant { tv_sec: 1147463, tv_nsec: 758784882 }
+WPT [519,16897,2577]
+Wrote 520th vote at Instant { tv_sec: 1147463, tv_nsec: 806207350 }
+Read 520th vote at Instant { tv_sec: 1147463, tv_nsec: 809089079 }
+WPT [520,16947,2881]
+Wrote 521th vote at Instant { tv_sec: 1147463, tv_nsec: 856207470 }
+Read 521th vote at Instant { tv_sec: 1147463, tv_nsec: 861144742 }
+WPT [521,16997,4937]
+Sent 277543 unsharded messages in 27.574616ms for 10279 messages / ms
+Sent 4800000 sharded messages in 27.574616ms for 177777 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 522th vote at Instant { tv_sec: 1147463, tv_nsec: 906207507 }
+Read 522th vote at Instant { tv_sec: 1147463, tv_nsec: 909537394 }
+WPT [522,17047,3329]
+Wrote 523th vote at Instant { tv_sec: 1147463, tv_nsec: 956300781 }
+Read 523th vote at Instant { tv_sec: 1147463, tv_nsec: 958616935 }
+WPT [523,17097,2316]
+Wrote 524th vote at Instant { tv_sec: 1147464, tv_nsec: 6300812 }
+Read 524th vote at Instant { tv_sec: 1147464, tv_nsec: 11140958 }
+WPT [524,17147,4840]
+Wrote 525th vote at Instant { tv_sec: 1147464, tv_nsec: 56300999 }
+Read 525th vote at Instant { tv_sec: 1147464, tv_nsec: 60115949 }
+WPT [525,17197,3814]
+Wrote 526th vote at Instant { tv_sec: 1147464, tv_nsec: 106323533 }
+Read 526th vote at Instant { tv_sec: 1147464, tv_nsec: 109155841 }
+WPT [526,17247,2832]
+Wrote 527th vote at Instant { tv_sec: 1147464, tv_nsec: 156413575 }
+Read 527th vote at Instant { tv_sec: 1147464, tv_nsec: 161164022 }
+WPT [527,17297,4750]
+Wrote 528th vote at Instant { tv_sec: 1147464, tv_nsec: 206511026 }
+Read 528th vote at Instant { tv_sec: 1147464, tv_nsec: 211140958 }
+WPT [528,17347,4629]
+Wrote 529th vote at Instant { tv_sec: 1147464, tv_nsec: 256729068 }
+Read 529th vote at Instant { tv_sec: 1147464, tv_nsec: 259558532 }
+WPT [529,17398,2829]
+Wrote 530th vote at Instant { tv_sec: 1147464, tv_nsec: 306735927 }
+Read 530th vote at Instant { tv_sec: 1147464, tv_nsec: 310606883 }
+WPT [530,17448,3870]
+Wrote 531th vote at Instant { tv_sec: 1147464, tv_nsec: 356809953 }
+Read 531th vote at Instant { tv_sec: 1147464, tv_nsec: 358993242 }
+WPT [531,17498,2183]
+Wrote 532th vote at Instant { tv_sec: 1147464, tv_nsec: 406977410 }
+Sent 283340 unsharded messages in 28.119667ms for 10119 messages / ms
+Sent 4900000 sharded messages in 28.119667ms for 175000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Read 532th vote at Instant { tv_sec: 1147464, tv_nsec: 410908496 }
+WPT [532,17548,3931]
+Wrote 533th vote at Instant { tv_sec: 1147464, tv_nsec: 457095033 }
+Read 533th vote at Instant { tv_sec: 1147464, tv_nsec: 460984993 }
+WPT [533,17598,3889]
+Wrote 534th vote at Instant { tv_sec: 1147464, tv_nsec: 507285494 }
+Read 534th vote at Instant { tv_sec: 1147464, tv_nsec: 510117342 }
+WPT [534,17648,2831]
+Wrote 535th vote at Instant { tv_sec: 1147464, tv_nsec: 557294913 }
+Read 535th vote at Instant { tv_sec: 1147464, tv_nsec: 560214128 }
+WPT [535,17698,2919]
+Wrote 536th vote at Instant { tv_sec: 1147464, tv_nsec: 607452210 }
+Read 536th vote at Instant { tv_sec: 1147464, tv_nsec: 611112402 }
+WPT [536,17748,3660]
+Wrote 537th vote at Instant { tv_sec: 1147464, tv_nsec: 657560786 }
+Read 537th vote at Instant { tv_sec: 1147464, tv_nsec: 660545282 }
+WPT [537,17798,2984]
+Wrote 538th vote at Instant { tv_sec: 1147464, tv_nsec: 707686249 }
+Read 538th vote at Instant { tv_sec: 1147464, tv_nsec: 710569940 }
+WPT [538,17849,2883]
+Wrote 539th vote at Instant { tv_sec: 1147464, tv_nsec: 757771083 }
+Read 539th vote at Instant { tv_sec: 1147464, tv_nsec: 761132883 }
+WPT [539,17899,3361]
+Wrote 540th vote at Instant { tv_sec: 1147464, tv_nsec: 807929040 }
+Read 540th vote at Instant { tv_sec: 1147464, tv_nsec: 810798729 }
+WPT [540,17949,2869]
+Wrote 541th vote at Instant { tv_sec: 1147464, tv_nsec: 858034531 }
+Read 541th vote at Instant { tv_sec: 1147464, tv_nsec: 860944554 }
+WPT [541,17999,2910]
+Wrote 542th vote at Instant { tv_sec: 1147464, tv_nsec: 908137496 }
+Read 542th vote at Instant { tv_sec: 1147464, tv_nsec: 912027901 }
+WPT [542,18049,3890]
+Sent 289135 unsharded messages in 28.662871ms for 10326 messages / ms
+Sent 5000000 sharded messages in 28.662871ms for 178571 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 543th vote at Instant { tv_sec: 1147464, tv_nsec: 958256436 }
+Read 543th vote at Instant { tv_sec: 1147464, tv_nsec: 961386844 }
+WPT [543,18099,3130]
+Wrote 544th vote at Instant { tv_sec: 1147465, tv_nsec: 8400799 }
+Read 544th vote at Instant { tv_sec: 1147465, tv_nsec: 11314153 }
+WPT [544,18149,2913]
+Wrote 545th vote at Instant { tv_sec: 1147465, tv_nsec: 58579854 }
+Read 545th vote at Instant { tv_sec: 1147465, tv_nsec: 60439814 }
+WPT [545,18199,1859]
+Wrote 546th vote at Instant { tv_sec: 1147465, tv_nsec: 108675104 }
+Read 546th vote at Instant { tv_sec: 1147465, tv_nsec: 111488631 }
+WPT [546,18250,2813]
+Wrote 547th vote at Instant { tv_sec: 1147465, tv_nsec: 158792291 }
+Read 547th vote at Instant { tv_sec: 1147465, tv_nsec: 160730926 }
+WPT [547,18300,1938]
+Wrote 548th vote at Instant { tv_sec: 1147465, tv_nsec: 208862946 }
+Read 548th vote at Instant { tv_sec: 1147465, tv_nsec: 210725836 }
+WPT [548,18350,1862]
+Wrote 549th vote at Instant { tv_sec: 1147465, tv_nsec: 259015234 }
+Read 549th vote at Instant { tv_sec: 1147465, tv_nsec: 260909620 }
+WPT [549,18400,1894]
+Wrote 550th vote at Instant { tv_sec: 1147465, tv_nsec: 309119851 }
+Read 550th vote at Instant { tv_sec: 1147465, tv_nsec: 310999507 }
+WPT [550,18450,1879]
+Wrote 551th vote at Instant { tv_sec: 1147465, tv_nsec: 359248324 }
+Read 551th vote at Instant { tv_sec: 1147465, tv_nsec: 362114395 }
+WPT [551,18500,2866]
+Wrote 552th vote at Instant { tv_sec: 1147465, tv_nsec: 409386527 }
+Read 552th vote at Instant { tv_sec: 1147465, tv_nsec: 413209946 }
+WPT [552,18550,3823]
+Wrote 553th vote at Instant { tv_sec: 1147465, tv_nsec: 459485190 }
+Read 553th vote at Instant { tv_sec: 1147465, tv_nsec: 462411150 }
+WPT [553,18600,2925]
+Sent 294912 unsharded messages in 29.205354ms for 10169 messages / ms
+Sent 5100000 sharded messages in 29.205354ms for 175862 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 554th vote at Instant { tv_sec: 1147465, tv_nsec: 509625740 }
+Read 554th vote at Instant { tv_sec: 1147465, tv_nsec: 513516497 }
+WPT [554,18651,3890]
+Wrote 555th vote at Instant { tv_sec: 1147465, tv_nsec: 559731468 }
+Read 555th vote at Instant { tv_sec: 1147465, tv_nsec: 561617540 }
+WPT [555,18701,1886]
+Wrote 556th vote at Instant { tv_sec: 1147465, tv_nsec: 609876776 }
+Read 556th vote at Instant { tv_sec: 1147465, tv_nsec: 612714364 }
+WPT [556,18751,2837]
+Wrote 557th vote at Instant { tv_sec: 1147465, tv_nsec: 659954661 }
+Read 557th vote at Instant { tv_sec: 1147465, tv_nsec: 661859367 }
+WPT [557,18801,1904]
+Wrote 558th vote at Instant { tv_sec: 1147465, tv_nsec: 710007434 }
+Read 558th vote at Instant { tv_sec: 1147465, tv_nsec: 714454566 }
+WPT [558,18851,4447]
+Wrote 559th vote at Instant { tv_sec: 1147465, tv_nsec: 760190599 }
+Read 559th vote at Instant { tv_sec: 1147465, tv_nsec: 762087111 }
+WPT [559,18901,1896]
+Wrote 560th vote at Instant { tv_sec: 1147465, tv_nsec: 810307157 }
+Read 560th vote at Instant { tv_sec: 1147465, tv_nsec: 813408738 }
+WPT [560,18951,3101]
+Wrote 561th vote at Instant { tv_sec: 1147465, tv_nsec: 860451997 }
+Read 561th vote at Instant { tv_sec: 1147465, tv_nsec: 863332252 }
+WPT [561,19001,2880]
+Wrote 562th vote at Instant { tv_sec: 1147465, tv_nsec: 910529381 }
+Read 562th vote at Instant { tv_sec: 1147465, tv_nsec: 913449891 }
+WPT [562,19051,2920]
+Wrote 563th vote at Instant { tv_sec: 1147465, tv_nsec: 960644329 }
+Read 563th vote at Instant { tv_sec: 1147465, tv_nsec: 963529700 }
+WPT [563,19102,2885]
+Wrote 564th vote at Instant { tv_sec: 1147466, tv_nsec: 10753195 }
+Read 564th vote at Instant { tv_sec: 1147466, tv_nsec: 17854348 }
+WPT [564,19152,7101]
+Sent 300702 unsharded messages in 29.749436ms for 10369 messages / ms
+Sent 5200000 sharded messages in 29.749436ms for 179310 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 565th vote at Instant { tv_sec: 1147466, tv_nsec: 60895974 }
+Read 565th vote at Instant { tv_sec: 1147466, tv_nsec: 64823196 }
+WPT [565,19202,3927]
+Wrote 566th vote at Instant { tv_sec: 1147466, tv_nsec: 111028260 }
+Read 566th vote at Instant { tv_sec: 1147466, tv_nsec: 113890439 }
+WPT [566,19252,2862]
+Wrote 567th vote at Instant { tv_sec: 1147466, tv_nsec: 161192710 }
+Read 567th vote at Instant { tv_sec: 1147466, tv_nsec: 163074849 }
+WPT [567,19302,1882]
+Wrote 568th vote at Instant { tv_sec: 1147466, tv_nsec: 211253067 }
+Read 568th vote at Instant { tv_sec: 1147466, tv_nsec: 213195642 }
+WPT [568,19352,1942]
+Wrote 569th vote at Instant { tv_sec: 1147466, tv_nsec: 261364644 }
+Read 569th vote at Instant { tv_sec: 1147466, tv_nsec: 263276122 }
+WPT [569,19402,1911]
+Wrote 570th vote at Instant { tv_sec: 1147466, tv_nsec: 311470899 }
+Read 570th vote at Instant { tv_sec: 1147466, tv_nsec: 313352353 }
+WPT [570,19452,1881]
+Wrote 571th vote at Instant { tv_sec: 1147466, tv_nsec: 361568946 }
+Read 571th vote at Instant { tv_sec: 1147466, tv_nsec: 363519195 }
+WPT [571,19502,1950]
+Wrote 572th vote at Instant { tv_sec: 1147466, tv_nsec: 411658045 }
+Read 572th vote at Instant { tv_sec: 1147466, tv_nsec: 414437020 }
+WPT [572,19553,2778]
+Wrote 573th vote at Instant { tv_sec: 1147466, tv_nsec: 461658124 }
+Read 573th vote at Instant { tv_sec: 1147466, tv_nsec: 464755795 }
+WPT [573,19603,3097]
+Wrote 574th vote at Instant { tv_sec: 1147466, tv_nsec: 511658143 }
+Read 574th vote at Instant { tv_sec: 1147466, tv_nsec: 513922765 }
+WPT [574,19653,2264]
+Wrote 575th vote at Instant { tv_sec: 1147466, tv_nsec: 561720572 }
+Read 575th vote at Instant { tv_sec: 1147466, tv_nsec: 563980434 }
+WPT [575,19703,2259]
+Sent 306485 unsharded messages in 30.289491ms for 10216 messages / ms
+Sent 5300000 sharded messages in 30.289491ms for 176666 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 576th vote at Instant { tv_sec: 1147466, tv_nsec: 611801507 }
+Read 576th vote at Instant { tv_sec: 1147466, tv_nsec: 614426368 }
+WPT [576,19753,2624]
+Wrote 577th vote at Instant { tv_sec: 1147466, tv_nsec: 661926990 }
+Read 577th vote at Instant { tv_sec: 1147466, tv_nsec: 664143852 }
+WPT [577,19803,2216]
+Wrote 578th vote at Instant { tv_sec: 1147466, tv_nsec: 712070005 }
+Read 578th vote at Instant { tv_sec: 1147466, tv_nsec: 714234073 }
+WPT [578,19853,2164]
+Wrote 579th vote at Instant { tv_sec: 1147466, tv_nsec: 762070015 }
+Read 579th vote at Instant { tv_sec: 1147466, tv_nsec: 771165732 }
+WPT [579,19903,9095]
+Wrote 580th vote at Instant { tv_sec: 1147466, tv_nsec: 812070114 }
+Read 580th vote at Instant { tv_sec: 1147466, tv_nsec: 814675854 }
+WPT [580,19953,2605]
+Wrote 581th vote at Instant { tv_sec: 1147466, tv_nsec: 862070302 }
+Read 581th vote at Instant { tv_sec: 1147466, tv_nsec: 867800406 }
+WPT [581,20003,5730]
+Wrote 582th vote at Instant { tv_sec: 1147466, tv_nsec: 912070391 }
+Read 582th vote at Instant { tv_sec: 1147466, tv_nsec: 914787988 }
+WPT [582,20053,2717]
+Wrote 583th vote at Instant { tv_sec: 1147466, tv_nsec: 962144787 }
+Read 583th vote at Instant { tv_sec: 1147466, tv_nsec: 965871510 }
+WPT [583,20103,3726]
+Wrote 584th vote at Instant { tv_sec: 1147467, tv_nsec: 12207959 }
+Read 584th vote at Instant { tv_sec: 1147467, tv_nsec: 14018102 }
+WPT [584,20153,1810]
+Wrote 585th vote at Instant { tv_sec: 1147467, tv_nsec: 62313929 }
+Read 585th vote at Instant { tv_sec: 1147467, tv_nsec: 65229349 }
+WPT [585,20203,2915]
+Wrote 586th vote at Instant { tv_sec: 1147467, tv_nsec: 112416948 }
+Read 586th vote at Instant { tv_sec: 1147467, tv_nsec: 115263912 }
+WPT [586,20253,2846]
+Sent 312259 unsharded messages in 30.829932ms for 10408 messages / ms
+Sent 5400000 sharded messages in 30.829932ms for 180000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 587th vote at Instant { tv_sec: 1147467, tv_nsec: 162621794 }
+Read 587th vote at Instant { tv_sec: 1147467, tv_nsec: 165314463 }
+WPT [587,20304,2692]
+Wrote 588th vote at Instant { tv_sec: 1147467, tv_nsec: 212681236 }
+Read 588th vote at Instant { tv_sec: 1147467, tv_nsec: 224457255 }
+WPT [588,20354,11776]
+Wrote 589th vote at Instant { tv_sec: 1147467, tv_nsec: 262771800 }
+Read 589th vote at Instant { tv_sec: 1147467, tv_nsec: 266510336 }
+WPT [589,20404,3738]
+Wrote 590th vote at Instant { tv_sec: 1147467, tv_nsec: 312895837 }
+Read 590th vote at Instant { tv_sec: 1147467, tv_nsec: 316772382 }
+WPT [590,20454,3876]
+Wrote 591th vote at Instant { tv_sec: 1147467, tv_nsec: 363015421 }
+Read 591th vote at Instant { tv_sec: 1147467, tv_nsec: 366715294 }
+WPT [591,20504,3699]
+Wrote 592th vote at Instant { tv_sec: 1147467, tv_nsec: 413130112 }
+Read 592th vote at Instant { tv_sec: 1147467, tv_nsec: 416852945 }
+WPT [592,20554,3722]
+Wrote 593th vote at Instant { tv_sec: 1147467, tv_nsec: 463240133 }
+Read 593th vote at Instant { tv_sec: 1147467, tv_nsec: 467881973 }
+WPT [593,20604,4641]
+Wrote 594th vote at Instant { tv_sec: 1147467, tv_nsec: 513240205 }
+Read 594th vote at Instant { tv_sec: 1147467, tv_nsec: 515049966 }
+WPT [594,20654,1809]
+Wrote 595th vote at Instant { tv_sec: 1147467, tv_nsec: 563240380 }
+Read 595th vote at Instant { tv_sec: 1147467, tv_nsec: 566177985 }
+WPT [595,20704,2937]
+Wrote 596th vote at Instant { tv_sec: 1147467, tv_nsec: 613240465 }
+Read 596th vote at Instant { tv_sec: 1147467, tv_nsec: 616348168 }
+WPT [596,20754,3107]
+Sent 318039 unsharded messages in 31.371715ms for 10259 messages / ms
+Sent 5500000 sharded messages in 31.371715ms for 177419 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 597th vote at Instant { tv_sec: 1147467, tv_nsec: 663240661 }
+Read 597th vote at Instant { tv_sec: 1147467, tv_nsec: 667823825 }
+WPT [597,20804,4583]
+Wrote 598th vote at Instant { tv_sec: 1147467, tv_nsec: 713309387 }
+Read 598th vote at Instant { tv_sec: 1147467, tv_nsec: 715545170 }
+WPT [598,20854,2235]
+Wrote 599th vote at Instant { tv_sec: 1147467, tv_nsec: 763404396 }
+Read 599th vote at Instant { tv_sec: 1147467, tv_nsec: 771177094 }
+WPT [599,20904,7772]
+Wrote 600th vote at Instant { tv_sec: 1147467, tv_nsec: 813547259 }
+Read 600th vote at Instant { tv_sec: 1147467, tv_nsec: 821122488 }
+WPT [600,20954,7575]
+Wrote 601th vote at Instant { tv_sec: 1147467, tv_nsec: 863685483 }
+Read 601th vote at Instant { tv_sec: 1147467, tv_nsec: 866943721 }
+WPT [601,21005,3258]
+Wrote 602th vote at Instant { tv_sec: 1147467, tv_nsec: 913783104 }
+Read 602th vote at Instant { tv_sec: 1147467, tv_nsec: 916019628 }
+WPT [602,21055,2236]
+Wrote 603th vote at Instant { tv_sec: 1147467, tv_nsec: 963898010 }
+Read 603th vote at Instant { tv_sec: 1147467, tv_nsec: 966297864 }
+WPT [603,21105,2399]
+Wrote 604th vote at Instant { tv_sec: 1147468, tv_nsec: 13976270 }
+Read 604th vote at Instant { tv_sec: 1147468, tv_nsec: 16255116 }
+WPT [604,21155,2278]
+Wrote 605th vote at Instant { tv_sec: 1147468, tv_nsec: 64149327 }
+Read 605th vote at Instant { tv_sec: 1147468, tv_nsec: 66404270 }
+WPT [605,21205,2254]
+Wrote 606th vote at Instant { tv_sec: 1147468, tv_nsec: 114242867 }
+Read 606th vote at Instant { tv_sec: 1147468, tv_nsec: 117747974 }
+WPT [606,21255,3505]
+Wrote 607th vote at Instant { tv_sec: 1147468, tv_nsec: 164242911 }
+Read 607th vote at Instant { tv_sec: 1147468, tv_nsec: 167048261 }
+WPT [607,21305,2805]
+Wrote 608th vote at Instant { tv_sec: 1147468, tv_nsec: 214247206 }
+Read 608th vote at Instant { tv_sec: 1147468, tv_nsec: 217737969 }
+WPT [608,21355,3490]
+Sent 323802 unsharded messages in 31.943053ms for 10445 messages / ms
+Sent 5600000 sharded messages in 31.943053ms for 180645 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 609th vote at Instant { tv_sec: 1147468, tv_nsec: 264443552 }
+Read 609th vote at Instant { tv_sec: 1147468, tv_nsec: 266899004 }
+WPT [609,21405,2455]
+Wrote 610th vote at Instant { tv_sec: 1147468, tv_nsec: 314511296 }
+Read 610th vote at Instant { tv_sec: 1147468, tv_nsec: 321080279 }
+WPT [610,21455,6568]
+Wrote 611th vote at Instant { tv_sec: 1147468, tv_nsec: 364652351 }
+Read 611th vote at Instant { tv_sec: 1147468, tv_nsec: 368221840 }
+WPT [611,21506,3569]
+Wrote 612th vote at Instant { tv_sec: 1147468, tv_nsec: 414703199 }
+Read 612th vote at Instant { tv_sec: 1147468, tv_nsec: 424426911 }
+WPT [612,21556,9723]
+Wrote 613th vote at Instant { tv_sec: 1147468, tv_nsec: 464814049 }
+Read 613th vote at Instant { tv_sec: 1147468, tv_nsec: 468322427 }
+WPT [613,21606,3508]
+Wrote 614th vote at Instant { tv_sec: 1147468, tv_nsec: 514933627 }
+Read 614th vote at Instant { tv_sec: 1147468, tv_nsec: 518539909 }
+WPT [614,21656,3606]
+Wrote 615th vote at Instant { tv_sec: 1147468, tv_nsec: 565012561 }
+Read 615th vote at Instant { tv_sec: 1147468, tv_nsec: 568832116 }
+WPT [615,21706,3819]
+Wrote 616th vote at Instant { tv_sec: 1147468, tv_nsec: 615189387 }
+Read 616th vote at Instant { tv_sec: 1147468, tv_nsec: 617773974 }
+WPT [616,21756,2584]
+Wrote 617th vote at Instant { tv_sec: 1147468, tv_nsec: 665268595 }
+Read 617th vote at Instant { tv_sec: 1147468, tv_nsec: 667827421 }
+WPT [617,21806,2558]
+Wrote 618th vote at Instant { tv_sec: 1147468, tv_nsec: 715387163 }
+Read 618th vote at Instant { tv_sec: 1147468, tv_nsec: 720109150 }
+WPT [618,21856,4721]
+Wrote 619th vote at Instant { tv_sec: 1147468, tv_nsec: 765507332 }
+Read 619th vote at Instant { tv_sec: 1147468, tv_nsec: 771098906 }
+WPT [619,21906,5591]
+Sent 329568 unsharded messages in 32.486346ms for 10299 messages / ms
+Sent 5700000 sharded messages in 32.486346ms for 178125 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 620th vote at Instant { tv_sec: 1147468, tv_nsec: 815609517 }
+Read 620th vote at Instant { tv_sec: 1147468, tv_nsec: 818065735 }
+WPT [620,21956,2456]
+Wrote 621th vote at Instant { tv_sec: 1147468, tv_nsec: 865753651 }
+Read 621th vote at Instant { tv_sec: 1147468, tv_nsec: 869366236 }
+WPT [621,22007,3612]
+Wrote 622th vote at Instant { tv_sec: 1147468, tv_nsec: 915828608 }
+Read 622th vote at Instant { tv_sec: 1147468, tv_nsec: 919508978 }
+WPT [622,22057,3680]
+Wrote 623th vote at Instant { tv_sec: 1147468, tv_nsec: 965922741 }
+Read 623th vote at Instant { tv_sec: 1147468, tv_nsec: 969669756 }
+WPT [623,22107,3747]
+Wrote 624th vote at Instant { tv_sec: 1147469, tv_nsec: 16038340 }
+Read 624th vote at Instant { tv_sec: 1147469, tv_nsec: 19985525 }
+WPT [624,22157,3947]
+Wrote 625th vote at Instant { tv_sec: 1147469, tv_nsec: 66171466 }
+Read 625th vote at Instant { tv_sec: 1147469, tv_nsec: 68741530 }
+WPT [625,22207,2570]
+Wrote 626th vote at Instant { tv_sec: 1147469, tv_nsec: 116238933 }
+Read 626th vote at Instant { tv_sec: 1147469, tv_nsec: 119783821 }
+WPT [626,22257,3544]
+Wrote 627th vote at Instant { tv_sec: 1147469, tv_nsec: 166414047 }
+Read 627th vote at Instant { tv_sec: 1147469, tv_nsec: 168877985 }
+WPT [627,22307,2463]
+Wrote 628th vote at Instant { tv_sec: 1147469, tv_nsec: 216468465 }
+Read 628th vote at Instant { tv_sec: 1147469, tv_nsec: 220008708 }
+WPT [628,22357,3540]
+Wrote 629th vote at Instant { tv_sec: 1147469, tv_nsec: 266611119 }
+Read 629th vote at Instant { tv_sec: 1147469, tv_nsec: 270198064 }
+WPT [629,22407,3586]
+Wrote 630th vote at Instant { tv_sec: 1147469, tv_nsec: 316698398 }
+Read 630th vote at Instant { tv_sec: 1147469, tv_nsec: 320244664 }
+WPT [630,22458,3546]
+Sent 335342 unsharded messages in 33.031656ms for 10161 messages / ms
+Sent 5800000 sharded messages in 33.031656ms for 175757 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 631th vote at Instant { tv_sec: 1147469, tv_nsec: 366839489 }
+Read 631th vote at Instant { tv_sec: 1147469, tv_nsec: 369361151 }
+WPT [631,22508,2521]
+Wrote 632th vote at Instant { tv_sec: 1147469, tv_nsec: 416960435 }
+Read 632th vote at Instant { tv_sec: 1147469, tv_nsec: 420554038 }
+WPT [632,22558,3593]
+Wrote 633th vote at Instant { tv_sec: 1147469, tv_nsec: 467094402 }
+Read 633th vote at Instant { tv_sec: 1147469, tv_nsec: 470602941 }
+WPT [633,22608,3508]
+Wrote 634th vote at Instant { tv_sec: 1147469, tv_nsec: 517174629 }
+Read 634th vote at Instant { tv_sec: 1147469, tv_nsec: 519737479 }
+WPT [634,22658,2562]
+Wrote 635th vote at Instant { tv_sec: 1147469, tv_nsec: 567307071 }
+Read 635th vote at Instant { tv_sec: 1147469, tv_nsec: 570060942 }
+WPT [635,22708,2753]
+Wrote 636th vote at Instant { tv_sec: 1147469, tv_nsec: 617386586 }
+Read 636th vote at Instant { tv_sec: 1147469, tv_nsec: 621340177 }
+WPT [636,22758,3953]
+Wrote 637th vote at Instant { tv_sec: 1147469, tv_nsec: 667487742 }
+Read 637th vote at Instant { tv_sec: 1147469, tv_nsec: 674443074 }
+WPT [637,22808,6955]
+Wrote 638th vote at Instant { tv_sec: 1147469, tv_nsec: 717639221 }
+Read 638th vote at Instant { tv_sec: 1147469, tv_nsec: 721208524 }
+WPT [638,22859,3569]
+Wrote 639th vote at Instant { tv_sec: 1147469, tv_nsec: 767806515 }
+Read 639th vote at Instant { tv_sec: 1147469, tv_nsec: 771404988 }
+WPT [639,22909,3598]
+Wrote 640th vote at Instant { tv_sec: 1147469, tv_nsec: 817985925 }
+Read 640th vote at Instant { tv_sec: 1147469, tv_nsec: 820519351 }
+WPT [640,22959,2533]
+Sent 341114 unsharded messages in 33.57594ms for 10336 messages / ms
+Sent 5900000 sharded messages in 33.57594ms for 178787 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 641th vote at Instant { tv_sec: 1147469, tv_nsec: 868102302 }
+Read 641th vote at Instant { tv_sec: 1147469, tv_nsec: 871124330 }
+WPT [641,23009,3022]
+Wrote 642th vote at Instant { tv_sec: 1147469, tv_nsec: 918226272 }
+Read 642th vote at Instant { tv_sec: 1147469, tv_nsec: 920849674 }
+WPT [642,23059,2623]
+Wrote 643th vote at Instant { tv_sec: 1147469, tv_nsec: 968342921 }
+Read 643th vote at Instant { tv_sec: 1147469, tv_nsec: 971822786 }
+WPT [643,23109,3479]
+Wrote 644th vote at Instant { tv_sec: 1147470, tv_nsec: 18470796 }
+Read 644th vote at Instant { tv_sec: 1147470, tv_nsec: 24446859 }
+WPT [644,23159,5976]
+Wrote 645th vote at Instant { tv_sec: 1147470, tv_nsec: 68607440 }
+Read 645th vote at Instant { tv_sec: 1147470, tv_nsec: 71095257 }
+WPT [645,23209,2487]
+Wrote 646th vote at Instant { tv_sec: 1147470, tv_nsec: 118731424 }
+Read 646th vote at Instant { tv_sec: 1147470, tv_nsec: 121179677 }
+WPT [646,23260,2448]
+Wrote 647th vote at Instant { tv_sec: 1147470, tv_nsec: 168855453 }
+Read 647th vote at Instant { tv_sec: 1147470, tv_nsec: 171609826 }
+WPT [647,23310,2754]
+Wrote 648th vote at Instant { tv_sec: 1147470, tv_nsec: 218922942 }
+Read 648th vote at Instant { tv_sec: 1147470, tv_nsec: 222636791 }
+WPT [648,23360,3713]
+Wrote 649th vote at Instant { tv_sec: 1147470, tv_nsec: 268992860 }
+Read 649th vote at Instant { tv_sec: 1147470, tv_nsec: 271485399 }
+WPT [649,23410,2492]
+Wrote 650th vote at Instant { tv_sec: 1147470, tv_nsec: 319137235 }
+Read 650th vote at Instant { tv_sec: 1147470, tv_nsec: 323051887 }
+WPT [650,23460,3914]
+Wrote 651th vote at Instant { tv_sec: 1147470, tv_nsec: 369267208 }
+Read 651th vote at Instant { tv_sec: 1147470, tv_nsec: 372959232 }
+WPT [651,23510,3692]
+Sent 346881 unsharded messages in 34.119964ms for 10202 messages / ms
+Sent 6000000 sharded messages in 34.119964ms for 176470 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 652th vote at Instant { tv_sec: 1147470, tv_nsec: 419371967 }
+Read 652th vote at Instant { tv_sec: 1147470, tv_nsec: 424564344 }
+WPT [652,23560,5192]
+Wrote 653th vote at Instant { tv_sec: 1147470, tv_nsec: 469466733 }
+Read 653th vote at Instant { tv_sec: 1147470, tv_nsec: 472056088 }
+WPT [653,23610,2589]
+Wrote 654th vote at Instant { tv_sec: 1147470, tv_nsec: 519553594 }
+Read 654th vote at Instant { tv_sec: 1147470, tv_nsec: 521723855 }
+WPT [654,23660,2170]
+Wrote 655th vote at Instant { tv_sec: 1147470, tv_nsec: 569553602 }
+Read 655th vote at Instant { tv_sec: 1147470, tv_nsec: 571623485 }
+WPT [655,23710,2069]
+Wrote 656th vote at Instant { tv_sec: 1147470, tv_nsec: 619556397 }
+Read 656th vote at Instant { tv_sec: 1147470, tv_nsec: 621160007 }
+WPT [656,23760,1603]
+Wrote 657th vote at Instant { tv_sec: 1147470, tv_nsec: 669714019 }
+Read 657th vote at Instant { tv_sec: 1147470, tv_nsec: 672868317 }
+WPT [657,23811,3154]
+Wrote 658th vote at Instant { tv_sec: 1147470, tv_nsec: 719801345 }
+Read 658th vote at Instant { tv_sec: 1147470, tv_nsec: 724448306 }
+WPT [658,23861,4646]
+Wrote 659th vote at Instant { tv_sec: 1147470, tv_nsec: 769950597 }
+Read 659th vote at Instant { tv_sec: 1147470, tv_nsec: 773126533 }
+WPT [659,23911,3175]
+Wrote 660th vote at Instant { tv_sec: 1147470, tv_nsec: 819994185 }
+Read 660th vote at Instant { tv_sec: 1147470, tv_nsec: 822260564 }
+WPT [660,23961,2266]
+Wrote 661th vote at Instant { tv_sec: 1147470, tv_nsec: 870156323 }
+Read 661th vote at Instant { tv_sec: 1147470, tv_nsec: 871368315 }
+WPT [661,24011,1211]
+Wrote 662th vote at Instant { tv_sec: 1147470, tv_nsec: 920198764 }
+Read 662th vote at Instant { tv_sec: 1147470, tv_nsec: 922372022 }
+WPT [662,24061,2173]
+Sent 352664 unsharded messages in 34.660477ms for 10372 messages / ms
+Sent 6100000 sharded messages in 34.660477ms for 179411 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 663th vote at Instant { tv_sec: 1147470, tv_nsec: 970299241 }
+Read 663th vote at Instant { tv_sec: 1147470, tv_nsec: 973537389 }
+WPT [663,24111,3238]
+Wrote 664th vote at Instant { tv_sec: 1147471, tv_nsec: 20299362 }
+Read 664th vote at Instant { tv_sec: 1147471, tv_nsec: 22693170 }
+WPT [664,24161,2393]
+Wrote 665th vote at Instant { tv_sec: 1147471, tv_nsec: 70299565 }
+Read 665th vote at Instant { tv_sec: 1147471, tv_nsec: 72757414 }
+WPT [665,24211,2457]
+Wrote 666th vote at Instant { tv_sec: 1147471, tv_nsec: 120299588 }
+Read 666th vote at Instant { tv_sec: 1147471, tv_nsec: 123907565 }
+WPT [666,24261,3607]
+Wrote 667th vote at Instant { tv_sec: 1147471, tv_nsec: 170299663 }
+Read 667th vote at Instant { tv_sec: 1147471, tv_nsec: 172008499 }
+WPT [667,24311,1708]
+Wrote 668th vote at Instant { tv_sec: 1147471, tv_nsec: 220376262 }
+Read 668th vote at Instant { tv_sec: 1147471, tv_nsec: 224495445 }
+WPT [668,24361,4119]
+Wrote 669th vote at Instant { tv_sec: 1147471, tv_nsec: 270525026 }
+Read 669th vote at Instant { tv_sec: 1147471, tv_nsec: 274444993 }
+WPT [669,24411,3919]
+Wrote 670th vote at Instant { tv_sec: 1147471, tv_nsec: 320637774 }
+Read 670th vote at Instant { tv_sec: 1147471, tv_nsec: 327975618 }
+WPT [670,24462,7337]
+Wrote 671th vote at Instant { tv_sec: 1147471, tv_nsec: 370740677 }
+Read 671th vote at Instant { tv_sec: 1147471, tv_nsec: 374648085 }
+WPT [671,24512,3907]
+Wrote 672th vote at Instant { tv_sec: 1147471, tv_nsec: 420874006 }
+Read 672th vote at Instant { tv_sec: 1147471, tv_nsec: 424852474 }
+WPT [672,24562,3978]
+Wrote 673th vote at Instant { tv_sec: 1147471, tv_nsec: 471004629 }
+Read 673th vote at Instant { tv_sec: 1147471, tv_nsec: 474823033 }
+WPT [673,24612,3818]
+Sent 358445 unsharded messages in 35.209882ms for 10241 messages / ms
+Sent 6200000 sharded messages in 35.209882ms for 177142 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 674th vote at Instant { tv_sec: 1147471, tv_nsec: 521168857 }
+Read 674th vote at Instant { tv_sec: 1147471, tv_nsec: 524523002 }
+WPT [674,24662,3354]
+Wrote 675th vote at Instant { tv_sec: 1147471, tv_nsec: 571233461 }
+Read 675th vote at Instant { tv_sec: 1147471, tv_nsec: 574841094 }
+WPT [675,24712,3607]
+Wrote 676th vote at Instant { tv_sec: 1147471, tv_nsec: 621372020 }
+Read 676th vote at Instant { tv_sec: 1147471, tv_nsec: 623602682 }
+WPT [676,24762,2230]
+Wrote 677th vote at Instant { tv_sec: 1147471, tv_nsec: 671448502 }
+Read 677th vote at Instant { tv_sec: 1147471, tv_nsec: 673665485 }
+WPT [677,24812,2216]
+Wrote 678th vote at Instant { tv_sec: 1147471, tv_nsec: 721517564 }
+Read 678th vote at Instant { tv_sec: 1147471, tv_nsec: 724771714 }
+WPT [678,24862,3254]
+Wrote 679th vote at Instant { tv_sec: 1147471, tv_nsec: 771683217 }
+Read 679th vote at Instant { tv_sec: 1147471, tv_nsec: 778255813 }
+WPT [679,24913,6572]
+Wrote 680th vote at Instant { tv_sec: 1147471, tv_nsec: 821859340 }
+Read 680th vote at Instant { tv_sec: 1147471, tv_nsec: 827809619 }
+WPT [680,24963,5950]
+Wrote 681th vote at Instant { tv_sec: 1147471, tv_nsec: 871906048 }
+Read 681th vote at Instant { tv_sec: 1147471, tv_nsec: 874149246 }
+WPT [681,25013,2243]
+Wrote 682th vote at Instant { tv_sec: 1147471, tv_nsec: 921984089 }
+Read 682th vote at Instant { tv_sec: 1147471, tv_nsec: 925234400 }
+WPT [682,25063,3250]
+Wrote 683th vote at Instant { tv_sec: 1147471, tv_nsec: 972091126 }
+Read 683th vote at Instant { tv_sec: 1147471, tv_nsec: 976470295 }
+WPT [683,25113,4379]
+Wrote 684th vote at Instant { tv_sec: 1147472, tv_nsec: 22244327 }
+Read 684th vote at Instant { tv_sec: 1147472, tv_nsec: 24450184 }
+WPT [684,25163,2205]
+Sent 364207 unsharded messages in 35.762728ms for 10405 messages / ms
+Sent 6300000 sharded messages in 35.762728ms for 180000 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 685th vote at Instant { tv_sec: 1147472, tv_nsec: 72244407 }
+Read 685th vote at Instant { tv_sec: 1147472, tv_nsec: 75884366 }
+WPT [685,25213,3639]
+Wrote 686th vote at Instant { tv_sec: 1147472, tv_nsec: 122244544 }
+Read 686th vote at Instant { tv_sec: 1147472, tv_nsec: 125134760 }
+WPT [686,25263,2890]
+Wrote 687th vote at Instant { tv_sec: 1147472, tv_nsec: 172323822 }
+Read 687th vote at Instant { tv_sec: 1147472, tv_nsec: 185077877 }
+WPT [687,25313,12754]
+Wrote 688th vote at Instant { tv_sec: 1147472, tv_nsec: 222360244 }
+Read 688th vote at Instant { tv_sec: 1147472, tv_nsec: 224209668 }
+WPT [688,25363,1849]
+Wrote 689th vote at Instant { tv_sec: 1147472, tv_nsec: 272447512 }
+Read 689th vote at Instant { tv_sec: 1147472, tv_nsec: 274304332 }
+WPT [689,25413,1856]
+Wrote 690th vote at Instant { tv_sec: 1147472, tv_nsec: 322621072 }
+Read 690th vote at Instant { tv_sec: 1147472, tv_nsec: 325471291 }
+WPT [690,25464,2850]
+Wrote 691th vote at Instant { tv_sec: 1147472, tv_nsec: 372727521 }
+Read 691th vote at Instant { tv_sec: 1147472, tv_nsec: 375609470 }
+WPT [691,25514,2881]
+Wrote 692th vote at Instant { tv_sec: 1147472, tv_nsec: 422821130 }
+Read 692th vote at Instant { tv_sec: 1147472, tv_nsec: 427797091 }
+WPT [692,25564,4975]
+Wrote 693th vote at Instant { tv_sec: 1147472, tv_nsec: 472937236 }
+Read 693th vote at Instant { tv_sec: 1147472, tv_nsec: 475823496 }
+WPT [693,25614,2886]
+Wrote 694th vote at Instant { tv_sec: 1147472, tv_nsec: 522993494 }
+Read 694th vote at Instant { tv_sec: 1147472, tv_nsec: 525272494 }
+WPT [694,25664,2279]
+Wrote 695th vote at Instant { tv_sec: 1147472, tv_nsec: 573070517 }
+Read 695th vote at Instant { tv_sec: 1147472, tv_nsec: 575287664 }
+WPT [695,25714,2217]
+Sent 370001 unsharded messages in 36.305252ms for 10277 messages / ms
+Sent 6400000 sharded messages in 36.305252ms for 177777 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 696th vote at Instant { tv_sec: 1147472, tv_nsec: 623177376 }
+Read 696th vote at Instant { tv_sec: 1147472, tv_nsec: 625543109 }
+WPT [696,25764,2365]
+Wrote 697th vote at Instant { tv_sec: 1147472, tv_nsec: 673335711 }
+Read 697th vote at Instant { tv_sec: 1147472, tv_nsec: 675496752 }
+WPT [697,25814,2161]
+Wrote 698th vote at Instant { tv_sec: 1147472, tv_nsec: 723461639 }
+Read 698th vote at Instant { tv_sec: 1147472, tv_nsec: 726664871 }
+WPT [698,25864,3203]
+Wrote 699th vote at Instant { tv_sec: 1147472, tv_nsec: 773538659 }
+Read 699th vote at Instant { tv_sec: 1147472, tv_nsec: 774771405 }
+WPT [699,25914,1232]
+Wrote 700th vote at Instant { tv_sec: 1147472, tv_nsec: 823538667 }
+Read 700th vote at Instant { tv_sec: 1147472, tv_nsec: 831089014 }
+WPT [700,25964,7550]
+Wrote 701th vote at Instant { tv_sec: 1147472, tv_nsec: 873660890 }
+Read 701th vote at Instant { tv_sec: 1147472, tv_nsec: 875691487 }
+WPT [701,26015,2030]
+Wrote 702th vote at Instant { tv_sec: 1147472, tv_nsec: 923726153 }
+Read 702th vote at Instant { tv_sec: 1147472, tv_nsec: 927708611 }
+WPT [702,26065,3982]
+Wrote 703th vote at Instant { tv_sec: 1147472, tv_nsec: 973744189 }
+Read 703th vote at Instant { tv_sec: 1147472, tv_nsec: 976052451 }
+WPT [703,26115,2308]
+Wrote 704th vote at Instant { tv_sec: 1147473, tv_nsec: 23885898 }
+Read 704th vote at Instant { tv_sec: 1147473, tv_nsec: 27105321 }
+WPT [704,26165,3219]
+Wrote 705th vote at Instant { tv_sec: 1147473, tv_nsec: 74013754 }
+Read 705th vote at Instant { tv_sec: 1147473, tv_nsec: 76271559 }
+WPT [705,26215,2257]
+Wrote 706th vote at Instant { tv_sec: 1147473, tv_nsec: 124120909 }
+Read 706th vote at Instant { tv_sec: 1147473, tv_nsec: 126601322 }
+WPT [706,26265,2480]
+Sent 375781 unsharded messages in 36.879573ms for 10438 messages / ms
+Sent 6500000 sharded messages in 36.879573ms for 180555 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 707th vote at Instant { tv_sec: 1147473, tv_nsec: 174258730 }
+Read 707th vote at Instant { tv_sec: 1147473, tv_nsec: 177772704 }
+WPT [707,26315,3513]
+Wrote 708th vote at Instant { tv_sec: 1147473, tv_nsec: 224310667 }
+Read 708th vote at Instant { tv_sec: 1147473, tv_nsec: 226534546 }
+WPT [708,26365,2223]
+Wrote 709th vote at Instant { tv_sec: 1147473, tv_nsec: 274471679 }
+Read 709th vote at Instant { tv_sec: 1147473, tv_nsec: 277830967 }
+WPT [709,26415,3359]
+Wrote 710th vote at Instant { tv_sec: 1147473, tv_nsec: 324542448 }
+Read 710th vote at Instant { tv_sec: 1147473, tv_nsec: 326826001 }
+WPT [710,26465,2283]
+Wrote 711th vote at Instant { tv_sec: 1147473, tv_nsec: 374676513 }
+Read 711th vote at Instant { tv_sec: 1147473, tv_nsec: 378121338 }
+WPT [711,26516,3444]
+Wrote 712th vote at Instant { tv_sec: 1147473, tv_nsec: 424766376 }
+Read 712th vote at Instant { tv_sec: 1147473, tv_nsec: 427021899 }
+WPT [712,26566,2255]
+Wrote 713th vote at Instant { tv_sec: 1147473, tv_nsec: 474766447 }
+Read 713th vote at Instant { tv_sec: 1147473, tv_nsec: 478176037 }
+WPT [713,26616,3409]
+Wrote 714th vote at Instant { tv_sec: 1147473, tv_nsec: 524818811 }
+Read 714th vote at Instant { tv_sec: 1147473, tv_nsec: 527299927 }
+WPT [714,26666,2481]
+Wrote 715th vote at Instant { tv_sec: 1147473, tv_nsec: 574891522 }
+Read 715th vote at Instant { tv_sec: 1147473, tv_nsec: 577783172 }
+WPT [715,26716,2891]
+Wrote 716th vote at Instant { tv_sec: 1147473, tv_nsec: 625011028 }
+Read 716th vote at Instant { tv_sec: 1147473, tv_nsec: 628586437 }
+WPT [716,26766,3575]
+Wrote 717th vote at Instant { tv_sec: 1147473, tv_nsec: 675118320 }
+Read 717th vote at Instant { tv_sec: 1147473, tv_nsec: 678774947 }
+WPT [717,26816,3656]
+Sent 381559 unsharded messages in 37.422908ms for 10312 messages / ms
+Sent 6600000 sharded messages in 37.422908ms for 178378 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 718th vote at Instant { tv_sec: 1147473, tv_nsec: 725245092 }
+Read 718th vote at Instant { tv_sec: 1147473, tv_nsec: 728794717 }
+WPT [718,26866,3549]
+Wrote 719th vote at Instant { tv_sec: 1147473, tv_nsec: 775408341 }
+Read 719th vote at Instant { tv_sec: 1147473, tv_nsec: 781146143 }
+WPT [719,26916,5737]
+Wrote 720th vote at Instant { tv_sec: 1147473, tv_nsec: 825532727 }
+Read 720th vote at Instant { tv_sec: 1147473, tv_nsec: 828201459 }
+WPT [720,26966,2668]
+Wrote 721th vote at Instant { tv_sec: 1147473, tv_nsec: 875572738 }
+Read 721th vote at Instant { tv_sec: 1147473, tv_nsec: 878235506 }
+WPT [721,27016,2662]
+Wrote 722th vote at Instant { tv_sec: 1147473, tv_nsec: 925679555 }
+Read 722th vote at Instant { tv_sec: 1147473, tv_nsec: 931146350 }
+WPT [722,27067,5466]
+Wrote 723th vote at Instant { tv_sec: 1147473, tv_nsec: 975829656 }
+Read 723th vote at Instant { tv_sec: 1147473, tv_nsec: 979560439 }
+WPT [723,27117,3730]
+Wrote 724th vote at Instant { tv_sec: 1147474, tv_nsec: 25936381 }
+Read 724th vote at Instant { tv_sec: 1147474, tv_nsec: 28443848 }
+WPT [724,27167,2507]
+Wrote 725th vote at Instant { tv_sec: 1147474, tv_nsec: 76021129 }
+Read 725th vote at Instant { tv_sec: 1147474, tv_nsec: 78693273 }
+WPT [725,27217,2672]
+Wrote 726th vote at Instant { tv_sec: 1147474, tv_nsec: 126134000 }
+Read 726th vote at Instant { tv_sec: 1147474, tv_nsec: 129785831 }
+WPT [726,27267,3651]
+Wrote 727th vote at Instant { tv_sec: 1147474, tv_nsec: 176302785 }
+Read 727th vote at Instant { tv_sec: 1147474, tv_nsec: 178998449 }
+WPT [727,27317,2695]
+Wrote 728th vote at Instant { tv_sec: 1147474, tv_nsec: 226418813 }
+Read 728th vote at Instant { tv_sec: 1147474, tv_nsec: 229943017 }
+WPT [728,27367,3524]
+Sent 387357 unsharded messages in 37.968211ms for 10469 messages / ms
+Sent 6700000 sharded messages in 37.968211ms for 181081 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 729th vote at Instant { tv_sec: 1147474, tv_nsec: 276508915 }
+Read 729th vote at Instant { tv_sec: 1147474, tv_nsec: 278985355 }
+WPT [729,27417,2476]
+Wrote 730th vote at Instant { tv_sec: 1147474, tv_nsec: 326645030 }
+Read 730th vote at Instant { tv_sec: 1147474, tv_nsec: 329095320 }
+WPT [730,27468,2450]
+Wrote 731th vote at Instant { tv_sec: 1147474, tv_nsec: 376646697 }
+Read 731th vote at Instant { tv_sec: 1147474, tv_nsec: 379176656 }
+WPT [731,27518,2529]
+Wrote 732th vote at Instant { tv_sec: 1147474, tv_nsec: 426804673 }
+Read 732th vote at Instant { tv_sec: 1147474, tv_nsec: 429252905 }
+WPT [732,27568,2448]
+Wrote 733th vote at Instant { tv_sec: 1147474, tv_nsec: 476886776 }
+Read 733th vote at Instant { tv_sec: 1147474, tv_nsec: 479430734 }
+WPT [733,27618,2543]
+Wrote 734th vote at Instant { tv_sec: 1147474, tv_nsec: 526961224 }
+Read 734th vote at Instant { tv_sec: 1147474, tv_nsec: 530714152 }
+WPT [734,27668,3752]
+Wrote 735th vote at Instant { tv_sec: 1147474, tv_nsec: 577101862 }
+Read 735th vote at Instant { tv_sec: 1147474, tv_nsec: 579735921 }
+WPT [735,27718,2634]
+Wrote 736th vote at Instant { tv_sec: 1147474, tv_nsec: 627200393 }
+Read 736th vote at Instant { tv_sec: 1147474, tv_nsec: 630789649 }
+WPT [736,27768,3589]
+Wrote 737th vote at Instant { tv_sec: 1147474, tv_nsec: 677304509 }
+Read 737th vote at Instant { tv_sec: 1147474, tv_nsec: 679856402 }
+WPT [737,27818,2551]
+Wrote 738th vote at Instant { tv_sec: 1147474, tv_nsec: 727405125 }
+Read 738th vote at Instant { tv_sec: 1147474, tv_nsec: 730974029 }
+WPT [738,27868,3568]
+Wrote 739th vote at Instant { tv_sec: 1147474, tv_nsec: 777529543 }
+Read 739th vote at Instant { tv_sec: 1147474, tv_nsec: 780142388 }
+WPT [739,27918,2612]
+Sent 393128 unsharded messages in 38.510113ms for 10345 messages / ms
+Sent 6800000 sharded messages in 38.510113ms for 178947 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 740th vote at Instant { tv_sec: 1147474, tv_nsec: 827643400 }
+Read 740th vote at Instant { tv_sec: 1147474, tv_nsec: 831204780 }
+WPT [740,27969,3561]
+Wrote 741th vote at Instant { tv_sec: 1147474, tv_nsec: 877730778 }
+Read 741th vote at Instant { tv_sec: 1147474, tv_nsec: 880334857 }
+WPT [741,28019,2604]
+Wrote 742th vote at Instant { tv_sec: 1147474, tv_nsec: 927839199 }
+Read 742th vote at Instant { tv_sec: 1147474, tv_nsec: 931404411 }
+WPT [742,28069,3565]
+Wrote 743th vote at Instant { tv_sec: 1147474, tv_nsec: 978254130 }
+Read 743th vote at Instant { tv_sec: 1147474, tv_nsec: 980546870 }
+WPT [743,28119,2292]
+Wrote 744th vote at Instant { tv_sec: 1147475, tv_nsec: 28254270 }
+Read 744th vote at Instant { tv_sec: 1147475, tv_nsec: 31095606 }
+WPT [744,28169,2841]
+Wrote 745th vote at Instant { tv_sec: 1147475, tv_nsec: 78254417 }
+Read 745th vote at Instant { tv_sec: 1147475, tv_nsec: 81128091 }
+WPT [745,28219,2873]
+Wrote 746th vote at Instant { tv_sec: 1147475, tv_nsec: 128321496 }
+Read 746th vote at Instant { tv_sec: 1147475, tv_nsec: 131130679 }
+WPT [746,28269,2809]
+Wrote 747th vote at Instant { tv_sec: 1147475, tv_nsec: 178457824 }
+Read 747th vote at Instant { tv_sec: 1147475, tv_nsec: 181093078 }
+WPT [747,28319,2635]
+Wrote 748th vote at Instant { tv_sec: 1147475, tv_nsec: 228596789 }
+Read 748th vote at Instant { tv_sec: 1147475, tv_nsec: 231190083 }
+WPT [748,28369,2593]
+Wrote 749th vote at Instant { tv_sec: 1147475, tv_nsec: 278675782 }
+Read 749th vote at Instant { tv_sec: 1147475, tv_nsec: 281336335 }
+WPT [749,28420,2660]
+Wrote 750th vote at Instant { tv_sec: 1147475, tv_nsec: 328831016 }
+Read 750th vote at Instant { tv_sec: 1147475, tv_nsec: 331470543 }
+WPT [750,28470,2639]
+Sent 398893 unsharded messages in 39.052643ms for 10228 messages / ms
+Sent 6900000 sharded messages in 39.052643ms for 176923 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 751th vote at Instant { tv_sec: 1147475, tv_nsec: 378907242 }
+Read 751th vote at Instant { tv_sec: 1147475, tv_nsec: 381516062 }
+WPT [751,28520,2608]
+Wrote 752th vote at Instant { tv_sec: 1147475, tv_nsec: 429103471 }
+Read 752th vote at Instant { tv_sec: 1147475, tv_nsec: 431696418 }
+WPT [752,28570,2592]
+Wrote 753th vote at Instant { tv_sec: 1147475, tv_nsec: 479130433 }
+Read 753th vote at Instant { tv_sec: 1147475, tv_nsec: 480775421 }
+WPT [753,28620,1644]
+Wrote 754th vote at Instant { tv_sec: 1147475, tv_nsec: 529286987 }
+Read 754th vote at Instant { tv_sec: 1147475, tv_nsec: 532930740 }
+WPT [754,28670,3643]
+Wrote 755th vote at Instant { tv_sec: 1147475, tv_nsec: 579396730 }
+Read 755th vote at Instant { tv_sec: 1147475, tv_nsec: 582063982 }
+WPT [755,28720,2667]
+Wrote 756th vote at Instant { tv_sec: 1147475, tv_nsec: 629505811 }
+Read 756th vote at Instant { tv_sec: 1147475, tv_nsec: 633354725 }
+WPT [756,28770,3848]
+Wrote 757th vote at Instant { tv_sec: 1147475, tv_nsec: 679578817 }
+Read 757th vote at Instant { tv_sec: 1147475, tv_nsec: 684409998 }
+WPT [757,28820,4831]
+Wrote 758th vote at Instant { tv_sec: 1147475, tv_nsec: 729734686 }
+Read 758th vote at Instant { tv_sec: 1147475, tv_nsec: 732410308 }
+WPT [758,28871,2675]
+Wrote 759th vote at Instant { tv_sec: 1147475, tv_nsec: 779824910 }
+Read 759th vote at Instant { tv_sec: 1147475, tv_nsec: 784486205 }
+WPT [759,28921,4661]
+Wrote 760th vote at Instant { tv_sec: 1147475, tv_nsec: 829942416 }
+Read 760th vote at Instant { tv_sec: 1147475, tv_nsec: 833602851 }
+WPT [760,28971,3660]
+Wrote 761th vote at Instant { tv_sec: 1147475, tv_nsec: 880048756 }
+Read 761th vote at Instant { tv_sec: 1147475, tv_nsec: 882836120 }
+WPT [761,29021,2787]
+Sent 404674 unsharded messages in 39.595072ms for 10376 messages / ms
+Sent 7000000 sharded messages in 39.595072ms for 179487 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 762th vote at Instant { tv_sec: 1147475, tv_nsec: 930178978 }
+Read 762th vote at Instant { tv_sec: 1147475, tv_nsec: 933740360 }
+WPT [762,29071,3561]
+Wrote 763th vote at Instant { tv_sec: 1147475, tv_nsec: 980317061 }
+Read 763th vote at Instant { tv_sec: 1147475, tv_nsec: 983943352 }
+WPT [763,29121,3626]
+Wrote 764th vote at Instant { tv_sec: 1147476, tv_nsec: 30475199 }
+Read 764th vote at Instant { tv_sec: 1147476, tv_nsec: 33888468 }
+WPT [764,29171,3413]
+Wrote 765th vote at Instant { tv_sec: 1147476, tv_nsec: 80553165 }
+Read 765th vote at Instant { tv_sec: 1147476, tv_nsec: 84137902 }
+WPT [765,29221,3584]
+Wrote 766th vote at Instant { tv_sec: 1147476, tv_nsec: 130691730 }
+Read 766th vote at Instant { tv_sec: 1147476, tv_nsec: 134279205 }
+WPT [766,29272,3587]
+Wrote 767th vote at Instant { tv_sec: 1147476, tv_nsec: 180816029 }
+Read 767th vote at Instant { tv_sec: 1147476, tv_nsec: 184378920 }
+WPT [767,29322,3562]
+Wrote 768th vote at Instant { tv_sec: 1147476, tv_nsec: 230996454 }
+Read 768th vote at Instant { tv_sec: 1147476, tv_nsec: 234592452 }
+WPT [768,29372,3595]
+Wrote 769th vote at Instant { tv_sec: 1147476, tv_nsec: 281055014 }
+Read 769th vote at Instant { tv_sec: 1147476, tv_nsec: 284677194 }
+WPT [769,29422,3622]
+Wrote 770th vote at Instant { tv_sec: 1147476, tv_nsec: 331169724 }
+Read 770th vote at Instant { tv_sec: 1147476, tv_nsec: 334810564 }
+WPT [770,29472,3640]
+Wrote 771th vote at Instant { tv_sec: 1147476, tv_nsec: 381243832 }
+Read 771th vote at Instant { tv_sec: 1147476, tv_nsec: 384105214 }
+WPT [771,29522,2861]
+Sent 410439 unsharded messages in 40.137968ms for 10260 messages / ms
+Sent 7100000 sharded messages in 40.137968ms for 177500 messages / ms
+Size of packet data: [344, 824, 1144, 36344]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 772th vote at Instant { tv_sec: 1147476, tv_nsec: 431391507 }
+Read 772th vote at Instant { tv_sec: 1147476, tv_nsec: 435065012 }
+WPT [772,29572,3673]
+Wrote 773th vote at Instant { tv_sec: 1147476, tv_nsec: 481491997 }
+Read 773th vote at Instant { tv_sec: 1147476, tv_nsec: 484464070 }
+WPT [773,29622,2972]
+Wrote 774th vote at Instant { tv_sec: 1147476, tv_nsec: 531650749 }
+Read 774th vote at Instant { tv_sec: 1147476, tv_nsec: 535245993 }
+WPT [774,29673,3595]
+Wrote 775th vote at Instant { tv_sec: 1147476, tv_nsec: 581804687 }
+Read 775th vote at Instant { tv_sec: 1147476, tv_nsec: 585397850 }
+WPT [775,29723,3593]
+Wrote 776th vote at Instant { tv_sec: 1147476, tv_nsec: 631960576 }
+Read 776th vote at Instant { tv_sec: 1147476, tv_nsec: 634545253 }
+WPT [776,29773,2584]
+Wrote 777th vote at Instant { tv_sec: 1147476, tv_nsec: 682094681 }
+Read 777th vote at Instant { tv_sec: 1147476, tv_nsec: 684632675 }
+WPT [777,29823,2537]
+Wrote 778th vote at Instant { tv_sec: 1147476, tv_nsec: 732192110 }
+Read 778th vote at Instant { tv_sec: 1147476, tv_nsec: 734773383 }
+WPT [778,29873,2581]
+Wrote 779th vote at Instant { tv_sec: 1147476, tv_nsec: 782417851 }
+Read 779th vote at Instant { tv_sec: 1147476, tv_nsec: 785770697 }
+WPT [779,29923,3352]
+Wrote 780th vote at Instant { tv_sec: 1147476, tv_nsec: 832454550 }
+Read 780th vote at Instant { tv_sec: 1147476, tv_nsec: 837799155 }
+WPT [780,29973,5344]
+
+(relative write time (ms since start), delay (us))
+[[31,2972],[81,4137],[131,1099],[181,6631],[231,3189],[281,1342],[331,2189],[381,3303],[431,2254],[481,6140],[531,2180],[581,2468],[632,9509],[682,4936],[732,3507],[782,2705],[832,3613],[882,3793],[932,3910],[982,3667],[1032,2847],[1082,3084],[1132,3055],[1182,3446],[1232,3301],[1282,5433],[1332,3301],[1382,12425],[1433,3211],[1483,8280],[1533,3384],[1583,3507],[1633,3603],[1683,2646],[1733,2179],[1783,4496],[1833,1210],[1883,3223],[1933,2296],[1984,2151],[2034,1359],[2084,3900],[2134,2413],[2184,3479],[2234,3613],[2284,1776],[2334,1852],[2384,3972],[2434,2942],[2484,2939],[2534,1916],[2584,2194],[2634,4009],[2684,3597],[2735,3052],[2785,1412],[2835,3450],[2885,3197],[2935,2255],[2985,3144],[3035,2596],[3085,1129],[3135,3247],[3185,2191],[3235,2257],[3286,3194],[3336,1934],[3386,1260],[3436,1250],[3486,1217],[3536,2226],[3586,4650],[3636,3235],[3687,3386],[3737,2343],[3787,3206],[3837,4060],[3887,2232],[3937,3279],[3987,3343],[4037,3398],[4088,3219],[4138,3210],[4188,2259],[4238,3276],[4288,2282],[4338,2887],[4388,2171],[4438,2350],[4488,2346],[4538,2237],[4589,2332],[4639,5572],[4689,2484],[4739,3292],[4789,3278],[4839,2185],[4889,3218],[4939,2197],[4990,2422],[5040,2257],[5090,3221],[5140,3271],[5190,3275],[5240,3344],[5290,3234],[5340,7240],[5390,3231],[5441,3329],[5491,3259],[5541,3196],[5591,2309],[5641,2097],[5691,3261],[5741,1226],[5791,1164],[5842,2198],[5892,2378],[5942,1995],[5992,3180],[6042,3645],[6092,2401],[6142,3192],[6192,2165],[6242,2226],[6292,2454],[6342,2466],[6392,2621],[6442,2510],[6492,2712],[6543,2592],[6593,4527],[6643,3582],[6693,4724],[6743,2364],[6793,4659],[6843,3387],[6893,2636],[6943,2808],[6993,1738],[7043,2881],[7093,3501],[7144,7470],[7194,3724],[7244,1726],[7294,1956],[7344,2136],[7394,2191],[7444,3221],[7494,2569],[7544,3144],[7594,2248],[7644,3375],[7694,2538],[7744,3611],[7794,2521],[7844,2732],[7894,3169],[7945,6457],[7995,2767],[8045,3737],[8095,2798],[8145,1771],[8195,2734],[8245,2622],[8295,3740],[8346,3691],[8396,3768],[8446,2660],[8496,2718],[8546,3607],[8596,2668],[8646,2624],[8696,2757],[8746,2718],[8797,3627],[8847,3625],[8897,2649],[8947,2566],[8997,3724],[9047,3715],[9097,2487],[9148,2453],[9198,3593],[9248,3630],[9298,3554],[9348,3671],[9398,3060],[9448,2874],[9498,2039],[9548,2250],[9598,3300],[9648,3301],[9698,3291],[9748,2280],[9798,2239],[9849,3232],[9899,3322],[9949,1562],[9999,12660],[10049,9023],[10099,1835],[10149,1852],[10199,2931],[10249,5452],[10299,2956],[10349,3816],[10399,2929],[10449,3773],[10500,2746],[10550,3849],[10600,3012],[10650,1952],[10700,3094],[10750,3943],[10800,3855],[10850,3979],[10900,3892],[10951,3856],[11001,3921],[11051,2743],[11101,2851],[11151,2746],[11201,6601],[11251,6533],[11301,1912],[11351,3936],[11401,1020],[11451,2166],[11501,2258],[11552,2233],[11602,3282],[11652,2192],[11702,12403],[11752,2417],[11802,3469],[11852,3414],[11902,3334],[11952,3116],[12002,3619],[12052,5270],[12102,1914],[12152,2880],[12203,2867],[12253,1911],[12303,2969],[12353,2893],[12403,4489],[12453,2127],[12503,3971],[12554,2943],[12604,2918],[12654,3855],[12704,1861],[12754,3895],[12804,2811],[12854,2748],[12904,6541],[12954,2890],[13005,2762],[13055,2882],[13105,2924],[13155,2726],[13205,5860],[13255,2829],[13305,3895],[13355,2908],[13406,5440],[13456,2164],[13506,5333],[13556,3956],[13606,3874],[13656,3798],[13706,2831],[13756,2768],[13807,2732],[13857,2777],[13907,2706],[13957,1894],[14007,4205],[14057,3091],[14107,3199],[14157,10798],[14207,3263],[14257,2398],[14307,3665],[14357,2394],[14407,3528],[14458,3277],[14508,2410],[14558,2655],[14608,2660],[14658,2611],[14708,3604],[14758,2664],[14808,3689],[14858,1840],[14908,2652],[14958,2648],[15009,2840],[15059,2619],[15109,3572],[15159,5440],[15209,3824],[15259,3781],[15309,1619],[15359,3693],[15409,2686],[15460,3637],[15510,2555],[15560,3743],[15610,3601],[15660,3655],[15710,7486],[15760,2644],[15810,7303],[15860,2926],[15911,2562],[15961,3566],[16011,3629],[16061,3675],[16111,9837],[16161,3546],[16211,2570],[16261,2883],[16312,3845],[16362,1858],[16412,3028],[16462,3258],[16512,2228],[16562,3204],[16612,2427],[16662,2202],[16712,2470],[16762,2780],[16812,2762],[16862,3798],[16912,8876],[16962,2958],[17012,3116],[17062,3218],[17112,3226],[17162,3445],[17212,5424],[17262,2547],[17312,2486],[17362,2539],[17413,2624],[17463,2835],[17513,2579],[17563,2577],[17613,2881],[17663,4937],[17713,3329],[17763,2316],[17813,4840],[17863,3814],[17913,2832],[17963,4750],[18013,4629],[18063,2829],[18113,3870],[18163,2183],[18213,3931],[18264,3889],[18314,2831],[18364,2919],[18414,3660],[18464,2984],[18514,2883],[18564,3361],[18614,2869],[18665,2910],[18715,3890],[18765,3130],[18815,2913],[18865,1859],[18915,2813],[18965,1938],[19015,1862],[19066,1894],[19116,1879],[19166,2866],[19216,3823],[19266,2925],[19316,3890],[19366,1886],[19416,2837],[19466,1904],[19517,4447],[19567,1896],[19617,3101],[19667,2880],[19717,2920],[19767,2885],[19817,7101],[19867,3927],[19918,2862],[19968,1882],[20018,1942],[20068,1911],[20118,1881],[20168,1950],[20218,2778],[20268,3097],[20318,2264],[20368,2259],[20418,2624],[20468,2216],[20519,2164],[20569,9095],[20619,2605],[20669,5730],[20719,2717],[20769,3726],[20819,1810],[20869,2915],[20919,2846],[20969,2692],[21019,11776],[21069,3738],[21119,3876],[21170,3699],[21220,3722],[21270,4641],[21320,1809],[21370,2937],[21420,3107],[21470,4583],[21520,2235],[21570,7772],[21620,7575],[21670,3258],[21720,2236],[21770,2399],[21820,2278],[21871,2254],[21921,3505],[21971,2805],[22021,3490],[22071,2455],[22121,6568],[22171,3569],[22221,9723],[22271,3508],[22321,3606],[22372,3819],[22422,2584],[22472,2558],[22522,4721],[22572,5591],[22622,2456],[22672,3612],[22722,3680],[22772,3747],[22823,3947],[22873,2570],[22923,3544],[22973,2463],[23023,3540],[23073,3586],[23123,3546],[23173,2521],[23223,3593],[23274,3508],[23324,2562],[23374,2753],[23424,3953],[23474,6955],[23524,3569],[23574,3598],[23624,2533],[23675,3022],[23725,2623],[23775,3479],[23825,5976],[23875,2487],[23925,2448],[23975,2754],[24025,3713],[24076,2492],[24126,3914],[24176,3692],[24226,5192],[24276,2589],[24326,2170],[24376,2069],[24426,1603],[24476,3154],[24526,4646],[24576,3175],[24627,2266],[24677,1211],[24727,2173],[24777,3238],[24827,2393],[24877,2457],[24927,3607],[24977,1708],[25027,4119],[25077,3919],[25127,7337],[25177,3907],[25227,3978],[25278,3818],[25328,3354],[25378,3607],[25428,2230],[25478,2216],[25528,3254],[25578,6572],[25628,5950],[25678,2243],[25728,3250],[25779,4379],[25829,2205],[25879,3639],[25929,2890],[25979,12754],[26029,1849],[26079,1856],[26129,2850],[26179,2881],[26229,4975],[26279,2886],[26330,2279],[26380,2217],[26430,2365],[26480,2161],[26530,3203],[26580,1232],[26630,7550],[26680,2030],[26730,3982],[26780,2308],[26830,3219],[26881,2257],[26931,2480],[26981,3513],[27031,2223],[27081,3359],[27131,2283],[27181,3444],[27231,2255],[27281,3409],[27331,2481],[27381,2891],[27432,3575],[27482,3656],[27532,3549],[27582,5737],[27632,2668],[27682,2662],[27732,5466],[27782,3730],[27832,2507],[27883,2672],[27933,3651],[27983,2695],[28033,3524],[28083,2476],[28133,2450],[28183,2529],[28233,2448],[28283,2543],[28333,3752],[28384,2634],[28434,3589],[28484,2551],[28534,3568],[28584,2612],[28634,3561],[28684,2604],[28734,3565],[28785,2292],[28835,2841],[28885,2873],[28935,2809],[28985,2635],[29035,2593],[29085,2660],[29135,2639],[29185,2608],[29236,2592],[29286,1644],[29336,3643],[29386,2667],[29436,3848],[29486,4831],[29536,2675],[29586,4661],[29636,3660],[29687,2787],[29737,3561],[29787,3626],[29837,3413],[29887,3584],[29937,3587],[29987,3562],[30038,3595],[30088,3622],[30138,3640],[30188,2861],[30238,3673],[30288,2972],[30338,3595],[30388,3593],[30438,2584],[30489,2537],[30539,2581],[30589,3352],[30639,5344]]
+write	50	2943	(us)
+write	95	6143	(us)
+write	99	9839	(us)
+write	100	12759	(us)
+
+# generated ops/s: 900259.00
+# actual ops/s: 900282.36
+# op	pct	sojourn	remote
+write	50	2567	1975	(all µs)
+read	50	1039	431	(all µs)
+write	95	7063	6351	(all µs)
+read	95	4399	3655	(all µs)
+write	99	11311	10023	(all µs)
+read	99	8503	7383	(all µs)
+write	100	35039	23967	(all µs)
+read	100	27327	13447	(all µs)

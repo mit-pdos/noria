@@ -1,0 +1,495 @@
+Wrote 1th vote at Instant { tv_sec: 1147981, tv_nsec: 17557250 }
+Read 1th vote at Instant { tv_sec: 1147982, tv_nsec: 236871438 }
+Wrote 2th vote at Instant { tv_sec: 1147982, tv_nsec: 236874787 }
+Read 2th vote at Instant { tv_sec: 1147982, tv_nsec: 276802764 }
+Wrote 3th vote at Instant { tv_sec: 1147982, tv_nsec: 287476794 }
+Read 3th vote at Instant { tv_sec: 1147982, tv_nsec: 297717653 }
+Wrote 4th vote at Instant { tv_sec: 1147982, tv_nsec: 337925025 }
+Read 4th vote at Instant { tv_sec: 1147982, tv_nsec: 341120920 }
+Wrote 5th vote at Instant { tv_sec: 1147982, tv_nsec: 387925211 }
+Read 5th vote at Instant { tv_sec: 1147982, tv_nsec: 390455016 }
+Wrote 6th vote at Instant { tv_sec: 1147982, tv_nsec: 437925368 }
+Read 6th vote at Instant { tv_sec: 1147982, tv_nsec: 441437970 }
+Wrote 7th vote at Instant { tv_sec: 1147982, tv_nsec: 487925574 }
+Read 7th vote at Instant { tv_sec: 1147982, tv_nsec: 491456880 }
+Wrote 8th vote at Instant { tv_sec: 1147982, tv_nsec: 538011637 }
+Read 8th vote at Instant { tv_sec: 1147982, tv_nsec: 542438973 }
+Sent 5131 unsharded messages in 2.125395ms for 2565 messages / ms
+Sent 100000 sharded messages in 2.125395ms for 50000 messages / ms
+Size of packet data: [984, 7064, 39544, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 9th vote at Instant { tv_sec: 1147982, tv_nsec: 588057041 }
+Read 9th vote at Instant { tv_sec: 1147982, tv_nsec: 593178916 }
+Wrote 10th vote at Instant { tv_sec: 1147982, tv_nsec: 638058451 }
+Read 10th vote at Instant { tv_sec: 1147982, tv_nsec: 643010511 }
+Wrote 11th vote at Instant { tv_sec: 1147982, tv_nsec: 688058580 }
+Read 11th vote at Instant { tv_sec: 1147982, tv_nsec: 690702312 }
+Wrote 12th vote at Instant { tv_sec: 1147982, tv_nsec: 738224431 }
+Read 12th vote at Instant { tv_sec: 1147982, tv_nsec: 742036439 }
+Wrote 13th vote at Instant { tv_sec: 1147982, tv_nsec: 788446428 }
+Read 13th vote at Instant { tv_sec: 1147982, tv_nsec: 791986630 }
+Wrote 14th vote at Instant { tv_sec: 1147982, tv_nsec: 838446505 }
+Read 14th vote at Instant { tv_sec: 1147982, tv_nsec: 843466249 }
+Wrote 15th vote at Instant { tv_sec: 1147982, tv_nsec: 888446754 }
+Read 15th vote at Instant { tv_sec: 1147982, tv_nsec: 892248834 }
+Wrote 16th vote at Instant { tv_sec: 1147982, tv_nsec: 938446839 }
+Read 16th vote at Instant { tv_sec: 1147982, tv_nsec: 944427769 }
+Wrote 17th vote at Instant { tv_sec: 1147982, tv_nsec: 988583274 }
+Read 17th vote at Instant { tv_sec: 1147982, tv_nsec: 991645393 }
+Wrote 18th vote at Instant { tv_sec: 1147983, tv_nsec: 38653699 }
+Read 18th vote at Instant { tv_sec: 1147983, tv_nsec: 43258591 }
+Sent 10208 unsharded messages in 2.603933ms for 5104 messages / ms
+Sent 200000 sharded messages in 2.603933ms for 100000 messages / ms
+Size of packet data: [824, 2904, 33464, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 19th vote at Instant { tv_sec: 1147983, tv_nsec: 88711180 }
+Read 19th vote at Instant { tv_sec: 1147983, tv_nsec: 94434721 }
+Wrote 20th vote at Instant { tv_sec: 1147983, tv_nsec: 138711267 }
+Read 20th vote at Instant { tv_sec: 1147983, tv_nsec: 147728740 }
+Wrote 21th vote at Instant { tv_sec: 1147983, tv_nsec: 188813406 }
+Read 21th vote at Instant { tv_sec: 1147983, tv_nsec: 193126596 }
+Wrote 22th vote at Instant { tv_sec: 1147983, tv_nsec: 238813435 }
+Read 22th vote at Instant { tv_sec: 1147983, tv_nsec: 247762834 }
+Wrote 23th vote at Instant { tv_sec: 1147983, tv_nsec: 289083413 }
+Read 23th vote at Instant { tv_sec: 1147983, tv_nsec: 301090113 }
+Wrote 24th vote at Instant { tv_sec: 1147983, tv_nsec: 339083426 }
+Read 24th vote at Instant { tv_sec: 1147983, tv_nsec: 344445871 }
+Wrote 25th vote at Instant { tv_sec: 1147983, tv_nsec: 389083468 }
+Read 25th vote at Instant { tv_sec: 1147983, tv_nsec: 392071179 }
+Wrote 26th vote at Instant { tv_sec: 1147983, tv_nsec: 441069240 }
+Read 26th vote at Instant { tv_sec: 1147983, tv_nsec: 454327503 }
+Wrote 27th vote at Instant { tv_sec: 1147983, tv_nsec: 491341452 }
+Read 27th vote at Instant { tv_sec: 1147983, tv_nsec: 494459756 }
+Wrote 28th vote at Instant { tv_sec: 1147983, tv_nsec: 541435754 }
+Read 28th vote at Instant { tv_sec: 1147983, tv_nsec: 545690790 }
+Wrote 29th vote at Instant { tv_sec: 1147983, tv_nsec: 591491020 }
+Read 29th vote at Instant { tv_sec: 1147983, tv_nsec: 601628519 }
+Sent 15275 unsharded messages in 3.170466ms for 5091 messages / ms
+Sent 300000 sharded messages in 3.170466ms for 100000 messages / ms
+Size of packet data: [824, 2424, 28184, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 30th vote at Instant { tv_sec: 1147983, tv_nsec: 641611961 }
+Read 30th vote at Instant { tv_sec: 1147983, tv_nsec: 649614351 }
+Wrote 31th vote at Instant { tv_sec: 1147983, tv_nsec: 691611978 }
+Read 31th vote at Instant { tv_sec: 1147983, tv_nsec: 696124594 }
+Wrote 32th vote at Instant { tv_sec: 1147983, tv_nsec: 741653819 }
+Read 32th vote at Instant { tv_sec: 1147983, tv_nsec: 744401424 }
+Wrote 33th vote at Instant { tv_sec: 1147983, tv_nsec: 792398464 }
+Read 33th vote at Instant { tv_sec: 1147983, tv_nsec: 817756360 }
+Wrote 34th vote at Instant { tv_sec: 1147983, tv_nsec: 843196512 }
+Read 34th vote at Instant { tv_sec: 1147983, tv_nsec: 851523227 }
+Wrote 35th vote at Instant { tv_sec: 1147983, tv_nsec: 893197044 }
+Read 35th vote at Instant { tv_sec: 1147983, tv_nsec: 904403504 }
+Wrote 36th vote at Instant { tv_sec: 1147983, tv_nsec: 943484284 }
+Read 36th vote at Instant { tv_sec: 1147983, tv_nsec: 949554315 }
+Wrote 37th vote at Instant { tv_sec: 1147983, tv_nsec: 993677735 }
+Read 37th vote at Instant { tv_sec: 1147984, tv_nsec: 1590085 }
+Wrote 38th vote at Instant { tv_sec: 1147984, tv_nsec: 43761738 }
+Read 38th vote at Instant { tv_sec: 1147984, tv_nsec: 57760606 }
+Wrote 39th vote at Instant { tv_sec: 1147984, tv_nsec: 93763795 }
+Read 39th vote at Instant { tv_sec: 1147984, tv_nsec: 97810560 }
+Wrote 40th vote at Instant { tv_sec: 1147984, tv_nsec: 143763848 }
+Read 40th vote at Instant { tv_sec: 1147984, tv_nsec: 148039087 }
+Wrote 41th vote at Instant { tv_sec: 1147984, tv_nsec: 193763891 }
+Sent 20332 unsharded messages in 3.741655ms for 6777 messages / ms
+Sent 400000 sharded messages in 3.741655ms for 133333 messages / ms
+Size of packet data: [824, 2264, 17464, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Read 41th vote at Instant { tv_sec: 1147984, tv_nsec: 201042114 }
+Wrote 42th vote at Instant { tv_sec: 1147984, tv_nsec: 243786969 }
+Read 42th vote at Instant { tv_sec: 1147984, tv_nsec: 247708384 }
+Wrote 43th vote at Instant { tv_sec: 1147984, tv_nsec: 294013518 }
+Read 43th vote at Instant { tv_sec: 1147984, tv_nsec: 316358201 }
+Wrote 44th vote at Instant { tv_sec: 1147984, tv_nsec: 345134666 }
+Read 44th vote at Instant { tv_sec: 1147984, tv_nsec: 351056341 }
+Wrote 45th vote at Instant { tv_sec: 1147984, tv_nsec: 395272811 }
+Read 45th vote at Instant { tv_sec: 1147984, tv_nsec: 398422200 }
+Wrote 46th vote at Instant { tv_sec: 1147984, tv_nsec: 445330095 }
+Read 46th vote at Instant { tv_sec: 1147984, tv_nsec: 452933344 }
+Wrote 47th vote at Instant { tv_sec: 1147984, tv_nsec: 495458954 }
+Read 47th vote at Instant { tv_sec: 1147984, tv_nsec: 500725558 }
+Wrote 48th vote at Instant { tv_sec: 1147984, tv_nsec: 545459085 }
+Read 48th vote at Instant { tv_sec: 1147984, tv_nsec: 551946989 }
+Wrote 49th vote at Instant { tv_sec: 1147984, tv_nsec: 595459135 }
+Read 49th vote at Instant { tv_sec: 1147984, tv_nsec: 607794588 }
+Wrote 50th vote at Instant { tv_sec: 1147984, tv_nsec: 645459302 }
+Read 50th vote at Instant { tv_sec: 1147984, tv_nsec: 651067154 }
+Wrote 51th vote at Instant { tv_sec: 1147984, tv_nsec: 695459505 }
+Read 51th vote at Instant { tv_sec: 1147984, tv_nsec: 698767644 }
+Sent 25392 unsharded messages in 4.276479ms for 6348 messages / ms
+Sent 500000 sharded messages in 4.276479ms for 125000 messages / ms
+Size of packet data: [824, 2104, 7864, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 52th vote at Instant { tv_sec: 1147984, tv_nsec: 745615396 }
+Read 52th vote at Instant { tv_sec: 1147984, tv_nsec: 754371866 }
+Wrote 53th vote at Instant { tv_sec: 1147984, tv_nsec: 795872061 }
+Read 53th vote at Instant { tv_sec: 1147984, tv_nsec: 804442392 }
+Wrote 54th vote at Instant { tv_sec: 1147984, tv_nsec: 845999926 }
+Read 54th vote at Instant { tv_sec: 1147984, tv_nsec: 849584989 }
+Wrote 55th vote at Instant { tv_sec: 1147984, tv_nsec: 896000092 }
+Read 55th vote at Instant { tv_sec: 1147984, tv_nsec: 901031618 }
+Wrote 56th vote at Instant { tv_sec: 1147984, tv_nsec: 946083135 }
+Read 56th vote at Instant { tv_sec: 1147984, tv_nsec: 950019339 }
+Wrote 57th vote at Instant { tv_sec: 1147984, tv_nsec: 996195782 }
+Read 57th vote at Instant { tv_sec: 1147985, tv_nsec: 1169741 }
+Wrote 58th vote at Instant { tv_sec: 1147985, tv_nsec: 46231795 }
+Read 58th vote at Instant { tv_sec: 1147985, tv_nsec: 57109792 }
+Wrote 59th vote at Instant { tv_sec: 1147985, tv_nsec: 96231935 }
+Read 59th vote at Instant { tv_sec: 1147985, tv_nsec: 99344688 }
+Wrote 60th vote at Instant { tv_sec: 1147985, tv_nsec: 146232328 }
+Read 60th vote at Instant { tv_sec: 1147985, tv_nsec: 149397990 }
+Wrote 61th vote at Instant { tv_sec: 1147985, tv_nsec: 196480753 }
+Read 61th vote at Instant { tv_sec: 1147985, tv_nsec: 204708434 }
+Sent 30461 unsharded messages in 4.775906ms for 7615 messages / ms
+Sent 600000 sharded messages in 4.775906ms for 150000 messages / ms
+Size of packet data: [824, 1944, 5784, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 62th vote at Instant { tv_sec: 1147985, tv_nsec: 246487421 }
+Read 62th vote at Instant { tv_sec: 1147985, tv_nsec: 250760462 }
+Wrote 63th vote at Instant { tv_sec: 1147985, tv_nsec: 296681747 }
+Read 63th vote at Instant { tv_sec: 1147985, tv_nsec: 301065327 }
+Wrote 64th vote at Instant { tv_sec: 1147985, tv_nsec: 346721959 }
+Read 64th vote at Instant { tv_sec: 1147985, tv_nsec: 349778704 }
+Wrote 65th vote at Instant { tv_sec: 1147985, tv_nsec: 397621229 }
+Read 65th vote at Instant { tv_sec: 1147985, tv_nsec: 416053250 }
+Wrote 66th vote at Instant { tv_sec: 1147985, tv_nsec: 447621464 }
+Read 66th vote at Instant { tv_sec: 1147985, tv_nsec: 454413687 }
+Wrote 67th vote at Instant { tv_sec: 1147985, tv_nsec: 497621467 }
+Read 67th vote at Instant { tv_sec: 1147985, tv_nsec: 502239134 }
+Wrote 68th vote at Instant { tv_sec: 1147985, tv_nsec: 547621553 }
+Read 68th vote at Instant { tv_sec: 1147985, tv_nsec: 552125139 }
+Wrote 69th vote at Instant { tv_sec: 1147985, tv_nsec: 597621738 }
+Read 69th vote at Instant { tv_sec: 1147985, tv_nsec: 604360120 }
+Wrote 70th vote at Instant { tv_sec: 1147985, tv_nsec: 647621839 }
+Read 70th vote at Instant { tv_sec: 1147985, tv_nsec: 650186688 }
+Wrote 71th vote at Instant { tv_sec: 1147985, tv_nsec: 697621963 }
+Read 71th vote at Instant { tv_sec: 1147985, tv_nsec: 702012734 }
+Wrote 72th vote at Instant { tv_sec: 1147985, tv_nsec: 747622119 }
+Read 72th vote at Instant { tv_sec: 1147985, tv_nsec: 754736508 }
+Sent 35526 unsharded messages in 5.341136ms for 7105 messages / ms
+Sent 700000 sharded messages in 5.341136ms for 140000 messages / ms
+Size of packet data: [824, 1944, 5784, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 73th vote at Instant { tv_sec: 1147985, tv_nsec: 797756542 }
+Read 73th vote at Instant { tv_sec: 1147985, tv_nsec: 804364396 }
+Wrote 74th vote at Instant { tv_sec: 1147985, tv_nsec: 847901939 }
+Read 74th vote at Instant { tv_sec: 1147985, tv_nsec: 854422804 }
+Wrote 75th vote at Instant { tv_sec: 1147985, tv_nsec: 897928677 }
+Read 75th vote at Instant { tv_sec: 1147985, tv_nsec: 901731622 }
+Wrote 76th vote at Instant { tv_sec: 1147985, tv_nsec: 948081314 }
+Read 76th vote at Instant { tv_sec: 1147985, tv_nsec: 954384066 }
+Wrote 77th vote at Instant { tv_sec: 1147985, tv_nsec: 998088936 }
+Read 77th vote at Instant { tv_sec: 1147986, tv_nsec: 2069225 }
+Wrote 78th vote at Instant { tv_sec: 1147986, tv_nsec: 48528156 }
+Read 78th vote at Instant { tv_sec: 1147986, tv_nsec: 61062907 }
+Wrote 79th vote at Instant { tv_sec: 1147986, tv_nsec: 98528418 }
+Read 79th vote at Instant { tv_sec: 1147986, tv_nsec: 102261752 }
+Wrote 80th vote at Instant { tv_sec: 1147986, tv_nsec: 148528692 }
+Read 80th vote at Instant { tv_sec: 1147986, tv_nsec: 152197268 }
+Wrote 81th vote at Instant { tv_sec: 1147986, tv_nsec: 198864521 }
+Read 81th vote at Instant { tv_sec: 1147986, tv_nsec: 201919236 }
+Wrote 82th vote at Instant { tv_sec: 1147986, tv_nsec: 248870566 }
+Read 82th vote at Instant { tv_sec: 1147986, tv_nsec: 254392674 }
+Wrote 83th vote at Instant { tv_sec: 1147986, tv_nsec: 298887380 }
+Sent 40595 unsharded messages in 5.84316ms for 8119 messages / ms
+Sent 800000 sharded messages in 5.84316ms for 160000 messages / ms
+Size of packet data: [824, 1784, 5144, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Read 83th vote at Instant { tv_sec: 1147986, tv_nsec: 303444265 }
+Wrote 84th vote at Instant { tv_sec: 1147986, tv_nsec: 349153973 }
+Read 84th vote at Instant { tv_sec: 1147986, tv_nsec: 354389285 }
+Wrote 85th vote at Instant { tv_sec: 1147986, tv_nsec: 399167283 }
+Read 85th vote at Instant { tv_sec: 1147986, tv_nsec: 421062882 }
+Wrote 86th vote at Instant { tv_sec: 1147986, tv_nsec: 449375630 }
+Read 86th vote at Instant { tv_sec: 1147986, tv_nsec: 454387297 }
+Wrote 87th vote at Instant { tv_sec: 1147986, tv_nsec: 499417938 }
+Read 87th vote at Instant { tv_sec: 1147986, tv_nsec: 504426578 }
+Wrote 88th vote at Instant { tv_sec: 1147986, tv_nsec: 549421271 }
+Read 88th vote at Instant { tv_sec: 1147986, tv_nsec: 552822342 }
+Wrote 89th vote at Instant { tv_sec: 1147986, tv_nsec: 599799449 }
+Read 89th vote at Instant { tv_sec: 1147986, tv_nsec: 604430525 }
+Wrote 90th vote at Instant { tv_sec: 1147986, tv_nsec: 649799504 }
+Read 90th vote at Instant { tv_sec: 1147986, tv_nsec: 661070989 }
+Wrote 91th vote at Instant { tv_sec: 1147986, tv_nsec: 699799654 }
+Read 91th vote at Instant { tv_sec: 1147986, tv_nsec: 703852747 }
+Wrote 92th vote at Instant { tv_sec: 1147986, tv_nsec: 749851313 }
+Read 92th vote at Instant { tv_sec: 1147986, tv_nsec: 755172017 }
+Sent 45660 unsharded messages in 6.342731ms for 7610 messages / ms
+Sent 900000 sharded messages in 6.342731ms for 150000 messages / ms
+Size of packet data: [824, 1784, 4504, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 93th vote at Instant { tv_sec: 1147986, tv_nsec: 799930511 }
+Read 93th vote at Instant { tv_sec: 1147986, tv_nsec: 803660860 }
+Wrote 94th vote at Instant { tv_sec: 1147986, tv_nsec: 849988453 }
+Read 94th vote at Instant { tv_sec: 1147986, tv_nsec: 852792557 }
+Wrote 95th vote at Instant { tv_sec: 1147986, tv_nsec: 899988653 }
+Read 95th vote at Instant { tv_sec: 1147986, tv_nsec: 907697720 }
+Wrote 96th vote at Instant { tv_sec: 1147986, tv_nsec: 950232751 }
+Read 96th vote at Instant { tv_sec: 1147986, tv_nsec: 954582318 }
+Wrote 97th vote at Instant { tv_sec: 1147987, tv_nsec: 394898 }
+Read 97th vote at Instant { tv_sec: 1147987, tv_nsec: 3333087 }
+Wrote 98th vote at Instant { tv_sec: 1147987, tv_nsec: 50592857 }
+Read 98th vote at Instant { tv_sec: 1147987, tv_nsec: 61091701 }
+Wrote 99th vote at Instant { tv_sec: 1147987, tv_nsec: 100592964 }
+Read 99th vote at Instant { tv_sec: 1147987, tv_nsec: 103955771 }
+Wrote 100th vote at Instant { tv_sec: 1147987, tv_nsec: 150592985 }
+Read 100th vote at Instant { tv_sec: 1147987, tv_nsec: 155088152 }
+Wrote 101th vote at Instant { tv_sec: 1147987, tv_nsec: 200612665 }
+Read 101th vote at Instant { tv_sec: 1147987, tv_nsec: 205496894 }
+Wrote 102th vote at Instant { tv_sec: 1147987, tv_nsec: 250612846 }
+Read 102th vote at Instant { tv_sec: 1147987, tv_nsec: 253863692 }
+Sent 50732 unsharded messages in 6.834959ms for 8455 messages / ms
+Sent 1000000 sharded messages in 6.834959ms for 166666 messages / ms
+Size of packet data: [824, 1784, 4184, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 103th vote at Instant { tv_sec: 1147987, tv_nsec: 300693433 }
+Read 103th vote at Instant { tv_sec: 1147987, tv_nsec: 304897557 }
+Wrote 104th vote at Instant { tv_sec: 1147987, tv_nsec: 350693542 }
+Read 104th vote at Instant { tv_sec: 1147987, tv_nsec: 354327977 }
+Wrote 105th vote at Instant { tv_sec: 1147987, tv_nsec: 400693549 }
+Read 105th vote at Instant { tv_sec: 1147987, tv_nsec: 404111195 }
+Wrote 106th vote at Instant { tv_sec: 1147987, tv_nsec: 450693662 }
+Read 106th vote at Instant { tv_sec: 1147987, tv_nsec: 461042185 }
+Wrote 107th vote at Instant { tv_sec: 1147987, tv_nsec: 500843324 }
+Read 107th vote at Instant { tv_sec: 1147987, tv_nsec: 505737459 }
+Wrote 108th vote at Instant { tv_sec: 1147987, tv_nsec: 551027722 }
+Read 108th vote at Instant { tv_sec: 1147987, tv_nsec: 566497078 }
+Wrote 109th vote at Instant { tv_sec: 1147987, tv_nsec: 601292086 }
+Read 109th vote at Instant { tv_sec: 1147987, tv_nsec: 604568386 }
+Wrote 110th vote at Instant { tv_sec: 1147987, tv_nsec: 651292174 }
+Read 110th vote at Instant { tv_sec: 1147987, tv_nsec: 657718111 }
+Wrote 111th vote at Instant { tv_sec: 1147987, tv_nsec: 702082184 }
+Read 111th vote at Instant { tv_sec: 1147987, tv_nsec: 715854434 }
+Wrote 112th vote at Instant { tv_sec: 1147987, tv_nsec: 752249370 }
+Read 112th vote at Instant { tv_sec: 1147987, tv_nsec: 757445018 }
+Wrote 113th vote at Instant { tv_sec: 1147987, tv_nsec: 802402177 }
+Read 113th vote at Instant { tv_sec: 1147987, tv_nsec: 809847469 }
+Sent 55797 unsharded messages in 7.3615ms for 7971 messages / ms
+Sent 1100000 sharded messages in 7.3615ms for 157142 messages / ms
+Size of packet data: [824, 1784, 4024, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 114th vote at Instant { tv_sec: 1147987, tv_nsec: 852402244 }
+Read 114th vote at Instant { tv_sec: 1147987, tv_nsec: 856123890 }
+Wrote 115th vote at Instant { tv_sec: 1147987, tv_nsec: 902423650 }
+Read 115th vote at Instant { tv_sec: 1147987, tv_nsec: 917866174 }
+Wrote 116th vote at Instant { tv_sec: 1147987, tv_nsec: 952423654 }
+Read 116th vote at Instant { tv_sec: 1147987, tv_nsec: 956043767 }
+Wrote 117th vote at Instant { tv_sec: 1147988, tv_nsec: 2460240 }
+Read 117th vote at Instant { tv_sec: 1147988, tv_nsec: 14406286 }
+Wrote 118th vote at Instant { tv_sec: 1147988, tv_nsec: 52632294 }
+Read 118th vote at Instant { tv_sec: 1147988, tv_nsec: 55175737 }
+Wrote 119th vote at Instant { tv_sec: 1147988, tv_nsec: 102697145 }
+Read 119th vote at Instant { tv_sec: 1147988, tv_nsec: 107231013 }
+Wrote 120th vote at Instant { tv_sec: 1147988, tv_nsec: 152719054 }
+Read 120th vote at Instant { tv_sec: 1147988, tv_nsec: 159560824 }
+Wrote 121th vote at Instant { tv_sec: 1147988, tv_nsec: 202719216 }
+Read 121th vote at Instant { tv_sec: 1147988, tv_nsec: 207828121 }
+Wrote 122th vote at Instant { tv_sec: 1147988, tv_nsec: 252719220 }
+Read 122th vote at Instant { tv_sec: 1147988, tv_nsec: 256897887 }
+Wrote 123th vote at Instant { tv_sec: 1147988, tv_nsec: 302731332 }
+Read 123th vote at Instant { tv_sec: 1147988, tv_nsec: 307841147 }
+Sent 60866 unsharded messages in 7.862457ms for 8695 messages / ms
+Sent 1200000 sharded messages in 7.862457ms for 171428 messages / ms
+Size of packet data: [824, 1784, 3864, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Wrote 124th vote at Instant { tv_sec: 1147988, tv_nsec: 352904803 }
+Sent 65930 unsharded messages in 8.51408ms for 8241 messages / ms
+Sent 1300000 sharded messages in 8.51408ms for 162500 messages / ms
+Size of packet data: [824, 1784, 3544, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 70996 unsharded messages in 9.156398ms for 7888 messages / ms
+Sent 1400000 sharded messages in 9.156398ms for 155555 messages / ms
+Size of packet data: [824, 1784, 3384, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 76063 unsharded messages in 9.804745ms for 8451 messages / ms
+Sent 1500000 sharded messages in 9.804745ms for 166666 messages / ms
+Size of packet data: [824, 1784, 3224, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 81126 unsharded messages in 10.45429ms for 8112 messages / ms
+Sent 1600000 sharded messages in 10.45429ms for 160000 messages / ms
+Size of packet data: [824, 1624, 3224, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 86189 unsharded messages in 11.095343ms for 7835 messages / ms
+Sent 1700000 sharded messages in 11.095343ms for 154545 messages / ms
+Size of packet data: [824, 1624, 3064, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 91252 unsharded messages in 11.734844ms for 8295 messages / ms
+Sent 1800000 sharded messages in 11.734844ms for 163636 messages / ms
+Size of packet data: [824, 1624, 2904, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 96314 unsharded messages in 12.378674ms for 8026 messages / ms
+Sent 1900000 sharded messages in 12.378674ms for 158333 messages / ms
+Size of packet data: [824, 1624, 2904, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 101379 unsharded messages in 13.019621ms for 7798 messages / ms
+Sent 2000000 sharded messages in 13.019621ms for 153846 messages / ms
+Size of packet data: [824, 1624, 2744, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 106449 unsharded messages in 13.661734ms for 8188 messages / ms
+Sent 2100000 sharded messages in 13.661734ms for 161538 messages / ms
+Size of packet data: [824, 1624, 2744, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 111519 unsharded messages in 14.301303ms for 7965 messages / ms
+Sent 2200000 sharded messages in 14.301303ms for 157142 messages / ms
+Size of packet data: [824, 1624, 2744, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 116586 unsharded messages in 14.945952ms for 8327 messages / ms
+Sent 2300000 sharded messages in 14.945952ms for 164285 messages / ms
+Size of packet data: [824, 1624, 2584, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 121646 unsharded messages in 15.591151ms for 8109 messages / ms
+Sent 2400000 sharded messages in 15.591151ms for 160000 messages / ms
+Size of packet data: [824, 1624, 2584, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 126709 unsharded messages in 16.2352ms for 7919 messages / ms
+Sent 2500000 sharded messages in 16.2352ms for 156250 messages / ms
+Size of packet data: [824, 1624, 2584, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 131771 unsharded messages in 16.881039ms for 8235 messages / ms
+Sent 2600000 sharded messages in 16.881039ms for 162500 messages / ms
+Size of packet data: [824, 1624, 2424, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 136827 unsharded messages in 17.529728ms for 8048 messages / ms
+Sent 2700000 sharded messages in 17.529728ms for 158823 messages / ms
+Size of packet data: [824, 1624, 2424, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 141893 unsharded messages in 18.17445ms for 7882 messages / ms
+Sent 2800000 sharded messages in 18.17445ms for 155555 messages / ms
+Size of packet data: [824, 1624, 2424, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 146951 unsharded messages in 18.824741ms for 8163 messages / ms
+Sent 2900000 sharded messages in 18.824741ms for 161111 messages / ms
+Size of packet data: [824, 1624, 2424, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 152017 unsharded messages in 19.465823ms for 8000 messages / ms
+Sent 3000000 sharded messages in 19.465823ms for 157894 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 157077 unsharded messages in 20.111357ms for 7853 messages / ms
+Sent 3100000 sharded messages in 20.111357ms for 155000 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 162143 unsharded messages in 20.755505ms for 8107 messages / ms
+Sent 3200000 sharded messages in 20.755505ms for 160000 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 167212 unsharded messages in 21.397264ms for 7962 messages / ms
+Sent 3300000 sharded messages in 21.397264ms for 157142 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 172279 unsharded messages in 22.037477ms for 7830 messages / ms
+Sent 3400000 sharded messages in 22.037477ms for 154545 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 177347 unsharded messages in 22.677349ms for 8061 messages / ms
+Sent 3500000 sharded messages in 22.677349ms for 159090 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 182419 unsharded messages in 23.313741ms for 7931 messages / ms
+Sent 3600000 sharded messages in 23.313741ms for 156521 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 187484 unsharded messages in 23.966391ms for 8151 messages / ms
+Sent 3700000 sharded messages in 23.966391ms for 160869 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 192547 unsharded messages in 24.612607ms for 8022 messages / ms
+Sent 3800000 sharded messages in 24.612607ms for 158333 messages / ms
+Size of packet data: [824, 1624, 2264, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 197605 unsharded messages in 25.261134ms for 7904 messages / ms
+Sent 3900000 sharded messages in 25.261134ms for 156000 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 202672 unsharded messages in 25.912524ms for 8106 messages / ms
+Sent 4000000 sharded messages in 25.912524ms for 160000 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 207740 unsharded messages in 26.563427ms for 7990 messages / ms
+Sent 4100000 sharded messages in 26.563427ms for 157692 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 212807 unsharded messages in 27.209883ms for 7881 messages / ms
+Sent 4200000 sharded messages in 27.209883ms for 155555 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 217867 unsharded messages in 27.862251ms for 8069 messages / ms
+Sent 4300000 sharded messages in 27.862251ms for 159259 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 222938 unsharded messages in 28.506955ms for 7962 messages / ms
+Sent 4400000 sharded messages in 28.506955ms for 157142 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 228007 unsharded messages in 29.159303ms for 7862 messages / ms
+Sent 4500000 sharded messages in 29.159303ms for 155172 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 233084 unsharded messages in 29.809622ms for 8037 messages / ms
+Sent 4600000 sharded messages in 29.809622ms for 158620 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 238155 unsharded messages in 30.448206ms for 7938 messages / ms
+Sent 4700000 sharded messages in 30.448206ms for 156666 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 243223 unsharded messages in 31.095696ms for 7845 messages / ms
+Sent 4800000 sharded messages in 31.095696ms for 154838 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 248287 unsharded messages in 31.740472ms for 8009 messages / ms
+Sent 4900000 sharded messages in 31.740472ms for 158064 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 253348 unsharded messages in 32.384577ms for 7917 messages / ms
+Sent 5000000 sharded messages in 32.384577ms for 156250 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 258410 unsharded messages in 33.032822ms for 7830 messages / ms
+Sent 5100000 sharded messages in 33.032822ms for 154545 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 263467 unsharded messages in 33.6804ms for 7983 messages / ms
+Sent 5200000 sharded messages in 33.6804ms for 157575 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 268529 unsharded messages in 34.323267ms for 7897 messages / ms
+Sent 5300000 sharded messages in 34.323267ms for 155882 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 273596 unsharded messages in 35.004909ms for 7817 messages / ms
+Sent 5400000 sharded messages in 35.004909ms for 154285 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 278664 unsharded messages in 35.645179ms for 7961 messages / ms
+Sent 5500000 sharded messages in 35.645179ms for 157142 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 283733 unsharded messages in 36.286844ms for 7881 messages / ms
+Sent 5600000 sharded messages in 36.286844ms for 155555 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 288804 unsharded messages in 36.926383ms for 8022 messages / ms
+Sent 5700000 sharded messages in 36.926383ms for 158333 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 293874 unsharded messages in 37.569542ms for 7942 messages / ms
+Sent 5800000 sharded messages in 37.569542ms for 156756 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 298941 unsharded messages in 38.210874ms for 7866 messages / ms
+Sent 5900000 sharded messages in 38.210874ms for 155263 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 304007 unsharded messages in 38.852161ms for 8000 messages / ms
+Sent 6000000 sharded messages in 38.852161ms for 157894 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 309078 unsharded messages in 39.490625ms for 7925 messages / ms
+Sent 6100000 sharded messages in 39.490625ms for 156410 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 314140 unsharded messages in 40.136543ms for 7853 messages / ms
+Sent 6200000 sharded messages in 40.136543ms for 155000 messages / ms
+Size of packet data: [824, 1624, 2104, 59224]
+Num shards by author_id: [20, 20, 20, 20]

@@ -1,0 +1,2100 @@
+Wrote 1th vote at Instant { tv_sec: 3713624, tv_nsec: 112726514 }
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+TRUNCATING 0 UPDATES
+Read 1th vote at Instant { tv_sec: 3713625, tv_nsec: 397232133 }
+Wrote 2th vote at Instant { tv_sec: 3713625, tv_nsec: 397813420 }
+Read 2th vote at Instant { tv_sec: 3713625, tv_nsec: 513411596 }
+Wrote 3th vote at Instant { tv_sec: 3713625, tv_nsec: 513415592 }
+Read 3th vote at Instant { tv_sec: 3713625, tv_nsec: 563717565 }
+Wrote 4th vote at Instant { tv_sec: 3713625, tv_nsec: 563719777 }
+Read 4th vote at Instant { tv_sec: 3713625, tv_nsec: 580377234 }
+Wrote 5th vote at Instant { tv_sec: 3713625, tv_nsec: 613719785 }
+Read 5th vote at Instant { tv_sec: 3713625, tv_nsec: 615749856 }
+Wrote 6th vote at Instant { tv_sec: 3713625, tv_nsec: 663719965 }
+Read 6th vote at Instant { tv_sec: 3713625, tv_nsec: 667081660 }
+Wrote 7th vote at Instant { tv_sec: 3713625, tv_nsec: 713720106 }
+Read 7th vote at Instant { tv_sec: 3713625, tv_nsec: 717211117 }
+Wrote 8th vote at Instant { tv_sec: 3713625, tv_nsec: 763720110 }
+Read 8th vote at Instant { tv_sec: 3713625, tv_nsec: 767758724 }
+Wrote 9th vote at Instant { tv_sec: 3713625, tv_nsec: 813720261 }
+Read 9th vote at Instant { tv_sec: 3713625, tv_nsec: 816506653 }
+Wrote 10th vote at Instant { tv_sec: 3713625, tv_nsec: 863872429 }
+Read 10th vote at Instant { tv_sec: 3713625, tv_nsec: 867487353 }
+Wrote 11th vote at Instant { tv_sec: 3713625, tv_nsec: 913927282 }
+Read 11th vote at Instant { tv_sec: 3713625, tv_nsec: 917577239 }
+Wrote 12th vote at Instant { tv_sec: 3713625, tv_nsec: 964085248 }
+Read 12th vote at Instant { tv_sec: 3713625, tv_nsec: 966761241 }
+Wrote 13th vote at Instant { tv_sec: 3713626, tv_nsec: 14172490 }
+Read 13th vote at Instant { tv_sec: 3713626, tv_nsec: 18814737 }
+Wrote 14th vote at Instant { tv_sec: 3713626, tv_nsec: 64254318 }
+Read 14th vote at Instant { tv_sec: 3713626, tv_nsec: 67042630 }
+Wrote 15th vote at Instant { tv_sec: 3713626, tv_nsec: 114396733 }
+Read 15th vote at Instant { tv_sec: 3713626, tv_nsec: 118126896 }
+Wrote 16th vote at Instant { tv_sec: 3713626, tv_nsec: 164458596 }
+Read 16th vote at Instant { tv_sec: 3713626, tv_nsec: 168094696 }
+Wrote 17th vote at Instant { tv_sec: 3713626, tv_nsec: 214541365 }
+Read 17th vote at Instant { tv_sec: 3713626, tv_nsec: 217515904 }
+Wrote 18th vote at Instant { tv_sec: 3713626, tv_nsec: 264653821 }
+Read 18th vote at Instant { tv_sec: 3713626, tv_nsec: 267396285 }
+Wrote 19th vote at Instant { tv_sec: 3713626, tv_nsec: 314746310 }
+Read 19th vote at Instant { tv_sec: 3713626, tv_nsec: 318438924 }
+Wrote 20th vote at Instant { tv_sec: 3713626, tv_nsec: 364829898 }
+Read 20th vote at Instant { tv_sec: 3713626, tv_nsec: 368665890 }
+Wrote 21th vote at Instant { tv_sec: 3713626, tv_nsec: 414958057 }
+Read 21th vote at Instant { tv_sec: 3713626, tv_nsec: 418670794 }
+Wrote 22th vote at Instant { tv_sec: 3713626, tv_nsec: 465012454 }
+Read 22th vote at Instant { tv_sec: 3713626, tv_nsec: 467275771 }
+TRUNCATING 922 UPDATES
+TRUNCATING 879 UPDATES
+TRUNCATING 856 UPDATES
+TRUNCATING 882 UPDATES
+TRUNCATING 849 UPDATES
+TRUNCATING 930 UPDATES
+TRUNCATING 871 UPDATES
+TRUNCATING 890 UPDATES
+TRUNCATING 936 UPDATES
+TRUNCATING 897 UPDATES
+TRUNCATING 843 UPDATES
+TRUNCATING 948 UPDATES
+TRUNCATING 911 UPDATES
+TRUNCATING 880 UPDATES
+TRUNCATING 935 UPDATES
+TRUNCATING 847 UPDATES
+TRUNCATING 917 UPDATES
+TRUNCATING 939 UPDATES
+TRUNCATING 944 UPDATES
+TRUNCATING 877 UPDATES
+Wrote 23th vote at Instant { tv_sec: 3713626, tv_nsec: 515012470 }
+Read 23th vote at Instant { tv_sec: 3713626, tv_nsec: 516080128 }
+Wrote 24th vote at Instant { tv_sec: 3713626, tv_nsec: 565012498 }
+Read 24th vote at Instant { tv_sec: 3713626, tv_nsec: 567088764 }
+Wrote 25th vote at Instant { tv_sec: 3713626, tv_nsec: 615016745 }
+Read 25th vote at Instant { tv_sec: 3713626, tv_nsec: 618200304 }
+Wrote 26th vote at Instant { tv_sec: 3713626, tv_nsec: 665146022 }
+Read 26th vote at Instant { tv_sec: 3713626, tv_nsec: 667394894 }
+Wrote 27th vote at Instant { tv_sec: 3713626, tv_nsec: 715203767 }
+Read 27th vote at Instant { tv_sec: 3713626, tv_nsec: 717440303 }
+Wrote 28th vote at Instant { tv_sec: 3713626, tv_nsec: 765224571 }
+Read 28th vote at Instant { tv_sec: 3713626, tv_nsec: 777069382 }
+Wrote 29th vote at Instant { tv_sec: 3713626, tv_nsec: 815342962 }
+Read 29th vote at Instant { tv_sec: 3713626, tv_nsec: 823725408 }
+Wrote 30th vote at Instant { tv_sec: 3713626, tv_nsec: 865379996 }
+Read 30th vote at Instant { tv_sec: 3713626, tv_nsec: 868856544 }
+Wrote 31th vote at Instant { tv_sec: 3713626, tv_nsec: 915490259 }
+Read 31th vote at Instant { tv_sec: 3713626, tv_nsec: 924799359 }
+Wrote 32th vote at Instant { tv_sec: 3713626, tv_nsec: 965757883 }
+Read 32th vote at Instant { tv_sec: 3713626, tv_nsec: 969788094 }
+Wrote 33th vote at Instant { tv_sec: 3713627, tv_nsec: 15758037 }
+Read 33th vote at Instant { tv_sec: 3713627, tv_nsec: 18665147 }
+Wrote 34th vote at Instant { tv_sec: 3713627, tv_nsec: 65917425 }
+Read 34th vote at Instant { tv_sec: 3713627, tv_nsec: 73053576 }
+Wrote 35th vote at Instant { tv_sec: 3713627, tv_nsec: 116125550 }
+Read 35th vote at Instant { tv_sec: 3713627, tv_nsec: 132766882 }
+Wrote 36th vote at Instant { tv_sec: 3713627, tv_nsec: 166183350 }
+Read 36th vote at Instant { tv_sec: 3713627, tv_nsec: 172330090 }
+Wrote 37th vote at Instant { tv_sec: 3713627, tv_nsec: 216266817 }
+Read 37th vote at Instant { tv_sec: 3713627, tv_nsec: 224316903 }
+Wrote 38th vote at Instant { tv_sec: 3713627, tv_nsec: 266537383 }
+Read 38th vote at Instant { tv_sec: 3713627, tv_nsec: 272301484 }
+Wrote 39th vote at Instant { tv_sec: 3713627, tv_nsec: 316537531 }
+Read 39th vote at Instant { tv_sec: 3713627, tv_nsec: 318891607 }
+Wrote 40th vote at Instant { tv_sec: 3713627, tv_nsec: 366596840 }
+Read 40th vote at Instant { tv_sec: 3713627, tv_nsec: 377077158 }
+Wrote 41th vote at Instant { tv_sec: 3713627, tv_nsec: 416597022 }
+Read 41th vote at Instant { tv_sec: 3713627, tv_nsec: 419271724 }
+Wrote 42th vote at Instant { tv_sec: 3713627, tv_nsec: 466597081 }
+Read 42th vote at Instant { tv_sec: 3713627, tv_nsec: 475316279 }
+Wrote 43th vote at Instant { tv_sec: 3713627, tv_nsec: 516777696 }
+Read 43th vote at Instant { tv_sec: 3713627, tv_nsec: 520825267 }
+Wrote 44th vote at Instant { tv_sec: 3713627, tv_nsec: 566834943 }
+Read 44th vote at Instant { tv_sec: 3713627, tv_nsec: 572187585 }
+Wrote 45th vote at Instant { tv_sec: 3713627, tv_nsec: 616973781 }
+Read 45th vote at Instant { tv_sec: 3713627, tv_nsec: 620279229 }
+Wrote 46th vote at Instant { tv_sec: 3713627, tv_nsec: 667158119 }
+Read 46th vote at Instant { tv_sec: 3713627, tv_nsec: 669927995 }
+Wrote 47th vote at Instant { tv_sec: 3713627, tv_nsec: 717178312 }
+Read 47th vote at Instant { tv_sec: 3713627, tv_nsec: 720399511 }
+Wrote 48th vote at Instant { tv_sec: 3713627, tv_nsec: 767395977 }
+Read 48th vote at Instant { tv_sec: 3713627, tv_nsec: 780979578 }
+Wrote 49th vote at Instant { tv_sec: 3713627, tv_nsec: 817424026 }
+Read 49th vote at Instant { tv_sec: 3713627, tv_nsec: 821760730 }
+Wrote 50th vote at Instant { tv_sec: 3713627, tv_nsec: 867572567 }
+Read 50th vote at Instant { tv_sec: 3713627, tv_nsec: 875547790 }
+Wrote 51th vote at Instant { tv_sec: 3713627, tv_nsec: 917592736 }
+Read 51th vote at Instant { tv_sec: 3713627, tv_nsec: 921140292 }
+Sent 28151 unsharded messages in 4.399508ms for 7037 messages / ms
+Sent 500000 sharded messages in 4.399508ms for 125000 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 3224, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 52th vote at Instant { tv_sec: 3713627, tv_nsec: 967592829 }
+Read 52th vote at Instant { tv_sec: 3713627, tv_nsec: 973807551 }
+Wrote 53th vote at Instant { tv_sec: 3713628, tv_nsec: 17592986 }
+Read 53th vote at Instant { tv_sec: 3713628, tv_nsec: 20396288 }
+Wrote 54th vote at Instant { tv_sec: 3713628, tv_nsec: 67593145 }
+Read 54th vote at Instant { tv_sec: 3713628, tv_nsec: 70370075 }
+Wrote 55th vote at Instant { tv_sec: 3713628, tv_nsec: 117601758 }
+Read 55th vote at Instant { tv_sec: 3713628, tv_nsec: 121557769 }
+Wrote 56th vote at Instant { tv_sec: 3713628, tv_nsec: 167701267 }
+Read 56th vote at Instant { tv_sec: 3713628, tv_nsec: 170537319 }
+Wrote 57th vote at Instant { tv_sec: 3713628, tv_nsec: 217808027 }
+Read 57th vote at Instant { tv_sec: 3713628, tv_nsec: 220714635 }
+Wrote 58th vote at Instant { tv_sec: 3713628, tv_nsec: 267883779 }
+Read 58th vote at Instant { tv_sec: 3713628, tv_nsec: 271819306 }
+Wrote 59th vote at Instant { tv_sec: 3713628, tv_nsec: 317965648 }
+Read 59th vote at Instant { tv_sec: 3713628, tv_nsec: 327035928 }
+Wrote 60th vote at Instant { tv_sec: 3713628, tv_nsec: 368087026 }
+Read 60th vote at Instant { tv_sec: 3713628, tv_nsec: 370981217 }
+Wrote 61th vote at Instant { tv_sec: 3713628, tv_nsec: 418206646 }
+Read 61th vote at Instant { tv_sec: 3713628, tv_nsec: 421171131 }
+Wrote 62th vote at Instant { tv_sec: 3713628, tv_nsec: 468540793 }
+Read 62th vote at Instant { tv_sec: 3713628, tv_nsec: 472366340 }
+Wrote 63th vote at Instant { tv_sec: 3713628, tv_nsec: 518763099 }
+TRUNCATING 19783 UPDATES
+TRUNCATING 19753 UPDATES
+TRUNCATING 19769 UPDATES
+TRUNCATING 19778 UPDATES
+TRUNCATING 19720 UPDATES
+TRUNCATING 19738 UPDATES
+TRUNCATING 19868 UPDATES
+TRUNCATING 19752 UPDATES
+TRUNCATING 19776 UPDATES
+TRUNCATING 19742 UPDATES
+TRUNCATING 19746 UPDATES
+TRUNCATING 19551 UPDATES
+TRUNCATING 19752 UPDATES
+TRUNCATING 19752 UPDATES
+TRUNCATING 19759 UPDATES
+TRUNCATING 19690 UPDATES
+TRUNCATING 19866 UPDATES
+TRUNCATING 19749 UPDATES
+TRUNCATING 19821 UPDATES
+TRUNCATING 19768 UPDATES
+Read 63th vote at Instant { tv_sec: 3713628, tv_nsec: 633762195 }
+Wrote 64th vote at Instant { tv_sec: 3713628, tv_nsec: 634242765 }
+Read 64th vote at Instant { tv_sec: 3713628, tv_nsec: 659639266 }
+Wrote 65th vote at Instant { tv_sec: 3713628, tv_nsec: 684242805 }
+Read 65th vote at Instant { tv_sec: 3713628, tv_nsec: 687399134 }
+Wrote 66th vote at Instant { tv_sec: 3713628, tv_nsec: 734242925 }
+Read 66th vote at Instant { tv_sec: 3713628, tv_nsec: 738233034 }
+Wrote 67th vote at Instant { tv_sec: 3713628, tv_nsec: 784249101 }
+Read 67th vote at Instant { tv_sec: 3713628, tv_nsec: 786508026 }
+Wrote 68th vote at Instant { tv_sec: 3713628, tv_nsec: 834360450 }
+Read 68th vote at Instant { tv_sec: 3713628, tv_nsec: 836583961 }
+Wrote 69th vote at Instant { tv_sec: 3713628, tv_nsec: 884499311 }
+Read 69th vote at Instant { tv_sec: 3713628, tv_nsec: 886922812 }
+Wrote 70th vote at Instant { tv_sec: 3713628, tv_nsec: 934626154 }
+Read 70th vote at Instant { tv_sec: 3713628, tv_nsec: 936868986 }
+Wrote 71th vote at Instant { tv_sec: 3713628, tv_nsec: 984786005 }
+Read 71th vote at Instant { tv_sec: 3713628, tv_nsec: 988059168 }
+Wrote 72th vote at Instant { tv_sec: 3713629, tv_nsec: 34848413 }
+Read 72th vote at Instant { tv_sec: 3713629, tv_nsec: 37051497 }
+Wrote 73th vote at Instant { tv_sec: 3713629, tv_nsec: 84892566 }
+Read 73th vote at Instant { tv_sec: 3713629, tv_nsec: 88217152 }
+Wrote 74th vote at Instant { tv_sec: 3713629, tv_nsec: 135054119 }
+Read 74th vote at Instant { tv_sec: 3713629, tv_nsec: 138394738 }
+Wrote 75th vote at Instant { tv_sec: 3713629, tv_nsec: 185119209 }
+Read 75th vote at Instant { tv_sec: 3713629, tv_nsec: 187343500 }
+Wrote 76th vote at Instant { tv_sec: 3713629, tv_nsec: 235238618 }
+Read 76th vote at Instant { tv_sec: 3713629, tv_nsec: 238498530 }
+Wrote 77th vote at Instant { tv_sec: 3713629, tv_nsec: 285369859 }
+Read 77th vote at Instant { tv_sec: 3713629, tv_nsec: 287554772 }
+Wrote 78th vote at Instant { tv_sec: 3713629, tv_nsec: 335369982 }
+Read 78th vote at Instant { tv_sec: 3713629, tv_nsec: 338057378 }
+Wrote 79th vote at Instant { tv_sec: 3713629, tv_nsec: 385370080 }
+Read 79th vote at Instant { tv_sec: 3713629, tv_nsec: 388213059 }
+Wrote 80th vote at Instant { tv_sec: 3713629, tv_nsec: 435370200 }
+Read 80th vote at Instant { tv_sec: 3713629, tv_nsec: 438087216 }
+Wrote 81th vote at Instant { tv_sec: 3713629, tv_nsec: 485370206 }
+Read 81th vote at Instant { tv_sec: 3713629, tv_nsec: 489305327 }
+Wrote 82th vote at Instant { tv_sec: 3713629, tv_nsec: 535564704 }
+Read 82th vote at Instant { tv_sec: 3713629, tv_nsec: 538553745 }
+Wrote 83th vote at Instant { tv_sec: 3713629, tv_nsec: 585608952 }
+Read 83th vote at Instant { tv_sec: 3713629, tv_nsec: 588500079 }
+Wrote 84th vote at Instant { tv_sec: 3713629, tv_nsec: 635794829 }
+Read 84th vote at Instant { tv_sec: 3713629, tv_nsec: 640529002 }
+Wrote 85th vote at Instant { tv_sec: 3713629, tv_nsec: 685944852 }
+Read 85th vote at Instant { tv_sec: 3713629, tv_nsec: 689860307 }
+Wrote 86th vote at Instant { tv_sec: 3713629, tv_nsec: 736040172 }
+Read 86th vote at Instant { tv_sec: 3713629, tv_nsec: 740397827 }
+Wrote 87th vote at Instant { tv_sec: 3713629, tv_nsec: 786189303 }
+Read 87th vote at Instant { tv_sec: 3713629, tv_nsec: 790346846 }
+Wrote 88th vote at Instant { tv_sec: 3713629, tv_nsec: 836327149 }
+Read 88th vote at Instant { tv_sec: 3713629, tv_nsec: 840841755 }
+Wrote 89th vote at Instant { tv_sec: 3713629, tv_nsec: 886423565 }
+Read 89th vote at Instant { tv_sec: 3713629, tv_nsec: 889119768 }
+Wrote 90th vote at Instant { tv_sec: 3713629, tv_nsec: 936586157 }
+Read 90th vote at Instant { tv_sec: 3713629, tv_nsec: 939164839 }
+Wrote 91th vote at Instant { tv_sec: 3713629, tv_nsec: 986663471 }
+Read 91th vote at Instant { tv_sec: 3713629, tv_nsec: 990298337 }
+Wrote 92th vote at Instant { tv_sec: 3713630, tv_nsec: 36794416 }
+Read 92th vote at Instant { tv_sec: 3713630, tv_nsec: 40463631 }
+Wrote 93th vote at Instant { tv_sec: 3713630, tv_nsec: 86794462 }
+Read 93th vote at Instant { tv_sec: 3713630, tv_nsec: 89356503 }
+Wrote 94th vote at Instant { tv_sec: 3713630, tv_nsec: 136794836 }
+Read 94th vote at Instant { tv_sec: 3713630, tv_nsec: 139527620 }
+Wrote 95th vote at Instant { tv_sec: 3713630, tv_nsec: 186847047 }
+Read 95th vote at Instant { tv_sec: 3713630, tv_nsec: 193742660 }
+Wrote 96th vote at Instant { tv_sec: 3713630, tv_nsec: 236968474 }
+Read 96th vote at Instant { tv_sec: 3713630, tv_nsec: 239737037 }
+Wrote 97th vote at Instant { tv_sec: 3713630, tv_nsec: 287175177 }
+Read 97th vote at Instant { tv_sec: 3713630, tv_nsec: 291086112 }
+Wrote 98th vote at Instant { tv_sec: 3713630, tv_nsec: 337264231 }
+Read 98th vote at Instant { tv_sec: 3713630, tv_nsec: 340045068 }
+Wrote 99th vote at Instant { tv_sec: 3713630, tv_nsec: 387404800 }
+Read 99th vote at Instant { tv_sec: 3713630, tv_nsec: 390151081 }
+Wrote 100th vote at Instant { tv_sec: 3713630, tv_nsec: 437563143 }
+Read 100th vote at Instant { tv_sec: 3713630, tv_nsec: 440047412 }
+Wrote 101th vote at Instant { tv_sec: 3713630, tv_nsec: 489352674 }
+TRUNCATING 18543 UPDATES
+TRUNCATING 18610 UPDATES
+TRUNCATING 18563 UPDATES
+TRUNCATING 18613 UPDATES
+TRUNCATING 18701 UPDATES
+TRUNCATING 18617 UPDATES
+TRUNCATING 18611 UPDATES
+TRUNCATING 18559 UPDATES
+TRUNCATING 18655 UPDATES
+TRUNCATING 18545 UPDATES
+TRUNCATING 18603 UPDATES
+TRUNCATING 18652 UPDATES
+TRUNCATING 18545 UPDATES
+TRUNCATING 18415 UPDATES
+TRUNCATING 18641 UPDATES
+TRUNCATING 18551 UPDATES
+TRUNCATING 18614 UPDATES
+TRUNCATING 18622 UPDATES
+TRUNCATING 18633 UPDATES
+TRUNCATING 18574 UPDATES
+Read 101th vote at Instant { tv_sec: 3713630, tv_nsec: 576887664 }
+Wrote 102th vote at Instant { tv_sec: 3713630, tv_nsec: 576892249 }
+Read 102th vote at Instant { tv_sec: 3713630, tv_nsec: 591394747 }
+Sent 56388 unsharded messages in 7.075794ms for 8055 messages / ms
+Sent 1000000 sharded messages in 7.075794ms for 142857 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1784, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 103th vote at Instant { tv_sec: 3713630, tv_nsec: 626892326 }
+Read 103th vote at Instant { tv_sec: 3713630, tv_nsec: 629667835 }
+Wrote 104th vote at Instant { tv_sec: 3713630, tv_nsec: 676948865 }
+Read 104th vote at Instant { tv_sec: 3713630, tv_nsec: 680340093 }
+Wrote 105th vote at Instant { tv_sec: 3713630, tv_nsec: 726949047 }
+Read 105th vote at Instant { tv_sec: 3713630, tv_nsec: 733770023 }
+Wrote 106th vote at Instant { tv_sec: 3713630, tv_nsec: 776949053 }
+Read 106th vote at Instant { tv_sec: 3713630, tv_nsec: 780569391 }
+Wrote 107th vote at Instant { tv_sec: 3713630, tv_nsec: 826949116 }
+Read 107th vote at Instant { tv_sec: 3713630, tv_nsec: 831087274 }
+Wrote 108th vote at Instant { tv_sec: 3713630, tv_nsec: 877040158 }
+Read 108th vote at Instant { tv_sec: 3713630, tv_nsec: 879744074 }
+Wrote 109th vote at Instant { tv_sec: 3713630, tv_nsec: 927068361 }
+Read 109th vote at Instant { tv_sec: 3713630, tv_nsec: 930859548 }
+Wrote 110th vote at Instant { tv_sec: 3713630, tv_nsec: 977282469 }
+Read 110th vote at Instant { tv_sec: 3713630, tv_nsec: 980908509 }
+Wrote 111th vote at Instant { tv_sec: 3713631, tv_nsec: 27348951 }
+Read 111th vote at Instant { tv_sec: 3713631, tv_nsec: 31113191 }
+Wrote 112th vote at Instant { tv_sec: 3713631, tv_nsec: 77453202 }
+Read 112th vote at Instant { tv_sec: 3713631, tv_nsec: 80168475 }
+Wrote 113th vote at Instant { tv_sec: 3713631, tv_nsec: 127453330 }
+Read 113th vote at Instant { tv_sec: 3713631, tv_nsec: 130280008 }
+Wrote 114th vote at Instant { tv_sec: 3713631, tv_nsec: 177453443 }
+Read 114th vote at Instant { tv_sec: 3713631, tv_nsec: 183146583 }
+Wrote 115th vote at Instant { tv_sec: 3713631, tv_nsec: 227639615 }
+Read 115th vote at Instant { tv_sec: 3713631, tv_nsec: 230872826 }
+Wrote 116th vote at Instant { tv_sec: 3713631, tv_nsec: 277639632 }
+Read 116th vote at Instant { tv_sec: 3713631, tv_nsec: 279871493 }
+Wrote 117th vote at Instant { tv_sec: 3713631, tv_nsec: 327639745 }
+Read 117th vote at Instant { tv_sec: 3713631, tv_nsec: 332232279 }
+Wrote 118th vote at Instant { tv_sec: 3713631, tv_nsec: 377730105 }
+Read 118th vote at Instant { tv_sec: 3713631, tv_nsec: 381418928 }
+Wrote 119th vote at Instant { tv_sec: 3713631, tv_nsec: 427823784 }
+Read 119th vote at Instant { tv_sec: 3713631, tv_nsec: 430081790 }
+Wrote 120th vote at Instant { tv_sec: 3713631, tv_nsec: 477942593 }
+Read 120th vote at Instant { tv_sec: 3713631, tv_nsec: 481181388 }
+Wrote 121th vote at Instant { tv_sec: 3713631, tv_nsec: 528050554 }
+Read 121th vote at Instant { tv_sec: 3713631, tv_nsec: 531532758 }
+Wrote 122th vote at Instant { tv_sec: 3713631, tv_nsec: 578166460 }
+Read 122th vote at Instant { tv_sec: 3713631, tv_nsec: 580425227 }
+Wrote 123th vote at Instant { tv_sec: 3713631, tv_nsec: 628226280 }
+Read 123th vote at Instant { tv_sec: 3713631, tv_nsec: 631598179 }
+Wrote 124th vote at Instant { tv_sec: 3713631, tv_nsec: 678328082 }
+Read 124th vote at Instant { tv_sec: 3713631, tv_nsec: 683763640 }
+Wrote 125th vote at Instant { tv_sec: 3713631, tv_nsec: 728440783 }
+Read 125th vote at Instant { tv_sec: 3713631, tv_nsec: 732352066 }
+Wrote 126th vote at Instant { tv_sec: 3713631, tv_nsec: 778440791 }
+Read 126th vote at Instant { tv_sec: 3713631, tv_nsec: 782899935 }
+Wrote 127th vote at Instant { tv_sec: 3713631, tv_nsec: 828440828 }
+Read 127th vote at Instant { tv_sec: 3713631, tv_nsec: 831956078 }
+Wrote 128th vote at Instant { tv_sec: 3713631, tv_nsec: 878441015 }
+Read 128th vote at Instant { tv_sec: 3713631, tv_nsec: 882082410 }
+Wrote 129th vote at Instant { tv_sec: 3713631, tv_nsec: 928441269 }
+Read 129th vote at Instant { tv_sec: 3713631, tv_nsec: 931189142 }
+Wrote 130th vote at Instant { tv_sec: 3713631, tv_nsec: 978516746 }
+Read 130th vote at Instant { tv_sec: 3713631, tv_nsec: 984552560 }
+Wrote 131th vote at Instant { tv_sec: 3713632, tv_nsec: 28516869 }
+Read 131th vote at Instant { tv_sec: 3713632, tv_nsec: 31417595 }
+Wrote 132th vote at Instant { tv_sec: 3713632, tv_nsec: 78516941 }
+Read 132th vote at Instant { tv_sec: 3713632, tv_nsec: 81189318 }
+Wrote 133th vote at Instant { tv_sec: 3713632, tv_nsec: 128572604 }
+Read 133th vote at Instant { tv_sec: 3713632, tv_nsec: 131776558 }
+Wrote 134th vote at Instant { tv_sec: 3713632, tv_nsec: 178665646 }
+Read 134th vote at Instant { tv_sec: 3713632, tv_nsec: 183809437 }
+Wrote 135th vote at Instant { tv_sec: 3713632, tv_nsec: 228696089 }
+Read 135th vote at Instant { tv_sec: 3713632, tv_nsec: 231581705 }
+Wrote 136th vote at Instant { tv_sec: 3713632, tv_nsec: 278899539 }
+Read 136th vote at Instant { tv_sec: 3713632, tv_nsec: 281815863 }
+Wrote 137th vote at Instant { tv_sec: 3713632, tv_nsec: 329037311 }
+Read 137th vote at Instant { tv_sec: 3713632, tv_nsec: 333769615 }
+Wrote 138th vote at Instant { tv_sec: 3713632, tv_nsec: 379138896 }
+Read 138th vote at Instant { tv_sec: 3713632, tv_nsec: 382991290 }
+Wrote 139th vote at Instant { tv_sec: 3713632, tv_nsec: 429226038 }
+Read 139th vote at Instant { tv_sec: 3713632, tv_nsec: 432212759 }
+Wrote 140th vote at Instant { tv_sec: 3713632, tv_nsec: 479308234 }
+TRUNCATING 18976 UPDATES
+TRUNCATING 18813 UPDATES
+TRUNCATING 18900 UPDATES
+TRUNCATING 18870 UPDATES
+TRUNCATING 18931 UPDATES
+TRUNCATING 18866 UPDATES
+TRUNCATING 18900 UPDATES
+TRUNCATING 18853 UPDATES
+TRUNCATING 18873 UPDATES
+TRUNCATING 18925 UPDATES
+TRUNCATING 18841 UPDATES
+TRUNCATING 18878 UPDATES
+TRUNCATING 18896 UPDATES
+TRUNCATING 18594 UPDATES
+TRUNCATING 18969 UPDATES
+TRUNCATING 18865 UPDATES
+TRUNCATING 18859 UPDATES
+TRUNCATING 18843 UPDATES
+TRUNCATING 18923 UPDATES
+TRUNCATING 18892 UPDATES
+Read 140th vote at Instant { tv_sec: 3713632, tv_nsec: 567503633 }
+Wrote 141th vote at Instant { tv_sec: 3713632, tv_nsec: 567505928 }
+Read 141th vote at Instant { tv_sec: 3713632, tv_nsec: 579576092 }
+Wrote 142th vote at Instant { tv_sec: 3713632, tv_nsec: 617506017 }
+Read 142th vote at Instant { tv_sec: 3713632, tv_nsec: 619884484 }
+Wrote 143th vote at Instant { tv_sec: 3713632, tv_nsec: 667506091 }
+Read 143th vote at Instant { tv_sec: 3713632, tv_nsec: 669922003 }
+Wrote 144th vote at Instant { tv_sec: 3713632, tv_nsec: 717506104 }
+Read 144th vote at Instant { tv_sec: 3713632, tv_nsec: 720971350 }
+Wrote 145th vote at Instant { tv_sec: 3713632, tv_nsec: 767506114 }
+Read 145th vote at Instant { tv_sec: 3713632, tv_nsec: 773728311 }
+Wrote 146th vote at Instant { tv_sec: 3713632, tv_nsec: 817506120 }
+Read 146th vote at Instant { tv_sec: 3713632, tv_nsec: 820407399 }
+Wrote 147th vote at Instant { tv_sec: 3713632, tv_nsec: 867564155 }
+Read 147th vote at Instant { tv_sec: 3713632, tv_nsec: 871183949 }
+Wrote 148th vote at Instant { tv_sec: 3713632, tv_nsec: 917688007 }
+Read 148th vote at Instant { tv_sec: 3713632, tv_nsec: 920380323 }
+Wrote 149th vote at Instant { tv_sec: 3713632, tv_nsec: 967835035 }
+Read 149th vote at Instant { tv_sec: 3713632, tv_nsec: 971407561 }
+Wrote 150th vote at Instant { tv_sec: 3713633, tv_nsec: 17893310 }
+Read 150th vote at Instant { tv_sec: 3713633, tv_nsec: 23722464 }
+Wrote 151th vote at Instant { tv_sec: 3713633, tv_nsec: 68022863 }
+Read 151th vote at Instant { tv_sec: 3713633, tv_nsec: 71781299 }
+Wrote 152th vote at Instant { tv_sec: 3713633, tv_nsec: 118122422 }
+Read 152th vote at Instant { tv_sec: 3713633, tv_nsec: 121059323 }
+Wrote 153th vote at Instant { tv_sec: 3713633, tv_nsec: 168222939 }
+Read 153th vote at Instant { tv_sec: 3713633, tv_nsec: 171096048 }
+Wrote 154th vote at Instant { tv_sec: 3713633, tv_nsec: 218275342 }
+Read 154th vote at Instant { tv_sec: 3713633, tv_nsec: 220295775 }
+Sent 84683 unsharded messages in 9.708216ms for 9409 messages / ms
+Sent 1500000 sharded messages in 9.708216ms for 166666 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1464, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 155th vote at Instant { tv_sec: 3713633, tv_nsec: 268275465 }
+Read 155th vote at Instant { tv_sec: 3713633, tv_nsec: 271417923 }
+Wrote 156th vote at Instant { tv_sec: 3713633, tv_nsec: 318386655 }
+Read 156th vote at Instant { tv_sec: 3713633, tv_nsec: 320663779 }
+Wrote 157th vote at Instant { tv_sec: 3713633, tv_nsec: 368429631 }
+Read 157th vote at Instant { tv_sec: 3713633, tv_nsec: 371567696 }
+Wrote 158th vote at Instant { tv_sec: 3713633, tv_nsec: 418523023 }
+Read 158th vote at Instant { tv_sec: 3713633, tv_nsec: 421697764 }
+Wrote 159th vote at Instant { tv_sec: 3713633, tv_nsec: 468610877 }
+Read 159th vote at Instant { tv_sec: 3713633, tv_nsec: 471788069 }
+Wrote 160th vote at Instant { tv_sec: 3713633, tv_nsec: 518709380 }
+Read 160th vote at Instant { tv_sec: 3713633, tv_nsec: 520894988 }
+Wrote 161th vote at Instant { tv_sec: 3713633, tv_nsec: 568822895 }
+Read 161th vote at Instant { tv_sec: 3713633, tv_nsec: 572027626 }
+Wrote 162th vote at Instant { tv_sec: 3713633, tv_nsec: 618942408 }
+Read 162th vote at Instant { tv_sec: 3713633, tv_nsec: 621136009 }
+Wrote 163th vote at Instant { tv_sec: 3713633, tv_nsec: 669054177 }
+Read 163th vote at Instant { tv_sec: 3713633, tv_nsec: 672393192 }
+Wrote 164th vote at Instant { tv_sec: 3713633, tv_nsec: 719054392 }
+Read 164th vote at Instant { tv_sec: 3713633, tv_nsec: 722647493 }
+Wrote 165th vote at Instant { tv_sec: 3713633, tv_nsec: 769054501 }
+Read 165th vote at Instant { tv_sec: 3713633, tv_nsec: 772721933 }
+Wrote 166th vote at Instant { tv_sec: 3713633, tv_nsec: 819054690 }
+Read 166th vote at Instant { tv_sec: 3713633, tv_nsec: 822827539 }
+Wrote 167th vote at Instant { tv_sec: 3713633, tv_nsec: 869114696 }
+Read 167th vote at Instant { tv_sec: 3713633, tv_nsec: 871884440 }
+Wrote 168th vote at Instant { tv_sec: 3713633, tv_nsec: 919215864 }
+Read 168th vote at Instant { tv_sec: 3713633, tv_nsec: 923773681 }
+Wrote 169th vote at Instant { tv_sec: 3713633, tv_nsec: 969289893 }
+Read 169th vote at Instant { tv_sec: 3713633, tv_nsec: 972486199 }
+Wrote 170th vote at Instant { tv_sec: 3713634, tv_nsec: 19459567 }
+Read 170th vote at Instant { tv_sec: 3713634, tv_nsec: 27067347 }
+Wrote 171th vote at Instant { tv_sec: 3713634, tv_nsec: 69514753 }
+Read 171th vote at Instant { tv_sec: 3713634, tv_nsec: 73527926 }
+Wrote 172th vote at Instant { tv_sec: 3713634, tv_nsec: 119612172 }
+Read 172th vote at Instant { tv_sec: 3713634, tv_nsec: 127159888 }
+Wrote 173th vote at Instant { tv_sec: 3713634, tv_nsec: 169695694 }
+Read 173th vote at Instant { tv_sec: 3713634, tv_nsec: 173773448 }
+Wrote 174th vote at Instant { tv_sec: 3713634, tv_nsec: 219816539 }
+Read 174th vote at Instant { tv_sec: 3713634, tv_nsec: 223821362 }
+Wrote 175th vote at Instant { tv_sec: 3713634, tv_nsec: 269896022 }
+Read 175th vote at Instant { tv_sec: 3713634, tv_nsec: 274115506 }
+Wrote 176th vote at Instant { tv_sec: 3713634, tv_nsec: 319994451 }
+Read 176th vote at Instant { tv_sec: 3713634, tv_nsec: 322157569 }
+Wrote 177th vote at Instant { tv_sec: 3713634, tv_nsec: 370100256 }
+Read 177th vote at Instant { tv_sec: 3713634, tv_nsec: 373759298 }
+Wrote 178th vote at Instant { tv_sec: 3713634, tv_nsec: 420184135 }
+Read 178th vote at Instant { tv_sec: 3713634, tv_nsec: 423490971 }
+Wrote 179th vote at Instant { tv_sec: 3713634, tv_nsec: 470275550 }
+Read 179th vote at Instant { tv_sec: 3713634, tv_nsec: 472657456 }
+TRUNCATING 19030 UPDATES
+TRUNCATING 19043 UPDATES
+TRUNCATING 18983 UPDATES
+TRUNCATING 19030 UPDATES
+TRUNCATING 19018 UPDATES
+TRUNCATING 19018 UPDATES
+TRUNCATING 19025 UPDATES
+TRUNCATING 18828 UPDATES
+TRUNCATING 19134 UPDATES
+TRUNCATING 19050 UPDATES
+TRUNCATING 19111 UPDATES
+TRUNCATING 18983 UPDATES
+TRUNCATING 19017 UPDATES
+TRUNCATING 18985 UPDATES
+TRUNCATING 19103 UPDATES
+TRUNCATING 19081 UPDATES
+TRUNCATING 19093 UPDATES
+TRUNCATING 19032 UPDATES
+TRUNCATING 19000 UPDATES
+TRUNCATING 19052 UPDATES
+Wrote 180th vote at Instant { tv_sec: 3713634, tv_nsec: 520275550 }
+Read 180th vote at Instant { tv_sec: 3713634, tv_nsec: 557094007 }
+Wrote 181th vote at Instant { tv_sec: 3713634, tv_nsec: 570360195 }
+Read 181th vote at Instant { tv_sec: 3713634, tv_nsec: 577979764 }
+Wrote 182th vote at Instant { tv_sec: 3713634, tv_nsec: 620451781 }
+Read 182th vote at Instant { tv_sec: 3713634, tv_nsec: 623769337 }
+Wrote 183th vote at Instant { tv_sec: 3713634, tv_nsec: 670545760 }
+Read 183th vote at Instant { tv_sec: 3713634, tv_nsec: 672947045 }
+Wrote 184th vote at Instant { tv_sec: 3713634, tv_nsec: 720545774 }
+Read 184th vote at Instant { tv_sec: 3713634, tv_nsec: 723028160 }
+Wrote 185th vote at Instant { tv_sec: 3713634, tv_nsec: 770546213 }
+Read 185th vote at Instant { tv_sec: 3713634, tv_nsec: 773168813 }
+Wrote 186th vote at Instant { tv_sec: 3713634, tv_nsec: 820546402 }
+Read 186th vote at Instant { tv_sec: 3713634, tv_nsec: 823340508 }
+Wrote 187th vote at Instant { tv_sec: 3713634, tv_nsec: 870622988 }
+Read 187th vote at Instant { tv_sec: 3713634, tv_nsec: 873432396 }
+Wrote 188th vote at Instant { tv_sec: 3713634, tv_nsec: 920727189 }
+Read 188th vote at Instant { tv_sec: 3713634, tv_nsec: 923444425 }
+Wrote 189th vote at Instant { tv_sec: 3713634, tv_nsec: 970772814 }
+Read 189th vote at Instant { tv_sec: 3713634, tv_nsec: 973551912 }
+Wrote 190th vote at Instant { tv_sec: 3713635, tv_nsec: 20920396 }
+Read 190th vote at Instant { tv_sec: 3713635, tv_nsec: 24899523 }
+Wrote 191th vote at Instant { tv_sec: 3713635, tv_nsec: 70995987 }
+Read 191th vote at Instant { tv_sec: 3713635, tv_nsec: 73867555 }
+Wrote 192th vote at Instant { tv_sec: 3713635, tv_nsec: 121163731 }
+Read 192th vote at Instant { tv_sec: 3713635, tv_nsec: 124927195 }
+Wrote 193th vote at Instant { tv_sec: 3713635, tv_nsec: 171293325 }
+Read 193th vote at Instant { tv_sec: 3713635, tv_nsec: 174118503 }
+Wrote 194th vote at Instant { tv_sec: 3713635, tv_nsec: 221390232 }
+Read 194th vote at Instant { tv_sec: 3713635, tv_nsec: 224118143 }
+Wrote 195th vote at Instant { tv_sec: 3713635, tv_nsec: 271798061 }
+Read 195th vote at Instant { tv_sec: 3713635, tv_nsec: 280491800 }
+Wrote 196th vote at Instant { tv_sec: 3713635, tv_nsec: 321798104 }
+Read 196th vote at Instant { tv_sec: 3713635, tv_nsec: 325562796 }
+Wrote 197th vote at Instant { tv_sec: 3713635, tv_nsec: 371798447 }
+Read 197th vote at Instant { tv_sec: 3713635, tv_nsec: 375608169 }
+Wrote 198th vote at Instant { tv_sec: 3713635, tv_nsec: 421798566 }
+Read 198th vote at Instant { tv_sec: 3713635, tv_nsec: 425605911 }
+Wrote 199th vote at Instant { tv_sec: 3713635, tv_nsec: 471925408 }
+Read 199th vote at Instant { tv_sec: 3713635, tv_nsec: 475677512 }
+TRUNCATING 9486 UPDATES
+TRUNCATING 9493 UPDATES
+TRUNCATING 9459 UPDATES
+TRUNCATING 9463 UPDATES
+TRUNCATING 9371 UPDATES
+TRUNCATING 9444 UPDATES
+TRUNCATING 9351 UPDATES
+TRUNCATING 9414 UPDATES
+TRUNCATING 9414 UPDATES
+TRUNCATING 9435 UPDATES
+TRUNCATING 9445 UPDATES
+TRUNCATING 9431 UPDATES
+TRUNCATING 9458 UPDATES
+TRUNCATING 9484 UPDATES
+TRUNCATING 9440 UPDATES
+TRUNCATING 9448 UPDATES
+TRUNCATING 9504 UPDATES
+TRUNCATING 9456 UPDATES
+TRUNCATING 9454 UPDATES
+TRUNCATING 9493 UPDATES
+Wrote 200th vote at Instant { tv_sec: 3713635, tv_nsec: 521925554 }
+Read 200th vote at Instant { tv_sec: 3713635, tv_nsec: 542807868 }
+Wrote 201th vote at Instant { tv_sec: 3713635, tv_nsec: 571925611 }
+Read 201th vote at Instant { tv_sec: 3713635, tv_nsec: 575103340 }
+Wrote 202th vote at Instant { tv_sec: 3713635, tv_nsec: 622034449 }
+Read 202th vote at Instant { tv_sec: 3713635, tv_nsec: 624199529 }
+Wrote 203th vote at Instant { tv_sec: 3713635, tv_nsec: 672133754 }
+Read 203th vote at Instant { tv_sec: 3713635, tv_nsec: 675311958 }
+Wrote 204th vote at Instant { tv_sec: 3713635, tv_nsec: 722203711 }
+Read 204th vote at Instant { tv_sec: 3713635, tv_nsec: 724478582 }
+Wrote 205th vote at Instant { tv_sec: 3713635, tv_nsec: 772285767 }
+Read 205th vote at Instant { tv_sec: 3713635, tv_nsec: 774476657 }
+Wrote 206th vote at Instant { tv_sec: 3713635, tv_nsec: 822350650 }
+Read 206th vote at Instant { tv_sec: 3713635, tv_nsec: 824614946 }
+Wrote 207th vote at Instant { tv_sec: 3713635, tv_nsec: 872475219 }
+Read 207th vote at Instant { tv_sec: 3713635, tv_nsec: 875695758 }
+Sent 112939 unsharded messages in 12.375597ms for 9411 messages / ms
+Sent 2000000 sharded messages in 12.375597ms for 166666 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 208th vote at Instant { tv_sec: 3713635, tv_nsec: 922582865 }
+Read 208th vote at Instant { tv_sec: 3713635, tv_nsec: 927055756 }
+Wrote 209th vote at Instant { tv_sec: 3713635, tv_nsec: 972671348 }
+Read 209th vote at Instant { tv_sec: 3713635, tv_nsec: 975915368 }
+Wrote 210th vote at Instant { tv_sec: 3713636, tv_nsec: 22791041 }
+Read 210th vote at Instant { tv_sec: 3713636, tv_nsec: 25038737 }
+Wrote 211th vote at Instant { tv_sec: 3713636, tv_nsec: 72901356 }
+Read 211th vote at Instant { tv_sec: 3713636, tv_nsec: 75130636 }
+Wrote 212th vote at Instant { tv_sec: 3713636, tv_nsec: 123042920 }
+Read 212th vote at Instant { tv_sec: 3713636, tv_nsec: 130360217 }
+Wrote 213th vote at Instant { tv_sec: 3713636, tv_nsec: 173141279 }
+Read 213th vote at Instant { tv_sec: 3713636, tv_nsec: 175364970 }
+Wrote 214th vote at Instant { tv_sec: 3713636, tv_nsec: 223141534 }
+Read 214th vote at Instant { tv_sec: 3713636, tv_nsec: 226496253 }
+Wrote 215th vote at Instant { tv_sec: 3713636, tv_nsec: 273233312 }
+Read 215th vote at Instant { tv_sec: 3713636, tv_nsec: 276406653 }
+Wrote 216th vote at Instant { tv_sec: 3713636, tv_nsec: 323343876 }
+Read 216th vote at Instant { tv_sec: 3713636, tv_nsec: 326637986 }
+Wrote 217th vote at Instant { tv_sec: 3713636, tv_nsec: 373446923 }
+Read 217th vote at Instant { tv_sec: 3713636, tv_nsec: 380461890 }
+Wrote 218th vote at Instant { tv_sec: 3713636, tv_nsec: 423516476 }
+Read 218th vote at Instant { tv_sec: 3713636, tv_nsec: 426816972 }
+Wrote 219th vote at Instant { tv_sec: 3713636, tv_nsec: 473694126 }
+Read 219th vote at Instant { tv_sec: 3713636, tv_nsec: 477005466 }
+Wrote 220th vote at Instant { tv_sec: 3713636, tv_nsec: 523786667 }
+Read 220th vote at Instant { tv_sec: 3713636, tv_nsec: 527026734 }
+Wrote 221th vote at Instant { tv_sec: 3713636, tv_nsec: 573831131 }
+Read 221th vote at Instant { tv_sec: 3713636, tv_nsec: 580422652 }
+Wrote 222th vote at Instant { tv_sec: 3713636, tv_nsec: 623971402 }
+Read 222th vote at Instant { tv_sec: 3713636, tv_nsec: 630414084 }
+Wrote 223th vote at Instant { tv_sec: 3713636, tv_nsec: 673971713 }
+Read 223th vote at Instant { tv_sec: 3713636, tv_nsec: 677548389 }
+Wrote 224th vote at Instant { tv_sec: 3713636, tv_nsec: 723971840 }
+Read 224th vote at Instant { tv_sec: 3713636, tv_nsec: 730429283 }
+Wrote 225th vote at Instant { tv_sec: 3713636, tv_nsec: 773978159 }
+Read 225th vote at Instant { tv_sec: 3713636, tv_nsec: 777014354 }
+Wrote 226th vote at Instant { tv_sec: 3713636, tv_nsec: 824049547 }
+Read 226th vote at Instant { tv_sec: 3713636, tv_nsec: 830417408 }
+Wrote 227th vote at Instant { tv_sec: 3713636, tv_nsec: 874150731 }
+Read 227th vote at Instant { tv_sec: 3713636, tv_nsec: 877998941 }
+Wrote 228th vote at Instant { tv_sec: 3713636, tv_nsec: 924260836 }
+Read 228th vote at Instant { tv_sec: 3713636, tv_nsec: 927114802 }
+Wrote 229th vote at Instant { tv_sec: 3713636, tv_nsec: 974371813 }
+Read 229th vote at Instant { tv_sec: 3713636, tv_nsec: 980435030 }
+Wrote 230th vote at Instant { tv_sec: 3713637, tv_nsec: 24509824 }
+Read 230th vote at Instant { tv_sec: 3713637, tv_nsec: 27326187 }
+Wrote 231th vote at Instant { tv_sec: 3713637, tv_nsec: 74566053 }
+Read 231th vote at Instant { tv_sec: 3713637, tv_nsec: 83691345 }
+Wrote 232th vote at Instant { tv_sec: 3713637, tv_nsec: 124689311 }
+Read 232th vote at Instant { tv_sec: 3713637, tv_nsec: 128571948 }
+Wrote 233th vote at Instant { tv_sec: 3713637, tv_nsec: 174833463 }
+Read 233th vote at Instant { tv_sec: 3713637, tv_nsec: 177761894 }
+Wrote 234th vote at Instant { tv_sec: 3713637, tv_nsec: 224963418 }
+Read 234th vote at Instant { tv_sec: 3713637, tv_nsec: 228977421 }
+Wrote 235th vote at Instant { tv_sec: 3713637, tv_nsec: 274981135 }
+Read 235th vote at Instant { tv_sec: 3713637, tv_nsec: 280398756 }
+Wrote 236th vote at Instant { tv_sec: 3713637, tv_nsec: 325083402 }
+Read 236th vote at Instant { tv_sec: 3713637, tv_nsec: 329063986 }
+Wrote 237th vote at Instant { tv_sec: 3713637, tv_nsec: 375083540 }
+Read 237th vote at Instant { tv_sec: 3713637, tv_nsec: 378116368 }
+Wrote 238th vote at Instant { tv_sec: 3713637, tv_nsec: 425083599 }
+Read 238th vote at Instant { tv_sec: 3713637, tv_nsec: 428205567 }
+Wrote 239th vote at Instant { tv_sec: 3713637, tv_nsec: 475130637 }
+Read 239th vote at Instant { tv_sec: 3713637, tv_nsec: 480385285 }
+TRUNCATING 18943 UPDATES
+TRUNCATING 18941 UPDATES
+TRUNCATING 18694 UPDATES
+TRUNCATING 18932 UPDATES
+TRUNCATING 18902 UPDATES
+TRUNCATING 18942 UPDATES
+TRUNCATING 18940 UPDATES
+TRUNCATING 18958 UPDATES
+TRUNCATING 18924 UPDATES
+TRUNCATING 18936 UPDATES
+TRUNCATING 18940 UPDATES
+TRUNCATING 18993 UPDATES
+TRUNCATING 18913 UPDATES
+TRUNCATING 18957 UPDATES
+TRUNCATING 18969 UPDATES
+TRUNCATING 18903 UPDATES
+TRUNCATING 19004 UPDATES
+TRUNCATING 18959 UPDATES
+TRUNCATING 18973 UPDATES
+TRUNCATING 19021 UPDATES
+Wrote 240th vote at Instant { tv_sec: 3713637, tv_nsec: 525130655 }
+Read 240th vote at Instant { tv_sec: 3713637, tv_nsec: 563839979 }
+Wrote 241th vote at Instant { tv_sec: 3713637, tv_nsec: 575130961 }
+Read 241th vote at Instant { tv_sec: 3713637, tv_nsec: 583504299 }
+Wrote 242th vote at Instant { tv_sec: 3713637, tv_nsec: 625131125 }
+Read 242th vote at Instant { tv_sec: 3713637, tv_nsec: 627628155 }
+Wrote 243th vote at Instant { tv_sec: 3713637, tv_nsec: 675131234 }
+Read 243th vote at Instant { tv_sec: 3713637, tv_nsec: 683723120 }
+Wrote 244th vote at Instant { tv_sec: 3713637, tv_nsec: 725132521 }
+Read 244th vote at Instant { tv_sec: 3713637, tv_nsec: 728801743 }
+Wrote 245th vote at Instant { tv_sec: 3713637, tv_nsec: 775230525 }
+Read 245th vote at Instant { tv_sec: 3713637, tv_nsec: 779052462 }
+Wrote 246th vote at Instant { tv_sec: 3713637, tv_nsec: 825286900 }
+Read 246th vote at Instant { tv_sec: 3713637, tv_nsec: 827976965 }
+Wrote 247th vote at Instant { tv_sec: 3713637, tv_nsec: 875421606 }
+Read 247th vote at Instant { tv_sec: 3713637, tv_nsec: 879161242 }
+Wrote 248th vote at Instant { tv_sec: 3713637, tv_nsec: 925498896 }
+Read 248th vote at Instant { tv_sec: 3713637, tv_nsec: 928260351 }
+Wrote 249th vote at Instant { tv_sec: 3713637, tv_nsec: 975612922 }
+Read 249th vote at Instant { tv_sec: 3713637, tv_nsec: 979291710 }
+Wrote 250th vote at Instant { tv_sec: 3713638, tv_nsec: 25743583 }
+Read 250th vote at Instant { tv_sec: 3713638, tv_nsec: 30393930 }
+Wrote 251th vote at Instant { tv_sec: 3713638, tv_nsec: 75878648 }
+Read 251th vote at Instant { tv_sec: 3713638, tv_nsec: 83695853 }
+Wrote 252th vote at Instant { tv_sec: 3713638, tv_nsec: 126013754 }
+Read 252th vote at Instant { tv_sec: 3713638, tv_nsec: 127786179 }
+Wrote 253th vote at Instant { tv_sec: 3713638, tv_nsec: 176070556 }
+Read 253th vote at Instant { tv_sec: 3713638, tv_nsec: 179885604 }
+Wrote 254th vote at Instant { tv_sec: 3713638, tv_nsec: 226260700 }
+Read 254th vote at Instant { tv_sec: 3713638, tv_nsec: 229092171 }
+Wrote 255th vote at Instant { tv_sec: 3713638, tv_nsec: 276324583 }
+Read 255th vote at Instant { tv_sec: 3713638, tv_nsec: 279132332 }
+Wrote 256th vote at Instant { tv_sec: 3713638, tv_nsec: 326466613 }
+Read 256th vote at Instant { tv_sec: 3713638, tv_nsec: 329225106 }
+Wrote 257th vote at Instant { tv_sec: 3713638, tv_nsec: 376565354 }
+Read 257th vote at Instant { tv_sec: 3713638, tv_nsec: 380377130 }
+Wrote 258th vote at Instant { tv_sec: 3713638, tv_nsec: 426604200 }
+Read 258th vote at Instant { tv_sec: 3713638, tv_nsec: 430606403 }
+Wrote 259th vote at Instant { tv_sec: 3713638, tv_nsec: 476791772 }
+Read 259th vote at Instant { tv_sec: 3713638, tv_nsec: 479763832 }
+Wrote 260th vote at Instant { tv_sec: 3713638, tv_nsec: 526895114 }
+Read 260th vote at Instant { tv_sec: 3713638, tv_nsec: 533727946 }
+Sent 141193 unsharded messages in 15.008388ms for 9412 messages / ms
+Sent 2500000 sharded messages in 15.008388ms for 166666 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 261th vote at Instant { tv_sec: 3713638, tv_nsec: 577077750 }
+Read 261th vote at Instant { tv_sec: 3713638, tv_nsec: 580979048 }
+Wrote 262th vote at Instant { tv_sec: 3713638, tv_nsec: 627154040 }
+Read 262th vote at Instant { tv_sec: 3713638, tv_nsec: 630103890 }
+Wrote 263th vote at Instant { tv_sec: 3713638, tv_nsec: 677164286 }
+Read 263th vote at Instant { tv_sec: 3713638, tv_nsec: 680368744 }
+Wrote 264th vote at Instant { tv_sec: 3713638, tv_nsec: 727224088 }
+Read 264th vote at Instant { tv_sec: 3713638, tv_nsec: 730428465 }
+Wrote 265th vote at Instant { tv_sec: 3713638, tv_nsec: 777322758 }
+Read 265th vote at Instant { tv_sec: 3713638, tv_nsec: 779537278 }
+Wrote 266th vote at Instant { tv_sec: 3713638, tv_nsec: 827425876 }
+Read 266th vote at Instant { tv_sec: 3713638, tv_nsec: 830385616 }
+Wrote 267th vote at Instant { tv_sec: 3713638, tv_nsec: 877565707 }
+Read 267th vote at Instant { tv_sec: 3713638, tv_nsec: 880057151 }
+Wrote 268th vote at Instant { tv_sec: 3713638, tv_nsec: 927575078 }
+Read 268th vote at Instant { tv_sec: 3713638, tv_nsec: 930823694 }
+Wrote 269th vote at Instant { tv_sec: 3713638, tv_nsec: 977676374 }
+Read 269th vote at Instant { tv_sec: 3713638, tv_nsec: 979946849 }
+Wrote 270th vote at Instant { tv_sec: 3713639, tv_nsec: 27777065 }
+Read 270th vote at Instant { tv_sec: 3713639, tv_nsec: 33738328 }
+Wrote 271th vote at Instant { tv_sec: 3713639, tv_nsec: 77902885 }
+Read 271th vote at Instant { tv_sec: 3713639, tv_nsec: 80400927 }
+Wrote 272th vote at Instant { tv_sec: 3713639, tv_nsec: 127969292 }
+Read 272th vote at Instant { tv_sec: 3713639, tv_nsec: 131167568 }
+Wrote 273th vote at Instant { tv_sec: 3713639, tv_nsec: 178050087 }
+Read 273th vote at Instant { tv_sec: 3713639, tv_nsec: 181289876 }
+Wrote 274th vote at Instant { tv_sec: 3713639, tv_nsec: 228165321 }
+Read 274th vote at Instant { tv_sec: 3713639, tv_nsec: 231347736 }
+Wrote 275th vote at Instant { tv_sec: 3713639, tv_nsec: 278165402 }
+Read 275th vote at Instant { tv_sec: 3713639, tv_nsec: 283760185 }
+Wrote 276th vote at Instant { tv_sec: 3713639, tv_nsec: 328165474 }
+Read 276th vote at Instant { tv_sec: 3713639, tv_nsec: 331573154 }
+Wrote 277th vote at Instant { tv_sec: 3713639, tv_nsec: 378165783 }
+Read 277th vote at Instant { tv_sec: 3713639, tv_nsec: 380761571 }
+Wrote 278th vote at Instant { tv_sec: 3713639, tv_nsec: 428167815 }
+Read 278th vote at Instant { tv_sec: 3713639, tv_nsec: 430869257 }
+Wrote 279th vote at Instant { tv_sec: 3713639, tv_nsec: 478227229 }
+TRUNCATING 18905 UPDATES
+TRUNCATING 18990 UPDATES
+TRUNCATING 18974 UPDATES
+TRUNCATING 18749 UPDATES
+TRUNCATING 18957 UPDATES
+TRUNCATING 18936 UPDATES
+TRUNCATING 19037 UPDATES
+TRUNCATING 18962 UPDATES
+TRUNCATING 18958 UPDATES
+TRUNCATING 18989 UPDATES
+TRUNCATING 18988 UPDATES
+TRUNCATING 18975 UPDATES
+TRUNCATING 18955 UPDATES
+TRUNCATING 18890 UPDATES
+TRUNCATING 19081 UPDATES
+TRUNCATING 18916 UPDATES
+TRUNCATING 18993 UPDATES
+TRUNCATING 18977 UPDATES
+TRUNCATING 19003 UPDATES
+TRUNCATING 19036 UPDATES
+Read 279th vote at Instant { tv_sec: 3713639, tv_nsec: 567063808 }
+Wrote 280th vote at Instant { tv_sec: 3713639, tv_nsec: 567187358 }
+Read 280th vote at Instant { tv_sec: 3713639, tv_nsec: 576419669 }
+Wrote 281th vote at Instant { tv_sec: 3713639, tv_nsec: 617335933 }
+Read 281th vote at Instant { tv_sec: 3713639, tv_nsec: 619530992 }
+Wrote 282th vote at Instant { tv_sec: 3713639, tv_nsec: 667336008 }
+Read 282th vote at Instant { tv_sec: 3713639, tv_nsec: 670772918 }
+Wrote 283th vote at Instant { tv_sec: 3713639, tv_nsec: 717336149 }
+Read 283th vote at Instant { tv_sec: 3713639, tv_nsec: 720878321 }
+Wrote 284th vote at Instant { tv_sec: 3713639, tv_nsec: 767336187 }
+Read 284th vote at Instant { tv_sec: 3713639, tv_nsec: 770085344 }
+Wrote 285th vote at Instant { tv_sec: 3713639, tv_nsec: 817336793 }
+Read 285th vote at Instant { tv_sec: 3713639, tv_nsec: 820997600 }
+Wrote 286th vote at Instant { tv_sec: 3713639, tv_nsec: 867336794 }
+Read 286th vote at Instant { tv_sec: 3713639, tv_nsec: 871125266 }
+Wrote 287th vote at Instant { tv_sec: 3713639, tv_nsec: 917336980 }
+Read 287th vote at Instant { tv_sec: 3713639, tv_nsec: 921159501 }
+Wrote 288th vote at Instant { tv_sec: 3713639, tv_nsec: 967426344 }
+Read 288th vote at Instant { tv_sec: 3713639, tv_nsec: 970402750 }
+Wrote 289th vote at Instant { tv_sec: 3713640, tv_nsec: 17622514 }
+Read 289th vote at Instant { tv_sec: 3713640, tv_nsec: 21510237 }
+Wrote 290th vote at Instant { tv_sec: 3713640, tv_nsec: 67624119 }
+Read 290th vote at Instant { tv_sec: 3713640, tv_nsec: 71731590 }
+Wrote 291th vote at Instant { tv_sec: 3713640, tv_nsec: 117635501 }
+Read 291th vote at Instant { tv_sec: 3713640, tv_nsec: 123737256 }
+Wrote 292th vote at Instant { tv_sec: 3713640, tv_nsec: 167635655 }
+Read 292th vote at Instant { tv_sec: 3713640, tv_nsec: 177070585 }
+Wrote 293th vote at Instant { tv_sec: 3713640, tv_nsec: 217642442 }
+Read 293th vote at Instant { tv_sec: 3713640, tv_nsec: 220819437 }
+Wrote 294th vote at Instant { tv_sec: 3713640, tv_nsec: 267643380 }
+Read 294th vote at Instant { tv_sec: 3713640, tv_nsec: 270230066 }
+Wrote 295th vote at Instant { tv_sec: 3713640, tv_nsec: 317643381 }
+Read 295th vote at Instant { tv_sec: 3713640, tv_nsec: 321234087 }
+Wrote 296th vote at Instant { tv_sec: 3713640, tv_nsec: 367643501 }
+Read 296th vote at Instant { tv_sec: 3713640, tv_nsec: 373726799 }
+Wrote 297th vote at Instant { tv_sec: 3713640, tv_nsec: 417643700 }
+Read 297th vote at Instant { tv_sec: 3713640, tv_nsec: 420053162 }
+Wrote 298th vote at Instant { tv_sec: 3713640, tv_nsec: 467789154 }
+Read 298th vote at Instant { tv_sec: 3713640, tv_nsec: 472983182 }
+Wrote 299th vote at Instant { tv_sec: 3713640, tv_nsec: 517858773 }
+Read 299th vote at Instant { tv_sec: 3713640, tv_nsec: 520810708 }
+Wrote 300th vote at Instant { tv_sec: 3713640, tv_nsec: 567858894 }
+Read 300th vote at Instant { tv_sec: 3713640, tv_nsec: 571068088 }
+Wrote 301th vote at Instant { tv_sec: 3713640, tv_nsec: 617862417 }
+Read 301th vote at Instant { tv_sec: 3713640, tv_nsec: 621388233 }
+Wrote 302th vote at Instant { tv_sec: 3713640, tv_nsec: 667862480 }
+Read 302th vote at Instant { tv_sec: 3713640, tv_nsec: 671564992 }
+Wrote 303th vote at Instant { tv_sec: 3713640, tv_nsec: 717862524 }
+Read 303th vote at Instant { tv_sec: 3713640, tv_nsec: 720374034 }
+Wrote 304th vote at Instant { tv_sec: 3713640, tv_nsec: 767862533 }
+Read 304th vote at Instant { tv_sec: 3713640, tv_nsec: 771613481 }
+Wrote 305th vote at Instant { tv_sec: 3713640, tv_nsec: 817937920 }
+Read 305th vote at Instant { tv_sec: 3713640, tv_nsec: 820687647 }
+Wrote 306th vote at Instant { tv_sec: 3713640, tv_nsec: 868050145 }
+Read 306th vote at Instant { tv_sec: 3713640, tv_nsec: 871799778 }
+Wrote 307th vote at Instant { tv_sec: 3713640, tv_nsec: 918160992 }
+Read 307th vote at Instant { tv_sec: 3713640, tv_nsec: 928699517 }
+Wrote 308th vote at Instant { tv_sec: 3713640, tv_nsec: 968297135 }
+Read 308th vote at Instant { tv_sec: 3713640, tv_nsec: 974443270 }
+Wrote 309th vote at Instant { tv_sec: 3713641, tv_nsec: 18306035 }
+Read 309th vote at Instant { tv_sec: 3713641, tv_nsec: 20395404 }
+Wrote 310th vote at Instant { tv_sec: 3713641, tv_nsec: 68463285 }
+Read 310th vote at Instant { tv_sec: 3713641, tv_nsec: 72436172 }
+Wrote 311th vote at Instant { tv_sec: 3713641, tv_nsec: 118463414 }
+Read 311th vote at Instant { tv_sec: 3713641, tv_nsec: 130434346 }
+Wrote 312th vote at Instant { tv_sec: 3713641, tv_nsec: 168463585 }
+Read 312th vote at Instant { tv_sec: 3713641, tv_nsec: 170922530 }
+Wrote 313th vote at Instant { tv_sec: 3713641, tv_nsec: 218580970 }
+Read 313th vote at Instant { tv_sec: 3713641, tv_nsec: 221185902 }
+Sent 169434 unsharded messages in 17.67531ms for 9966 messages / ms
+Sent 3000000 sharded messages in 17.67531ms for 176470 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 314th vote at Instant { tv_sec: 3713641, tv_nsec: 268644009 }
+Read 314th vote at Instant { tv_sec: 3713641, tv_nsec: 270455727 }
+Wrote 315th vote at Instant { tv_sec: 3713641, tv_nsec: 318644184 }
+Read 315th vote at Instant { tv_sec: 3713641, tv_nsec: 320080928 }
+Wrote 316th vote at Instant { tv_sec: 3713641, tv_nsec: 368644253 }
+Read 316th vote at Instant { tv_sec: 3713641, tv_nsec: 374274079 }
+Wrote 317th vote at Instant { tv_sec: 3713641, tv_nsec: 418644793 }
+Read 317th vote at Instant { tv_sec: 3713641, tv_nsec: 421481276 }
+Wrote 318th vote at Instant { tv_sec: 3713641, tv_nsec: 468644858 }
+Read 318th vote at Instant { tv_sec: 3713641, tv_nsec: 472629211 }
+Wrote 319th vote at Instant { tv_sec: 3713641, tv_nsec: 518797638 }
+TRUNCATING 18964 UPDATES
+TRUNCATING 18918 UPDATES
+TRUNCATING 18938 UPDATES
+TRUNCATING 18923 UPDATES
+TRUNCATING 18865 UPDATES
+TRUNCATING 18835 UPDATES
+TRUNCATING 18900 UPDATES
+TRUNCATING 18889 UPDATES
+TRUNCATING 18888 UPDATES
+TRUNCATING 18888 UPDATES
+TRUNCATING 18917 UPDATES
+TRUNCATING 18915 UPDATES
+TRUNCATING 18851 UPDATES
+TRUNCATING 18928 UPDATES
+TRUNCATING 18613 UPDATES
+TRUNCATING 18929 UPDATES
+TRUNCATING 18871 UPDATES
+TRUNCATING 18927 UPDATES
+TRUNCATING 18838 UPDATES
+TRUNCATING 18829 UPDATES
+Read 319th vote at Instant { tv_sec: 3713641, tv_nsec: 615544521 }
+Wrote 320th vote at Instant { tv_sec: 3713641, tv_nsec: 615667266 }
+Read 320th vote at Instant { tv_sec: 3713641, tv_nsec: 637065974 }
+Wrote 321th vote at Instant { tv_sec: 3713641, tv_nsec: 665667384 }
+Read 321th vote at Instant { tv_sec: 3713641, tv_nsec: 666853426 }
+Wrote 322th vote at Instant { tv_sec: 3713641, tv_nsec: 715746545 }
+Read 322th vote at Instant { tv_sec: 3713641, tv_nsec: 718032446 }
+Wrote 323th vote at Instant { tv_sec: 3713641, tv_nsec: 765843255 }
+Read 323th vote at Instant { tv_sec: 3713641, tv_nsec: 768103639 }
+Wrote 324th vote at Instant { tv_sec: 3713641, tv_nsec: 816022995 }
+Read 324th vote at Instant { tv_sec: 3713641, tv_nsec: 819227849 }
+Wrote 325th vote at Instant { tv_sec: 3713641, tv_nsec: 866096227 }
+Read 325th vote at Instant { tv_sec: 3713641, tv_nsec: 869307583 }
+Wrote 326th vote at Instant { tv_sec: 3713641, tv_nsec: 916223983 }
+Read 326th vote at Instant { tv_sec: 3713641, tv_nsec: 918455798 }
+Wrote 327th vote at Instant { tv_sec: 3713641, tv_nsec: 966307418 }
+Read 327th vote at Instant { tv_sec: 3713641, tv_nsec: 969551343 }
+Wrote 328th vote at Instant { tv_sec: 3713642, tv_nsec: 16307538 }
+Read 328th vote at Instant { tv_sec: 3713642, tv_nsec: 20441930 }
+Wrote 329th vote at Instant { tv_sec: 3713642, tv_nsec: 66307597 }
+Read 329th vote at Instant { tv_sec: 3713642, tv_nsec: 71338682 }
+Wrote 330th vote at Instant { tv_sec: 3713642, tv_nsec: 116307777 }
+Read 330th vote at Instant { tv_sec: 3713642, tv_nsec: 120026815 }
+Wrote 331th vote at Instant { tv_sec: 3713642, tv_nsec: 166308894 }
+Read 331th vote at Instant { tv_sec: 3713642, tv_nsec: 169028526 }
+Wrote 332th vote at Instant { tv_sec: 3713642, tv_nsec: 216400970 }
+Read 332th vote at Instant { tv_sec: 3713642, tv_nsec: 230377718 }
+Wrote 333th vote at Instant { tv_sec: 3713642, tv_nsec: 266401033 }
+Read 333th vote at Instant { tv_sec: 3713642, tv_nsec: 269208926 }
+Wrote 334th vote at Instant { tv_sec: 3713642, tv_nsec: 316403302 }
+Read 334th vote at Instant { tv_sec: 3713642, tv_nsec: 319816360 }
+Wrote 335th vote at Instant { tv_sec: 3713642, tv_nsec: 366493675 }
+Read 335th vote at Instant { tv_sec: 3713642, tv_nsec: 371072020 }
+Wrote 336th vote at Instant { tv_sec: 3713642, tv_nsec: 416592677 }
+Read 336th vote at Instant { tv_sec: 3713642, tv_nsec: 420698573 }
+Wrote 337th vote at Instant { tv_sec: 3713642, tv_nsec: 466685817 }
+Read 337th vote at Instant { tv_sec: 3713642, tv_nsec: 470860606 }
+Wrote 338th vote at Instant { tv_sec: 3713642, tv_nsec: 516700473 }
+Read 338th vote at Instant { tv_sec: 3713642, tv_nsec: 520064405 }
+Wrote 339th vote at Instant { tv_sec: 3713642, tv_nsec: 566798554 }
+Read 339th vote at Instant { tv_sec: 3713642, tv_nsec: 568967111 }
+Wrote 340th vote at Instant { tv_sec: 3713642, tv_nsec: 616872364 }
+Read 340th vote at Instant { tv_sec: 3713642, tv_nsec: 619097312 }
+Wrote 341th vote at Instant { tv_sec: 3713642, tv_nsec: 667004957 }
+Read 341th vote at Instant { tv_sec: 3713642, tv_nsec: 669185896 }
+Wrote 342th vote at Instant { tv_sec: 3713642, tv_nsec: 717102522 }
+Read 342th vote at Instant { tv_sec: 3713642, tv_nsec: 720293129 }
+Wrote 343th vote at Instant { tv_sec: 3713642, tv_nsec: 767206978 }
+Read 343th vote at Instant { tv_sec: 3713642, tv_nsec: 769522999 }
+Wrote 344th vote at Instant { tv_sec: 3713642, tv_nsec: 817284756 }
+Read 344th vote at Instant { tv_sec: 3713642, tv_nsec: 819501422 }
+Wrote 345th vote at Instant { tv_sec: 3713642, tv_nsec: 867442678 }
+Read 345th vote at Instant { tv_sec: 3713642, tv_nsec: 870601891 }
+Wrote 346th vote at Instant { tv_sec: 3713642, tv_nsec: 917500984 }
+Read 346th vote at Instant { tv_sec: 3713642, tv_nsec: 919784046 }
+Wrote 347th vote at Instant { tv_sec: 3713642, tv_nsec: 967614717 }
+Read 347th vote at Instant { tv_sec: 3713642, tv_nsec: 970280195 }
+Wrote 348th vote at Instant { tv_sec: 3713643, tv_nsec: 17702226 }
+Read 348th vote at Instant { tv_sec: 3713643, tv_nsec: 20937297 }
+Wrote 349th vote at Instant { tv_sec: 3713643, tv_nsec: 67750021 }
+Read 349th vote at Instant { tv_sec: 3713643, tv_nsec: 70968950 }
+Wrote 350th vote at Instant { tv_sec: 3713643, tv_nsec: 117895908 }
+Read 350th vote at Instant { tv_sec: 3713643, tv_nsec: 121122386 }
+Wrote 351th vote at Instant { tv_sec: 3713643, tv_nsec: 168053488 }
+Read 351th vote at Instant { tv_sec: 3713643, tv_nsec: 170251481 }
+Wrote 352th vote at Instant { tv_sec: 3713643, tv_nsec: 218112277 }
+Read 352th vote at Instant { tv_sec: 3713643, tv_nsec: 220355504 }
+Wrote 353th vote at Instant { tv_sec: 3713643, tv_nsec: 268216192 }
+Read 353th vote at Instant { tv_sec: 3713643, tv_nsec: 271461317 }
+Wrote 354th vote at Instant { tv_sec: 3713643, tv_nsec: 318358183 }
+Read 354th vote at Instant { tv_sec: 3713643, tv_nsec: 321521359 }
+Wrote 355th vote at Instant { tv_sec: 3713643, tv_nsec: 368430045 }
+Read 355th vote at Instant { tv_sec: 3713643, tv_nsec: 373707096 }
+Wrote 356th vote at Instant { tv_sec: 3713643, tv_nsec: 418493529 }
+Read 356th vote at Instant { tv_sec: 3713643, tv_nsec: 420691531 }
+Wrote 357th vote at Instant { tv_sec: 3713643, tv_nsec: 468604108 }
+Read 357th vote at Instant { tv_sec: 3713643, tv_nsec: 470835266 }
+TRUNCATING 18577 UPDATES
+TRUNCATING 18636 UPDATES
+TRUNCATING 18533 UPDATES
+TRUNCATING 18531 UPDATES
+TRUNCATING 18612 UPDATES
+TRUNCATING 18554 UPDATES
+TRUNCATING 18580 UPDATES
+TRUNCATING 18326 UPDATES
+TRUNCATING 18653 UPDATES
+TRUNCATING 18599 UPDATES
+TRUNCATING 18566 UPDATES
+TRUNCATING 18562 UPDATES
+TRUNCATING 18550 UPDATES
+TRUNCATING 18591 UPDATES
+TRUNCATING 18639 UPDATES
+TRUNCATING 18592 UPDATES
+TRUNCATING 18600 UPDATES
+TRUNCATING 18558 UPDATES
+TRUNCATING 18589 UPDATES
+TRUNCATING 18534 UPDATES
+Wrote 358th vote at Instant { tv_sec: 3713643, tv_nsec: 518809815 }
+Read 358th vote at Instant { tv_sec: 3713643, tv_nsec: 576309433 }
+Wrote 359th vote at Instant { tv_sec: 3713643, tv_nsec: 576311284 }
+Read 359th vote at Instant { tv_sec: 3713643, tv_nsec: 581798712 }
+Wrote 360th vote at Instant { tv_sec: 3713643, tv_nsec: 626311368 }
+Read 360th vote at Instant { tv_sec: 3713643, tv_nsec: 630374308 }
+Wrote 361th vote at Instant { tv_sec: 3713643, tv_nsec: 676344261 }
+Read 361th vote at Instant { tv_sec: 3713643, tv_nsec: 679650072 }
+Wrote 362th vote at Instant { tv_sec: 3713643, tv_nsec: 726454095 }
+Read 362th vote at Instant { tv_sec: 3713643, tv_nsec: 728695709 }
+Wrote 363th vote at Instant { tv_sec: 3713643, tv_nsec: 776551345 }
+Read 363th vote at Instant { tv_sec: 3713643, tv_nsec: 778833597 }
+Wrote 364th vote at Instant { tv_sec: 3713643, tv_nsec: 826638587 }
+Read 364th vote at Instant { tv_sec: 3713643, tv_nsec: 829863552 }
+Wrote 365th vote at Instant { tv_sec: 3713643, tv_nsec: 876763647 }
+Sent 197680 unsharded messages in 20.332813ms for 9884 messages / ms
+Sent 3500000 sharded messages in 20.332813ms for 175000 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Read 365th vote at Instant { tv_sec: 3713643, tv_nsec: 883731828 }
+Wrote 366th vote at Instant { tv_sec: 3713643, tv_nsec: 926895866 }
+Read 366th vote at Instant { tv_sec: 3713643, tv_nsec: 930366591 }
+Wrote 367th vote at Instant { tv_sec: 3713643, tv_nsec: 976956917 }
+Read 367th vote at Instant { tv_sec: 3713643, tv_nsec: 979218679 }
+Wrote 368th vote at Instant { tv_sec: 3713644, tv_nsec: 26957004 }
+Read 368th vote at Instant { tv_sec: 3713644, tv_nsec: 29426880 }
+Wrote 369th vote at Instant { tv_sec: 3713644, tv_nsec: 76957063 }
+Read 369th vote at Instant { tv_sec: 3713644, tv_nsec: 80535789 }
+Wrote 370th vote at Instant { tv_sec: 3713644, tv_nsec: 126957097 }
+Read 370th vote at Instant { tv_sec: 3713644, tv_nsec: 130443086 }
+Wrote 371th vote at Instant { tv_sec: 3713644, tv_nsec: 176957144 }
+Read 371th vote at Instant { tv_sec: 3713644, tv_nsec: 178886976 }
+Wrote 372th vote at Instant { tv_sec: 3713644, tv_nsec: 226957276 }
+Read 372th vote at Instant { tv_sec: 3713644, tv_nsec: 228963296 }
+Wrote 373th vote at Instant { tv_sec: 3713644, tv_nsec: 276957353 }
+Read 373th vote at Instant { tv_sec: 3713644, tv_nsec: 280383839 }
+Wrote 374th vote at Instant { tv_sec: 3713644, tv_nsec: 326957378 }
+Read 374th vote at Instant { tv_sec: 3713644, tv_nsec: 329307845 }
+Wrote 375th vote at Instant { tv_sec: 3713644, tv_nsec: 377052363 }
+Read 375th vote at Instant { tv_sec: 3713644, tv_nsec: 380347651 }
+Wrote 376th vote at Instant { tv_sec: 3713644, tv_nsec: 427155805 }
+Read 376th vote at Instant { tv_sec: 3713644, tv_nsec: 430361112 }
+Wrote 377th vote at Instant { tv_sec: 3713644, tv_nsec: 477280733 }
+Read 377th vote at Instant { tv_sec: 3713644, tv_nsec: 483746039 }
+TRUNCATING 9329 UPDATES
+TRUNCATING 9307 UPDATES
+TRUNCATING 9342 UPDATES
+TRUNCATING 9275 UPDATES
+TRUNCATING 9284 UPDATES
+TRUNCATING 9345 UPDATES
+TRUNCATING 9287 UPDATES
+TRUNCATING 9269 UPDATES
+TRUNCATING 9318 UPDATES
+TRUNCATING 9266 UPDATES
+TRUNCATING 9346 UPDATES
+TRUNCATING 9148 UPDATES
+TRUNCATING 9271 UPDATES
+TRUNCATING 9302 UPDATES
+TRUNCATING 9322 UPDATES
+TRUNCATING 9259 UPDATES
+TRUNCATING 9299 UPDATES
+TRUNCATING 9270 UPDATES
+TRUNCATING 9280 UPDATES
+TRUNCATING 9346 UPDATES
+Wrote 378th vote at Instant { tv_sec: 3713644, tv_nsec: 527348521 }
+Read 378th vote at Instant { tv_sec: 3713644, tv_nsec: 532259536 }
+Wrote 379th vote at Instant { tv_sec: 3713644, tv_nsec: 577501671 }
+Read 379th vote at Instant { tv_sec: 3713644, tv_nsec: 581327049 }
+Wrote 380th vote at Instant { tv_sec: 3713644, tv_nsec: 627565249 }
+Read 380th vote at Instant { tv_sec: 3713644, tv_nsec: 631469429 }
+Wrote 381th vote at Instant { tv_sec: 3713644, tv_nsec: 677565407 }
+Read 381th vote at Instant { tv_sec: 3713644, tv_nsec: 680592464 }
+Wrote 382th vote at Instant { tv_sec: 3713644, tv_nsec: 727565597 }
+Read 382th vote at Instant { tv_sec: 3713644, tv_nsec: 730625390 }
+Wrote 383th vote at Instant { tv_sec: 3713644, tv_nsec: 777565814 }
+Read 383th vote at Instant { tv_sec: 3713644, tv_nsec: 781111656 }
+Wrote 384th vote at Instant { tv_sec: 3713644, tv_nsec: 827615155 }
+Read 384th vote at Instant { tv_sec: 3713644, tv_nsec: 837050929 }
+Wrote 385th vote at Instant { tv_sec: 3713644, tv_nsec: 877718802 }
+Read 385th vote at Instant { tv_sec: 3713644, tv_nsec: 879898140 }
+Wrote 386th vote at Instant { tv_sec: 3713644, tv_nsec: 927849020 }
+Read 386th vote at Instant { tv_sec: 3713644, tv_nsec: 930153373 }
+Wrote 387th vote at Instant { tv_sec: 3713644, tv_nsec: 977974552 }
+Read 387th vote at Instant { tv_sec: 3713644, tv_nsec: 981315146 }
+Wrote 388th vote at Instant { tv_sec: 3713645, tv_nsec: 27974599 }
+Read 388th vote at Instant { tv_sec: 3713645, tv_nsec: 31525866 }
+Wrote 389th vote at Instant { tv_sec: 3713645, tv_nsec: 77974650 }
+Read 389th vote at Instant { tv_sec: 3713645, tv_nsec: 80470080 }
+Wrote 390th vote at Instant { tv_sec: 3713645, tv_nsec: 127974693 }
+Read 390th vote at Instant { tv_sec: 3713645, tv_nsec: 130663116 }
+Wrote 391th vote at Instant { tv_sec: 3713645, tv_nsec: 178104565 }
+Read 391th vote at Instant { tv_sec: 3713645, tv_nsec: 181215807 }
+Wrote 392th vote at Instant { tv_sec: 3713645, tv_nsec: 228184178 }
+Read 392th vote at Instant { tv_sec: 3713645, tv_nsec: 232009110 }
+Wrote 393th vote at Instant { tv_sec: 3713645, tv_nsec: 278280898 }
+Read 393th vote at Instant { tv_sec: 3713645, tv_nsec: 280876437 }
+Wrote 394th vote at Instant { tv_sec: 3713645, tv_nsec: 328334394 }
+Read 394th vote at Instant { tv_sec: 3713645, tv_nsec: 332185595 }
+Wrote 395th vote at Instant { tv_sec: 3713645, tv_nsec: 378421229 }
+Read 395th vote at Instant { tv_sec: 3713645, tv_nsec: 382126325 }
+Wrote 396th vote at Instant { tv_sec: 3713645, tv_nsec: 428537806 }
+Read 396th vote at Instant { tv_sec: 3713645, tv_nsec: 440394235 }
+Wrote 397th vote at Instant { tv_sec: 3713645, tv_nsec: 478537824 }
+Read 397th vote at Instant { tv_sec: 3713645, tv_nsec: 480512540 }
+Wrote 398th vote at Instant { tv_sec: 3713645, tv_nsec: 528538091 }
+Read 398th vote at Instant { tv_sec: 3713645, tv_nsec: 530594217 }
+Wrote 399th vote at Instant { tv_sec: 3713645, tv_nsec: 578538127 }
+Read 399th vote at Instant { tv_sec: 3713645, tv_nsec: 581811833 }
+Wrote 400th vote at Instant { tv_sec: 3713645, tv_nsec: 628538264 }
+Read 400th vote at Instant { tv_sec: 3713645, tv_nsec: 630533512 }
+Wrote 401th vote at Instant { tv_sec: 3713645, tv_nsec: 678538498 }
+Read 401th vote at Instant { tv_sec: 3713645, tv_nsec: 680631726 }
+Wrote 402th vote at Instant { tv_sec: 3713645, tv_nsec: 728569982 }
+Read 402th vote at Instant { tv_sec: 3713645, tv_nsec: 731817799 }
+Wrote 403th vote at Instant { tv_sec: 3713645, tv_nsec: 778648456 }
+Read 403th vote at Instant { tv_sec: 3713645, tv_nsec: 780910658 }
+Wrote 404th vote at Instant { tv_sec: 3713645, tv_nsec: 828779175 }
+Read 404th vote at Instant { tv_sec: 3713645, tv_nsec: 832170983 }
+Wrote 405th vote at Instant { tv_sec: 3713645, tv_nsec: 878889669 }
+Read 405th vote at Instant { tv_sec: 3713645, tv_nsec: 882148211 }
+Wrote 406th vote at Instant { tv_sec: 3713645, tv_nsec: 928889851 }
+Read 406th vote at Instant { tv_sec: 3713645, tv_nsec: 932337910 }
+Wrote 407th vote at Instant { tv_sec: 3713645, tv_nsec: 978889983 }
+Read 407th vote at Instant { tv_sec: 3713645, tv_nsec: 982652521 }
+Wrote 408th vote at Instant { tv_sec: 3713646, tv_nsec: 28890121 }
+Read 408th vote at Instant { tv_sec: 3713646, tv_nsec: 31793384 }
+Wrote 409th vote at Instant { tv_sec: 3713646, tv_nsec: 78997601 }
+Read 409th vote at Instant { tv_sec: 3713646, tv_nsec: 83728393 }
+Wrote 410th vote at Instant { tv_sec: 3713646, tv_nsec: 128997618 }
+Read 410th vote at Instant { tv_sec: 3713646, tv_nsec: 132482215 }
+Wrote 411th vote at Instant { tv_sec: 3713646, tv_nsec: 178997750 }
+Read 411th vote at Instant { tv_sec: 3713646, tv_nsec: 183707203 }
+Wrote 412th vote at Instant { tv_sec: 3713646, tv_nsec: 228997768 }
+Read 412th vote at Instant { tv_sec: 3713646, tv_nsec: 232604033 }
+Wrote 413th vote at Instant { tv_sec: 3713646, tv_nsec: 278997851 }
+Read 413th vote at Instant { tv_sec: 3713646, tv_nsec: 290409598 }
+Wrote 414th vote at Instant { tv_sec: 3713646, tv_nsec: 328998096 }
+Read 414th vote at Instant { tv_sec: 3713646, tv_nsec: 333051308 }
+Wrote 415th vote at Instant { tv_sec: 3713646, tv_nsec: 379069606 }
+Read 415th vote at Instant { tv_sec: 3713646, tv_nsec: 390381146 }
+Wrote 416th vote at Instant { tv_sec: 3713646, tv_nsec: 429232101 }
+Read 416th vote at Instant { tv_sec: 3713646, tv_nsec: 433339050 }
+Wrote 417th vote at Instant { tv_sec: 3713646, tv_nsec: 479403524 }
+TRUNCATING 19245 UPDATES
+TRUNCATING 19200 UPDATES
+TRUNCATING 19200 UPDATES
+TRUNCATING 19156 UPDATES
+TRUNCATING 19148 UPDATES
+TRUNCATING 19159 UPDATES
+TRUNCATING 19206 UPDATES
+TRUNCATING 19145 UPDATES
+TRUNCATING 19075 UPDATES
+TRUNCATING 19186 UPDATES
+TRUNCATING 19161 UPDATES
+TRUNCATING 19166 UPDATES
+TRUNCATING 18874 UPDATES
+TRUNCATING 19205 UPDATES
+TRUNCATING 19123 UPDATES
+TRUNCATING 19160 UPDATES
+TRUNCATING 19177 UPDATES
+TRUNCATING 19145 UPDATES
+TRUNCATING 19181 UPDATES
+TRUNCATING 19164 UPDATES
+Sent 225899 unsharded messages in 23.011375ms for 9821 messages / ms
+Sent 4000000 sharded messages in 23.011375ms for 173913 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Read 417th vote at Instant { tv_sec: 3713646, tv_nsec: 564719417 }
+Wrote 418th vote at Instant { tv_sec: 3713646, tv_nsec: 564938922 }
+Read 418th vote at Instant { tv_sec: 3713646, tv_nsec: 577823842 }
+Wrote 419th vote at Instant { tv_sec: 3713646, tv_nsec: 614938953 }
+Read 419th vote at Instant { tv_sec: 3713646, tv_nsec: 620396493 }
+Wrote 420th vote at Instant { tv_sec: 3713646, tv_nsec: 664938966 }
+Read 420th vote at Instant { tv_sec: 3713646, tv_nsec: 668016832 }
+Wrote 421th vote at Instant { tv_sec: 3713646, tv_nsec: 714939163 }
+Read 421th vote at Instant { tv_sec: 3713646, tv_nsec: 717412225 }
+Wrote 422th vote at Instant { tv_sec: 3713646, tv_nsec: 764939297 }
+Read 422th vote at Instant { tv_sec: 3713646, tv_nsec: 768471155 }
+Wrote 423th vote at Instant { tv_sec: 3713646, tv_nsec: 814939479 }
+Read 423th vote at Instant { tv_sec: 3713646, tv_nsec: 819393418 }
+Wrote 424th vote at Instant { tv_sec: 3713646, tv_nsec: 864939667 }
+Read 424th vote at Instant { tv_sec: 3713646, tv_nsec: 868486020 }
+Wrote 425th vote at Instant { tv_sec: 3713646, tv_nsec: 914939765 }
+Read 425th vote at Instant { tv_sec: 3713646, tv_nsec: 917589185 }
+Wrote 426th vote at Instant { tv_sec: 3713646, tv_nsec: 965086466 }
+Read 426th vote at Instant { tv_sec: 3713646, tv_nsec: 970412417 }
+Wrote 427th vote at Instant { tv_sec: 3713647, tv_nsec: 15197670 }
+Read 427th vote at Instant { tv_sec: 3713647, tv_nsec: 19041768 }
+Wrote 428th vote at Instant { tv_sec: 3713647, tv_nsec: 65309207 }
+Read 428th vote at Instant { tv_sec: 3713647, tv_nsec: 68918440 }
+Wrote 429th vote at Instant { tv_sec: 3713647, tv_nsec: 115351895 }
+Read 429th vote at Instant { tv_sec: 3713647, tv_nsec: 119034899 }
+Wrote 430th vote at Instant { tv_sec: 3713647, tv_nsec: 165503845 }
+Read 430th vote at Instant { tv_sec: 3713647, tv_nsec: 168115213 }
+Wrote 431th vote at Instant { tv_sec: 3713647, tv_nsec: 215611794 }
+Read 431th vote at Instant { tv_sec: 3713647, tv_nsec: 219225052 }
+Wrote 432th vote at Instant { tv_sec: 3713647, tv_nsec: 265679951 }
+Read 432th vote at Instant { tv_sec: 3713647, tv_nsec: 268378496 }
+Wrote 433th vote at Instant { tv_sec: 3713647, tv_nsec: 315790933 }
+Read 433th vote at Instant { tv_sec: 3713647, tv_nsec: 320435558 }
+Wrote 434th vote at Instant { tv_sec: 3713647, tv_nsec: 365791038 }
+Read 434th vote at Instant { tv_sec: 3713647, tv_nsec: 370384635 }
+Wrote 435th vote at Instant { tv_sec: 3713647, tv_nsec: 415791188 }
+Read 435th vote at Instant { tv_sec: 3713647, tv_nsec: 417821590 }
+Wrote 436th vote at Instant { tv_sec: 3713647, tv_nsec: 465791260 }
+Read 436th vote at Instant { tv_sec: 3713647, tv_nsec: 467931042 }
+Wrote 437th vote at Instant { tv_sec: 3713647, tv_nsec: 515791319 }
+Read 437th vote at Instant { tv_sec: 3713647, tv_nsec: 519027304 }
+Wrote 438th vote at Instant { tv_sec: 3713647, tv_nsec: 565914026 }
+Read 438th vote at Instant { tv_sec: 3713647, tv_nsec: 568209935 }
+Wrote 439th vote at Instant { tv_sec: 3713647, tv_nsec: 616048268 }
+Read 439th vote at Instant { tv_sec: 3713647, tv_nsec: 619304355 }
+Wrote 440th vote at Instant { tv_sec: 3713647, tv_nsec: 666113557 }
+Read 440th vote at Instant { tv_sec: 3713647, tv_nsec: 668395253 }
+Wrote 441th vote at Instant { tv_sec: 3713647, tv_nsec: 716189574 }
+Read 441th vote at Instant { tv_sec: 3713647, tv_nsec: 719507392 }
+Wrote 442th vote at Instant { tv_sec: 3713647, tv_nsec: 766330855 }
+Read 442th vote at Instant { tv_sec: 3713647, tv_nsec: 769531692 }
+Wrote 443th vote at Instant { tv_sec: 3713647, tv_nsec: 816429256 }
+Read 443th vote at Instant { tv_sec: 3713647, tv_nsec: 818719125 }
+Wrote 444th vote at Instant { tv_sec: 3713647, tv_nsec: 866517941 }
+Read 444th vote at Instant { tv_sec: 3713647, tv_nsec: 869133990 }
+Wrote 445th vote at Instant { tv_sec: 3713647, tv_nsec: 916605400 }
+Read 445th vote at Instant { tv_sec: 3713647, tv_nsec: 919795269 }
+Wrote 446th vote at Instant { tv_sec: 3713647, tv_nsec: 966754890 }
+Read 446th vote at Instant { tv_sec: 3713647, tv_nsec: 969906179 }
+Wrote 447th vote at Instant { tv_sec: 3713648, tv_nsec: 16811477 }
+Read 447th vote at Instant { tv_sec: 3713648, tv_nsec: 23685580 }
+Wrote 448th vote at Instant { tv_sec: 3713648, tv_nsec: 66819673 }
+Read 448th vote at Instant { tv_sec: 3713648, tv_nsec: 70073593 }
+Wrote 449th vote at Instant { tv_sec: 3713648, tv_nsec: 116951000 }
+Read 449th vote at Instant { tv_sec: 3713648, tv_nsec: 120442950 }
+Wrote 450th vote at Instant { tv_sec: 3713648, tv_nsec: 166951289 }
+Read 450th vote at Instant { tv_sec: 3713648, tv_nsec: 170480827 }
+Wrote 451th vote at Instant { tv_sec: 3713648, tv_nsec: 216951366 }
+Read 451th vote at Instant { tv_sec: 3713648, tv_nsec: 227110709 }
+Wrote 452th vote at Instant { tv_sec: 3713648, tv_nsec: 266951480 }
+Read 452th vote at Instant { tv_sec: 3713648, tv_nsec: 270779069 }
+Wrote 453th vote at Instant { tv_sec: 3713648, tv_nsec: 316951507 }
+Read 453th vote at Instant { tv_sec: 3713648, tv_nsec: 320968658 }
+Wrote 454th vote at Instant { tv_sec: 3713648, tv_nsec: 366974667 }
+Read 454th vote at Instant { tv_sec: 3713648, tv_nsec: 370964593 }
+Wrote 455th vote at Instant { tv_sec: 3713648, tv_nsec: 417107167 }
+Read 455th vote at Instant { tv_sec: 3713648, tv_nsec: 420112437 }
+Wrote 456th vote at Instant { tv_sec: 3713648, tv_nsec: 467226296 }
+Read 456th vote at Instant { tv_sec: 3713648, tv_nsec: 473749889 }
+TRUNCATING 18360 UPDATES
+TRUNCATING 18601 UPDATES
+TRUNCATING 18595 UPDATES
+TRUNCATING 18670 UPDATES
+TRUNCATING 18669 UPDATES
+TRUNCATING 18675 UPDATES
+TRUNCATING 18584 UPDATES
+TRUNCATING 18615 UPDATES
+TRUNCATING 18576 UPDATES
+TRUNCATING 18699 UPDATES
+TRUNCATING 18632 UPDATES
+TRUNCATING 18569 UPDATES
+TRUNCATING 18608 UPDATES
+TRUNCATING 18602 UPDATES
+TRUNCATING 18672 UPDATES
+TRUNCATING 18590 UPDATES
+TRUNCATING 18659 UPDATES
+TRUNCATING 18685 UPDATES
+TRUNCATING 18633 UPDATES
+TRUNCATING 18600 UPDATES
+Wrote 457th vote at Instant { tv_sec: 3713648, tv_nsec: 517226554 }
+Read 457th vote at Instant { tv_sec: 3713648, tv_nsec: 569069230 }
+Wrote 458th vote at Instant { tv_sec: 3713648, tv_nsec: 569072220 }
+Read 458th vote at Instant { tv_sec: 3713648, tv_nsec: 575806069 }
+Wrote 459th vote at Instant { tv_sec: 3713648, tv_nsec: 619072453 }
+Read 459th vote at Instant { tv_sec: 3713648, tv_nsec: 621913252 }
+Wrote 460th vote at Instant { tv_sec: 3713648, tv_nsec: 669132910 }
+Read 460th vote at Instant { tv_sec: 3713648, tv_nsec: 672899581 }
+Wrote 461th vote at Instant { tv_sec: 3713648, tv_nsec: 719132940 }
+Read 461th vote at Instant { tv_sec: 3713648, tv_nsec: 722999755 }
+Wrote 462th vote at Instant { tv_sec: 3713648, tv_nsec: 769189825 }
+Read 462th vote at Instant { tv_sec: 3713648, tv_nsec: 772418560 }
+Wrote 463th vote at Instant { tv_sec: 3713648, tv_nsec: 819260272 }
+Read 463th vote at Instant { tv_sec: 3713648, tv_nsec: 823477697 }
+Wrote 464th vote at Instant { tv_sec: 3713648, tv_nsec: 869260278 }
+Read 464th vote at Instant { tv_sec: 3713648, tv_nsec: 871305844 }
+Wrote 465th vote at Instant { tv_sec: 3713648, tv_nsec: 919260419 }
+Read 465th vote at Instant { tv_sec: 3713648, tv_nsec: 921590261 }
+Wrote 466th vote at Instant { tv_sec: 3713648, tv_nsec: 969316240 }
+Read 466th vote at Instant { tv_sec: 3713648, tv_nsec: 971501060 }
+Wrote 467th vote at Instant { tv_sec: 3713649, tv_nsec: 19380887 }
+Read 467th vote at Instant { tv_sec: 3713649, tv_nsec: 20656481 }
+Wrote 468th vote at Instant { tv_sec: 3713649, tv_nsec: 69462304 }
+Read 468th vote at Instant { tv_sec: 3713649, tv_nsec: 72897499 }
+Wrote 469th vote at Instant { tv_sec: 3713649, tv_nsec: 119565300 }
+Read 469th vote at Instant { tv_sec: 3713649, tv_nsec: 122820959 }
+Wrote 470th vote at Instant { tv_sec: 3713649, tv_nsec: 169706948 }
+Read 470th vote at Instant { tv_sec: 3713649, tv_nsec: 172967892 }
+Sent 254178 unsharded messages in 25.642ms for 10167 messages / ms
+Sent 4500000 sharded messages in 25.642ms for 180000 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 984, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 471th vote at Instant { tv_sec: 3713649, tv_nsec: 219801598 }
+Read 471th vote at Instant { tv_sec: 3713649, tv_nsec: 221975096 }
+Wrote 472th vote at Instant { tv_sec: 3713649, tv_nsec: 269801632 }
+Read 472th vote at Instant { tv_sec: 3713649, tv_nsec: 273777244 }
+Wrote 473th vote at Instant { tv_sec: 3713649, tv_nsec: 319930398 }
+Read 473th vote at Instant { tv_sec: 3713649, tv_nsec: 323700066 }
+Wrote 474th vote at Instant { tv_sec: 3713649, tv_nsec: 370035926 }
+Read 474th vote at Instant { tv_sec: 3713649, tv_nsec: 372493998 }
+Wrote 475th vote at Instant { tv_sec: 3713649, tv_nsec: 420143028 }
+Read 475th vote at Instant { tv_sec: 3713649, tv_nsec: 422580278 }
+Wrote 476th vote at Instant { tv_sec: 3713649, tv_nsec: 470232891 }
+Read 476th vote at Instant { tv_sec: 3713649, tv_nsec: 473446707 }
+Wrote 477th vote at Instant { tv_sec: 3713649, tv_nsec: 520352371 }
+Read 477th vote at Instant { tv_sec: 3713649, tv_nsec: 523698301 }
+Wrote 478th vote at Instant { tv_sec: 3713649, tv_nsec: 570533102 }
+Read 478th vote at Instant { tv_sec: 3713649, tv_nsec: 577029830 }
+Wrote 479th vote at Instant { tv_sec: 3713649, tv_nsec: 620633342 }
+Read 479th vote at Instant { tv_sec: 3713649, tv_nsec: 623866467 }
+Wrote 480th vote at Instant { tv_sec: 3713649, tv_nsec: 670667746 }
+Read 480th vote at Instant { tv_sec: 3713649, tv_nsec: 673968057 }
+Wrote 481th vote at Instant { tv_sec: 3713649, tv_nsec: 720812769 }
+Read 481th vote at Instant { tv_sec: 3713649, tv_nsec: 723035123 }
+Wrote 482th vote at Instant { tv_sec: 3713649, tv_nsec: 770870822 }
+Read 482th vote at Instant { tv_sec: 3713649, tv_nsec: 775130633 }
+Wrote 483th vote at Instant { tv_sec: 3713649, tv_nsec: 821015534 }
+Read 483th vote at Instant { tv_sec: 3713649, tv_nsec: 824174941 }
+Wrote 484th vote at Instant { tv_sec: 3713649, tv_nsec: 871125982 }
+Read 484th vote at Instant { tv_sec: 3713649, tv_nsec: 873344162 }
+Wrote 485th vote at Instant { tv_sec: 3713649, tv_nsec: 921257972 }
+Read 485th vote at Instant { tv_sec: 3713649, tv_nsec: 924550923 }
+Wrote 486th vote at Instant { tv_sec: 3713649, tv_nsec: 971358170 }
+Read 486th vote at Instant { tv_sec: 3713649, tv_nsec: 977040175 }
+Wrote 487th vote at Instant { tv_sec: 3713650, tv_nsec: 21358294 }
+Read 487th vote at Instant { tv_sec: 3713650, tv_nsec: 24849998 }
+Wrote 488th vote at Instant { tv_sec: 3713650, tv_nsec: 71358487 }
+Read 488th vote at Instant { tv_sec: 3713650, tv_nsec: 73908695 }
+Wrote 489th vote at Instant { tv_sec: 3713650, tv_nsec: 121358527 }
+Read 489th vote at Instant { tv_sec: 3713650, tv_nsec: 124031788 }
+Wrote 490th vote at Instant { tv_sec: 3713650, tv_nsec: 171462783 }
+Read 490th vote at Instant { tv_sec: 3713650, tv_nsec: 176111268 }
+Wrote 491th vote at Instant { tv_sec: 3713650, tv_nsec: 221562348 }
+Read 491th vote at Instant { tv_sec: 3713650, tv_nsec: 230371789 }
+Wrote 492th vote at Instant { tv_sec: 3713650, tv_nsec: 271633888 }
+Read 492th vote at Instant { tv_sec: 3713650, tv_nsec: 275324647 }
+Wrote 493th vote at Instant { tv_sec: 3713650, tv_nsec: 321756972 }
+Read 493th vote at Instant { tv_sec: 3713650, tv_nsec: 327081538 }
+Wrote 494th vote at Instant { tv_sec: 3713650, tv_nsec: 371906260 }
+Read 494th vote at Instant { tv_sec: 3713650, tv_nsec: 374662126 }
+Wrote 495th vote at Instant { tv_sec: 3713650, tv_nsec: 421976092 }
+Read 495th vote at Instant { tv_sec: 3713650, tv_nsec: 424583644 }
+Wrote 496th vote at Instant { tv_sec: 3713650, tv_nsec: 472079876 }
+Read 496th vote at Instant { tv_sec: 3713650, tv_nsec: 477040659 }
+TRUNCATING 19019 UPDATES
+TRUNCATING 18706 UPDATES
+TRUNCATING 19066 UPDATES
+TRUNCATING 18936 UPDATES
+TRUNCATING 18990 UPDATES
+TRUNCATING 19021 UPDATES
+TRUNCATING 18911 UPDATES
+TRUNCATING 18977 UPDATES
+TRUNCATING 19018 UPDATES
+TRUNCATING 19037 UPDATES
+TRUNCATING 19040 UPDATES
+TRUNCATING 19031 UPDATES
+TRUNCATING 19002 UPDATES
+TRUNCATING 19006 UPDATES
+TRUNCATING 19079 UPDATES
+TRUNCATING 19046 UPDATES
+TRUNCATING 18938 UPDATES
+TRUNCATING 19010 UPDATES
+TRUNCATING 19070 UPDATES
+TRUNCATING 19013 UPDATES
+Wrote 497th vote at Instant { tv_sec: 3713650, tv_nsec: 522080011 }
+Read 497th vote at Instant { tv_sec: 3713650, tv_nsec: 564268217 }
+Wrote 498th vote at Instant { tv_sec: 3713650, tv_nsec: 572115416 }
+Read 498th vote at Instant { tv_sec: 3713650, tv_nsec: 603743712 }
+Wrote 499th vote at Instant { tv_sec: 3713650, tv_nsec: 622139929 }
+Read 499th vote at Instant { tv_sec: 3713650, tv_nsec: 625369467 }
+Wrote 500th vote at Instant { tv_sec: 3713650, tv_nsec: 672140010 }
+Read 500th vote at Instant { tv_sec: 3713650, tv_nsec: 675420134 }
+Wrote 501th vote at Instant { tv_sec: 3713650, tv_nsec: 722140130 }
+Read 501th vote at Instant { tv_sec: 3713650, tv_nsec: 724522772 }
+Wrote 502th vote at Instant { tv_sec: 3713650, tv_nsec: 772219438 }
+Read 502th vote at Instant { tv_sec: 3713650, tv_nsec: 775417701 }
+Wrote 503th vote at Instant { tv_sec: 3713650, tv_nsec: 822219595 }
+Read 503th vote at Instant { tv_sec: 3713650, tv_nsec: 824753716 }
+Wrote 504th vote at Instant { tv_sec: 3713650, tv_nsec: 872219912 }
+Read 504th vote at Instant { tv_sec: 3713650, tv_nsec: 875924955 }
+Wrote 505th vote at Instant { tv_sec: 3713650, tv_nsec: 922220121 }
+Read 505th vote at Instant { tv_sec: 3713650, tv_nsec: 927072940 }
+Wrote 506th vote at Instant { tv_sec: 3713650, tv_nsec: 972220134 }
+Read 506th vote at Instant { tv_sec: 3713650, tv_nsec: 976079413 }
+Wrote 507th vote at Instant { tv_sec: 3713651, tv_nsec: 22220400 }
+Read 507th vote at Instant { tv_sec: 3713651, tv_nsec: 25119445 }
+Wrote 508th vote at Instant { tv_sec: 3713651, tv_nsec: 72264743 }
+Read 508th vote at Instant { tv_sec: 3713651, tv_nsec: 76118424 }
+Wrote 509th vote at Instant { tv_sec: 3713651, tv_nsec: 122354649 }
+Read 509th vote at Instant { tv_sec: 3713651, tv_nsec: 127045819 }
+Wrote 510th vote at Instant { tv_sec: 3713651, tv_nsec: 172476875 }
+Read 510th vote at Instant { tv_sec: 3713651, tv_nsec: 176265403 }
+Wrote 511th vote at Instant { tv_sec: 3713651, tv_nsec: 222592753 }
+Read 511th vote at Instant { tv_sec: 3713651, tv_nsec: 226424348 }
+Wrote 512th vote at Instant { tv_sec: 3713651, tv_nsec: 272644561 }
+Read 512th vote at Instant { tv_sec: 3713651, tv_nsec: 275681409 }
+Wrote 513th vote at Instant { tv_sec: 3713651, tv_nsec: 322783163 }
+Read 513th vote at Instant { tv_sec: 3713651, tv_nsec: 326665192 }
+Wrote 514th vote at Instant { tv_sec: 3713651, tv_nsec: 372975268 }
+Read 514th vote at Instant { tv_sec: 3713651, tv_nsec: 375738087 }
+Wrote 515th vote at Instant { tv_sec: 3713651, tv_nsec: 423058386 }
+Read 515th vote at Instant { tv_sec: 3713651, tv_nsec: 427047937 }
+Wrote 516th vote at Instant { tv_sec: 3713651, tv_nsec: 473163801 }
+Read 516th vote at Instant { tv_sec: 3713651, tv_nsec: 476036373 }
+Wrote 517th vote at Instant { tv_sec: 3713651, tv_nsec: 523220629 }
+Read 517th vote at Instant { tv_sec: 3713651, tv_nsec: 527158196 }
+Wrote 518th vote at Instant { tv_sec: 3713651, tv_nsec: 573429415 }
+Read 518th vote at Instant { tv_sec: 3713651, tv_nsec: 577466878 }
+Wrote 519th vote at Instant { tv_sec: 3713651, tv_nsec: 623484634 }
+Read 519th vote at Instant { tv_sec: 3713651, tv_nsec: 626269688 }
+Wrote 520th vote at Instant { tv_sec: 3713651, tv_nsec: 673619992 }
+Read 520th vote at Instant { tv_sec: 3713651, tv_nsec: 676372723 }
+Wrote 521th vote at Instant { tv_sec: 3713651, tv_nsec: 723784488 }
+Read 521th vote at Instant { tv_sec: 3713651, tv_nsec: 726474098 }
+Wrote 522th vote at Instant { tv_sec: 3713651, tv_nsec: 773794997 }
+Read 522th vote at Instant { tv_sec: 3713651, tv_nsec: 778480417 }
+Wrote 523th vote at Instant { tv_sec: 3713651, tv_nsec: 823990360 }
+Read 523th vote at Instant { tv_sec: 3713651, tv_nsec: 830404932 }
+Sent 282456 unsharded messages in 28.29053ms for 10087 messages / ms
+Sent 5000000 sharded messages in 28.29053ms for 178571 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1304, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 524th vote at Instant { tv_sec: 3713651, tv_nsec: 874020076 }
+Read 524th vote at Instant { tv_sec: 3713651, tv_nsec: 877019955 }
+Wrote 525th vote at Instant { tv_sec: 3713651, tv_nsec: 924094969 }
+Read 525th vote at Instant { tv_sec: 3713651, tv_nsec: 927021137 }
+Wrote 526th vote at Instant { tv_sec: 3713651, tv_nsec: 974223555 }
+Read 526th vote at Instant { tv_sec: 3713651, tv_nsec: 977071383 }
+Wrote 527th vote at Instant { tv_sec: 3713652, tv_nsec: 24316205 }
+Read 527th vote at Instant { tv_sec: 3713652, tv_nsec: 27213768 }
+Wrote 528th vote at Instant { tv_sec: 3713652, tv_nsec: 74451379 }
+Read 528th vote at Instant { tv_sec: 3713652, tv_nsec: 77212571 }
+Wrote 529th vote at Instant { tv_sec: 3713652, tv_nsec: 124476562 }
+Read 529th vote at Instant { tv_sec: 3713652, tv_nsec: 127390634 }
+Wrote 530th vote at Instant { tv_sec: 3713652, tv_nsec: 174590411 }
+Read 530th vote at Instant { tv_sec: 3713652, tv_nsec: 178502030 }
+Wrote 531th vote at Instant { tv_sec: 3713652, tv_nsec: 224654041 }
+Read 531th vote at Instant { tv_sec: 3713652, tv_nsec: 228609159 }
+Wrote 532th vote at Instant { tv_sec: 3713652, tv_nsec: 274772886 }
+Read 532th vote at Instant { tv_sec: 3713652, tv_nsec: 277637276 }
+Wrote 533th vote at Instant { tv_sec: 3713652, tv_nsec: 324871320 }
+Read 533th vote at Instant { tv_sec: 3713652, tv_nsec: 328782943 }
+Wrote 534th vote at Instant { tv_sec: 3713652, tv_nsec: 375022167 }
+Read 534th vote at Instant { tv_sec: 3713652, tv_nsec: 378878499 }
+Wrote 535th vote at Instant { tv_sec: 3713652, tv_nsec: 425115022 }
+Read 535th vote at Instant { tv_sec: 3713652, tv_nsec: 430389673 }
+Wrote 536th vote at Instant { tv_sec: 3713652, tv_nsec: 475189854 }
+Read 536th vote at Instant { tv_sec: 3713652, tv_nsec: 477622162 }
+TRUNCATING 18780 UPDATES
+TRUNCATING 18804 UPDATES
+TRUNCATING 18859 UPDATES
+TRUNCATING 18773 UPDATES
+TRUNCATING 18886 UPDATES
+TRUNCATING 18680 UPDATES
+TRUNCATING 18751 UPDATES
+TRUNCATING 18819 UPDATES
+TRUNCATING 18838 UPDATES
+TRUNCATING 18814 UPDATES
+TRUNCATING 18862 UPDATES
+TRUNCATING 18808 UPDATES
+TRUNCATING 18779 UPDATES
+TRUNCATING 18868 UPDATES
+TRUNCATING 18732 UPDATES
+TRUNCATING 18806 UPDATES
+TRUNCATING 18882 UPDATES
+TRUNCATING 18767 UPDATES
+TRUNCATING 18751 UPDATES
+TRUNCATING 18752 UPDATES
+Wrote 537th vote at Instant { tv_sec: 3713652, tv_nsec: 525189973 }
+Read 537th vote at Instant { tv_sec: 3713652, tv_nsec: 557053841 }
+Wrote 538th vote at Instant { tv_sec: 3713652, tv_nsec: 575191072 }
+Read 538th vote at Instant { tv_sec: 3713652, tv_nsec: 578034704 }
+Wrote 539th vote at Instant { tv_sec: 3713652, tv_nsec: 625309356 }
+Read 539th vote at Instant { tv_sec: 3713652, tv_nsec: 629107884 }
+Wrote 540th vote at Instant { tv_sec: 3713652, tv_nsec: 675413050 }
+Read 540th vote at Instant { tv_sec: 3713652, tv_nsec: 679240695 }
+Wrote 541th vote at Instant { tv_sec: 3713652, tv_nsec: 725508154 }
+Read 541th vote at Instant { tv_sec: 3713652, tv_nsec: 728385715 }
+Wrote 542th vote at Instant { tv_sec: 3713652, tv_nsec: 775653997 }
+Read 542th vote at Instant { tv_sec: 3713652, tv_nsec: 779611584 }
+Wrote 543th vote at Instant { tv_sec: 3713652, tv_nsec: 825707165 }
+Read 543th vote at Instant { tv_sec: 3713652, tv_nsec: 829668650 }
+Wrote 544th vote at Instant { tv_sec: 3713652, tv_nsec: 875841604 }
+Read 544th vote at Instant { tv_sec: 3713652, tv_nsec: 879789009 }
+Wrote 545th vote at Instant { tv_sec: 3713652, tv_nsec: 925893231 }
+Read 545th vote at Instant { tv_sec: 3713652, tv_nsec: 929881516 }
+Wrote 546th vote at Instant { tv_sec: 3713652, tv_nsec: 976049006 }
+Read 546th vote at Instant { tv_sec: 3713652, tv_nsec: 978976989 }
+Wrote 547th vote at Instant { tv_sec: 3713653, tv_nsec: 26135094 }
+Read 547th vote at Instant { tv_sec: 3713653, tv_nsec: 30190786 }
+Wrote 548th vote at Instant { tv_sec: 3713653, tv_nsec: 76298473 }
+Read 548th vote at Instant { tv_sec: 3713653, tv_nsec: 80262865 }
+Wrote 549th vote at Instant { tv_sec: 3713653, tv_nsec: 126424559 }
+Read 549th vote at Instant { tv_sec: 3713653, tv_nsec: 129402706 }
+Wrote 550th vote at Instant { tv_sec: 3713653, tv_nsec: 176520166 }
+Read 550th vote at Instant { tv_sec: 3713653, tv_nsec: 179429865 }
+Wrote 551th vote at Instant { tv_sec: 3713653, tv_nsec: 226520175 }
+Read 551th vote at Instant { tv_sec: 3713653, tv_nsec: 228671925 }
+Wrote 552th vote at Instant { tv_sec: 3713653, tv_nsec: 276520528 }
+Read 552th vote at Instant { tv_sec: 3713653, tv_nsec: 280663247 }
+Wrote 553th vote at Instant { tv_sec: 3713653, tv_nsec: 326520681 }
+Read 553th vote at Instant { tv_sec: 3713653, tv_nsec: 328640688 }
+Wrote 554th vote at Instant { tv_sec: 3713653, tv_nsec: 376520819 }
+Read 554th vote at Instant { tv_sec: 3713653, tv_nsec: 380373586 }
+Wrote 555th vote at Instant { tv_sec: 3713653, tv_nsec: 426644084 }
+Read 555th vote at Instant { tv_sec: 3713653, tv_nsec: 430214354 }
+Wrote 556th vote at Instant { tv_sec: 3713653, tv_nsec: 476644100 }
+Read 556th vote at Instant { tv_sec: 3713653, tv_nsec: 480421738 }
+Wrote 557th vote at Instant { tv_sec: 3713653, tv_nsec: 526714204 }
+Read 557th vote at Instant { tv_sec: 3713653, tv_nsec: 530052959 }
+Wrote 558th vote at Instant { tv_sec: 3713653, tv_nsec: 576849564 }
+Read 558th vote at Instant { tv_sec: 3713653, tv_nsec: 580475934 }
+Wrote 559th vote at Instant { tv_sec: 3713653, tv_nsec: 626849666 }
+Read 559th vote at Instant { tv_sec: 3713653, tv_nsec: 630294941 }
+Wrote 560th vote at Instant { tv_sec: 3713653, tv_nsec: 676849715 }
+Read 560th vote at Instant { tv_sec: 3713653, tv_nsec: 680474451 }
+Wrote 561th vote at Instant { tv_sec: 3713653, tv_nsec: 726936895 }
+Read 561th vote at Instant { tv_sec: 3713653, tv_nsec: 731606213 }
+Wrote 562th vote at Instant { tv_sec: 3713653, tv_nsec: 777063922 }
+Read 562th vote at Instant { tv_sec: 3713653, tv_nsec: 779799076 }
+Wrote 563th vote at Instant { tv_sec: 3713653, tv_nsec: 827145895 }
+Read 563th vote at Instant { tv_sec: 3713653, tv_nsec: 830256710 }
+Wrote 564th vote at Instant { tv_sec: 3713653, tv_nsec: 877285657 }
+Read 564th vote at Instant { tv_sec: 3713653, tv_nsec: 880902264 }
+Wrote 565th vote at Instant { tv_sec: 3713653, tv_nsec: 927368182 }
+Read 565th vote at Instant { tv_sec: 3713653, tv_nsec: 930092803 }
+Wrote 566th vote at Instant { tv_sec: 3713653, tv_nsec: 977479478 }
+Read 566th vote at Instant { tv_sec: 3713653, tv_nsec: 980034565 }
+Wrote 567th vote at Instant { tv_sec: 3713654, tv_nsec: 27582405 }
+Read 567th vote at Instant { tv_sec: 3713654, tv_nsec: 31361442 }
+Wrote 568th vote at Instant { tv_sec: 3713654, tv_nsec: 77734047 }
+Read 568th vote at Instant { tv_sec: 3713654, tv_nsec: 80334134 }
+Wrote 569th vote at Instant { tv_sec: 3713654, tv_nsec: 127838943 }
+Read 569th vote at Instant { tv_sec: 3713654, tv_nsec: 132342180 }
+Wrote 570th vote at Instant { tv_sec: 3713654, tv_nsec: 177861614 }
+Read 570th vote at Instant { tv_sec: 3713654, tv_nsec: 181310853 }
+Wrote 571th vote at Instant { tv_sec: 3713654, tv_nsec: 227959726 }
+Read 571th vote at Instant { tv_sec: 3713654, tv_nsec: 237114272 }
+Wrote 572th vote at Instant { tv_sec: 3713654, tv_nsec: 278082818 }
+Read 572th vote at Instant { tv_sec: 3713654, tv_nsec: 280621233 }
+Wrote 573th vote at Instant { tv_sec: 3713654, tv_nsec: 328193823 }
+Read 573th vote at Instant { tv_sec: 3713654, tv_nsec: 330876620 }
+Wrote 574th vote at Instant { tv_sec: 3713654, tv_nsec: 378385136 }
+Read 574th vote at Instant { tv_sec: 3713654, tv_nsec: 381672734 }
+Wrote 575th vote at Instant { tv_sec: 3713654, tv_nsec: 428459358 }
+Read 575th vote at Instant { tv_sec: 3713654, tv_nsec: 431119582 }
+Sent 310698 unsharded messages in 30.92099ms for 10356 messages / ms
+Sent 5500000 sharded messages in 30.92099ms for 183333 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1144, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 576th vote at Instant { tv_sec: 3713654, tv_nsec: 478582569 }
+TRUNCATING 18954 UPDATES
+TRUNCATING 19055 UPDATES
+TRUNCATING 19018 UPDATES
+TRUNCATING 19101 UPDATES
+TRUNCATING 19022 UPDATES
+TRUNCATING 18759 UPDATES
+TRUNCATING 19054 UPDATES
+TRUNCATING 18965 UPDATES
+TRUNCATING 18983 UPDATES
+TRUNCATING 18940 UPDATES
+TRUNCATING 18942 UPDATES
+TRUNCATING 18938 UPDATES
+TRUNCATING 19037 UPDATES
+TRUNCATING 19048 UPDATES
+TRUNCATING 19019 UPDATES
+TRUNCATING 19051 UPDATES
+TRUNCATING 18937 UPDATES
+TRUNCATING 18996 UPDATES
+TRUNCATING 19118 UPDATES
+TRUNCATING 19037 UPDATES
+Read 576th vote at Instant { tv_sec: 3713654, tv_nsec: 556770120 }
+Wrote 577th vote at Instant { tv_sec: 3713654, tv_nsec: 556776308 }
+Read 577th vote at Instant { tv_sec: 3713654, tv_nsec: 580408278 }
+Wrote 578th vote at Instant { tv_sec: 3713654, tv_nsec: 606776326 }
+Read 578th vote at Instant { tv_sec: 3713654, tv_nsec: 609206125 }
+Wrote 579th vote at Instant { tv_sec: 3713654, tv_nsec: 656902714 }
+Read 579th vote at Instant { tv_sec: 3713654, tv_nsec: 660547222 }
+Wrote 580th vote at Instant { tv_sec: 3713654, tv_nsec: 707039340 }
+Read 580th vote at Instant { tv_sec: 3713654, tv_nsec: 710220412 }
+Wrote 581th vote at Instant { tv_sec: 3713654, tv_nsec: 757039400 }
+Read 581th vote at Instant { tv_sec: 3713654, tv_nsec: 760413643 }
+Wrote 582th vote at Instant { tv_sec: 3713654, tv_nsec: 807039588 }
+Read 582th vote at Instant { tv_sec: 3713654, tv_nsec: 810642069 }
+Wrote 583th vote at Instant { tv_sec: 3713654, tv_nsec: 857039790 }
+Read 583th vote at Instant { tv_sec: 3713654, tv_nsec: 859762213 }
+Wrote 584th vote at Instant { tv_sec: 3713654, tv_nsec: 907039886 }
+Read 584th vote at Instant { tv_sec: 3713654, tv_nsec: 909907220 }
+Wrote 585th vote at Instant { tv_sec: 3713654, tv_nsec: 957040547 }
+Read 585th vote at Instant { tv_sec: 3713654, tv_nsec: 960947310 }
+Wrote 586th vote at Instant { tv_sec: 3713655, tv_nsec: 7160775 }
+Read 586th vote at Instant { tv_sec: 3713655, tv_nsec: 13711516 }
+Wrote 587th vote at Instant { tv_sec: 3713655, tv_nsec: 57290425 }
+Read 587th vote at Instant { tv_sec: 3713655, tv_nsec: 60074513 }
+Wrote 588th vote at Instant { tv_sec: 3713655, tv_nsec: 107348373 }
+Read 588th vote at Instant { tv_sec: 3713655, tv_nsec: 110248261 }
+Wrote 589th vote at Instant { tv_sec: 3713655, tv_nsec: 157472693 }
+Read 589th vote at Instant { tv_sec: 3713655, tv_nsec: 160396945 }
+Wrote 590th vote at Instant { tv_sec: 3713655, tv_nsec: 207504051 }
+Read 590th vote at Instant { tv_sec: 3713655, tv_nsec: 211351882 }
+Wrote 591th vote at Instant { tv_sec: 3713655, tv_nsec: 257599065 }
+Read 591th vote at Instant { tv_sec: 3713655, tv_nsec: 260434010 }
+Wrote 592th vote at Instant { tv_sec: 3713655, tv_nsec: 307599241 }
+Read 592th vote at Instant { tv_sec: 3713655, tv_nsec: 311744872 }
+Wrote 593th vote at Instant { tv_sec: 3713655, tv_nsec: 357678547 }
+Read 593th vote at Instant { tv_sec: 3713655, tv_nsec: 360736288 }
+Wrote 594th vote at Instant { tv_sec: 3713655, tv_nsec: 407750004 }
+Read 594th vote at Instant { tv_sec: 3713655, tv_nsec: 410722215 }
+Wrote 595th vote at Instant { tv_sec: 3713655, tv_nsec: 457879107 }
+Read 595th vote at Instant { tv_sec: 3713655, tv_nsec: 461866625 }
+Wrote 596th vote at Instant { tv_sec: 3713655, tv_nsec: 507990440 }
+Read 596th vote at Instant { tv_sec: 3713655, tv_nsec: 510965302 }
+Wrote 597th vote at Instant { tv_sec: 3713655, tv_nsec: 558072078 }
+Read 597th vote at Instant { tv_sec: 3713655, tv_nsec: 560193323 }
+Wrote 598th vote at Instant { tv_sec: 3713655, tv_nsec: 608195287 }
+Read 598th vote at Instant { tv_sec: 3713655, tv_nsec: 610997666 }
+Wrote 599th vote at Instant { tv_sec: 3713655, tv_nsec: 658370113 }
+Read 599th vote at Instant { tv_sec: 3713655, tv_nsec: 660816265 }
+Wrote 600th vote at Instant { tv_sec: 3713655, tv_nsec: 708445238 }
+Read 600th vote at Instant { tv_sec: 3713655, tv_nsec: 712028267 }
+Wrote 601th vote at Instant { tv_sec: 3713655, tv_nsec: 758518001 }
+Read 601th vote at Instant { tv_sec: 3713655, tv_nsec: 762229431 }
+Wrote 602th vote at Instant { tv_sec: 3713655, tv_nsec: 808621853 }
+Read 602th vote at Instant { tv_sec: 3713655, tv_nsec: 811163047 }
+Wrote 603th vote at Instant { tv_sec: 3713655, tv_nsec: 858767615 }
+Read 603th vote at Instant { tv_sec: 3713655, tv_nsec: 862219410 }
+Wrote 604th vote at Instant { tv_sec: 3713655, tv_nsec: 908886803 }
+Read 604th vote at Instant { tv_sec: 3713655, tv_nsec: 912698492 }
+Wrote 605th vote at Instant { tv_sec: 3713655, tv_nsec: 959104391 }
+Read 605th vote at Instant { tv_sec: 3713655, tv_nsec: 963535304 }
+Wrote 606th vote at Instant { tv_sec: 3713656, tv_nsec: 9271802 }
+Read 606th vote at Instant { tv_sec: 3713656, tv_nsec: 20540433 }
+Wrote 607th vote at Instant { tv_sec: 3713656, tv_nsec: 59379169 }
+Read 607th vote at Instant { tv_sec: 3713656, tv_nsec: 63705389 }
+Wrote 608th vote at Instant { tv_sec: 3713656, tv_nsec: 109455134 }
+Read 608th vote at Instant { tv_sec: 3713656, tv_nsec: 112384675 }
+Wrote 609th vote at Instant { tv_sec: 3713656, tv_nsec: 159670964 }
+Read 609th vote at Instant { tv_sec: 3713656, tv_nsec: 163635176 }
+Wrote 610th vote at Instant { tv_sec: 3713656, tv_nsec: 209775818 }
+Read 610th vote at Instant { tv_sec: 3713656, tv_nsec: 211712716 }
+Wrote 611th vote at Instant { tv_sec: 3713656, tv_nsec: 259829106 }
+Read 611th vote at Instant { tv_sec: 3713656, tv_nsec: 263730277 }
+Wrote 612th vote at Instant { tv_sec: 3713656, tv_nsec: 309829142 }
+Read 612th vote at Instant { tv_sec: 3713656, tv_nsec: 312071174 }
+Wrote 613th vote at Instant { tv_sec: 3713656, tv_nsec: 359829173 }
+Read 613th vote at Instant { tv_sec: 3713656, tv_nsec: 363240471 }
+Wrote 614th vote at Instant { tv_sec: 3713656, tv_nsec: 409829321 }
+Read 614th vote at Instant { tv_sec: 3713656, tv_nsec: 412547235 }
+Wrote 615th vote at Instant { tv_sec: 3713656, tv_nsec: 459829335 }
+Read 615th vote at Instant { tv_sec: 3713656, tv_nsec: 466497516 }
+Wrote 616th vote at Instant { tv_sec: 3713656, tv_nsec: 509829337 }
+TRUNCATING 18951 UPDATES
+TRUNCATING 18942 UPDATES
+TRUNCATING 18969 UPDATES
+TRUNCATING 18875 UPDATES
+TRUNCATING 19000 UPDATES
+TRUNCATING 18988 UPDATES
+TRUNCATING 18896 UPDATES
+TRUNCATING 18653 UPDATES
+TRUNCATING 18973 UPDATES
+TRUNCATING 19000 UPDATES
+TRUNCATING 18939 UPDATES
+TRUNCATING 18886 UPDATES
+TRUNCATING 18901 UPDATES
+TRUNCATING 18983 UPDATES
+TRUNCATING 19005 UPDATES
+TRUNCATING 18935 UPDATES
+TRUNCATING 18991 UPDATES
+TRUNCATING 19004 UPDATES
+TRUNCATING 18891 UPDATES
+TRUNCATING 18931 UPDATES
+Read 616th vote at Instant { tv_sec: 3713656, tv_nsec: 607940483 }
+Wrote 617th vote at Instant { tv_sec: 3713656, tv_nsec: 607974499 }
+Read 617th vote at Instant { tv_sec: 3713656, tv_nsec: 628896850 }
+Wrote 618th vote at Instant { tv_sec: 3713656, tv_nsec: 657974556 }
+Read 618th vote at Instant { tv_sec: 3713656, tv_nsec: 663711737 }
+Wrote 619th vote at Instant { tv_sec: 3713656, tv_nsec: 708063087 }
+Read 619th vote at Instant { tv_sec: 3713656, tv_nsec: 711341306 }
+Wrote 620th vote at Instant { tv_sec: 3713656, tv_nsec: 758156441 }
+Read 620th vote at Instant { tv_sec: 3713656, tv_nsec: 760357633 }
+Wrote 621th vote at Instant { tv_sec: 3713656, tv_nsec: 808272085 }
+Read 621th vote at Instant { tv_sec: 3713656, tv_nsec: 812628380 }
+Wrote 622th vote at Instant { tv_sec: 3713656, tv_nsec: 858366898 }
+Read 622th vote at Instant { tv_sec: 3713656, tv_nsec: 861568176 }
+Wrote 623th vote at Instant { tv_sec: 3713656, tv_nsec: 908444559 }
+Read 623th vote at Instant { tv_sec: 3713656, tv_nsec: 910654166 }
+Wrote 624th vote at Instant { tv_sec: 3713656, tv_nsec: 958539598 }
+Read 624th vote at Instant { tv_sec: 3713656, tv_nsec: 962080279 }
+Wrote 625th vote at Instant { tv_sec: 3713657, tv_nsec: 8690180 }
+Read 625th vote at Instant { tv_sec: 3713657, tv_nsec: 10833013 }
+Wrote 626th vote at Instant { tv_sec: 3713657, tv_nsec: 58820257 }
+Read 626th vote at Instant { tv_sec: 3713657, tv_nsec: 67260840 }
+Wrote 627th vote at Instant { tv_sec: 3713657, tv_nsec: 108890815 }
+Read 627th vote at Instant { tv_sec: 3713657, tv_nsec: 112116978 }
+Sent 338963 unsharded messages in 33.595733ms for 10271 messages / ms
+Sent 6000000 sharded messages in 33.595733ms for 181818 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1144, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 628th vote at Instant { tv_sec: 3713657, tv_nsec: 158982969 }
+Read 628th vote at Instant { tv_sec: 3713657, tv_nsec: 161358100 }
+Wrote 629th vote at Instant { tv_sec: 3713657, tv_nsec: 209106765 }
+Read 629th vote at Instant { tv_sec: 3713657, tv_nsec: 213716565 }
+Wrote 630th vote at Instant { tv_sec: 3713657, tv_nsec: 259197420 }
+Read 630th vote at Instant { tv_sec: 3713657, tv_nsec: 262332985 }
+Wrote 631th vote at Instant { tv_sec: 3713657, tv_nsec: 309256696 }
+Read 631th vote at Instant { tv_sec: 3713657, tv_nsec: 313774831 }
+Wrote 632th vote at Instant { tv_sec: 3713657, tv_nsec: 359386668 }
+Read 632th vote at Instant { tv_sec: 3713657, tv_nsec: 360700341 }
+Wrote 633th vote at Instant { tv_sec: 3713657, tv_nsec: 409446878 }
+Read 633th vote at Instant { tv_sec: 3713657, tv_nsec: 413698001 }
+Wrote 634th vote at Instant { tv_sec: 3713657, tv_nsec: 459522399 }
+Read 634th vote at Instant { tv_sec: 3713657, tv_nsec: 466075741 }
+TRUNCATING 9006 UPDATES
+TRUNCATING 9026 UPDATES
+TRUNCATING 9033 UPDATES
+TRUNCATING 9015 UPDATES
+TRUNCATING 9091 UPDATES
+TRUNCATING 8989 UPDATES
+TRUNCATING 9098 UPDATES
+TRUNCATING 9091 UPDATES
+TRUNCATING 9034 UPDATES
+TRUNCATING 8983 UPDATES
+TRUNCATING 9060 UPDATES
+TRUNCATING 8931 UPDATES
+TRUNCATING 9015 UPDATES
+TRUNCATING 9018 UPDATES
+TRUNCATING 9033 UPDATES
+TRUNCATING 9061 UPDATES
+TRUNCATING 9047 UPDATES
+TRUNCATING 9066 UPDATES
+TRUNCATING 9063 UPDATES
+TRUNCATING 9067 UPDATES
+Wrote 635th vote at Instant { tv_sec: 3713657, tv_nsec: 509664172 }
+Read 635th vote at Instant { tv_sec: 3713657, tv_nsec: 555255951 }
+Wrote 636th vote at Instant { tv_sec: 3713657, tv_nsec: 559685310 }
+Read 636th vote at Instant { tv_sec: 3713657, tv_nsec: 562400880 }
+Wrote 637th vote at Instant { tv_sec: 3713657, tv_nsec: 609737852 }
+Read 637th vote at Instant { tv_sec: 3713657, tv_nsec: 612930645 }
+Wrote 638th vote at Instant { tv_sec: 3713657, tv_nsec: 659852515 }
+Read 638th vote at Instant { tv_sec: 3713657, tv_nsec: 664497964 }
+Wrote 639th vote at Instant { tv_sec: 3713657, tv_nsec: 709971768 }
+Read 639th vote at Instant { tv_sec: 3713657, tv_nsec: 713693194 }
+Wrote 640th vote at Instant { tv_sec: 3713657, tv_nsec: 760097922 }
+Read 640th vote at Instant { tv_sec: 3713657, tv_nsec: 762539501 }
+Wrote 641th vote at Instant { tv_sec: 3713657, tv_nsec: 810146910 }
+Read 641th vote at Instant { tv_sec: 3713657, tv_nsec: 813924135 }
+Wrote 642th vote at Instant { tv_sec: 3713657, tv_nsec: 860255905 }
+Read 642th vote at Instant { tv_sec: 3713657, tv_nsec: 862999030 }
+Wrote 643th vote at Instant { tv_sec: 3713657, tv_nsec: 910411363 }
+Read 643th vote at Instant { tv_sec: 3713657, tv_nsec: 914115841 }
+Wrote 644th vote at Instant { tv_sec: 3713657, tv_nsec: 960443026 }
+Read 644th vote at Instant { tv_sec: 3713657, tv_nsec: 963208717 }
+Wrote 645th vote at Instant { tv_sec: 3713658, tv_nsec: 10575926 }
+Read 645th vote at Instant { tv_sec: 3713658, tv_nsec: 13320540 }
+Wrote 646th vote at Instant { tv_sec: 3713658, tv_nsec: 60706463 }
+Read 646th vote at Instant { tv_sec: 3713658, tv_nsec: 63521609 }
+Wrote 647th vote at Instant { tv_sec: 3713658, tv_nsec: 110706511 }
+Read 647th vote at Instant { tv_sec: 3713658, tv_nsec: 113690010 }
+Wrote 648th vote at Instant { tv_sec: 3713658, tv_nsec: 160844410 }
+Read 648th vote at Instant { tv_sec: 3713658, tv_nsec: 163568255 }
+Wrote 649th vote at Instant { tv_sec: 3713658, tv_nsec: 210900419 }
+Read 649th vote at Instant { tv_sec: 3713658, tv_nsec: 214754597 }
+Wrote 650th vote at Instant { tv_sec: 3713658, tv_nsec: 261065468 }
+Read 650th vote at Instant { tv_sec: 3713658, tv_nsec: 265117760 }
+Wrote 651th vote at Instant { tv_sec: 3713658, tv_nsec: 311215805 }
+Read 651th vote at Instant { tv_sec: 3713658, tv_nsec: 313938559 }
+Wrote 652th vote at Instant { tv_sec: 3713658, tv_nsec: 361279361 }
+Read 652th vote at Instant { tv_sec: 3713658, tv_nsec: 365280226 }
+Wrote 653th vote at Instant { tv_sec: 3713658, tv_nsec: 411427334 }
+Read 653th vote at Instant { tv_sec: 3713658, tv_nsec: 415259630 }
+Wrote 654th vote at Instant { tv_sec: 3713658, tv_nsec: 461489146 }
+Read 654th vote at Instant { tv_sec: 3713658, tv_nsec: 464228905 }
+Wrote 655th vote at Instant { tv_sec: 3713658, tv_nsec: 511566663 }
+Read 655th vote at Instant { tv_sec: 3713658, tv_nsec: 517094073 }
+Wrote 656th vote at Instant { tv_sec: 3713658, tv_nsec: 561681529 }
+Read 656th vote at Instant { tv_sec: 3713658, tv_nsec: 564642446 }
+Wrote 657th vote at Instant { tv_sec: 3713658, tv_nsec: 611775376 }
+Read 657th vote at Instant { tv_sec: 3713658, tv_nsec: 615554127 }
+Wrote 658th vote at Instant { tv_sec: 3713658, tv_nsec: 661943695 }
+Read 658th vote at Instant { tv_sec: 3713658, tv_nsec: 666662124 }
+Wrote 659th vote at Instant { tv_sec: 3713658, tv_nsec: 711957559 }
+Read 659th vote at Instant { tv_sec: 3713658, tv_nsec: 720389481 }
+Wrote 660th vote at Instant { tv_sec: 3713658, tv_nsec: 762093906 }
+Read 660th vote at Instant { tv_sec: 3713658, tv_nsec: 765856988 }
+Wrote 661th vote at Instant { tv_sec: 3713658, tv_nsec: 812250133 }
+Read 661th vote at Instant { tv_sec: 3713658, tv_nsec: 815112407 }
+Wrote 662th vote at Instant { tv_sec: 3713658, tv_nsec: 862291121 }
+Read 662th vote at Instant { tv_sec: 3713658, tv_nsec: 866133842 }
+Wrote 663th vote at Instant { tv_sec: 3713658, tv_nsec: 912369319 }
+Read 663th vote at Instant { tv_sec: 3713658, tv_nsec: 915508938 }
+Wrote 664th vote at Instant { tv_sec: 3713658, tv_nsec: 962450016 }
+Read 664th vote at Instant { tv_sec: 3713658, tv_nsec: 967108268 }
+Wrote 665th vote at Instant { tv_sec: 3713659, tv_nsec: 12590790 }
+Read 665th vote at Instant { tv_sec: 3713659, tv_nsec: 15924274 }
+Wrote 666th vote at Instant { tv_sec: 3713659, tv_nsec: 62709038 }
+Read 666th vote at Instant { tv_sec: 3713659, tv_nsec: 65898178 }
+Wrote 667th vote at Instant { tv_sec: 3713659, tv_nsec: 112849270 }
+Read 667th vote at Instant { tv_sec: 3713659, tv_nsec: 116765805 }
+Wrote 668th vote at Instant { tv_sec: 3713659, tv_nsec: 162849917 }
+Read 668th vote at Instant { tv_sec: 3713659, tv_nsec: 168347302 }
+Wrote 669th vote at Instant { tv_sec: 3713659, tv_nsec: 212851401 }
+Read 669th vote at Instant { tv_sec: 3713659, tv_nsec: 215060389 }
+Wrote 670th vote at Instant { tv_sec: 3713659, tv_nsec: 262980945 }
+Read 670th vote at Instant { tv_sec: 3713659, tv_nsec: 266446047 }
+Wrote 671th vote at Instant { tv_sec: 3713659, tv_nsec: 313104032 }
+Read 671th vote at Instant { tv_sec: 3713659, tv_nsec: 315410049 }
+Wrote 672th vote at Instant { tv_sec: 3713659, tv_nsec: 363186252 }
+Read 672th vote at Instant { tv_sec: 3713659, tv_nsec: 366530249 }
+Wrote 673th vote at Instant { tv_sec: 3713659, tv_nsec: 413381074 }
+Read 673th vote at Instant { tv_sec: 3713659, tv_nsec: 417323359 }
+Wrote 674th vote at Instant { tv_sec: 3713659, tv_nsec: 463450818 }
+Read 674th vote at Instant { tv_sec: 3713659, tv_nsec: 466656461 }
+TRUNCATING 19186 UPDATES
+TRUNCATING 19168 UPDATES
+TRUNCATING 19181 UPDATES
+TRUNCATING 19163 UPDATES
+TRUNCATING 19220 UPDATES
+TRUNCATING 19233 UPDATES
+TRUNCATING 19273 UPDATES
+TRUNCATING 19164 UPDATES
+TRUNCATING 19230 UPDATES
+TRUNCATING 19172 UPDATES
+TRUNCATING 19176 UPDATES
+TRUNCATING 19200 UPDATES
+TRUNCATING 19207 UPDATES
+TRUNCATING 19155 UPDATES
+TRUNCATING 18859 UPDATES
+TRUNCATING 19190 UPDATES
+TRUNCATING 19133 UPDATES
+TRUNCATING 19189 UPDATES
+TRUNCATING 19327 UPDATES
+TRUNCATING 19244 UPDATES
+Wrote 675th vote at Instant { tv_sec: 3713659, tv_nsec: 513450918 }
+Read 675th vote at Instant { tv_sec: 3713659, tv_nsec: 601801292 }
+Wrote 676th vote at Instant { tv_sec: 3713659, tv_nsec: 602109497 }
+Read 676th vote at Instant { tv_sec: 3713659, tv_nsec: 618750052 }
+Wrote 677th vote at Instant { tv_sec: 3713659, tv_nsec: 652109654 }
+Read 677th vote at Instant { tv_sec: 3713659, tv_nsec: 657037351 }
+Wrote 678th vote at Instant { tv_sec: 3713659, tv_nsec: 702110453 }
+Read 678th vote at Instant { tv_sec: 3713659, tv_nsec: 707054268 }
+Wrote 679th vote at Instant { tv_sec: 3713659, tv_nsec: 752110621 }
+Read 679th vote at Instant { tv_sec: 3713659, tv_nsec: 756001852 }
+Sent 367206 unsharded messages in 36.250909ms for 10200 messages / ms
+Sent 6500000 sharded messages in 36.250909ms for 180555 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1144, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 680th vote at Instant { tv_sec: 3713659, tv_nsec: 802184770 }
+Read 680th vote at Instant { tv_sec: 3713659, tv_nsec: 806331873 }
+Wrote 681th vote at Instant { tv_sec: 3713659, tv_nsec: 852184779 }
+Read 681th vote at Instant { tv_sec: 3713659, tv_nsec: 857028391 }
+Wrote 682th vote at Instant { tv_sec: 3713659, tv_nsec: 902184959 }
+Read 682th vote at Instant { tv_sec: 3713659, tv_nsec: 905742889 }
+Wrote 683th vote at Instant { tv_sec: 3713659, tv_nsec: 952260300 }
+Read 683th vote at Instant { tv_sec: 3713659, tv_nsec: 955606105 }
+Wrote 684th vote at Instant { tv_sec: 3713660, tv_nsec: 2411854 }
+Read 684th vote at Instant { tv_sec: 3713660, tv_nsec: 4648061 }
+Wrote 685th vote at Instant { tv_sec: 3713660, tv_nsec: 52411867 }
+Read 685th vote at Instant { tv_sec: 3713660, tv_nsec: 57028153 }
+Wrote 686th vote at Instant { tv_sec: 3713660, tv_nsec: 102411925 }
+Read 686th vote at Instant { tv_sec: 3713660, tv_nsec: 107110882 }
+Wrote 687th vote at Instant { tv_sec: 3713660, tv_nsec: 152411955 }
+Read 687th vote at Instant { tv_sec: 3713660, tv_nsec: 154920017 }
+Wrote 688th vote at Instant { tv_sec: 3713660, tv_nsec: 202415261 }
+Read 688th vote at Instant { tv_sec: 3713660, tv_nsec: 210436419 }
+Wrote 689th vote at Instant { tv_sec: 3713660, tv_nsec: 252591281 }
+Read 689th vote at Instant { tv_sec: 3713660, tv_nsec: 255817508 }
+Wrote 690th vote at Instant { tv_sec: 3713660, tv_nsec: 302631624 }
+Read 690th vote at Instant { tv_sec: 3713660, tv_nsec: 305465360 }
+Wrote 691th vote at Instant { tv_sec: 3713660, tv_nsec: 352793456 }
+Read 691th vote at Instant { tv_sec: 3713660, tv_nsec: 357065181 }
+Wrote 692th vote at Instant { tv_sec: 3713660, tv_nsec: 402960113 }
+Read 692th vote at Instant { tv_sec: 3713660, tv_nsec: 405585968 }
+Wrote 693th vote at Instant { tv_sec: 3713660, tv_nsec: 452997985 }
+Read 693th vote at Instant { tv_sec: 3713660, tv_nsec: 460396583 }
+Wrote 694th vote at Instant { tv_sec: 3713660, tv_nsec: 503108265 }
+Read 694th vote at Instant { tv_sec: 3713660, tv_nsec: 507061999 }
+Wrote 695th vote at Instant { tv_sec: 3713660, tv_nsec: 553201012 }
+Read 695th vote at Instant { tv_sec: 3713660, tv_nsec: 560573967 }
+Wrote 696th vote at Instant { tv_sec: 3713660, tv_nsec: 603435747 }
+Read 696th vote at Instant { tv_sec: 3713660, tv_nsec: 614452169 }
+Wrote 697th vote at Instant { tv_sec: 3713660, tv_nsec: 653531823 }
+Read 697th vote at Instant { tv_sec: 3713660, tv_nsec: 657493093 }
+Wrote 698th vote at Instant { tv_sec: 3713660, tv_nsec: 703670931 }
+Read 698th vote at Instant { tv_sec: 3713660, tv_nsec: 706460581 }
+Wrote 699th vote at Instant { tv_sec: 3713660, tv_nsec: 753756803 }
+Read 699th vote at Instant { tv_sec: 3713660, tv_nsec: 756507091 }
+Wrote 700th vote at Instant { tv_sec: 3713660, tv_nsec: 803847667 }
+Read 700th vote at Instant { tv_sec: 3713660, tv_nsec: 813768189 }
+Wrote 701th vote at Instant { tv_sec: 3713660, tv_nsec: 853933115 }
+Read 701th vote at Instant { tv_sec: 3713660, tv_nsec: 860402328 }
+Wrote 702th vote at Instant { tv_sec: 3713660, tv_nsec: 904049628 }
+Read 702th vote at Instant { tv_sec: 3713660, tv_nsec: 906691217 }
+Wrote 703th vote at Instant { tv_sec: 3713660, tv_nsec: 954122349 }
+Read 703th vote at Instant { tv_sec: 3713660, tv_nsec: 957944927 }
+Wrote 704th vote at Instant { tv_sec: 3713661, tv_nsec: 4293887 }
+Read 704th vote at Instant { tv_sec: 3713661, tv_nsec: 7307345 }
+Wrote 705th vote at Instant { tv_sec: 3713661, tv_nsec: 54388164 }
+Read 705th vote at Instant { tv_sec: 3713661, tv_nsec: 57114991 }
+Wrote 706th vote at Instant { tv_sec: 3713661, tv_nsec: 104444733 }
+Read 706th vote at Instant { tv_sec: 3713661, tv_nsec: 107887586 }
+Wrote 707th vote at Instant { tv_sec: 3713661, tv_nsec: 154650425 }
+Read 707th vote at Instant { tv_sec: 3713661, tv_nsec: 158546585 }
+Wrote 708th vote at Instant { tv_sec: 3713661, tv_nsec: 204765216 }
+Read 708th vote at Instant { tv_sec: 3713661, tv_nsec: 207362284 }
+Wrote 709th vote at Instant { tv_sec: 3713661, tv_nsec: 254838761 }
+Read 709th vote at Instant { tv_sec: 3713661, tv_nsec: 257477146 }
+Wrote 710th vote at Instant { tv_sec: 3713661, tv_nsec: 304937239 }
+Read 710th vote at Instant { tv_sec: 3713661, tv_nsec: 308564878 }
+Wrote 711th vote at Instant { tv_sec: 3713661, tv_nsec: 355069750 }
+Read 711th vote at Instant { tv_sec: 3713661, tv_nsec: 358694846 }
+Wrote 712th vote at Instant { tv_sec: 3713661, tv_nsec: 405207468 }
+Read 712th vote at Instant { tv_sec: 3713661, tv_nsec: 409024017 }
+Wrote 713th vote at Instant { tv_sec: 3713661, tv_nsec: 455294959 }
+Read 713th vote at Instant { tv_sec: 3713661, tv_nsec: 457784874 }
+TRUNCATING 18768 UPDATES
+TRUNCATING 18724 UPDATES
+TRUNCATING 18709 UPDATES
+TRUNCATING 18703 UPDATES
+TRUNCATING 18710 UPDATES
+TRUNCATING 18670 UPDATES
+TRUNCATING 18420 UPDATES
+TRUNCATING 18792 UPDATES
+TRUNCATING 18788 UPDATES
+TRUNCATING 18840 UPDATES
+TRUNCATING 18686 UPDATES
+TRUNCATING 18700 UPDATES
+TRUNCATING 18692 UPDATES
+TRUNCATING 18768 UPDATES
+TRUNCATING 18677 UPDATES
+TRUNCATING 18714 UPDATES
+TRUNCATING 18771 UPDATES
+TRUNCATING 18736 UPDATES
+TRUNCATING 18699 UPDATES
+TRUNCATING 18629 UPDATES
+Wrote 714th vote at Instant { tv_sec: 3713661, tv_nsec: 505403555 }
+Read 714th vote at Instant { tv_sec: 3713661, tv_nsec: 570715560 }
+Wrote 715th vote at Instant { tv_sec: 3713661, tv_nsec: 571094205 }
+Read 715th vote at Instant { tv_sec: 3713661, tv_nsec: 593713429 }
+Wrote 716th vote at Instant { tv_sec: 3713661, tv_nsec: 621094213 }
+Read 716th vote at Instant { tv_sec: 3713661, tv_nsec: 623114183 }
+Wrote 717th vote at Instant { tv_sec: 3713661, tv_nsec: 671223997 }
+Read 717th vote at Instant { tv_sec: 3713661, tv_nsec: 674600705 }
+Wrote 718th vote at Instant { tv_sec: 3713661, tv_nsec: 721289367 }
+Read 718th vote at Instant { tv_sec: 3713661, tv_nsec: 725768284 }
+Wrote 719th vote at Instant { tv_sec: 3713661, tv_nsec: 771420945 }
+Read 719th vote at Instant { tv_sec: 3713661, tv_nsec: 773544582 }
+Wrote 720th vote at Instant { tv_sec: 3713661, tv_nsec: 821466482 }
+Read 720th vote at Instant { tv_sec: 3713661, tv_nsec: 824691069 }
+Wrote 721th vote at Instant { tv_sec: 3713661, tv_nsec: 871586948 }
+Read 721th vote at Instant { tv_sec: 3713661, tv_nsec: 874156712 }
+Wrote 722th vote at Instant { tv_sec: 3713661, tv_nsec: 921733293 }
+Read 722th vote at Instant { tv_sec: 3713661, tv_nsec: 924146180 }
+Wrote 723th vote at Instant { tv_sec: 3713661, tv_nsec: 971823463 }
+Read 723th vote at Instant { tv_sec: 3713661, tv_nsec: 974974980 }
+Wrote 724th vote at Instant { tv_sec: 3713662, tv_nsec: 21891362 }
+Read 724th vote at Instant { tv_sec: 3713662, tv_nsec: 24154536 }
+Wrote 725th vote at Instant { tv_sec: 3713662, tv_nsec: 71997965 }
+Read 725th vote at Instant { tv_sec: 3713662, tv_nsec: 80356844 }
+Wrote 726th vote at Instant { tv_sec: 3713662, tv_nsec: 122169845 }
+Read 726th vote at Instant { tv_sec: 3713662, tv_nsec: 125273210 }
+Wrote 727th vote at Instant { tv_sec: 3713662, tv_nsec: 172199650 }
+Read 727th vote at Instant { tv_sec: 3713662, tv_nsec: 175511598 }
+Wrote 728th vote at Instant { tv_sec: 3713662, tv_nsec: 222334220 }
+Read 728th vote at Instant { tv_sec: 3713662, tv_nsec: 224686290 }
+Wrote 729th vote at Instant { tv_sec: 3713662, tv_nsec: 272388714 }
+Read 729th vote at Instant { tv_sec: 3713662, tv_nsec: 274654877 }
+Wrote 730th vote at Instant { tv_sec: 3713662, tv_nsec: 322493953 }
+Read 730th vote at Instant { tv_sec: 3713662, tv_nsec: 325801418 }
+Wrote 731th vote at Instant { tv_sec: 3713662, tv_nsec: 372598400 }
+Read 731th vote at Instant { tv_sec: 3713662, tv_nsec: 374768104 }
+Wrote 732th vote at Instant { tv_sec: 3713662, tv_nsec: 422630127 }
+Read 732th vote at Instant { tv_sec: 3713662, tv_nsec: 424845310 }
+Sent 395453 unsharded messages in 38.896693ms for 10406 messages / ms
+Sent 7000000 sharded messages in 38.896693ms for 184210 messages / ms
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1144, 36664]
+Num shards by author_id: [18, 20, 20, 20]
+Wrote 733th vote at Instant { tv_sec: 3713662, tv_nsec: 472769268 }
+Read 733th vote at Instant { tv_sec: 3713662, tv_nsec: 475952080 }
+Wrote 734th vote at Instant { tv_sec: 3713662, tv_nsec: 522822564 }
+Read 734th vote at Instant { tv_sec: 3713662, tv_nsec: 525132768 }
+Wrote 735th vote at Instant { tv_sec: 3713662, tv_nsec: 572933509 }
+Read 735th vote at Instant { tv_sec: 3713662, tv_nsec: 575138150 }
+Wrote 736th vote at Instant { tv_sec: 3713662, tv_nsec: 622998374 }
+Read 736th vote at Instant { tv_sec: 3713662, tv_nsec: 625196650 }
+Wrote 737th vote at Instant { tv_sec: 3713662, tv_nsec: 673114597 }
+Read 737th vote at Instant { tv_sec: 3713662, tv_nsec: 674357090 }
+Wrote 738th vote at Instant { tv_sec: 3713662, tv_nsec: 723245815 }
+Read 738th vote at Instant { tv_sec: 3713662, tv_nsec: 726415121 }
+Wrote 739th vote at Instant { tv_sec: 3713662, tv_nsec: 773299367 }
+Read 739th vote at Instant { tv_sec: 3713662, tv_nsec: 776491971 }
+Wrote 740th vote at Instant { tv_sec: 3713662, tv_nsec: 823442901 }
+Read 740th vote at Instant { tv_sec: 3713662, tv_nsec: 827047128 }
+Wrote 741th vote at Instant { tv_sec: 3713662, tv_nsec: 873553707 }
+Read 741th vote at Instant { tv_sec: 3713662, tv_nsec: 880410425 }
+Wrote 742th vote at Instant { tv_sec: 3713662, tv_nsec: 923634743 }
+Read 742th vote at Instant { tv_sec: 3713662, tv_nsec: 925796416 }
+Wrote 743th vote at Instant { tv_sec: 3713662, tv_nsec: 973773312 }
+Read 743th vote at Instant { tv_sec: 3713662, tv_nsec: 980946467 }
+Wrote 744th vote at Instant { tv_sec: 3713663, tv_nsec: 23860055 }
+Read 744th vote at Instant { tv_sec: 3713663, tv_nsec: 27039508 }
+Wrote 745th vote at Instant { tv_sec: 3713663, tv_nsec: 73981284 }
+Read 745th vote at Instant { tv_sec: 3713663, tv_nsec: 77243889 }
+Wrote 746th vote at Instant { tv_sec: 3713663, tv_nsec: 124077625 }
+Read 746th vote at Instant { tv_sec: 3713663, tv_nsec: 126371774 }
+Wrote 747th vote at Instant { tv_sec: 3713663, tv_nsec: 174217893 }
+Read 747th vote at Instant { tv_sec: 3713663, tv_nsec: 176475628 }
+Wrote 748th vote at Instant { tv_sec: 3713663, tv_nsec: 224294398 }
+Read 748th vote at Instant { tv_sec: 3713663, tv_nsec: 227559505 }
+Wrote 749th vote at Instant { tv_sec: 3713663, tv_nsec: 274465690 }
+Read 749th vote at Instant { tv_sec: 3713663, tv_nsec: 277055316 }
+Wrote 750th vote at Instant { tv_sec: 3713663, tv_nsec: 324611613 }
+Read 750th vote at Instant { tv_sec: 3713663, tv_nsec: 326988601 }
+Wrote 751th vote at Instant { tv_sec: 3713663, tv_nsec: 374656431 }
+Read 751th vote at Instant { tv_sec: 3713663, tv_nsec: 377046229 }
+Wrote 752th vote at Instant { tv_sec: 3713663, tv_nsec: 424771446 }
+Read 752th vote at Instant { tv_sec: 3713663, tv_nsec: 427029475 }
+Wrote 753th vote at Instant { tv_sec: 3713663, tv_nsec: 474918115 }
+Read 753th vote at Instant { tv_sec: 3713663, tv_nsec: 478725085 }
+TRUNCATING 18945 UPDATES
+TRUNCATING 18954 UPDATES
+TRUNCATING 18939 UPDATES
+TRUNCATING 18932 UPDATES
+TRUNCATING 18932 UPDATES
+TRUNCATING 18882 UPDATES
+TRUNCATING 18894 UPDATES
+TRUNCATING 18964 UPDATES
+TRUNCATING 18882 UPDATES
+TRUNCATING 18910 UPDATES
+TRUNCATING 18942 UPDATES
+TRUNCATING 18867 UPDATES
+TRUNCATING 18922 UPDATES
+TRUNCATING 18926 UPDATES
+TRUNCATING 18967 UPDATES
+TRUNCATING 18948 UPDATES
+TRUNCATING 18710 UPDATES
+TRUNCATING 18975 UPDATES
+TRUNCATING 18890 UPDATES
+TRUNCATING 18936 UPDATES
+Wrote 754th vote at Instant { tv_sec: 3713663, tv_nsec: 525037515 }
+Read 754th vote at Instant { tv_sec: 3713663, tv_nsec: 574745625 }
+Wrote 755th vote at Instant { tv_sec: 3713663, tv_nsec: 575157275 }
+Read 755th vote at Instant { tv_sec: 3713663, tv_nsec: 583752457 }
+Wrote 756th vote at Instant { tv_sec: 3713663, tv_nsec: 625219876 }
+Read 756th vote at Instant { tv_sec: 3713663, tv_nsec: 630349403 }
+Wrote 757th vote at Instant { tv_sec: 3713663, tv_nsec: 675366273 }
+Read 757th vote at Instant { tv_sec: 3713663, tv_nsec: 677582725 }
+Wrote 758th vote at Instant { tv_sec: 3713663, tv_nsec: 725432964 }
+Read 758th vote at Instant { tv_sec: 3713663, tv_nsec: 730412211 }
+Wrote 759th vote at Instant { tv_sec: 3713663, tv_nsec: 775527353 }
+Read 759th vote at Instant { tv_sec: 3713663, tv_nsec: 777782983 }
+Wrote 760th vote at Instant { tv_sec: 3713663, tv_nsec: 825565793 }
+Read 760th vote at Instant { tv_sec: 3713663, tv_nsec: 827862935 }
+Wrote 761th vote at Instant { tv_sec: 3713663, tv_nsec: 875714459 }
+Read 761th vote at Instant { tv_sec: 3713663, tv_nsec: 878950112 }
+Wrote 762th vote at Instant { tv_sec: 3713663, tv_nsec: 925861176 }
+Read 762th vote at Instant { tv_sec: 3713663, tv_nsec: 930402581 }
+Wrote 763th vote at Instant { tv_sec: 3713663, tv_nsec: 975951817 }
+Read 763th vote at Instant { tv_sec: 3713663, tv_nsec: 980405145 }
+Wrote 764th vote at Instant { tv_sec: 3713664, tv_nsec: 26088042 }
+Read 764th vote at Instant { tv_sec: 3713664, tv_nsec: 28322119 }
+Wrote 765th vote at Instant { tv_sec: 3713664, tv_nsec: 76172272 }
+Read 765th vote at Instant { tv_sec: 3713664, tv_nsec: 78476366 }
+D2.17: incoming socket closed, no more clients will arrive
+D1.0: incoming socket closed, no more clients will arrive
+D0.0: incoming socket closed, no more clients will arrive
+D0.12: incoming socket closed, no more clients will arrive
+D0.19: incoming socket closed, no more clients will arrive
+D0.14: incoming socket closed, no more clients will arrive
+D0.15: incoming socket closed, no more clients will arrive
+D0.4: incoming socket closed, no more clients will arrive
+D0.16: incoming socket closed, no more clients will arrive
+D2.16: incoming socket closed, no more clients will arrive
+D0.6: incoming socket closed, no more clients will arrive
+D2.0: incoming socket closed, no more clients will arrive
+D2.3: incoming socket closed, no more clients will arrive
+D2.15: incoming socket closed, no more clients will arrive
+D0.13: incoming socket closed, no more clients will arrive
+D0.1: incoming socket closed, no more clients will arrive
+D0.5: incoming socket closed, no more clients will arrive
+D0.18: incoming socket closed, no more clients will arrive
+D0.7: incoming socket closed, no more clients will arrive
+D2.11: incoming socket closed, no more clients will arrive
+D0.11: incoming socket closed, no more clients will arrive
+D2.4: incoming socket closed, no more clients will arrive
+D2.1: incoming socket closed, no more clients will arrive
+D2.7: incoming socket closed, no more clients will arrive
+D2.2: incoming socket closed, no more clients will arrive
+D2.6: incoming socket closed, no more clients will arrive
+D0.17: incoming socket closed, no more clients will arrive
+D2.8: incoming socket closed, no more clients will arrive
+D0.2: incoming socket closed, no more clients will arrive
+D2.9: incoming socket closed, no more clients will arrive
+D2.10: incoming socket closed, no more clients will arrive
+D2.13: incoming socket closed, no more clients will arrive
+D0.3: incoming socket closed, no more clients will arrive
+D2.14: incoming socket closed, no more clients will arrive
+D2.18: incoming socket closed, no more clients will arrive
+D2.19: incoming socket closed, no more clients will arrive
+D0.9: incoming socket closed, no more clients will arrive
+D0.10: incoming socket closed, no more clients will arrive
+D2.5: incoming socket closed, no more clients will arrive
+D2.12: incoming socket closed, no more clients will arrive
+D0.8: incoming socket closed, no more clients will arrive
+
+(relative write time (ms since start), delay (us))
+[[41,3177],[91,2185],[141,3204],[191,2193],[242,3339],[292,3593],[342,3667],[392,3772],[442,2769],[492,4557],[542,3196],[592,7607],[642,4013],[692,7547],[742,4077],[792,4004],[842,4219],[892,2163],[943,3659],[993,3306],[1043,2381],[1093,36818],[1143,7619],[1193,3317],[1243,2401],[1293,2482],[1343,2622],[1393,2794],[1443,2809],[1493,2717],[1543,2779],[1593,3979],[1643,2871],[1694,3763],[1744,2825],[1794,2727],[1844,8693],[1894,3764],[1944,3809],[1994,3807],[2044,3752],[2094,20882],[2144,3177],[2194,2165],[2245,3178],[2295,2274],[2345,2190],[2395,2264],[2445,3220],[2495,4472],[2545,3244],[2595,2247],[2645,2229],[2696,7317],[2746,2223],[2796,3354],[2846,3173],[2896,3294],[2946,7014],[2996,3300],[3046,3311],[3096,3240],[3146,6591],[3196,6442],[3246,3576],[3296,6457],[3346,3036],[3397,6367],[3447,3848],[3497,2853],[3547,6063],[3597,2816],[3647,9125],[3697,3882],[3747,2928],[3797,4014],[3847,5417],[3898,3980],[3948,3032],[3998,3121],[4048,5254],[4098,38709],[4148,8373],[4198,2497],[4248,8591],[4298,3669],[4348,3821],[4398,2690],[4448,3739],[4498,2761],[4548,3678],[4598,4650],[4648,7817],[4698,1772],[4749,3815],[4799,2831],[4849,2807],[4899,2758],[4949,3811],[4999,4002],[5049,2972],[5099,6832],[5150,3901],[5200,2949],[5250,3204],[5300,3204],[5350,2214],[5400,2959],[5450,2491],[5500,3248],[5550,2270],[5600,5961],[5650,2498],[5700,3198],[5751,3239],[5801,3182],[5851,5594],[5901,3407],[5951,2595],[6001,2701],[6051,88836],[6140,9232],[6190,2195],[6240,3436],[6290,3542],[6340,2749],[6390,3660],[6440,3788],[6490,3822],[6540,2976],[6590,3887],[6640,4107],[6690,6101],[6740,9434],[6790,3176],[6840,2586],[6890,3590],[6940,6083],[6990,2409],[7040,5194],[7090,2951],[7140,3209],[7190,3525],[7240,3702],[7290,2511],[7340,3750],[7390,2749],[7441,3749],[7491,10538],[7541,6146],[7591,2089],[7641,3972],[7691,11970],[7741,2458],[7791,2604],[7841,1811],[7891,1436],[7941,5629],[7991,2836],[8041,3984],[8091,96746],[8188,21398],[8238,1186],[8288,2285],[8338,2260],[8388,3204],[8439,3211],[8489,2231],[8539,3243],[8589,4134],[8639,5031],[8689,3719],[8739,2719],[8789,13976],[8839,2807],[8889,3413],[8939,4578],[8989,4105],[9039,4174],[9089,3363],[9139,2168],[9189,2224],[9239,2180],[9290,3190],[9340,2316],[9390,2216],[9440,3159],[9490,2283],[9540,2665],[9590,3235],[9640,3218],[9690,3226],[9741,2197],[9791,2243],[9841,3245],[9891,3163],[9941,5277],[9991,2198],[10041,2231],[10091,57499],[10149,5487],[10199,4062],[10249,3305],[10299,2241],[10349,2282],[10399,3224],[10449,6968],[10499,3470],[10549,2261],[10599,2469],[10649,3578],[10699,3485],[10749,1929],[10799,2006],[10849,3426],[10899,2350],[10950,3295],[11000,3205],[11050,6465],[11100,4911],[11150,3825],[11200,3904],[11250,3027],[11300,3059],[11350,3545],[11400,9435],[11450,2179],[11500,2304],[11550,3340],[11600,3551],[11650,2495],[11700,2688],[11751,3111],[11801,3824],[11851,2595],[11901,3851],[11951,3705],[12001,11856],[12051,1974],[12101,2056],[12151,3273],[12201,1995],[12251,2093],[12301,3247],[12351,2262],[12401,3391],[12451,3258],[12501,3448],[12551,3762],[12601,2903],[12651,4730],[12701,3484],[12751,4709],[12801,3606],[12851,11411],[12901,4053],[12952,11311],[13002,4106],[13052,85315],[13137,12884],[13187,5457],[13237,3077],[13287,2473],[13337,3531],[13387,4453],[13437,3546],[13487,2649],[13538,5325],[13588,3844],[13638,3609],[13688,3683],[13738,2611],[13788,3613],[13838,2698],[13888,4644],[13938,4593],[13988,2030],[14038,2139],[14088,3235],[14138,2295],[14189,3256],[14239,2281],[14289,3317],[14339,3200],[14389,2289],[14439,2616],[14489,3189],[14539,3151],[14589,6874],[14639,3253],[14689,3491],[14739,3529],[14789,10159],[14839,3827],[14889,4017],[14939,3989],[14990,3005],[15040,6523],[15090,51842],[15142,6733],[15192,2840],[15242,3766],[15292,3866],[15342,3228],[15392,4217],[15442,2045],[15492,2329],[15542,2184],[15592,1275],[15642,3435],[15692,3255],[15742,3260],[15792,2173],[15842,3975],[15892,3769],[15942,2458],[15993,2437],[16043,3213],[16093,3345],[16143,6496],[16193,3233],[16243,3300],[16293,2222],[16343,4259],[16393,3159],[16444,2218],[16494,3292],[16544,5682],[16594,3491],[16644,2550],[16694,2673],[16744,4648],[16794,8809],[16844,3690],[16894,5324],[16944,2755],[16994,2607],[17045,4960],[17095,42188],[17145,31628],[17195,3229],[17245,3280],[17295,2382],[17345,3198],[17395,2534],[17445,3705],[17495,4852],[17545,3859],[17595,2899],[17645,3853],[17695,4691],[17745,3788],[17795,3831],[17845,3036],[17895,3882],[17945,2762],[17996,3989],[18046,2872],[18096,3937],[18146,4037],[18196,2785],[18246,2752],[18296,2689],[18346,4685],[18396,6414],[18446,2999],[18497,2926],[18547,2847],[18597,2897],[18647,2761],[18697,2914],[18747,3911],[18797,3955],[18847,2864],[18897,3911],[18947,3856],[18998,5274],[19048,2432],[19098,31863],[19148,2843],[19198,3798],[19248,3827],[19298,2877],[19348,3957],[19398,3961],[19448,3947],[19498,3988],[19549,2927],[19599,4055],[19649,3964],[19699,2978],[19749,2909],[19799,2151],[19849,4142],[19899,2120],[19949,3852],[19999,3570],[20049,3777],[20099,3338],[20149,3626],[20199,3445],[20249,3624],[20299,4669],[20350,2735],[20400,3110],[20450,3616],[20500,2724],[20550,2555],[20600,3779],[20650,2600],[20700,4503],[20750,3449],[20800,9154],[20851,2538],[20901,2682],[20951,3287],[21001,2660],[21051,78187],[21129,23631],[21179,2429],[21229,3644],[21280,3181],[21330,3374],[21380,3602],[21430,2722],[21480,2867],[21530,3906],[21580,6550],[21630,2784],[21680,2899],[21730,2924],[21780,3847],[21830,2834],[21880,4145],[21930,3057],[21980,2972],[22030,3987],[22080,2974],[22131,2121],[22181,2802],[22231,2446],[22281,3583],[22331,3711],[22381,2541],[22431,3451],[22481,3811],[22532,4430],[22582,11268],[22632,4326],[22682,2929],[22732,3964],[22782,1936],[22832,3901],[22882,2242],[22932,3411],[22982,2717],[23032,6668],[23082,98111],[23180,20922],[23230,5737],[23281,3278],[23331,2201],[23381,4356],[23431,3201],[23481,2209],[23531,3540],[23581,2142],[23631,8440],[23681,3226],[23731,2375],[23782,4609],[23832,3135],[23882,4518],[23932,1313],[23982,4251],[24032,6553],[24082,45591],[24132,2715],[24182,3192],[24232,4645],[24282,3721],[24333,2441],[24383,3777],[24433,2743],[24483,3704],[24533,2765],[24583,2744],[24633,2815],[24683,2983],[24733,2723],[24783,3854],[24834,4052],[24884,2722],[24934,4000],[24984,3832],[25034,2739],[25084,5527],[25134,2960],[25184,3778],[25234,4718],[25284,8431],[25335,3763],[25385,2862],[25435,3842],[25485,3139],[25535,4658],[25585,3333],[25635,3189],[25685,3916],[25735,5497],[25785,2208],[25835,3465],[25886,2306],[25936,3343],[25986,3942],[26036,3205],[26086,88350],[26175,16640],[26225,4927],[26275,4943],[26325,3891],[26375,4147],[26425,4843],[26475,3557],[26525,3345],[26575,2236],[26625,4616],[26675,4698],[26725,2508],[26775,8021],[26825,3226],[26875,2833],[26925,4271],[26975,2625],[27025,7398],[27076,3953],[27126,7372],[27176,11016],[27226,3961],[27276,2789],[27326,2750],[27376,9920],[27426,6469],[27477,2641],[27527,3822],[27577,3013],[27627,2726],[27677,3442],[27727,3896],[27777,2597],[27827,2638],[27877,3627],[27928,3625],[27978,3816],[28028,2489],[28078,65312],[28144,22619],[28194,2019],[28244,3376],[28294,4478],[28344,2123],[28394,3224],[28444,2569],[28494,2412],[28544,3151],[28594,2263],[28644,8358],[28695,3103],[28745,3311],[28795,2352],[28845,2266],[28895,3307],[28945,2169],[28995,2215],[29045,3182],[29095,2310],[29145,2204],[29195,2198],[29246,1242],[29296,3169],[29346,3192],[29396,3604],[29446,6856],[29496,2161],[29546,7173],[29596,3179],[29646,3262],[29697,2294],[29747,2257],[29797,3265],[29847,2589],[29897,2376],[29947,2389],[29997,2258],[30047,3806],[30098,49708],[30148,8595],[30198,5129],[30248,2216],[30298,4979],[30348,2255],[30398,2297],[30448,3235],[30498,4541],[30548,4453],[30599,2234],[30649,2304]]
+write	50	3311	(us)
+write	95	10543	(us)
+write	99	65319	(us)
+write	100	98111	(us)
+
+# generated ops/s: 1000582.40
+# actual ops/s: 1000522.28
+# op	pct	sojourn	remote
+write	50	2871	2231	(all µs)
+read	50	1095	455	(all µs)
+write	95	9351	8583	(all µs)
+read	95	5671	4935	(all µs)
+write	99	14367	12839	(all µs)
+read	99	9823	8703	(all µs)
+write	100	37879	25807	(all µs)
+read	100	30567	15391	(all µs)
