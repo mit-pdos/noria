@@ -2,8 +2,8 @@ use fnv::FnvHashMap;
 use hdrhistogram::Histogram;
 use payload;
 use prelude::*;
-use std::time;
 use std::collections::{HashMap, VecDeque};
+use std::time;
 use vec_map::VecMap;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -66,7 +66,7 @@ impl Clone for Sharder {
     }
 }
 
-const CHECK_EVERY: u64 = 500_000;
+const CHECK_EVERY: u64 = 100_000;
 
 impl Sharder {
     pub fn new(by: usize) -> Self {
@@ -228,7 +228,7 @@ impl Sharder {
                         let m = h.high();
                         h.record(m).unwrap();
                     }
-                    let total = self.id_size_hist.as_ref().unwrap().len();
+                    let total = self.data_size_hist.as_ref().unwrap().len();
                     if total % CHECK_EVERY == 0 {
                         let now = time::Instant::now();
                         let dur = now.duration_since(self.start.unwrap()) / 1_000;
