@@ -461,14 +461,14 @@ impl Node {
         self.inner = NodeType::Internal(*op);
     }
 
-    pub fn recover(&mut self, graph: &DomainGraph, new_domain: domain::Index, shard: usize) {
+    pub fn recover(&mut self, _graph: &DomainGraph, new_domain: domain::Index, _shard: usize) {
         assert!(self.domain.is_some());
         assert!(!self.is_dropped());
         self.domain = Some(new_domain);
         self.taken = false;
 
         if let NodeType::Egress(None) = self.inner {
-            let mut e = self::special::Egress::default();
+            // let mut e = self::special::Egress::default();
             // TODO(ygina): this is a hacky way to reinitialize the view of the graph from the
             // perspective of the egress node. this is bad since even though the egress's view
             // of the graph may be consistent, downstream affected nodes may still believe, for

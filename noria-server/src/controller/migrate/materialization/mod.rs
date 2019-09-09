@@ -105,9 +105,9 @@ impl Materializations {
         }
     }
 
-    pub(in crate::controller) fn get_path(&self, tag: Tag) -> Option<&Vec<NodeIndex>> {
-        self.paths.get(&tag)
-    }
+    // pub(in crate::controller) fn get_path(&self, tag: Tag) -> Option<&Vec<NodeIndex>> {
+    //     self.paths.get(&tag)
+    // }
 
     #[allow(unused)]
     pub(in crate::controller) fn set_logger(&mut self, logger: &Logger) {

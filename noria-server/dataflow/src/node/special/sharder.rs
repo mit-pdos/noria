@@ -24,7 +24,7 @@ pub struct Sharder {
     /// Nodes it's ok to send packets too and the minimum labels (inclusive)
     min_label_to_send: HashMap<ReplicaAddr, usize>,
     /// Target provenances to hit as we're generating new messages
-    targets: Vec<Provenance>,
+    targets: Vec<TreeClock>,
     /// Buffered messages per parent for when we can't hit the next target provenance
     parent_buffer: HashMap<ReplicaAddr, Vec<(usize, Box<Packet>)>>,
 
@@ -284,7 +284,7 @@ impl Sharder {
 
     pub fn process_eviction(
         &mut self,
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         key_columns: &[usize],
         tag: Tag,
         keys: &[Vec<DataType>],
@@ -402,9 +402,9 @@ impl Sharder {
             .collect();
     }
 
-    pub fn new_incoming(&mut self, old: ReplicaAddr, new: ReplicaAddr) {
+    pub fn new_incoming(&mut self, _old: ReplicaAddr, _new: ReplicaAddr) {
         /*
-        if self.min_provenance.new_incoming(old, new) {
+        if self.min_clock.new_incoming(old, new) {
             // Remove the old domain from the updates entirely
             for update in self.updates.iter_mut() {
                 if update.len() == 0 {
@@ -429,10 +429,10 @@ impl Sharder {
     pub fn resume_at(
         &mut self,
         addr_labels: Vec<(ReplicaAddr, usize)>,
-        mut min_provenance: Option<Provenance>,
-        targets: Vec<Provenance>,
-        on_shard: Option<usize>,
-        output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
+        mut min_clock: Option<TreeClock>,
+        targets: Vec<TreeClock>,
+        _on_shard: Option<usize>,
+        _output: &mut FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>,
     ) {
         for &(addr, label) in &addr_labels {
             // don't duplicate sent messages
@@ -446,7 +446,7 @@ impl Sharder {
             // we must have lost a stateless domain
             if label > next_label {
                 println!("{} > {}", label, next_label);
-                let p = min_provenance.take().unwrap();
+                let p = min_clock.take().unwrap();
                 self.payloads.init_after_resume_at(p.label());
                 self.labels = self.updates.init_after_resume_at(p);
                 self.min_labels = self
@@ -477,7 +477,7 @@ impl Sharder {
         // If we made it this far, it means we have all the messages we need to send (assuming
         // log truncation works correctly).
         assert!(self.targets.is_empty());
-        assert!(min_provenance.is_none());
+        assert!(min_clock.is_none());
         unimplemented!();
     }
 
@@ -502,7 +502,7 @@ impl Sharder {
             .push((next.label(), m.as_ref().unwrap().clone()));
 
         // Whether all parent labels would match the target if the update were applied to the base
-        fn would_hit_target(update: &Provenance, target: &Provenance) -> bool {
+        fn would_hit_target(update: &TreeClock, target: &TreeClock) -> bool {
             assert_eq!(target.edges().len(), 1);
             let p = target.edges().values().next().unwrap();
             return p.root() == update.root() && p.label() == update.label();
@@ -640,10 +640,10 @@ impl Sharder {
         // we just add the label of the next packet to send of this domain as the root of the
         // new provenance.
         let mut update = if let Some(diff) = m.as_ref().unwrap().id() {
-            ProvenanceUpdate::new_with(from, label, &[diff.clone()])
+            TreeClockDiff::new_with(from, label, &[diff.clone()])
         } else {
             assert!(self.targets.is_empty());
-            ProvenanceUpdate::new(from, label)
+            TreeClockDiff::new(from, label)
         };
         let (old, new) = self.updates.add_update(&update);
 

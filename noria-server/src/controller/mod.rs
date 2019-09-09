@@ -107,12 +107,12 @@ pub(super) fn main<A: Authority + 'static>(
                             crate::block_on(|| ctrl.handle_truncate_logs(from, labels));
                         }
                     }
-                    CoordinationPayload::AckNewIncoming { from, updates, min_provenance } => {
+                    CoordinationPayload::AckNewIncoming { from, updates, min_clock } => {
                         if let Some(ref mut ctrl) = controller {
                             crate::block_on(|| ctrl.handle_ack_new_incoming(
                                 from,
                                 updates,
-                                min_provenance,
+                                min_clock,
                             ));
                         }
                     }

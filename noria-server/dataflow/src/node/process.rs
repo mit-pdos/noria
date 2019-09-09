@@ -234,7 +234,7 @@ impl Node {
 
     crate fn process_eviction(
         &mut self,
-        id: Option<ProvenanceUpdate>,
+        id: Option<TreeClockDiff>,
         from: LocalNodeIndex,
         key_columns: &[usize],
         keys: &mut Vec<Vec<DataType>>,

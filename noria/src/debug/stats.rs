@@ -8,17 +8,17 @@ type DomainMap = HashMap<(DomainIndex, usize), (DomainStats, HashMap<NodeIndex, 
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Domain provenance information.
-pub struct Provenance {
+pub struct TreeClock {
     /// Label of the message it represents.
     pub label: usize,
     /// Labels of upstream messages used to construct it.
-    pub edges: HashMap<(DomainIndex, usize), Box<Provenance>>,
+    pub edges: HashMap<(DomainIndex, usize), Box<TreeClock>>,
 }
 
-impl Provenance {
+impl TreeClock {
     /// New debug provenance.
-    pub fn new(label: usize) -> Provenance {
-        Provenance {
+    pub fn new(label: usize) -> TreeClock {
+        TreeClock {
             label,
             edges: HashMap::new(),
         }
@@ -45,7 +45,7 @@ pub struct DomainStats {
     /// Number of payloads stored in the log.
     pub log_size: usize,
     /// Latest provenance.
-    pub provenance: Provenance,
+    pub provenance: TreeClock,
 }
 
 /// Statistics about a node.
