@@ -1286,14 +1286,9 @@ impl ControllerInner {
             let addr_labels = self.resume_ats.remove(&addr).unwrap();
 
             // Send the message!
-<<<<<<< HEAD
-            let m = box Packet::ResumeAt { addr_labels, min_provenance, targets };
+            let m = box Packet::ResumeAt { addr_labels, min_clock, targets };
 
             warn!(self.log, "Sending ResumeAt to D{}.{}", addr.0.index(), addr.1);
-
-=======
-            let m = box Packet::ResumeAt { addr_labels, min_clock, targets };
->>>>>>> fault_tolerance
             self.domains
                 .get_mut(&addr.0)
                 .unwrap()

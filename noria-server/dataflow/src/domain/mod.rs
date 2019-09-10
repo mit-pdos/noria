@@ -1553,7 +1553,7 @@ impl Domain {
                             "responding to new incoming",
                         );
 
-                        println!("D{}.{}: NewIncoming respond with {} updates and {:?}", self.index.index(), self.shard.unwrap_or(0), updates.len(), min_provenance);
+                        println!("D{}.{}: NewIncoming respond with {} updates and {:?}", self.index.index(), self.shard.unwrap_or(0), updates.len(), min_clock);
                         executor.ack_new_incoming(
                             (self.index, self.shard.unwrap_or(0)),
                             updates,
