@@ -108,7 +108,7 @@ impl Updates {
         }
 
         // Drain and apply the rest of the updates to min_clock
-        println!("TRUNCATING {} UPDATES", i_to_keep);
+        // println!("TRUNCATING {} UPDATES", i_to_keep);
         for update in self.updates.drain(..i_to_keep) {
             self.min_clock.apply_update(&update);
         }

@@ -438,7 +438,7 @@ where
 
                         assert_eq!(r_reserved_time.len() + 1, read_count);
                         assert_eq!(num_writes, read_count);
-                        println!("Read {}th vote at {:?}", read_count, done);
+                        // println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
 
                         if !warmup_done {
@@ -462,7 +462,7 @@ where
                             let delay = r_time.duration_since(w_time);
                             delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000
                         };
-                        println!("WPT [{},{},{:?}]", read_count, relative_w_time_ms, delay_us);
+                        // println!("WPT [{},{},{:?}]", read_count, relative_w_time_ms, delay_us);
                     }
                 }
             }
@@ -565,7 +565,7 @@ where
                     queued_w_keys[0] = RESERVED_W_KEY;
                 }
 
-                println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+                // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
                 *next_reserved_w = now + *WRITE_RESERVED_EVERY_US;
             } else if w_reserved_time.len() > num_reads {
                 // if the previous write has not been read, queue a read
