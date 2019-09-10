@@ -43,8 +43,6 @@ impl Clone for Sharder {
     }
 }
 
-const CHECK_EVERY: time::Duration = time::Duration::from_secs(1);
-
 impl Sharder {
     pub fn new(by: usize) -> Self {
         Self {
