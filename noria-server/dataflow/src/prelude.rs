@@ -22,6 +22,8 @@ crate use state::{LookupResult, MemoryState, PersistentState, RecordResult, Row,
 crate type StateMap = Map<Box<dyn State>>;
 crate type DomainNodes = Map<cell::RefCell<Node>>;
 
+crate const CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(1);
+
 use fnv::FnvHashMap;
 use std::collections::VecDeque;
 crate type EnqueuedSends = FnvHashMap<ReplicaAddr, VecDeque<Box<Packet>>>;

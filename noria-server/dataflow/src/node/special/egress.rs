@@ -1,6 +1,8 @@
 use fnv::FnvHashMap;
+use hdrhistogram::Histogram;
 use prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::time;
 
 #[derive(Serialize, Deserialize)]
 struct EgressTx {
@@ -30,6 +32,19 @@ pub struct Egress {
     targets: Vec<TreeClock>,
     /// Buffered messages per parent for when we can't hit the next target provenance
     parent_buffer: HashMap<ReplicaAddr, Vec<(usize, Box<Packet>)>>,
+
+    /// Size of packet data in bytes
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    data_size_hist: Option<Histogram<u64>>,
+    /// Time the sharder started existing
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    start: Option<time::Instant>,
+    /// The next time to print data from the histograms
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    check: Option<time::Instant>,
 }
 
 impl Clone for Egress {
@@ -47,6 +62,7 @@ impl Clone for Egress {
             min_label_to_send: self.min_label_to_send.clone(),
             targets: self.targets.clone(),
             parent_buffer: self.parent_buffer.clone(),
+            ..Default::default()
         }
     }
 }
@@ -72,6 +88,11 @@ impl Egress {
 
     pub fn add_tag(&mut self, tag: Tag, dst: NodeIndex) {
         self.tags.insert(tag, dst);
+
+        // ygina: ugh, just want to put this here so the histogram exists
+        self.data_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
+        self.start = Some(time::Instant::now());
+        self.check = Some(time::Instant::now() + CHECK_EVERY);
     }
 
     pub fn process(
@@ -86,6 +107,10 @@ impl Egress {
             ref mut txs,
             ref min_label_to_send,
             ref do_not_send,
+            ref tags,
+            ref mut data_size_hist,
+            ref start,
+            ref mut check,
             ..
         } = self;
 
@@ -139,7 +164,37 @@ impl Egress {
             //     m.id().as_ref().unwrap(),
             // );
 
-            // TODO(ygina): don't clone the last send
+            let is_message = match m {
+                box Packet::Message { .. } => true,
+                _ => false,
+            };
+            if is_message && shard == 0 {
+                let h = data_size_hist.as_mut().unwrap();
+                if h.record(m.size_of_data()).is_err() {
+                    let m = h.high();
+                    h.record(m).unwrap();
+                }
+                let total = data_size_hist.as_ref().unwrap().len();
+                let now = time::Instant::now();
+                if now > *check.as_ref().unwrap() {
+                    *check = Some(check.unwrap() + CHECK_EVERY);
+                    let dur = now.duration_since(start.unwrap()) / 1_000;
+                    println!(
+                        "EGRESS Sent {} messages in {:?} for {:?} messages / s",
+                        total,
+                        dur,
+                        (total as u128) / dur.as_millis(),
+                    );
+                    println!(
+                        "EGRESS Size of packet data: [{}, {}, {}, {}]",
+                        data_size_hist.as_ref().unwrap().value_at_quantile(0.5),
+                        data_size_hist.as_ref().unwrap().value_at_quantile(0.95),
+                        data_size_hist.as_ref().unwrap().value_at_quantile(0.99),
+                        data_size_hist.as_ref().unwrap().max(),
+                    );
+                }
+            }
+
             output.entry(tx.dest).or_default().push_back(m);
             if to_addrs.len() == 1 {
                 break;

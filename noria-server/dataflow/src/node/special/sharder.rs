@@ -44,6 +44,10 @@ pub struct Sharder {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     start: Option<time::Instant>,
+    /// The next time to print data from the histograms
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    check: Option<time::Instant>,
 }
 
 impl Clone for Sharder {
@@ -65,8 +69,6 @@ impl Clone for Sharder {
         }
     }
 }
-
-const CHECK_EVERY: u64 = 100_000;
 
 impl Sharder {
     pub fn new(by: usize) -> Self {
@@ -116,6 +118,7 @@ impl Sharder {
         self.id_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
         self.data_size_hist = Some(Histogram::new_with_max(10_000, 5).unwrap());
         self.start = Some(time::Instant::now());
+        self.check = Some(time::Instant::now() + CHECK_EVERY);
     }
 
     pub fn sharded_by(&self) -> usize {
@@ -229,18 +232,19 @@ impl Sharder {
                         h.record(m).unwrap();
                     }
                     let total = self.data_size_hist.as_ref().unwrap().len();
-                    if total % CHECK_EVERY == 0 {
-                        let now = time::Instant::now();
+                    let now = time::Instant::now();
+                    if now > *self.check.as_ref().unwrap() {
+                        self.check = Some(self.check.unwrap() + CHECK_EVERY);
                         let dur = now.duration_since(self.start.unwrap()) / 1_000;
                         let total_unsharded = self.shards_hist.as_ref().unwrap().len();
                         println!(
-                            "Sent {} unsharded messages in {:?} for {:?} messages / ms",
+                            "Sent {} unsharded messages in {:?} for {:?} messages / s",
                             total_unsharded,
                             dur,
                             (total_unsharded as u128) / dur.as_millis(),
                         );
                         println!(
-                            "Sent {} sharded messages in {:?} for {:?} messages / ms",
+                            "Sent {} sharded messages in {:?} for {:?} messages / s",
                             total,
                             dur,
                             (total as u128) / dur.as_millis(),
