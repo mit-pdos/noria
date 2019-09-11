@@ -112,7 +112,6 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
-    let wp_delay = Arc::new(Mutex::new(hists.4));
     let finished = Arc::new(Barrier::new(nthreads + ngen));
 
     let ts = (
@@ -120,7 +119,6 @@ where
         sjrn_r_t.clone(),
         rmt_w_t.clone(),
         rmt_r_t.clone(),
-        wp_delay.clone(),
         finished.clone(),
     );
     let mut rt = tokio::runtime::Builder::new()
@@ -137,9 +135,6 @@ where
                 .unwrap();
             RMT_R
                 .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
-            WP_DELAY
-                .with(|h| ts.4.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
         })
         .build()
@@ -208,7 +203,7 @@ where
     let r_reserved_time = R_RESERVED_TIME.clone();
     let w_reserved_time = w_reserved_time.lock().unwrap();
     let r_reserved_time = r_reserved_time.lock().unwrap();
-    let mut wp_delay = wp_delay.lock().unwrap();
+    let mut wp_delay = hists.4;
     println!("\n(relative write time (ms since start), delay (us))");
     print!("[");
     for i in 0..r_reserved_time.len() {
