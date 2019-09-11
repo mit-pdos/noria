@@ -114,7 +114,6 @@ where
     let sjrn_r_t = Arc::new(Mutex::new(hists.1));
     let rmt_w_t = Arc::new(Mutex::new(hists.2));
     let rmt_r_t = Arc::new(Mutex::new(hists.3));
-    let wp_delay = Arc::new(Mutex::new(hists.4));
     let finished = Arc::new(Barrier::new(nthreads + ngen));
 
     let ts = (
@@ -122,7 +121,6 @@ where
         sjrn_r_t.clone(),
         rmt_w_t.clone(),
         rmt_r_t.clone(),
-        wp_delay.clone(),
         finished.clone(),
     );
     let mut rt = tokio::runtime::Builder::new()
@@ -140,13 +138,11 @@ where
             RMT_R
                 .with(|h| ts.3.lock().unwrap().add(&*h.borrow()))
                 .unwrap();
-            WP_DELAY
-                .with(|h| ts.4.lock().unwrap().add(&*h.borrow()))
-                .unwrap();
         })
         .build()
         .unwrap();
 
+    println!("BENCHMARK: start");
     let start = time::Instant::now();
     let handle: C = {
         let local_args = local_args.clone();
@@ -157,6 +153,7 @@ where
             .unwrap()
     };
 
+    println!("BENCHMARK: start generators");
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
             let ex = rt.executor();
@@ -193,64 +190,72 @@ where
         })
         .collect();
 
+    println!("BENCHMARK: wait for {} generators", generators.len());
     let mut ops = 0.0;
     let mut wops = 0.0;
     for gen in generators {
         let (gen, completed) = gen.join().unwrap();
         ops += gen;
         wops += completed;
+        println!("BENCHMARK: generator completed");
     }
-    drop(handle);
-    rt.shutdown_on_idle().wait().unwrap();
 
     // all done!
 
     // write propagation delay over time
-    let w_reserved_time = W_RESERVED_TIME.clone();
-    let r_reserved_time = R_RESERVED_TIME.clone();
-    let w_reserved_time = w_reserved_time.lock().unwrap();
-    let r_reserved_time = r_reserved_time.lock().unwrap();
-    let mut wp_delay = wp_delay.lock().unwrap();
-    println!("\n(relative write time (ms since start), delay (us))");
-    print!("[");
-    for i in 0..r_reserved_time.len() {
-        let w_time = w_reserved_time[i];
-        let r_time = r_reserved_time[i];
-        let relative_w_time = w_time.duration_since(start);
-        let relative_w_time_ms =
-            relative_w_time.as_secs() * 1_000 +
-            u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
-        if relative_w_time_ms < warmup_ms {
-            // don't use data from warmup time
-            continue;
-        }
-        let relative_w_time_ms = relative_w_time_ms - warmup_ms;
+    {
+        let w_reserved_time = W_RESERVED_TIME.clone();
+        let r_reserved_time = R_RESERVED_TIME.clone();
+        let w_reserved_time = w_reserved_time.lock().unwrap();
+        let r_reserved_time = r_reserved_time.lock().unwrap();
+        let mut wp_delay = hists.4;
+        println!("\n(relative write time (ms since start), delay (us))");
+        print!("[");
+        for i in 0..r_reserved_time.len() {
+            let w_time = w_reserved_time[i];
+            let r_time = r_reserved_time[i];
+            let relative_w_time = w_time.duration_since(start);
+            let relative_w_time_ms =
+                relative_w_time.as_secs() * 1_000 +
+                u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
+            if relative_w_time_ms < warmup_ms {
+                // don't use data from warmup time
+                continue;
+            }
+            let relative_w_time_ms = relative_w_time_ms - warmup_ms;
 
-        let delay_us = if r_time == w_time {
-            0
-        } else {
-            let delay = r_time.duration_since(w_time);
-            let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
-            if wp_delay.record(us).is_err() {
-                let m = wp_delay.high();
-                wp_delay.record(m).unwrap();
+            let delay_us = if r_time == w_time {
+                0
+            } else {
+                let delay = r_time.duration_since(w_time);
+                let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
+                if wp_delay.record(us).is_err() {
+                    let m = wp_delay.high();
+                    wp_delay.record(m).unwrap();
+                };
+                us
             };
-            us
-        };
-        if i == r_reserved_time.len() - 1 {
-            print!("[{},{}]]\n", relative_w_time_ms, delay_us);
-        } else {
-            print!("[{},{}],", relative_w_time_ms, delay_us);
+            if i == r_reserved_time.len() - 1 {
+                print!("[{},{}]]\n", relative_w_time_ms, delay_us);
+            } else {
+                print!("[{},{}],", relative_w_time_ms, delay_us);
+            }
         }
+
+        // write propagation delay
+        println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
+        println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
+        println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
+        println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
     }
 
-    // write propagation delay
-    println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
-    println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
-    println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
-    println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
-
     // sojourn/remote write/read time
+    println!("BENCHMARK: dropping handle...");
+    drop(handle);
+    println!("BENCHMARK: dropped handle");
+    rt.shutdown_on_idle().wait().unwrap();
+    println!("BENCHMARK: shut down runtime");
+
     println!("# generated ops/s: {:.2}", ops);
     println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
