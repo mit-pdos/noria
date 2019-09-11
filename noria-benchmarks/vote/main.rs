@@ -199,49 +199,51 @@ where
     // all done!
 
     // write propagation delay over time
-    let w_reserved_time = W_RESERVED_TIME.clone();
-    let r_reserved_time = R_RESERVED_TIME.clone();
-    let w_reserved_time = w_reserved_time.lock().unwrap();
-    let r_reserved_time = r_reserved_time.lock().unwrap();
-    let mut wp_delay = hists.4;
-    println!("\n(relative write time (ms since start), delay (us))");
-    print!("[");
-    for i in 0..r_reserved_time.len() {
-        let w_time = w_reserved_time[i];
-        let r_time = r_reserved_time[i];
-        let relative_w_time = w_time.duration_since(start);
-        let relative_w_time_ms =
-            relative_w_time.as_secs() * 1_000 +
-            u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
-        if relative_w_time_ms < warmup_ms {
-            // don't use data from warmup time
-            continue;
-        }
-        let relative_w_time_ms = relative_w_time_ms - warmup_ms;
+    {
+        let w_reserved_time = W_RESERVED_TIME.clone();
+        let r_reserved_time = R_RESERVED_TIME.clone();
+        let w_reserved_time = w_reserved_time.lock().unwrap();
+        let r_reserved_time = r_reserved_time.lock().unwrap();
+        let mut wp_delay = hists.4;
+        println!("\n(relative write time (ms since start), delay (us))");
+        print!("[");
+        for i in 0..r_reserved_time.len() {
+            let w_time = w_reserved_time[i];
+            let r_time = r_reserved_time[i];
+            let relative_w_time = w_time.duration_since(start);
+            let relative_w_time_ms =
+                relative_w_time.as_secs() * 1_000 +
+                u64::from(relative_w_time.subsec_nanos()) / 1_000_000;
+            if relative_w_time_ms < warmup_ms {
+                // don't use data from warmup time
+                continue;
+            }
+            let relative_w_time_ms = relative_w_time_ms - warmup_ms;
 
-        let delay_us = if r_time == w_time {
-            0
-        } else {
-            let delay = r_time.duration_since(w_time);
-            let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
-            if wp_delay.record(us).is_err() {
-                let m = wp_delay.high();
-                wp_delay.record(m).unwrap();
+            let delay_us = if r_time == w_time {
+                0
+            } else {
+                let delay = r_time.duration_since(w_time);
+                let us = delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000;
+                if wp_delay.record(us).is_err() {
+                    let m = wp_delay.high();
+                    wp_delay.record(m).unwrap();
+                };
+                us
             };
-            us
-        };
-        if i == r_reserved_time.len() - 1 {
-            print!("[{},{}]]\n", relative_w_time_ms, delay_us);
-        } else {
-            print!("[{},{}],", relative_w_time_ms, delay_us);
+            if i == r_reserved_time.len() - 1 {
+                print!("[{},{}]]\n", relative_w_time_ms, delay_us);
+            } else {
+                print!("[{},{}],", relative_w_time_ms, delay_us);
+            }
         }
-    }
 
-    // write propagation delay
-    println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
-    println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
-    println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
-    println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
+        // write propagation delay
+        println!("write\t50\t{:.2}\t(us)", wp_delay.value_at_quantile(0.5));
+        println!("write\t95\t{:.2}\t(us)", wp_delay.value_at_quantile(0.95));
+        println!("write\t99\t{:.2}\t(us)", wp_delay.value_at_quantile(0.99));
+        println!("write\t100\t{:.2}\t(us)\n", wp_delay.max());
+    }
 
     // sojourn/remote write/read time
     println!("# generated ops/s: {:.2}", ops);
