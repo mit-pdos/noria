@@ -193,8 +193,6 @@ where
         ops += gen;
         wops += completed;
     }
-    drop(handle);
-    rt.shutdown_on_idle().wait().unwrap();
 
     // all done!
 
@@ -246,6 +244,9 @@ where
     }
 
     // sojourn/remote write/read time
+    drop(handle);
+    rt.shutdown_on_idle().wait().unwrap();
+
     println!("# generated ops/s: {:.2}", ops);
     println!("# actual ops/s: {:.2}", wops);
     println!("# op\tpct\tsojourn\tremote");
