@@ -182,9 +182,11 @@ where
 {
     fn drop(&mut self) {
         let views = self.views.clone();
+        print!("BENCHMARK: (controller.rs) {} views...", views.lock().unwrap().len());
         for (_, rpc) in views.lock().unwrap().drain() {
             drop(rpc);
         }
+        println!("done");
     }
 }
 

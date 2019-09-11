@@ -140,6 +140,7 @@ where
         .build()
         .unwrap();
 
+    println!("BENCHMARK: start");
     let start = time::Instant::now();
     let handle: C = {
         let local_args = local_args.clone();
@@ -150,6 +151,7 @@ where
             .unwrap()
     };
 
+    println!("BENCHMARK: start generators");
     let generators: Vec<_> = (0..ngen)
         .map(|geni| {
             let ex = rt.executor();
@@ -186,12 +188,14 @@ where
         })
         .collect();
 
+    println!("BENCHMARK: wait for {} generators", generators.len());
     let mut ops = 0.0;
     let mut wops = 0.0;
     for gen in generators {
         let (gen, completed) = gen.join().unwrap();
         ops += gen;
         wops += completed;
+        println!("BENCHMARK: generator completed");
     }
 
     // all done!
@@ -244,8 +248,11 @@ where
     }
 
     // sojourn/remote write/read time
+    println!("BENCHMARK: dropping handle...");
     drop(handle);
+    println!("BENCHMARK: dropped handle");
     rt.shutdown_on_idle().wait().unwrap();
+    println!("BENCHMARK: shut down runtime");
 
     println!("# generated ops/s: {:.2}", ops);
     println!("# actual ops/s: {:.2}", wops);
