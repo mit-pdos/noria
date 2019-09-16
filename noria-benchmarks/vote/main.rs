@@ -201,9 +201,9 @@ where
     // all done!
 
     // write propagation delay over time
+    let w_reserved_time = W_RESERVED_TIME.clone();
+    let r_reserved_time = R_RESERVED_TIME.clone();
     {
-        let w_reserved_time = W_RESERVED_TIME.clone();
-        let r_reserved_time = R_RESERVED_TIME.clone();
         let w_reserved_time = w_reserved_time.lock().unwrap();
         let r_reserved_time = r_reserved_time.lock().unwrap();
         let mut wp_delay = hists.4;
@@ -407,6 +407,8 @@ where
             let warmup_done = sent.duration_since(start) > warmup;
             ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
+            let w_reserved_time = Arc::clone(&W_RESERVED_TIME);
+            let r_reserved_time = Arc::clone(&R_RESERVED_TIME);
             if !write {
                 for row in rows {
                     if row.is_empty() {
@@ -429,23 +431,27 @@ where
                     }
 
                     {
-                        let w_reserved_time = Arc::clone(&W_RESERVED_TIME);
-                        let r_reserved_time = Arc::clone(&R_RESERVED_TIME);
                         let w_reserved_time = w_reserved_time.lock().unwrap();
                         let mut r_reserved_time = r_reserved_time.lock().unwrap();
                         let num_writes = w_reserved_time.len();
-                        if read_count <= r_reserved_time.len() {
+                        let num_reads = r_reserved_time.len();
+                        if read_count <= num_reads {
                             // already read this author count
+                            drop(w_reserved_time);
+                            drop(r_reserved_time);
                             continue;
                         }
 
-                        assert_eq!(r_reserved_time.len() + 1, read_count);
+                        assert_eq!(num_reads + 1, read_count);
                         assert_eq!(num_writes, read_count);
                         // println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
 
+                        /*
                         if !warmup_done {
                             // don't use data from warmup time
+                            drop(w_reserved_time);
+                            drop(r_reserved_time);
                             continue;
                         }
 
@@ -465,7 +471,10 @@ where
                             let delay = r_time.duration_since(w_time);
                             delay.as_secs() * 1_000_000 + u64::from(delay.subsec_nanos()) / 1_000
                         };
+                        */
                         // println!("WPT [{},{},{:?}]", read_count, relative_w_time_ms, delay_us);
+                        drop(w_reserved_time);
+                        drop(r_reserved_time);
                     }
                 }
             }
@@ -554,7 +563,9 @@ where
             let mut w_reserved_time = w_reserved_time.lock().unwrap();
             let r_reserved_time = r_reserved_time.lock().unwrap();
             let num_reads = r_reserved_time.len();
-            if w_reserved_time.len() == num_reads && now >= *next_reserved_w {
+            let num_writes = w_reserved_time.len();
+
+            if num_writes == num_reads && now >= *next_reserved_w {
                 // if our previous write has been read and we haven't sent a write in a while,
                 // note down the time of write, then queue it
                 w_reserved_time.push(now);
@@ -568,11 +579,11 @@ where
                     queued_w_keys[0] = RESERVED_W_KEY;
                 }
 
-                // println!("Wrote {}th vote at {:?}", w_reserved_time.len(), now);
+                // println!("Wrote {}th vote at {:?}", num_writes + 1, now);
                 *next_reserved_w = now + *WRITE_RESERVED_EVERY_US;
-            } else if w_reserved_time.len() > num_reads {
+            } else if num_writes > num_reads {
                 // if the previous write has not been read, queue a read
-                assert_eq!(w_reserved_time.len() - 1, num_reads);
+                assert_eq!(num_writes - 1, num_reads);
                 if queued_r.is_empty() && next_send.is_none() {
                     next_send = Some(now + max_batch_time);
                 }
@@ -583,6 +594,9 @@ where
                     queued_r_keys[0] = RESERVED_R_KEY;
                 }
             }
+            drop(next_reserved_w);
+            drop(w_reserved_time);
+            drop(r_reserved_time);
         }
 
         if let Some(f) = next_send {
