@@ -1,0 +1,384 @@
+BENCHMARK: start
+BENCHMARK: start generators
+BENCHMARK: wait for 1 generators
+EGRESS Sent 16 messages in 1.079235ms for 16 messages / s
+EGRESS Size of packet data: [5304, 14904, 14904, 14904]
+Sent 161 unsharded messages in 1.222101ms for 161 messages / s
+Sent 1408 sharded messages in 1.222101ms for 1408 messages / s
+Size of packet data: [664, 3064, 5144, 20344]
+Num shards by author_id: [10, 13, 16, 20]
+Sent 6113 unsharded messages in 2.000076ms for 3056 messages / s
+Sent 116180 sharded messages in 2.000076ms for 58090 messages / s
+Size of packet data: [664, 2744, 28824, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 345 messages in 2.001724ms for 172 messages / s
+EGRESS Size of packet data: [12824, 27704, 77464, 183864]
+Sent 16609 unsharded messages in 3ms for 5536 messages / s
+Sent 318408 sharded messages in 3ms for 106136 messages / s
+EGRESS Sent 867 messages in 3.000289ms for 289 messages / s
+Size of packet data: [664, 1464, 11384, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Size of packet data: [12664, 19224, 45304, 183864]
+Sent 26416 unsharded messages in 4.000044ms for 6604 messages / s
+Sent 507948 sharded messages in 4.000044ms for 126987 messages / s
+Size of packet data: [664, 1464, 3864, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1352 messages in 4.001843ms for 338 messages / s
+EGRESS Size of packet data: [12664, 17944, 42904, 183864]
+Sent 36700 unsharded messages in 5.000037ms for 7340 messages / s
+Sent 706713 sharded messages in 5.000037ms for 141342 messages / s
+Size of packet data: [664, 1464, 2904, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1867 messages in 5.000762ms for 373 messages / s
+EGRESS Size of packet data: [12504, 17464, 42584, 183864]
+Sent 40386 unsharded messages in 6.000448ms for 6731 messages / s
+Sent 778041 sharded messages in 6.000448ms for 129673 messages / s
+Size of packet data: [664, 1304, 2744, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 42456 unsharded messages in 7.001436ms for 6065 messages / s
+Sent 818355 sharded messages in 7.001436ms for 116907 messages / s
+Size of packet data: [664, 1304, 2744, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 44535 unsharded messages in 8.001719ms for 5566 messages / s
+Sent 858802 sharded messages in 8.001719ms for 107350 messages / s
+Size of packet data: [664, 1304, 2584, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 46606 unsharded messages in 9.00003ms for 5178 messages / s
+Sent 899086 sharded messages in 9.00003ms for 99898 messages / s
+Size of packet data: [664, 1304, 2584, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 48702 unsharded messages in 10.00114ms for 4870 messages / s
+Sent 939782 sharded messages in 10.00114ms for 93978 messages / s
+Size of packet data: [664, 1304, 2424, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 50809 unsharded messages in 11.000632ms for 4619 messages / s
+Sent 980636 sharded messages in 11.000632ms for 89148 messages / s
+Size of packet data: [664, 1304, 2424, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 52931 unsharded messages in 12.000031ms for 4410 messages / s
+Sent 1021685 sharded messages in 12.000031ms for 85140 messages / s
+Size of packet data: [664, 1304, 2264, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 55049 unsharded messages in 13.000982ms for 4234 messages / s
+Sent 1062685 sharded messages in 13.000982ms for 81745 messages / s
+Size of packet data: [664, 1304, 2264, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 57166 unsharded messages in 14.001279ms for 4083 messages / s
+Sent 1103708 sharded messages in 14.001279ms for 78836 messages / s
+Size of packet data: [664, 1304, 2264, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 59267 unsharded messages in 15.000357ms for 3951 messages / s
+Sent 1144436 sharded messages in 15.000357ms for 76295 messages / s
+Size of packet data: [664, 1304, 2104, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 61370 unsharded messages in 16.000892ms for 3835 messages / s
+Sent 1185233 sharded messages in 16.000892ms for 74077 messages / s
+Size of packet data: [664, 1304, 2104, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 63460 unsharded messages in 17ms for 3732 messages / s
+Sent 1225809 sharded messages in 17ms for 72106 messages / s
+Size of packet data: [664, 1304, 2104, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 65564 unsharded messages in 18.000374ms for 3642 messages / s
+Sent 1266514 sharded messages in 18.000374ms for 70361 messages / s
+Size of packet data: [664, 1304, 2104, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 67653 unsharded messages in 19.000708ms for 3560 messages / s
+Sent 1307057 sharded messages in 19.000708ms for 68792 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 69784 unsharded messages in 20.000107ms for 3489 messages / s
+Sent 1348303 sharded messages in 20.000107ms for 67415 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 71889 unsharded messages in 21.001168ms for 3423 messages / s
+Sent 1389145 sharded messages in 21.001168ms for 66149 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 73991 unsharded messages in 22.000567ms for 3363 messages / s
+Sent 1429937 sharded messages in 22.000567ms for 64997 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 76102 unsharded messages in 23.000738ms for 3308 messages / s
+Sent 1470794 sharded messages in 23.000738ms for 63947 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 78201 unsharded messages in 24.000127ms for 3258 messages / s
+Sent 1511521 sharded messages in 24.000127ms for 62980 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 80315 unsharded messages in 25.000308ms for 3212 messages / s
+Sent 1552424 sharded messages in 25.000308ms for 62096 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 82441 unsharded messages in 26.000955ms for 3170 messages / s
+Sent 1593589 sharded messages in 26.000955ms for 61291 messages / s
+Size of packet data: [664, 1304, 1944, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 85061 unsharded messages in 27.000377ms for 3150 messages / s
+Sent 1644466 sharded messages in 27.000377ms for 60906 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 87687 unsharded messages in 28.001029ms for 3131 messages / s
+Sent 1695366 sharded messages in 28.001029ms for 60548 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 90320 unsharded messages in 29.000041ms for 3114 messages / s
+Sent 1746345 sharded messages in 29.000041ms for 60218 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 92946 unsharded messages in 30.000295ms for 3098 messages / s
+Sent 1797252 sharded messages in 30.000295ms for 59908 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 95578 unsharded messages in 31.000376ms for 3083 messages / s
+Sent 1848301 sharded messages in 31.000376ms for 59622 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 98214 unsharded messages in 32.000119ms for 3069 messages / s
+Sent 1899399 sharded messages in 32.000119ms for 59356 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 100871 unsharded messages in 33.000075ms for 3056 messages / s
+Sent 1950771 sharded messages in 33.000075ms for 59114 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 103521 unsharded messages in 34.000398ms for 3044 messages / s
+Sent 2002053 sharded messages in 34.000398ms for 58883 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 106138 unsharded messages in 35.000608ms for 3032 messages / s
+Sent 2052865 sharded messages in 35.000608ms for 58653 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 108771 unsharded messages in 36.000869ms for 3021 messages / s
+Sent 2103849 sharded messages in 36.000869ms for 58440 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 111388 unsharded messages in 37.000095ms for 3010 messages / s
+Sent 2154612 sharded messages in 37.000095ms for 58232 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 114020 unsharded messages in 38.000276ms for 3000 messages / s
+Sent 2205613 sharded messages in 38.000276ms for 58042 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 116647 unsharded messages in 39.000518ms for 2990 messages / s
+Sent 2256583 sharded messages in 39.000518ms for 57861 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 119265 unsharded messages in 40.000031ms for 2981 messages / s
+Sent 2307354 sharded messages in 40.000031ms for 57683 messages / s
+Size of packet data: [664, 1304, 1784, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 121883 unsharded messages in 41.00128ms for 2972 messages / s
+Sent 2358056 sharded messages in 41.00128ms for 57513 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 124504 unsharded messages in 42.000615ms for 2964 messages / s
+Sent 2408894 sharded messages in 42.000615ms for 57354 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 127100 unsharded messages in 43.000884ms for 2955 messages / s
+Sent 2459286 sharded messages in 43.000884ms for 57192 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 129735 unsharded messages in 44.000147ms for 2948 messages / s
+Sent 2510369 sharded messages in 44.000147ms for 57053 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 132361 unsharded messages in 45.000792ms for 2941 messages / s
+Sent 2561310 sharded messages in 45.000792ms for 56918 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 134966 unsharded messages in 46.000854ms for 2934 messages / s
+Sent 2611949 sharded messages in 46.000854ms for 56781 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 137582 unsharded messages in 47.000027ms for 2927 messages / s
+Sent 2662705 sharded messages in 47.000027ms for 56653 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 140196 unsharded messages in 48.000353ms for 2920 messages / s
+Sent 2713469 sharded messages in 48.000353ms for 56530 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 142830 unsharded messages in 49.000327ms for 2914 messages / s
+Sent 2764440 sharded messages in 49.000327ms for 56417 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 145450 unsharded messages in 50.000481ms for 2909 messages / s
+Sent 2815312 sharded messages in 50.000481ms for 56306 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 148079 unsharded messages in 51.000145ms for 2903 messages / s
+Sent 2866240 sharded messages in 51.000145ms for 56200 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 150692 unsharded messages in 52.000271ms for 2897 messages / s
+Sent 2916988 sharded messages in 52.000271ms for 56095 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 153310 unsharded messages in 53.001583ms for 2892 messages / s
+Sent 2967843 sharded messages in 53.001583ms for 55997 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 155939 unsharded messages in 54.000102ms for 2887 messages / s
+Sent 3018896 sharded messages in 54.000102ms for 55905 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 158586 unsharded messages in 55.000267ms for 2883 messages / s
+Sent 3070001 sharded messages in 55.000267ms for 55818 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 161210 unsharded messages in 56.000584ms for 2878 messages / s
+Sent 3120888 sharded messages in 56.000584ms for 55730 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 163814 unsharded messages in 57.00009ms for 2873 messages / s
+Sent 3171497 sharded messages in 57.00009ms for 55640 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 166230 unsharded messages in 58.000362ms for 2866 messages / s
+Sent 3218207 sharded messages in 58.000362ms for 55486 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 168888 unsharded messages in 59.001014ms for 2862 messages / s
+Sent 3269636 sharded messages in 59.001014ms for 55417 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 171517 unsharded messages in 60.000111ms for 2858 messages / s
+Sent 3320576 sharded messages in 60.000111ms for 55342 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 174151 unsharded messages in 61.000359ms for 2854 messages / s
+Sent 3371657 sharded messages in 61.000359ms for 55273 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 176777 unsharded messages in 62.000684ms for 2851 messages / s
+Sent 3422616 sharded messages in 62.000684ms for 55203 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 179410 unsharded messages in 63.00113ms for 2847 messages / s
+Sent 3473660 sharded messages in 63.00113ms for 55137 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 182028 unsharded messages in 64.000246ms for 2844 messages / s
+Sent 3524432 sharded messages in 64.000246ms for 55069 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 184658 unsharded messages in 65.000626ms for 2840 messages / s
+Sent 3575430 sharded messages in 65.000626ms for 55006 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 187279 unsharded messages in 66.000026ms for 2837 messages / s
+Sent 3626282 sharded messages in 66.000026ms for 54943 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 189901 unsharded messages in 67.00027ms for 2834 messages / s
+Sent 3677239 sharded messages in 67.00027ms for 54884 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 192531 unsharded messages in 68.00158ms for 2831 messages / s
+Sent 3728170 sharded messages in 68.00158ms for 54826 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 195156 unsharded messages in 69.000768ms for 2828 messages / s
+Sent 3779031 sharded messages in 69.000768ms for 54768 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 197790 unsharded messages in 70.000064ms for 2825 messages / s
+Sent 3830163 sharded messages in 70.000064ms for 54716 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 200938 unsharded messages in 71.001241ms for 2830 messages / s
+Sent 3891198 sharded messages in 71.001241ms for 54805 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 204079 unsharded messages in 72.000429ms for 2834 messages / s
+Sent 3952112 sharded messages in 72.000429ms for 54890 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 207239 unsharded messages in 73.000058ms for 2838 messages / s
+Sent 4013354 sharded messages in 73.000058ms for 54977 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 210387 unsharded messages in 74.000121ms for 2843 messages / s
+Sent 4074449 sharded messages in 74.000121ms for 55060 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 213532 unsharded messages in 75.000006ms for 2847 messages / s
+Sent 4135334 sharded messages in 75.000006ms for 55137 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 216729 unsharded messages in 76.001238ms for 2851 messages / s
+Sent 4197180 sharded messages in 76.001238ms for 55226 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 219908 unsharded messages in 77.000647ms for 2855 messages / s
+Sent 4258684 sharded messages in 77.000647ms for 55307 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 223091 unsharded messages in 78.000028ms for 2860 messages / s
+Sent 4320306 sharded messages in 78.000028ms for 55388 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 226275 unsharded messages in 79.000083ms for 2864 messages / s
+Sent 4381887 sharded messages in 79.000083ms for 55466 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 229445 unsharded messages in 80.000286ms for 2868 messages / s
+Sent 4443250 sharded messages in 80.000286ms for 55540 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 232618 unsharded messages in 81.000738ms for 2871 messages / s
+Sent 4504722 sharded messages in 81.000738ms for 55613 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 235800 unsharded messages in 82.000055ms for 2875 messages / s
+Sent 4566401 sharded messages in 82.000055ms for 55687 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 238979 unsharded messages in 83.001376ms for 2879 messages / s
+Sent 4627985 sharded messages in 83.001376ms for 55758 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 242162 unsharded messages in 84.005251ms for 2882 messages / s
+Sent 4689596 sharded messages in 84.005251ms for 55828 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 245303 unsharded messages in 85.000518ms for 2885 messages / s
+Sent 4750538 sharded messages in 85.000518ms for 55888 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 248456 unsharded messages in 86.000102ms for 2889 messages / s
+Sent 4811748 sharded messages in 86.000102ms for 55950 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 251379 unsharded messages in 87.000319ms for 2889 messages / s
+Sent 4868418 sharded messages in 87.000319ms for 55958 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 254532 unsharded messages in 88.000647ms for 2892 messages / s
+Sent 4929533 sharded messages in 88.000647ms for 56017 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 257569 unsharded messages in 89.000024ms for 2894 messages / s
+Sent 4988462 sharded messages in 89.000024ms for 56050 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 260688 unsharded messages in 90.000215ms for 2896 messages / s
+Sent 5049147 sharded messages in 90.000215ms for 56101 messages / s
+Size of packet data: [664, 1304, 1624, 52664]
+Num shards by author_id: [20, 20, 20, 20]
+BENCHMARK: generator completed
+
+(relative write time (ms since start), delay (us))
+[write	50	0	(us)
+write	95	0	(us)
+write	99	0	(us)
+write	100	0	(us)
+
+BENCHMARK: dropping handle...
+BENCHMARK: (controller.rs) 20 views...done
+BENCHMARK: (controller.rs) 0 views...done

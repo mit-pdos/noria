@@ -1,0 +1,556 @@
+BENCHMARK: start
+BENCHMARK: start generators
+BENCHMARK: wait for 2 generators
+Sent 344 unsharded messages in 1.000154ms for 344 messages / s
+Sent 3932 sharded messages in 1.000154ms for 3932 messages / s
+Size of packet data: [1144, 7704, 11384, 18424]
+Num shards by author_id: [12, 17, 17, 17]
+EGRESS Sent 30 messages in 1.280902ms for 30 messages / s
+EGRESS Size of packet data: [10904, 69144, 88184, 88184]
+EGRESS Sent 38 messages in 2.038723ms for 19 messages / s
+EGRESS Size of packet data: [10000, 69144, 88184, 88184]
+Sent 573 unsharded messages in 2.276938ms for 286 messages / s
+Sent 7919 sharded messages in 2.276938ms for 3959 messages / s
+Size of packet data: [2584, 29464, 36344, 56664]
+Num shards by author_id: [16, 20, 20, 20]
+Sent 999 unsharded messages in 3.001083ms for 333 messages / s
+Sent 16439 sharded messages in 3.001083ms for 5479 messages / s
+Size of packet data: [23704, 59704, 75064, 101144]
+Num shards by author_id: [17, 20, 20, 20]
+EGRESS Sent 65 messages in 3.00732ms for 21 messages / s
+EGRESS Size of packet data: [10000, 69144, 228824, 228824]
+Sent 2310 unsharded messages in 4.007603ms for 577 messages / s
+Sent 42658 sharded messages in 4.007603ms for 10664 messages / s
+Size of packet data: [21944, 52664, 63384, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 104 messages in 4.012879ms for 26 messages / s
+EGRESS Size of packet data: [10000, 55704, 151224, 228824]
+Sent 3223 unsharded messages in 5.00146ms for 644 messages / s
+Sent 60918 sharded messages in 5.00146ms for 12183 messages / s
+Size of packet data: [19704, 48024, 61464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 148 messages in 5.012254ms for 29 messages / s
+EGRESS Size of packet data: [10000, 151224, 254264, 258104]
+Sent 5575 unsharded messages in 6.000186ms for 929 messages / s
+Sent 107939 sharded messages in 6.000186ms for 17989 messages / s
+Size of packet data: [12344, 37944, 58584, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 210 messages in 6.002169ms for 35 messages / s
+EGRESS Size of packet data: [10000, 151224, 254104, 258104]
+Sent 9795 unsharded messages in 7.000374ms for 1399 messages / s
+Sent 192306 sharded messages in 7.000374ms for 27472 messages / s
+Size of packet data: [4664, 29944, 53784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 428 messages in 7.000855ms for 61 messages / s
+EGRESS Size of packet data: [48664, 129304, 244984, 258104]
+Sent 14098 unsharded messages in 8.000046ms for 1762 messages / s
+Sent 278221 sharded messages in 8.000046ms for 34777 messages / s
+Size of packet data: [4184, 26584, 49304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 632 messages in 8.002772ms for 79 messages / s
+EGRESS Size of packet data: [59704, 132984, 228824, 258104]
+Sent 18975 unsharded messages in 9.000042ms for 2108 messages / s
+Sent 375751 sharded messages in 9.000042ms for 41750 messages / s
+Size of packet data: [3704, 24344, 44664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 865 messages in 9.002215ms for 96 messages / s
+EGRESS Size of packet data: [60504, 129304, 218424, 258104]
+Sent 24017 unsharded messages in 10.000511ms for 2401 messages / s
+Sent 476546 sharded messages in 10.000511ms for 47654 messages / s
+Size of packet data: [3544, 22584, 40024, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1107 messages in 10.000783ms for 110 messages / s
+EGRESS Size of packet data: [60824, 119384, 195864, 258104]
+Sent 29258 unsharded messages in 11.000146ms for 2659 messages / s
+Sent 581344 sharded messages in 11.000146ms for 52849 messages / s
+Size of packet data: [3384, 20984, 36664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1376 messages in 11.001133ms for 125 messages / s
+EGRESS Size of packet data: [60184, 115224, 191224, 258104]
+Sent 34475 unsharded messages in 12.000022ms for 2872 messages / s
+Sent 685574 sharded messages in 12.000022ms for 57131 messages / s
+Size of packet data: [3224, 19704, 33944, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1644 messages in 12.002318ms for 137 messages / s
+EGRESS Size of packet data: [59384, 113784, 162104, 258104]
+Sent 39770 unsharded messages in 13.000221ms for 3059 messages / s
+Sent 791346 sharded messages in 13.000221ms for 60872 messages / s
+Size of packet data: [3224, 18104, 32184, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 1898 messages in 13.002713ms for 146 messages / s
+EGRESS Size of packet data: [59544, 112024, 157624, 258104]
+Sent 44697 unsharded messages in 14.000504ms for 3192 messages / s
+Sent 889808 sharded messages in 14.000504ms for 63557 messages / s
+Size of packet data: [3224, 16664, 30904, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 2145 messages in 14.003937ms for 153 messages / s
+EGRESS Size of packet data: [59544, 111064, 155704, 258104]
+Sent 48629 unsharded messages in 15.000086ms for 3241 messages / s
+Sent 968389 sharded messages in 15.000086ms for 64559 messages / s
+Size of packet data: [3224, 15224, 29944, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 2336 messages in 15.002539ms for 155 messages / s
+EGRESS Size of packet data: [60344, 114424, 158584, 258104]
+Sent 52798 unsharded messages in 16.000037ms for 3299 messages / s
+Sent 1051754 sharded messages in 16.000037ms for 65734 messages / s
+Size of packet data: [3224, 13784, 29144, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 2562 messages in 16.00443ms for 160 messages / s
+EGRESS Size of packet data: [60824, 114744, 158904, 258104]
+Sent 58070 unsharded messages in 17.000067ms for 3415 messages / s
+Sent 1157101 sharded messages in 17.000067ms for 68064 messages / s
+Size of packet data: [3224, 11704, 28184, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 2819 messages in 17.000769ms for 165 messages / s
+EGRESS Size of packet data: [60664, 113944, 157624, 258104]
+Sent 63277 unsharded messages in 18.000005ms for 3515 messages / s
+Sent 1261175 sharded messages in 18.000005ms for 70065 messages / s
+Size of packet data: [3224, 10104, 27384, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 3074 messages in 18.001521ms for 170 messages / s
+EGRESS Size of packet data: [60504, 113144, 157464, 258104]
+Sent 68495 unsharded messages in 19.000033ms for 3605 messages / s
+Sent 1365482 sharded messages in 19.000033ms for 71867 messages / s
+Size of packet data: [3064, 9144, 26744, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 3334 messages in 19.002534ms for 175 messages / s
+EGRESS Size of packet data: [60344, 111544, 155704, 258104]
+Sent 73329 unsharded messages in 20.000185ms for 3666 messages / s
+Sent 1462127 sharded messages in 20.000185ms for 73106 messages / s
+Size of packet data: [3064, 8504, 26264, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 3569 messages in 20.004485ms for 178 messages / s
+EGRESS Size of packet data: [60184, 111064, 157464, 258104]
+Sent 78729 unsharded messages in 21.000432ms for 3749 messages / s
+Sent 1570083 sharded messages in 21.000432ms for 74765 messages / s
+Size of packet data: [3064, 8024, 25624, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 3837 messages in 21.003035ms for 182 messages / s
+EGRESS Size of packet data: [59864, 109624, 155704, 258104]
+Sent 84065 unsharded messages in 22.000672ms for 3821 messages / s
+Sent 1676705 sharded messages in 22.000672ms for 76213 messages / s
+Size of packet data: [3064, 7704, 25144, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 4110 messages in 22.003681ms for 186 messages / s
+EGRESS Size of packet data: [59544, 107864, 153784, 258104]
+Sent 89382 unsharded messages in 23.000083ms for 3886 messages / s
+Sent 1782965 sharded messages in 23.000083ms for 77520 messages / s
+Size of packet data: [3064, 7384, 24664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 4368 messages in 23.001594ms for 189 messages / s
+EGRESS Size of packet data: [59384, 106584, 153784, 258104]
+Sent 94886 unsharded messages in 24.000035ms for 3953 messages / s
+Sent 1893030 sharded messages in 24.000035ms for 78876 messages / s
+Size of packet data: [3064, 7064, 24184, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 4650 messages in 24.002626ms for 193 messages / s
+EGRESS Size of packet data: [59064, 105144, 146424, 258104]
+Sent 100200 unsharded messages in 25.000041ms for 4008 messages / s
+Sent 1999229 sharded messages in 25.000041ms for 79969 messages / s
+Size of packet data: [3064, 6904, 23864, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 4902 messages in 25.000436ms for 196 messages / s
+EGRESS Size of packet data: [59064, 104824, 146424, 258104]
+Sent 105671 unsharded messages in 26.000068ms for 4064 messages / s
+Sent 2108595 sharded messages in 26.000068ms for 81099 messages / s
+Size of packet data: [3064, 6744, 23384, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 5175 messages in 26.001094ms for 199 messages / s
+EGRESS Size of packet data: [58904, 104024, 145944, 258104]
+Sent 111030 unsharded messages in 27.000009ms for 4112 messages / s
+Sent 2215721 sharded messages in 27.000009ms for 82063 messages / s
+Size of packet data: [3064, 6584, 23064, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 5442 messages in 27.000159ms for 201 messages / s
+EGRESS Size of packet data: [58904, 103544, 145144, 258104]
+Sent 116462 unsharded messages in 28.000073ms for 4159 messages / s
+Sent 2324296 sharded messages in 28.000073ms for 83010 messages / s
+Size of packet data: [3064, 6584, 22744, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 5704 messages in 28.001624ms for 203 messages / s
+EGRESS Size of packet data: [58744, 103224, 143864, 258104]
+Sent 121703 unsharded messages in 29.000066ms for 4196 messages / s
+Sent 2429053 sharded messages in 29.000066ms for 83760 messages / s
+Size of packet data: [3064, 6424, 22424, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 5978 messages in 29.002533ms for 206 messages / s
+EGRESS Size of packet data: [58584, 102744, 142904, 258104]
+Sent 126937 unsharded messages in 30.000287ms for 4231 messages / s
+Sent 2533658 sharded messages in 30.000287ms for 84455 messages / s
+Size of packet data: [3064, 6264, 22104, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 6230 messages in 30.005909ms for 207 messages / s
+EGRESS Size of packet data: [58584, 102104, 142744, 258104]
+Sent 132131 unsharded messages in 31.000136ms for 4262 messages / s
+Sent 2637500 sharded messages in 31.000136ms for 85080 messages / s
+Size of packet data: [2904, 6264, 21784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 6479 messages in 31.000984ms for 209 messages / s
+EGRESS Size of packet data: [58584, 101784, 142744, 258104]
+Sent 137436 unsharded messages in 32.000055ms for 4294 messages / s
+Sent 2743587 sharded messages in 32.000055ms for 85737 messages / s
+Size of packet data: [2904, 6264, 21464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 6748 messages in 32.001941ms for 210 messages / s
+EGRESS Size of packet data: [58584, 101144, 141144, 258104]
+Sent 142701 unsharded messages in 33.000462ms for 4324 messages / s
+Sent 2848837 sharded messages in 33.000462ms for 86328 messages / s
+Size of packet data: [2904, 6104, 21144, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 7009 messages in 33.000361ms for 212 messages / s
+EGRESS Size of packet data: [58584, 100664, 139384, 258104]
+Sent 147172 unsharded messages in 34.000098ms for 4328 messages / s
+Sent 2938220 sharded messages in 34.000098ms for 86418 messages / s
+Size of packet data: [2904, 6104, 20984, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 7252 messages in 34.001744ms for 213 messages / s
+EGRESS Size of packet data: [58584, 101624, 139224, 258104]
+Sent 152415 unsharded messages in 35.000006ms for 4354 messages / s
+Sent 3043063 sharded messages in 35.000006ms for 86944 messages / s
+Size of packet data: [2904, 6104, 20664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 7534 messages in 35.000512ms for 215 messages / s
+EGRESS Size of packet data: [58424, 100664, 138584, 258104]
+Sent 157586 unsharded messages in 36.00011ms for 4377 messages / s
+Sent 3146322 sharded messages in 36.00011ms for 87397 messages / s
+Size of packet data: [2904, 6104, 20344, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 7803 messages in 36.001304ms for 216 messages / s
+EGRESS Size of packet data: [58264, 100504, 138584, 258104]
+Sent 162843 unsharded messages in 37.000042ms for 4401 messages / s
+Sent 3251430 sharded messages in 37.000042ms for 87876 messages / s
+Size of packet data: [2904, 5944, 20184, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 8077 messages in 37.001908ms for 218 messages / s
+EGRESS Size of packet data: [58104, 100024, 138104, 258104]
+Sent 167767 unsharded messages in 38.00019ms for 4414 messages / s
+Sent 3349752 sharded messages in 38.00019ms for 88151 messages / s
+Size of packet data: [2904, 5944, 19864, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 8344 messages in 38.001502ms for 219 messages / s
+EGRESS Size of packet data: [58104, 100024, 138104, 258104]
+Sent 172914 unsharded messages in 39.000109ms for 4433 messages / s
+Sent 3452534 sharded messages in 39.000109ms for 88526 messages / s
+Size of packet data: [2904, 5944, 19544, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 8618 messages in 39.001248ms for 220 messages / s
+EGRESS Size of packet data: [58104, 99864, 137944, 258104]
+Sent 178202 unsharded messages in 40.000301ms for 4455 messages / s
+Sent 3558276 sharded messages in 40.000301ms for 88956 messages / s
+Size of packet data: [2904, 5944, 19384, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 8911 messages in 40.002559ms for 222 messages / s
+EGRESS Size of packet data: [57944, 99064, 137304, 258104]
+Sent 183577 unsharded messages in 41.00039ms for 4477 messages / s
+Sent 3665757 sharded messages in 41.00039ms for 89408 messages / s
+Size of packet data: [2904, 5784, 19064, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 9197 messages in 41.001997ms for 224 messages / s
+EGRESS Size of packet data: [57624, 98584, 136984, 258104]
+Sent 188666 unsharded messages in 42.000037ms for 4492 messages / s
+Sent 3767453 sharded messages in 42.000037ms for 89701 messages / s
+Size of packet data: [2904, 5784, 18744, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 9468 messages in 42.00214ms for 225 messages / s
+EGRESS Size of packet data: [57624, 98424, 136984, 258104]
+Sent 193336 unsharded messages in 43.000593ms for 4496 messages / s
+Sent 3860793 sharded messages in 43.000593ms for 89785 messages / s
+Size of packet data: [2904, 5784, 18584, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 9711 messages in 43.003931ms for 225 messages / s
+EGRESS Size of packet data: [57784, 98584, 136984, 258104]
+Sent 198355 unsharded messages in 44.000053ms for 4508 messages / s
+Sent 3961073 sharded messages in 44.000053ms for 90024 messages / s
+Size of packet data: [2904, 5784, 18264, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 9980 messages in 44.0042ms for 226 messages / s
+EGRESS Size of packet data: [57784, 98424, 136984, 258104]
+Sent 203773 unsharded messages in 45.00009ms for 4528 messages / s
+Sent 4069403 sharded messages in 45.00009ms for 90431 messages / s
+Size of packet data: [2904, 5784, 17944, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 10266 messages in 45.002364ms for 228 messages / s
+EGRESS Size of packet data: [57624, 97944, 136504, 258104]
+Sent 209155 unsharded messages in 46.000341ms for 4546 messages / s
+Sent 4177004 sharded messages in 46.000341ms for 90804 messages / s
+Size of packet data: [2904, 5784, 17624, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 10536 messages in 46.003839ms for 229 messages / s
+EGRESS Size of packet data: [57624, 97784, 136184, 258104]
+Sent 214446 unsharded messages in 47.000711ms for 4562 messages / s
+Sent 4282823 sharded messages in 47.000711ms for 91123 messages / s
+Size of packet data: [2904, 5624, 17304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 10823 messages in 47.000225ms for 230 messages / s
+EGRESS Size of packet data: [57464, 97144, 135544, 258104]
+Sent 219466 unsharded messages in 48.000058ms for 4572 messages / s
+Sent 4383200 sharded messages in 48.000058ms for 91316 messages / s
+Size of packet data: [2904, 5624, 16984, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 11093 messages in 48.002151ms for 231 messages / s
+EGRESS Size of packet data: [57464, 96984, 135544, 258104]
+Sent 224304 unsharded messages in 49.000571ms for 4577 messages / s
+Sent 4479953 sharded messages in 49.000571ms for 91427 messages / s
+Size of packet data: [2904, 5624, 16664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 11361 messages in 49.000327ms for 231 messages / s
+EGRESS Size of packet data: [57304, 96824, 135544, 258104]
+Sent 229605 unsharded messages in 50.000508ms for 4592 messages / s
+Sent 4585930 sharded messages in 50.000508ms for 91718 messages / s
+Size of packet data: [2904, 5624, 16344, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 11653 messages in 50.001505ms for 233 messages / s
+EGRESS Size of packet data: [57304, 96344, 134744, 258104]
+Sent 234961 unsharded messages in 51.000567ms for 4607 messages / s
+Sent 4693020 sharded messages in 51.000567ms for 92020 messages / s
+Size of packet data: [2904, 5624, 15864, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 11947 messages in 51.002955ms for 234 messages / s
+EGRESS Size of packet data: [57144, 96184, 133944, 258104]
+Sent 240288 unsharded messages in 52.000033ms for 4620 messages / s
+Sent 4799521 sharded messages in 52.000033ms for 92298 messages / s
+Size of packet data: [2904, 5624, 15544, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 12222 messages in 52.002748ms for 235 messages / s
+EGRESS Size of packet data: [56984, 95864, 133944, 258104]
+Sent 245600 unsharded messages in 53.000019ms for 4633 messages / s
+Sent 4905674 sharded messages in 53.000019ms for 92559 messages / s
+Size of packet data: [2904, 5624, 15224, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 12506 messages in 53.001006ms for 235 messages / s
+EGRESS Size of packet data: [56984, 95704, 133624, 258104]
+Sent 250576 unsharded messages in 54.000008ms for 4640 messages / s
+Sent 5005192 sharded messages in 54.000008ms for 92688 messages / s
+Size of packet data: [2904, 5464, 14744, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 12770 messages in 54.002489ms for 236 messages / s
+EGRESS Size of packet data: [56984, 95704, 133624, 258104]
+Sent 255868 unsharded messages in 55.000232ms for 4652 messages / s
+Sent 5111019 sharded messages in 55.000232ms for 92927 messages / s
+EGRESS Sent 13052 messages in 55.001585ms for 237 messages / s
+Size of packet data: [2904, 5464, 14424, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Size of packet data: [56824, 95544, 133304, 258104]
+Sent 261030 unsharded messages in 56.000295ms for 4661 messages / s
+Sent 5214244 sharded messages in 56.000295ms for 93111 messages / s
+Size of packet data: [2904, 5464, 14104, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 13306 messages in 56.000097ms for 237 messages / s
+EGRESS Size of packet data: [56824, 95544, 133304, 258104]
+Sent 266255 unsharded messages in 57.00041ms for 4671 messages / s
+Sent 5318724 sharded messages in 57.00041ms for 93310 messages / s
+Size of packet data: [2904, 5464, 13624, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 13594 messages in 57.002706ms for 238 messages / s
+EGRESS Size of packet data: [56824, 95224, 133144, 258104]
+Sent 271396 unsharded messages in 58.000177ms for 4679 messages / s
+Sent 5421450 sharded messages in 58.000177ms for 93473 messages / s
+Size of packet data: [2904, 5464, 13304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 13842 messages in 58.001559ms for 238 messages / s
+EGRESS Size of packet data: [56824, 95224, 133304, 258104]
+Sent 276189 unsharded messages in 59.000489ms for 4681 messages / s
+Sent 5517280 sharded messages in 59.000489ms for 93513 messages / s
+Size of packet data: [2904, 5464, 12984, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 14081 messages in 59.000111ms for 238 messages / s
+EGRESS Size of packet data: [56824, 95384, 133144, 258104]
+Sent 281323 unsharded messages in 60.000034ms for 4688 messages / s
+Sent 5619873 sharded messages in 60.000034ms for 93664 messages / s
+Size of packet data: [2904, 5464, 12664, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 14346 messages in 60.001499ms for 239 messages / s
+EGRESS Size of packet data: [56824, 95384, 132984, 258104]
+Sent 286396 unsharded messages in 61.000065ms for 4695 messages / s
+Sent 5721314 sharded messages in 61.000065ms for 93792 messages / s
+Size of packet data: [2904, 5464, 12344, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 14609 messages in 61.001845ms for 239 messages / s
+EGRESS Size of packet data: [56984, 95384, 132664, 258104]
+Sent 291494 unsharded messages in 62.000161ms for 4701 messages / s
+Sent 5823207 sharded messages in 62.000161ms for 93922 messages / s
+Size of packet data: [2904, 5464, 11864, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 14887 messages in 62.003453ms for 240 messages / s
+EGRESS Size of packet data: [56824, 95064, 132344, 258104]
+Sent 296329 unsharded messages in 63.000054ms for 4703 messages / s
+Sent 5919847 sharded messages in 63.000054ms for 93965 messages / s
+Size of packet data: [2904, 5464, 11704, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 15129 messages in 63.00331ms for 240 messages / s
+EGRESS Size of packet data: [56984, 95384, 132984, 258104]
+Sent 301349 unsharded messages in 64.00005ms for 4708 messages / s
+Sent 6020102 sharded messages in 64.00005ms for 94064 messages / s
+Size of packet data: [2904, 5464, 11384, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 15396 messages in 64.000316ms for 240 messages / s
+EGRESS Size of packet data: [56984, 95384, 132664, 258104]
+Sent 306460 unsharded messages in 65.0003ms for 4714 messages / s
+Sent 6122290 sharded messages in 65.0003ms for 94189 messages / s
+Size of packet data: [2904, 5464, 11064, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 15664 messages in 65.000356ms for 240 messages / s
+EGRESS Size of packet data: [56984, 95064, 132024, 258104]
+Sent 311457 unsharded messages in 66.000091ms for 4719 messages / s
+Sent 6222225 sharded messages in 66.000091ms for 94276 messages / s
+Size of packet data: [2904, 5304, 10904, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 15940 messages in 66.001318ms for 241 messages / s
+EGRESS Size of packet data: [56984, 94904, 131544, 258104]
+Sent 316527 unsharded messages in 67.000078ms for 4724 messages / s
+Sent 6323603 sharded messages in 67.000078ms for 94382 messages / s
+Size of packet data: [2904, 5304, 10744, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 16214 messages in 67.001719ms for 242 messages / s
+EGRESS Size of packet data: [56984, 94744, 131064, 258104]
+Sent 321662 unsharded messages in 68.00009ms for 4730 messages / s
+Sent 6426275 sharded messages in 68.00009ms for 94504 messages / s
+Size of packet data: [2904, 5304, 10424, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 16484 messages in 68.002675ms for 242 messages / s
+EGRESS Size of packet data: [56824, 94744, 131064, 258104]
+Sent 326475 unsharded messages in 69.000031ms for 4731 messages / s
+Sent 6522508 sharded messages in 69.000031ms for 94529 messages / s
+Size of packet data: [2904, 5304, 10264, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 16744 messages in 69.001848ms for 242 messages / s
+EGRESS Size of packet data: [56824, 94744, 131064, 258104]
+Sent 329608 unsharded messages in 70.000157ms for 4708 messages / s
+Sent 6585161 sharded messages in 70.000157ms for 94073 messages / s
+Size of packet data: [2904, 5464, 10424, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 16899 messages in 70.002421ms for 241 messages / s
+EGRESS Size of packet data: [56984, 96184, 135544, 258104]
+Sent 334539 unsharded messages in 71.000601ms for 4711 messages / s
+Sent 6683769 sharded messages in 71.000601ms for 94137 messages / s
+Size of packet data: [2904, 5464, 10264, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 17145 messages in 71.000878ms for 241 messages / s
+EGRESS Size of packet data: [57144, 96184, 134744, 258104]
+Sent 339674 unsharded messages in 72.000943ms for 4717 messages / s
+Sent 6786311 sharded messages in 72.000943ms for 94254 messages / s
+Size of packet data: [2904, 5464, 10104, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 17411 messages in 72.002102ms for 241 messages / s
+EGRESS Size of packet data: [57144, 96184, 134744, 258104]
+Sent 344877 unsharded messages in 73.000521ms for 4724 messages / s
+Sent 6890342 sharded messages in 73.000521ms for 94388 messages / s
+Size of packet data: [2904, 5464, 9944, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 17696 messages in 73.002892ms for 242 messages / s
+EGRESS Size of packet data: [56984, 96024, 134424, 258104]
+Sent 350029 unsharded messages in 74.000047ms for 4730 messages / s
+Sent 6993342 sharded messages in 74.000047ms for 94504 messages / s
+Size of packet data: [2904, 5464, 9784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 17978 messages in 74.000704ms for 242 messages / s
+EGRESS Size of packet data: [56984, 95864, 133944, 258104]
+Sent 355286 unsharded messages in 75.000015ms for 4737 messages / s
+Sent 7098454 sharded messages in 75.000015ms for 94646 messages / s
+EGRESS Sent 18253 messages in 75.000752ms for 243 messages / s
+Size of packet data: [2904, 5304, 9784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Size of packet data: [56984, 95544, 133624, 258104]
+EGRESS Sent 18499 messages in 76.076547ms for 243 messages / s
+EGRESS Size of packet data: [56984, 95544, 133624, 258104]
+Sent 360228 unsharded messages in 76.097373ms for 4739 messages / s
+Sent 7197288 sharded messages in 76.097373ms for 94701 messages / s
+Size of packet data: [2904, 5304, 9624, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+Sent 364266 unsharded messages in 77.000042ms for 4730 messages / s
+Sent 7278041 sharded messages in 77.000042ms for 94520 messages / s
+Size of packet data: [2904, 5304, 9944, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 18712 messages in 77.005148ms for 243 messages / s
+EGRESS Size of packet data: [56824, 95704, 133944, 258104]
+Sent 369480 unsharded messages in 78.000025ms for 4736 messages / s
+Sent 7382311 sharded messages in 78.000025ms for 94645 messages / s
+Size of packet data: [2904, 5304, 9784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 18989 messages in 78.001509ms for 243 messages / s
+EGRESS Size of packet data: [56824, 95544, 133944, 258104]
+Sent 374798 unsharded messages in 79.000047ms for 4744 messages / s
+Sent 7488649 sharded messages in 79.000047ms for 94793 messages / s
+Size of packet data: [2904, 5304, 9784, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 19260 messages in 79.002786ms for 243 messages / s
+EGRESS Size of packet data: [56824, 95384, 133944, 258104]
+Sent 380109 unsharded messages in 80.000171ms for 4751 messages / s
+Sent 7594866 sharded messages in 80.000171ms for 94935 messages / s
+Size of packet data: [2904, 5304, 9624, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 19535 messages in 80.001998ms for 244 messages / s
+EGRESS Size of packet data: [56824, 95224, 133464, 258104]
+Sent 385317 unsharded messages in 81.000045ms for 4757 messages / s
+Sent 7699013 sharded messages in 81.000045ms for 95049 messages / s
+Size of packet data: [2904, 5304, 9464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 19809 messages in 81.002783ms for 244 messages / s
+EGRESS Size of packet data: [56824, 95064, 133304, 258104]
+Sent 390595 unsharded messages in 82.000327ms for 4763 messages / s
+Sent 7804552 sharded messages in 82.000327ms for 95177 messages / s
+Size of packet data: [2904, 5304, 9464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 20095 messages in 82.003194ms for 245 messages / s
+EGRESS Size of packet data: [56664, 94904, 133144, 258104]
+Sent 395884 unsharded messages in 83.000105ms for 4769 messages / s
+Sent 7910303 sharded messages in 83.000105ms for 95304 messages / s
+Size of packet data: [2904, 5304, 9304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 20380 messages in 83.004325ms for 245 messages / s
+EGRESS Size of packet data: [56664, 94744, 132984, 258104]
+Sent 401235 unsharded messages in 84.000154ms for 4776 messages / s
+Sent 8017304 sharded messages in 84.000154ms for 95444 messages / s
+Size of packet data: [2904, 5304, 9304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 20668 messages in 84.000699ms for 246 messages / s
+EGRESS Size of packet data: [56504, 94424, 132504, 258104]
+Sent 406169 unsharded messages in 85.000056ms for 4778 messages / s
+Sent 8115951 sharded messages in 85.000056ms for 95481 messages / s
+EGRESS Sent 20928 messages in 85.001091ms for 246 messages / s
+Size of packet data: [2904, 5304, 9144, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Size of packet data: [56504, 94584, 132344, 258104]
+Sent 409717 unsharded messages in 86.000061ms for 4764 messages / s
+Sent 8186899 sharded messages in 86.000061ms for 95196 messages / s
+Size of packet data: [2904, 5304, 9464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 21092 messages in 86.00275ms for 245 messages / s
+EGRESS Size of packet data: [56664, 94904, 133464, 258104]
+Sent 414769 unsharded messages in 87.000023ms for 4767 messages / s
+Sent 8287933 sharded messages in 87.000023ms for 95263 messages / s
+Size of packet data: [2904, 5304, 9464, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 21359 messages in 87.002053ms for 245 messages / s
+EGRESS Size of packet data: [56664, 94744, 133464, 258104]
+Sent 420028 unsharded messages in 88.000212ms for 4773 messages / s
+Sent 8393092 sharded messages in 88.000212ms for 95376 messages / s
+Size of packet data: [2904, 5304, 9304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 21633 messages in 88.000586ms for 245 messages / s
+EGRESS Size of packet data: [56504, 94584, 133464, 258104]
+Sent 425262 unsharded messages in 89.000052ms for 4778 messages / s
+Sent 8497753 sharded messages in 89.000052ms for 95480 messages / s
+Size of packet data: [2904, 5304, 9304, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 21908 messages in 89.003618ms for 246 messages / s
+EGRESS Size of packet data: [56504, 94424, 133304, 258104]
+Sent 430163 unsharded messages in 90.000069ms for 4779 messages / s
+Sent 8595771 sharded messages in 90.000069ms for 95508 messages / s
+Size of packet data: [2904, 5304, 9144, 101144]
+Num shards by author_id: [20, 20, 20, 20]
+EGRESS Sent 22172 messages in 90.006342ms for 246 messages / s
+EGRESS Size of packet data: [56504, 94424, 133144, 258104]
+BENCHMARK: generator completed
+BENCHMARK: generator completed
+
+(relative write time (ms since start), delay (us))
+[write	50	0	(us)
+write	95	0	(us)
+write	99	0	(us)
+write	100	0	(us)
+
+BENCHMARK: dropping handle...
+BENCHMARK: (controller.rs) 20 views...done
+BENCHMARK: (controller.rs) 0 views...done
+BENCHMARK: dropped handle

@@ -1,0 +1,349 @@
+BENCHMARK: start
+BENCHMARK: start generators
+BENCHMARK: wait for 1 generators
+EGRESS Sent 2 messages in 1.128522ms for 2 messages / s
+EGRESS Size of packet data: [664, 10000, 10000, 10000]
+Sent 158 unsharded messages in 1.272861ms for 158 messages / s
+Sent 1603 sharded messages in 1.272861ms for 1603 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [664, 1944, 2584, 22424]
+Num shards by author_id: [11, 17, 18, 20]
+Sent 6248 unsharded messages in 2.000012ms for 3124 messages / s
+Sent 99561 sharded messages in 2.000012ms for 49780 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 1304, 18584, 40344]
+Num shards by author_id: [16, 20, 20, 20]
+EGRESS Sent 330 messages in 2.000788ms for 165 messages / s
+EGRESS Size of packet data: [5624, 14744, 44504, 228984]
+Sent 16722 unsharded messages in 3.000053ms for 5574 messages / s
+Sent 266251 sharded messages in 3.000053ms for 88750 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 2584, 40344]
+Num shards by author_id: [16, 20, 20, 20]
+EGRESS Sent 852 messages in 3.002439ms for 284 messages / s
+EGRESS Size of packet data: [5624, 8984, 26424, 228984]
+Sent 27272 unsharded messages in 4.00005ms for 6818 messages / s
+Sent 433745 sharded messages in 4.00005ms for 108436 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1624, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 1371 messages in 4.000372ms for 342 messages / s
+EGRESS Size of packet data: [5464, 8184, 22744, 228984]
+EGRESS Sent 1887 messages in 5.000389ms for 377 messages / s
+EGRESS Size of packet data: [5464, 8024, 21624, 228984]
+Sent 37377 unsharded messages in 5.010164ms for 7475 messages / s
+Sent 593903 sharded messages in 5.010164ms for 118780 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1304, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+Sent 48236 unsharded messages in 6.000212ms for 8039 messages / s
+Sent 766795 sharded messages in 6.000212ms for 127799 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 824, 1144, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 2404 messages in 6.001561ms for 400 messages / s
+EGRESS Size of packet data: [5464, 7864, 16824, 228984]
+Sent 58887 unsharded messages in 7.000211ms for 8412 messages / s
+Sent 935613 sharded messages in 7.000211ms for 133659 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 1144, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 2923 messages in 7.000891ms for 417 messages / s
+EGRESS Size of packet data: [5464, 7704, 14744, 228984]
+Sent 69204 unsharded messages in 8.000037ms for 8650 messages / s
+Sent 1098888 sharded messages in 8.000037ms for 137361 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 1144, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 3450 messages in 8.000926ms for 431 messages / s
+EGRESS Size of packet data: [5464, 7544, 13144, 228984]
+Sent 80037 unsharded messages in 9.000025ms for 8893 messages / s
+Sent 1270881 sharded messages in 9.000025ms for 141209 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 3980 messages in 9.001451ms for 442 messages / s
+EGRESS Size of packet data: [5464, 7544, 13144, 228984]
+Sent 90667 unsharded messages in 10.000059ms for 9066 messages / s
+Sent 1439284 sharded messages in 10.000059ms for 143928 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 4512 messages in 10.001935ms for 451 messages / s
+EGRESS Size of packet data: [5464, 7544, 12664, 228984]
+EGRESS Sent 5042 messages in 11.001028ms for 458 messages / s
+EGRESS Size of packet data: [5464, 7384, 12504, 228984]
+Sent 100805 unsharded messages in 11.025322ms for 9164 messages / s
+Sent 1600280 sharded messages in 11.025322ms for 145480 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+Sent 111679 unsharded messages in 12.000007ms for 9306 messages / s
+Sent 1773152 sharded messages in 12.000007ms for 147762 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 5567 messages in 12.001079ms for 463 messages / s
+EGRESS Size of packet data: [5464, 7384, 12184, 228984]
+Sent 122306 unsharded messages in 13.000031ms for 9408 messages / s
+Sent 1942051 sharded messages in 13.000031ms for 149388 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 6091 messages in 13.000012ms for 468 messages / s
+EGRESS Size of packet data: [5464, 7384, 11704, 228984]
+Sent 132755 unsharded messages in 14.000126ms for 9482 messages / s
+Sent 2107744 sharded messages in 14.000126ms for 150553 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 6616 messages in 14.001301ms for 472 messages / s
+EGRESS Size of packet data: [5464, 7384, 11544, 228984]
+Sent 143500 unsharded messages in 15.000077ms for 9566 messages / s
+Sent 2278600 sharded messages in 15.000077ms for 151906 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 7138 messages in 15.001247ms for 475 messages / s
+EGRESS Size of packet data: [5464, 7384, 11224, 228984]
+Sent 154128 unsharded messages in 16.000369ms for 9633 messages / s
+Sent 2447747 sharded messages in 16.000369ms for 152984 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 7672 messages in 16.000614ms for 479 messages / s
+EGRESS Size of packet data: [5464, 7384, 10744, 228984]
+EGRESS Sent 8195 messages in 17.000959ms for 482 messages / s
+EGRESS Size of packet data: [5464, 7384, 10584, 228984]
+Sent 164185 unsharded messages in 17.00936ms for 9657 messages / s
+Sent 2608082 sharded messages in 17.00936ms for 153416 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+Sent 175139 unsharded messages in 18.000012ms for 9729 messages / s
+Sent 2782574 sharded messages in 18.000012ms for 154587 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 8715 messages in 18.000938ms for 484 messages / s
+EGRESS Size of packet data: [5464, 7384, 10424, 228984]
+Sent 185746 unsharded messages in 19.000023ms for 9776 messages / s
+Sent 2951220 sharded messages in 19.000023ms for 155327 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 9244 messages in 19.001975ms for 486 messages / s
+EGRESS Size of packet data: [5464, 7384, 10264, 228984]
+Sent 196182 unsharded messages in 20.000021ms for 9809 messages / s
+Sent 3116689 sharded messages in 20.000021ms for 155834 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 9767 messages in 20.00057ms for 488 messages / s
+EGRESS Size of packet data: [5464, 7384, 10000, 228984]
+Sent 206849 unsharded messages in 21.000043ms for 9849 messages / s
+Sent 3286796 sharded messages in 21.000043ms for 156514 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 10300 messages in 21.00044ms for 490 messages / s
+EGRESS Size of packet data: [5464, 7384, 9944, 228984]
+Sent 217435 unsharded messages in 22.000017ms for 9883 messages / s
+Sent 3455437 sharded messages in 22.000017ms for 157065 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 10834 messages in 22.001786ms for 492 messages / s
+EGRESS Size of packet data: [5464, 7384, 9624, 228984]
+EGRESS Sent 11342 messages in 23.000249ms for 493 messages / s
+EGRESS Size of packet data: [5464, 7384, 9624, 228984]
+Sent 227522 unsharded messages in 23.015925ms for 9892 messages / s
+Sent 3616147 sharded messages in 23.015925ms for 157223 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+Sent 238529 unsharded messages in 24.000335ms for 9938 messages / s
+Sent 3790785 sharded messages in 24.000335ms for 157949 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 11859 messages in 24.000824ms for 494 messages / s
+EGRESS Size of packet data: [5464, 7384, 9624, 228984]
+Sent 249139 unsharded messages in 25.000415ms for 9965 messages / s
+Sent 3959715 sharded messages in 25.000415ms for 158388 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 12387 messages in 25.000631ms for 495 messages / s
+EGRESS Size of packet data: [5464, 7384, 9464, 228984]
+Sent 259280 unsharded messages in 26.004461ms for 9972 messages / s
+Sent 4120591 sharded messages in 26.004461ms for 158484 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 12908 messages in 26.00021ms for 496 messages / s
+EGRESS Size of packet data: [5464, 7384, 9304, 228984]
+Sent 270289 unsharded messages in 27.00045ms for 10010 messages / s
+Sent 4295448 sharded messages in 27.00045ms for 159090 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 13438 messages in 27.000611ms for 497 messages / s
+EGRESS Size of packet data: [5464, 7384, 9304, 228984]
+Sent 280897 unsharded messages in 28.000038ms for 10032 messages / s
+Sent 4464143 sharded messages in 28.000038ms for 159433 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 13971 messages in 28.000056ms for 498 messages / s
+EGRESS Size of packet data: [5464, 7384, 9144, 228984]
+EGRESS Sent 14500 messages in 29.000082ms for 500 messages / s
+EGRESS Size of packet data: [5464, 7384, 9144, 228984]
+Sent 291012 unsharded messages in 29.012591ms for 10034 messages / s
+Sent 4624788 sharded messages in 29.012591ms for 159475 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+Sent 302018 unsharded messages in 30.000109ms for 10067 messages / s
+Sent 4799310 sharded messages in 30.000109ms for 159977 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 15024 messages in 30.001387ms for 500 messages / s
+EGRESS Size of packet data: [5464, 7384, 9144, 228984]
+Sent 312647 unsharded messages in 31.000096ms for 10085 messages / s
+Sent 4968372 sharded messages in 31.000096ms for 160270 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 15552 messages in 31.001476ms for 501 messages / s
+EGRESS Size of packet data: [5464, 7384, 8984, 228984]
+Sent 323095 unsharded messages in 32.000019ms for 10096 messages / s
+Sent 5134758 sharded messages in 32.000019ms for 160461 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 16072 messages in 32.000703ms for 502 messages / s
+EGRESS Size of packet data: [5464, 7384, 8984, 228984]
+Sent 333809 unsharded messages in 33.000017ms for 10115 messages / s
+Sent 5305351 sharded messages in 33.000017ms for 160768 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 16587 messages in 33.001101ms for 502 messages / s
+EGRESS Size of packet data: [5464, 7384, 8984, 228984]
+Sent 344417 unsharded messages in 34.00004ms for 10129 messages / s
+Sent 5473519 sharded messages in 34.00004ms for 160985 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 17118 messages in 34.001163ms for 503 messages / s
+EGRESS Size of packet data: [5464, 7224, 8984, 228984]
+Sent 354537 unsharded messages in 35.004746ms for 10129 messages / s
+Sent 5634230 sharded messages in 35.004746ms for 160978 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 17658 messages in 35.00082ms for 504 messages / s
+EGRESS Size of packet data: [5464, 7224, 8824, 228984]
+Sent 365534 unsharded messages in 36.000018ms for 10153 messages / s
+Sent 5808925 sharded messages in 36.000018ms for 161359 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 18191 messages in 36.000096ms for 505 messages / s
+EGRESS Size of packet data: [5464, 7224, 8824, 228984]
+Sent 376153 unsharded messages in 37.00002ms for 10166 messages / s
+Sent 5978022 sharded messages in 37.00002ms for 161568 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 18717 messages in 37.001374ms for 505 messages / s
+EGRESS Size of packet data: [5464, 7224, 8824, 228984]
+Sent 386337 unsharded messages in 38.000074ms for 10166 messages / s
+Sent 6139147 sharded messages in 38.000074ms for 161556 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 19237 messages in 38.000702ms for 506 messages / s
+EGRESS Size of packet data: [5464, 7224, 8824, 228984]
+Sent 397234 unsharded messages in 39.000022ms for 10185 messages / s
+Sent 6313011 sharded messages in 39.000022ms for 161872 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 19751 messages in 39.000222ms for 506 messages / s
+EGRESS Size of packet data: [5464, 7384, 8824, 228984]
+Sent 407860 unsharded messages in 40.000147ms for 10196 messages / s
+Sent 6481980 sharded messages in 40.000147ms for 162049 messages / s
+Size of packet id: [152, 152, 152, 152]
+Size of packet data: [344, 664, 984, 40344]
+Num shards by author_id: [16, 19, 20, 20]
+EGRESS Sent 20290 messages in 40.000161ms for 507 messages / s
+EGRESS Size of packet data: [5464, 7384, 8824, 228984]
+BENCHMARK: generator completed
+
+(relative write time (ms since start), delay (us))
+[[1,3450],[51,2161],[101,3507],[151,1659],[201,3972],[251,2230],[301,4868],[351,4050],[401,3896],[452,2178],[502,3168],[552,3241],[602,4296],[652,3713],[702,3271],[752,4353],[802,6547],[852,3019],[902,3216],[952,3243],[1002,2192],[1052,3346],[1102,140644],[1243,19048],[1293,2202],[1343,2286],[1393,3461],[1443,2662],[1493,2675],[1543,2843],[1593,2265],[1643,2195],[1693,5483],[1743,3302],[1793,2496],[1843,2663],[1893,2908],[1944,3933],[1994,1905],[2044,2054],[2094,2197],[2144,3171],[2194,2144],[2244,2230],[2294,2499],[2344,3534],[2394,4648],[2444,2881],[2494,2908],[2544,2040],[2594,2244],[2644,4439],[2694,3501],[2744,2777],[2794,2878],[2844,3853],[2894,1910],[2944,4193],[2994,1160],[3045,2128],[3095,2432],[3145,2220],[3195,3187],[3245,2351],[3295,3465],[3345,3620],[3395,3843],[3445,3111],[3495,2911],[3545,2954],[3595,3842],[3645,3013],[3695,6572],[3745,2276],[3796,6332],[3846,1450],[3896,2533],[3946,2747],[3996,1841],[4046,3896],[4096,28480],[4146,9611],[4196,3239],[4246,3258],[4296,2400],[4346,2539],[4396,2742],[4446,3013],[4496,4052],[4546,3176],[4596,3240],[4646,2261],[4696,4149],[4746,3459],[4796,3564],[4846,3618],[4896,1703],[4946,2982],[4996,2952],[5046,3276],[5096,5451],[5146,2425],[5196,2436],[5247,2531],[5297,2041],[5347,1205],[5397,2242],[5447,3394],[5497,3451],[5547,2963],[5597,2813],[5647,2641],[5697,3361],[5747,3442],[5797,2703],[5847,5099],[5897,1873],[5947,2141],[5997,2120],[6047,3132],[6097,3158],[6147,2484],[6197,3664],[6247,1830],[6297,8106],[6347,2820],[6397,3920],[6447,3272],[6497,2202],[6548,2241],[6598,3406],[6648,2662],[6698,3868],[6748,2767],[6798,2819],[6848,3096],[6898,3040],[6948,3190],[6998,1377],[7048,4177],[7098,87554],[7185,18554],[7235,2734],[7285,3325],[7335,4136],[7385,3162],[7436,3173],[7486,3191],[7536,2267],[7586,3513],[7636,9538],[7686,3691],[7736,1781],[7786,2944],[7836,6185],[7886,2265],[7936,3238],[7986,2661],[8036,2522],[8086,5979],[8136,3739],[8186,5890],[8236,3238],[8286,2287],[8336,2341],[8386,1149],[8437,2241],[8487,3383],[8537,2603],[8587,2708],[8637,2719],[8687,3800],[8737,1913],[8787,2497],[8837,2192],[8887,2278],[8937,2374],[8987,2536],[9037,3727],[9087,2865],[9137,2855],[9187,2886],[9237,3866],[9287,2148],[9337,3251],[9387,3230],[9438,1231],[9488,2430],[9538,2241],[9588,2344],[9638,2594],[9688,2685],[9738,2817],[9788,3072],[9838,3244],[9888,3268],[9938,3851],[9988,2381],[10038,2401],[10088,40358],[10138,2971],[10188,3072],[10238,3188],[10288,1224],[10339,3376],[10389,3220],[10439,6414],[10489,2168],[10539,2817],[10589,2377],[10639,3588],[10689,3518],[10739,2676],[10789,2897],[10839,3056],[10889,2181],[10939,3306],[10989,3220],[11039,3574],[11089,2656],[11139,9130],[11189,2017],[11239,2109],[11290,2464],[11340,3586],[11390,2632],[11440,3822],[11490,5410],[11540,3611],[11590,3673],[11640,2647],[11690,1809],[11740,2919],[11790,2102],[11840,2199],[11890,3190],[11940,4799],[11991,3499],[12041,3855],[12091,3877],[12141,3074],[12191,3290],[12241,2450],[12291,4705],[12341,2613],[12391,3693],[12441,4568],[12491,2764],[12541,4464],[12591,2416],[12641,2193],[12691,3236],[12741,2237],[12791,2405],[12841,2479],[12891,3679],[12941,7539],[12991,4118],[13041,2157],[13091,90802],[13182,16587],[13232,2910],[13282,3041],[13332,3102],[13382,2346],[13432,3340],[13482,3420],[13532,2640],[13582,3956],[13632,1885],[13682,3900],[13733,2936],[13783,4230],[13833,9105],[13883,1991],[13933,5641],[13983,1197],[14033,2475],[14083,2747],[14133,2673],[14183,4026],[14233,3949],[14283,3069],[14333,3269],[14383,3326],[14433,2795],[14483,3660],[14533,3862],[14583,3804],[14633,2775],[14683,3929],[14734,3912],[14784,2903],[14834,2040],[14884,3210],[14934,2206],[14984,1151],[15034,3450],[15084,3509],[15134,3698],[15184,2849],[15234,3003],[15284,4077],[15334,2147],[15384,3167],[15434,2404],[15484,5682],[15534,4383],[15584,4468],[15634,2925],[15684,3047],[15734,2720],[15784,3492],[15834,3550],[15884,2714],[15934,3764],[15984,2888],[16034,3004],[16084,83536],[16168,9851],[16218,2810],[16268,2920],[16318,7196],[16368,3024],[16418,3846],[16468,3234],[16518,2203],[16568,3414],[16618,2619],[16668,7071],[16718,3718],[16768,3066],[16818,3775],[16868,3247],[16919,3248],[16969,3346],[17019,3555],[17069,3660],[17119,3688],[17169,9696],[17219,2974],[17269,3398],[17319,2091],[17369,3410],[17419,2291],[17469,2760],[17519,3777],[17569,12583],[17619,3038],[17670,2728],[17720,3859],[17770,2054],[17820,3026],[17870,3369],[17920,3283],[17970,3374],[18020,2546],[18070,8784],[18120,2742],[18170,2742],[18220,2842],[18270,2183],[18320,2277],[18370,5302],[18420,4170],[18470,1759],[18520,5332],[18570,4884],[18620,5289],[18670,3252],[18720,2501],[18770,2617],[18820,3639],[18870,3207],[18920,2912],[18970,3224],[19020,8493],[19070,122680],[19193,15981],[19243,2611],[19293,3554],[19343,3615],[19393,3637],[19443,2506],[19494,3885],[19544,2792],[19594,3834],[19644,3912],[19694,3066],[19744,3913],[19794,4200],[19845,3955],[19895,3142],[19945,2263],[19995,2547],[20045,4022],[20095,2693],[20145,3873],[20195,2852],[20245,2864],[20295,3967],[20345,2129],[20395,3173],[20445,3204],[20495,2198],[20545,3189],[20595,2331],[20645,3231],[20695,1665],[20745,3199],[20796,3843],[20846,2915],[20896,3017],[20946,3112],[20996,3194],[21046,2221],[21096,2474],[21146,2534],[21196,2480],[21246,3412],[21296,2828],[21346,1689],[21396,2042],[21446,2309],[21496,3481],[21546,2600],[21596,2764],[21646,3691],[21696,9072],[21746,1986],[21796,2997],[21846,3310],[21896,3280],[21946,2422],[21996,2558],[22046,3558],[22096,35379],[22146,2571],[22196,2528],[22246,2645],[22296,2948],[22346,1956],[22396,3230],[22446,5473],[22497,2262],[22547,3463],[22597,2926],[22647,2643],[22697,3931],[22747,5098],[22797,2070],[22847,2181],[22897,3228],[22947,2447],[22997,2602],[23047,3755],[23097,3722],[23147,3688],[23197,8018],[23247,3082],[23297,3130],[23347,3187],[23397,2389],[23447,3478],[23497,3728],[23547,3663],[23597,7870],[23647,2963],[23697,2126],[23747,3469],[23797,2668],[23847,2872],[23898,4096],[23948,3852],[23998,3015],[24048,2158],[24098,3357],[24148,2569],[24198,2651],[24248,2749],[24298,4239],[24348,2043],[24398,2223],[24448,3180],[24498,2262],[24548,2367],[24598,4128],[24648,2722],[24698,3999],[24748,2002],[24798,2185],[24848,3323],[24898,2507],[24948,3906],[24998,2636],[25048,2759],[25098,110636],[25209,12659],[25259,3663],[25309,3783],[25359,2827],[25409,2973],[25459,3122],[25509,2767],[25559,2456],[25609,3731],[25659,3713],[25709,2698],[25759,1845],[25809,2646],[25859,2144],[25909,3547],[25959,3662],[26009,1991],[26059,2069],[26109,2344],[26159,3366],[26209,3449],[26260,3826],[26310,2732],[26360,2651],[26410,3547],[26460,2528],[26510,3535],[26560,11666],[26610,2839],[26660,3038],[26710,2262],[26760,3184],[26810,4999],[26860,3887],[26911,2639],[26961,2976],[27011,2831],[27061,2948],[27111,3036],[27161,4674],[27211,3428],[27261,2425],[27311,2479],[27361,4703],[27411,7594],[27461,7118],[27511,3005],[27561,4260],[27611,2207],[27661,2300],[27711,3229],[27761,5274],[27811,10469],[27861,4570],[27912,2751],[27962,1928],[28012,3220],[28062,104947],[28167,9182],[28217,3233],[28267,5108],[28317,5056],[28367,3639],[28417,3545],[28467,3598],[28517,2777],[28567,2904],[28617,3039],[28667,2142],[28717,2213],[28767,2417],[28817,3708],[28867,4589],[28917,2984],[28967,3273],[29017,3154],[29067,4496],[29117,3358],[29167,3632],[29218,2638],[29268,7548],[29318,1766],[29368,3084],[29418,3002],[29468,3789],[29518,2211],[29568,3416],[29618,3516],[29668,2837],[29718,4044],[29768,1798],[29818,1997],[29868,3263],[29918,2235],[29968,3267],[30018,2372],[30068,3930],[30118,3668],[30168,1790],[30218,2978],[30268,3220],[30318,3438],[30368,2571],[30418,3790],[30468,2673],[30518,1763],[30568,2937],[30618,2044]]
+write	50	3087	(us)
+write	95	7871	(us)
+write	99	83543	(us)
+write	100	140647	(us)
+
+BENCHMARK: dropping handle...
+BENCHMARK: (controller.rs) 20 views...done
+BENCHMARK: (controller.rs) 0 views...done
+D0.15: incoming socket closed, no more clients will arrive
+D0.5: incoming socket closed, no more clients will arrive
+D2.4: incoming socket closed, no more clients will arrive
+D0.13: incoming socket closed, no more clients will arrive
+D0.6: incoming socket closed, no more clients will arrive
+D0.12: incoming socket closed, no more clients will arrive
+D0.16: incoming socket closed, no more clients will arrive
+D0.1: incoming socket closed, no more clients will arrive
+D0.19: incoming socket closed, no more clients will arrive
+D2.0: incoming socket closed, no more clients will arrive
+D2.3: incoming socket closed, no more clients will arrive
+D0.2: incoming socket closed, no more clients will arrive
+D0.0: incoming socket closed, no more clients will arrive
+D2.19: incoming socket closed, no more clients will arrive
+D0.11: incoming socket closed, no more clients will arrive
+D2.13: incoming socket closed, no more clients will arrive
+D0.9: incoming socket closed, no more clients will arrive
+D0.14: incoming socket closed, no more clients will arrive
+D0.17: incoming socket closed, no more clients will arrive
+D2.2: incoming socket closed, no more clients will arrive
+D0.8: incoming socket closed, no more clients will arrive
+D2.11: incoming socket closed, no more clients will arrive
+D2.17: incoming socket closed, no more clients will arrive
+D0.10: incoming socket closed, no more clients will arrive
+D2.8: incoming socket closed, no more clients will arrive
+D2.7: incoming socket closed, no more clients will arrive
+D2.14: incoming socket closed, no more clients will arrive
+D0.18: incoming socket closed, no more clients will arrive
+D0.3: incoming socket closed, no more clients will arrive
+D2.1: incoming socket closed, no more clients will arrive
+D0.4: incoming socket closed, no more clients will arrive
+D0.7: incoming socket closed, no more clients will arrive
+D2.12: incoming socket closed, no more clients will arrive
+D2.16: incoming socket closed, no more clients will arrive
+D2.18: incoming socket closed, no more clients will arrive
+D1.0: incoming socket closed, no more clients will arrive
+D2.5: incoming socket closed, no more clients will arrive
+D2.9: incoming socket closed, no more clients will arrive
+D2.15: incoming socket closed, no more clients will arrive
+BENCHMARK: dropped handle
+D2.10: incoming socket closed, no more clients will arrive
+D2.6: incoming socket closed, no more clients will arrive
+BENCHMARK: shut down runtime
+# generated ops/s: 700261.94
+# actual ops/s: 700249.25
+# op	pct	sojourn	remote
+write	50	2559	1935	(all µs)
+read	50	1047	423	(all µs)
+write	95	8175	7655	(all µs)
+read	95	5151	4607	(all µs)
+write	99	13143	12615	(all µs)
+read	99	9095	8567	(all µs)
+write	100	26823	25815	(all µs)
+read	100	17095	16087	(all µs)
