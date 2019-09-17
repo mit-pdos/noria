@@ -444,7 +444,7 @@ where
 
                         assert_eq!(num_reads + 1, read_count);
                         assert_eq!(num_writes, read_count);
-                        // println!("Read {}th vote at {:?}", read_count, done);
+                        println!("Read {}th vote at {:?}", read_count, done);
                         r_reserved_time.push(done);
 
                         /*
@@ -579,7 +579,7 @@ where
                     queued_w_keys[0] = RESERVED_W_KEY;
                 }
 
-                // println!("Wrote {}th vote at {:?}", num_writes + 1, now);
+                println!("Wrote {}th vote at {:?}", num_writes + 1, now);
                 *next_reserved_w = now + *WRITE_RESERVED_EVERY_US;
             } else if num_writes > num_reads {
                 // if the previous write has not been read, queue a read
