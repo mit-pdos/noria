@@ -734,6 +734,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures-executor-preview"
+version = "0.3.0-alpha.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "futures-core-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-util-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num_cpus 1.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "futures-sink-preview"
 version = "0.3.0-alpha.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1620,6 +1630,7 @@ dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-executor-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-sink-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "hostname 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3801,6 +3812,7 @@ dependencies = [
 "checksum futures-channel-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)" = "f477fd0292c4a4ae77044454e7f2b413207942ad405f759bb0b4698b7ace5b12"
 "checksum futures-core-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)" = "4a2f26f774b81b3847dcda0c81bd4b6313acfb4f69e5a0390c7cb12c058953e9"
 "checksum futures-cpupool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "ab90cde24b3319636588d0c35fe03b1333857621051837ed769faefb4c2162e4"
+"checksum futures-executor-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)" = "80705612926df8a1bc05f0057e77460e29318801f988bf7d803a734cf54e7528"
 "checksum futures-sink-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)" = "e9b65a2481863d1b78e094a07e9c0eed458cc7dc6e72b22b7138b8a67d924859"
 "checksum futures-state-stream 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2776ce933858e98061287622bf43051a7122ce7aa9ac02459ff2d4b9957e2191"
 "checksum futures-util-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)" = "7df53daff1e98cc024bf2720f3ceb0414d96fbb0a94f3cad3a5c3bf3be1d261c"
