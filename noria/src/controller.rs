@@ -176,19 +176,24 @@ where
     views: Arc<Mutex<HashMap<(SocketAddr, usize), ViewRpc>>>,
 }
 
-impl<A> Drop for ControllerHandle<A>
-where
-    A: 'static + Authority,
-{
-    fn drop(&mut self) {
-        let views = self.views.clone();
-        print!("BENCHMARK: (controller.rs) {} views...", views.lock().unwrap().len());
-        for (_, rpc) in views.lock().unwrap().drain() {
-            drop(rpc);
-        }
-        println!("done");
-    }
-}
+// impl<A> Drop for ControllerHandle<A>
+// where
+//     A: 'static + Authority,
+// {
+//     fn drop(&mut self) {
+//         let views = self.views.clone();
+//         print!("BENCHMARK: (controller.rs) {} views...", views.lock().unwrap().len());
+//         for (_, rpc) in views.lock().unwrap().drain() {
+//             drop(rpc);
+//         }
+//         let domains = self.domains.clone();
+//         for (_, rpc) in domains.lock().unwrap().drain() {
+//             drop(rpc);
+//         }
+//         drop(&self.handle);
+//         println!("done");
+//     }
+// }
 
 impl<A> Clone for ControllerHandle<A>
 where
