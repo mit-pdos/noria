@@ -1,5 +1,3 @@
-#![feature(duration_float)]
-
 mod parameters;
 mod populate;
 
@@ -8,7 +6,7 @@ extern crate clap;
 
 use crate::parameters::SampleKeys;
 use noria::{Builder, LocalAuthority, SyncHandle};
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Barrier};
 use std::thread::JoinHandle;
@@ -39,7 +37,7 @@ fn get_queries(recipe_location: &str, random: bool) -> Vec<String> {
 
     if random {
         let mut rng = rand::thread_rng();
-        queries.shuffle(&mut rng);
+        queries.as_mut_slice().shuffle(&mut rng);
     }
 
     queries

@@ -143,6 +143,11 @@ impl Ingredient for Union {
         }
     }
 
+    fn probe(&self) -> HashMap<String, String> {
+        let mut hm = HashMap::new();
+        hm.insert("captured".into(), format!("{}", self.replay_pieces.len()));
+        hm
+    }
     fn on_connected(&mut self, g: &Graph) {
         if let Emit::Project {
             ref mut cols,
@@ -190,7 +195,7 @@ impl Ingredient for Union {
 
     fn on_input(
         &mut self,
-        _: &mut Executor,
+        _: &mut dyn Executor,
         from: LocalNodeIndex,
         rs: Records,
         _: &mut Tracer,
@@ -231,7 +236,7 @@ impl Ingredient for Union {
 
     fn on_input_raw(
         &mut self,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
         from: LocalNodeIndex,
         rs: Records,
         tracer: &mut Tracer,
@@ -291,13 +296,15 @@ impl Ingredient for Union {
                     }
                 }
 
-                if self.replay_key.is_none() || self.replay_pieces.is_empty() {
+                let replay_key = self.replay_key.as_ref().and_then(|rks| rks.get(&from));
+                if replay_key.is_none() || self.replay_pieces.is_empty() {
                     // no replay going on, so we're done.
                     return RawProcessingResult::Regular(
                         self.on_input(ex, from, rs, tracer, None, n, s),
                     );
                 }
 
+                let k = replay_key.unwrap();
                 // partial replays are flowing through us, and at least one piece is being waited
                 // for. we need to keep track of any records that succeed a replay piece (and thus
                 // aren't included in it) before the other pieces come in. note that it's perfectly
@@ -305,7 +312,6 @@ impl Ingredient for Union {
                 // in the downstream node. in fact, we *must* forward them, becuase there may be
                 // *other* nodes downstream that do *not* have holes for the key in question.
                 for r in &rs {
-                    let k = &self.replay_key.as_ref().unwrap()[&from];
                     // XXX: the clone + collect here is really sad
                     if let Some(ref mut pieces) = self
                         .replay_pieces
@@ -453,14 +459,13 @@ impl Ingredient for Union {
             ReplayContext::Partial {
                 ref key_cols,
                 ref keys,
+                unishard,
             } => {
                 // FIXME: with multi-partial indices, we may now need to track *multiple* ongoing
                 // replays!
 
-                // TODO: which node is key_col an index of?
-                if let Emit::AllFrom(_, Sharding::ByColumn(shard_col, _)) = self.emit {
-                    assert_eq!(key_cols.len(), 1);
-                    if shard_col == key_cols[0] {
+                if let Emit::AllFrom(_, _) = self.emit {
+                    if unishard {
                         // No need to buffer since request should only be for one shard
                         assert!(self.replay_pieces.is_empty());
                         return RawProcessingResult::ReplayPiece {

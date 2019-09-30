@@ -84,6 +84,7 @@ crate enum ReplayContext {
     Partial {
         key_cols: Vec<usize>,
         keys: HashSet<Vec<DataType>>,
+        unishard: bool,
     },
     Full {
         last: bool,
@@ -147,6 +148,16 @@ where
     ///    ⋃    |  Union
     fn description(&self, detailed: bool) -> String;
 
+    /// Provide measurements of transient internal state that may be useful in debugging contexts.
+    ///
+    /// For example, a union might use this to report if it has captured any replays that it has
+    /// not yet released.
+    ///
+    /// The default implementation returns `null`.
+    fn probe(&self) -> HashMap<String, String> {
+        Default::default()
+    }
+
     /// Called when a node is first connected to the graph.
     ///
     /// All its ancestors are present, but this node and its children may not have been connected
@@ -163,7 +174,7 @@ where
     #[allow(clippy::too_many_arguments)]
     fn on_input(
         &mut self,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -175,7 +186,7 @@ where
     #[allow(clippy::too_many_arguments)]
     fn on_input_raw(
         &mut self,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         from: LocalNodeIndex,
         data: Records,
         tracer: &mut Tracer,
@@ -216,7 +227,7 @@ where
         _key: &KeyType,
         _nodes: &DomainNodes,
         _states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+    ) -> Option<Option<Box<dyn Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         None
     }
 
@@ -235,7 +246,7 @@ where
         key: &KeyType,
         nodes: &DomainNodes,
         states: &'a StateMap,
-    ) -> Option<Option<Box<Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
+    ) -> Option<Option<Box<dyn Iterator<Item = Cow<'a, [DataType]>> + 'a>>> {
         states
             .get(parent)
             .and_then(move |state| match state.lookup(columns, key) {

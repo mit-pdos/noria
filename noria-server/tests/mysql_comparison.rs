@@ -17,7 +17,6 @@ use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
-use std::slice::SliceConcatExt;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -311,7 +310,9 @@ fn check_query(
                     .map(|v| match v {
                         DataType::None => "NULL".to_owned(),
                         DataType::Int(i) => i.to_string(),
+                        DataType::UnsignedInt(i) => i.to_string(),
                         DataType::BigInt(i) => i.to_string(),
+                        DataType::UnsignedBigInt(i) => i.to_string(),
                         DataType::Real(i, f) => ((i as f64) + (f as f64) * 1.0e-9).to_string(),
                         DataType::Text(_) | DataType::TinyText(_) => v.into(),
                         DataType::Timestamp(_) => unimplemented!(),
@@ -409,7 +410,7 @@ fn mysql_comparison() {
             let result = panic::catch_unwind(|| {
                 check_query(&schema.tables, query_name, query, &target_data[query_name])
             });
-            panic::take_hook();
+            let _ = panic::take_hook();
             match result {
                 Ok(Ok(())) => println!("\x1B[32;1mPASS\x1B[m"),
                 Ok(Err(e)) => {

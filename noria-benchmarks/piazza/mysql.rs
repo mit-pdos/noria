@@ -1,10 +1,58 @@
-use clap::value_t_or_exit;
-use hdrhistogram::Histogram;
-use rand::seq::SliceRandom;
-use rand::Rng;
-use slog::{crit, debug, error, info, o, trace, warn, Logger};
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
+#![feature(type_ascription)]
+
+#[macro_use]
+extern crate clap;
+extern crate noria;
+#[macro_use]
+extern crate mysql;
+extern crate rand;
+
+use mysql as my;
+use noria::DataType;
+use std::time;
+
+#[macro_use]
+mod populate;
+use populate::Populate;
+
+struct Backend {
+    pool: mysql::Pool,
+}
+
+impl Backend {
+    fn new(addr: &str) -> Backend {
+        Backend {
+            pool: my::Pool::new_manual(1, 1, addr).unwrap(),
+        }
+    }
+
+    pub fn read(&self, uid: i32) {
+        let qstring = format!(
+            "SELECT p_author, COUNT(p_id) FROM Post WHERE p_author={} GROUP BY p_author",
+            uid
+        );
+        self.pool.prep_exec(qstring, ()).unwrap();
+    }
+
+    pub fn secure_read(&self, uid: i32, logged_uid: i32) {
+        let qstring = format!(
+            "SELECT p_author, count(p_id) FROM Post \
+                WHERE \
+                p_author = {} AND \
+                (
+                    (Post.p_private = 1 AND Post.p_author = {}) OR \
+                    (Post.p_private = 1 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 1 AND Role.r_uid = {})) OR \
+                    (Post.p_private = 0 AND Post.p_cid in (SELECT r_cid FROM Role WHERE r_role = 0 AND Role.r_uid = {})) \
+                ) \
+                GROUP BY p_author",
+            uid,
+            logged_uid,
+            logged_uid,
+            logged_uid
+        );
+
+        self.pool.prep_exec(qstring, ()).unwrap();
+    }
 
 const STUDENTS_PER_CLASS: usize = 150;
 const TAS_PER_CLASS: usize = 5;

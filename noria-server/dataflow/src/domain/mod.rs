@@ -13,7 +13,7 @@ use futures;
 use group_commit::GroupCommitQueueSet;
 use noria::channel::{self, TcpSender};
 pub use noria::internal::DomainIndex as Index;
-use payload::{ControlReplyPacket, ReplayPieceContext};
+use payload::{ControlReplyPacket, ReplayPieceContext, SourceSelection};
 use prelude::*;
 use slog::Logger;
 use stream_cancel::Valve;
@@ -68,7 +68,7 @@ enum TriggerEndpoint {
     None,
     Start(Vec<usize>),
     End {
-        ask_all: bool,
+        source: SourceSelection,
         options: Vec<Box<dyn channel::Sender<Item = Box<Packet>> + Send>>,
     },
     Local(Vec<usize>),
@@ -82,7 +82,14 @@ struct ReplayPath {
 }
 
 type Hole = (Vec<usize>, Vec<DataType>);
-type Redo = (Tag, Vec<DataType>);
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+struct Redo {
+    tag: Tag,
+    replay_key: Vec<DataType>,
+    unishard: bool,
+}
+
 /// When a replay misses while being processed, it triggers a replay to backfill the hole that it
 /// missed in. We need to ensure that when this happens, we re-run the original replay to fill the
 /// hole we *originally* were trying to fill.
@@ -190,7 +197,9 @@ impl DomainBuilder {
             wait_time: Timer::new(),
             process_times: TimerSet::new(),
             process_ptimes: TimerSet::new(),
-            srmap_handles: Vec::new(),
+
+            total_replay_time: Timer::new(),
+            total_forward_time: Timer::new(),
         }
     }
 }
@@ -235,7 +244,7 @@ pub struct Domain {
     control_reply_tx: TcpSender<ControlReplyPacket>,
     channel_coordinator: Arc<ChannelCoordinator>,
 
-    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>)>,
+    buffered_replay_requests: HashMap<Tag, (time::Instant, HashSet<Vec<DataType>>, bool)>,
     replay_batch_timeout: time::Duration,
     delayed_for_self: VecDeque<Box<Packet>>,
 
@@ -249,6 +258,11 @@ pub struct Domain {
     wait_time: Timer<SimpleTracker, RealTime>,
     process_times: TimerSet<LocalNodeIndex, SimpleTracker, RealTime>,
     process_ptimes: TimerSet<LocalNodeIndex, SimpleTracker, ThreadTime>,
+
+    /// time spent processing replays
+    total_replay_time: Timer<SimpleTracker, RealTime>,
+    /// time spent processing ordinary, forward updates
+    total_forward_time: Timer<SimpleTracker, RealTime>,
 }
 
 impl Domain {
@@ -293,7 +307,11 @@ impl Domain {
                 // and then get back to it after all processing has finished (at the bottom of
                 // `Self::handle()`)
                 self.delayed_for_self
-                    .push_back(box Packet::RequestPartialReplay { tag, key });
+                    .push_back(box Packet::RequestPartialReplay {
+                        tag,
+                        key,
+                        unishard: true, // local replays are necessarily single-shard
+                    });
                 continue;
             }
 
@@ -317,6 +335,7 @@ impl Domain {
         miss_columns: &[usize],
         replay_key: Vec<DataType>,
         miss_key: Vec<DataType>,
+        was_single_shard: bool,
         needed_for: Tag,
     ) {
         use std::collections::hash_map::Entry;
@@ -326,7 +345,11 @@ impl Domain {
         let mut w = self.waiting.remove(miss_in).unwrap_or_default();
 
         let mut redundant = false;
-        let redo = (needed_for, replay_key.clone());
+        let redo = Redo {
+            tag: needed_for,
+            replay_key: replay_key.clone(),
+            unishard: was_single_shard,
+        };
         match w.redos.entry((Vec::from(miss_columns), miss_key.clone())) {
             Entry::Occupied(e) => {
                 // we have already requested backfill of this key
@@ -359,11 +382,22 @@ impl Domain {
     fn send_partial_replay_request(&mut self, tag: Tag, key: Vec<DataType>) {
         debug_assert!(self.concurrent_replays < self.max_concurrent_replays);
         if let TriggerEndpoint::End {
-            ask_all,
+            source,
             ref mut options,
         } = self.replay_paths.get_mut(&tag).unwrap().trigger
         {
-            if ask_all && options.len() != 1 {
+            let ask_shard_by_key_i = match source {
+                SourceSelection::AllShards(_) => None,
+                SourceSelection::SameShard => {
+                    // note that we "ask all" here because we're not indexing the vector by the
+                    // key's shard index. unipath will still be set to true though, since
+                    // options.len() == 1.
+                    None
+                }
+                SourceSelection::KeyShard { key_i_to_shard, .. } => Some(key_i_to_shard),
+            };
+
+            if ask_shard_by_key_i.is_none() && options.len() != 1 {
                 // source is sharded by a different key than we are doing lookups for,
                 // so we need to trigger on all the shards.
                 self.concurrent_replays += 1;
@@ -378,6 +412,7 @@ impl Domain {
                     if trigger
                         .send(box Packet::RequestPartialReplay {
                             tag,
+                            unishard: false,  // ask_all is true, so replay is sharded
                             key: key.clone(), // sad to clone here
                         })
                         .is_err()
@@ -390,9 +425,11 @@ impl Domain {
 
             let shard = if options.len() == 1 {
                 0
+            } else if let Some(key_shard_i) = ask_shard_by_key_i {
+                ::shard_by(&key[key_shard_i], options.len())
             } else {
-                assert_eq!(key.len(), 1);
-                ::shard_by(&key[0], options.len())
+                // would have hit the if further up
+                unreachable!();
             };
             self.concurrent_replays += 1;
             trace!(self.log, "sending replay request";
@@ -402,7 +439,11 @@ impl Domain {
             "concurrent" => self.concurrent_replays,
             );
             if options[shard]
-                .send(box Packet::RequestPartialReplay { tag, key })
+                .send(box Packet::RequestPartialReplay {
+                    tag,
+                    key,
+                    unishard: true, // only one option / !ask_all, so only one path
+                })
                 .is_err()
             {
                 // we're shutting down -- it's fine.
@@ -488,7 +529,7 @@ impl Domain {
         }
     }
 
-    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut Executor) {
+    fn dispatch(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, executor: &mut dyn Executor) {
         let src = m.src();
         let me = m.dst();
 
@@ -685,19 +726,25 @@ impl Domain {
         &mut self,
         m: Box<Packet>,
         sends: &mut EnqueuedSends,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         top: bool,
     ) {
-        self.wait_time.stop();
+        if self.wait_time.is_running() {
+            self.wait_time.stop();
+        }
         m.trace(PacketEvent::Handle);
 
         match *m {
             Packet::Message { .. } | Packet::Input { .. } => {
                 // WO for https://github.com/rust-lang/rfcs/issues/1403
+                self.total_forward_time.start();
                 self.dispatch(m, sends, executor);
+                self.total_forward_time.stop();
             }
             Packet::ReplayPiece { .. } => {
+                self.total_replay_time.start();
                 self.handle_replay(m, sends, executor);
+                self.total_replay_time.stop();
             }
             Packet::Evict { .. } | Packet::EvictKeys { .. } => {
                 self.handle_eviction(m, sends);
@@ -1209,22 +1256,19 @@ impl Domain {
                                         .unwrap()
                                 };
 
-                                let (ask_all, options) = match selection {
-                                    payload::SourceSelection::AllShards(nshards) => {
-                                        (true, (0..nshards).map(shard).collect())
+                                let options = match selection {
+                                    SourceSelection::AllShards(nshards)
+                                    | SourceSelection::KeyShard { nshards, .. } => {
+                                        // we may need to send to any of these shards
+                                        (0..nshards).map(shard).collect()
                                     }
-                                    payload::SourceSelection::SameShard => (
-                                        true,
-                                        vec![shard(self.shard.expect(
-                                            "told to replay from same shard, but not sharded",
-                                        ))],
-                                    ),
-                                    payload::SourceSelection::KeyShard(nshards) => {
-                                        (false, (0..nshards).map(shard).collect())
-                                    }
+                                    SourceSelection::SameShard => vec![shard(self.shard.unwrap())],
                                 };
 
-                                TriggerEndpoint::End { ask_all, options }
+                                TriggerEndpoint::End {
+                                    source: selection,
+                                    options,
+                                }
                             }
                         };
 
@@ -1248,12 +1292,8 @@ impl Domain {
                             },
                         );
                     }
-                    Packet::RequestReaderReplay {
-                        key,
-                        cols,
-                        node,
-                        id,
-                    } => {
+                    Packet::RequestReaderReplay { key, cols, node } => {
+                        self.total_replay_time.start();
                         // the reader could have raced with us filling in the key after some
                         // *other* reader requested it, so let's double check that it indeed still
                         // misses!
@@ -1283,21 +1323,25 @@ impl Domain {
                         {
                             self.find_tags_and_replay(key, &cols[..], node, id);
                         }
+                        self.total_replay_time.stop();
                     }
-                    Packet::RequestPartialReplay { tag, key } => {
+                    Packet::RequestPartialReplay { tag, key, unishard } => {
                         trace!(
                             self.log,
                            "got replay request";
                            "tag" => tag.id(),
                            "key" => format!("{:?}", key)
                         );
-                        self.seed_replay(tag, &key[..], sends, executor);
+                        self.total_replay_time.start();
+                        self.seed_replay(tag, &key[..], unishard, sends, executor);
+                        self.total_replay_time.stop();
                     }
                     Packet::StartReplay { tag, from } => {
                         use std::thread;
                         assert_eq!(self.replay_paths[&tag].source, Some(from));
 
                         let start = time::Instant::now();
+                        self.total_replay_time.start();
                         info!(self.log, "starting replay");
 
                         // we know that the node is materialized, as the migration coordinator
@@ -1423,11 +1467,14 @@ impl Domain {
                                 })
                                 .unwrap();
                         }
-
                         self.handle_replay(p, sends, executor);
+
+                        self.total_replay_time.stop();
                     }
                     Packet::Finish(tag, ni) => {
+                        self.total_replay_time.start();
                         self.finish_replay(tag, ni, sends, executor);
+                        self.total_replay_time.stop();
                     }
                     Packet::Ready { node, purge, index } => {
                         assert_eq!(self.mode, DomainMode::Forwarding);
@@ -1435,7 +1482,7 @@ impl Domain {
                         self.nodes[node].borrow_mut().purge = purge;
 
                         if !index.is_empty() {
-                            let mut s: Box<State> = {
+                            let mut s: Box<dyn State> = {
                                 let n = self.nodes[node].borrow();
                                 let params = &self.persistence_parameters;
                                 match (n.get_base(), &params.mode) {
@@ -1489,6 +1536,8 @@ impl Domain {
                         let domain_stats = noria::debug::stats::DomainStats {
                             total_time: self.total_time.num_nanoseconds(),
                             total_ptime: self.total_ptime.num_nanoseconds(),
+                            total_replay_time: self.total_replay_time.num_nanoseconds(),
+                            total_forward_time: self.total_forward_time.num_nanoseconds(),
                             wait_time: self.wait_time.num_nanoseconds(),
                         };
 
@@ -1540,6 +1589,12 @@ impl Domain {
                                     .unwrap()
                                 };
 
+                                let probe_result = if n.is_internal() {
+                                    n.probe()
+                                } else {
+                                    Default::default()
+                                };
+
                                 if time.is_some() && ptime.is_some() {
                                     Some((
                                         node_index,
@@ -1549,6 +1604,7 @@ impl Domain {
                                             process_ptime: ptime.unwrap(),
                                             mem_size,
                                             materialized: mat_state,
+                                            probe_result,
                                         },
                                     ))
                                 } else {
@@ -1574,15 +1630,16 @@ impl Domain {
         }
 
         if !self.buffered_replay_requests.is_empty() {
+            self.total_replay_time.start();
             let now = time::Instant::now();
             let to = self.replay_batch_timeout;
             let elapsed_replays: Vec<_> = {
                 self.buffered_replay_requests
                     .iter_mut()
-                    .filter_map(|(&tag, &mut (first, ref mut keys))| {
+                    .filter_map(|(&tag, &mut (first, ref mut keys, single_shard))| {
                         if !keys.is_empty() && now.duration_since(first) > to {
                             // will be removed by retain below
-                            Some((tag, mem::replace(keys, HashSet::new())))
+                            Some((tag, mem::replace(keys, HashSet::new()), single_shard))
                         } else {
                             None
                         }
@@ -1590,10 +1647,11 @@ impl Domain {
                     .collect()
             };
             self.buffered_replay_requests
-                .retain(|_, (_, ref keys)| !keys.is_empty());
-            for (tag, keys) in elapsed_replays {
-                self.seed_all(tag, keys, sends, executor);
+                .retain(|_, (_, ref keys, _)| !keys.is_empty());
+            for (tag, keys, single_shard) in elapsed_replays {
+                self.seed_all(tag, keys, single_shard, sends, executor);
             }
+            self.total_replay_time.stop();
         }
 
         let mut swap = HashSet::new();
@@ -1638,7 +1696,9 @@ impl Domain {
                 self.handle(m, sends, executor, false);
             }
         }
-        self.wait_time.start();
+        if !self.wait_time.is_running() {
+            self.wait_time.start();
+        }
     }
 
     fn seed_row<'a>(&self, source: LocalNodeIndex, row: Cow<'a, [DataType]>) -> Record {
@@ -1663,8 +1723,9 @@ impl Domain {
         &mut self,
         tag: Tag,
         keys: HashSet<Vec<DataType>>,
+        single_shard: bool,
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         let (m, source, is_miss) = match self.replay_paths[&tag] {
             ReplayPath {
@@ -1701,6 +1762,7 @@ impl Domain {
                         tag,
                         context: ReplayPieceContext::Partial {
                             for_keys: keys,
+                            unishard: single_shard, // if we are the only source, only one path
                             ignore: false,
                         },
                         data: rs.into(),
@@ -1729,7 +1791,7 @@ impl Domain {
                        "missed during replay request";
                        "tag" => tag.id(),
                        "key" => ?key);
-                self.on_replay_miss(source, &cols[..], key.clone(), key, tag);
+                self.on_replay_miss(source, &cols[..], key.clone(), key, single_shard, tag);
             }
         }
 
@@ -1757,8 +1819,9 @@ impl Domain {
         &mut self,
         tag: Tag,
         key: &[DataType],
+        single_shard: bool,
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         if let ReplayPath {
             trigger: TriggerEndpoint::Start(..),
@@ -1781,7 +1844,7 @@ impl Domain {
                 Entry::Vacant(v) => {
                     let mut ks = HashSet::new();
                     ks.insert(key);
-                    v.insert((time::Instant::now(), ks));
+                    v.insert((time::Instant::now(), ks, single_shard));
                 }
             }
 
@@ -1819,6 +1882,7 @@ impl Domain {
                         tag,
                         context: ReplayPieceContext::Partial {
                             for_keys: k,
+                            unishard: single_shard, // if we are the only source, only one path
                             ignore: false,
                         },
                         data,
@@ -1835,7 +1899,14 @@ impl Domain {
         if let Some(cols) = is_miss {
             // we have missed in our lookup, so we have a partial replay through a partial replay
             // trigger a replay to source node, and enqueue this request.
-            self.on_replay_miss(source, &cols[..], Vec::from(key), Vec::from(key), tag);
+            self.on_replay_miss(
+                source,
+                &cols[..],
+                Vec::from(key),
+                Vec::from(key),
+                single_shard,
+                tag,
+            );
             trace!(self.log,
                    "missed during replay request";
                    "tag" => tag.id(),
@@ -1855,7 +1926,7 @@ impl Domain {
     }
 
     #[allow(clippy::cognitive_complexity)]
-    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut Executor) {
+    fn handle_replay(&mut self, m: Box<Packet>, sends: &mut EnqueuedSends, ex: &mut dyn Executor) {
         let tag = m.tag().unwrap();
         if self.nodes[self.replay_paths[&tag].path.last().unwrap().node]
             .borrow()
@@ -2177,12 +2248,22 @@ impl Domain {
 
                         // if we missed during replay, we need to do another replay
                         if backfill_keys.is_some() && !misses.is_empty() {
+                            let single_shard = if let box Packet::ReplayPiece {
+                                context: ReplayPieceContext::Partial { unishard, .. },
+                                ..
+                            } = m.as_mut().unwrap()
+                            {
+                                *unishard
+                            } else {
+                                unreachable!("backfill_keys.is_some() implies Context::Partial");
+                            };
                             for miss in misses {
                                 need_replay.push((
                                     miss.on,
                                     miss.replay_key_vec().unwrap(),
                                     miss.lookup_key_vec(),
                                     miss.lookup_idx,
+                                    single_shard,
                                     tag,
                                 ));
                             }
@@ -2424,7 +2505,11 @@ impl Domain {
                         ReplayPieceContext::Regular { .. } => {
                             debug!(self.log, "batch processed");
                         }
-                        ReplayPieceContext::Partial { for_keys, ignore } => {
+                        ReplayPieceContext::Partial {
+                            for_keys,
+                            ignore,
+                            unishard: _,
+                        } => {
                             assert!(!ignore);
                             if dst_is_reader {
                                 if self.nodes[dst].borrow().beyond_mat_frontier() {
@@ -2459,7 +2544,7 @@ impl Domain {
             self.finished_partial_replay(tag, finished_partial);
         }
 
-        for (node, while_replaying_key, miss_key, miss_cols, tag) in need_replay {
+        for (node, while_replaying_key, miss_key, miss_cols, single_shard, tag) in need_replay {
             trace!(self.log,
                    "missed during replay processing";
                    "tag" => tag.id(),
@@ -2467,7 +2552,14 @@ impl Domain {
                    "missed" => ?miss_key,
                    "on" => %node,
             );
-            self.on_replay_miss(node, &miss_cols[..], while_replaying_key, miss_key, tag);
+            self.on_replay_miss(
+                node,
+                &miss_cols[..],
+                while_replaying_key,
+                miss_key,
+                single_shard,
+                tag,
+            );
         }
 
         if let Some((tag, ni, for_keys)) = finished {
@@ -2528,10 +2620,16 @@ impl Domain {
                         })
                         .collect();
 
-                    for (tag, replay_key) in replay {
+                    for Redo {
+                        tag,
+                        replay_key,
+                        unishard,
+                    } in replay
+                    {
                         self.delayed_for_self
                             .push_back(box Packet::RequestPartialReplay {
                                 tag,
+                                unishard,
                                 key: replay_key,
                             });
                     }
@@ -2566,7 +2664,7 @@ impl Domain {
         tag: Tag,
         node: LocalNodeIndex,
         sends: &mut EnqueuedSends,
-        ex: &mut Executor,
+        ex: &mut dyn Executor,
     ) {
         let mut was = mem::replace(&mut self.mode, DomainMode::Forwarding);
         let finished = if let DomainMode::Replaying {
@@ -2884,7 +2982,6 @@ impl Domain {
         self.control_reply_tx
             .send(ControlReplyPacket::Booted(self.shard.unwrap_or(0), addr))
             .unwrap();
-        self.wait_time.start();
     }
 
     pub fn update_state_sizes(&mut self) {
@@ -2922,11 +3019,13 @@ impl Domain {
 
     pub fn on_event(
         &mut self,
-        executor: &mut Executor,
+        executor: &mut dyn Executor,
         event: PollEvent,
         sends: &mut EnqueuedSends,
     ) -> ProcessResult {
-        self.wait_time.stop();
+        if self.wait_time.is_running() {
+            self.wait_time.stop();
+        }
         //self.total_time.start();
         //self.total_ptime.start();
         let res = match event {
@@ -2936,8 +3035,8 @@ impl Domain {
                 let opt1 = self
                     .buffered_replay_requests
                     .iter()
-                    .filter(|&(_, &(_, ref keys))| !keys.is_empty())
-                    .map(|(_, &(first, _))| {
+                    .filter(|&(_, &(_, ref keys, _))| !keys.is_empty())
+                    .map(|(_, &(first, _, _))| {
                         self.replay_batch_timeout
                             .checked_sub(now.duration_since(first))
                             .unwrap_or(time::Duration::from_millis(0))
@@ -2995,7 +3094,9 @@ impl Domain {
                 ProcessResult::Processed
             }
         };
-        self.wait_time.start();
+        if !self.wait_time.is_running() {
+            self.wait_time.start();
+        }
         res
     }
 }

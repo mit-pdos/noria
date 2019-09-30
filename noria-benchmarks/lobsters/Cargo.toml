@@ -5,21 +5,24 @@ authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 edition = "2018"
 
 [features]
-orchestration = ["tsunami", "rusoto_core", "rusoto_sts", "failure"]
+orchestration = ["tsunami", "rusoto_core", "rusoto_sts", "failure", "ssh2", "shellwords", "yansi"]
 default = []
 
 [dependencies]
-trawler = "0.5.10"
-mysql_async = "0.14"
-tokio-core = "0.1"
+trawler = "0.6.3"
+mysql_async = { git = "https://github.com/blackbeam/mysql_async.git" }
+tokio = "0.1"
 clap = "2.31"
 futures = "0.1"
 chrono = "0.4"
 
+yansi = { version = "0.5", optional = true }
+ssh2 = { version = "0.3", optional = true }
+shellwords = { version = "1", optional = true }
 failure = { version = "0.1.1", optional = true }
-rusoto_core = { optional = true, version = "0.34" }
-rusoto_sts = { optional = true, version = "0.34" }
-tsunami = { optional = true, version = "0.7.1" }
+rusoto_core = { optional = true, version = "0.40" }
+rusoto_sts = { optional = true, version = "0.40" }
+tsunami = { optional = true, version = "0.9" }
 
 [[bin]]
 name = "lobsters"

@@ -354,7 +354,6 @@
 #![feature(box_syntax)]
 #![feature(nll)]
 #![feature(try_blocks)]
-#![feature(fnbox)]
 #![feature(vec_remove_item)]
 #![feature(crate_visibility_modifier)]
 #![deny(missing_docs)]
@@ -366,8 +365,6 @@
 
 #[macro_use]
 extern crate failure;
-#[macro_use]
-extern crate nom;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -399,6 +396,13 @@ pub use dataflow::{DurabilityMode, PersistenceParameters};
 pub use noria::consensus::LocalAuthority;
 pub use noria::*;
 pub use petgraph::graph::NodeIndex;
+
+#[doc(hidden)]
+pub mod manual {
+    pub use crate::controller::migrate::Migration;
+    pub use dataflow::node::special::Base;
+    pub use dataflow::ops;
+}
 
 use dataflow::DomainConfig;
 use std::time;

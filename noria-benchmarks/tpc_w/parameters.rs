@@ -1,5 +1,5 @@
 use noria::DataType;
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -12,7 +12,7 @@ pub struct SampleKeys {
     order_line: Vec<Vec<DataType>>,
     shopping_cart: Vec<Vec<DataType>>,
     country: Vec<Vec<DataType>>,
-    rng: rand::prelude::ThreadRng,
+    rng: ThreadRng,
     item_write: f32,
     ol_write: f32,
 }
@@ -240,11 +240,11 @@ impl SampleKeys {
     }
 
     fn customer_id(&mut self) -> DataType {
-        self.customer.choose(&mut self.rng).unwrap()[0].clone()
+        self.customer.as_slice().choose(&mut self.rng).unwrap()[0].clone()
     }
 
     fn customer_uname(&mut self) -> DataType {
-        self.customer.choose(&mut self.rng).unwrap()[1].clone()
+        self.customer.as_slice().choose(&mut self.rng).unwrap()[1].clone()
     }
 
     fn item_id(&mut self) -> DataType {
@@ -266,7 +266,7 @@ impl SampleKeys {
     }
 
     fn order_id(&mut self) -> DataType {
-        self.order.choose(&mut self.rng).unwrap()[0].clone()
+        self.order.as_slice().choose(&mut self.rng).unwrap()[0].clone()
     }
 
     fn shopping_cart_id(&self) -> DataType {
@@ -274,6 +274,6 @@ impl SampleKeys {
     }
 
     fn country_name(&mut self) -> DataType {
-        self.country.choose(&mut self.rng).unwrap()[0].clone()
+        self.country.as_slice().choose(&mut self.rng).unwrap()[0].clone()
     }
 }

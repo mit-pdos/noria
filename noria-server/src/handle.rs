@@ -1,7 +1,7 @@
-#[cfg(test)]
 use crate::controller::migrate::Migration;
 use crate::startup::Event;
 use dataflow::prelude::*;
+use futures::try_ready;
 use noria::consensus::Authority;
 use noria::prelude::*;
 use noria::SyncControllerHandle;
@@ -49,8 +49,20 @@ impl<A: Authority + 'static> Handle<A> {
         })
     }
 
+    /// A future that resolves when the controller can accept more messages.
+    ///
+    /// When this future resolves, you it is safe to call any methods on the wrapped
+    /// `ControllerHandle` that require `poll_ready` to have returned `Async::Ready`.
+    pub fn ready(self) -> impl Future<Item = Self, Error = failure::Error> {
+        let mut rdy = Some(self);
+        future::poll_fn(move || -> Poll<_, failure::Error> {
+            try_ready!(rdy.as_mut().unwrap().poll_ready());
+            Ok(Async::Ready(rdy.take().unwrap()))
+        })
+    }
+
     #[cfg(test)]
-    pub(super) fn ready<E>(self) -> impl Future<Item = Self, Error = E> {
+    pub(super) fn backend_ready<E>(self) -> impl Future<Item = Self, Error = E> {
         let snd = self.event_tx.clone().unwrap();
         future::loop_fn((self, snd), |(this, snd)| {
             let (tx, rx) = futures::sync::oneshot::channel();
@@ -73,8 +85,8 @@ impl<A: Authority + 'static> Handle<A> {
         })
     }
 
-    #[cfg(test)]
-    crate fn migrate<F, T>(&mut self, f: F) -> T
+    #[doc(hidden)]
+    pub fn migrate<F, T>(&mut self, f: F) -> T
     where
         F: FnOnce(&mut Migration) -> T + Send + 'static,
         T: Send + 'static,
@@ -214,8 +226,8 @@ impl<A: Authority> SyncHandle<A> {
         self.sh.as_mut().unwrap().run(fut)
     }
 
-    #[cfg(test)]
-    crate fn migrate<F, T>(&mut self, f: F) -> T
+    #[doc(hidden)]
+    pub fn migrate<F, T>(&mut self, f: F) -> T
     where
         F: FnOnce(&mut Migration) -> T + Send + 'static,
         T: Send + 'static,

@@ -220,6 +220,7 @@ fn main() {
             })
             .collect();;
 
+
         let pid = papers.len() + 1;
         trace!(log, "adding paper"; "title" => &title, "id" => pid, "accepted" => accepted.contains(id));
         papers.push(Paper {
@@ -227,6 +228,9 @@ fn main() {
             accepted: accepted.contains(id),
             authors,
         });
+
+//    thread::sleep(time::Duration::from_millis(2000));
+//    let _ = backend.login(make_user(user)).is_ok();
 
         let url = format!(
             "https://openreview.net/notes?forum={}&invitation={}/-/Paper{}/Official_Review",

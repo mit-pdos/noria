@@ -95,7 +95,9 @@ impl GroupConcat {
                         s.push_str(&*text);
                     }
                     DataType::Int(ref n) => s.push_str(&n.to_string()),
+                    DataType::UnsignedInt(ref n) => s.push_str(&n.to_string()),
                     DataType::BigInt(ref n) => s.push_str(&n.to_string()),
+                    DataType::UnsignedBigInt(ref n) => s.push_str(&n.to_string()),
                     DataType::Real(..) => s.push_str(&rec[*i].to_string()),
                     DataType::Timestamp(ref ts) => s.push_str(&ts.format("%+").to_string()),
                     DataType::None => unreachable!(),
@@ -152,7 +154,7 @@ impl GroupedOperation for GroupConcat {
     fn apply(
         &self,
         current: Option<&DataType>,
-        diffs: &mut Iterator<Item = Self::Diff>,
+        diffs: &mut dyn Iterator<Item = Self::Diff>,
     ) -> DataType {
         use std::collections::BTreeSet;
         use std::iter::FromIterator;
@@ -226,10 +228,7 @@ impl GroupedOperation for GroupConcat {
             .collect::<Vec<_>>()
             .join(", ");
 
-        format!(
-            "||([{}], \"{}\") γ[{}]",
-            fields, self.separator, group_cols
-        )
+        format!("||([{}], \"{}\") γ[{}]", fields, self.separator, group_cols)
     }
 
     fn over_columns(&self) -> Vec<usize> {

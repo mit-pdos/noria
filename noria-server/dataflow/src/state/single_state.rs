@@ -1,9 +1,9 @@
-use rand::{Rng, ThreadRng};
-use std::rc::Rc;
-
+use super::mk_key::MakeKey;
 use common::SizeOf;
 use prelude::*;
+use rand::prelude::*;
 use state::keyed_state::KeyedState;
+use std::rc::Rc;
 
 pub(super) struct SingleState {
     key: Vec<usize>,
@@ -11,6 +11,28 @@ pub(super) struct SingleState {
     partial: bool,
     rows: usize,
 }
+
+macro_rules! insert_row_match_impl {
+    ($self:ident, $r:ident, $map:ident) => {{
+        let key = MakeKey::from_row(&$self.key, &*$r);
+        match $map.entry(key) {
+            Entry::Occupied(mut rs) => rs.get_mut().push($r),
+            Entry::Vacant(..) if $self.partial => return false,
+            rs @ Entry::Vacant(..) => rs.or_default().push($r),
+        }
+    }};
+}
+
+macro_rules! remove_row_match_impl {
+    ($self:ident, $r:ident, $do_remove:ident, $map:ident, $($hint:tt)*) => {{
+        // TODO: can we avoid the Clone here?
+        let key = MakeKey::from_row(&$self.key, $r);
+        if let Some(ref mut rs) = $map.get_mut::<$($hint)*>(&key) {
+            return $do_remove(&mut $self.rows, rs);
+        }
+    }};
+}
+
 impl SingleState {
     pub(super) fn new(columns: &[usize], partial: bool) -> Self {
         Self {
@@ -24,7 +46,7 @@ impl SingleState {
     /// Inserts the given record, or returns false if a hole was encountered (and the record hence
     /// not inserted).
     pub(super) fn insert_row(&mut self, r: Row) -> bool {
-        use rahashmap::Entry;
+        use indexmap::map::Entry;
         match self.state {
             KeyedState::Single(ref mut map) => {
                 // treat this specially to avoid the extra Vec
@@ -41,68 +63,11 @@ impl SingleState {
                 }
                 map.insert(r[self.key[0]].clone(), vec![r]);
             }
-            KeyedState::Double(ref mut map) => {
-                let key = (r[self.key[0]].clone(), r[self.key[1]].clone());
-                match map.entry(key) {
-                    Entry::Occupied(mut rs) => rs.get_mut().push(r),
-                    Entry::Vacant(..) if self.partial => return false,
-                    rs @ Entry::Vacant(..) => rs.or_default().push(r),
-                }
-            }
-            KeyedState::Tri(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                );
-                match map.entry(key) {
-                    Entry::Occupied(mut rs) => rs.get_mut().push(r),
-                    Entry::Vacant(..) if self.partial => return false,
-                    rs @ Entry::Vacant(..) => rs.or_default().push(r),
-                }
-            }
-            KeyedState::Quad(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                );
-                match map.entry(key) {
-                    Entry::Occupied(mut rs) => rs.get_mut().push(r),
-                    Entry::Vacant(..) if self.partial => return false,
-                    rs @ Entry::Vacant(..) => rs.or_default().push(r),
-                }
-            }
-            KeyedState::Quin(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                    r[self.key[4]].clone(),
-                );
-                match map.entry(key) {
-                    Entry::Occupied(mut rs) => rs.get_mut().push(r),
-                    Entry::Vacant(..) if self.partial => return false,
-                    rs @ Entry::Vacant(..) => rs.or_default().push(r),
-                }
-            }
-            KeyedState::Sex(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                    r[self.key[4]].clone(),
-                    r[self.key[5]].clone(),
-                );
-                match map.entry(key) {
-                    Entry::Occupied(mut rs) => rs.get_mut().push(r),
-                    Entry::Vacant(..) if self.partial => return false,
-                    rs @ Entry::Vacant(..) => rs.or_default().push(r),
-                }
-            }
+            KeyedState::Double(ref mut map) => insert_row_match_impl!(self, r, map),
+            KeyedState::Tri(ref mut map) => insert_row_match_impl!(self, r, map),
+            KeyedState::Quad(ref mut map) => insert_row_match_impl!(self, r, map),
+            KeyedState::Quin(ref mut map) => insert_row_match_impl!(self, r, map),
+            KeyedState::Sex(ref mut map) => insert_row_match_impl!(self, r, map),
         }
 
         self.rows += 1;
@@ -136,57 +101,19 @@ impl SingleState {
                 }
             }
             KeyedState::Double(ref mut map) => {
-                // TODO: can we avoid the Clone here?
-                let key = (r[self.key[0]].clone(), r[self.key[1]].clone());
-                if let Some(ref mut rs) = map.get_mut(&key) {
-                    return do_remove(&mut self.rows, rs);
-                }
+                remove_row_match_impl!(self, r, do_remove, map, (DataType, _))
             }
             KeyedState::Tri(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                );
-                if let Some(ref mut rs) = map.get_mut(&key) {
-                    return do_remove(&mut self.rows, rs);
-                }
+                remove_row_match_impl!(self, r, do_remove, map, (DataType, _, _))
             }
             KeyedState::Quad(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                );
-                if let Some(ref mut rs) = map.get_mut(&key) {
-                    return do_remove(&mut self.rows, rs);
-                }
+                remove_row_match_impl!(self, r, do_remove, map, (DataType, _, _, _))
             }
             KeyedState::Quin(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                    r[self.key[4]].clone(),
-                );
-                if let Some(ref mut rs) = map.get_mut(&key) {
-                    return do_remove(&mut self.rows, rs);
-                }
+                remove_row_match_impl!(self, r, do_remove, map, (DataType, _, _, _, _))
             }
             KeyedState::Sex(ref mut map) => {
-                let key = (
-                    r[self.key[0]].clone(),
-                    r[self.key[1]].clone(),
-                    r[self.key[2]].clone(),
-                    r[self.key[3]].clone(),
-                    r[self.key[4]].clone(),
-                    r[self.key[5]].clone(),
-                );
-                if let Some(ref mut rs) = map.get_mut(&key) {
-                    return do_remove(&mut self.rows, rs);
-                }
+                remove_row_match_impl!(self, r, do_remove, map, (DataType, _, _, _, _, _))
             }
         }
         None
@@ -243,32 +170,16 @@ impl SingleState {
 
     pub(super) fn mark_hole(&mut self, key: &[DataType]) -> u64 {
         let removed = match self.state {
-            KeyedState::Single(ref mut map) => map.remove(&key[0]),
-            KeyedState::Double(ref mut map) => map.remove(&(key[0].clone(), key[1].clone())),
-            KeyedState::Tri(ref mut map) => {
-                map.remove(&(key[0].clone(), key[1].clone(), key[2].clone()))
+            KeyedState::Single(ref mut m) => m.remove(&(key[0])),
+            KeyedState::Double(ref mut m) => m.remove::<(DataType, _)>(&MakeKey::from_key(key)),
+            KeyedState::Tri(ref mut m) => m.remove::<(DataType, _, _)>(&MakeKey::from_key(key)),
+            KeyedState::Quad(ref mut m) => m.remove::<(DataType, _, _, _)>(&MakeKey::from_key(key)),
+            KeyedState::Quin(ref mut m) => {
+                m.remove::<(DataType, _, _, _, _)>(&MakeKey::from_key(key))
             }
-            KeyedState::Quad(ref mut map) => map.remove(&(
-                key[0].clone(),
-                key[1].clone(),
-                key[2].clone(),
-                key[3].clone(),
-            )),
-            KeyedState::Quin(ref mut map) => map.remove(&(
-                key[0].clone(),
-                key[1].clone(),
-                key[2].clone(),
-                key[3].clone(),
-                key[4].clone(),
-            )),
-            KeyedState::Sex(ref mut map) => map.remove(&(
-                key[0].clone(),
-                key[1].clone(),
-                key[2].clone(),
-                key[3].clone(),
-                key[4].clone(),
-                key[5].clone(),
-            )),
+            KeyedState::Sex(ref mut m) => {
+                m.remove::<(DataType, _, _, _, _, _)>(&MakeKey::from_key(key))
+            }
         };
         // mark_hole should only be called on keys we called mark_filled on
         removed
@@ -301,7 +212,7 @@ impl SingleState {
         let mut bytes_freed = 0;
         let mut keys = Vec::with_capacity(count);
         for _ in 0..count {
-            if let Some((n, key)) = self.state.evict_at_index(rng.gen()) {
+            if let Some((n, key)) = self.state.evict_with_seed(rng.gen()) {
                 bytes_freed += n;
                 keys.push(key);
             } else {
@@ -316,7 +227,7 @@ impl SingleState {
         keys.iter().map(|k| self.state.evict(k)).sum()
     }
 
-    pub(super) fn values<'a>(&'a self) -> Box<Iterator<Item = &'a Vec<Row>> + 'a> {
+    pub(super) fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Vec<Row>> + 'a> {
         match self.state {
             KeyedState::Single(ref map) => Box::new(map.values()),
             KeyedState::Double(ref map) => Box::new(map.values()),

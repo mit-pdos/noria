@@ -76,23 +76,30 @@ fn is_ident(chr: u8) -> bool {
     is_alphanumeric(chr) || chr as char == '_'
 }
 
-named!(query_expr<&[u8], (bool, Option<String>, SqlQuery)>,
+use nom::types::CompleteByteSlice;
+use nom::*;
+named!(query_expr<CompleteByteSlice, (bool, Option<String>, SqlQuery)>,
     do_parse!(
         prefix: opt!(do_parse!(
-            public: opt!(alt_complete!(tag_no_case!("query") | tag_no_case!("view"))) >>
-            opt!(complete!(multispace)) >>
-            name: opt!(terminated!(map_res!(take_while1!(is_ident), str::from_utf8),
-                                   opt!(complete!(multispace)))) >>
+            public: opt!(alt!(tag_no_case!("query") | tag_no_case!("view"))) >>
+            opt!(multispace) >>
+            name: opt!(terminated!(take_while1!(is_ident), opt!(multispace))) >>
             tag!(":") >>
-            opt!(complete!(multispace)) >>
+            opt!(multispace) >>
             (public, name)
         )) >>
         expr: apply!(sql_parser::sql_query,) >>
+        opt!(multispace) >>
         (match prefix {
             None => (false, None, expr),
-            Some(p) => (p.0.is_some(), p.1.map(ToOwned::to_owned), expr)
+            Some(p) => (p.0.is_some(),
+                        p.1.map(|s| str::from_utf8(s.as_bytes()).unwrap().into()), expr)
         })
     )
+);
+
+named!(query_exprs<CompleteByteSlice, (Vec<(bool, Option<String>, SqlQuery)>)>,
+    many1!(query_expr)
 );
 
 #[allow(unused)]
@@ -608,40 +615,51 @@ impl Recipe {
             .collect();
         let mut query_strings = Vec::new();
         let mut q = String::new();
+
+        let linecount = lines.len();
+        let mut i = 1;
         for l in lines {
-            if !l.ends_with(';') {
+            if !l.ends_with(';') && i < linecount {
                 q.push_str(l);
                 q.push_str(" ");
             } else {
-                // end of query
+                // either line ends with semicolor, or it does not and this is the last line
+                // in both cases, we're at the end of the query
                 q.push_str(l);
                 query_strings.push(q);
                 q = String::new();
             }
+            i += 1;
         }
 
-        let parsed_queries = query_strings
-            .iter()
-            .map(|q| (q, query_expr(q.as_bytes())))
-            .collect::<Vec<_>>();
-
-        if !parsed_queries.iter().all(|pq| pq.1.is_done()) {
-            for pq in parsed_queries {
-                match pq.1 {
-                    nom::IResult::Error(e) => {
-                        return Err(format!("Query \"{}\", parse error: {}", pq.0, e));
+        let parsed_queries = query_strings.iter().fold(
+            Vec::new(),
+            |mut acc: Vec<Result<(bool, Option<String>, SqlQuery), String>>, q| {
+                match query_exprs(CompleteByteSlice(q.as_bytes())) {
+                    Result::Err(e) => {
+                        // we got a parse error
+                        acc.push(Err(format!("Query \"{}\", parse error: {}", q, e)));
                     }
-                    nom::IResult::Done(_, _) => (),
-                    nom::IResult::Incomplete(_) => unreachable!(),
+                    Result::Ok((remainder, parsed)) => {
+                        // should have consumed all input
+                        assert!(
+                            remainder.is_empty(),
+                            format!(
+                                "failed to parse the complete recipe; left with: {}",
+                                str::from_utf8(*remainder).unwrap()
+                            )
+                        );
+                        acc.extend(parsed.into_iter().map(|p| Ok(p)).collect::<Vec<_>>());
+                    }
                 }
-            }
-            return Err("Failed to parse recipe!".to_string());
-        }
+                acc
+            },
+        );
 
         Ok(parsed_queries
             .into_iter()
-            .map(|(_, t)| {
-                let pr = t.unwrap().1;
+            .map(|pr| {
+                let pr = pr.unwrap();
                 (pr.1, pr.2, pr.0)
             })
             .collect::<Vec<_>>())
@@ -827,5 +845,36 @@ mod tests {
         let r2 = r1.extend(r2_txt).unwrap();
         assert_eq!(r2.version, 2);
         assert_eq!(r2.expressions.len(), 4);
+    }
+
+    #[test]
+    fn it_handles_multiple_statements_per_line() {
+        let r0 = Recipe::blank(None);
+
+        let r1_txt = "  QUERY q_0: SELECT a FROM b; QUERY q_1: SELECT x FROM y;";
+        let r1_t = Recipe::from_str(r1_txt, None).unwrap();
+        let r1 = r0.replace(r1_t).unwrap();
+        assert_eq!(r1.expressions.len(), 2);
+    }
+
+    #[test]
+    fn it_handles_spaces() {
+        let r0 = Recipe::blank(None);
+
+        let r1_txt = "  QUERY q_0: SELECT a FROM b;\
+                      QUERY q_1: SELECT x FROM y;";
+        let r1_t = Recipe::from_str(r1_txt, None).unwrap();
+        let r1 = r0.replace(r1_t).unwrap();
+        assert_eq!(r1.expressions.len(), 2);
+    }
+
+    #[test]
+    fn it_handles_missing_semicolon() {
+        let r0 = Recipe::blank(None);
+
+        let r1_txt = "QUERY q_0: SELECT a FROM b;\nVIEW q_1: SELECT x FROM y";
+        let r1_t = Recipe::from_str(r1_txt, None).unwrap();
+        let r1 = r0.replace(r1_t).unwrap();
+        assert_eq!(r1.expressions.len(), 2);
     }
 }

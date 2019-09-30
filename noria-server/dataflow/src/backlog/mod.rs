@@ -1,7 +1,7 @@
 use common::SizeOf;
 use fnv::FnvBuildHasher;
 use prelude::*;
-use rand::{Rng, ThreadRng};
+use rand::prelude::*;
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -35,8 +35,7 @@ fn new_inner(
     srmap: bool,
     cols: usize,
     key: &[usize],
-    trigger: Option<Arc<Fn(&[DataType], Option<usize>) -> bool + Send + Sync>>,
-    uid: usize,
+    trigger: Option<Arc<dyn Fn(&[DataType]) -> bool + Send + Sync>>,
 ) -> (SingleReadHandle, WriteHandle) {
     let contiguous = {
         let mut contiguous = true;
@@ -461,8 +460,8 @@ enum RHandleVariant {
 /// Handle to get the state of a single shard of a reader.
 #[derive(Clone)]
 pub struct SingleReadHandle {
-    handle: RHandleVariant,
-    trigger: Option<Arc<Fn(&[DataType], Option<usize>) -> bool + Send + Sync>>,
+    handle: multir::Handle,
+    trigger: Option<Arc<dyn Fn(&[DataType]) -> bool + Send + Sync>>,
     key: Vec<usize>,
     pub uid: usize,
 }
@@ -592,8 +591,8 @@ mod tests {
     fn busybusybusy() {
         use std::thread;
 
-        let n = 10000;
-        let (r, mut w) = new(false, 1, &[0], 0);
+        let n = 1_000;
+        let (r, mut w) = new(1, &[0]);
         thread::spawn(move || {
             for i in 0..n {
                 w.add(vec![Record::Positive(vec![i.into()])], None);

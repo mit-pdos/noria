@@ -18,9 +18,6 @@ use tokio::prelude::future::Either;
 use tokio::prelude::*;
 use tokio_io_pool;
 
-#[cfg(test)]
-use std::boxed::FnBox;
-
 use crate::handle::Handle;
 use crate::Config;
 
@@ -39,9 +36,8 @@ crate enum Event {
     CampaignError(failure::Error),
     #[cfg(test)]
     IsReady(futures::sync::oneshot::Sender<bool>),
-    #[cfg(test)]
     ManualMigration {
-        f: Box<FnBox(&mut crate::controller::migrate::Migration) + Send + 'static>,
+        f: Box<dyn FnOnce(&mut crate::controller::migrate::Migration) + Send + 'static>,
         done: futures::sync::oneshot::Sender<()>,
     },
 }
@@ -57,7 +53,6 @@ impl fmt::Debug for Event {
             Event::CampaignError(ref e) => write!(f, "CampaignError({:?})", e),
             #[cfg(test)]
             Event::IsReady(..) => write!(f, "IsReady"),
-            #[cfg(test)]
             Event::ManualMigration { .. } => write!(f, "ManualMigration{{..}}"),
         }
     }
@@ -144,7 +139,6 @@ pub(super) fn start_instance<A: Authority + 'static>(
                         CoordinationPayload::CreateUniverse(..) => fw(e, true),
                     },
                     Event::ExternalRequest(..) => fw(e, true),
-                    #[cfg(test)]
                     Event::ManualMigration { .. } => fw(e, true),
                     Event::LeaderChange(..) => fw(e, false),
                     Event::WonLeaderElection(..) => fw(e, true),
@@ -237,7 +231,7 @@ fn listen_external<A: Authority + 'static>(
         type ReqBody = hyper::Body;
         type ResBody = hyper::Body;
         type Error = hyper::Error;
-        type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error> + Send>;
+        type Future = Box<dyn Future<Item = Response<Self::ResBody>, Error = Self::Error> + Send>;
 
         fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
             let mut res = Response::builder();

@@ -2,7 +2,8 @@
 
 [![Crates.io](https://img.shields.io/crates/v/noria.svg)](https://crates.io/crates/noria)
 [![Documentation](https://docs.rs/noria/badge.svg)](https://jon.thesquareplanet.com/crates/noria/)
-[![Build Status](https://travis-ci.org/mit-pdos/noria.svg?branch=master)](https://travis-ci.org/mit-pdos/noria)
+[![Travis Status](https://travis-ci.org/mit-pdos/noria.svg?branch=master)](https://travis-ci.org/mit-pdos/noria)
+[![Azure Status](https://dev.azure.com/mit-pdos/mit-pdos/_apis/build/status/noria?branchName=master)](https://dev.azure.com/mit-pdos/mit-pdos/_build/latest?definitionId=1&branchName=master)
 
 Noria is a new streaming data-flow system designed to act as a fast
 storage backend for read-heavy web applications based on [this
@@ -90,8 +91,8 @@ The [`noria` crate](https://crates.io/crates/noria) provides native Rust
 bindings to interact with `noria-server`. See the [`noria`
 documentation](https://jon.thesquareplanet.com/crates/noria/) for detailed
 instructions on how to use the library. You can also take a look at the
-[example Noria program](noria/examples/quickstart.rs) using Noria's async client
-API, or the same example using [the synchronous API](noria/examples/basic-distribution.rs).
+[example Noria program](noria/examples/quickstart-async.rs) using Noria's async client
+API, or the same example using [the synchronous API](noria/examples/quickstart-sync.rs).
 You can also see a self-contained version that embeds `noria-server` (and
 doesn't require ZooKeeper) in [this example](noria-server/examples/local-server.rs).
 
@@ -125,7 +126,7 @@ executing data-flow operators (`noria-server/dataflow`). The code in
 establishing materializations, scheduling data-flow work, orchestrating
 Noria program changes, handling failovers, etc.
 
-[`noria-server/lib.rs`](noria-server/src/lib.rs) has a pretty extensive comment at
+[`noria-server/src/lib.rs`](noria-server/src/lib.rs) has a pretty extensive comment at
 the top of it that goes through how the Noria internals fit together at
 an implementation level. While it occasionally lags behind, especially
 following larger changes, it should serve to get you familiarized with

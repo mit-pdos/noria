@@ -143,7 +143,8 @@ pub(super) fn assign(log: &Logger, mainline: &mut ControllerInner, topo_list: &[
                 return domain_assignment;
             }
 
-            let any_parents = move |prime: &Fn(&Node) -> bool, check: &Fn(&Node) -> bool| {
+            let any_parents = move |prime: &dyn Fn(&Node) -> bool,
+                                    check: &dyn Fn(&Node) -> bool| {
                 let mut stack: Vec<_> = graph
                     .neighbors_directed(node, petgraph::EdgeDirection::Incoming)
                     .filter(move |&p| prime(&graph[p]))

@@ -25,9 +25,10 @@ pub struct ReplayPathSegment {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum SourceSelection {
     /// Query only the shard of the source that matches the key.
-    ///
-    /// Value is the number of shards.
-    KeyShard(usize),
+    KeyShard {
+        key_i_to_shard: usize,
+        nshards: usize,
+    },
     /// Query the same shard of the source as the destination.
     SameShard,
     /// Query all shards of the source.
@@ -71,6 +72,7 @@ pub enum InitialState {
 pub enum ReplayPieceContext {
     Partial {
         for_keys: HashSet<Vec<DataType>>,
+        unishard: bool,
         ignore: bool,
     },
     Regular {
@@ -214,9 +216,10 @@ pub enum Packet {
     RequestPartialReplay {
         tag: Tag,
         key: Vec<DataType>,
+        unishard: bool,
     },
 
-    /// Ask domain (nicely) to replay a particular key.
+    /// Ask domain (nicely) to replay a particular key into a Reader.
     RequestReaderReplay {
         node: LocalNodeIndex,
         cols: Vec<usize>,
