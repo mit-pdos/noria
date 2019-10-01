@@ -54,6 +54,9 @@ ctrlc = "3.1"
 failure = "0.1"
 tower-service = "0.2"
 tokio-mock-task = "0.1"
+reqwest = "0.9"
+serde_json = "1.0"
+url = "1.7"
 
 [[bin]]
 name = "vote"
@@ -113,6 +116,10 @@ path = "vote-purge-stress/main.rs"
 [[bin]]
 name = "replay"
 path = "replay/main.rs"
+
+[[bin]]
+name = "manual-graphs"
+path = "manual-graphs/main.rs"
 
 #[[bin]]
 #name = "security-mysql"
