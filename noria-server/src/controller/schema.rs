@@ -85,6 +85,10 @@ fn type_for_internal_column(
             // ancestors; so keep iterating to try the other paths
             None
         }
+        ops::NodeOperator::Rewrite(_) => {
+            // Rewrites don't "generate" columns, they write over them.
+            None
+        }
         // no other operators should every generate columns
         _ => unreachable!(),
     }

@@ -8,10 +8,13 @@ use dataflow::ops::join::JoinSource::*;
 use dataflow::ops::join::{Join, JoinSource, JoinType};
 use dataflow::ops::project::Project;
 use dataflow::ops::union::Union;
+use dataflow::ops::rewrite::Rewrite;
+use dataflow::ops::filter::{Filter, FilterCondition, Value};
 use dataflow::{DurabilityMode, PersistenceParameters};
 use futures::Future;
 use noria::consensus::{Authority, LocalAuthority};
 use noria::DataType;
+use nom_sql::Operator;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -2513,4 +2516,100 @@ fn correct_nested_view_schema() {
         ColumnSpecification::new("swvc.vc".into(), SqlType::Bigint(64)),
     ];
     assert_eq!(q.schema(), Some(&expected_schema[..]));
+}
+
+#[test]
+fn manual_policy_graph() {
+    // Graph for the policy "Reviewer R can see reviews for paper P only if R has submitted
+    // a review for P."
+    // set up graph
+    let mut b = Builder::default();
+    b.set_sharding(None);
+    b.set_persistence(PersistenceParameters::new(
+        DurabilityMode::DeleteOnExit,
+        Duration::from_millis(1),
+        Some(String::from("manual_policy_graph")),
+        1,
+    ));
+    println!("building graph");
+    let mut g = b.start_simple().unwrap();
+    let (review, review_assgn) = g.migrate(|mig| {
+        // paper,reviewer col is a hacky way of doing multi-column joins
+        let review_assgn = mig.add_base(
+            "review_assgn",
+            &["paper", "reviewer", "paper,reviewer"],
+            Base::new(vec![]).with_key(vec![2]));
+        let review = mig.add_base(
+            "review",
+            &["paper", "reviewer", "contents", "paper,reviewer"],
+            Base::new(vec![]).with_key(vec![3]));
+
+        (review, review_assgn)
+    });
+
+    let (r_ra_join, r_rewrite) = g.migrate(move |mig| {
+        let r_ra_join = mig.add_ingredient(
+            "r_ra_join",
+            &["reviewer", "paper", "contents", "paper,reviewer"],
+            Join::new(review, review_assgn, JoinType::Inner, vec![L(1), L(0), L(2), B(3, 2)]));
+        let r_rewrite = mig.add_ingredient(
+            "r_rewrite",
+            &["paper", "reviewer", "contents", "paper,reviewer"],
+            Rewrite::new(
+                review,
+                review,
+                1 as usize,
+                "anonymous".into(),
+                0 as usize));
+        (r_ra_join, r_rewrite)
+    });
+    
+    let filter = g.migrate(move |mig| {
+        let filter = mig.add_ingredient(
+            "filter",
+            &["reviewer", "paper", "contents", "paper,reviewer"],
+            Filter::new(r_ra_join,
+                        &[Some(FilterCondition::In(vec!["r2".into()]))]
+            ));
+        filter
+    });
+
+    let _ = g.migrate(move |mig| {
+        let bottom_join = mig.add_ingredient(
+            "bottom_join",
+            &["paper", "reviewer", "contents"],
+            Join::new(r_rewrite, filter, JoinType::Inner, vec![B(0, 1), L(1), L(2)]));
+
+        mig.maintain_anonymous(bottom_join, &[0]);
+        
+        bottom_join
+    });
+    
+    // populate base tables
+    println!("getting table views");
+    let mut mutreview = g.table("review").unwrap().into_sync();
+    let mut mutrevassgn = g.table("review_assgn").unwrap().into_sync();
+
+    println!("populating base tables");
+    mutrevassgn.insert(vec!["2".into(), "r1".into(), "2,r1".into()]).unwrap();
+    mutrevassgn.insert(vec!["2".into(), "r2".into(), "2,r2".into()]).unwrap();
+    mutrevassgn.insert(vec!["3".into(), "r2".into(), "3,r2".into()]).unwrap();
+
+    mutreview.insert(vec!["2".into(), "r1".into(), "great paper".into(), "2,r1".into()]).unwrap();
+    mutreview.insert(vec!["2".into(), "r2".into(), "interesting".into(), "2,r2".into()]).unwrap();
+    
+    // allow time to propagate
+    sleep();
+    
+    // print graphviz graph representation
+    println!("{}", g.graphviz().unwrap());
+    
+    // send query + verify result
+    let mut qview = g.view("bottom_join").unwrap().into_sync();
+    let result = qview.lookup(&["2".into()], true).unwrap();
+    assert_eq!(result, vec![
+        vec!["2".into(), "anonymous".into(), "great paper".into()],
+        vec!["2".into(), "anonymous".into(), "interesting".into()]]);
+    let result = qview.lookup(&["3".into()], true).unwrap();
+    assert_eq!(result.len(), 0);
 }
