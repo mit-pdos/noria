@@ -5,8 +5,9 @@ use serde;
 use tempfile::{tempdir, TempDir};
 
 use crate::prelude::*;
-use crate::state::{RecordResult, State};
+use crate::state::{RecordResult, State, Version};
 use common::SizeOf;
+use std::collections::HashMap;
 
 // Incremented on each PersistentState initialization so that IndexSeq
 // can be used to create unique identifiers for rows.
@@ -53,6 +54,10 @@ pub struct PersistentState {
     seq: IndexSeq,
     epoch: IndexEpoch,
     has_unique_index: bool,
+    // The next version for a write operation. This needs to be calculated on recovery.
+    version: Version,
+    // The in-memory book-keeping of the living versions for each pk.
+    alive_keys: HashMap<Vec<u8>, Vec<Version>>,
     // With DurabilityMode::DeleteOnExit,
     // RocksDB files are stored in a temporary directory.
     _directory: Option<TempDir>,
@@ -83,7 +88,7 @@ impl State for PersistentState {
         self.db.as_ref().unwrap().write_opt(batch, &opts).unwrap();
     }
 
-    fn lookup(&self, columns: &[usize], key: &KeyType) -> LookupResult {
+    fn lookup_at(&self, columns: &[usize], key: &KeyType, version: Option<Version>) -> LookupResult {
         let db = self.db.as_ref().unwrap();
         let index_id = self
             .indices
@@ -91,10 +96,9 @@ impl State for PersistentState {
             .position(|index| &index.columns[..] == columns)
             .expect("lookup on non-indexed column set");
         let cf = db.cf_handle(&self.indices[index_id].column_family).unwrap();
-        let prefix = Self::serialize_prefix(&key);
-        let data = if index_id == 0 && self.has_unique_index {
-            // This is a primary key, so we know there's only one row to retrieve
-            // (no need to use prefix_iterator).
+
+        let do_lookup_at = |version: Version| -> Vec<Vec<DataType>> {
+            let prefix = Self::serialize_versioned_prefix(&key, version);
             let raw_row = db.get_cf(cf, &prefix).unwrap();
             if let Some(raw) = raw_row {
                 let row = bincode::deserialize(&*raw).unwrap();
@@ -102,15 +106,38 @@ impl State for PersistentState {
             } else {
                 vec![]
             }
-        } else {
-            // This could correspond to more than one value, so we'll use a prefix_iterator:
-            db.prefix_iterator_cf(cf, &prefix)
-                .unwrap()
-                .map(|(_key, value)| bincode::deserialize(&*value).unwrap())
-                .collect()
         };
 
+        let data = match version {
+            None => {
+                if self.has_unique_index && columns == &self.indices[0].columns[..] {
+                    // The key being looked up is a primary key, find the latest version.
+                    match self.alive_keys.get(&Self::serialize_prefix(key)) {
+                        Some(v) => do_lookup_at(*v.last().unwrap()),
+                        None => vec![],
+                    }
+                } else {
+                    // TODO(zeling): We went here because we don't have 
+                    // a primary key, and the client didn't specify
+                    // the version, currently, all rows are returned.
+                    // But this sounds wierd. Maybe require a version
+                    // to be specified?
+                    let prefix = Self::serialize_prefix(&key);
+                    db.prefix_iterator_cf(cf, &prefix)
+                        .unwrap()
+                        .map(|(_key, value)| bincode::deserialize(&*value).unwrap())
+                        .collect()
+                }
+            }
+            Some(v) => {
+                do_lookup_at(v)
+            }
+        };
         LookupResult::Some(RecordResult::Owned(data))
+    }
+
+    fn lookup(&self, columns: &[usize], key: &KeyType) -> LookupResult {
+        self.lookup_at(columns, key, None)
     }
 
     fn add_key(&mut self, columns: &[usize], partial: Option<Vec<Tag>>) {
@@ -275,6 +302,29 @@ impl PersistentState {
             db.drop_cf(&indices.len().to_string()).unwrap();
         }
 
+        // Version recovery:
+        let mut alive_keys = HashMap::new();
+        let version = if indices.is_empty() {
+            0
+        } else {
+            let mut newest = 0;
+            let cf = db.cf_handle(&indices[0].column_family).unwrap();
+            db.full_iterator_cf(cf, rocksdb::IteratorMode::Start).unwrap().for_each(|(key, _)| {
+                let prefix_len = prefix_transform(&key).len();
+                let v = bincode::deserialize(&key[prefix_len..]).unwrap();
+                newest = std::cmp::max(newest, v);
+                let key_bytes = Vec::from(&key[..prefix_len]);
+                alive_keys.entry(key_bytes).and_modify(|vs: &mut Vec<Version>| {
+                    match vs.binary_search(&v) {
+                        Ok(_) => unreachable!("No two rows with the same pk should have the same version"),
+                        Err(pos) => vs.insert(pos, v),
+                    }
+                }).or_insert(vec![v]);
+            });
+            newest + 1
+        };
+        
+
         let mut state = Self {
             seq: 0,
             indices,
@@ -282,6 +332,8 @@ impl PersistentState {
             epoch: meta.epoch,
             db_opts: opts,
             db: Some(db),
+            version,
+            alive_keys,
             _directory: directory,
         };
 
@@ -399,12 +451,14 @@ impl PersistentState {
     // Our RocksDB keys come in three forms, and are encoded as follows:
     //
     // * Unique Primary Keys
-    // (size, key), where size is the serialized byte size of `key`
+    // (size, key, version), where size is the serialized byte size of `key`, and version
+    // is the version of the persistent_state when the tuple is created.
     // (used in `prefix_transform`).
     //
     // * Non-unique Primary Keys
-    // (size, key, epoch, seq), where epoch is incremented on each recover, and seq is a
-    // monotonically increasing sequence number that starts at 0 for every new epoch.
+    // (size, key, version, epoch, seq), where epoch is incremented on each recover, and seq is a
+    // monotonically increasing sequence number that starts at 0 for every new epoch, version is
+    // the version of the persistent_state when the tuple is created.
     //
     // * Secondary Index Keys
     // (size, key, primary_key), where `primary_key` makes sure that each secondary index row is
@@ -432,6 +486,10 @@ impl PersistentState {
         Self::serialize_raw_key(key, ())
     }
 
+    fn serialize_versioned_prefix(key: &KeyType, version: Version) -> Vec<u8> {
+        Self::serialize_raw_key(key, version)
+    }
+
     fn serialize_secondary(key: &KeyType, raw_primary: &[u8]) -> Vec<u8> {
         let mut bytes = Self::serialize_raw_key(key, ());
         bytes.extend_from_slice(raw_primary);
@@ -452,18 +510,24 @@ impl PersistentState {
     // with exactly those values. I think the regular state implementation supports inserting
     // something like an Int and retrieving with a BigInt.
     fn insert(&mut self, batch: &mut WriteBatch, r: &[DataType]) {
+        let next_version = self.version;
+        self.version += 1;
+        let pk = Self::build_key(r, &self.indices[0].columns);
         let serialized_pk = {
             let pk = Self::build_key(r, &self.indices[0].columns);
             if self.has_unique_index {
-                Self::serialize_prefix(&pk)
+                Self::serialize_raw_key(&pk, next_version)
             } else {
                 // For bases without primary keys we store the actual row values keyed by the index
                 // that was added first. This means that we can't consider the keys unique though, so
                 // we'll append a sequence number.
                 self.seq += 1;
-                Self::serialize_raw_key(&pk, (self.epoch, self.seq))
+                Self::serialize_raw_key(&pk, (next_version, self.epoch, self.seq))
             }
         };
+        self.alive_keys.entry(Self::serialize_prefix(&pk)).and_modify(|vs| {
+            vs.push(next_version);
+        }).or_insert(vec![next_version]);
 
         // First insert the actual value for our primary index:
         let serialized_row = bincode::serialize(&r).unwrap();
@@ -483,16 +547,17 @@ impl PersistentState {
         }
     }
 
-    fn remove(&self, batch: &mut WriteBatch, r: &[DataType]) {
+    fn remove(&mut self, batch: &mut WriteBatch, r: &[DataType]) {
         let db = self.db.as_ref().unwrap();
         let pk_index = &self.indices[0];
         let value_cf = db.cf_handle(&pk_index.column_family).unwrap();
-        let mut do_remove = move |primary_key: &[u8]| {
+        let indices = self.indices.iter();
+        let do_remove = move |primary_key: &[u8]| {
             // Delete the value row first (primary index):
             batch.delete_cf(value_cf, &primary_key).unwrap();
 
             // Then delete any references that point _exactly_ to that row:
-            for index in self.indices[1..].iter() {
+            for index in indices {
                 let key = Self::build_key(&r, &index.columns);
                 let serialized_key = Self::serialize_secondary(&key, primary_key);
                 let cf = db.cf_handle(&index.column_family).unwrap();
@@ -502,20 +567,22 @@ impl PersistentState {
 
         let pk = Self::build_key(&r, &pk_index.columns);
         let prefix = Self::serialize_prefix(&pk);
-        if self.has_unique_index {
+        let (removed_key, removed_version) = if self.has_unique_index {
+            let latest_version = self.alive_keys.get(&prefix).expect("tried removing non-existing row").last().unwrap();
+            let versioned_key = Self::serialize_versioned_prefix(&pk, *latest_version);
             if cfg!(debug_assertions) {
                 // This would imply that we're trying to delete a different row than the one we
                 // found when we resolved the DeleteRequest in Base. This really shouldn't happen,
                 // but we'll leave a check here in debug mode for now.
                 let raw = db
-                    .get_cf(value_cf, &prefix)
+                    .get_cf(value_cf, &versioned_key)
                     .unwrap()
                     .expect("tried removing non-existant primary key row");
                 let value: Vec<DataType> = bincode::deserialize(&*raw).unwrap();
                 assert_eq!(r, &value[..], "tried removing non-matching primary key row");
             }
-
-            do_remove(&prefix[..]);
+            do_remove(&versioned_key);
+            (prefix, *latest_version)
         } else {
             let (key, _value) = db
                 .prefix_iterator_cf(value_cf, &prefix)
@@ -525,8 +592,18 @@ impl PersistentState {
                     r == &value[..]
                 })
                 .expect("tried removing non-existant row");
+            let prefix_len = prefix_transform(&key).len();
+            let version = bincode::deserialize(&key[prefix_len..]).unwrap();
             do_remove(&key[..]);
+            (prefix_transform(&key[..]).to_vec(), version)
         };
+        let vs = self.alive_keys.get_mut(&removed_key).expect("living keys should be remembered");
+        if let Ok(pos) = vs.binary_search(&removed_version) {
+            vs.remove(pos);
+            if vs.is_empty() {
+                self.alive_keys.remove(&removed_key);
+            }
+        }
     }
 }
 
@@ -1153,5 +1230,95 @@ mod tests {
 
         // 4) prefix(prefix(key)) == prefix(key)
         assert_eq!(prefix, prefix_transform(&prefix));
+    }
+
+    #[test]
+    fn test_recover_version() {
+        let path = "_test_recover_version";
+        let get_state = || -> PersistentState {
+            let parameters = PersistenceParameters {
+                mode: DurabilityMode::Permanent,
+                ..PersistenceParameters::default()
+            };
+            PersistentState::new(path.to_string(), Some(&[0]), &parameters)
+        };
+        {
+            let mut state = get_state();
+            let first: Vec<DataType> = vec![10.into(), "Cat".into(), 1.into()];
+            let second: Vec<DataType> = vec![20.into(), "Cat".into(), 1.into()];
+            state.process_records(&mut vec![first.clone(), second.clone()].into(), None);
+            assert_eq!(state.version, 2);
+        }
+        {
+            let state = get_state();
+            // two writes before, so the next version should be 2.
+            assert_eq!(state.version, 2);
+            let pk1 = PersistentState::serialize_prefix(&KeyType::Single(&10.into()));
+            let pk2 = PersistentState::serialize_prefix(&KeyType::Single(&20.into()));
+            assert_eq!(*state.alive_keys.get(&pk1).unwrap(), vec![0]);
+            assert_eq!(*state.alive_keys.get(&pk2).unwrap(), vec![1]);
+        }
+        assert!(rocksdb::DB::destroy(&rocksdb::Options::default(), format!("{}.db", path)).is_ok());
+    }
+
+    #[test]
+    fn test_write_with_version() {
+        let path = "_test_write_with_version";
+        let get_state = || -> PersistentState {
+            PersistentState::new(path.to_string(), Some(&[0]), &PersistenceParameters::default())
+        };
+
+        let mut state = get_state();
+        let first: Vec<DataType> = vec![10.into(), "Cat".into(), 1.into()];
+        let second: Vec<DataType> = vec![20.into(), "Cat".into(), 1.into()];
+        state.process_records(&mut vec![first.clone(), second.clone()].into(), None);
+        let pk1 = PersistentState::build_key(&first, &state.indices[0].columns);
+        let serialized_pk1 = PersistentState::serialize_versioned_prefix(&pk1, 0);
+        let cf = state.db.as_ref().unwrap().cf_handle(&state.indices[0].column_family).unwrap();
+        let rows = state.db.as_ref().unwrap().get_cf(cf, &serialized_pk1).unwrap().unwrap();
+        assert_eq!(&*rows, &bincode::serialize(&first).unwrap()[..]);
+
+        let pk2 = PersistentState::build_key(&second, &state.indices[0].columns);
+        let serialized_pk2 = PersistentState::serialize_versioned_prefix(&pk2, 1);
+        let cf = state.db.as_ref().unwrap().cf_handle(&state.indices[0].column_family).unwrap();
+        let rows = state.db.as_ref().unwrap().get_cf(cf, &serialized_pk2).unwrap().unwrap();
+        assert_eq!(&*rows, &bincode::serialize(&second).unwrap()[..]);
+    }
+
+    #[test]
+    fn test_persistent_state_lookup_at() {
+        let mut state = PersistentState::new(
+            "test_persistent_state_lookup_at".to_string(),
+            Some(&[0]),
+            &PersistenceParameters::default(),
+        );
+        state.process_records(&mut vec![
+            vec![1.into(), "Hello".into()],
+            vec![1.into(), "World".into()],
+        ].into(), None);
+
+        match state.lookup_at(&[0], &KeyType::Single(&1.into()), Some(0)) {
+            LookupResult::Some(RecordResult::Owned(rs)) => {
+                assert_eq!(rs.len(), 1);
+                assert_eq!(rs[0][1], "Hello".into());
+            },
+            _ => unreachable!("should be found"),
+        }
+
+        match state.lookup_at(&[0], &KeyType::Single(&1.into()), Some(1)) {
+            LookupResult::Some(RecordResult::Owned(rs)) => {
+                assert_eq!(rs.len(), 1);
+                assert_eq!(rs[0][1], "World".into());
+            },
+            _ => unreachable!("should be found"),
+        }
+
+        match state.lookup_at(&[0], &KeyType::Single(&1.into()), None) {
+            LookupResult::Some(RecordResult::Owned(rs)) => {
+                assert_eq!(rs.len(), 1);
+                assert_eq!(rs[0][1], "World".into());
+            },
+            _ => unreachable!("should be found"),
+        }
     }
 }

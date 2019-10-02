@@ -15,6 +15,8 @@ use common::SizeOf;
 pub(crate) use self::memory_state::MemoryState;
 pub(crate) use self::persistent_state::PersistentState;
 
+// // The version of a tuple
+type Version = u64;
 pub(crate) trait State: SizeOf + Send {
     /// Add an index keyed by the given columns and replayed to by the given partial tags.
     fn add_key(&mut self, columns: &[usize], partial: Option<Vec<Tag>>);
@@ -34,6 +36,12 @@ pub(crate) trait State: SizeOf + Send {
     fn mark_filled(&mut self, key: Vec<DataType>, tag: Tag);
 
     fn lookup<'a>(&'a self, columns: &[usize], key: &KeyType) -> LookupResult<'a>;
+
+    // lookup a tuple at a specific version.
+    // Currently, it falls back to the default `lookup` implementation and ignores the version.
+    fn lookup_at<'a>(&'a self, columns: &[usize], key: &KeyType, _version: Option<Version>) -> LookupResult<'a> {
+        self.lookup(columns, key)
+    }
 
     fn rows(&self) -> usize;
 
