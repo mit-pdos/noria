@@ -296,6 +296,7 @@ fn main() {
     }
 
     drop(author_set);
+    let nauthors = authors.len();
     let nusers = authors.len();
     let nlogged = (loggedf * nusers as f64) as usize;
 
@@ -362,140 +363,124 @@ fn main() {
         let init = Instant::now();
         thread::sleep(Duration::from_millis(2000));
         // Manual Graph
-        if args.value_of("schema").unwrap() == "noschema" {
-            debug!(log, "No schema, manual graph");
-            let tmp = g.migrate(|mig| {
-                let tbl = mig.add_base("Table", &["col1", "col2"], Base::new(vec![]));
-                tbl
-            });
-            // BASE TABLES            
-            debug!(log, "Finished test migration");
-            let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
-                // paper,reviewer col is a hacky way of doing multi-column joins
-                let review_assgn = mig.add_base(
-                    "review_assgn",
-                    &["paper", "reviewer", "paper,reviewer"],
-                    Base::new(vec![]).with_key(vec![2]));
-                mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
-                println!("added PC member view of review_assgn");
-                let review = mig.add_base(
-                    "review",
-                    &["paper", "reviewer", "contents", "paper,reviewer"],
-                    Base::new(vec![]).with_key(vec![3]));
-                let paper = mig.add_base(
-                    "paper",
-                    &["paper","author","accepted"],
-                    Base::new(vec![]).with_key(vec![0]));
-                let coauthor = mig.add_base(
-                    "coauthor",
-                    &["paper","author", "paper,author"],
-                    Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
-                (review, review_assgn, paper, coauthor)
-            });
-            debug!(log, "Completed migration: create base tables");
-            // BASE TABLE DIRECT DERIVATIVES
-            let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
-                let paper_rewrite = mig.add_ingredient(
-                    "paper_rewrite",
-                    &["paper", "author", "accepted"],
-                    Rewrite::new(
-                        paper,
-                        paper,
-                        1 as usize,
-                        "anonymous".into(),
-                        0 as usize));
-                mig.maintain_anonymous(paper_rewrite, &[0]);
-                
-                let papers_for_authors = mig.add_ingredient(
-                    "papers_for_authors",
-                    &["author", "paper", "accepted"],
-                    Join::new(paper, coauthor, JoinType::Inner, vec![R(1), B(0, 0), L(2)]));
-                
-                let submitted_reviews = mig.add_ingredient(
-                    "submitted_reviews",
-                    &["reviewer", "paper", "contents", "paper,reviewer"],
-                    Join::new(review, review_assgn, JoinType::Inner, vec![L(1), L(0), L(2), B(3, 2)]));
-                
-                (paper_rewrite, papers_for_authors, submitted_reviews)
-            });
-            debug!(log, "Completed migration: created direct derivatives of base tables");
-            // NEXT LAYER
-            let (reviews_by_r1, review_rewrite) = g.migrate(move |mig| {
-                let papers_a1 = mig.add_ingredient(
-                    "papers_a1",
+        // BASE TABLES
+        let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
+            // paper,reviewer col is a hacky way of doing multi-column joins
+            let review_assgn = mig.add_base(
+                "ReviewAssignment",
+                &["paper", "reviewer", "paper,reviewer"],
+                Base::new(vec![]).with_key(vec![2]));
+            mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
+            let review = mig.add_base(
+                "Review",
+                &["paper", "reviewer", "contents", "paper,reviewer"],
+                Base::new(vec![]).with_key(vec![3]));
+            let paper = mig.add_base(
+                "Paper",
+                &["paper","author","accepted"],
+                Base::new(vec![]).with_key(vec![0]));
+            let coauthor = mig.add_base(
+                "Coauthor",
+                &["paper","author", "paper,author"],
+                Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
+            (review, review_assgn, paper, coauthor)
+        });
+        
+        // BASE TABLE DIRECT DERIVATIVES
+        let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
+            let paper_rewrite = mig.add_ingredient(
+                "paper_rewrite",
+                &["paper", "author", "accepted"],
+                Rewrite::new(
+                    paper,
+                    paper,
+                    1 as usize,
+                    "anonymous".into(),
+                    0 as usize));
+            mig.maintain_anonymous(paper_rewrite, &[0]);
+            
+            let papers_for_authors = mig.add_ingredient(
+                "papers_for_authors",
+                &["author", "paper", "accepted"],
+                Join::new(paper, coauthor, JoinType::Inner, vec![R(1), B(0, 0), L(2)]));
+            
+            let submitted_reviews = mig.add_ingredient(
+                "submitted_reviews",
+                &["reviewer", "paper", "contents", "paper,reviewer"],
+                Join::new(review, review_assgn, JoinType::Inner, vec![L(1), L(0), L(2), B(3, 2)]));
+            
+            (paper_rewrite, papers_for_authors, submitted_reviews)
+        });
+        
+        // NEXT LAYER
+        let (reviews_by_rs, review_rewrite) = g.migrate(move |mig| {
+            // Author views of PaperList
+            for i in 0..nauthors {
+                let papers_ai = mig.add_ingredient(
+                    format!("PaperList_a{}", i+1),
                     &["author", "paper", "accepted"], // another way to specify col? 
                     Filter::new(papers_for_authors,
-                                &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                   Value::Constant("a1".into())))]));
-                mig.maintain_anonymous(papers_a1, &[0]);
-                
-                let reviews_by_r1 = mig.add_ingredient(
-                    "reviews_by_r1",
-                    &["reviewer", "paper", "contents"], // another way to specify col?
-                    Filter::new(submitted_reviews,
-                                &[Some(FilterCondition::Comparison(Operator::Equal,
-                                                                   Value::Constant("r1".into())))]));
-                
-                // Note: anonymization doesn't happen if signal column comes from submitted_reviews
-                // instead of directly from review table.
-                let review_rewrite = mig.add_ingredient(
-                    "review_rewrite",
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
+                mig.maintain_anonymous(papers_ai, &[0]);
+            }
+
+            // Reviews by each reviewer
+            let mut reviews_by_rs = Vec::new();
+            for i in 0..nreviewers {
+                let reviews_by_ri = mig.add_ingredient(
+                format!("reviews_by_r{}", i+1),
+                &["reviewer", "paper", "contents"], // another way to specify col?
+                Filter::new(submitted_reviews,
+                            &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("r{}", i+1).into())))]));
+                reviews_by_rs.push(reviews_by_ri);
+            }
+            
+            // Note: anonymization doesn't happen if signal column comes from submitted_reviews
+            // instead of directly from review table.
+            let review_rewrite = mig.add_ingredient(
+                "review_rewrite",
+                &["reviewer", "paper", "contents"],
+                Rewrite::new(
+                    submitted_reviews,
+                    review,
+                    0 as usize,
+                    "anonymous".into(),
+                    1 as usize));
+            
+            (reviews_by_rs, review_rewrite)
+        });
+
+        // REVIEWS FOR EACH REVIEWER
+        //        let reviews_rs = g.migrate(move |mig| {
+        let _ = g.migrate(move |mig| {
+            let mut reviews_rs = Vec::new();
+            for i in 0..nreviewers {
+                let reviews_ri = mig.add_ingredient(
+                    format!("reviews_r{}", i+1),
                     &["reviewer", "paper", "contents"],
-                    Rewrite::new(
-                        submitted_reviews,
-                        review,
-                        0 as usize,
-                        "anonymous".into(),
-                        1 as usize));
-                
-                (reviews_by_r1, review_rewrite)
-            });
-            debug!(log, "Completed migration: next layer");
-            // REVIEWS FOR R1
-            let reviews_r1 = g.migrate(move |mig| {
-                let reviews_r1 = mig.add_ingredient(
-                    "reviews_r1",
-                    &["reviewer", "paper", "contents"],
-                    Join::new(review_rewrite, reviews_by_r1, JoinType::Inner, vec![L(0), B(1, 1), L(2)]));
-                mig.maintain_anonymous(reviews_r1, &[1]);
-                
-                reviews_r1
-            });
-            debug!(log, "Completed migration: reviews for R1");
-            // REVIEWLIST QUERY
-            let _ = g.migrate(move |mig| {
-                let revlist_r1 = mig.add_ingredient(
-                    "revlist_r1",
-                    &["paper", "reviewer", "contents", "author", "accepted"],
-                    Join::new(paper_rewrite, reviews_r1,
-                              JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
-                mig.maintain_anonymous(revlist_r1, &[0]);
-            });
-            debug!(log, "Completed all migrations");
-        } else {
-            // Recipe Installation
-            info!(log, "setting up database schema");
-            debug!(log, "setting up initial schema");
-            g.install_recipe(
-                std::fs::read_to_string(args.value_of("schema").unwrap())
-                    .expect("failed to read schema file"),
-            )
-                .expect("failed to load initial schema");
-            debug!(log, "adding security policies");
-            g.on_worker(|w| {
-                w.set_security_config(
-                    std::fs::read_to_string(args.value_of("policies").unwrap())
-                        .expect("failed to read policy file"),
-                )
-            }).unwrap();
-            debug!(log, "adding queries");
-            g.extend_recipe(
-                std::fs::read_to_string(args.value_of("queries").unwrap())
-                    .expect("failed to read queries file"),
-            )
-                .expect("failed to load initial schema");
-            debug!(log, "database schema setup done");
-        }
+                    Join::new(review_rewrite, reviews_by_rs[i], JoinType::Inner, vec![L(0), B(1, 1), L(2)]));
+                mig.maintain_anonymous(reviews_ri, &[1]);
+                reviews_rs.push(reviews_ri);
+            }
+            reviews_rs
+        });
+        
+        // REVIEWLIST QUERY
+//        let _ = g.migrate(move |mig| {
+//            for i in 0..n_reviewers {
+//                let revlist_ri = mig.add_ingredient(
+//                    format!("ReviewList_r{}", i+1),
+//                    &["paper", "reviewer", "contents", "author", "accepted"],
+//                    Join::new(paper_rewrite, reviews_rs[i],
+//                              JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
+//                mig.maintain_anonymous(revlist_ri, &[0]);
+//            }
+//        });
+
+        // For debugging: print graph
+        println!("{}", g.graphviz().unwrap());
+        
+        // Graph construction complete; Collect memory stats
         let memstats = |g: &mut noria::SyncHandle<_>, at| {
             if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
                 debug!(log, "extracing process memory stats"; "at" => at);
