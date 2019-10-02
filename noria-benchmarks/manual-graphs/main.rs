@@ -4,7 +4,9 @@ use noria::{Builder, FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Instant, Duration};
+use std::thread;
+use noria::{DurabilityMode, PersistenceParameters};
 use noria::manual::Base;
 use noria::manual::ops::join::JoinSource::*;
 use noria::manual::ops::join::{Join, JoinType};
@@ -42,7 +44,7 @@ struct Review {
 
 fn main() {
     use clap::{App, Arg};
-    let args = App::new("securecrp")
+    let args = App::new("manualgraph")
         .version("0.1")
         .about("Benchmarks HotCRP-like application with security policies.")
         .arg(
@@ -345,15 +347,29 @@ fn main() {
         if verbose > 1 {
             g.log_with(log.clone());
         }
+       
+        g.set_persistence(PersistenceParameters::new(
+            DurabilityMode::DeleteOnExit,
+            Duration::from_millis(1),
+            Some(String::from("manual_policy_graph")),
+            1,
+        ));
+        
         debug!(log, "spinning up");
         let mut g = g.start_simple().unwrap();
         debug!(log, "noria ready");
 
         let init = Instant::now();
-
+        thread::sleep(Duration::from_millis(2000));
         // Manual Graph
         if args.value_of("schema").unwrap() == "noschema" {
-            // BASE TABLES
+            debug!(log, "No schema, manual graph");
+            let tmp = g.migrate(|mig| {
+                let tbl = mig.add_base("Table", &["col1", "col2"], Base::new(vec![]));
+                tbl
+            });
+            // BASE TABLES            
+            debug!(log, "Finished test migration");
             let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
                 // paper,reviewer col is a hacky way of doing multi-column joins
                 let review_assgn = mig.add_base(
@@ -361,6 +377,7 @@ fn main() {
                     &["paper", "reviewer", "paper,reviewer"],
                     Base::new(vec![]).with_key(vec![2]));
                 mig.maintain_anonymous(review_assgn, &[1]); // for PC members to view
+                println!("added PC member view of review_assgn");
                 let review = mig.add_base(
                     "review",
                     &["paper", "reviewer", "contents", "paper,reviewer"],
@@ -375,7 +392,7 @@ fn main() {
                     Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
                 (review, review_assgn, paper, coauthor)
             });
-            
+            debug!(log, "Completed migration: create base tables");
             // BASE TABLE DIRECT DERIVATIVES
             let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
                 let paper_rewrite = mig.add_ingredient(
@@ -401,7 +418,7 @@ fn main() {
                 
                 (paper_rewrite, papers_for_authors, submitted_reviews)
             });
-            
+            debug!(log, "Completed migration: created direct derivatives of base tables");
             // NEXT LAYER
             let (reviews_by_r1, review_rewrite) = g.migrate(move |mig| {
                 let papers_a1 = mig.add_ingredient(
@@ -433,7 +450,7 @@ fn main() {
                 
                 (reviews_by_r1, review_rewrite)
             });
-            
+            debug!(log, "Completed migration: next layer");
             // REVIEWS FOR R1
             let reviews_r1 = g.migrate(move |mig| {
                 let reviews_r1 = mig.add_ingredient(
@@ -444,7 +461,7 @@ fn main() {
                 
                 reviews_r1
             });
-            
+            debug!(log, "Completed migration: reviews for R1");
             // REVIEWLIST QUERY
             let _ = g.migrate(move |mig| {
                 let revlist_r1 = mig.add_ingredient(
@@ -454,8 +471,9 @@ fn main() {
                               JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
                 mig.maintain_anonymous(revlist_r1, &[0]);
             });
+            debug!(log, "Completed all migrations");
         } else {
-        // Recipe Installation
+            // Recipe Installation
             info!(log, "setting up database schema");
             debug!(log, "setting up initial schema");
             g.install_recipe(
@@ -469,15 +487,14 @@ fn main() {
                     std::fs::read_to_string(args.value_of("policies").unwrap())
                         .expect("failed to read policy file"),
                 )
-            })
-        .unwrap();
-        debug!(log, "adding queries");
-        g.extend_recipe(
-            std::fs::read_to_string(args.value_of("queries").unwrap())
-                .expect("failed to read queries file"),
-        )
-        .expect("failed to load initial schema");
-        debug!(log, "database schema setup done");
+            }).unwrap();
+            debug!(log, "adding queries");
+            g.extend_recipe(
+                std::fs::read_to_string(args.value_of("queries").unwrap())
+                    .expect("failed to read queries file"),
+            )
+                .expect("failed to load initial schema");
+            debug!(log, "database schema setup done");
         }
         let memstats = |g: &mut noria::SyncHandle<_>, at| {
             if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
