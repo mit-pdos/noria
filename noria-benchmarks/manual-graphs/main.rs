@@ -70,30 +70,6 @@ fn main() {
                 .help("Source to pull paper data from"),
         )
         .arg(
-            Arg::with_name("schema")
-                .long("schema")
-                .short("s")
-                .required(true)
-                .default_value("noria-benchmarks/securecrp/jeeves_schema.sql")
-                .help("SQL schema file"),
-        )
-        .arg(
-            Arg::with_name("queries")
-                .long("queries")
-                .short("q")
-                .required(true)
-                .default_value("noria-benchmarks/securecrp/jeeves_queries.sql")
-                .help("SQL query file"),
-        )
-        .arg(
-            Arg::with_name("policies")
-                .long("policies")
-                .short("p")
-                .required(true)
-                .default_value("noria-benchmarks/securecrp/jeeves_policies.json")
-                .help("Security policies file"),
-        )
-        .arg(
             Arg::with_name("npapers")
                 .short("n")
                 .takes_value(true)
@@ -104,7 +80,7 @@ fn main() {
             Arg::with_name("logged-in")
                 .short("l")
                 .default_value("1.0")
-                .help("Fraction of users that are logged in."),
+                .help("Fraction of authors & reviewers that are logged in."),
         )
         .arg(
             Arg::with_name("iter")
@@ -297,18 +273,20 @@ fn main() {
 
     drop(author_set);
     let nauthors = authors.len();
-    let nusers = authors.len();
-    let nlogged = (loggedf * nusers as f64) as usize;
+    let alogged = (loggedf * nauthors as f64) as usize;
 
     // let's compute the number of reviewers
     // we know the number of reviews
     // we have fixed the number of reviews per reviewer
-    // and we assume every reviewer is an author
+    // We assume the set of reviewers DOES NOT intersect the set of authors.
     let nreviewers = (reviews.len() + (PAPERS_PER_REVIEWER - 1)) / PAPERS_PER_REVIEWER;
-
+    let rlogged = (loggedf * nreviewers as f64) as usize;
+    let nusers = authors.len() + nreviewers;
+    
     println!("# nauthors: {}", authors.len());
     println!("# nreviewers: {}", nreviewers);
-    println!("# logged-in users: {}", nlogged);
+    println!("# logged-in authors: {}", alogged);
+    println!("# logged-in reviewers: {}", rlogged);
     println!("# npapers: {}", papers.len());
     println!("# nreviews: {}", reviews.len());
     println!(
@@ -362,7 +340,7 @@ fn main() {
 
         let init = Instant::now();
         thread::sleep(Duration::from_millis(2000));
-        // Manual Graph
+        // Manual Graph Construction
         // BASE TABLES
         let (review, review_assgn, paper, coauthor) = g.migrate(|mig| {
             // paper,reviewer col is a hacky way of doing multi-column joins
@@ -380,12 +358,12 @@ fn main() {
                 &["paper","author","accepted"],
                 Base::new(vec![]).with_key(vec![0]));
             let coauthor = mig.add_base(
-                "Coauthor",
+                "PaperCoauthor",
                 &["paper","author", "paper,author"],
                 Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
             (review, review_assgn, paper, coauthor)
         });
-        
+
         // BASE TABLE DIRECT DERIVATIVES
         let (paper_rewrite, papers_for_authors, submitted_reviews) = g.migrate(move |mig| {
             let paper_rewrite = mig.add_ingredient(
@@ -411,30 +389,9 @@ fn main() {
             
             (paper_rewrite, papers_for_authors, submitted_reviews)
         });
-        
-        // NEXT LAYER
-        let (reviews_by_rs, review_rewrite) = g.migrate(move |mig| {
-            // Author views of PaperList
-            for i in 0..nauthors {
-                let papers_ai = mig.add_ingredient(
-                    format!("PaperList_a{}", i+1),
-                    &["author", "paper", "accepted"], // another way to specify col? 
-                    Filter::new(papers_for_authors,
-                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
-                mig.maintain_anonymous(papers_ai, &[0]);
-            }
 
-            // Reviews by each reviewer
-            let mut reviews_by_rs = Vec::new();
-            for i in 0..nreviewers {
-                let reviews_by_ri = mig.add_ingredient(
-                format!("reviews_by_r{}", i+1),
-                &["reviewer", "paper", "contents"], // another way to specify col?
-                Filter::new(submitted_reviews,
-                            &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("r{}", i+1).into())))]));
-                reviews_by_rs.push(reviews_by_ri);
-            }
-            
+        // NEXT LAYER
+        let review_rewrite = g.migrate(move |mig| {
             // Note: anonymization doesn't happen if signal column comes from submitted_reviews
             // instead of directly from review table.
             let review_rewrite = mig.add_ingredient(
@@ -447,35 +404,8 @@ fn main() {
                     "anonymous".into(),
                     1 as usize));
             
-            (reviews_by_rs, review_rewrite)
+            review_rewrite
         });
-
-        // REVIEWS FOR EACH REVIEWER
-        //        let reviews_rs = g.migrate(move |mig| {
-        let _ = g.migrate(move |mig| {
-            let mut reviews_rs = Vec::new();
-            for i in 0..nreviewers {
-                let reviews_ri = mig.add_ingredient(
-                    format!("reviews_r{}", i+1),
-                    &["reviewer", "paper", "contents"],
-                    Join::new(review_rewrite, reviews_by_rs[i], JoinType::Inner, vec![L(0), B(1, 1), L(2)]));
-                mig.maintain_anonymous(reviews_ri, &[1]);
-                reviews_rs.push(reviews_ri);
-            }
-            reviews_rs
-        });
-        
-        // REVIEWLIST QUERY
-//        let _ = g.migrate(move |mig| {
-//            for i in 0..n_reviewers {
-//                let revlist_ri = mig.add_ingredient(
-//                    format!("ReviewList_r{}", i+1),
-//                    &["paper", "reviewer", "contents", "author", "accepted"],
-//                    Join::new(paper_rewrite, reviews_rs[i],
-//                              JoinType::Inner, vec![B(0, 1), R(0), R(2), L(1), L(2)]));
-//                mig.maintain_anonymous(revlist_ri, &[0]);
-//            }
-//        });
 
         // For debugging: print graph
         println!("{}", g.graphviz().unwrap());
@@ -513,13 +443,13 @@ fn main() {
 
         info!(log, "starting db population");
         debug!(log, "getting handles to tables");
-        let mut user_profile = g.table("UserProfile").unwrap().into_sync();
+//        let mut user_profile = g.table("UserProfile").unwrap().into_sync();
         let mut paper = g.table("Paper").unwrap().into_sync();
         let mut coauthor = g.table("PaperCoauthor").unwrap().into_sync();
-        let mut version = g.table("PaperVersion").unwrap().into_sync();
+//        let mut version = g.table("PaperVersion").unwrap().into_sync();
         let mut review_assignment = g.table("ReviewAssignment").unwrap().into_sync();
         let mut review = g.table("Review").unwrap().into_sync();
-        debug!(log, "creating users"; "n" => nusers);
+/*        debug!(log, "creating users"; "n" => nusers);
         user_profile
             .perform_all(authors.iter().enumerate().map(|(i, &email)| {
                 vec![
@@ -538,22 +468,35 @@ fn main() {
                 ]
             }))
             .unwrap();
-        debug!(log, "logging in users"; "n" => nlogged);
+*/
+        debug!(log, "logging in authors"; "n" => alogged);
         let mut printi = 0;
-        let stripe = nlogged / 10;
-        let mut login_times = Vec::with_capacity(nlogged);
-        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
-            trace!(log, "logging in user"; "uid" => uid);
-            let user_context: HashMap<_, _> =
+        let stripe = alogged / 10;
+        let mut alogin_times = Vec::with_capacity(alogged);
+        // TODO: Switch to specifying number of logged in authors and reviewers.
+        for (i, &uid) in authors.iter().take(alogged).enumerate() {
+            println!("{}", uid);
+            trace!(log, "logging in author"; "uid" => uid);
+            let user_context: std::collections::HashMap<std::string::String, std::string::String> =
                 std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
+            // TODO also have to add info to user profile table??
             let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
-                .unwrap();
+            // Add user-view nodes to graph (substitute for call to create_universe)
+            // TODO implication: logging in two users may not be equally expensive.
+            let _ = g.migrate(move |mig| {
+                // Author views of PaperList
+                let papers_ai = mig.add_ingredient(
+                    format!("PaperList_a{}", i+1),
+                    &["author", "paper", "accepted"], // another way to specify col? 
+                    Filter::new(papers_for_authors,
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
+                mig.maintain_anonymous(papers_ai, &[0]);
+            });
             let took = start.elapsed();
-            login_times.push(took);
+            alogin_times.push(took);
 
             if i == printi {
-                println!("# login sample[{}]: {:?}", i, login_times[i]);
+                println!("# login sample[{}]: {:?}", i, alogin_times[i]);
                 if i == 0 {
                     // we want to include both 0 and 1
                     printi += 1;
@@ -565,8 +508,52 @@ fn main() {
                 }
             }
         }
+        debug!(log, "logging in reviewers"; "n" => rlogged);
+        let mut printi = 0;
+        let stripe = rlogged / 10;
+        let mut rlogin_times = Vec::with_capacity(rlogged);
+        for i in 0..rlogged {
+            trace!(log, "logging in reviewer"; "id" => i);
+            let start = Instant::now();
+            
+            // Reviews by each reviewer
+            let reviews_by_ri = g.migrate(move |mig| {
+                let reviews_by_ri = mig.add_ingredient(
+                    format!("reviews_by_r{}", i+1),
+                    &["reviewer", "paper", "contents"], // another way to specify col?
+                    Filter::new(submitted_reviews,
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("r{}", i+1).into())))]));
+                reviews_by_ri
+            });
+            let _ = g.migrate(move |mig| {
+                // Reviews viewable by each reviewer
+                let reviews_ri = mig.add_ingredient(
+                    format!("reviews_r{}", i+1),
+                    &["reviewer", "paper", "contents"],
+                    Join::new(review_rewrite, reviews_by_ri, JoinType::Inner, vec![L(0), B(1, 1), L(2)]));
+                mig.maintain_anonymous(reviews_ri, &[1]);
+            });
+            let took = start.elapsed();
+            rlogin_times.push(took);
+
+            if i == printi {
+                println!("# rlogin sample[{}]: {:?}", i, rlogin_times[i]);
+                if i == 0 {
+                    // we want to include both 0 and 1
+                    printi += 1;
+                } else if i == 1 {
+                    // and then go back to every stripe'th sample
+                    printi = stripe;
+                } else {
+                    printi += stripe;
+                }
+            }
+        }
+
         debug!(log, "registering papers");
         let start = Instant::now();
+        // TODO: Can still use perform_all, but need to modify columns to
+        // match Paper table in manual graph.
         paper
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
                 vec![
@@ -581,23 +568,9 @@ fn main() {
             papers.len(),
             start.elapsed()
         );
-        trace!(log, "also registering paper version");
-        version
-            .perform_all(papers.iter().enumerate().map(|(i, p)| {
-                vec![
-                    (i + 1).into(),
-                    (&*p.title).into(),
-                    "Text".into(),
-                    "Abstract".into(),
-                    "0".into(),
-                ]
-            }))
-            .unwrap();
-        println!(
-            "# paper + version: {} in {:?}",
-            papers.len(),
-            start.elapsed()
-        );
+        // TODO: Can still use perform_all, but need to modify columns to
+        // match Coauthor table in manual graph.
+        // TODO have to partition users into reviewers & authors
         debug!(log, "registering paper authors");
         let start = Instant::now();
         let mut npauthors = 0;
@@ -607,13 +580,18 @@ fn main() {
                 npauthors += p.authors.len();
                 p.authors
                     .iter()
-                    .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into()])
+                    .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into(),
+                    format!("{},{}", i + 1, a + 1).into()])
             }))
             .unwrap();
         println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
+        // TODO: Can still use perform_all, but need to modify columns to
+        // match Review table in manual graph.
         debug!(log, "registering reviews");
         reviews.shuffle(&mut rng);
         // assume all reviews have been submitted
+        // TODO: Can still use perform_all, but need to modify columns to
+        // match ReviewAssignment table in manual graph.
         trace!(log, "register assignments");
         let start = Instant::now();
         review_assignment
@@ -624,7 +602,8 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // TODO: don't review own paper
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into()]
+                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into(),
+                            format!("{},{}", r.paper, i + 1).into()]
                         })
                     }),
             )
@@ -644,14 +623,10 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         rs.iter().map(move |r| {
                             vec![
-                                "0".into(),
                                 r.paper.into(),
                                 format!("{}", i + 1).into(),
                                 "review text".into(),
-                                r.rating.into(),
-                                r.rating.into(),
-                                r.rating.into(),
-                                r.confidence.into(),
+                                format!("{},{}", r.paper, i + 1).into(),
                             ]
                         })
                     }),
@@ -669,12 +644,12 @@ fn main() {
 
         info!(log, "creating api handles");
         debug!(log, "creating view handles for paper list");
-        let mut paper_list: HashMap<_, _> = (0..nlogged)
+        let mut paper_list: HashMap<_, _> = (0..alogged)
             .map(|uid| {
                 trace!(log, "creating posts handle for user"; "uid" => authors[uid]);
                 (
                     authors[uid],
-                    g.view(format!("PaperList_u{}", uid + 1))
+                    g.view(format!("PaperList_a{}", uid + 1))
                         .unwrap()
                         .into_sync(),
                 )
@@ -688,7 +663,7 @@ fn main() {
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();
-        'pl_outer: for uid in authors[0..nlogged].choose_multiple(&mut rng, nlogged) {
+        'pl_outer: for uid in authors[0..alogged].choose_multiple(&mut rng, alogged) {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));
             let begin = Instant::now();
