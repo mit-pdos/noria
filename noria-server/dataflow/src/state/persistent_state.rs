@@ -88,7 +88,12 @@ impl State for PersistentState {
         self.db.as_ref().unwrap().write_opt(batch, &opts).unwrap();
     }
 
-    fn lookup_at(&self, columns: &[usize], key: &KeyType, version: Option<Version>) -> LookupResult {
+    fn lookup_at(
+        &self,
+        columns: &[usize],
+        key: &KeyType,
+        version: Option<Version>,
+    ) -> LookupResult {
         let db = self.db.as_ref().unwrap();
         let index_id = self
             .indices
@@ -117,7 +122,7 @@ impl State for PersistentState {
                         None => vec![],
                     }
                 } else {
-                    // TODO(zeling): We went here because we don't have 
+                    // TODO(zeling): We went here because we don't have
                     // a primary key, and the client didn't specify
                     // the version, currently, all rows are returned.
                     // But this sounds wierd. Maybe require a version
@@ -129,9 +134,7 @@ impl State for PersistentState {
                         .collect()
                 }
             }
-            Some(v) => {
-                do_lookup_at(v)
-            }
+            Some(v) => do_lookup_at(v),
         };
         LookupResult::Some(RecordResult::Owned(data))
     }
@@ -309,21 +312,25 @@ impl PersistentState {
         } else {
             let mut newest = 0;
             let cf = db.cf_handle(&indices[0].column_family).unwrap();
-            db.full_iterator_cf(cf, rocksdb::IteratorMode::Start).unwrap().for_each(|(key, _)| {
-                let prefix_len = prefix_transform(&key).len();
-                let v = bincode::deserialize(&key[prefix_len..]).unwrap();
-                newest = std::cmp::max(newest, v);
-                let key_bytes = Vec::from(&key[..prefix_len]);
-                alive_keys.entry(key_bytes).and_modify(|vs: &mut Vec<Version>| {
-                    match vs.binary_search(&v) {
-                        Ok(_) => unreachable!("No two rows with the same pk should have the same version"),
-                        Err(pos) => vs.insert(pos, v),
-                    }
-                }).or_insert(vec![v]);
-            });
+            db.full_iterator_cf(cf, rocksdb::IteratorMode::Start)
+                .unwrap()
+                .for_each(|(key, _)| {
+                    let prefix_len = prefix_transform(&key).len();
+                    let v = bincode::deserialize(&key[prefix_len..]).unwrap();
+                    newest = std::cmp::max(newest, v);
+                    let key_bytes = Vec::from(&key[..prefix_len]);
+                    alive_keys
+                        .entry(key_bytes)
+                        .and_modify(|vs: &mut Vec<Version>| match vs.binary_search(&v) {
+                            Ok(_) => unreachable!(
+                                "No two rows with the same pk should have the same version"
+                            ),
+                            Err(pos) => vs.insert(pos, v),
+                        })
+                        .or_insert(vec![v]);
+                });
             newest + 1
         };
-        
 
         let mut state = Self {
             seq: 0,
@@ -525,9 +532,12 @@ impl PersistentState {
                 Self::serialize_raw_key(&pk, (next_version, self.epoch, self.seq))
             }
         };
-        self.alive_keys.entry(Self::serialize_prefix(&pk)).and_modify(|vs| {
-            vs.push(next_version);
-        }).or_insert(vec![next_version]);
+        self.alive_keys
+            .entry(Self::serialize_prefix(&pk))
+            .and_modify(|vs| {
+                vs.push(next_version);
+            })
+            .or_insert(vec![next_version]);
 
         // First insert the actual value for our primary index:
         let serialized_row = bincode::serialize(&r).unwrap();
@@ -568,7 +578,12 @@ impl PersistentState {
         let pk = Self::build_key(&r, &pk_index.columns);
         let prefix = Self::serialize_prefix(&pk);
         let (removed_key, removed_version) = if self.has_unique_index {
-            let latest_version = self.alive_keys.get(&prefix).expect("tried removing non-existing row").last().unwrap();
+            let latest_version = self
+                .alive_keys
+                .get(&prefix)
+                .expect("tried removing non-existing row")
+                .last()
+                .unwrap();
             let versioned_key = Self::serialize_versioned_prefix(&pk, *latest_version);
             if cfg!(debug_assertions) {
                 // This would imply that we're trying to delete a different row than the one we
@@ -597,7 +612,10 @@ impl PersistentState {
             do_remove(&key[..]);
             (prefix_transform(&key[..]).to_vec(), version)
         };
-        let vs = self.alive_keys.get_mut(&removed_key).expect("living keys should be remembered");
+        let vs = self
+            .alive_keys
+            .get_mut(&removed_key)
+            .expect("living keys should be remembered");
         if let Ok(pos) = vs.binary_search(&removed_version) {
             vs.remove(pos);
             if vs.is_empty() {
@@ -1265,7 +1283,11 @@ mod tests {
     fn test_write_with_version() {
         let path = "_test_write_with_version";
         let get_state = || -> PersistentState {
-            PersistentState::new(path.to_string(), Some(&[0]), &PersistenceParameters::default())
+            PersistentState::new(
+                path.to_string(),
+                Some(&[0]),
+                &PersistenceParameters::default(),
+            )
         };
 
         let mut state = get_state();
@@ -1274,14 +1296,36 @@ mod tests {
         state.process_records(&mut vec![first.clone(), second.clone()].into(), None);
         let pk1 = PersistentState::build_key(&first, &state.indices[0].columns);
         let serialized_pk1 = PersistentState::serialize_versioned_prefix(&pk1, 0);
-        let cf = state.db.as_ref().unwrap().cf_handle(&state.indices[0].column_family).unwrap();
-        let rows = state.db.as_ref().unwrap().get_cf(cf, &serialized_pk1).unwrap().unwrap();
+        let cf = state
+            .db
+            .as_ref()
+            .unwrap()
+            .cf_handle(&state.indices[0].column_family)
+            .unwrap();
+        let rows = state
+            .db
+            .as_ref()
+            .unwrap()
+            .get_cf(cf, &serialized_pk1)
+            .unwrap()
+            .unwrap();
         assert_eq!(&*rows, &bincode::serialize(&first).unwrap()[..]);
 
         let pk2 = PersistentState::build_key(&second, &state.indices[0].columns);
         let serialized_pk2 = PersistentState::serialize_versioned_prefix(&pk2, 1);
-        let cf = state.db.as_ref().unwrap().cf_handle(&state.indices[0].column_family).unwrap();
-        let rows = state.db.as_ref().unwrap().get_cf(cf, &serialized_pk2).unwrap().unwrap();
+        let cf = state
+            .db
+            .as_ref()
+            .unwrap()
+            .cf_handle(&state.indices[0].column_family)
+            .unwrap();
+        let rows = state
+            .db
+            .as_ref()
+            .unwrap()
+            .get_cf(cf, &serialized_pk2)
+            .unwrap()
+            .unwrap();
         assert_eq!(&*rows, &bincode::serialize(&second).unwrap()[..]);
     }
 
@@ -1292,16 +1336,20 @@ mod tests {
             Some(&[0]),
             &PersistenceParameters::default(),
         );
-        state.process_records(&mut vec![
-            vec![1.into(), "Hello".into()],
-            vec![1.into(), "World".into()],
-        ].into(), None);
+        state.process_records(
+            &mut vec![
+                vec![1.into(), "Hello".into()],
+                vec![1.into(), "World".into()],
+            ]
+            .into(),
+            None,
+        );
 
         match state.lookup_at(&[0], &KeyType::Single(&1.into()), Some(0)) {
             LookupResult::Some(RecordResult::Owned(rs)) => {
                 assert_eq!(rs.len(), 1);
                 assert_eq!(rs[0][1], "Hello".into());
-            },
+            }
             _ => unreachable!("should be found"),
         }
 
@@ -1309,7 +1357,7 @@ mod tests {
             LookupResult::Some(RecordResult::Owned(rs)) => {
                 assert_eq!(rs.len(), 1);
                 assert_eq!(rs[0][1], "World".into());
-            },
+            }
             _ => unreachable!("should be found"),
         }
 
@@ -1317,7 +1365,7 @@ mod tests {
             LookupResult::Some(RecordResult::Owned(rs)) => {
                 assert_eq!(rs.len(), 1);
                 assert_eq!(rs[0][1], "World".into());
-            },
+            }
             _ => unreachable!("should be found"),
         }
     }
