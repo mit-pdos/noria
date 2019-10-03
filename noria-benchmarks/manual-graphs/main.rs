@@ -475,7 +475,6 @@ fn main() {
         let mut alogin_times = Vec::with_capacity(alogged);
         // TODO: Switch to specifying number of logged in authors and reviewers.
         for (i, &uid) in authors.iter().take(alogged).enumerate() {
-            println!("{}", uid);
             trace!(log, "logging in author"; "uid" => uid);
             let user_context: std::collections::HashMap<std::string::String, std::string::String> =
                 std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
@@ -509,10 +508,11 @@ fn main() {
             }
         }
         debug!(log, "logging in reviewers"; "n" => rlogged);
-        let mut printi = 0;
+        let mut printj = 0;
         let stripe = rlogged / 10;
         let mut rlogin_times = Vec::with_capacity(rlogged);
-        for i in 0..rlogged {
+        for j in 0..rlogged {
+            let i = j + nauthors;
             trace!(log, "logging in reviewer"; "id" => i);
             let start = Instant::now();
             
@@ -536,16 +536,16 @@ fn main() {
             let took = start.elapsed();
             rlogin_times.push(took);
 
-            if i == printi {
-                println!("# rlogin sample[{}]: {:?}", i, rlogin_times[i]);
-                if i == 0 {
+            if j == printj {
+                println!("# rlogin sample[{}]: {:?} (id: {})", j, rlogin_times[j], i);
+                if j == 0 {
                     // we want to include both 0 and 1
-                    printi += 1;
-                } else if i == 1 {
+                    printj += 1;
+                } else if j == 1 {
                     // and then go back to every stripe'th sample
-                    printi = stripe;
+                    printj = stripe;
                 } else {
-                    printi += stripe;
+                    printj += stripe;
                 }
             }
         }
@@ -568,9 +568,6 @@ fn main() {
             papers.len(),
             start.elapsed()
         );
-        // TODO: Can still use perform_all, but need to modify columns to
-        // match Coauthor table in manual graph.
-        // TODO have to partition users into reviewers & authors
         debug!(log, "registering paper authors");
         let start = Instant::now();
         let mut npauthors = 0;
@@ -585,13 +582,9 @@ fn main() {
             }))
             .unwrap();
         println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
-        // TODO: Can still use perform_all, but need to modify columns to
-        // match Review table in manual graph.
         debug!(log, "registering reviews");
         reviews.shuffle(&mut rng);
         // assume all reviews have been submitted
-        // TODO: Can still use perform_all, but need to modify columns to
-        // match ReviewAssignment table in manual graph.
         trace!(log, "register assignments");
         let start = Instant::now();
         review_assignment
@@ -600,10 +593,10 @@ fn main() {
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
-                        // TODO: don't review own paper
+                        // Reviewer user IDs start after author user IDs
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into(),
-                            format!("{},{}", r.paper, i + 1).into()]
+                            vec![r.paper.into(), format!("{}", i + nauthors + 1).into(), "foo".into(),
+                            format!("{},{}", r.paper, i + nauthors + 1).into()]
                         })
                     }),
             )
@@ -624,9 +617,9 @@ fn main() {
                         rs.iter().map(move |r| {
                             vec![
                                 r.paper.into(),
-                                format!("{}", i + 1).into(),
+                                format!("{}", i + nauthors + 1).into(),
                                 "review text".into(),
-                                format!("{},{}", r.paper, i + 1).into(),
+                                format!("{},{}", r.paper, i + nauthors + 1).into(),
                             ]
                         })
                     }),
