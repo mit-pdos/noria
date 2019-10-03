@@ -40,7 +40,12 @@ crate trait State: SizeOf + Send {
 
     // lookup a tuple at a specific version.
     // Currently, it falls back to the default `lookup` implementation and ignores the version.
-    fn lookup_at<'a>(&'a self, columns: &[usize], key: &KeyType, _version: Option<Version>) -> LookupResult<'a> {
+    fn lookup_at<'a>(
+        &'a self,
+        columns: &[usize],
+        key: &KeyType,
+        _version: Option<Version>,
+    ) -> LookupResult<'a> {
         self.lookup(columns, key)
     }
 
