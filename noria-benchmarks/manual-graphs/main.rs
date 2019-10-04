@@ -488,7 +488,7 @@ fn main() {
                     format!("PaperList_a{}", i + 1),
                     &["author", "paper", "accepted"], // another way to specify col? 
                     Filter::new(papers_for_authors,
-                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("{}", i+1).into())))]));
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
                 mig.maintain_anonymous(papers_ai, &[0]);
             });
             let took = start.elapsed();
@@ -522,7 +522,7 @@ fn main() {
                     format!("reviews_by_r{}", i+1),
                     &["reviewer", "paper", "contents"], // another way to specify col?
                     Filter::new(submitted_reviews,
-                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("{}", i+1).into())))]));
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("r{}", i+1).into())))]));
                 reviews_by_ri
             });
             let _ = g.migrate(move |mig| {
