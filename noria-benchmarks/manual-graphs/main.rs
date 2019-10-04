@@ -6,7 +6,7 @@ use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::{Instant, Duration};
 use std::thread;
-use noria::{DurabilityMode, PersistenceParameters};
+use noria::{DurabilityMode, PersistenceParameters, DataType};
 use noria::manual::Base;
 use noria::manual::ops::join::JoinSource::*;
 use noria::manual::ops::join::{Join, JoinType};
@@ -36,10 +36,12 @@ struct Paper {
     authors: Vec<usize>,
 }
 
+#[derive(Debug)]
 struct Review {
     paper: usize,
     rating: usize,
     confidence: usize,
+    
 }
 
 fn main() {
@@ -361,6 +363,7 @@ fn main() {
                 "PaperCoauthor",
                 &["paper","author", "paper,author"],
                 Base::new(vec![]).with_key(vec![2])); // needs to be over multiple keys?
+            mig.maintain_anonymous(coauthor, &[1]);
             (review, review_assgn, paper, coauthor)
         });
 
@@ -381,7 +384,7 @@ fn main() {
                 "papers_for_authors",
                 &["author", "paper", "accepted"],
                 Join::new(paper, coauthor, JoinType::Inner, vec![R(1), B(0, 0), L(2)]));
-            
+            mig.maintain_anonymous(papers_for_authors, &[0]);
             let submitted_reviews = mig.add_ingredient(
                 "submitted_reviews",
                 &["reviewer", "paper", "contents", "paper,reviewer"],
@@ -406,9 +409,6 @@ fn main() {
             
             review_rewrite
         });
-
-        // For debugging: print graph
-        println!("{}", g.graphviz().unwrap());
         
         // Graph construction complete; Collect memory stats
         let memstats = |g: &mut noria::SyncHandle<_>, at| {
@@ -485,10 +485,10 @@ fn main() {
             let _ = g.migrate(move |mig| {
                 // Author views of PaperList
                 let papers_ai = mig.add_ingredient(
-                    format!("PaperList_a{}", i+1),
+                    format!("PaperList_a{}", i + 1),
                     &["author", "paper", "accepted"], // another way to specify col? 
                     Filter::new(papers_for_authors,
-                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("{}", i+1).into())))]));
                 mig.maintain_anonymous(papers_ai, &[0]);
             });
             let took = start.elapsed();
@@ -522,7 +522,7 @@ fn main() {
                     format!("reviews_by_r{}", i+1),
                     &["reviewer", "paper", "contents"], // another way to specify col?
                     Filter::new(submitted_reviews,
-                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("r{}", i+1).into())))]));
+                                &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("{}", i+1).into())))]));
                 reviews_by_ri
             });
             let _ = g.migrate(move |mig| {
@@ -550,10 +550,13 @@ fn main() {
             }
         }
 
+        // For debugging: print graph
+//        println!("{}", g.graphviz().unwrap());
+
         debug!(log, "registering papers");
         let start = Instant::now();
-        // TODO: Can still use perform_all, but need to modify columns to
-        // match Paper table in manual graph.
+        println!("author fmt for paper: {}", papers[0].authors[0] + 1);
+        // Paper cols: ["paper","author","accepted"]
         paper
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
                 vec![
@@ -571,9 +574,20 @@ fn main() {
         debug!(log, "registering paper authors");
         let start = Instant::now();
         let mut npauthors = 0;
+        // PaperCoauthor cols: ["paper","author", "paper,author"]
+        let coauth_rows: Vec<Vec<DataType>> = papers.iter().enumerate().flat_map(|(i, p)| {
+                // XXX: should first author be repeated here? Yes!
+                // TODO: there may be a mismatch between using author names vs ids?
+                npauthors += p.authors.len();
+                p.authors
+                    .iter()
+                    .map(move |&a| vec![(i+1).into(), format!("{}", a + 1).into(),
+                                        format!("{},{}", i + 1, a + 1).into()])}).collect();
+        println!("coauth rows: {:?}", coauth_rows);
         coauthor
             .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
-                // XXX: should first author be repeated here?
+                // XXX: should first author be repeated here? Yes!
+                // TODO: there may be a mismatch between using author names vs ids?
                 npauthors += p.authors.len();
                 p.authors
                     .iter()
@@ -584,9 +598,23 @@ fn main() {
         println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
         debug!(log, "registering reviews");
         reviews.shuffle(&mut rng);
+        println!("reviews: {:?}", reviews);
         // assume all reviews have been submitted
         trace!(log, "register assignments");
         let start = Instant::now();
+        // ReviewAssignment cols: ["paper", "reviewer", "paper,reviewer"]
+        let reva_rows: Vec<Vec<std::string::String>> = reviews
+                    .chunks(PAPERS_PER_REVIEWER)
+                    .enumerate()
+                    .flat_map(|(i, rs)| {
+                        // Reviewer user IDs start after author user IDs
+                        rs.iter().map(move |r| {
+                            vec![format!("{}", r.paper),
+                                 format!("{}", i + nauthors + 1),
+                                 format!("{},{}", r.paper, i + nauthors + 1)]
+                        })
+                    }).collect();
+        println!("reva_rows: {:?}", reva_rows);
         review_assignment
             .perform_all(
                 reviews
@@ -595,7 +623,7 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // Reviewer user IDs start after author user IDs
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + nauthors + 1).into(), "foo".into(),
+                            vec![r.paper.into(), format!("{}", i + nauthors + 1).into(),
                             format!("{},{}", r.paper, i + nauthors + 1).into()]
                         })
                     }),
@@ -608,6 +636,22 @@ fn main() {
         );
         trace!(log, "register the actual reviews");
         let start = Instant::now();
+        // Review cols: ["paper", "reviewer", "contents", "paper,reviewer"],
+        // TODO: first and last paper assigned to a reviewer are the same?
+        let reviews_rows: Vec<Vec<std::string::String>> = reviews
+                    .chunks(PAPERS_PER_REVIEWER)
+                    .enumerate()
+                    .flat_map(|(i, rs)| {
+                        rs.iter().map(move |r| {
+                            vec![
+                                format!("{}", r.paper),
+                                format!("{}", i + nauthors + 1),
+                                format!("{}", "review text"),
+                                format!("{},{}", r.paper, i + nauthors + 1),
+                            ]
+                        })
+                    }).collect();
+        println!("Reviews: {:?}", reviews_rows);
         review
             .perform_all(
                 reviews
@@ -639,9 +683,9 @@ fn main() {
         debug!(log, "creating view handles for paper list");
         let mut paper_list: HashMap<_, _> = (0..alogged)
             .map(|uid| {
-                trace!(log, "creating posts handle for user"; "uid" => authors[uid]);
+                trace!(log, "creating posts handle for user"; "uid" => uid);
                 (
-                    authors[uid],
+                    uid,
                     g.view(format!("PaperList_a{}", uid + 1))
                         .unwrap()
                         .into_sync(),
@@ -653,18 +697,27 @@ fn main() {
         println!("# setup time: {:?}", init.elapsed());
 
         // now time to measure the cost of different operations
+        // TODO: Also time ReviewList reads.
+        // For debugging:
+        let mut coauthors_view = g.view("PaperCoauthor").unwrap().into_sync();
+        let coauthors_contents = coauthors_view.lookup(&["1".into()], true).unwrap();
+        println!("coauthors: {:?}", coauthors_contents);
+        let mut papers_for_authors_view = g.view("papers_for_authors").unwrap().into_sync();
+        let pfa_contents = papers_for_authors_view.lookup(&["1".into()], true).unwrap();
+        println!("pfa: {:?}", pfa_contents);
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();
-        'pl_outer: for uid in authors[0..alogged].choose_multiple(&mut rng, alogged) {
+        'pl_outer: for uid in 0..alogged {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));
             let begin = Instant::now();
-            paper_list
-                .get_mut(uid)
+            let result = paper_list
+                .get_mut(&uid)
                 .unwrap()
                 .lookup(&[0.into(/* bogokey */)], true)
                 .unwrap();
+            println!("PaperList bogokey lookup: {:?}", result);
             let took = begin.elapsed();
 
             // NOTE: do we want a warm-up period/drop first sample per uid?
@@ -689,7 +742,7 @@ fn main() {
             match op {
                 Operation::ReadPaperList => {
                     paper_list
-                        .get_mut(uid)
+                        .get_mut(&uid)
                         .unwrap()
                         .lookup(&[0.into(/* bogokey */)], true)
                         .unwrap();
