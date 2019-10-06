@@ -623,6 +623,7 @@ impl PersistentState {
                 self.alive_keys.remove(&removed_key);
             }
         }
+        self.version += 1;
     }
 }
 
