@@ -168,7 +168,7 @@ impl Ingredient for Filter {
     }
 
     fn can_query_through(&self) -> bool {
-        true
+        false
     }
 
     #[allow(clippy::type_complexity)]
@@ -183,8 +183,10 @@ impl Ingredient for Filter {
             .and_then(|result| {
                 let f = self.filter.clone();
                 let filter = move |r: &[DataType]| {
+                    println!("filter!!! {:?}, {:?}", r, f);
                     r.iter().enumerate().all(|(i, d)| {
                         // check if this filter matches
+                        println!("{}, {}, {}", i, d, f.len());
                         if let Some(ref cond) = f[i] {
                             match *cond {
                                 FilterCondition::Comparison(ref op, ref f) => {

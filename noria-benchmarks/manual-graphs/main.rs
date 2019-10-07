@@ -330,7 +330,7 @@ fn main() {
         }
        
         g.set_persistence(PersistenceParameters::new(
-            DurabilityMode::DeleteOnExit,
+            DurabilityMode::MemoryOnly,
             Duration::from_millis(1),
             Some(String::from("manual_policy_graph")),
             1,
@@ -468,14 +468,14 @@ fn main() {
                 ]
             }))
             .unwrap();
-*/
+         */
         debug!(log, "logging in authors"; "n" => alogged);
         let mut printi = 0;
         let stripe = alogged / 10;
         let mut alogin_times = Vec::with_capacity(alogged);
         // TODO: Switch to specifying number of logged in authors and reviewers.
         for (i, &uid) in authors.iter().take(alogged).enumerate() {
-            trace!(log, "logging in author"; "uid" => uid);
+            trace!(log, "logging in author"; "uid" => uid, "i" => i);
             let user_context: std::collections::HashMap<std::string::String, std::string::String> =
                 std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
             // TODO also have to add info to user profile table??
@@ -561,7 +561,7 @@ fn main() {
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
                 vec![
                     (i + 1).into(),
-                    format!("{}", p.authors[0] + 1).into(),
+                    format!("a{}", p.authors[0] + 1).into(),
                     if p.accepted { 1 } else { 0 }.into(),
                 ]
             }))
@@ -581,7 +581,7 @@ fn main() {
                 npauthors += p.authors.len();
                 p.authors
                     .iter()
-                    .map(move |&a| vec![(i+1).into(), format!("{}", a + 1).into(),
+                    .map(move |&a| vec![(i+1).into(), format!("a{}", a + 1).into(),
                                         format!("{},{}", i + 1, a + 1).into()])}).collect();
         println!("coauth rows: {:?}", coauth_rows);
         coauthor
@@ -591,7 +591,7 @@ fn main() {
                 npauthors += p.authors.len();
                 p.authors
                     .iter()
-                    .map(move |&a| vec![(i + 1).into(), format!("{}", a + 1).into(),
+                    .map(move |&a| vec![(i + 1).into(), format!("a{}", a + 1).into(),
                     format!("{},{}", i + 1, a + 1).into()])
             }))
             .unwrap();
@@ -610,7 +610,7 @@ fn main() {
                         // Reviewer user IDs start after author user IDs
                         rs.iter().map(move |r| {
                             vec![format!("{}", r.paper),
-                                 format!("{}", i + nauthors + 1),
+                                 format!("r{}", i + nauthors + 1),
                                  format!("{},{}", r.paper, i + nauthors + 1)]
                         })
                     }).collect();
@@ -623,7 +623,7 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // Reviewer user IDs start after author user IDs
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + nauthors + 1).into(),
+                            vec![r.paper.into(), format!("r{}", i + nauthors + 1).into(),
                             format!("{},{}", r.paper, i + nauthors + 1).into()]
                         })
                     }),
@@ -645,7 +645,7 @@ fn main() {
                         rs.iter().map(move |r| {
                             vec![
                                 format!("{}", r.paper),
-                                format!("{}", i + nauthors + 1),
+                                format!("r{}", i + nauthors + 1),
                                 format!("{}", "review text"),
                                 format!("{},{}", r.paper, i + nauthors + 1),
                             ]
@@ -661,7 +661,7 @@ fn main() {
                         rs.iter().map(move |r| {
                             vec![
                                 r.paper.into(),
-                                format!("{}", i + nauthors + 1).into(),
+                                format!("r{}", i + nauthors + 1).into(),
                                 "review text".into(),
                                 format!("{},{}", r.paper, i + nauthors + 1).into(),
                             ]
@@ -698,13 +698,6 @@ fn main() {
 
         // now time to measure the cost of different operations
         // TODO: Also time ReviewList reads.
-        // For debugging:
-        let mut coauthors_view = g.view("PaperCoauthor").unwrap().into_sync();
-        let coauthors_contents = coauthors_view.lookup(&["1".into()], true).unwrap();
-        println!("coauthors: {:?}", coauthors_contents);
-        let mut papers_for_authors_view = g.view("papers_for_authors").unwrap().into_sync();
-        let pfa_contents = papers_for_authors_view.lookup(&["1".into()], true).unwrap();
-        println!("pfa: {:?}", pfa_contents);
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();
@@ -715,9 +708,10 @@ fn main() {
             let result = paper_list
                 .get_mut(&uid)
                 .unwrap()
-                .lookup(&[0.into(/* bogokey */)], true)
+                .lookup(&[format!("a{}", uid + 1).into()], true)
                 .unwrap();
-            println!("PaperList bogokey lookup: {:?}", result);
+            // TODO set up tables to make this a bogokey lookup
+            println!("PaperList_a{} lookup on a{}: {:?}", uid + 1, uid + 1, result);
             let took = begin.elapsed();
 
             // NOTE: do we want a warm-up period/drop first sample per uid?
@@ -762,6 +756,7 @@ fn main() {
         info!(log, "measuring space overhead");
         // NOTE: we have already done all possible reads, so no need to do "filling" reads
         memstats(&mut g, "end");
+        thread::sleep(Duration::from_millis(50000));        
     }
 
     println!("# op\tphase\tpct\ttime");
@@ -790,4 +785,5 @@ fn main() {
             }
         }
     }
+
 }
