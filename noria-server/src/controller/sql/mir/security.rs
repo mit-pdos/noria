@@ -185,7 +185,10 @@ fn make_security_nodes(
             if *rel == "computed_columns" {
                 continue;
             }
-            if local_node_for_rel.contains_key(*rel) {
+            if local_node_for_rel.contains_key(*rel)
+                && !rel.contains("UserContext")
+                && !rel.contains("GroupContext")
+            {
                 local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
                 continue;
             }
@@ -205,7 +208,8 @@ fn make_security_nodes(
                 .get(*rel)
                 .expect("relation should have a query graph node.");
             assert!(*rel != "computed_collumns");
-
+            let mut any_added = false;
+            
             // Skip empty predicates
             if qgn.predicates.is_empty() {
                 continue;
@@ -214,7 +218,8 @@ fn make_security_nodes(
             for pred in &qgn.predicates {
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
-                    prev_node.expect("empty previous node"),
+                    local_node_for_rel[rel].clone(),
+//                    prev_node.expect("empty previous node"),
                     pred,
                     0,
                 );
@@ -227,10 +232,13 @@ fn make_security_nodes(
                         .clone(),
                 );
                 filter_nodes.extend(new_nodes);
+                any_added = true;
             }
 
             // update local node relations so joins know which views to join
-            local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
+            if any_added {
+                local_node_for_rel.insert(*rel, prev_node.clone().unwrap());
+            }
         }
 
         let join_nodes = make_joins(

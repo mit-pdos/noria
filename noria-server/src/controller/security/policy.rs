@@ -119,7 +119,7 @@ impl Policy {
         let table = p["table"].as_str().unwrap();
         let pred = p["predicate"].as_str().unwrap();
 
-        let sq = sql_parser::parse_query(&format!("select * from {} {};", table, pred)).unwrap();
+        let sq = sql_parser::parse_query(&format!("{};", pred)).unwrap();
 
         let rp = RowPolicy {
             name: name.to_string(),

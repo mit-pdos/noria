@@ -587,14 +587,37 @@ fn make_join_node(
     assert_eq!(on_left.len(), on_right.len());
 
     let column_names = column_names(columns);
+    
+    // Partition proj_cols into left and right.
+    // Put only one instance (the first) of a given column into projected_cols_left
+    // (or right).
+    // This is used in lieu of iter().partition(...) to address cases where a table
+    // and its derivative are both joined against the same table-column pair, to
+    // prevent an incorrect partition on the second join (where all copies of the
+    // right side columns go to left).
+    let mut rest = proj_cols.to_vec();
+    let mut projected_cols_left: Vec<Column> = Vec::new();
+    let mut projected_cols_right: Vec<Column> = Vec::new();
 
-    let (projected_cols_left, rest): (Vec<Column>, Vec<Column>) = proj_cols
-        .iter()
-        .cloned()
-        .partition(|c| left.borrow().columns.contains(c));
-    let (projected_cols_right, rest): (Vec<Column>, Vec<Column>) = rest
-        .into_iter()
-        .partition(|c| right.borrow().columns.contains(c));
+    for c in left.borrow().columns() {
+        let i = match rest.iter().position(|rc| rc.clone() == c.clone()) {
+            Some(index) => index,
+            None => unimplemented!(),
+        };
+        let pc = rest.swap_remove(i);
+        projected_cols_left.push(pc);
+    }
+    for c in right.borrow().columns() {
+        // TODO it seems like there's a better way to handle the references
+        // than cloning
+        let i = match rest.iter().position(|rc| rc.clone() == c.clone()) {
+            Some(index) => index,
+            None => unimplemented!(),
+        };
+        let pc = rest.swap_remove(i);
+        projected_cols_right.push(pc);
+    }
+    
     assert!(
         rest.is_empty(),
         "could not resolve output columns projected from join: {:?}",

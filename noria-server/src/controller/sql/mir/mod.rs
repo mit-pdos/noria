@@ -792,20 +792,39 @@ impl SqlToMirConverter {
         assert!(ancestors.len() > 1, "union must have more than 1 ancestors");
 
         let ucols: Vec<Column> = ancestors.first().unwrap().borrow().columns().to_vec();
-        let num_ucols = ucols.len();
+        let mut num_ucols = ucols.len();
 
         let mut selected_cols = HashSet::new();
         let mut selected_col_objects = HashSet::new();
-        for c in ucols {
-            if ancestors
-                .iter()
-                .all(|a| a.borrow().columns().iter().any(|ac| *ac.name == c.name))
-            {
-                selected_cols.insert(c.name.clone());
-                selected_col_objects.insert(c.clone());
+        
+        for c in &ucols {
+            match &c.table {
+                Some(table) => {
+                    if table.contains("UserContext") || table.contains("GroupContext") {
+                        num_ucols -= 1; // Don't want to include Context columns in this count.
+                        continue;
+                    }
+                }
+                None => (),
+            }
+            for ancestor in ancestors.iter() {
+                if let Some(_ac) = ancestor
+                    .borrow()
+                    .columns()
+                    .iter()
+                    .find(|ac| *ac.name == c.name)
+                {
+                    // below is weird because it always adds the column from the
+                    // first ancestor, rather than the ancestor being iterated through.
+                    // Can change to ac and complete this proposed refactor after
+                    // figuring how how that would affect precedent_table later in
+                    // this function.
+                    selected_cols.insert(c.name.clone());
+                    selected_col_objects.insert(c.clone());
+                }
             }
         }
-
+        
         let mut precedent_table = " ".to_string();
         for col in selected_col_objects.clone() {
             match &col.table {
@@ -870,11 +889,13 @@ impl SqlToMirConverter {
 
         assert!(
             emit.iter().all(|e| e.len() == selected_cols.len()),
-            "all ancestors columns must have the same size, but got emit: {:?}, selected: {:?}",
-            emit,
+            "all {} ancestors columns must have the same size (expected {}), but got emit:\n{}\n selected: {:?}",
+            ancestors.len(),
+            selected_cols.len(),
+            emit.iter().map(|c| format!("Size {}: {:?}\n", c.len(), c)).collect::<Vec<String>>().join("\n"),
             selected_cols
         );
-
+        
         (
             MirNode::new(
                 name,
@@ -1113,10 +1134,12 @@ impl SqlToMirConverter {
         let fields: Vec<Column> = fields
             .into_iter()
             .filter_map(|mut f| {
-                if f == r_col {
+                // Check for non-equality to prevent dropping columns that are already aliased
+                // as a result of joining against the same table twice.
+                if f == r_col && f != l_col {
                     // drop instances of right-side column
                     None
-                } else if f == l_col {
+                } else if f == l_col && f != r_col {
                     // add alias for right-side column to any left-side column
                     // N.B.: since `l_col` is already aliased, need to check this *after* checking
                     // for equivalence with `r_col` (by now, `l_col` == `r_col` via alias), so
@@ -1776,6 +1799,8 @@ impl SqlToMirConverter {
                 ancestors.push(final_node);
             }
 
+            ancestors.retain(|a| a.borrow().children().len() == 0);
+            
             let final_node = if ancestors.len() > 1 {
                 // If we have multiple queries, reconcile them.
                 sec_round = true;
