@@ -16,7 +16,7 @@ crate use self::memory_state::MemoryState;
 crate use self::persistent_state::PersistentState;
 
 // // The version of a tuple
-type Version = u64;
+type Timestamp = u64;
 
 crate trait State: SizeOf + Send {
     /// Add an index keyed by the given columns and replayed to by the given partial tags.
@@ -44,7 +44,7 @@ crate trait State: SizeOf + Send {
         &'a self,
         columns: &[usize],
         key: &KeyType,
-        _version: Option<Version>,
+        _timestamp: Option<Timestamp>,
     ) -> LookupResult<'a> {
         self.lookup(columns, key)
     }
