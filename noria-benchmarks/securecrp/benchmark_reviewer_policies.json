@@ -1,0 +1,17 @@
+{
+    "groups": [
+	{
+	    "name": "reviewers",
+	    "membership": "SELECT username AS uid, paper AS gid FROM ReviewAssignment WHERE username = ?",
+	    "policies": [
+		{
+		    "table": "Review",
+		    "predicate": "SELECT * FROM Review JOIN GroupContext ON (Review.paper = GroupContext.id) JOIN ReviewAssignment ON (Review.paper = ReviewAssignment.paper)",
+		    "description": "Reviewers can see reviews on papers they are assigned to and have submitted reviews for."
+		}
+	    ]
+	}
+    ],
+    "policies": [
+    ]
+}

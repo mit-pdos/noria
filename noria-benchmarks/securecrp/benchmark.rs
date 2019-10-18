@@ -573,7 +573,7 @@ fn main() {
                 trace!(log, "creating posts handle for user"; "uid" => authors[uid]);
                 (
                     authors[uid],
-                    g.view(format!("PaperList_u{}", uid + 1))
+                    g.view(format!("ReviewList_u{}", uid + 1))
                         .unwrap()
                         .into_sync(),
                 )
@@ -587,15 +587,19 @@ fn main() {
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();
+        let mut i = 0; // for debugging
         'pl_outer: for uid in authors[0..nlogged].choose_multiple(&mut rng, nlogged) {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));
             let begin = Instant::now();
-            paper_list
+            let result = paper_list
                 .get_mut(uid)
                 .unwrap()
                 .lookup(&[0.into(/* bogokey */)], true)
                 .unwrap();
+            // for debugging
+            println!("Reviewer ID {} ({}): {:#?}", uid, i, result);
+            i += 1;
             let took = begin.elapsed();
 
             // NOTE: do we want a warm-up period/drop first sample per uid?

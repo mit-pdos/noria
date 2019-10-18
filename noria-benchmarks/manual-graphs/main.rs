@@ -551,7 +551,7 @@ fn main() {
         }
 
         // For debugging: print graph
-//        println!("{}", g.graphviz().unwrap());
+        println!("{}", g.graphviz().unwrap());
 
         debug!(log, "registering papers");
         let start = Instant::now();

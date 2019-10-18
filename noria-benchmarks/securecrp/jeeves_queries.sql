@@ -1,8 +1,20 @@
-QUERY PaperList: SELECT Paper.*, Paper.title AS latest_version_title
-           FROM Paper
-           JOIN (SELECT *
-                 FROM PaperVersion
-                 ORDER BY PaperVersion.time
-                 LIMIT 1)
-                AS LatestPaperVersion
-           ON (Paper.id = LatestPaperVersion.paper);
+--LatestPaperVersion: SELECT *
+--                 FROM PaperVersion
+--		 WHERE PaperVersion.paper = ?
+--		 GROUP BY PaperVersion.paper
+--               ORDER BY PaperVersion.time
+--                 LIMIT 10;
+
+--QUERY PaperList: SELECT Paper.*
+--           FROM Paper
+--	   JOIN LatestPaperVersion
+--	   ON (Paper.id = LatestPaperVersion.paper);
+
+--QUERY ReviewList: SELECT Paper.id, Review.reviewer, Review.contents, Review.score_novelty, Review.score_presentation, Review.score_technical, Review.score_confidence, Paper.author as author
+--           FROM Paper
+--	   JOIN Review
+--	   ON (Paper.id = Review.paper);
+
+--QUERY PaperList: SELECT Paper.* FROM Paper;
+
+QUERY ReviewList: SELECT Review.* FROM Review;
