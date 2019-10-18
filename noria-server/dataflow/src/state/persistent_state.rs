@@ -5,9 +5,9 @@ use serde;
 use tempfile::{tempdir, TempDir};
 
 use crate::prelude::*;
-use crate::state::{RecordResult, State, Version};
+use crate::state::{RecordResult, State, Timestamp};
 use common::SizeOf;
-use std::collections::HashMap;
+use std::iter::FromIterator;
 
 // Incremented on each PersistentState initialization so that IndexSeq
 // can be used to create unique identifiers for rows.
@@ -55,9 +55,7 @@ pub struct PersistentState {
     epoch: IndexEpoch,
     has_unique_index: bool,
     // The next version for a write operation. This needs to be calculated on recovery.
-    version: Version,
-    // The in-memory book-keeping of the living versions for each pk.
-    alive_keys: HashMap<Vec<u8>, Vec<Version>>,
+    current_ts: Timestamp,
     // With DurabilityMode::DeleteOnExit,
     // RocksDB files are stored in a temporary directory.
     _directory: Option<TempDir>,
@@ -88,12 +86,7 @@ impl State for PersistentState {
         self.db.as_ref().unwrap().write_opt(batch, &opts).unwrap();
     }
 
-    fn lookup_at(
-        &self,
-        columns: &[usize],
-        key: &KeyType,
-        version: Option<Version>,
-    ) -> LookupResult {
+    fn lookup_at(&self, columns: &[usize], key: &KeyType, ts: Option<Timestamp>) -> LookupResult {
         let db = self.db.as_ref().unwrap();
         let index_id = self
             .indices
@@ -102,40 +95,29 @@ impl State for PersistentState {
             .expect("lookup on non-indexed column set");
         let cf = db.cf_handle(&self.indices[index_id].column_family).unwrap();
 
-        let do_lookup_at = |version: Version| -> Vec<Vec<DataType>> {
-            let prefix = Self::serialize_versioned_prefix(&key, version);
-            let raw_row = db.get_cf(cf, &prefix).unwrap();
-            if let Some(raw) = raw_row {
-                let row = bincode::deserialize(&*raw).unwrap();
-                vec![row]
-            } else {
-                vec![]
-            }
+        let ts = match ts {
+            None => self.current_ts,
+            Some(ts) => ts,
         };
-
-        let data = match version {
-            None => {
-                if self.has_unique_index && columns == &self.indices[0].columns[..] {
-                    // The key being looked up is a primary key, find the latest version.
-                    match self.alive_keys.get(&Self::serialize_prefix(key)) {
-                        Some(v) => do_lookup_at(*v.last().unwrap()),
-                        None => vec![],
+        let prefix = Self::serialize_prefix(&key);
+        let rows = db
+            .prefix_iterator_cf(cf, &prefix)
+            .unwrap()
+            .filter(|(key, value)| {
+                // TODO: Figure out how to do GC here using O2N chaining.
+                let (_, begin_ts) = Self::split_timestamp_from_raw_key(&*key);
+                let (_, end_ts) = Self::split_timestamp_from_raw_value(&*value);
+                begin_ts <= ts
+                    && match end_ts {
+                        None => true,
+                        Some(end_ts) => ts < end_ts,
                     }
-                } else {
-                    // TODO(zeling): We went here because we don't have
-                    // a primary key, and the client didn't specify
-                    // the version, currently, all rows are returned.
-                    // But this sounds wierd. Maybe require a version
-                    // to be specified?
-                    let prefix = Self::serialize_prefix(&key);
-                    db.prefix_iterator_cf(cf, &prefix)
-                        .unwrap()
-                        .map(|(_key, value)| bincode::deserialize(&*value).unwrap())
-                        .collect()
-                }
-            }
-            Some(v) => do_lookup_at(v),
-        };
+            })
+            .map(|(_, value)| {
+                let (row, _) = Self::split_timestamp_from_raw_value(&*value);
+                bincode::deserialize(row).unwrap()
+            });
+        let data = Vec::from_iter(rows);
         LookupResult::Some(RecordResult::Owned(data))
     }
 
@@ -170,7 +152,8 @@ impl State for PersistentState {
             for chunk in iter.chunks(INDEX_BATCH_SIZE).into_iter() {
                 let mut batch = WriteBatch::default();
                 for (ref pk, ref value) in chunk {
-                    let row: Vec<DataType> = bincode::deserialize(&value).unwrap();
+                    let (r, _) = Self::split_timestamp_from_raw_value(value);
+                    let row: Vec<DataType> = bincode::deserialize(r).unwrap();
                     let index_key = Self::build_key(&row, columns);
                     let key = Self::serialize_secondary(&index_key, pk);
                     let cf = db.cf_handle(&index_id).unwrap();
@@ -305,29 +288,21 @@ impl PersistentState {
             db.drop_cf(&indices.len().to_string()).unwrap();
         }
 
-        // Version recovery:
-        let mut alive_keys = HashMap::new();
-        let version = if indices.is_empty() {
+        // Timestamp recovery:
+        let current_ts = if indices.is_empty() {
             0
         } else {
             let mut newest = 0;
             let cf = db.cf_handle(&indices[0].column_family).unwrap();
             db.full_iterator_cf(cf, rocksdb::IteratorMode::Start)
                 .unwrap()
-                .for_each(|(key, _)| {
-                    let prefix_len = prefix_transform(&key).len();
-                    let v = bincode::deserialize(&key[prefix_len..]).unwrap();
-                    newest = std::cmp::max(newest, v);
-                    let key_bytes = Vec::from(&key[..prefix_len]);
-                    alive_keys
-                        .entry(key_bytes)
-                        .and_modify(|vs: &mut Vec<Version>| match vs.binary_search(&v) {
-                            Ok(_) => unreachable!(
-                                "No two rows with the same pk should have the same version"
-                            ),
-                            Err(pos) => vs.insert(pos, v),
-                        })
-                        .or_insert(vec![v]);
+                .for_each(|(key, value)| {
+                    let (_, begin_ts) = Self::split_timestamp_from_raw_key(&key);
+                    newest = std::cmp::max(newest, begin_ts);
+                    let (_, end_ts) = Self::split_timestamp_from_raw_value(&value);
+                    if let Some(end_ts) = end_ts {
+                        newest = std::cmp::max(newest, end_ts);
+                    }
                 });
             newest + 1
         };
@@ -339,8 +314,7 @@ impl PersistentState {
             epoch: meta.epoch,
             db_opts: opts,
             db: Some(db),
-            version,
-            alive_keys,
+            current_ts,
             _directory: directory,
         };
 
@@ -458,14 +432,14 @@ impl PersistentState {
     // Our RocksDB keys come in three forms, and are encoded as follows:
     //
     // * Unique Primary Keys
-    // (size, key, version), where size is the serialized byte size of `key`, and version
+    // (size, key, begin_ts), where size is the serialized byte size of `key`, and version
     // is the version of the persistent_state when the tuple is created.
     // (used in `prefix_transform`).
     //
     // * Non-unique Primary Keys
-    // (size, key, version, epoch, seq), where epoch is incremented on each recover, and seq is a
-    // monotonically increasing sequence number that starts at 0 for every new epoch, version is
-    // the version of the persistent_state when the tuple is created.
+    // (size, key, epoch, seq, begin_ts), where epoch is incremented on each recover, and seq is a
+    // monotonically increasing sequence number that starts at 0 for every new epoch, begin_ts is
+    // the ts of the persistent_state when the tuple is created.
     //
     // * Secondary Index Keys
     // (size, key, primary_key), where `primary_key` makes sure that each secondary index row is
@@ -493,14 +467,38 @@ impl PersistentState {
         Self::serialize_raw_key(key, ())
     }
 
-    fn serialize_versioned_prefix(key: &KeyType, version: Version) -> Vec<u8> {
-        Self::serialize_raw_key(key, version)
-    }
-
     fn serialize_secondary(key: &KeyType, raw_primary: &[u8]) -> Vec<u8> {
         let mut bytes = Self::serialize_raw_key(key, ());
         bytes.extend_from_slice(raw_primary);
         bytes
+    }
+
+    fn serialize_row(row: &[DataType], ts: Option<Timestamp>) -> Vec<u8> {
+        bincode::serialize(&(ts, row)).unwrap()
+    }
+
+    fn split_timestamp_from_raw_key(raw_key: &[u8]) -> (&[u8], Timestamp) {
+        let timestamp_pos =
+            raw_key.len() - bincode::serialized_size::<Timestamp>(&0).unwrap() as usize;
+        (
+            &raw_key[..timestamp_pos],
+            bincode::deserialize(&raw_key[timestamp_pos..]).unwrap(),
+        )
+    }
+
+    fn split_timestamp_from_raw_value(raw_value: &[u8]) -> (&[u8], Option<Timestamp>) {
+        assert!(raw_value.len() > 0);
+        let ts: Option<Timestamp> = bincode::deserialize(&raw_value[..]).unwrap();
+        let ts_size = bincode::serialized_size(&ts).unwrap() as usize;
+        (&raw_value[ts_size..], ts)
+    }
+
+    fn update_row_timestamp(old_row: &[u8], ts: Option<Timestamp>) -> Vec<u8> {
+        let mut serialized_new_row = Vec::new();
+        bincode::serialize_into(&mut serialized_new_row, &ts).unwrap();
+        let (r, _) = Self::split_timestamp_from_raw_value(old_row);
+        serialized_new_row.extend_from_slice(r);
+        serialized_new_row
     }
 
     // Filters out secondary indices to return an iterator for the actual key-value pairs.
@@ -509,6 +507,11 @@ impl PersistentState {
         let cf = db.cf_handle(&self.indices[0].column_family).unwrap();
         db.full_iterator_cf(cf, rocksdb::IteratorMode::Start)
             .unwrap()
+            .map(|(key, value)| {
+                let (real_key, _) = Self::split_timestamp_from_raw_key(&key);
+                let (real_value, _) = Self::split_timestamp_from_raw_value(&value);
+                (real_key.into(), real_value.into())
+            })
     }
 
     // Puts by primary key first, then retrieves the existing value for each index and appends the
@@ -517,30 +520,49 @@ impl PersistentState {
     // with exactly those values. I think the regular state implementation supports inserting
     // something like an Int and retrieving with a BigInt.
     fn insert(&mut self, batch: &mut WriteBatch, r: &[DataType]) {
-        let next_version = self.version;
-        self.version += 1;
+        let current_ts = self.current_ts;
+        self.current_ts += 1;
         let pk = Self::build_key(r, &self.indices[0].columns);
-        let serialized_pk = {
+        let (serialized_pk, unique) = {
             let pk = Self::build_key(r, &self.indices[0].columns);
             if self.has_unique_index {
-                Self::serialize_raw_key(&pk, next_version)
+                (Self::serialize_raw_key(&pk, current_ts), true)
             } else {
                 // For bases without primary keys we store the actual row values keyed by the index
                 // that was added first. This means that we can't consider the keys unique though, so
                 // we'll append a sequence number.
                 self.seq += 1;
-                Self::serialize_raw_key(&pk, (next_version, self.epoch, self.seq))
+                (
+                    Self::serialize_raw_key(&pk, (self.epoch, self.seq, current_ts)),
+                    false,
+                )
             }
         };
-        self.alive_keys
-            .entry(Self::serialize_prefix(&pk))
-            .and_modify(|vs| {
-                vs.push(next_version);
-            })
-            .or_insert(vec![next_version]);
+        let old_primary_row = if unique {
+            let db = self.db.as_ref().unwrap();
+            let value_cf = db.cf_handle(&self.indices[0].column_family).unwrap();
+            if let Some((key, value)) = db
+                .prefix_iterator_cf(value_cf, &Self::serialize_prefix(&pk))
+                .unwrap()
+                .find(|(_, raw_value)| {
+                    // TODO: the prefix_iterator basically gives us the O2N chaining,
+                    // it is a good place to do GC here.
+                    let (_, end) = Self::split_timestamp_from_raw_value(&raw_value);
+                    end.is_none()
+                })
+            {
+                let new_row = Self::update_row_timestamp(&value, Some(current_ts));
+                batch.put_cf(value_cf, &key, &new_row).unwrap();
+                Some((key, value))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         // First insert the actual value for our primary index:
-        let serialized_row = bincode::serialize(&r).unwrap();
+        let serialized_row = Self::serialize_row(r, None);
         let db = self.db.as_ref().unwrap();
         let value_cf = db.cf_handle(&self.indices[0].column_family).unwrap();
         batch
@@ -553,6 +575,13 @@ impl PersistentState {
             let key = Self::build_key(&r, &index.columns);
             let serialized_key = Self::serialize_secondary(&key, &serialized_pk);
             let cf = db.cf_handle(&index.column_family).unwrap();
+            if let Some((ref k, ref v)) = old_primary_row {
+                let (v, _) = Self::split_timestamp_from_raw_value(&v);
+                let new_row = Self::update_row_timestamp(v, Some(current_ts));
+                batch
+                    .put_cf(cf, &Self::serialize_secondary(&key, &k[..]), new_row)
+                    .unwrap();
+            }
             batch.put_cf(cf, &serialized_key, &serialized_row).unwrap();
         }
     }
@@ -561,68 +590,36 @@ impl PersistentState {
         let db = self.db.as_ref().unwrap();
         let pk_index = &self.indices[0];
         let value_cf = db.cf_handle(&pk_index.column_family).unwrap();
-        let indices = self.indices.iter();
-        let do_remove = move |primary_key: &[u8]| {
-            // Delete the value row first (primary index):
-            batch.delete_cf(value_cf, &primary_key).unwrap();
-
-            // Then delete any references that point _exactly_ to that row:
-            for index in indices {
-                let key = Self::build_key(&r, &index.columns);
-                let serialized_key = Self::serialize_secondary(&key, primary_key);
-                let cf = db.cf_handle(&index.column_family).unwrap();
-                batch.delete_cf(cf, &serialized_key).unwrap();
-            }
-        };
-
+        let now_ts = self.current_ts;
+        self.current_ts += 1;
         let pk = Self::build_key(&r, &pk_index.columns);
         let prefix = Self::serialize_prefix(&pk);
-        let (removed_key, removed_version) = if self.has_unique_index {
-            let latest_version = self
-                .alive_keys
-                .get(&prefix)
-                .expect("tried removing non-existing row")
-                .last()
-                .unwrap();
-            let versioned_key = Self::serialize_versioned_prefix(&pk, *latest_version);
-            if cfg!(debug_assertions) {
-                // This would imply that we're trying to delete a different row than the one we
-                // found when we resolved the DeleteRequest in Base. This really shouldn't happen,
-                // but we'll leave a check here in debug mode for now.
-                let raw = db
-                    .get_cf(value_cf, &versioned_key)
-                    .unwrap()
-                    .expect("tried removing non-existant primary key row");
-                let value: Vec<DataType> = bincode::deserialize(&*raw).unwrap();
-                assert_eq!(r, &value[..], "tried removing non-matching primary key row");
-            }
-            do_remove(&versioned_key);
-            (prefix, *latest_version)
-        } else {
-            let (key, _value) = db
-                .prefix_iterator_cf(value_cf, &prefix)
-                .unwrap()
-                .find(|(_, raw_value)| {
-                    let value: Vec<DataType> = bincode::deserialize(&*raw_value).unwrap();
-                    r == &value[..]
-                })
-                .expect("tried removing non-existant row");
-            let prefix_len = prefix_transform(&key).len();
-            let version = bincode::deserialize(&key[prefix_len..]).unwrap();
-            do_remove(&key[..]);
-            (prefix_transform(&key[..]).to_vec(), version)
-        };
-        let vs = self
-            .alive_keys
-            .get_mut(&removed_key)
-            .expect("living keys should be remembered");
-        if let Ok(pos) = vs.binary_search(&removed_version) {
-            vs.remove(pos);
-            if vs.is_empty() {
-                self.alive_keys.remove(&removed_key);
-            }
+        let unique = self.has_unique_index;
+        let (pk, value) = db
+            .prefix_iterator_cf(value_cf, &prefix)
+            .unwrap()
+            .find(|(_, raw_value)| {
+                let (row, end_ts) = Self::split_timestamp_from_raw_value(&*raw_value);
+                if unique {
+                    // TODO: due to O2N chaining, this might be a good place to do GC.
+                    end_ts.is_none() // Just find the latest version.
+                } else {
+                    // Exact match and the latest version.
+                    let value: Vec<DataType> = bincode::deserialize(row).unwrap();
+                    end_ts.is_none() && r == &value[..]
+                }
+            })
+            .expect("tried removing non-existant primary key row");
+        let new_row = Self::update_row_timestamp(&value, Some(now_ts));
+        batch.put_cf(value_cf, &pk, &new_row).unwrap();
+        // Also set up secondary index.
+        for index in self.indices[1..].iter() {
+            // Construct a key with the index values, and serialize it with bincode:
+            let key = Self::build_key(&r, &index.columns);
+            let serialized_key = Self::serialize_secondary(&key, &pk);
+            let cf = db.cf_handle(&index.column_family).unwrap();
+            batch.put_cf(cf, &serialized_key, &new_row).unwrap();
         }
-        self.version += 1;
     }
 }
 
@@ -1266,16 +1263,12 @@ mod tests {
             let first: Vec<DataType> = vec![10.into(), "Cat".into(), 1.into()];
             let second: Vec<DataType> = vec![20.into(), "Cat".into(), 1.into()];
             state.process_records(&mut vec![first.clone(), second.clone()].into(), None);
-            assert_eq!(state.version, 2);
+            assert_eq!(state.current_ts, 2);
         }
         {
             let state = get_state();
             // two writes before, so the next version should be 2.
-            assert_eq!(state.version, 2);
-            let pk1 = PersistentState::serialize_prefix(&KeyType::Single(&10.into()));
-            let pk2 = PersistentState::serialize_prefix(&KeyType::Single(&20.into()));
-            assert_eq!(*state.alive_keys.get(&pk1).unwrap(), vec![0]);
-            assert_eq!(*state.alive_keys.get(&pk2).unwrap(), vec![1]);
+            assert_eq!(state.current_ts, 2);
         }
         assert!(rocksdb::DB::destroy(&rocksdb::Options::default(), format!("{}.db", path)).is_ok());
     }
@@ -1296,7 +1289,7 @@ mod tests {
         let second: Vec<DataType> = vec![20.into(), "Cat".into(), 1.into()];
         state.process_records(&mut vec![first.clone(), second.clone()].into(), None);
         let pk1 = PersistentState::build_key(&first, &state.indices[0].columns);
-        let serialized_pk1 = PersistentState::serialize_versioned_prefix(&pk1, 0);
+        let serialized_pk1 = PersistentState::serialize_raw_key(&pk1, 0 as Timestamp);
         let cf = state
             .db
             .as_ref()
@@ -1310,10 +1303,11 @@ mod tests {
             .get_cf(cf, &serialized_pk1)
             .unwrap()
             .unwrap();
-        assert_eq!(&*rows, &bincode::serialize(&first).unwrap()[..]);
+        let (rows, _) = PersistentState::split_timestamp_from_raw_value(&*rows);
+        assert_eq!(rows, &bincode::serialize(&first).unwrap()[..]);
 
         let pk2 = PersistentState::build_key(&second, &state.indices[0].columns);
-        let serialized_pk2 = PersistentState::serialize_versioned_prefix(&pk2, 1);
+        let serialized_pk2 = PersistentState::serialize_raw_key(&pk2, 1 as Timestamp);
         let cf = state
             .db
             .as_ref()
@@ -1327,6 +1321,7 @@ mod tests {
             .get_cf(cf, &serialized_pk2)
             .unwrap()
             .unwrap();
+        let (rows, _) = PersistentState::split_timestamp_from_raw_value(&*rows);
         assert_eq!(&*rows, &bincode::serialize(&second).unwrap()[..]);
     }
 
@@ -1337,14 +1332,8 @@ mod tests {
             Some(&[0]),
             &PersistenceParameters::default(),
         );
-        state.process_records(
-            &mut vec![
-                vec![1.into(), "Hello".into()],
-                vec![1.into(), "World".into()],
-            ]
-            .into(),
-            None,
-        );
+        state.process_records(&mut vec![vec![1.into(), "Hello".into()]].into(), None);
+        state.process_records(&mut vec![vec![1.into(), "World".into()]].into(), None);
 
         match state.lookup_at(&[0], &KeyType::Single(&1.into()), Some(0)) {
             LookupResult::Some(RecordResult::Owned(rs)) => {
@@ -1369,5 +1358,49 @@ mod tests {
             }
             _ => unreachable!("should be found"),
         }
+    }
+
+    #[test]
+    fn test_serialize_row() {
+        {
+            let row = vec![DataType::BigInt(10), DataType::BigInt(20)];
+            let serialized_row = PersistentState::serialize_row(&row[..], Some(1));
+            let (r, ts) = PersistentState::split_timestamp_from_raw_value(&serialized_row[..]);
+            assert_eq!(ts, Some(1));
+            assert_eq!(r, &bincode::serialize(&row[..]).unwrap()[..]);
+        }
+        {
+            let row = vec![DataType::BigInt(10), DataType::BigInt(20)];
+            let serialized_row = PersistentState::serialize_row(&row[..], None);
+            let (r, ts) = PersistentState::split_timestamp_from_raw_value(&serialized_row[..]);
+            assert_eq!(ts, None);
+            assert_eq!(r, &bincode::serialize(&row[..]).unwrap()[..]);
+        }
+    }
+
+    #[test]
+    fn test_update_row_ts() {
+        let row = vec![DataType::BigInt(10), DataType::BigInt(20)];
+        let serialized_row = PersistentState::serialize_row(&row[..], None);
+        let (r, ts) = PersistentState::split_timestamp_from_raw_value(&serialized_row[..]);
+        assert_eq!(r, &bincode::serialize(&row[..]).unwrap()[..]);
+        assert_eq!(ts, None);
+        let serialized_row = PersistentState::update_row_timestamp(&serialized_row[..], Some(1));
+        let (r, ts) = PersistentState::split_timestamp_from_raw_value(&serialized_row[..]);
+        assert_eq!(ts, Some(1));
+        assert_eq!(r, &bincode::serialize(&row[..]).unwrap()[..]);
+        let serialized_row = PersistentState::update_row_timestamp(&serialized_row[..], None);
+        let (r, ts) = PersistentState::split_timestamp_from_raw_value(&serialized_row[..]);
+        assert_eq!(ts, None);
+        assert_eq!(r, &bincode::serialize(&row[..]).unwrap()[..]);
+    }
+
+    #[test]
+    fn test_split_timestamp_from_key() {
+        let key = KeyType::Double((DataType::BigInt(10), DataType::BigInt(20)));
+        let serialized_key = PersistentState::serialize_raw_key(&key, 42 as Timestamp);
+        let (k, ts) = PersistentState::split_timestamp_from_raw_key(&serialized_key);
+        assert_eq!(ts, 42);
+        assert_eq!(k, &PersistentState::serialize_prefix(&key)[..]);
     }
 }

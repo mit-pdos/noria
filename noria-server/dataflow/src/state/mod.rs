@@ -15,8 +15,9 @@ use common::SizeOf;
 pub(crate) use self::memory_state::MemoryState;
 pub(crate) use self::persistent_state::PersistentState;
 
-// // The version of a tuple
-type Version = u64;
+// The version of a tuple
+type Timestamp = u64;
+
 pub(crate) trait State: SizeOf + Send {
     /// Add an index keyed by the given columns and replayed to by the given partial tags.
     fn add_key(&mut self, columns: &[usize], partial: Option<Vec<Tag>>);
@@ -43,7 +44,7 @@ pub(crate) trait State: SizeOf + Send {
         &'a self,
         columns: &[usize],
         key: &KeyType,
-        _version: Option<Version>,
+        _timestamp: Option<Timestamp>,
     ) -> LookupResult<'a> {
         self.lookup(columns, key)
     }
