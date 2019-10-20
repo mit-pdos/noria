@@ -142,6 +142,10 @@ fn make_security_nodes(
     prev_node: &MirNodeRef,
     node_for_rel: HashMap<&str, MirNodeRef>,
 ) -> Result<(Vec<MirNodeRef>, Vec<MirNodeRef>), String> {
+    trace!(mir_converter.log,
+           "make_security_nodes called with policies {:#?}",
+           mir_converter.universe.row_policies,
+    );
     let policies = match mir_converter
         .universe
         .row_policies
@@ -149,11 +153,11 @@ fn make_security_nodes(
     {
         Some(p) => p.clone(),
         // no policies associated with this base node
-        None => return Ok((vec![], vec![])),
+        None => {
+            trace!(mir_converter.log, "No policies associated with table {}", table);
+            return Ok((vec![], vec![]))
+        },
     };
-
-    let mut node_count = 0;
-    let mut local_node_for_rel = node_for_rel.clone();
 
     debug!(
         mir_converter.log,
@@ -161,10 +165,18 @@ fn make_security_nodes(
         policies.len(),
         table
     );
+    trace!(
+        mir_converter.log,
+        "Row policies for table {}: {:#?}",
+        table,
+        policies,
+    );
 
     let mut security_nodes = Vec::new();
     let mut last_policy_nodes = Vec::new();
-
+    let mut node_count = 0;
+    let mut local_node_for_rel = node_for_rel.clone();
+    
     // Policies are created in parallel and later union'ed
     // Differently from normal queries, the policies order filters
     // before joins, since we can always reuse filter, but if a policy
@@ -219,7 +231,6 @@ fn make_security_nodes(
                 let new_nodes = mir_converter.make_predicate_nodes(
                     &format!("sp_{:x}_n{:x}", qg.signature().hash, node_count),
                     local_node_for_rel[rel].clone(),
-//                    prev_node.expect("empty previous node"),
                     pred,
                     0,
                 );

@@ -1828,8 +1828,18 @@ impl SqlToMirConverter {
                 ancestors.last().unwrap().clone()
             };
 
-            let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
             // 8. Generate leaf views that expose the query result
+            
+            let mut projected_columns: Vec<Column> = qg
+                .columns
+                .iter()
+                .filter_map(|oc| match *oc {
+                    OutputColumn::Arithmetic(_) => None,
+                    OutputColumn::Data(ref c) => Some(Column::from(c)),
+                    OutputColumn::Literal(_) => None,
+                })
+                .collect();
+/*            let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
             let mut projected_columns: Vec<Column> = if universe.1.is_none() {
                 qg.columns
                     .iter()
@@ -1846,6 +1856,7 @@ impl SqlToMirConverter {
                 // will be added.
                 final_node_cols.to_vec()
             };
+*/
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);

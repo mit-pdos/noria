@@ -270,8 +270,8 @@ impl MirNode {
                             None => match map.get(&(c.name.clone(), None)) {
                                 Some(ref t_name) => get_column_index(c, t_name),
                                 None => panic!(
-                                    "tried to look up non-existent column {:?} on node \
-                                     \"{}\" (columns: {:?})",
+                                    "Table mapping passed, tried to look up non-existent column \
+                                     {:?} on node \"{}\" (columns: {:?})",
                                     c, self.name, self.columns
                                 ),
                             },

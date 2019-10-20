@@ -981,21 +981,42 @@ impl ControllerInner {
             .clone();
         let uid = &[uid];
         if context.get("group").is_none() {
+            trace!(log, "User {:?} has no group, adding groups {:#?}", uid, groups);
             let x = Arc::new(Mutex::new(HashMap::new()));
             for g in groups {
                 // TODO: this should use external APIs through noria::ControllerHandle
                 // TODO: can this move to the client entirely?
                 let rgb: Option<ViewBuilder> = self.view_builder(&g);
                 // TODO: is it even okay to use wait() here?
-                let view = rgb.map(|rgb| rgb.build(x.clone()).wait().unwrap()).unwrap();
+                let mut view = rgb
+                    .map(|rgb| rgb.build(x.clone()).wait().unwrap())
+                    .unwrap()
+                    .into_sync();
+                debug!(
+                    log,
+                    "view cols: {:?}, schema: {:?}",
+                    view.columns(),
+                    view.schema()
+                );
+                // for debugging, temporary
+                let res = view.lookup(&[uid[0].to_string().into()], true).unwrap();
+                debug!(log, "Groups: {:#?}", res);
+                //
                 let my_groups: Vec<DataType> = view
+                //                    .lookup(uid, true)
+                    .lookup(&[uid[0].to_string().into()], true)
+                    .unwrap()
+                    .iter()
+                    .map(|v| v[1].clone())
+                    .collect();/*
                     .lookup(uid, true)
                     .wait()
                     .unwrap()
                     .1
                     .iter()
                     .map(|v| v[1].clone())
-                    .collect();
+                    .collect();*/
+                debug!(log, "mygroups, flattened (inner.rs): {:?}", my_groups);
                 universe_groups.insert(g, my_groups);
             }
         }
