@@ -1109,7 +1109,8 @@ impl SqlToMirConverter {
             .into_iter()
             .chain(projected_cols_right.into_iter())
             .collect::<Vec<Column>>();
-
+        println!("make_join_node {:?} and {:?} fields: {:#?}", left_node.borrow().name(),
+                 right_node.borrow().name(), fields);
         // join columns need us to generate join group configs for the operator
         // TODO(malte): no multi-level joins yet
         let mut left_join_columns = Vec::new();
@@ -1128,7 +1129,7 @@ impl SqlToMirConverter {
 
         // don't duplicate the join column in the output, but instead add aliases to the columns
         // that represent it going forward (viz., the left-side join column)
-        l_col.add_alias(&r_col);
+//        l_col.add_alias(&r_col);
         // add the alias to all instances of `l_col` in `fields` (there might be more than one
         // if `l_col` is explicitly projected multiple times)
         let fields: Vec<Column> = fields
@@ -1153,6 +1154,8 @@ impl SqlToMirConverter {
             })
             .collect();
 
+        println!("with alias make_join_node fields: {:#?}", fields);
+        
         left_join_columns.push(l_col);
         right_join_columns.push(r_col);
 
@@ -1542,6 +1545,8 @@ impl SqlToMirConverter {
                 }
             };
 
+            println!("prev_node set to: {:#?}", prev_node);
+
             // 2. Get columns used by each predicate. This will be used to check
             // if we need to reorder predicates before group_by nodes.
             let mut column_to_predicates: HashMap<Column, Vec<&ConditionExpression>> =
@@ -1636,6 +1641,7 @@ impl SqlToMirConverter {
 
             // For each policy chain, create a version of the query
             // All query versions, including group queries will be reconciled at the end
+            println!("last_policy nodes: {:#?}", last_policy_nodes);
             for n in last_policy_nodes.iter() {
                 prev_node = Some(n.clone());
 
@@ -1715,6 +1721,7 @@ impl SqlToMirConverter {
 
                 // 5. Global predicates
                 for (i, ref p) in qg.global_predicates.iter().enumerate() {
+                    println!("Global predicates: {:#?}", qg.global_predicates);
                     if created_predicates.contains(p) {
                         continue;
                     }
@@ -1745,6 +1752,7 @@ impl SqlToMirConverter {
 
                 // 6. Get the final node
                 let mut final_node: MirNodeRef = if prev_node.is_some() {
+                    println!("Getting the final node: prev_node exists");
                     prev_node.unwrap().clone()
                 } else {
                     // no join, filter, or function node --> base node is parent
@@ -1800,7 +1808,7 @@ impl SqlToMirConverter {
             }
 
             ancestors.retain(|a| a.borrow().children().len() == 0);
-            
+            println!("make_selection_node ancestors: {:#?}", ancestors);
             let final_node = if ancestors.len() > 1 {
                 // If we have multiple queries, reconcile them.
                 sec_round = true;
@@ -1830,7 +1838,7 @@ impl SqlToMirConverter {
 
             // 8. Generate leaf views that expose the query result
             
-            let mut projected_columns: Vec<Column> = qg
+/*            let mut projected_columns: Vec<Column> = qg
                 .columns
                 .iter()
                 .filter_map(|oc| match *oc {
@@ -1839,7 +1847,8 @@ impl SqlToMirConverter {
                     OutputColumn::Literal(_) => None,
                 })
                 .collect();
-/*            let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
+*/  
+          let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
             let mut projected_columns: Vec<Column> = if universe.1.is_none() {
                 qg.columns
                     .iter()
@@ -1854,9 +1863,9 @@ impl SqlToMirConverter {
                 // all columns in the final node. When a user universe that
                 // belongs to this group, the proper projection and leaf node
                 // will be added.
-                final_node_cols.to_vec()
+                final_node_cols.into_iter().filter(|c| c.table != Some("GroupContext".into())).collect()
             };
-*/
+
 
             for pc in qg.parameters() {
                 let pc = Column::from(pc);
@@ -1926,7 +1935,7 @@ impl SqlToMirConverter {
                 projected_columns.iter().collect(),
                 projected_arithmetic,
                 projected_literals,
-                !has_leaf,
+                !has_leaf && universe.1.is_none(),
             );
 
             nodes_added.push(leaf_project_node.clone());

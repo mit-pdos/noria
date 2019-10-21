@@ -612,7 +612,7 @@ fn make_join_node(
         // than cloning
         let i = match rest.iter().position(|rc| rc.clone() == c.clone()) {
             Some(index) => index,
-            None => unimplemented!(),
+            None => continue,
         };
         let pc = rest.swap_remove(i);
         projected_cols_right.push(pc);
