@@ -1,3 +1,5 @@
+extern crate csv;
+use csv::Writer;
 use clap::value_t_or_exit;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
@@ -275,20 +277,16 @@ fn main() {
 
     drop(author_set);
     let nauthors = authors.len();
-    let alogged = (loggedf * nauthors as f64) as usize;
 
     // let's compute the number of reviewers
     // we know the number of reviews
     // we have fixed the number of reviews per reviewer
     // We assume the set of reviewers DOES NOT intersect the set of authors.
     let nreviewers = (reviews.len() + (PAPERS_PER_REVIEWER - 1)) / PAPERS_PER_REVIEWER;
-    let rlogged = (loggedf * nreviewers as f64) as usize;
-    let nusers = authors.len() + nreviewers;
+//    let nusers = authors.len() + nreviewers;
     
     println!("# nauthors: {}", authors.len());
     println!("# nreviewers: {}", nreviewers);
-    println!("# logged-in authors: {}", alogged);
-    println!("# logged-in reviewers: {}", rlogged);
     println!("# npapers: {}", papers.len());
     println!("# nreviews: {}", reviews.len());
     println!(
@@ -299,8 +297,23 @@ fn main() {
     let mut cold_stats = HashMap::new();
     let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
-    for iter in 1..=iter {
-        info!(log, "starting up noria"; "iteration" => iter);
+    let loggedfs = vec![0.0, 0.003, 0.1, 0.5, 1.0];
+    let mut wtr = Writer::from_path("results.csv").unwrap();
+    for &lfrac in loggedfs.iter() {
+        let mut lf = lfrac;
+        if lf > 0.0 && lf < 0.01 {
+            lf = 2.0/((authors.len() + nreviewers) as f32);
+        }
+        info!(log, "starting up noria"; "loggedf" => lf);
+        let mut rlogged = (loggedf * nreviewers as f64) as usize;
+        let mut alogged = (loggedf * nauthors as f64) as usize;
+        if lf != 0.0 && lf < 0.01 {
+            rlogged = 1;
+            alogged = 1;
+        }
+        println!("# logged-in authors: {}", alogged);
+        println!("# logged-in reviewers: {}", rlogged);
+        
         debug!(log, "configuring noria");
         let mut g = Builder::default();
         match args.value_of("reuse").unwrap() {
@@ -328,7 +341,7 @@ fn main() {
         if verbose > 1 {
             g.log_with(log.clone());
         }
-       
+        g.log_with(log.clone());
         g.set_persistence(PersistenceParameters::new(
             DurabilityMode::MemoryOnly,
             Duration::from_millis(1),
@@ -411,7 +424,7 @@ fn main() {
         });
         
         // Graph construction complete; Collect memory stats
-        let memstats = |g: &mut noria::SyncHandle<_>, at| {
+        let mut memstats = |g: &mut noria::SyncHandle<_>, at| {
             if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
                 debug!(log, "extracing process memory stats"; "at" => at);
                 let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
@@ -436,6 +449,11 @@ fn main() {
                     }
                 }
             }
+            wtr.write_record(&[format!("{}", lf),
+                               format!("{}", at),
+                               format!("{}", base_mem),
+                               format!("{}", reader_mem),
+                               format!("{}", mem)]);
             println!("# base memory @ {}: {}", at, base_mem);
             println!("# reader memory @ {}: {}", at, reader_mem);
             println!("# materialization memory @ {}: {}", at, mem);
@@ -495,7 +513,7 @@ fn main() {
             alogin_times.push(took);
 
             if i == printi {
-                println!("# login sample[{}]: {:?}", i, alogin_times[i]);
+//                println!("# login sample[{}]: {:?}", i, alogin_times[i]);
                 if i == 0 {
                     // we want to include both 0 and 1
                     printi += 1;
@@ -537,7 +555,7 @@ fn main() {
             rlogin_times.push(took);
 
             if j == printj {
-                println!("# rlogin sample[{}]: {:?} (id: {})", j, rlogin_times[j], i);
+//                println!("# rlogin sample[{}]: {:?} (id: {})", j, rlogin_times[j], i);
                 if j == 0 {
                     // we want to include both 0 and 1
                     printj += 1;
@@ -551,11 +569,11 @@ fn main() {
         }
 
         // For debugging: print graph
-        println!("{}", g.graphviz().unwrap());
+//        println!("{}", g.graphviz().unwrap());
 
         debug!(log, "registering papers");
         let start = Instant::now();
-        println!("author fmt for paper: {}", papers[0].authors[0] + 1);
+//        println!("author fmt for paper: {}", papers[0].authors[0] + 1);
         // Paper cols: ["paper","author","accepted"]
         paper
             .perform_all(papers.iter().enumerate().map(|(i, p)| {
@@ -575,7 +593,7 @@ fn main() {
         let start = Instant::now();
         let mut npauthors = 0;
         // PaperCoauthor cols: ["paper","author", "paper,author"]
-        let coauth_rows: Vec<Vec<DataType>> = papers.iter().enumerate().flat_map(|(i, p)| {
+/*        let coauth_rows: Vec<Vec<DataType>> = papers.iter().enumerate().flat_map(|(i, p)| {
                 // XXX: should first author be repeated here? Yes!
                 // TODO: there may be a mismatch between using author names vs ids?
                 npauthors += p.authors.len();
@@ -583,7 +601,7 @@ fn main() {
                     .iter()
                     .map(move |&a| vec![(i+1).into(), format!("a{}", a + 1).into(),
                                         format!("{},{}", i + 1, a + 1).into()])}).collect();
-        println!("coauth rows: {:?}", coauth_rows);
+        println!("coauth rows: {:?}", coauth_rows);*/
         coauthor
             .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
                 // XXX: should first author be repeated here? Yes!
@@ -598,12 +616,12 @@ fn main() {
         println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
         debug!(log, "registering reviews");
         reviews.shuffle(&mut rng);
-        println!("reviews: {:?}", reviews);
+//        println!("reviews: {:?}", reviews);
         // assume all reviews have been submitted
         trace!(log, "register assignments");
         let start = Instant::now();
         // ReviewAssignment cols: ["paper", "reviewer", "paper,reviewer"]
-        let reva_rows: Vec<Vec<std::string::String>> = reviews
+/*        let reva_rows: Vec<Vec<std::string::String>> = reviews
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
@@ -614,7 +632,7 @@ fn main() {
                                  format!("{},{}", r.paper, i + nauthors + 1)]
                         })
                     }).collect();
-        println!("reva_rows: {:?}", reva_rows);
+        println!("reva_rows: {:?}", reva_rows);*/
         review_assignment
             .perform_all(
                 reviews
@@ -638,7 +656,7 @@ fn main() {
         let start = Instant::now();
         // Review cols: ["paper", "reviewer", "contents", "paper,reviewer"],
         // TODO: first and last paper assigned to a reviewer are the same?
-        let reviews_rows: Vec<Vec<std::string::String>> = reviews
+/*        let reviews_rows: Vec<Vec<std::string::String>> = reviews
                     .chunks(PAPERS_PER_REVIEWER)
                     .enumerate()
                     .flat_map(|(i, rs)| {
@@ -651,7 +669,7 @@ fn main() {
                             ]
                         })
                     }).collect();
-        println!("Reviews: {:?}", reviews_rows);
+        println!("Reviews: {:?}", reviews_rows);*/
         review
             .perform_all(
                 reviews
@@ -705,13 +723,13 @@ fn main() {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));
             let begin = Instant::now();
-            let result = paper_list
+            paper_list
                 .get_mut(&uid)
                 .unwrap()
                 .lookup(&[format!("a{}", uid + 1).into()], true)
                 .unwrap();
             // TODO set up tables to make this a bogokey lookup
-            println!("PaperList_a{} lookup on a{}: {:?}", uid + 1, uid + 1, result);
+//            println!("PaperList_a{} lookup on a{}: {:?}", uid + 1, uid + 1, result);
             let took = begin.elapsed();
 
             // NOTE: do we want a warm-up period/drop first sample per uid?
@@ -756,7 +774,8 @@ fn main() {
         info!(log, "measuring space overhead");
         // NOTE: we have already done all possible reads, so no need to do "filling" reads
         memstats(&mut g, "end");
-        thread::sleep(Duration::from_millis(50000));        
+        wtr.flush();
+        thread::sleep(Duration::from_millis(1000));        
     }
 
     println!("# op\tphase\tpct\ttime");
@@ -785,5 +804,5 @@ fn main() {
             }
         }
     }
-
+    thread::sleep(Duration::from_millis(1000));
 }
