@@ -338,9 +338,10 @@ fn main() {
         }
         g.set_sharding(None);
         if verbose > 1 {
+            println!("NORIA IS verbose");
             g.log_with(log.clone());
         }
-       
+        g.log_with(log.clone());       
         g.set_persistence(PersistenceParameters::new(
             DurabilityMode::MemoryOnly,
             Duration::from_millis(1),
@@ -434,33 +435,6 @@ fn main() {
                 ]
             }))
             .unwrap();
-        debug!(log, "logging in users"; "n" => nlogged);
-        let mut printi = 0;
-        let stripe = nlogged / 10;
-        let mut login_times = Vec::with_capacity(nlogged);
-        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
-            trace!(log, "logging in user"; "uid" => uid);
-            let user_context: HashMap<_, _> =
-                std::iter::once(("id".to_string(), (i + 1).into())).collect();
-            let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
-                .unwrap();
-            let took = start.elapsed();
-            login_times.push(took);
-
-            if i == printi {
-                println!("# login sample[{}]: {:?}", i, login_times[i]);
-                if i == 0 {
-                    // we want to include both 0 and 1
-                    printi += 1;
-                } else if i == 1 {
-                    // and then go back to every stripe'th sample
-                    printi = stripe;
-                } else {
-                    printi += stripe;
-                }
-            }
-        }
         debug!(log, "registering papers");
         let start = Instant::now();
         paper
@@ -563,6 +537,35 @@ fn main() {
             std::fs::write(gloc, gv).expect("failed to save graphviz output");
         }
 
+        debug!(log, "logging in users"; "n" => nlogged);
+        let mut printi = 0;
+        let stripe = nlogged / 10;
+        let mut login_times = Vec::with_capacity(nlogged);
+        for (i, &uid) in authors.iter().take(nlogged).enumerate() {
+            trace!(log, "logging in user"; "uid" => uid);
+            let user_context: HashMap<_, _> =
+                std::iter::once(("id".to_string(), (i + 1).into())).collect();
+            let start = Instant::now();
+            g.on_worker(|w| w.create_universe(user_context.clone()))
+                .unwrap();
+            let took = start.elapsed();
+            login_times.push(took);
+
+            if i == printi {
+                println!("# login sample[{}]: {:?}", i, login_times[i]);
+                if i == 0 {
+                    // we want to include both 0 and 1
+                    printi += 1;
+                } else if i == 1 {
+                    // and then go back to every stripe'th sample
+                    printi = stripe;
+                } else {
+                    printi += stripe;
+                }
+            }
+        }
+
+        
         // For debugging: print graph
         println!("{}", g.graphviz().unwrap());
         
