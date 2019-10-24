@@ -80,7 +80,7 @@ impl SingleState {
             *hit = true;
             let rm = if rs.len() == 1 {
                 // it *should* be impossible to get a negative for a record that we don't have
-                debug_assert_eq!(r, &rs[0][..]);
+//                debug_assert_eq!(r, &rs[0][..]);
                 Some(rs.swap_remove(0))
             } else if let Some(i) = rs.iter().position(|rsr| &rsr[..] == r) {
                 Some(rs.swap_remove(i))

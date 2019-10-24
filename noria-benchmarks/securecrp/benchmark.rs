@@ -314,7 +314,7 @@ fn main() {
     let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
     //    let loggedfs = vec![0.0, 0.003, 0.1, 0.5, 1.0];
-    let loggedfs = vec![0.2];
+    let loggedfs = vec![1.0];
     let mut wtr = Writer::from_path("tmp.csv").unwrap();
     for &lfrac in loggedfs.iter() {
         //    for iter in 1..=iter {
@@ -575,7 +575,7 @@ fn main() {
             std::fs::write(gloc, gv).expect("failed to save graphviz output");
         }
 
-        // for debugging
+/*        // for debugging
         println!("{}", g.graphviz().unwrap());        
         g.extend_recipe(
             std::fs::read_to_string("gc_queries.sql")
@@ -586,6 +586,7 @@ fn main() {
         let mut gc_lookup = g.view("GroupContext").unwrap().into_sync();
         let res = gc_lookup.lookup(&[0.into()], true); // bogokey lookup
         println!("GC: {:?}", res);
+*/
         //
         
         debug!(log, "logging in users"; "n" => nlogged);
@@ -639,7 +640,7 @@ fn main() {
 
         // now time to measure the cost of different operations
         // for debugging
-        //        let mut gc_lookup = g.view("GroupContext_reviewers_3").unwrap().into_sync();
+/*
         let mut gc_lookup = g.view("GroupContext").unwrap().into_sync();
         println!("Numeric lookups");
         for i in 0..7 {
@@ -652,6 +653,7 @@ fn main() {
             println!("GC[{}]: {:?}", i, res);
         }
         //
+*/
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();

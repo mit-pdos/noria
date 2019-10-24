@@ -25,8 +25,8 @@ petgraph = { version = "0.4.11", features = ["serde-1"] }
 rand = "0.7.0"
 serde_derive = "1.0.8"
 serde_json = "1.0.2"
-slog = "2.4.0"
-#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_trace"] }
+#slog = "2.4.0"
+slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_trace"] }
 slog-term = "2.4.0"
 tokio-os-timer = "0.1.2"
 slab = "0.4"

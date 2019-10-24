@@ -1008,14 +1008,7 @@ impl ControllerInner {
                     .unwrap()
                     .iter()
                     .map(|v| v[1].clone())
-                    .collect();/*
-                    .lookup(uid, true)
-                    .wait()
-                    .unwrap()
-                    .1
-                    .iter()
-                    .map(|v| v[1].clone())
-                    .collect();*/
+                    .collect();
                 debug!(log, "mygroups, flattened (inner.rs): {:?}", my_groups);
                 universe_groups.insert(g, my_groups);
             }
