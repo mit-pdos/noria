@@ -1,3 +1,5 @@
+extern crate csv;
+use csv::Writer;
 use clap::value_t_or_exit;
 use hdrhistogram::Histogram;
 use noria::{Builder, FrontierStrategy, ReuseConfigType};
@@ -8,7 +10,7 @@ use std::time::{Instant, Duration};
 use std::thread;
 use noria::{DurabilityMode, PersistenceParameters};
 
-const PAPERS_PER_REVIEWER: usize = 5;
+const PAPERS_PER_REVIEWER: usize = 3;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 enum Operation {
@@ -29,6 +31,7 @@ struct Paper {
     authors: Vec<usize>,
 }
 
+#[derive(Debug)]
 struct Review {
     paper: usize,
     rating: usize,
@@ -290,7 +293,7 @@ fn main() {
 
     drop(author_set);
     let nusers = authors.len();
-    let nlogged = (loggedf * nusers as f64) as usize;
+    let mut nlogged = (loggedf * nusers as f64) as usize;
 
     // let's compute the number of reviewers
     // we know the number of reviews
@@ -300,7 +303,6 @@ fn main() {
 
     println!("# nauthors: {}", authors.len());
     println!("# nreviewers: {}", nreviewers);
-    println!("# logged-in users: {}", nlogged);
     println!("# npapers: {}", papers.len());
     println!("# nreviews: {}", reviews.len());
     println!(
@@ -311,7 +313,22 @@ fn main() {
     let mut cold_stats = HashMap::new();
     let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
-    for iter in 1..=iter {
+    //    let loggedfs = vec![0.0, 0.003, 0.1, 0.5, 1.0];
+    let loggedfs = vec![0.2];
+    let mut wtr = Writer::from_path("tmp.csv").unwrap();
+    for &lfrac in loggedfs.iter() {
+        //    for iter in 1..=iter {
+        let mut lf = lfrac;
+        if lf > 0.0 && lf < 0.01 {
+            lf = 1.0/(nreviewers as f32);
+        }
+        info!(log, "starting up noria"; "loggedf" => lf);
+        let mut nlogged = (lf * nreviewers as f32) as usize;
+        if lf != 0.0 && lf < 0.01 {
+            nlogged = 1;
+        }
+        println!("# logged-in users: {}", nlogged);
+
         info!(log, "starting up noria"; "iteration" => iter);
         debug!(log, "configuring noria");
         let mut g = Builder::default();
@@ -378,7 +395,7 @@ fn main() {
             .expect("failed to load initial schema");
         debug!(log, "database schema setup done");
         
-        let memstats = |g: &mut noria::SyncHandle<_>, at| {
+        let mut memstats = |g: &mut noria::SyncHandle<_>, at| {
             if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
                 debug!(log, "extracing process memory stats"; "at" => at);
                 let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
@@ -403,6 +420,14 @@ fn main() {
                     }
                 }
             }
+
+            wtr.write_record(&[format!("{}", lf),
+                               format!("{}", nlogged),
+                               format!("{}", at),
+                               format!("{}", base_mem),
+                               format!("{}", reader_mem),
+                               format!("{}", mem)]);
+            
             println!("# base memory @ {}: {}", at, base_mem);
             println!("# reader memory @ {}: {}", at, reader_mem);
             println!("# materialization memory @ {}: {}", at, mem);
@@ -486,6 +511,18 @@ fn main() {
         // assume all reviews have been submitted
         trace!(log, "register assignments");
         let start = Instant::now();
+        let reva_rows: Vec<Vec<std::string::String>> = reviews
+                    .chunks(PAPERS_PER_REVIEWER)
+                    .enumerate()
+                    .flat_map(|(i, rs)| {
+                        rs.iter().map(move |r| {
+                            vec![format!("{}",r.paper).into(), format!("{}", i + 1).into(),
+                                 format!("{},{}", r.rating, r.confidence).into()]
+                        })
+                    }).collect();
+//        println!("reviews: {:#?}", reviews);
+//        println!("reva_rows: {:?}", reva_rows);
+        
         review_assignment
             .perform_all(
                 reviews
@@ -494,7 +531,8 @@ fn main() {
                     .flat_map(|(i, rs)| {
                         // TODO: don't review own paper
                         rs.iter().map(move |r| {
-                            vec![r.paper.into(), format!("{}", i + 1).into(), "foo".into()]
+                            vec![r.paper.into(), format!("{}", i + 1).into(),
+                                 format!("{},{}", r.rating, r.confidence).into()]
                         })
                     }),
             )
@@ -537,6 +575,19 @@ fn main() {
             std::fs::write(gloc, gv).expect("failed to save graphviz output");
         }
 
+        // for debugging
+        println!("{}", g.graphviz().unwrap());        
+        g.extend_recipe(
+            std::fs::read_to_string("gc_queries.sql")
+                .expect("failed to read queries file"),
+        )
+            .expect("failed to load initial schema");
+        thread::sleep(Duration::from_millis(2000));        
+        let mut gc_lookup = g.view("GroupContext").unwrap().into_sync();
+        let res = gc_lookup.lookup(&[0.into()], true); // bogokey lookup
+        println!("GC: {:?}", res);
+        //
+        
         debug!(log, "logging in users"; "n" => nlogged);
         let mut printi = 0;
         let stripe = nlogged / 10;
@@ -587,10 +638,24 @@ fn main() {
         println!("# setup time: {:?}", init.elapsed());
 
         // now time to measure the cost of different operations
+        // for debugging
+        //        let mut gc_lookup = g.view("GroupContext_reviewers_3").unwrap().into_sync();
+        let mut gc_lookup = g.view("GroupContext").unwrap().into_sync();
+        println!("Numeric lookups");
+        for i in 0..7 {
+            let res = gc_lookup.lookup(&[i.into()], true);
+            println!("GC[{}]: {:?}", i, res);
+        }
+        println!("String lookups");
+        for i in 1..7 {
+            let res = gc_lookup.lookup(&[format!("{}", i).into()], true);
+            println!("GC[{}]: {:?}", i, res);
+        }
+        //
         info!(log, "starting cold read benchmarks");
         debug!(log, "cold reads of paper list");
         let mut requests = Vec::new();
-        let mut i = 0; // for debugging
+        let mut i = 1; // for debugging
         'pl_outer: for uid in authors[0..nlogged].choose_multiple(&mut rng, nlogged) {
             trace!(log, "reading paper list"; "uid" => uid);
             requests.push((Operation::ReadPaperList, uid));

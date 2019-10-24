@@ -18,3 +18,5 @@
 --QUERY PaperList: SELECT Paper.* FROM Paper;
 
 QUERY ReviewList: SELECT Review.paper, Review.reviewer, Review.contents, Review.score_novelty, Review.score_presentation, Review.score_technical, Review.score_confidence, Review.`time` FROM Review;
+
+
