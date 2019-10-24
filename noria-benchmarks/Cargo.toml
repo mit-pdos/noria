@@ -15,13 +15,14 @@ nom-sql = "0.0.9"
 regex = "1.0.0"
 itertools = "0.8"
 slog = "2.4.0"
-#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_debug"] }
+#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_trace"] }
 slog-term = "2.4.0"
 vec_map = { version = "0.8.0" }
 rayon = "1.0"
 ssh2 = "0.3"
 shellwords = "1"
 zookeeper = "0.5.3"
+csv = "1.1.1"
 
 # for benchmarks
 # cli
@@ -91,7 +92,7 @@ path = "hotsoup/extract_queries.rs"
 
 [[bin]]
 name = "securecrp"
-path = "securecrp/main.rs"
+path = "securecrp/benchmark.rs"
 
 [[bin]]
 name = "piazza"
