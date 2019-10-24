@@ -505,6 +505,9 @@ impl SqlToMirConverter {
                 leaves.push(mn);
             }
         }
+        // hacky
+        leaves.retain(|a| a.borrow().name != "Review");
+        //
         assert_eq!(
             leaves.len(),
             1,
@@ -1109,8 +1112,8 @@ impl SqlToMirConverter {
             .into_iter()
             .chain(projected_cols_right.into_iter())
             .collect::<Vec<Column>>();
-        println!("make_join_node {:?} and {:?} fields: {:#?}", left_node.borrow().name(),
-                 right_node.borrow().name(), fields);
+//        println!("make_join_node {:?} and {:?} fields: {:#?}", left_node.borrow().name(),
+//                 right_node.borrow().name(), fields);
         // join columns need us to generate join group configs for the operator
         // TODO(malte): no multi-level joins yet
         let mut left_join_columns = Vec::new();
@@ -1154,7 +1157,7 @@ impl SqlToMirConverter {
             })
             .collect();
 
-        println!("with alias make_join_node fields: {:#?}", fields);
+//        println!("with alias make_join_node fields: {:#?}", fields);
         
         left_join_columns.push(l_col);
         right_join_columns.push(r_col);
@@ -1545,7 +1548,7 @@ impl SqlToMirConverter {
                 }
             };
 
-            println!("prev_node set to: {:#?}", prev_node);
+//            println!("prev_node set to: {:#?}", prev_node);
 
             // 2. Get columns used by each predicate. This will be used to check
             // if we need to reorder predicates before group_by nodes.
@@ -1594,6 +1597,7 @@ impl SqlToMirConverter {
 
             // 3. Create security boundary
             use crate::controller::sql::mir::security::SecurityBoundary;
+//            println!("node_for_rel: {:?}, prev_node: {:?}", node_for_rel, prev_node);
             let (last_policy_nodes, policy_nodes) = self.make_security_boundary(
                 universe.clone(),
                 &mut node_for_rel,
@@ -1641,7 +1645,7 @@ impl SqlToMirConverter {
 
             // For each policy chain, create a version of the query
             // All query versions, including group queries will be reconciled at the end
-            println!("last_policy nodes: {:#?}", last_policy_nodes);
+//            println!("last_policy nodes: {:#?}", last_policy_nodes);
             for n in last_policy_nodes.iter() {
                 prev_node = Some(n.clone());
 
@@ -1721,7 +1725,7 @@ impl SqlToMirConverter {
 
                 // 5. Global predicates
                 for (i, ref p) in qg.global_predicates.iter().enumerate() {
-                    println!("Global predicates: {:#?}", qg.global_predicates);
+//                    println!("Global predicates: {:#?}", qg.global_predicates);
                     if created_predicates.contains(p) {
                         continue;
                     }
@@ -1752,7 +1756,7 @@ impl SqlToMirConverter {
 
                 // 6. Get the final node
                 let mut final_node: MirNodeRef = if prev_node.is_some() {
-                    println!("Getting the final node: prev_node exists");
+//                    println!("Getting the final node: prev_node exists");
                     prev_node.unwrap().clone()
                 } else {
                     // no join, filter, or function node --> base node is parent
@@ -1808,14 +1812,22 @@ impl SqlToMirConverter {
             }
 
             ancestors.retain(|a| a.borrow().children().len() == 0);
-            println!("make_selection_node ancestors: {:#?}", ancestors);
+//            println!("make_selection_node ancestors: {:#?}", ancestors);
+            // hacky
+            if ancestors.len() > 1 {
+                let rev: Vec<_> = ancestors.iter().filter(|a| a.borrow().name == "Review").collect();
+                if rev.len() >= 1 {
+                    ancestors.retain(|a| a.borrow().name != "Review");
+                }
+            }
+            //
             let final_node = if ancestors.len() > 1 {
                 // If we have multiple queries, reconcile them.
                 sec_round = true;
                 if uid != "global".into() {
                     sec_round = true;
                 }
-
+                
                 let (nodes, tables, union_base_node_name) = self.reconcile(
                     &format!("q_{:x}{}", qg.signature().hash, uformat),
                     &qg,
@@ -1848,8 +1860,10 @@ impl SqlToMirConverter {
                 })
                 .collect();
 */  
-          let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
+            let final_node_cols: Vec<Column> = final_node.borrow().columns().to_vec();
+//            println!("computing projected columns");
             let mut projected_columns: Vec<Column> = if universe.1.is_none() {
+//                println!("Not in group universe");
                 qg.columns
                     .iter()
                     .filter_map(|oc| match *oc {
@@ -1863,7 +1877,9 @@ impl SqlToMirConverter {
                 // all columns in the final node. When a user universe that
                 // belongs to this group, the proper projection and leaf node
                 // will be added.
-                final_node_cols.into_iter().filter(|c| c.table != Some("GroupContext".into())).collect()
+                //final_node_cols.into_iter().filter(|c| c.table != Some("Review".into())).collect()
+//                println!("in group universe");
+                final_node_cols.to_vec()
             };
 
 
