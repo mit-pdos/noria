@@ -283,7 +283,6 @@ fn main() {
     // we have fixed the number of reviews per reviewer
     // We assume the set of reviewers DOES NOT intersect the set of authors.
     let nreviewers = (reviews.len() + (PAPERS_PER_REVIEWER - 1)) / PAPERS_PER_REVIEWER;
-//    let nusers = authors.len() + nreviewers;
     
     println!("# nauthors: {}", authors.len());
     println!("# nreviewers: {}", nreviewers);
@@ -298,15 +297,15 @@ fn main() {
     let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
     let loggedfs = vec![0.0, 0.003, 0.1, 0.5, 1.0];
-    let mut wtr = Writer::from_path("results.csv").unwrap();
+    let mut wtr = Writer::from_path("tmp.csv").unwrap();
     for &lfrac in loggedfs.iter() {
         let mut lf = lfrac;
         if lf > 0.0 && lf < 0.01 {
             lf = 2.0/((authors.len() + nreviewers) as f32);
         }
         info!(log, "starting up noria"; "loggedf" => lf);
-        let mut rlogged = (loggedf * nreviewers as f64) as usize;
-        let mut alogged = (loggedf * nauthors as f64) as usize;
+        let mut rlogged = (lf * nreviewers as f32) as usize;
+        let mut alogged = (lf * nauthors as f32) as usize;
         if lf != 0.0 && lf < 0.01 {
             rlogged = 1;
             alogged = 1;
@@ -450,6 +449,8 @@ fn main() {
                 }
             }
             wtr.write_record(&[format!("{}", lf),
+                               format!("{}", alogged),
+                               format!("{}", rlogged),
                                format!("{}", at),
                                format!("{}", base_mem),
                                format!("{}", reader_mem),
@@ -569,7 +570,7 @@ fn main() {
         }
 
         // For debugging: print graph
-//        println!("{}", g.graphviz().unwrap());
+        println!("{}", g.graphviz().unwrap());
 
         debug!(log, "registering papers");
         let start = Instant::now();
