@@ -137,24 +137,6 @@ impl<A: Authority + 'static> Handle<A> {
             &context,
             "failed to create security universe",
         )
-        .and_then(move |_| {
-            // Write to Context table
-            let bname = match context.get("group") {
-                None => format!("UserContext_{}", uid.to_string()),
-                Some(g) => format!("GroupContext_{}_{}", g.to_string(), uid.to_string()),
-            };
-
-            let mut fields: Vec<_> = context.keys().collect();
-            fields.sort();
-            let record: Vec<DataType> = fields.iter().map(|&f| context[f].clone()).collect();
-
-            c.table(&bname).and_then(|table| {
-                table
-                    .insert(record)
-                    .map_err(|e| format_err!("failed to make table: {:?}", e))
-                    .map(|_| ())
-            })
-        })
     }
 
     /// Inform the local instance that it should exit.
