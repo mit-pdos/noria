@@ -597,7 +597,7 @@ fn main() {
             let user_context: HashMap<_, _> =
                 std::iter::once(("id".to_string(), (i + 1).into())).collect();
             let start = Instant::now();
-            g.on_worker(|w| w.create_universe(user_context.clone()))
+            g.on_worker(|w| w.create_universe(user_context.clone()).wait())
                 .unwrap();
             let took = start.elapsed();
             login_times.push(took);
