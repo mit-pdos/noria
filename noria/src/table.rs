@@ -160,7 +160,8 @@ pub struct TableBuilder {
 }
 
 impl TableBuilder {
-    pub(crate) fn build(
+    /// XXX
+    pub fn build(
         self,
         rpcs: Arc<Mutex<HashMap<(SocketAddr, usize), TableRpc>>>,
     ) -> impl Future<Item = Table, Error = io::Error> + Send {

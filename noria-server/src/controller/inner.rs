@@ -1038,6 +1038,31 @@ impl ControllerInner {
         });
 
         self.recipe = r;
+
+        // Write to Context table
+        let uid = context
+            .get("id")
+            .expect("Universe context must have id")
+            .clone();
+        let ctx_table_name = match context.get("group") {
+            None => format!("UserContext_{}", uid.to_string()),
+            Some(g) => format!("GroupContext_{}_{}", g.to_string(), uid.to_string()),
+        };
+
+        let mut fields: Vec<_> = context.keys().collect();
+        fields.sort();
+        let record: Vec<DataType> = fields
+            .iter()
+            .map(|&f| context.get(f).unwrap().clone())
+            .collect();
+
+        let x = Arc::new(Mutex::new(HashMap::new()));
+        let tb = self
+            .table_builder(&ctx_table_name)
+            .expect(&format!("context table {} doesn't exists", ctx_table_name));
+        let mut table = tb.build(x.clone()).wait().unwrap().into_sync();
+        table.insert(record).unwrap();
+
         Ok(())
     }
 
