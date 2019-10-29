@@ -15,6 +15,11 @@ type IndexEpoch = u64;
 // Monotonically increasing sequence number since last IndexEpoch used to uniquely identify a row.
 type IndexSeq = u64;
 
+enum DelPolicy {
+    erasurable,
+    Unerasurable,   
+}
+
 // RocksDB key used for storing meta information (like indices).
 const META_KEY: &[u8] = b"meta";
 // A default column family is always created, so we'll make use of that for meta information.
@@ -30,6 +35,7 @@ const INDEX_BATCH_SIZE: usize = 100_000;
 struct PersistentMeta {
     indices: Vec<Vec<usize>>,
     epoch: IndexEpoch,
+    deletePolicy: DelPolicy,
 }
 
 #[derive(Clone)]
