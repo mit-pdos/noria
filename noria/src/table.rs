@@ -23,9 +23,12 @@ use tower_buffer::Buffer;
 use tower_service::Service;
 use vec_map::VecMap;
 
+pub(crate) type Timestamp = u64;
+type ShardTimestamps = Vec<(usize, Timestamp)>;
+
 type Transport = AsyncBincodeStream<
     tokio::net::tcp::TcpStream,
-    Tagged<()>,
+    Tagged<Timestamp>,
     Tagged<LocalOrNot<Input>>,
     AsyncDestination,
 >;
@@ -230,9 +233,9 @@ impl fmt::Debug for Table {
 
 impl Service<Input> for Table {
     type Error = TableError;
-    type Response = <TableRpc as Service<Tagged<LocalOrNot<Input>>>>::Response;
+    type Response = ShardTimestamps;
     // have to repeat types because https://github.com/rust-lang/rust/issues/57807
-    type Future = impl Future<Output = Result<Tagged<()>, TableError>> + Send;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         for s in &mut self.shards {
@@ -264,7 +267,12 @@ impl Service<Input> for Table {
 
             let _guard = span.as_ref().map(tracing::Span::enter);
             tracing::trace!("submit request");
-            future::Either::Left(self.shards[0].call(request).map_err(TableError::from))
+            future::Either::Left(
+                self.shards[0]
+                    .call(request)
+                    .map_err(TableError::from)
+                    .map_ok(|t| vec![(0, t.v)]),
+            )
         } else {
             if self.key.is_empty() {
                 unreachable!("sharded base without a key?");
@@ -320,7 +328,7 @@ impl Service<Input> for Table {
                     let _guard = span.as_ref().map(tracing::Span::enter);
                     tracing::trace!("submit request shard");
 
-                    wait_for.push(self.shards[s].call(request));
+                    wait_for.push(self.shards[s].call(request).map_ok(move |t| (s, t.v)));
                 } else {
                     // poll_ready reserves a sender slot which we have to release
                     // we do that by dropping the old handle and replacing it with a clone
@@ -329,12 +337,7 @@ impl Service<Input> for Table {
                 }
             }
 
-            future::Either::Right(
-                wait_for
-                    .try_for_each(|_| async { Ok(()) })
-                    .map_err(TableError::from)
-                    .map_ok(Tagged::from),
-            )
+            future::Either::Right(wait_for.map_err(TableError::from).try_collect())
         }
     }
 }
@@ -481,14 +484,14 @@ impl Table {
     ) -> Result<R, <Self as Service<Request>>::Error>
     where
         Request: Send + 'static,
-        Self: Service<Request, Response = Tagged<R>>,
+        Self: Service<Request, Response = R>,
     {
-        future::poll_fn(|cx| self.poll_ready(cx)).await?;
-        Ok(self.call(r).await?.v)
+        let _ready = future::poll_fn(|cx| self.poll_ready(cx)).await?;
+        Ok(self.call(r).await?)
     }
 
     /// Insert a single row of data into this base table.
-    pub async fn insert<V>(&mut self, u: V) -> Result<(), TableError>
+    pub async fn insert<V>(&mut self, u: V) -> Result<ShardTimestamps, TableError>
     where
         V: Into<Vec<DataType>>,
     {
@@ -496,7 +499,7 @@ impl Table {
     }
 
     /// Perform multiple operation on this base table.
-    pub async fn perform_all<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub async fn perform_all<I, V>(&mut self, i: I) -> Result<ShardTimestamps, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
@@ -506,7 +509,7 @@ impl Table {
     }
 
     /// Delete the row with the given key from this base table.
-    pub async fn delete<I>(&mut self, key: I) -> Result<(), TableError>
+    pub async fn delete<I>(&mut self, key: I) -> Result<ShardTimestamps, TableError>
     where
         I: Into<Vec<DataType>>,
     {
@@ -518,7 +521,11 @@ impl Table {
     ///
     /// `u` is a set of column-modification pairs, where for each pair `(i, m)`, the modification
     /// `m` will be applied to column `i` of the record with key `key`.
-    pub async fn update<V>(&mut self, key: Vec<DataType>, u: V) -> Result<(), TableError>
+    pub async fn update<V>(
+        &mut self,
+        key: Vec<DataType>,
+        u: V,
+    ) -> Result<ShardTimestamps, TableError>
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
@@ -551,7 +558,7 @@ impl Table {
         &mut self,
         insert: Vec<DataType>,
         update: V,
-    ) -> Result<(), TableError>
+    ) -> Result<ShardTimestamps, TableError>
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
@@ -633,7 +640,7 @@ impl DerefMut for SyncTable {
 
 impl SyncTable {
     /// See [`Table::insert`].
-    pub fn insert<V>(&mut self, u: V) -> Result<(), TableError>
+    pub fn insert<V>(&mut self, u: V) -> Result<ShardTimestamps, TableError>
     where
         V: Into<Vec<DataType>>,
     {
@@ -641,7 +648,7 @@ impl SyncTable {
     }
 
     /// See [`Table::perform_all`].
-    pub fn perform_all<I, V>(&mut self, i: I) -> Result<(), TableError>
+    pub fn perform_all<I, V>(&mut self, i: I) -> Result<ShardTimestamps, TableError>
     where
         I: IntoIterator<Item = V>,
         V: Into<TableOperation>,
@@ -650,7 +657,7 @@ impl SyncTable {
     }
 
     /// See [`Table::delete`].
-    pub fn delete<I>(&mut self, key: I) -> Result<(), TableError>
+    pub fn delete<I>(&mut self, key: I) -> Result<ShardTimestamps, TableError>
     where
         I: Into<Vec<DataType>>,
     {
@@ -658,7 +665,7 @@ impl SyncTable {
     }
 
     /// See [`Table::update`].
-    pub fn update<V>(&mut self, key: Vec<DataType>, u: V) -> Result<(), TableError>
+    pub fn update<V>(&mut self, key: Vec<DataType>, u: V) -> Result<ShardTimestamps, TableError>
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {
@@ -670,7 +677,7 @@ impl SyncTable {
         &mut self,
         insert: Vec<DataType>,
         update: V,
-    ) -> Result<(), TableError>
+    ) -> Result<ShardTimestamps, TableError>
     where
         V: IntoIterator<Item = (usize, Modification)>,
     {

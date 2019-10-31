@@ -136,6 +136,7 @@ impl<A: Authority + 'static> Handle<A> {
         // https://gist.github.com/nikomatsakis/fee0e47e14c09c4202316d8ea51e50a0
         fut.await
             .map_err(|e| format_err!("failed to make table: {:?}", e))
+            .map(|_| ())
     }
 
     /// Inform the local instance that it should exit.
