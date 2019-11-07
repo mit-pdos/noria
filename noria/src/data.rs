@@ -628,6 +628,7 @@ pub enum TableOperation {
     /// Delete a row with the contained key.
     Delete {
         /// The key.
+        /// TODO: do we need to change here? Note by WY
         key: Vec<DataType>,
     },
     /// If a row exists with the same key as the contained row, update it using `update`, otherwise

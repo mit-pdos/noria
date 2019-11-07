@@ -94,6 +94,7 @@
 //! use [`ControllerHandle::table`] to get a handle to the new base table. Base tables support
 //! similar operations as SQL tables, such as [`Table::insert`], [`Table::update`],
 //! [`Table::delete`], and also more esoteric operations like [`Table::insert_or_update`].
+//! This file may be helpful- Note by WY
 //!
 //! # Synchronous and asynchronous operation
 //!

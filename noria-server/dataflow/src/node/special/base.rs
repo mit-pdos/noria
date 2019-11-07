@@ -211,6 +211,7 @@ impl Base {
                 }
                 TableOperation::Delete { .. } => {
                     if current.is_some() {
+                        // Todo: check for whether the deletePolicy is erasable (note by WY)
                         current = None;
                     } else {
                         // supposed to delete a non-existing row?

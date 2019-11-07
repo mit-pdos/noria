@@ -157,6 +157,9 @@ pub struct TableBuilder {
     pub table_name: String,
     pub columns: Vec<String>,
     pub schema: Option<CreateTableStatement>,
+    pub is_user_table: bool,
+    pub contains_personal_info: bool,
+    pub erasable: bool,
 }
 
 impl TableBuilder {
@@ -213,6 +216,10 @@ impl TableBuilder {
                 shards: conns,
 
                 dispatch,
+
+                is_user_table: self.is_user_table,
+                contains_personal_info: self.contains_personal_info,
+                erasable: self.erasable,
             }
         })
     }
@@ -241,6 +248,12 @@ pub struct Table {
     shard_addrs: Vec<SocketAddr>,
 
     dispatch: tracing::Dispatch,
+    //add a parameter called "contains_personal_info". If developers want to delete a user, they need to 
+    //make a sql query over the table which is explicitly specified as "is_user_table", and then this will trigger
+    //Noria to check all other tables for which "contains_personal_info == true" AND its esable policy is also true
+    is_user_table: bool,
+    contains_personal_info: bool,
+    erasable: bool,
 }
 
 impl fmt::Debug for Table {
@@ -256,6 +269,9 @@ impl fmt::Debug for Table {
             .field("schema", &self.schema)
             .field("dst_is_local", &self.dst_is_local)
             .field("shard_addrs", &self.shard_addrs)
+            .field("is_user_table", &self.is_user_table)
+            .field("contains_personal_info", &self.contains_personal_info)
+            .field("erasable", &self.erasable)
             .finish()
     }
 }
@@ -551,6 +567,7 @@ impl Table {
     where
         I: Into<Vec<DataType>>,
     {
+        /// TODO: need to check for whether it contains personal data and if yes, whether erasable
         self.quick_n_dirty(TableOperation::Delete { key: key.into() })
     }
 
