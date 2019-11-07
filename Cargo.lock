@@ -229,7 +229,7 @@ name = "block-buffer"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "block-padding 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "block-padding 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "byte-tools 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "generic-array 0.12.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "block-padding"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byte-tools 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3432,12 +3432,12 @@ dependencies = [
 
 [[package]]
 name = "trawler"
-version = "0.7.0-alpha.1"
+version = "0.7.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cookie 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "crossbeam-channel 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3453,7 +3453,7 @@ dependencies = [
  "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zipf 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -3472,7 +3472,7 @@ dependencies = [
  "shellwords 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "trawler 0.7.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trawler 0.7.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsunami 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "yansi 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -3840,7 +3840,7 @@ dependencies = [
 "checksum blake2b_simd 0.5.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b83b7baab1e671718d78204225800d6b170e648188ac7dc992e9d6bddf87d0c0"
 "checksum block-buffer 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a076c298b9ecdb530ed9d967e74a6027d6a7478924520acddcddc24c1c8ab3ab"
 "checksum block-buffer 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c0940dc441f31689269e10ac70eb1002a3a1d3ad1390e030043662eb7fe4688b"
-"checksum block-padding 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6d4dc3af3ee2e12f3e5d224e5e1e3d73668abbeb69e566d361f7d5563a4fdf09"
+"checksum block-padding 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
 "checksum bufstream 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "40e38929add23cdf8a366df9b0e088953150724bcbe5fc330b0d8eb3b328eec8"
 "checksum bumpalo 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ad807f2fc2bf185eeb98ff3a901bd46dc5ad58163d0fa4577ba0d25674d71708"
 "checksum byte-tools 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "560c32574a12a89ecd91f5e742165893f86e3ab98d21f8ea548658eb9eef5f40"
@@ -4147,7 +4147,7 @@ dependencies = [
 "checksum tracing-core 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "bc913647c520c959b6d21e35ed8fa6984971deca9f0a2fcb8c51207e0c56af1d"
 "checksum tracing-log 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
 "checksum tracing-subscriber 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "192ca16595cdd0661ce319e8eede9c975f227cdaabc4faaefdc256f43d852e45"
-"checksum trawler 0.7.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)" = "96844efb048c3e10c13a0019c075e30c1d850f015fae0092ceb657db2ec9d163"
+"checksum trawler 0.7.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3cdf494807d32cb8a3d3dbd8eaab151216e48c704ddd685bee5d6ee5754f408e"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum tsunami 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c8179821d0ba42fe1635c7d8236b8feb785e1fac8b94a8b3f5df69bde2e6f88a"
 "checksum twox-hash 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3bfd5b7557925ce778ff9b9ef90e3ade34c524b5ff10e239c69a42d546d2af56"
