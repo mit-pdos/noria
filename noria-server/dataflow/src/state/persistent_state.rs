@@ -16,8 +16,8 @@ type IndexEpoch = u64;
 type IndexSeq = u64;
 
 enum DelPolicy {
-    erasurable,
-    Unerasurable,   
+    erasable,
+    unerasable,   
 }
 
 // RocksDB key used for storing meta information (like indices).
@@ -35,6 +35,8 @@ const INDEX_BATCH_SIZE: usize = 100_000;
 struct PersistentMeta {
     indices: Vec<Vec<usize>>,
     epoch: IndexEpoch,
+    //todo: do we need to set deletePolicy here or should we add a parameter to the Table class?
+    // see noria/src/table.rs
     deletePolicy: DelPolicy,
 }
 
