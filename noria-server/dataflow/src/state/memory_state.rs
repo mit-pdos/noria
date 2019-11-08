@@ -72,7 +72,12 @@ impl State for MemoryState {
         self.state.iter().any(SingleState::partial)
     }
 
-    fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>) {
+    fn process_records(
+        &mut self,
+        records: &mut Records,
+        _timestamp: Timestamp,
+        partial_tag: Option<Tag>,
+    ) {
         if self.is_partial() {
             records.retain(|r| {
                 // we need to check that we're not erroneously filling any holes
@@ -230,7 +235,7 @@ mod tests {
 
     fn insert<S: State>(state: &mut S, row: Vec<DataType>) {
         let record: Record = row.into();
-        state.process_records(&mut record.into(), None);
+        state.process_records(&mut record.into(), state.current_ts(), None);
     }
 
     #[test]
@@ -245,8 +250,12 @@ mod tests {
         .into();
 
         state.add_key(&[0], None);
-        state.process_records(&mut Vec::from(&records[..3]).into(), None);
-        state.process_records(&mut records[3].clone().into(), None);
+        state.process_records(
+            &mut Vec::from(&records[..3]).into(),
+            state.current_ts(),
+            None,
+        );
+        state.process_records(&mut records[3].clone().into(), state.current_ts(), None);
 
         // Make sure the first record has been deleted:
         match state.lookup(&[0], &KeyType::Single(&records[0][0])) {

@@ -10,6 +10,8 @@ pub use self::map::*;
 pub use self::records::*;
 pub use noria::DataType;
 
+pub type Timestamp = u64;
+
 pub trait SizeOf {
     fn deep_size_of(&self) -> u64;
     fn size_of(&self) -> u64;

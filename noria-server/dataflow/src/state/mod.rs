@@ -10,13 +10,10 @@ use std::rc::Rc;
 use std::{slice, vec};
 
 use crate::prelude::*;
-use common::SizeOf;
+use noria::DataType;
 
 pub(crate) use self::memory_state::MemoryState;
 pub(crate) use self::persistent_state::PersistentState;
-
-// The version of a tuple
-type Timestamp = u64;
 
 pub(crate) trait State: SizeOf + Send {
     /// Add an index keyed by the given columns and replayed to by the given partial tags.
@@ -30,7 +27,12 @@ pub(crate) trait State: SizeOf + Send {
 
     // Inserts or removes each record into State. Records that miss all indices in partial state
     // are removed from `records` (thus the mutable reference).
-    fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>);
+    fn process_records(
+        &mut self,
+        records: &mut Records,
+        _timestamp: Timestamp,
+        partial_tag: Option<Tag>,
+    );
 
     fn mark_hole(&mut self, key: &[DataType], tag: Tag);
 
@@ -65,6 +67,11 @@ pub(crate) trait State: SizeOf + Send {
     fn evict_keys(&mut self, tag: Tag, keys: &[Vec<DataType>]) -> Option<(&[usize], u64)>;
 
     fn clear(&mut self);
+
+    // FIXME: The structs implementing the trait should be responsible for defining this function
+    fn current_ts(&self) -> Timestamp {
+        return 0;
+    }
 }
 
 #[derive(Clone, Debug)]

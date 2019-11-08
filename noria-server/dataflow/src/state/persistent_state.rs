@@ -5,8 +5,8 @@ use serde;
 use tempfile::{tempdir, TempDir};
 
 use crate::prelude::*;
-use crate::state::{RecordResult, State, Timestamp};
-use common::SizeOf;
+use crate::state::{RecordResult, State};
+
 use std::iter::FromIterator;
 
 // Incremented on each PersistentState initialization so that IndexSeq
@@ -62,7 +62,12 @@ pub struct PersistentState {
 }
 
 impl State for PersistentState {
-    fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>) {
+    fn process_records(
+        &mut self,
+        records: &mut Records,
+        _timestamp: Timestamp,
+        partial_tag: Option<Tag>,
+    ) {
         assert!(partial_tag.is_none(), "PersistentState can't be partial");
         if records.len() == 0 {
             return;
@@ -223,6 +228,10 @@ impl State for PersistentState {
 
     fn clear(&mut self) {
         unreachable!("can't clear PersistentState")
+    }
+
+    fn current_ts(&self) -> Timestamp {
+        self.current_ts
     }
 }
 
@@ -694,9 +703,18 @@ mod tests {
     use bincode;
     use std::path::PathBuf;
 
+    // The ultimate goal should aim to eliminate this impl block, but it
+    // it currently here to make the compiler happy
+    impl PersistentState {
+        fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>) {
+            let ts = self.current_ts();
+            <PersistentState as State>::process_records(self, records, ts, partial_tag);
+        }
+    }
+
     fn insert<S: State>(state: &mut S, row: Vec<DataType>) {
         let record: Record = row.into();
-        state.process_records(&mut record.into(), None);
+        state.process_records(&mut record.into(), state.current_ts(), None);
     }
 
     fn get_tmp_path() -> (TempDir, String) {

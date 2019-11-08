@@ -24,7 +24,9 @@ impl Node {
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs| {
-                    materialize(rs, tag, state.get_mut(addr));
+                    // TODO: Figure out how we would like to assign the TS,
+                    // probably by modifying Packet::Message and Packet::ReplayPiece
+                    materialize(rs, 0, tag, state.get_mut(addr));
                 });
             }
             NodeType::Base(ref mut b) => {
@@ -35,6 +37,10 @@ impl Node {
                     }) => {
                         let Input { dst, data, tracer } = unsafe { inner.take() };
                         let mut rs = b.process(addr, data, &*state);
+                        let persist_state = state
+                            .get(addr)
+                            .expect("base should be backed up by persistent_state");
+                        let ts = persist_state.current_ts();
 
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay
@@ -44,7 +50,7 @@ impl Node {
                         //
                         // So: only materialize if the message we're processing is not a replay!
                         if keyed_by.is_none() {
-                            materialize(&mut rs, None, state.get_mut(addr));
+                            materialize(&mut rs, ts, None, state.get_mut(addr));
                         }
 
                         // Send write-ACKs to all the clients with updates that made
@@ -205,7 +211,8 @@ impl Node {
                     _ => None,
                 };
                 m.map_data(|rs| {
-                    materialize(rs, tag, state.get_mut(addr));
+                    // TODO: Figure out what should we put as the ts here.
+                    materialize(rs, 0, tag, state.get_mut(addr));
                 });
 
                 for miss in misses.iter_mut() {
@@ -307,6 +314,7 @@ fn reroute_miss(nodes: &DomainNodes, miss: &mut Miss) {
 // crate visibility due to use by tests
 pub(crate) fn materialize(
     rs: &mut Records,
+    timestamp: Timestamp,
     partial: Option<Tag>,
     state: Option<&mut Box<dyn State>>,
 ) {
@@ -317,5 +325,5 @@ pub(crate) fn materialize(
     }
 
     // yes!
-    state.unwrap().process_records(rs, partial);
+    state.unwrap().process_records(rs, timestamp, partial);
 }

@@ -388,7 +388,7 @@ pub mod test {
 
             // if the base node has state, keep it
             if let Some(ref mut state) = self.states.get_mut(*base) {
-                state.process_records(&mut vec![data].into(), None);
+                state.process_records(&mut vec![data].into(), state.current_ts(), None);
             } else {
                 panic!(
                     "unnecessary seed value for {} (never used by any node)",
@@ -443,7 +443,8 @@ pub mod test {
                 return u;
             }
 
-            node::materialize(&mut u, None, self.states.get_mut(*self.nut.unwrap()));
+            // TODO: Figure out what should be put here as the timestamp.
+            node::materialize(&mut u, 0, None, self.states.get_mut(*self.nut.unwrap()));
             u
         }
 

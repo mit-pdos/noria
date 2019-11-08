@@ -346,7 +346,11 @@ mod tests {
 
         let mut one = move |u: Vec<TableOperation>| {
             let mut m = n.get_base_mut().unwrap().process(local, u, &states);
-            node::materialize(&mut m, None, states.get_mut(local));
+            let persist_state = states
+                .get(local)
+                .expect("base should be backed up by persistent_state");
+            let ts = persist_state.current_ts();
+            node::materialize(&mut m, ts, None, states.get_mut(local));
             m
         };
 
