@@ -77,14 +77,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-lease"
-version = "0.2.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "tokio-sync 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "async-timer"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1689,7 +1681,6 @@ dependencies = [
 name = "noria-benchmarks"
 version = "0.0.1"
 dependencies = [
- "async-lease 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ctrlc 3.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3832,7 +3823,6 @@ dependencies = [
 "checksum arrayvec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 "checksum assert_infrequent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "28e856f8298901f495458d316d846b9502491e6a754c76c9ec0c9135daabbb50"
 "checksum async-bincode 0.5.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)" = "f03967425a91363d7c3f8c888e29f50ee6be478615e4d33c3be2cce84a6ff2b0"
-"checksum async-lease 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4295a3bf3e1197dfbb138a4b30db8134454ecbea039242f1fa12d0dc57b5f246"
 "checksum async-timer 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "637f5de4177a1d4fb5a37c20c4d4b2357eee1ac6b1b4fbf8ab10d909e5a89be4"
 "checksum atty 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)" = "1803c647a3ec87095e7ae7acfca019e98de5ec9a7d01343f611cf3152ed71a90"
 "checksum autocfg 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1d49d90015b3c36167a20fe2810c5cd875ad504b39cff3d4eae7977e6b7c1cb2"
