@@ -154,7 +154,8 @@ impl Reader {
             // make sure we don't fill a partial materialization
             // hole with incomplete (i.e., non-replay) state.
             if m.is_regular() && state.is_partial() {
-                m.map_data(|data| {
+                // TODO: find out how to use `_ts`
+                m.map_data(|data, _ts| {
                     data.retain(|row| {
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {
@@ -177,7 +178,8 @@ impl Reader {
             // same hole at the same time. we need to make sure that we ignore any such
             // duplicated replay.
             if !m.is_regular() && state.is_partial() {
-                m.map_data(|data| {
+                // TODO: find out how to use `_ts`
+                m.map_data(|data, _ts| {
                     data.retain(|row| {
                         match state.entry_from_record(&row[..]).try_find_and(|_| ()) {
                             Ok((None, _)) => {

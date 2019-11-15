@@ -279,14 +279,15 @@ impl Packet {
 
     pub(crate) fn map_data<F>(&mut self, map: F)
     where
-        F: FnOnce(&mut Records),
+        F: FnOnce(&mut Records, Timestamp),
     {
         match *self {
             Packet::Message { ref mut data, .. } => {
-                map(&mut data.0);
+                map(&mut data.0, data.1);
             }
             Packet::ReplayPiece { ref mut data, .. } => {
-                map(data);
+                // TODO: ReplayPiece might also need a timestamp
+                map(data, 0);
             }
             _ => {
                 unreachable!();

@@ -23,10 +23,10 @@ impl Node {
             NodeType::Ingress => {
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
-                m.map_data(|rs| {
+                m.map_data(|rs, ts| {
                     // TODO: Figure out how we would like to assign the TS,
                     // probably by modifying Packet::Message and Packet::ReplayPiece
-                    materialize(rs, 0, tag, state.get_mut(addr));
+                    materialize(rs, ts, tag, state.get_mut(addr));
                 });
             }
             NodeType::Base(ref mut b) => {
@@ -118,16 +118,15 @@ impl Node {
 
                     let mut set_replay_last = None;
                     tracer = m.tracer().and_then(Option::take);
-                    m.map_data(|data| {
+                    m.map_data(|data, ts| {
                         // we need to own the data
                         let old_data = mem::replace(data, Records::default());
 
-                        // FIXME: give the correct timestamp instead of 0
                         match i.on_input_raw(
                             ex,
                             from,
                             old_data,
-                            0,
+                            ts,
                             &mut tracer,
                             &replay,
                             nodes,
@@ -219,9 +218,8 @@ impl Node {
                     }
                     _ => None,
                 };
-                m.map_data(|rs| {
-                    // TODO: Figure out what should we put as the ts here.
-                    materialize(rs, 0, tag, state.get_mut(addr));
+                m.map_data(|rs, ts| {
+                    materialize(rs, ts, tag, state.get_mut(addr));
                 });
 
                 for miss in misses.iter_mut() {

@@ -2004,7 +2004,8 @@ impl Domain {
                             // prune all replayed records for keys where any replayed record for
                             // that key missed.
                             let partial_col = partial_key_cols.as_ref().unwrap();
-                            m.as_mut().unwrap().map_data(|rs| {
+                            // TODO: find out how to use `_ts`
+                            m.as_mut().unwrap().map_data(|rs, _ts| {
                                 rs.retain(|r| {
                                     // XXX: don't we technically need to translate the columns a
                                     // bunch here? what if two key columns are reordered?
