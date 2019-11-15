@@ -117,6 +117,7 @@ impl Ingredient for TopK {
         _: &mut dyn Executor,
         from: LocalNodeIndex,
         rs: Records,
+        _: Timestamp,
         _: &mut Tracer,
         replay_key_cols: Option<&[usize]>,
         _: &DomainNodes,

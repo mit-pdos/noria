@@ -122,8 +122,17 @@ impl Node {
                         // we need to own the data
                         let old_data = mem::replace(data, Records::default());
 
-                        match i.on_input_raw(ex, from, old_data, &mut tracer, &replay, nodes, state)
-                        {
+                        // FIXME: give the correct timestamp instead of 0
+                        match i.on_input_raw(
+                            ex,
+                            from,
+                            old_data,
+                            0,
+                            &mut tracer,
+                            &replay,
+                            nodes,
+                            state,
+                        ) {
                             RawProcessingResult::Regular(m) => {
                                 mem::replace(data, m.results);
                                 lookups = m.lookups;

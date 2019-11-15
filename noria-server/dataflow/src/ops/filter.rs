@@ -77,6 +77,7 @@ impl Ingredient for Filter {
         _: &mut dyn Executor,
         _: LocalNodeIndex,
         mut rs: Records,
+        _: Timestamp,
         _: &mut Tracer,
         _: Option<&[usize]>,
         _: &DomainNodes,

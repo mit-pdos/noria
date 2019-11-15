@@ -186,6 +186,7 @@ impl Ingredient for Union {
         _: &mut dyn Executor,
         from: LocalNodeIndex,
         rs: Records,
+        _: Timestamp,
         _: &mut Tracer,
         _: Option<&[usize]>,
         _: &DomainNodes,
@@ -227,6 +228,7 @@ impl Ingredient for Union {
         ex: &mut dyn Executor,
         from: LocalNodeIndex,
         rs: Records,
+        _: Timestamp,
         tracer: &mut Tracer,
         replay: &ReplayContext,
         n: &DomainNodes,
@@ -265,7 +267,8 @@ impl Ingredient for Union {
                     assert!(self.replay_key.is_none() || self.replay_pieces.is_empty());
 
                     // process the results (self is okay to have mutably borrowed here)
-                    let rs = self.on_input(ex, from, rs, tracer, None, n, s).results;
+                    // FIXME: give the correct timestamp instead of 0.
+                    let rs = self.on_input(ex, from, rs, 0, tracer, None, n, s).results;
 
                     // *then* borrow self.full_wait_state again
                     if let FullWait::Ongoing {
@@ -288,7 +291,8 @@ impl Ingredient for Union {
                 if replay_key.is_none() || self.replay_pieces.is_empty() {
                     // no replay going on, so we're done.
                     return RawProcessingResult::Regular(
-                        self.on_input(ex, from, rs, tracer, None, n, s),
+                        // FIXME: give the correct timestamp instead of 0
+                        self.on_input(ex, from, rs, 0, tracer, None, n, s),
                     );
                 }
 
@@ -321,7 +325,8 @@ impl Ingredient for Union {
                     }
                 }
 
-                RawProcessingResult::Regular(self.on_input(ex, from, rs, tracer, None, n, s))
+                // FIXME: give the correct timestamp instead of 0
+                RawProcessingResult::Regular(self.on_input(ex, from, rs, 0, tracer, None, n, s))
             }
             ReplayContext::Full { last } => {
                 // this part is actually surpringly straightforward, but the *reason* it is
@@ -377,7 +382,8 @@ impl Ingredient for Union {
                 // arm). feel free to go check. interestingly enough, it's also fine for us to
                 // still emit 2 (i.e., not capture it), since it'll just be dropped by the target
                 // domain.
-                let mut rs = self.on_input(ex, from, rs, tracer, None, n, s).results;
+                // FIXME: give the correct timestamp instead of 0
+                let mut rs = self.on_input(ex, from, rs, 0, tracer, None, n, s).results;
                 if let FullWait::None = self.full_wait_state {
                     if self.required == 1 {
                         // no need to ever buffer
@@ -573,7 +579,8 @@ impl Ingredient for Union {
                             pieces.buffered.into_iter()
                         })
                         .flat_map(|(from, rs)| {
-                            self.on_input(ex, from, rs, tracer, Some(&key_cols[..]), n, s)
+                            // FIXME: give the correct timestamp instead of 0
+                            self.on_input(ex, from, rs, 0, tracer, Some(&key_cols[..]), n, s)
                                 .results
                         })
                         .collect()
