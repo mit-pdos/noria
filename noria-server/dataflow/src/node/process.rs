@@ -59,7 +59,7 @@ impl Node {
 
                         *m = Some(Box::new(Packet::Message {
                             link: Link::new(dst, dst),
-                            data: rs,
+                            data: (rs, ts),
                             tracer,
                         }));
                     }

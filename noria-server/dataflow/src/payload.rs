@@ -15,6 +15,8 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::time;
 
+use common::Timestamp;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReplayPathSegment {
     pub node: LocalNodeIndex,
@@ -94,7 +96,7 @@ pub enum Packet {
     /// Regular data-flow update.
     Message {
         link: Link,
-        data: Records,
+        data: (Records, Timestamp),
         tracer: Tracer,
     },
 
@@ -269,7 +271,7 @@ impl Packet {
 
     pub(crate) fn is_empty(&self) -> bool {
         match *self {
-            Packet::Message { ref data, .. } => data.is_empty(),
+            Packet::Message { ref data, .. } => data.0.is_empty(),
             Packet::ReplayPiece { ref data, .. } => data.is_empty(),
             _ => unreachable!(),
         }
@@ -280,7 +282,10 @@ impl Packet {
         F: FnOnce(&mut Records),
     {
         match *self {
-            Packet::Message { ref mut data, .. } | Packet::ReplayPiece { ref mut data, .. } => {
+            Packet::Message { ref mut data, .. } => {
+                map(&mut data.0);
+            }
+            Packet::ReplayPiece { ref mut data, .. } => {
                 map(data);
             }
             _ => {
@@ -306,7 +311,7 @@ impl Packet {
 
     pub(crate) fn data(&self) -> &Records {
         match *self {
-            Packet::Message { ref data, .. } => data,
+            Packet::Message { ref data, .. } => &data.0,
             Packet::ReplayPiece { ref data, .. } => data,
             _ => unreachable!(),
         }
@@ -315,7 +320,7 @@ impl Packet {
     pub(crate) fn take_data(&mut self) -> Records {
         use std::mem;
         let inner = match *self {
-            Packet::Message { ref mut data, .. } => data,
+            Packet::Message { ref mut data, .. } => &mut data.0,
             Packet::ReplayPiece { ref mut data, .. } => data,
             _ => unreachable!(),
         };
