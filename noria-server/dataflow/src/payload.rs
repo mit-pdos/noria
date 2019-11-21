@@ -104,7 +104,7 @@ pub enum Packet {
     ReplayPiece {
         link: Link,
         tag: Tag,
-        data: Records,
+        data: (Records, Timestamp),
         context: ReplayPieceContext,
     },
 
@@ -272,7 +272,7 @@ impl Packet {
     pub(crate) fn is_empty(&self) -> bool {
         match *self {
             Packet::Message { ref data, .. } => data.0.is_empty(),
-            Packet::ReplayPiece { ref data, .. } => data.is_empty(),
+            Packet::ReplayPiece { ref data, .. } => data.0.is_empty(),
             _ => unreachable!(),
         }
     }
@@ -286,8 +286,7 @@ impl Packet {
                 map(&mut data.0, data.1);
             }
             Packet::ReplayPiece { ref mut data, .. } => {
-                // TODO: ReplayPiece might also need a timestamp
-                map(data, 0);
+                map(&mut data.0, data.1);
             }
             _ => {
                 unreachable!();
@@ -313,7 +312,7 @@ impl Packet {
     pub(crate) fn data(&self) -> &Records {
         match *self {
             Packet::Message { ref data, .. } => &data.0,
-            Packet::ReplayPiece { ref data, .. } => data,
+            Packet::ReplayPiece { ref data, .. } => &data.0,
             _ => unreachable!(),
         }
     }
@@ -322,7 +321,7 @@ impl Packet {
         use std::mem;
         let inner = match *self {
             Packet::Message { ref mut data, .. } => &mut data.0,
-            Packet::ReplayPiece { ref mut data, .. } => data,
+            Packet::ReplayPiece { ref mut data, .. } => &mut data.0,
             _ => unreachable!(),
         };
         mem::replace(inner, Records::default())
@@ -399,7 +398,7 @@ impl fmt::Debug for Packet {
                 "Packet::ReplayPiece({:?}, tag {}, {} records)",
                 link,
                 tag.id(),
-                data.len()
+                data.0.len()
             ),
             ref p => {
                 use std::mem;

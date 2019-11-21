@@ -1111,7 +1111,8 @@ impl Domain {
                             context: ReplayPieceContext::Regular {
                                 last: state.is_empty(),
                             },
-                            data: Vec::<Record>::new().into(),
+                            // TODO: The states should be able to give ts as well.
+                            data: (Vec::<Record>::new().into(), 0),
                         });
 
                         if !state.is_empty() {
@@ -1180,7 +1181,8 @@ impl Domain {
                                             tag,
                                             link, // to is overwritten by receiver
                                             context: ReplayPieceContext::Regular { last },
-                                            data: chunk,
+                                            // TODO: Use the ts provided by states.
+                                            data: (chunk, 0),
                                         });
 
                                         trace!(log, "sending batch"; "#" => i, "[]" => len);
@@ -1499,7 +1501,8 @@ impl Domain {
                             unishard: single_shard, // if we are the only source, only one path
                             ignore: false,
                         },
-                        data: rs.into(),
+                        // TODO: Figure out the timestamp, probably from states
+                        data: (rs.into(), 0),
                     }))
                 } else {
                     None
@@ -1617,7 +1620,8 @@ impl Domain {
                             unishard: single_shard, // if we are the only source, only one path
                             ignore: false,
                         },
-                        data,
+                        // TODO: Figure out the correct time stamp
+                        data: (data, 0),
                     }));
                     (m, source, None)
                 } else {
@@ -1717,12 +1721,12 @@ impl Domain {
                         trace!(
                             self.log,
                             "replaying batch";
-                            "#" => data.len(),
+                            "#" => data.0.len(),
                             "tag" => tag.id(),
                             "keys" => ?for_keys,
                         );
                     } else {
-                        debug!(self.log, "replaying batch"; "#" => data.len());
+                        debug!(self.log, "replaying batch"; "#" => data.0.len());
                     }
 
                     // let's collect some information about the destination of this replay
@@ -1765,7 +1769,8 @@ impl Domain {
                                 // yet
                                 let partial_keys =
                                     path.first().unwrap().partial_key.as_ref().unwrap();
-                                data.retain(|r| {
+                                // TODO: use the timestamp provided.
+                                data.0.retain(|r| {
                                     for_keys.iter().any(|k| {
                                         partial_keys.iter().enumerate().all(|(i, c)| r[*c] == k[i])
                                     })
