@@ -14,6 +14,43 @@ pub(super) struct VersionedRows {
     pub(super) rows: Vec<Row>,
 }
 
+pub(super) struct VersionedRowsIter {
+    headers_iter: ::std::vec::IntoIter<(Timestamp, Timestamp)>,
+    rows_iter: ::std::vec::IntoIter<Row>,
+}
+
+impl Iterator for VersionedRowsIter {
+    type Item = (Timestamp, Timestamp, Row);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.headers_iter.next() {
+            Some((begin_ts, end_ts)) => Some((
+                begin_ts,
+                end_ts,
+                self.rows_iter
+                    .next()
+                    .expect("rows exhausted before headers"),
+            )),
+            None => {
+                assert!(self.rows_iter.next().is_none());
+                None
+            }
+        }
+    }
+}
+
+impl IntoIterator for VersionedRows {
+    type Item = (Timestamp, Timestamp, Row);
+    type IntoIter = VersionedRowsIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let VersionedRows { headers, rows } = self;
+        VersionedRowsIter {
+            headers_iter: headers.into_iter(),
+            rows_iter: rows.into_iter(),
+        }
+    }
+}
+
 impl Default for VersionedRows {
     fn default() -> Self {
         Self {
