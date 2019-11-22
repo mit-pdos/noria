@@ -4,29 +4,45 @@ use std::rc::Rc;
 
 use super::mk_key::MakeKey;
 use crate::prelude::*;
-use common::SizeOf;
+use common::{SizeOf, Timestamp};
 
 type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
+// An AoS array of (beg_ts, end_ts) and rows.
+pub(super) struct VersionedRows {
+    pub(super) headers: Vec<(Timestamp, Timestamp)>,
+    pub(super) rows: Vec<Row>,
+}
+
+impl Default for VersionedRows {
+    fn default() -> Self {
+        Self {
+            headers: vec![],
+            rows: vec![],
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub(super) enum KeyedState {
-    Single(FnvHashMap<DataType, Vec<Row>>),
-    Double(FnvHashMap<(DataType, DataType), Vec<Row>>),
-    Tri(FnvHashMap<(DataType, DataType, DataType), Vec<Row>>),
-    Quad(FnvHashMap<(DataType, DataType, DataType, DataType), Vec<Row>>),
-    Quin(FnvHashMap<(DataType, DataType, DataType, DataType, DataType), Vec<Row>>),
-    Sex(FnvHashMap<(DataType, DataType, DataType, DataType, DataType, DataType), Vec<Row>>),
+    Single(FnvHashMap<DataType, VersionedRows>),
+    Double(FnvHashMap<(DataType, DataType), VersionedRows>),
+    Tri(FnvHashMap<(DataType, DataType, DataType), VersionedRows>),
+    Quad(FnvHashMap<(DataType, DataType, DataType, DataType), VersionedRows>),
+    Quin(FnvHashMap<(DataType, DataType, DataType, DataType, DataType), VersionedRows>),
+    Sex(FnvHashMap<(DataType, DataType, DataType, DataType, DataType, DataType), VersionedRows>),
 }
 
 impl KeyedState {
     pub(super) fn lookup<'a>(&'a self, key: &KeyType) -> Option<&'a Vec<Row>> {
         match (self, key) {
-            (&KeyedState::Single(ref m), &KeyType::Single(k)) => m.get(k),
-            (&KeyedState::Double(ref m), &KeyType::Double(ref k)) => m.get(k),
-            (&KeyedState::Tri(ref m), &KeyType::Tri(ref k)) => m.get(k),
-            (&KeyedState::Quad(ref m), &KeyType::Quad(ref k)) => m.get(k),
-            (&KeyedState::Quin(ref m), &KeyType::Quin(ref k)) => m.get(k),
-            (&KeyedState::Sex(ref m), &KeyType::Sex(ref k)) => m.get(k),
+            // TODO: filter out only visible rows.
+            (&KeyedState::Single(ref m), &KeyType::Single(k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Double(ref m), &KeyType::Double(ref k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Tri(ref m), &KeyType::Tri(ref k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Quad(ref m), &KeyType::Quad(ref k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Quin(ref m), &KeyType::Quin(ref k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Sex(ref m), &KeyType::Sex(ref k)) => m.get(k).map(|vrs| &vrs.rows),
             _ => unreachable!(),
         }
     }
@@ -66,9 +82,12 @@ impl KeyedState {
             }
         }?;
         Some((
-            rs.iter()
+            rs.rows
+                .iter()
                 .filter(|r| Rc::strong_count(&r.0) == 1)
-                .map(SizeOf::deep_size_of)
+                .map(|r| {
+                    SizeOf::deep_size_of(r) + std::mem::size_of::<(Timestamp, Timestamp)>() as u64
+                })
                 .sum(),
             key,
         ))
@@ -95,7 +114,8 @@ impl KeyedState {
             }
         }
         .map(|rows| {
-            rows.iter()
+            rows.rows
+                .iter()
                 .filter(|r| Rc::strong_count(&r.0) == 1)
                 .map(SizeOf::deep_size_of)
                 .sum()
