@@ -3430,7 +3430,7 @@ dependencies = [
 
 [[package]]
 name = "trawler"
-version = "0.7.0-alpha.4"
+version = "0.7.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3471,7 +3471,7 @@ dependencies = [
  "shellwords 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "trawler 0.7.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trawler 0.7.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsunami 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "yansi 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -4146,7 +4146,7 @@ dependencies = [
 "checksum tracing-core 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "bc913647c520c959b6d21e35ed8fa6984971deca9f0a2fcb8c51207e0c56af1d"
 "checksum tracing-log 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
 "checksum tracing-subscriber 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "192ca16595cdd0661ce319e8eede9c975f227cdaabc4faaefdc256f43d852e45"
-"checksum trawler 0.7.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)" = "abb299c0a4413de8abf88153b2ff89cb9314491c08216a8c03e28f9de9c4ebab"
+"checksum trawler 0.7.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a41356461cab47e1b74025fd8cafd056a7c0a67125b6aac365106acd975bdb4a"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum tsunami 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c8179821d0ba42fe1635c7d8236b8feb785e1fac8b94a8b3f5df69bde2e6f88a"
 "checksum twox-hash 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3bfd5b7557925ce778ff9b9ef90e3ade34c524b5ff10e239c69a42d546d2af56"
