@@ -56,10 +56,10 @@ impl State for MemoryState {
 
             if !old.is_empty() {
                 assert!(!old[0].partial());
-                for rs in old[0].values() {
-                    for r in rs {
-                        // TODO(zeling): Definitely fix this!
-                        new.insert_row(Row::from(r.0.clone()), 0);
+                for (headers, rs) in old[0].versioned_values() {
+                    debug_assert_eq!(headers.len(), rs.len());
+                    for i in 1..headers.len() {
+                        new.insert_row_with_header(Row::from(rs[i].0.clone()), headers[i].clone());
                     }
                 }
             }

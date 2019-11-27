@@ -9,6 +9,7 @@ use common::{SizeOf, Timestamp};
 type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
 // MVTO header
+#[derive(Clone)]
 pub(super) struct VersionedRowsHeader {
     pub(super) beg_ts: Timestamp,
     pub(super) end_ts: Option<Timestamp>, // None for +INF

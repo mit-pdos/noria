@@ -13,20 +13,20 @@ pub(super) struct SingleState {
 }
 
 macro_rules! insert_row_match_impl {
-    ($self:ident, $r:ident, $map:ident) => {{
+    ($self:ident, $r:ident, $map:ident, $header:ident) => {{
         let key = MakeKey::from_row(&$self.key, &*$r);
         match $map.entry(key) {
             Entry::Occupied(mut vrs) => {
                 // TODO: Fix the begin_ts and end_ts.
                 vrs.get_mut().rows.push($r);
-                vrs.get_mut().headers.push(VersionedRowsHeader::default());
+                vrs.get_mut().headers.push($header);
             }
             Entry::Vacant(..) if $self.partial => return false,
             rs @ Entry::Vacant(..) => {
                 let vrs = rs.or_default();
                 // TODO: Fix the begin_ts and end_ts.
                 vrs.rows.push($r);
-                vrs.headers.push(VersionedRowsHeader::default());
+                vrs.headers.push($header);
             }
         }
     }};
@@ -56,6 +56,12 @@ impl SingleState {
     /// not inserted).
     pub(super) fn insert_row(&mut self, r: Row, ts: Timestamp) -> bool {
         use indexmap::map::Entry;
+        let header = VersionedRowsHeader::with_begin_ts(ts);
+        self.insert_row_with_header(r, header)
+    }
+
+    pub(super) fn insert_row_with_header(&mut self, r: Row, header: VersionedRowsHeader) -> bool {
+        use indexmap::map::Entry;
         match self.state {
             KeyedState::Single(ref mut map) => {
                 // treat this specially to avoid the extra Vec
@@ -70,7 +76,7 @@ impl SingleState {
                     self.rows += 1;
                     // TODO: Fix the begin_ts and end_ts.
                     rows.push(r);
-                    headers.push(VersionedRowsHeader::with_begin_ts(ts));
+                    headers.push(header);
                     return true;
                 } else if self.partial {
                     // trying to insert a record into partial materialization hole!
@@ -80,16 +86,16 @@ impl SingleState {
                 map.insert(
                     r[self.key[0]].clone(),
                     VersionedRows {
-                        headers: vec![VersionedRowsHeader::with_begin_ts(ts)],
+                        headers: vec![header],
                         rows: vec![r],
                     },
                 );
             }
-            KeyedState::Double(ref mut map) => insert_row_match_impl!(self, r, map),
-            KeyedState::Tri(ref mut map) => insert_row_match_impl!(self, r, map),
-            KeyedState::Quad(ref mut map) => insert_row_match_impl!(self, r, map),
-            KeyedState::Quin(ref mut map) => insert_row_match_impl!(self, r, map),
-            KeyedState::Sex(ref mut map) => insert_row_match_impl!(self, r, map),
+            KeyedState::Double(ref mut map) => insert_row_match_impl!(self, r, map, header),
+            KeyedState::Tri(ref mut map) => insert_row_match_impl!(self, r, map, header),
+            KeyedState::Quad(ref mut map) => insert_row_match_impl!(self, r, map, header),
+            KeyedState::Quin(ref mut map) => insert_row_match_impl!(self, r, map, header),
+            KeyedState::Sex(ref mut map) => insert_row_match_impl!(self, r, map, header),
         }
 
         self.rows += 1;
@@ -274,6 +280,29 @@ impl SingleState {
             KeyedState::Sex(ref map) => Box::new(map.values().map(|vrs| &vrs.rows)),
         }
     }
+
+    pub(super) fn versioned_values<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = (&'a Vec<VersionedRowsHeader>, &'a Vec<Row>)> + 'a> {
+        match self.state {
+            KeyedState::Single(ref map) => {
+                Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows)))
+            }
+            KeyedState::Double(ref map) => {
+                Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows)))
+            }
+            KeyedState::Tri(ref map) => Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows))),
+            KeyedState::Quad(ref map) => {
+                Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows)))
+            }
+            KeyedState::Quin(ref map) => {
+                Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows)))
+            }
+            KeyedState::Sex(ref map) => Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows))),
+            _ => unimplemented!(),
+        }
+    }
+
     pub(super) fn key(&self) -> &[usize] {
         &self.key
     }
