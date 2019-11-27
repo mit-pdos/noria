@@ -1,6 +1,6 @@
 use super::mk_key::MakeKey;
 use crate::prelude::*;
-use crate::state::keyed_state::{KeyedState, VersionedRows};
+use crate::state::keyed_state::{KeyedState, VersionedRows, VersionedRowsHeader};
 use common::SizeOf;
 use rand::prelude::*;
 use std::rc::Rc;
@@ -19,14 +19,14 @@ macro_rules! insert_row_match_impl {
             Entry::Occupied(mut vrs) => {
                 // TODO: Fix the begin_ts and end_ts.
                 vrs.get_mut().rows.push($r);
-                vrs.get_mut().headers.push((0, 0));
+                vrs.get_mut().headers.push(VersionedRowsHeader::default());
             }
             Entry::Vacant(..) if $self.partial => return false,
             rs @ Entry::Vacant(..) => {
                 let vrs = rs.or_default();
                 // TODO: Fix the begin_ts and end_ts.
                 vrs.rows.push($r);
-                vrs.headers.push((0, 0));
+                vrs.headers.push(VersionedRowsHeader::default());
             }
         }
     }};
@@ -52,7 +52,6 @@ impl SingleState {
             rows: 0,
         }
     }
-
     /// Inserts the given record, or returns false if a hole was encountered (and the record hence
     /// not inserted).
     pub(super) fn insert_row(&mut self, r: Row) -> bool {
@@ -71,7 +70,7 @@ impl SingleState {
                     self.rows += 1;
                     // TODO: Fix the begin_ts and end_ts.
                     rows.push(r);
-                    headers.push((0, 0));
+                    headers.push(VersionedRowsHeader::default());
                     return true;
                 } else if self.partial {
                     // trying to insert a record into partial materialization hole!
@@ -81,7 +80,7 @@ impl SingleState {
                 map.insert(
                     r[self.key[0]].clone(),
                     VersionedRows {
-                        headers: vec![(0, 0)],
+                        headers: vec![VersionedRowsHeader::default()],
                         rows: vec![r],
                     },
                 );
@@ -285,8 +284,8 @@ impl SingleState {
         self.rows
     }
     pub(super) fn lookup<'a>(&'a self, key: &KeyType) -> LookupResult<'a> {
-        if let Some(rs) = self.state.lookup(key) {
-            LookupResult::Some(RecordResult::Borrowed(&rs[..]))
+        if let Some(rs) = self.state.lookup(key, 0) {
+            LookupResult::Some(RecordResult::Iterated(rs))
         } else if self.partial() {
             // partially materialized, so this is a hole (empty results would be vec![])
             LookupResult::Missing

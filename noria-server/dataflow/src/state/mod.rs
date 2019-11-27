@@ -105,6 +105,7 @@ impl SizeOf for Row {
 pub(crate) enum RecordResult<'a> {
     Borrowed(&'a [Row]),
     Owned(Vec<Vec<DataType>>),
+    Iterated(keyed_state::VersionedRowsIter<'a>),
 }
 
 impl<'a> RecordResult<'a> {
@@ -112,6 +113,7 @@ impl<'a> RecordResult<'a> {
         match *self {
             RecordResult::Borrowed(rs) => rs.len(),
             RecordResult::Owned(ref rs) => rs.len(),
+            RecordResult::Iterated(ref rs) => rs.clone().count(),
         }
     }
 
@@ -119,6 +121,7 @@ impl<'a> RecordResult<'a> {
         match *self {
             RecordResult::Borrowed(rs) => rs.is_empty(),
             RecordResult::Owned(ref rs) => rs.is_empty(),
+            RecordResult::Iterated(ref rs) => rs.clone().next().is_none(),
         }
     }
 }
@@ -131,6 +134,7 @@ impl<'a> IntoIterator for RecordResult<'a> {
         match self {
             RecordResult::Borrowed(rs) => RecordResultIterator::Borrowed(rs.iter()),
             RecordResult::Owned(rs) => RecordResultIterator::Owned(rs.into_iter()),
+            RecordResult::Iterated(rs) => RecordResultIterator::Iterated(rs),
         }
     }
 }
@@ -138,6 +142,7 @@ impl<'a> IntoIterator for RecordResult<'a> {
 pub(crate) enum RecordResultIterator<'a> {
     Owned(vec::IntoIter<Vec<DataType>>),
     Borrowed(slice::Iter<'a, Row>),
+    Iterated(keyed_state::VersionedRowsIter<'a>),
 }
 
 impl<'a> Iterator for RecordResultIterator<'a> {
@@ -146,6 +151,7 @@ impl<'a> Iterator for RecordResultIterator<'a> {
         match self {
             RecordResultIterator::Borrowed(iter) => iter.next().map(|r| Cow::from(&r[..])),
             RecordResultIterator::Owned(iter) => iter.next().map(Cow::from),
+            RecordResultIterator::Iterated(iter) => iter.next().map(|r| Cow::from(&r[..])),
         }
     }
 }

@@ -8,46 +8,75 @@ use common::{SizeOf, Timestamp};
 
 type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
-// An AoS array of (beg_ts, end_ts) and rows.
-pub(super) struct VersionedRows {
-    pub(super) headers: Vec<(Timestamp, Timestamp)>,
-    pub(super) rows: Vec<Row>,
+// MVTO header
+pub(super) struct VersionedRowsHeader {
+    txn_id: Option<Timestamp>, // None for not locked
+    beg_ts: Timestamp,
+    end_ts: Option<Timestamp>, // None for +INF
+    read_ts: Timestamp,
 }
 
-pub(super) struct VersionedRowsIter {
-    headers_iter: ::std::vec::IntoIter<(Timestamp, Timestamp)>,
-    rows_iter: ::std::vec::IntoIter<Row>,
-}
-
-impl Iterator for VersionedRowsIter {
-    type Item = (Timestamp, Timestamp, Row);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.headers_iter.next() {
-            Some((begin_ts, end_ts)) => Some((
-                begin_ts,
-                end_ts,
-                self.rows_iter
-                    .next()
-                    .expect("rows exhausted before headers"),
-            )),
-            None => {
-                assert!(self.rows_iter.next().is_none());
-                None
-            }
+impl Default for VersionedRowsHeader {
+    fn default() -> Self {
+        Self {
+            txn_id: None,
+            beg_ts: 0,
+            end_ts: None,
+            read_ts: 0,
         }
     }
 }
 
-impl IntoIterator for VersionedRows {
-    type Item = (Timestamp, Timestamp, Row);
-    type IntoIter = VersionedRowsIter;
+// An AoS array of (txn_id, beg_ts, end_ts) and rows.
+pub(super) struct VersionedRows {
+    pub(super) headers: Vec<VersionedRowsHeader>,
+    pub(super) rows: Vec<Row>,
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        let VersionedRows { headers, rows } = self;
+#[derive(Clone, Copy)]
+pub(crate) struct VersionedRowsIter<'rows> {
+    vrs: &'rows VersionedRows,
+    cur: usize,
+    ts: Timestamp,
+}
+
+impl VersionedRows {
+    fn num_rows(&self) -> usize {
+        debug_assert_eq!(self.rows.len(), self.headers.len());
+        self.rows.len()
+    }
+
+    fn row_iter_at<'a>(&'a self, ts: Timestamp) -> VersionedRowsIter<'a> {
         VersionedRowsIter {
-            headers_iter: headers.into_iter(),
-            rows_iter: rows.into_iter(),
+            vrs: &self, 
+            cur: 0,
+            ts,
         }
+    }
+}
+
+impl<'a> Iterator for VersionedRowsIter<'a> {
+    type Item = &'a Row;
+    fn next(&mut self) -> Option<Self::Item> {
+        let curr_ts = self.ts.clone();
+        let visible = move |header: &VersionedRowsHeader| {
+            if header.beg_ts > curr_ts {
+                return false;
+            }
+            if let Some(end_ts) = header.end_ts {
+                if end_ts <= curr_ts {
+                    return false;
+                }
+            }
+            true
+        };
+        if self.cur == self.vrs.num_rows() {
+            return None;
+        }
+        while !visible(&self.vrs.headers[self.cur]) {
+            self.cur += 1;
+        }
+        Some(&self.vrs.rows[self.cur])
     }
 }
 
@@ -71,15 +100,31 @@ pub(super) enum KeyedState {
 }
 
 impl KeyedState {
-    pub(super) fn lookup<'a>(&'a self, key: &KeyType) -> Option<&'a Vec<Row>> {
+    pub(super) fn lookup<'a>(
+        &'a self,
+        key: &KeyType,
+        tid: Timestamp,
+    ) -> Option<VersionedRowsIter<'a>> {
         match (self, key) {
             // TODO: filter out only visible rows.
-            (&KeyedState::Single(ref m), &KeyType::Single(k)) => m.get(k).map(|vrs| &vrs.rows),
-            (&KeyedState::Double(ref m), &KeyType::Double(ref k)) => m.get(k).map(|vrs| &vrs.rows),
-            (&KeyedState::Tri(ref m), &KeyType::Tri(ref k)) => m.get(k).map(|vrs| &vrs.rows),
-            (&KeyedState::Quad(ref m), &KeyType::Quad(ref k)) => m.get(k).map(|vrs| &vrs.rows),
-            (&KeyedState::Quin(ref m), &KeyType::Quin(ref k)) => m.get(k).map(|vrs| &vrs.rows),
-            (&KeyedState::Sex(ref m), &KeyType::Sex(ref k)) => m.get(k).map(|vrs| &vrs.rows),
+            (&KeyedState::Single(ref m), &KeyType::Single(k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
+            (&KeyedState::Double(ref m), &KeyType::Double(ref k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
+            (&KeyedState::Tri(ref m), &KeyType::Tri(ref k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
+            (&KeyedState::Quad(ref m), &KeyType::Quad(ref k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
+            (&KeyedState::Quin(ref m), &KeyType::Quin(ref k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
+            (&KeyedState::Sex(ref m), &KeyType::Sex(ref k)) => {
+                m.get(k).map(|vrs| vrs.row_iter_at(tid))
+            }
             _ => unreachable!(),
         }
     }
@@ -123,7 +168,7 @@ impl KeyedState {
                 .iter()
                 .filter(|r| Rc::strong_count(&r.0) == 1)
                 .map(|r| {
-                    SizeOf::deep_size_of(r) + std::mem::size_of::<(Timestamp, Timestamp)>() as u64
+                    SizeOf::deep_size_of(r) + std::mem::size_of::<VersionedRowsHeader>() as u64
                 })
                 .sum(),
             key,
