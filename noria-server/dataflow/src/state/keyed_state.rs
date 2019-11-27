@@ -16,6 +16,8 @@ pub(super) struct VersionedRowsHeader {
     read_ts: Timestamp,
 }
 
+pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedRowsHeader>() as u64;
+
 impl Default for VersionedRowsHeader {
     fn default() -> Self {
         Self {
@@ -79,6 +81,10 @@ impl<'a> Iterator for VersionedRowsIter<'a> {
         while !visible(&self.vrs.headers[self.cur]) {
             self.cur += 1;
         }
+        // TODO: MVTO requires us to update the read_ts
+        // of the record, but this will affect a lot of
+        // things, e.g., we will add `mut` to a whole
+        // bunch of places in the code.
         Some(&self.vrs.rows[self.cur])
     }
 }

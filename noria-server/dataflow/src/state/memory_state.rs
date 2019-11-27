@@ -5,6 +5,7 @@ use rand::{self, Rng};
 
 use crate::prelude::*;
 use crate::state::single_state::SingleState;
+use crate::state::keyed_state::VERSIONED_ROW_HEADER_SIZE;
 use common::SizeOf;
 
 #[derive(Default)]
@@ -210,7 +211,7 @@ impl MemoryState {
                     return true;
                 }
             };
-            self.mem_size += r.deep_size_of();
+            self.mem_size += r.deep_size_of() + VERSIONED_ROW_HEADER_SIZE;
             self.state[i].insert_row(Row::from(r))
         } else {
             let mut hit_any = false;
