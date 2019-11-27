@@ -283,8 +283,8 @@ impl SingleState {
     pub(super) fn rows(&self) -> usize {
         self.rows
     }
-    pub(super) fn lookup<'a>(&'a self, key: &KeyType) -> LookupResult<'a> {
-        if let Some(rs) = self.state.lookup(key, 0) {
+    pub(super) fn lookup<'a>(&'a self, key: &KeyType, ts: Option<Timestamp>) -> LookupResult<'a> {
+        if let Some(rs) = self.state.lookup(key, ts) {
             LookupResult::Some(RecordResult::Iterated(rs))
         } else if self.partial() {
             // partially materialized, so this is a hole (empty results would be vec![])

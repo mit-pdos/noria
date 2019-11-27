@@ -37,7 +37,7 @@ pub(super) struct VersionedRows {
 pub(crate) struct VersionedRowsIter<'rows> {
     vrs: &'rows VersionedRows,
     cur: usize,
-    ts: Timestamp,
+    ts: Option<Timestamp>,
 }
 
 impl VersionedRows {
@@ -46,9 +46,9 @@ impl VersionedRows {
         self.rows.len()
     }
 
-    fn row_iter_at<'a>(&'a self, ts: Timestamp) -> VersionedRowsIter<'a> {
+    fn row_iter_at<'a>(&'a self, ts: Option<Timestamp>) -> VersionedRowsIter<'a> {
         VersionedRowsIter {
-            vrs: &self, 
+            vrs: &self,
             cur: 0,
             ts,
         }
@@ -59,16 +59,19 @@ impl<'a> Iterator for VersionedRowsIter<'a> {
     type Item = &'a Row;
     fn next(&mut self) -> Option<Self::Item> {
         let curr_ts = self.ts.clone();
-        let visible = move |header: &VersionedRowsHeader| {
-            if header.beg_ts > curr_ts {
-                return false;
-            }
-            if let Some(end_ts) = header.end_ts {
-                if end_ts <= curr_ts {
+        let visible = move |header: &VersionedRowsHeader| match curr_ts {
+            Some(ts) => {
+                if header.beg_ts > ts {
                     return false;
                 }
+                if let Some(end_ts) = header.end_ts {
+                    if end_ts <= ts {
+                        return false;
+                    }
+                }
+                true
             }
-            true
+            None => header.end_ts.is_none(),
         };
         if self.cur == self.vrs.num_rows() {
             return None;
@@ -103,7 +106,7 @@ impl KeyedState {
     pub(super) fn lookup<'a>(
         &'a self,
         key: &KeyType,
-        tid: Timestamp,
+        tid: Option<Timestamp>,
     ) -> Option<VersionedRowsIter<'a>> {
         match (self, key) {
             // TODO: filter out only visible rows.

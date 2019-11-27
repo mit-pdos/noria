@@ -133,11 +133,20 @@ impl State for MemoryState {
     }
 
     fn lookup<'a>(&'a self, columns: &[usize], key: &KeyType) -> LookupResult<'a> {
+        self.lookup_at(columns, key, None)
+    }
+
+    fn lookup_at<'a>(
+        &'a self,
+        columns: &[usize],
+        key: &KeyType,
+        ts: Option<Timestamp>,
+    ) -> LookupResult<'a> {
         debug_assert!(!self.state.is_empty(), "lookup on uninitialized index");
         let index = self
             .state_for(columns)
             .expect("lookup on non-indexed column set");
-        self.state[index].lookup(key)
+        self.state[index].lookup(key, ts)
     }
 
     fn keys(&self) -> Vec<Vec<usize>> {
