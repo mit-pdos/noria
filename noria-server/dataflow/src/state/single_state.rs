@@ -37,8 +37,8 @@ macro_rules! remove_row_match_impl {
         // TODO: can we avoid the Clone here?
         let key = MakeKey::from_row(&$self.key, $r);
         // TODO: Deal with headers.
-        if let Some(VersionedRows { headers: _, ref mut rows }) = $map.get_mut::<$($hint)*>(&key) {
-            return $do_remove(&mut $self.rows, rows);
+        if let Some(VersionedRows { ref mut headers, ref rows }) = $map.get_mut::<$($hint)*>(&key) {
+            return $do_remove(rows, headers);
         }
     }};
 }
@@ -54,7 +54,7 @@ impl SingleState {
     }
     /// Inserts the given record, or returns false if a hole was encountered (and the record hence
     /// not inserted).
-    pub(super) fn insert_row(&mut self, r: Row) -> bool {
+    pub(super) fn insert_row(&mut self, r: Row, ts: Timestamp) -> bool {
         use indexmap::map::Entry;
         match self.state {
             KeyedState::Single(ref mut map) => {
@@ -70,7 +70,7 @@ impl SingleState {
                     self.rows += 1;
                     // TODO: Fix the begin_ts and end_ts.
                     rows.push(r);
-                    headers.push(VersionedRowsHeader::default());
+                    headers.push(VersionedRowsHeader::with_begin_ts(ts));
                     return true;
                 } else if self.partial {
                     // trying to insert a record into partial materialization hole!
@@ -80,7 +80,7 @@ impl SingleState {
                 map.insert(
                     r[self.key[0]].clone(),
                     VersionedRows {
-                        headers: vec![VersionedRowsHeader::default()],
+                        headers: vec![VersionedRowsHeader::with_begin_ts(ts)],
                         rows: vec![r],
                     },
                 );
@@ -97,34 +97,34 @@ impl SingleState {
     }
 
     /// Attempt to remove row `r`.
-    pub(super) fn remove_row(&mut self, r: &[DataType], hit: &mut bool) -> Option<Row> {
-        let mut do_remove = |self_rows: &mut usize, rs: &mut Vec<Row>| -> Option<Row> {
+    pub(super) fn remove_row(&mut self, r: &[DataType], hit: &mut bool, ts: Timestamp) -> bool {
+        let mut do_remove = |rs: &Vec<Row>, headers: &mut Vec<VersionedRowsHeader>| -> bool {
             *hit = true;
-            let rm = if rs.len() == 1 {
+            let idx = if rs.len() == 1 {
                 // it *should* be impossible to get a negative for a record that we don't have
                 debug_assert_eq!(r, &rs[0][..]);
-                Some(rs.swap_remove(0))
+                Some(0)
             } else if let Some(i) = rs.iter().position(|rsr| &rsr[..] == r) {
-                Some(rs.swap_remove(i))
+                Some(i)
             } else {
                 None
             };
 
-            if rm.is_some() {
-                *self_rows = self_rows.checked_sub(1).unwrap();
+            if let Some(i) = idx {
+                headers[i].end_ts = Some(ts);
             }
-            rm
+
+            idx.is_some()
         };
 
         match self.state {
             KeyedState::Single(ref mut map) => {
                 if let Some(VersionedRows {
-                    headers: _,
-                    ref mut rows,
+                    ref mut headers,
+                    ref rows,
                 }) = map.get_mut(&r[self.key[0]])
                 {
-                    // TODO: deal with deleted headers.
-                    return do_remove(&mut self.rows, rows);
+                    return do_remove(rows, headers);
                 }
             }
             KeyedState::Double(ref mut map) => {
@@ -143,7 +143,7 @@ impl SingleState {
                 remove_row_match_impl!(self, r, do_remove, map, (DataType, _, _, _, _, _))
             }
         }
-        None
+        false
     }
 
     pub(super) fn mark_filled(&mut self, key: Vec<DataType>) {

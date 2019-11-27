@@ -10,10 +10,9 @@ type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
 // MVTO header
 pub(super) struct VersionedRowsHeader {
-    txn_id: Option<Timestamp>, // None for not locked
-    beg_ts: Timestamp,
-    end_ts: Option<Timestamp>, // None for +INF
-    read_ts: Timestamp,
+    pub(super) beg_ts: Timestamp,
+    pub(super) end_ts: Option<Timestamp>, // None for +INF
+    pub(super) read_ts: Timestamp,
 }
 
 pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedRowsHeader>() as u64;
@@ -21,8 +20,17 @@ pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedR
 impl Default for VersionedRowsHeader {
     fn default() -> Self {
         Self {
-            txn_id: None,
             beg_ts: 0,
+            end_ts: None,
+            read_ts: 0,
+        }
+    }
+}
+
+impl VersionedRowsHeader {
+    pub(crate) fn with_begin_ts(beg_ts: Timestamp) -> VersionedRowsHeader {
+        Self {
+            beg_ts,
             end_ts: None,
             read_ts: 0,
         }

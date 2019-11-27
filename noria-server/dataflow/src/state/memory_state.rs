@@ -4,8 +4,8 @@ use std::rc::Rc;
 use rand::{self, Rng};
 
 use crate::prelude::*;
-use crate::state::single_state::SingleState;
 use crate::state::keyed_state::VERSIONED_ROW_HEADER_SIZE;
+use crate::state::single_state::SingleState;
 use common::SizeOf;
 
 #[derive(Default)]
@@ -58,7 +58,8 @@ impl State for MemoryState {
                 assert!(!old[0].partial());
                 for rs in old[0].values() {
                     for r in rs {
-                        new.insert_row(Row::from(r.0.clone()));
+                        // TODO(zeling): Definitely fix this!
+                        new.insert_row(Row::from(r.0.clone()), 0);
                     }
                 }
             }
@@ -73,12 +74,7 @@ impl State for MemoryState {
         self.state.iter().any(SingleState::partial)
     }
 
-    fn process_records(
-        &mut self,
-        records: &mut Records,
-        _timestamp: Timestamp,
-        partial_tag: Option<Tag>,
-    ) {
+    fn process_records(&mut self, records: &mut Records, ts: Timestamp, partial_tag: Option<Tag>) {
         if self.is_partial() {
             records.retain(|r| {
                 // we need to check that we're not erroneously filling any holes
@@ -96,19 +92,19 @@ impl State for MemoryState {
                 //    XXX: we could potentially save come computation here in joins by not forcing
                 //    `right` to backfill the lookup key only to then throw the record away
                 match *r {
-                    Record::Positive(ref r) => self.insert(r.clone(), partial_tag),
-                    Record::Negative(ref r) => self.remove(r),
+                    Record::Positive(ref r) => self.insert(r.clone(), partial_tag, ts),
+                    Record::Negative(ref r) => self.remove(r, ts),
                 }
             });
         } else {
             for r in records.iter() {
                 match *r {
                     Record::Positive(ref r) => {
-                        let hit = self.insert(r.clone(), None);
+                        let hit = self.insert(r.clone(), None, ts);
                         debug_assert!(hit);
                     }
                     Record::Negative(ref r) => {
-                        let hit = self.remove(r);
+                        let hit = self.remove(r, ts);
                         debug_assert!(hit);
                     }
                 }
@@ -198,7 +194,7 @@ impl MemoryState {
         self.state.iter().position(|s| s.key() == cols)
     }
 
-    fn insert(&mut self, r: Vec<DataType>, partial_tag: Option<Tag>) -> bool {
+    fn insert(&mut self, r: Vec<DataType>, partial_tag: Option<Tag>, ts: Timestamp) -> bool {
         let r = Rc::new(r);
 
         if let Some(tag) = partial_tag {
@@ -212,11 +208,11 @@ impl MemoryState {
                 }
             };
             self.mem_size += r.deep_size_of() + VERSIONED_ROW_HEADER_SIZE;
-            self.state[i].insert_row(Row::from(r))
+            self.state[i].insert_row(Row::from(r), ts)
         } else {
             let mut hit_any = false;
             for i in 0..self.state.len() {
-                hit_any |= self.state[i].insert_row(Row::from(r.clone()));
+                hit_any |= self.state[i].insert_row(Row::from(r.clone()), ts);
             }
             if hit_any {
                 self.mem_size += r.deep_size_of();
@@ -225,14 +221,16 @@ impl MemoryState {
         }
     }
 
-    fn remove(&mut self, r: &[DataType]) -> bool {
+    fn remove(&mut self, r: &[DataType], ts: Timestamp) -> bool {
         let mut hit = false;
         for s in &mut self.state {
-            if let Some(row) = s.remove_row(r, &mut hit) {
-                if Rc::strong_count(&row.0) == 1 {
-                    self.mem_size = self.mem_size.checked_sub(row.deep_size_of()).unwrap();
-                }
-            }
+            s.remove_row(r, &mut hit, ts);
+            // TODO: Vaccum the unused records
+            // if let Some(row) = s.remove_row(r, &mut hit, ts) {
+            //     if Rc::strong_count(&row.0) == 1 {
+            //         self.mem_size = self.mem_size.checked_sub(row.deep_size_of()).unwrap();
+            //     }
+            // }
         }
 
         hit
