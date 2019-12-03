@@ -40,7 +40,7 @@ stages:
            echo "##vso[task.setvariable variable=PATH]/usr/local/opt/llvm/bin:$PATH"
          displayName: Install LLVM (macOS)
          condition: eq( variables['Agent.OS'], 'Darwin' )
-       - script: cargo test -- --test-threads=1
+       - script: cargo test --workspace -- --test-threads=1
          displayName: Run tests
          env:
           SETTLE_TIME: 2000
@@ -58,6 +58,5 @@ resources:
   repositories:
     - repository: templates
       type: github
-      name: crate-ci/azure-pipelines
-      ref: refs/heads/v0.2
+      name: SamedhG/azure-pipelines
       endpoint: github.com_SamedhG
