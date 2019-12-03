@@ -60,4 +60,4 @@ resources:
       type: github
       name: crate-ci/azure-pipelines
       ref: refs/heads/v0.2
-      endpoint: mit-pdos
+      endpoint: github.com_SamedhG
