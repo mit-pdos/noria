@@ -40,7 +40,7 @@ stages:
            echo "##vso[task.setvariable variable=PATH]/usr/local/opt/llvm/bin:$PATH"
          displayName: Install LLVM (macOS)
          condition: eq( variables['Agent.OS'], 'Darwin' )
-       - script: cargo test --all -- --test-threads=1
+       - script: cargo test -- --test-threads=1
          displayName: Run tests
          env:
           SETTLE_TIME: 2000
