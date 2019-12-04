@@ -1,3 +1,8 @@
+trigger:
+- master
+pr:
+- master
+
 stages:
  - stage: check
    displayName: Compilation check
@@ -16,11 +21,11 @@ stages:
       strategy:
         matrix:
           Linux:
-            vmImage: ubuntu-16.04
+            vmImage: ubuntu-latest
           MacOS:
-            vmImage: macOS-10.14
+            vmImage: macOS-latest
           Windows:
-            vmImage: windows-2019
+            vmImage: windows-latest
       pool:
         vmImage: $(vmImage)
       steps:
