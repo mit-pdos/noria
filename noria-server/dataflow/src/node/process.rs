@@ -24,8 +24,6 @@ impl Node {
                 let m = m.as_mut().unwrap();
                 let tag = m.tag();
                 m.map_data(|rs, ts| {
-                    // TODO: Figure out how we would like to assign the TS,
-                    // probably by modifying Packet::Message and Packet::ReplayPiece
                     materialize(rs, ts, tag, state.get_mut(addr));
                 });
             }

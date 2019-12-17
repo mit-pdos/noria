@@ -17,6 +17,7 @@ pub struct Base {
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
+    current_ts: Timestamp,
 }
 
 impl Base {
@@ -82,6 +83,10 @@ impl Base {
             row.extend(self.defaults.iter().skip(rlen).cloned());
         }
     }
+
+    pub(crate) fn bootstrap_ts(&mut self, ts: Timestamp) {
+        self.current_ts = ts;
+    }
 }
 
 /// A Base clone must have a different unique_id so that no two copies write to the same file.
@@ -95,6 +100,8 @@ impl Clone for Base {
             defaults: self.defaults.clone(),
             dropped: self.dropped.clone(),
             unmodified: self.unmodified,
+
+            current_ts: self.current_ts,
         }
     }
 }
@@ -107,6 +114,8 @@ impl Default for Base {
             defaults: Vec::new(),
             dropped: Vec::new(),
             unmodified: true,
+
+            current_ts: 0,
         }
     }
 }

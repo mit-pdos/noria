@@ -1216,23 +1216,25 @@ impl Domain {
 
                         if !index.is_empty() {
                             let mut s: Box<dyn State> = {
-                                let n = self.nodes[node].borrow();
+                                let mut n = self.nodes[node].borrow_mut();
                                 let params = &self.persistence_parameters;
-                                match (n.get_base(), &params.mode) {
-                                    (Some(base), &DurabilityMode::DeleteOnExit)
-                                    | (Some(base), &DurabilityMode::Permanent) => {
-                                        let base_name = format!(
-                                            "{}-{}-{}",
-                                            params.log_prefix,
-                                            n.name(),
-                                            self.shard.unwrap_or(0),
-                                        );
+                                let base_name = format!(
+                                    "{}-{}-{}",
+                                    params.log_prefix,
+                                    n.name(),
+                                    self.shard.unwrap_or(0),
+                                );
+                                match (n.get_base_mut(), &params.mode) {
+                                    (Some(ref mut base), &DurabilityMode::DeleteOnExit)
+                                    | (Some(ref mut base), &DurabilityMode::Permanent) => {
 
-                                        Box::new(PersistentState::new(
+                                        let state = Box::new(PersistentState::new(
                                             base_name,
                                             base.key(),
                                             &params,
-                                        ))
+                                        ));
+                                        base.bootstrap_ts(state.current_ts);
+                                        state
                                     }
                                     _ => Box::new(MemoryState::default()),
                                 }

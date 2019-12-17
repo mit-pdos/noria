@@ -55,7 +55,7 @@ pub struct PersistentState {
     epoch: IndexEpoch,
     has_unique_index: bool,
     // The next version for a write operation. This needs to be calculated on recovery.
-    current_ts: Timestamp,
+    pub(crate) current_ts: Timestamp,
     // With DurabilityMode::DeleteOnExit,
     // RocksDB files are stored in a temporary directory.
     _directory: Option<TempDir>,
