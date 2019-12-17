@@ -35,10 +35,7 @@ impl Node {
                     }) => {
                         let Input { dst, data, tracer } = unsafe { inner.take() };
                         let mut rs = b.process(addr, data, &*state);
-                        let persist_state = state
-                            .get(addr)
-                            .expect("base should be backed up by persistent_state");
-                        let ts = persist_state.current_ts();
+                        let ts = b.current_ts;
 
                         // When a replay originates at a base node, we replay the data *through* that
                         // same base node because its column set may have changed. However, this replay

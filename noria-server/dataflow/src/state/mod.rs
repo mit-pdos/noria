@@ -67,11 +67,6 @@ pub(crate) trait State: SizeOf + Send {
     fn evict_keys(&mut self, tag: Tag, keys: &[Vec<DataType>]) -> Option<(&[usize], u64)>;
 
     fn clear(&mut self);
-
-    // FIXME: The structs implementing the trait should be responsible for defining this function
-    fn current_ts(&self) -> Timestamp {
-        return 0;
-    }
 }
 
 #[derive(Clone, Debug)]

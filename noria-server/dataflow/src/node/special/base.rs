@@ -17,7 +17,7 @@ pub struct Base {
     defaults: Vec<DataType>,
     dropped: Vec<usize>,
     unmodified: bool,
-    current_ts: Timestamp,
+    pub(crate) current_ts: Timestamp,
 }
 
 impl Base {
@@ -358,7 +358,7 @@ mod tests {
             let persist_state = states
                 .get(local)
                 .expect("base should be backed up by persistent_state");
-            let ts = persist_state.current_ts();
+            let ts = persist_state.current_ts;
             node::materialize(&mut m, ts, None, states.get_mut(local));
             m
         };

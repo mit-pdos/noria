@@ -522,7 +522,7 @@ mod tests {
         let row: Record = vec![1.into(), 2.into(), 3.into()].into();
         state.add_key(&[0], None);
         state.add_key(&[1], None);
-        state.process_records(&mut row.into(), state.current_ts(), None);
+        state.process_records(&mut row.into(), state.current_ts, None);
         states.insert(local, state);
 
         let mut project = Project::new(global, permutation, additional, expressions);

@@ -229,10 +229,6 @@ impl State for PersistentState {
     fn clear(&mut self) {
         unreachable!("can't clear PersistentState")
     }
-
-    fn current_ts(&self) -> Timestamp {
-        self.current_ts
-    }
 }
 
 impl PersistentState {
@@ -707,14 +703,14 @@ mod tests {
     // it currently here to make the compiler happy
     impl PersistentState {
         fn process_records(&mut self, records: &mut Records, partial_tag: Option<Tag>) {
-            let ts = self.current_ts();
+            let ts = self.current_ts;
             <PersistentState as State>::process_records(self, records, ts, partial_tag);
         }
     }
 
     fn insert<S: State>(state: &mut S, row: Vec<DataType>) {
         let record: Record = row.into();
-        state.process_records(&mut record.into(), state.current_ts(), None);
+        state.process_records(&mut record.into(), state.current_ts, None);
     }
 
     fn get_tmp_path() -> (TempDir, String) {
