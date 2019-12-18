@@ -13,7 +13,7 @@ use std::{fmt, thread, time};
 use tsunami::*;
 use yansi::Paint;
 
-const AMI: &str = "ami-09334f98436a81bd9";
+const AMI: &str = "ami-0804fdbc67d4197ab";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Backend {
@@ -102,13 +102,6 @@ fn main() {
                 .help("Partial state size limit / eviction threshold [in bytes]."),
         )
         .arg(
-            Arg::with_name("memscale")
-                .takes_value(true)
-                .default_value("1.0")
-                .long("memscale")
-                .help("Memory scale factor for workload"),
-        )
-        .arg(
             Arg::with_name("availability_zone")
                 .long("availability-zone")
                 .value_name("AZ")
@@ -119,7 +112,6 @@ fn main() {
         .arg(
             Arg::with_name("branch")
                 .takes_value(true)
-                .default_value("master")
                 .long("branch")
                 .help("Which branch of noria to benchmark"),
         )
@@ -140,7 +132,7 @@ fn main() {
     b.add_set(
         "trawler",
         1,
-        MachineSetup::new("m5a.24xlarge", AMI, move |ssh| {
+        MachineSetup::new("m5d.24xlarge", AMI, move |ssh| {
             git_and_cargo(
                 ssh,
                 "noria",
@@ -193,8 +185,19 @@ fn main() {
         None,
     );
 
-    b.set_max_duration(4);
-    b.wait_limit(time::Duration::from_secs(60));
+    b.set_max_duration(6);
+    b.wait_limit(time::Duration::from_secs(2 * 60));
+
+    // if the user wants us to terminate, finish whatever we're currently doing first
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    if let Err(e) = ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }) {
+        eprintln!("==> failed to set ^C handler: {}", e);
+    }
 
     let scales = args
         .values_of("SCALE")
@@ -206,7 +209,6 @@ fn main() {
             ]
         });
 
-    let memscale = value_t_or_exit!(args, "memscale", f64);
     let memlimit = args.value_of("memory_limit");
 
     let mut load = if args.is_present("SCALE") {
@@ -219,7 +221,7 @@ fn main() {
             .unwrap()
     } else {
         let mut f = File::create("load.log").unwrap();
-        f.write_all(b"#reqscale backend sload1 sload5 cload1 cload5\n")
+        f.write_all(b"#scale backend sload1 sload5 cload1 cload5\n")
             .unwrap();
         f
     };
@@ -243,12 +245,12 @@ fn main() {
         }
 
         let backends = [
-            //Backend::Mysql,
-            //Backend::Noria(0),
-            //Backend::Natural(0),
-            //Backend::Noria(1),
-            //Backend::Natural(1),
-            //Backend::Noria(2),
+            Backend::Mysql,
+            Backend::Noria(0),
+            Backend::Natural(0),
+            Backend::Noria(1),
+            Backend::Natural(1),
+            Backend::Noria(2),
             Backend::Natural(2),
         ];
 
@@ -417,20 +419,15 @@ fn main() {
                 };
 
                 let scale = format!("{}", scale);
-                let memscale = format!("{}", memscale);
                 trawler.ssh.as_ref().unwrap().exec_print_nonempty(
                     &[
                         "env",
                         "RUST_BACKTRACE=1",
                         "target/release/lobsters",
-                        "--memscale",
-                        &memscale,
                         "--warmup",
                         "0",
                         "--runtime",
                         "0",
-                        "--issuers",
-                        "24",
                         "--prime",
                         "--queries",
                         backend.queries(),
@@ -457,16 +454,12 @@ fn main() {
                         "env",
                         "RUST_BACKTRACE=1",
                         "target/release/lobsters",
-                        "--reqscale",
+                        "--scale",
                         "3000",
-                        "--memscale",
-                        &memscale,
                         "--warmup",
-                        "120",
+                        "30",
                         "--runtime",
                         "0",
-                        "--issuers",
-                        "24",
                         "--queries",
                         backend.queries(),
                         &format!("!mysql://lobsters:$(cat ~/mysql.pass)@{}/lobsters", ip),
@@ -491,13 +484,13 @@ fn main() {
                 let mut output = File::create(format!("{}.log", prefix))?;
                 let hist_output = if let Some(memlimit) = memlimit {
                     format!(
-                        "--histogram=lobsters-{}-m{}-r{}-l{}.hist ",
-                        backend, memscale, scale, memlimit
+                        "--histogram=lobsters-{}-r{}-l{}.hist ",
+                        backend, scale, memlimit
                     )
                 } else {
                     format!(
-                        "--histogram=lobsters-{}-m{}-r{}-unlimited.hist ",
-                        backend, memscale, scale
+                        "--histogram=lobsters-{}-r{}-unlimited.hist ",
+                        backend, scale
                     )
                 };
                 let res = trawler.ssh.as_ref().unwrap().just_exec(
@@ -505,16 +498,12 @@ fn main() {
                         "env",
                         "RUST_BACKTRACE=1",
                         "target/release/lobsters",
-                        "--reqscale",
+                        "--scale",
                         &scale,
-                        "--memscale",
-                        &memscale,
                         "--warmup",
-                        "20",
+                        "15",
                         "--runtime",
                         "30",
-                        "--issuers",
-                        "24",
                         "--queries",
                         backend.queries(),
                         &hist_output,
@@ -570,15 +559,9 @@ fn main() {
 
                 let mut hist = File::create(format!("{}.hist", prefix))?;
                 let hist_cmd = if let Some(memlimit) = memlimit {
-                    format!(
-                        "cat lobsters-{}-m{}-r{}-l{}.hist",
-                        backend, memscale, scale, memlimit
-                    )
+                    format!("cat lobsters-{}-r{}-l{}.hist", backend, scale, memlimit)
                 } else {
-                    format!(
-                        "cat lobsters-{}-m{}-r{}-unlimited.hist",
-                        backend, memscale, scale
-                    )
+                    format!("cat lobsters-{}-r{}-unlimited.hist", backend, scale)
                 };
                 trawler
                     .ssh
@@ -608,8 +591,8 @@ fn main() {
                             "unlimited".to_owned()
                         };
                         let mut sizefile = File::create(format!(
-                            "lobsters-{}-m{}-r{}-{}.json",
-                            backend, memscale, scale, mem_limit
+                            "lobsters-{}-r{}-{}.json",
+                            backend, scale, mem_limit
                         ))?;
                         trawler
                             .ssh
@@ -680,7 +663,7 @@ fn main() {
                     let line = line?;
                     if line.starts_with("# target ops/s") {
                         target = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
-                    } else if line.starts_with("# achieved ops/s") {
+                    } else if line.starts_with("# generated ops/s") {
                         actual = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
                     }
                     match (target, actual) {
@@ -688,7 +671,7 @@ fn main() {
                             eprintln!(
                                 "{}",
                                 Paint::cyan(format!(
-                                    " -> achieved {} ops/s (target: {})",
+                                    " -> generated {} ops/s (target: {})",
                                     actual, target
                                 ))
                             );
@@ -704,14 +687,18 @@ fn main() {
                         _ => {}
                     }
                 }
+
+                if !running.load(Ordering::SeqCst) {
+                    // user pressed ^C
+                    break;
+                }
+            }
+
+            if !running.load(Ordering::SeqCst) {
+                // user pressed ^C
+                break;
             }
         }
-
-        /*
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(60));
-        }
-        */
 
         Ok(())
     })
