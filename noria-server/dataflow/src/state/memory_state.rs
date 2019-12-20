@@ -150,14 +150,16 @@ impl State for MemoryState {
         self.state.iter().map(|s| s.key().to_vec()).collect()
     }
 
-    fn cloned_records(&self) -> Vec<Vec<DataType>> {
+    fn cloned_records(&self) -> Vec<(Timestamp, Option<Timestamp>, Vec<DataType>)> {
+        use crate::state::keyed_state::VersionedRowHeader;
         #[allow(clippy::ptr_arg)]
-        fn fix<'a>(rs: &'a Vec<Row>) -> impl Iterator<Item = Vec<DataType>> + 'a {
-            rs.iter().map(|r| Vec::clone(&**r))
+        fn fix<'a>(hdrs: &'a Vec<VersionedRowHeader>, rs: &'a Vec<Row>) -> impl Iterator<Item = (Timestamp, Option<Timestamp>, Vec<DataType>)> + 'a {
+            assert_eq!(hdrs.len(), rs.len());
+            hdrs.iter().zip(rs.iter()).map(|(hdr, r)| (hdr.beg_ts, hdr.end_ts, Vec::clone(&**r)))
         }
 
         assert!(!self.state[0].partial());
-        self.state[0].values().flat_map(fix).collect()
+        self.state[0].versioned_values().flat_map(|(hdrs, rs)| fix(hdrs, rs)).collect()
     }
 
     fn evict_random_keys(&mut self, count: usize) -> (&[usize], Vec<Vec<DataType>>, u64) {

@@ -56,7 +56,7 @@ pub(crate) trait State: SizeOf + Send {
     fn keys(&self) -> Vec<Vec<usize>>;
 
     /// Return a copy of all records. Panics if the state is only partially materialized.
-    fn cloned_records(&self) -> Vec<Vec<DataType>>;
+    fn cloned_records(&self) -> Vec<(Timestamp, Option<Timestamp>, Vec<DataType>)>;
 
     /// Evict `count` randomly selected keys, returning key colunms of the index chosen to evict
     /// from along with the keys evicted and the number of bytes evicted.

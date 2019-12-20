@@ -1129,7 +1129,12 @@ impl Domain {
                                 }
                                 default
                             };
-                            let fix = move |mut r: Vec<DataType>| -> Vec<DataType> {
+                            let fix = move |(_beg_ts, _end_ts, mut r): (
+                                Timestamp,
+                                Option<Timestamp>,
+                                Vec<DataType>,
+                            )|
+                                  -> Vec<DataType> {
                                 if let Some((start, ref added)) = added_cols {
                                     let rlen = r.len();
                                     r.extend(added.iter().skip(rlen - start).cloned());
@@ -1227,7 +1232,6 @@ impl Domain {
                                 match (n.get_base_mut(), &params.mode) {
                                     (Some(ref mut base), &DurabilityMode::DeleteOnExit)
                                     | (Some(ref mut base), &DurabilityMode::Permanent) => {
-
                                         let state = Box::new(PersistentState::new(
                                             base_name,
                                             base.key(),

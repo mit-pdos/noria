@@ -184,9 +184,9 @@ impl State for PersistentState {
             .collect()
     }
 
-    fn cloned_records(&self) -> Vec<Vec<DataType>> {
-        self.all_rows()
-            .map(|(_, ref value)| bincode::deserialize(&value).unwrap())
+    fn cloned_records(&self) -> Vec<(Timestamp, Option<Timestamp>, Vec<DataType>)> {
+        self.all_versioned_rows()
+            .map(|(beg_ts, end_ts, _, ref value)| (beg_ts, end_ts, bincode::deserialize(&value).unwrap()))
             .collect()
     }
 
@@ -516,6 +516,18 @@ impl PersistentState {
                 let (real_key, _) = Self::split_timestamp_from_raw_key(&key);
                 let (real_value, _) = Self::split_timestamp_from_raw_value(&value);
                 (real_key.into(), real_value.into())
+            })
+    }
+
+    fn all_versioned_rows(&self) -> impl Iterator<Item = (Timestamp, Option<Timestamp>, Box<[u8]>, Box<[u8]>)> + '_ {
+        let db = self.db.as_ref().unwrap();
+        let cf = db.cf_handle(&self.indices[0].column_family).unwrap();
+        db.full_iterator_cf(cf, rocksdb::IteratorMode::Start)
+            .unwrap()
+            .map(|(key, value)| {
+                let (real_key, beg_ts) = Self::split_timestamp_from_raw_key(&key);
+                let (real_value, end_ts) = Self::split_timestamp_from_raw_value(&value);
+                (beg_ts, end_ts, real_key.into(), real_value.into())
             })
     }
 
