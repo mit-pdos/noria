@@ -1,6 +1,6 @@
 use super::mk_key::MakeKey;
 use crate::prelude::*;
-use crate::state::keyed_state::{KeyedState, VersionedRows, VersionedRowsHeader};
+use crate::state::keyed_state::{KeyedState, VersionedRows, VersionedRowHeader};
 use common::SizeOf;
 use rand::prelude::*;
 use std::rc::Rc;
@@ -56,11 +56,11 @@ impl SingleState {
     /// not inserted).
     pub(super) fn insert_row(&mut self, r: Row, ts: Timestamp) -> bool {
         use indexmap::map::Entry;
-        let header = VersionedRowsHeader::with_begin_ts(ts);
+        let header = VersionedRowHeader::with_begin_ts(ts);
         self.insert_row_with_header(r, header)
     }
 
-    pub(super) fn insert_row_with_header(&mut self, r: Row, header: VersionedRowsHeader) -> bool {
+    pub(super) fn insert_row_with_header(&mut self, r: Row, header: VersionedRowHeader) -> bool {
         use indexmap::map::Entry;
         match self.state {
             KeyedState::Single(ref mut map) => {
@@ -104,7 +104,7 @@ impl SingleState {
 
     /// Attempt to remove row `r`.
     pub(super) fn remove_row(&mut self, r: &[DataType], hit: &mut bool, ts: Timestamp) -> bool {
-        let mut do_remove = |rs: &Vec<Row>, headers: &mut Vec<VersionedRowsHeader>| -> bool {
+        let mut do_remove = |rs: &Vec<Row>, headers: &mut Vec<VersionedRowHeader>| -> bool {
             *hit = true;
             let idx = if rs.len() == 1 {
                 // it *should* be impossible to get a negative for a record that we don't have
@@ -283,7 +283,7 @@ impl SingleState {
 
     pub(super) fn versioned_values<'a>(
         &'a self,
-    ) -> Box<dyn Iterator<Item = (&'a Vec<VersionedRowsHeader>, &'a Vec<Row>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (&'a Vec<VersionedRowHeader>, &'a Vec<Row>)> + 'a> {
         match self.state {
             KeyedState::Single(ref map) => {
                 Box::new(map.values().map(|vrs| (&vrs.headers, &vrs.rows)))

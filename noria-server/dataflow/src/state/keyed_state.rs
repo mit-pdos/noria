@@ -8,16 +8,15 @@ use common::{SizeOf, Timestamp};
 
 type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
-// MVTO header
 #[derive(Clone)]
-pub(super) struct VersionedRowsHeader {
+pub(super) struct VersionedRowHeader {
     pub(super) beg_ts: Timestamp,
     pub(super) end_ts: Option<Timestamp>, // None for +INF
 }
 
-pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedRowsHeader>() as u64;
+pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedRowHeader>() as u64;
 
-impl Default for VersionedRowsHeader {
+impl Default for VersionedRowHeader {
     fn default() -> Self {
         Self {
             beg_ts: 0,
@@ -26,8 +25,8 @@ impl Default for VersionedRowsHeader {
     }
 }
 
-impl VersionedRowsHeader {
-    pub(crate) fn with_begin_ts(beg_ts: Timestamp) -> VersionedRowsHeader {
+impl VersionedRowHeader {
+    pub(crate) fn with_begin_ts(beg_ts: Timestamp) -> VersionedRowHeader {
         Self {
             beg_ts,
             end_ts: None,
@@ -37,7 +36,7 @@ impl VersionedRowsHeader {
 
 // An AoS array of (txn_id, beg_ts, end_ts) and rows.
 pub(super) struct VersionedRows {
-    pub(super) headers: Vec<VersionedRowsHeader>,
+    pub(super) headers: Vec<VersionedRowHeader>,
     pub(super) rows: Vec<Row>,
 }
 
@@ -67,7 +66,7 @@ impl<'a> Iterator for VersionedRowsIter<'a> {
     type Item = &'a Row;
     fn next(&mut self) -> Option<Self::Item> {
         let curr_ts = self.ts.clone();
-        let visible = move |header: &VersionedRowsHeader| match curr_ts {
+        let visible = move |header: &VersionedRowHeader| match curr_ts {
             Some(ts) => {
                 if header.beg_ts > ts {
                     return false;
@@ -179,7 +178,7 @@ impl KeyedState {
                 .iter()
                 .filter(|r| Rc::strong_count(&r.0) == 1)
                 .map(|r| {
-                    SizeOf::deep_size_of(r) + std::mem::size_of::<VersionedRowsHeader>() as u64
+                    SizeOf::deep_size_of(r) + std::mem::size_of::<VersionedRowHeader>() as u64
                 })
                 .sum(),
             key,
