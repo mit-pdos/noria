@@ -13,7 +13,6 @@ type FnvHashMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 pub(super) struct VersionedRowsHeader {
     pub(super) beg_ts: Timestamp,
     pub(super) end_ts: Option<Timestamp>, // None for +INF
-    pub(super) read_ts: Timestamp,
 }
 
 pub(crate) const VERSIONED_ROW_HEADER_SIZE: u64 = std::mem::size_of::<VersionedRowsHeader>() as u64;
@@ -23,7 +22,6 @@ impl Default for VersionedRowsHeader {
         Self {
             beg_ts: 0,
             end_ts: None,
-            read_ts: 0,
         }
     }
 }
@@ -33,7 +31,6 @@ impl VersionedRowsHeader {
         Self {
             beg_ts,
             end_ts: None,
-            read_ts: 0,
         }
     }
 }
@@ -90,10 +87,6 @@ impl<'a> Iterator for VersionedRowsIter<'a> {
         while !visible(&self.vrs.headers[self.cur]) {
             self.cur += 1;
         }
-        // TODO: MVTO requires us to update the read_ts
-        // of the record, but this will affect a lot of
-        // things, e.g., we will add `mut` to a whole
-        // bunch of places in the code.
         Some(&self.vrs.rows[self.cur])
     }
 }
