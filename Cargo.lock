@@ -1667,7 +1667,7 @@ dependencies = [
  "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-tower 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-tower 0.3.1 (git+https://github.com/tower-rs/tokio-tower.git?branch=no-box)",
  "tower 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-balance 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-buffer 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1759,7 +1759,7 @@ dependencies = [
  "timekeeper 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "timer_heap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-tower 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-tower 0.3.1 (git+https://github.com/tower-rs/tokio-tower.git?branch=no-box)",
  "toml 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-util 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2996,7 +2996,7 @@ dependencies = [
 [[package]]
 name = "tokio-tower"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/tower-rs/tokio-tower.git?branch=no-box#531d6bfe3195eff75766839690e8af77a9f7746b"
 dependencies = [
  "crossbeam 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3954,7 +3954,7 @@ dependencies = [
 "checksum tokio-timer 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)" = "1739638e364e558128461fc1ad84d997702c8e31c2e6b18fb99842268199e827"
 "checksum tokio-tls 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "354b8cd83825b3c20217a9dc174d6a0c67441a2fae5c41bcb1ea6679f6ae0f7c"
 "checksum tokio-tls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7bde02a3a5291395f59b06ec6945a3077602fac2b07eeeaf0dee2122f3619828"
-"checksum tokio-tower 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "956f5b721693edde36edb9f5d2fd3951bf77a0c9c8c73252d2594ebd750f5e96"
+"checksum tokio-tower 0.3.1 (git+https://github.com/tower-rs/tokio-tower.git?branch=no-box)" = "<none>"
 "checksum tokio-udp 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "f02298505547f73e60f568359ef0d016d5acd6e830ab9bc7c4a5b3403440121b"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
 "checksum tokio-util 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "571da51182ec208780505a32528fc5512a8fe1443ab960b3f2f3ef093cd16930"
