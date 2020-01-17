@@ -513,6 +513,7 @@ impl Executor for Outboxes {
 impl Future for Replica {
     type Output = Result<(), failure::Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        trace!(self.log, "poll");
         'process: loop {
             // FIXME: check if we should call update_state_sizes (every evict_every)
 
@@ -525,6 +526,8 @@ impl Future for Replica {
                 // incoming socket closed -- no more clients will arrive
                 return Poll::Ready(Ok(()));
             }
+
+            trace!(self.log, "process");
 
             // have any of our timers expired?
             self.as_mut().try_timeout(cx);
@@ -584,10 +587,12 @@ impl Future for Replica {
                         .on_event(out, PollEvent::Process(p),));
                 }
 
+                trace!(this.log, "input loop");
                 for i in 0..FORCE_INPUT_YIELD_EVERY {
                     if !local_done && (check_local || remote_done) {
                         match this.locals.poll_recv(cx) {
                             Poll::Ready(Some(packet)) => {
+                                trace!(this.log, "got local transmission");
                                 process!(*this.retry, out, packet, |p| d
                                     .on_event(out, PollEvent::Process(p),));
                             }
@@ -601,6 +606,8 @@ impl Future for Replica {
                                 local_done = true;
                             }
                         }
+                    } else {
+                        trace!(this.log, "skip local");
                     }
 
                     if !remote_done && (!check_local || local_done) {
@@ -628,7 +635,6 @@ impl Future for Replica {
                             }
                             Poll::Ready(Some((StreamYield::Item(Err(e)), _))) => {
                                 error!(this.log, "input stream failed: {:?}", e);
-                                remote_done = true;
                                 break;
                             }
                         }
@@ -659,6 +665,8 @@ impl Future for Replica {
 
                 if interrupted {
                     // resume reading from our non-depleted inputs
+                    local_done = false;
+                    remote_done = false;
                     continue;
                 }
                 break Poll::Pending;
@@ -687,6 +695,7 @@ impl Future for Replica {
                                     // if we're already dirty, we'll re-do processing anyway
                                 } else {
                                     // try to resume polling again
+                                    trace!(self.log, "re-resume");
                                     continue;
                                 }
                             }

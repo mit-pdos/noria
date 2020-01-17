@@ -15,6 +15,14 @@ use std::thread;
 use std::time;
 use tower_service::Service;
 
+use tracing_futures::Instrument;
+use tracing_subscriber::{
+    fmt,
+    registry::{self, Registry},
+    EnvFilter, Layer,
+};
+use tokio_trace::waiters;
+
 thread_local! {
     static SJRN_W: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
     static SJRN_R: RefCell<Histogram<u64>> = RefCell::new(Histogram::new_with_bounds(10, 1_000_000, 4).unwrap());
@@ -30,6 +38,39 @@ const MAX_BATCH_TIME_US: u32 = 1000;
 
 mod clients;
 use self::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
+
+async fn print_wait_report<S>(
+    wait_report: waiters::ReportHandle<S>,
+    duration: std::time::Duration,
+)
+where
+    S: tracing::Subscriber + for<'span> registry::LookupSpan<'span>,
+{
+    use std::io::Write;
+    let mut interval = tokio::time::interval(duration);
+    loop {
+        interval.tick().await;
+        {
+            let mut is_first = true;
+            let stdout = std::io::stdout();
+            let mut stdout = stdout.lock();
+            let waiters = wait_report.report();
+            for waiter in &waiters {
+                if is_first {
+                    writeln!(&mut stdout, "\n========= CURRENT WAITERS =========\n").unwrap();
+                    is_first = false;
+                }
+                writeln!(
+                    &mut stdout,
+                    "task {} waiting on {} for {:?}",
+                    waiter.fmt_scope(),
+                    waiter.resource(),
+                    waiter.wait_duration()
+                ).unwrap();
+            }
+        }
+    }
+}
 
 fn run<C>(global_args: &clap::ArgMatches, local_args: &clap::ArgMatches)
 where
@@ -96,6 +137,14 @@ where
         rmt_r_t.clone(),
         finished.clone(),
     );
+
+    let (wait_layer, wait_report) = waiters::WaitLayer::new();
+    let subscriber = EnvFilter::new("tokio=trace")
+        .and_then(fmt::Layer::default())
+        .and_then(wait_layer)
+        .with_subscriber(Registry::default());
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let mut rt = tokio::runtime::Builder::new()
         .enable_all()
         .threaded_scheduler()
@@ -116,6 +165,10 @@ where
         })
         .build()
         .unwrap();
+
+    rt.block_on(async move {
+        tokio::spawn(print_wait_report(wait_report, std::time::Duration::from_secs(5)));
+    });
 
     let handle: C = {
         let local_args = local_args.clone();
@@ -294,6 +347,8 @@ where
     // this may change with https://github.com/rayon-rs/rayon/issues/544, but that's what we have
     // to do for now.
     let ndone: &'static _ = &*Box::leak(Box::new(atomic::AtomicUsize::new(0)));
+    let nwrite: &'static _ = &*Box::leak(Box::new(atomic::AtomicUsize::new(0)));
+    let nread: &'static _ = &*Box::leak(Box::new(atomic::AtomicUsize::new(0)));
 
     // when https://github.com/rust-lang/rust/issues/56556 is fixed, take &[i32] instead, make
     // Request hold &'a [i32] (then need for<'a> C: Service<Request<'a>>). then we no longer need
@@ -303,12 +358,14 @@ where
             let n = keys.len();
             let sent = time::Instant::now();
             let fut = if write {
+                nwrite.fetch_add(1, atomic::Ordering::AcqRel);
                 Either::Left(
                     client
                         .call(WriteRequest(keys))
                         .map(|r| r.context("failed to handle writes")),
                 )
             } else {
+                nread.fetch_add(1, atomic::Ordering::AcqRel);
                 // deduplicate requested keys, because not doing so would be silly
                 keys.sort_unstable();
                 keys.dedup();
@@ -320,6 +377,11 @@ where
             }
             .map_ok(move |_| {
                 let done = time::Instant::now();
+                if write {
+                    nwrite.fetch_sub(1, atomic::Ordering::AcqRel);
+                } else {
+                    nread.fetch_sub(1, atomic::Ordering::AcqRel);
+                }
                 ndone.fetch_add(n, atomic::Ordering::AcqRel);
 
                 if sent.duration_since(start) > warmup {
@@ -488,6 +550,7 @@ where
             measured.elapsed(),
         )
     });
+    eprintln!("pending: {} writes, {} reads", nwrite.load(atomic::Ordering::Acquire), nread.load(atomic::Ordering::Acquire));
 
     // need to drop the pool before waiting so that workers will exit
     // and thus hit the barrier

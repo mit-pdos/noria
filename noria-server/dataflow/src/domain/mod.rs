@@ -18,6 +18,8 @@ pub use noria::internal::DomainIndex as Index;
 use slog::Logger;
 use stream_cancel::Valve;
 
+use tracing_futures::Instrument;
+
 use crate::Readers;
 use timekeeper::{RealTime, SimpleTracker, ThreadTime, Timer, TimerSet};
 use tokio;
@@ -870,7 +872,7 @@ impl Domain {
                                 let txs = (0..shards)
                                     .map(|shard| {
                                         let key = key.clone();
-                                        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+                                        let (tx, rx) = futures_channel::mpsc::unbounded();
                                         let sender = self
                                             .channel_coordinator
                                             .builder_for(&(trigger_domain, shard))
@@ -878,10 +880,79 @@ impl Domain {
                                             .build_async()
                                             .unwrap();
 
+                                        struct Forwarder<I, O>(LocalNodeIndex, Vec<usize>, I, O);
+
+                                        use std::{future::Future, pin::Pin, task::{Context, Poll}};
+                                        use futures_util::{sink::Sink, stream::Stream};
+                                        impl<I, O> Future for Forwarder<I, O> where I: Stream<Item = Vec<DataType>>, O: Sink<Box<Packet>>, O::Error: std::error::Error {
+                                            type Output = ();
+                                            fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                                                let this = unsafe { self.get_unchecked_mut() };
+                                                let mut i = unsafe { Pin::new_unchecked(&mut this.2) };
+                                                let mut o = unsafe { Pin::new_unchecked(&mut this.3) };
+                                                loop {
+                                                    eprintln!("rdy?");
+                                                    if let Err(e) = futures_util::ready!(o.as_mut().poll_ready(cx)) {
+                                                        eprintln!("replay source went away: {:?}", e);
+                                                        break;
+                                                    }
+                                                    eprintln!("rdy!");
+                                                    match i.as_mut().poll_next(cx) {
+                                                    Poll::Ready(Some(miss)) => {
+                                                        let mut dbg = false;
+                                                        if let DataType::UnsignedBigInt(i) = miss[0] {
+                                                            if i > 60 && i < 200 {
+                                                                dbg = true;
+                                                            }
+                                                        }
+                                                        if dbg {
+                                                            eprintln!("fwd: {:?}", miss[0]);
+                                                        }
+                                                        let t = Box::new(Packet::RequestReaderReplay {
+                                                            key: miss,
+                                                            cols: this.1.clone(),
+                                                            node: this.0,
+                                                        });
+                                                        if let Err(e) = o.as_mut().start_send(t) {
+                                                            eprintln!("replay source went away: {:?}", e);
+                                                            break;
+                                                        }
+                                                    }
+                                                    Poll::Ready(None) => {
+                                                        break;
+                                                    }
+                                                    Poll::Pending => {
+                                                        eprintln!("poll_next->Pending");
+                                                        return Poll::Pending;
+                                                    }
+                                                    }
+                                                }
+                                                eprintln!("TERMINATED");
+                                                Poll::Ready(())
+                                            }
+                                        }
+
+                                        eprintln!("SPAWNING FORWARDER");
+                                        tokio::spawn(
+                                            Forwarder(node, key.clone(), rx, sender).instrument(tracing::info_span!("forwarder"))
+                                        );
+                                        /*
+
                                         tokio::spawn(
                                             self.shutdown_valve
-                                                .wrap(rx)
-                                                .map(move |miss| {
+                                                .wrap(rx.inspect(|miss: &Vec<_>| {
+                                                    if let DataType::UnsignedBigInt(i) = miss[0] {
+                                                        if i > 60 && i < 200 {
+                                                            eprintln!("x: {:?}", miss[0]);
+                                                        }
+                                                    }
+                                                }))
+                                                .map(move |miss: Vec<_>| {
+                                                    if let DataType::UnsignedBigInt(i) = miss[0] {
+                                                        if i > 60 && i < 200 {
+                                                            eprintln!("rrr: {:?}", miss[0]);
+                                                        }
+                                                    }
                                                     Box::new(Packet::RequestReaderReplay {
                                                         key: miss,
                                                         cols: key.clone(),
@@ -900,6 +971,7 @@ impl Domain {
                                                     }
                                                 }),
                                         );
+                                        */
                                         tx
                                     })
                                     .collect::<Vec<_>>();
@@ -913,7 +985,13 @@ impl Domain {
                                             assert_eq!(miss.len(), 1);
                                             &txs[crate::shard_by(&miss[0], n)]
                                         };
-                                        tx.send(Vec::from(miss)).is_ok()
+                                        if let DataType::UnsignedBigInt(i) = miss[0] {
+                                            if i > 60 && i < 200 {
+                                                eprintln!("miss: {:?}", miss[0]);
+                                            }
+                                        }
+                                        tx.unbounded_send(Vec::from(miss)).unwrap();
+                                        true
                                     });
 
                                 let mut n = self.nodes[node].borrow_mut();
@@ -1039,12 +1117,17 @@ impl Domain {
                                 // ensure that all writes have been applied
                                 w.swap();
                                 w.with_key(&key[..])
-                                    .try_find_and(|_| ())
+                                    .try_find_and(|r| {
+                                        info!(self.log, "found"; "r" => ?r, "key" => ?key);
+                                        ()
+                                    })
                                     .expect("reader replay requested for non-ready reader")
                                     .0
                                     .is_none()
                             })
                             .expect("reader replay requested for non-reader node");
+
+                        trace!(self.log, "request-reader-replay"; "still-miss" => ?still_miss);
 
                         // ensure that we haven't already requested a replay of this key
                         if still_miss
@@ -2733,6 +2816,7 @@ impl Domain {
     }
 
     pub fn on_event(&mut self, executor: &mut dyn Executor, event: PollEvent) -> ProcessResult {
+        info!(self.log, "on_event"; "event" => ?event);
         if self.wait_time.is_running() {
             self.wait_time.stop();
         }

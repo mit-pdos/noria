@@ -200,6 +200,7 @@ fn handle_message(
                             retry: async_timer::interval(retry),
                             trigger_timeout: trigger,
                             next_trigger: now,
+                            first: now,
                         }))
                     }
                 }
@@ -237,6 +238,7 @@ struct BlockingRead {
 
     trigger_timeout: time::Duration,
     next_trigger: time::Instant,
+    first: time::Instant,
 }
 
 impl Future for BlockingRead {
@@ -291,6 +293,10 @@ impl Future for BlockingRead {
                 }
 
                 if triggered {
+                    if this.first.elapsed() > time::Duration::from_secs(7) {
+                        panic!("Read of {:?} will probably wait forever", this.keys);
+                    }
+
                     *this.trigger_timeout *= 2;
                     *this.next_trigger = now + *this.trigger_timeout;
                 }

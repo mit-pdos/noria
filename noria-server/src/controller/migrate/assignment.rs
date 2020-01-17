@@ -13,8 +13,11 @@ pub fn assign(log: &Logger, graph: &mut Graph, topo_list: &[NodeIndex], ndomains
     //  - shard merge nodes are never in the same domain as their sharded ancestors
 
     let mut next_domain = || {
+        /*
         *ndomains += 1;
         *ndomains - 1
+        */
+        *ndomains
     };
 
     for &node in topo_list {

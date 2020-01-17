@@ -23,6 +23,12 @@ pub struct Graph {
     pub done: Box<dyn Future<Output = ()> + Unpin + Send>,
 }
 
+impl Drop for Graph {
+    fn drop(&mut self) {
+        eprintln!("DROPPING GRAPH");
+    }
+}
+
 pub struct Builder {
     pub stupid: bool,
     pub partial: bool,

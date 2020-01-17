@@ -13,6 +13,7 @@ bincode = "1.0.0"
 evmap = { version = "7.1.2", features = ["indexed"] }
 fnv = "1.0.5"
 futures-util = "0.3.0"
+futures-channel = "0.3.0"
 itertools = "0.8"
 nom-sql = "0.0.9"
 indexmap = "1.1.0"
@@ -25,6 +26,8 @@ stream-cancel = "0.5.0"
 tokio = { version = "0.2.0" }
 vec_map = { version = "0.8.0", features = ["eders"] }
 tempfile = "3.0.2"
+tracing = "*"
+tracing-futures = "*"
 
 # need features
 backtrace = { version = "0.3.2", features = ["serialize-serde"] }
