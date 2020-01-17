@@ -139,7 +139,7 @@ where
     );
 
     let (wait_layer, wait_report) = waiters::WaitLayer::new();
-    let subscriber = EnvFilter::new("tokio=trace")
+    let subscriber = EnvFilter::new("tokio=debug")
         .and_then(fmt::Layer::default())
         .and_then(wait_layer)
         .with_subscriber(Registry::default());

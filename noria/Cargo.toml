@@ -34,10 +34,10 @@ arccstr = "1.2.0"
 fnv = "1.0.5"
 chrono = { version = "0.4.0", features = ["serde"] }
 tower-service = "0.3.0"
-tower-balance = "0.3.0"
+tower-balance = { version = "0.3.0", default-features = false }
 tower-discover = "0.3.0"
-tower-buffer = "0.3.0"
-tokio-tower = "0.3.0"
+tower-buffer = { version = "0.3.0", default-features = false }
+tokio-tower = { version = "0.3.0", default-features = false }
 tracing = "0.1"
 tower-util = "0.3.0"
 tower = "0.3.0"

@@ -887,16 +887,17 @@ impl Domain {
                                         impl<I, O> Future for Forwarder<I, O> where I: Stream<Item = Vec<DataType>>, O: Sink<Box<Packet>>, O::Error: std::error::Error {
                                             type Output = ();
                                             fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+                                                tracing::info!("forwarder was polled");
                                                 let this = unsafe { self.get_unchecked_mut() };
                                                 let mut i = unsafe { Pin::new_unchecked(&mut this.2) };
                                                 let mut o = unsafe { Pin::new_unchecked(&mut this.3) };
                                                 loop {
-                                                    eprintln!("rdy?");
+                                                    //eprintln!("rdy?");
                                                     if let Err(e) = futures_util::ready!(o.as_mut().poll_ready(cx)) {
                                                         eprintln!("replay source went away: {:?}", e);
                                                         break;
                                                     }
-                                                    eprintln!("rdy!");
+                                                    //eprintln!("rdy!");
                                                     match i.as_mut().poll_next(cx) {
                                                     Poll::Ready(Some(miss)) => {
                                                         let mut dbg = false;

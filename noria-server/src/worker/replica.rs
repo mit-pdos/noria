@@ -513,6 +513,7 @@ impl Executor for Outboxes {
 impl Future for Replica {
     type Output = Result<(), failure::Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        tracing::info!("domain was polled");
         trace!(self.log, "poll");
         'process: loop {
             // FIXME: check if we should call update_state_sizes (every evict_every)
