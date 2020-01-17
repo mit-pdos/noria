@@ -872,7 +872,7 @@ impl Domain {
                                 let txs = (0..shards)
                                     .map(|shard| {
                                         let key = key.clone();
-                                        let (tx, rx) = futures_channel::mpsc::unbounded();
+                                        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
                                         let sender = self
                                             .channel_coordinator
                                             .builder_for(&(trigger_domain, shard))
@@ -991,7 +991,7 @@ impl Domain {
                                                 eprintln!("miss: {:?}", miss[0]);
                                             }
                                         }
-                                        tx.unbounded_send(Vec::from(miss)).unwrap();
+                                        tx.send(Vec::from(miss)).unwrap();
                                         true
                                     });
 
