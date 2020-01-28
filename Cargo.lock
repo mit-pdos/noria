@@ -1360,8 +1360,9 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memcached-rs"
-version = "0.4.1"
-source = "git+https://github.com/jonhoo/memcached-rs.git?branch=bump-deps#86170708ab2b24c2eb5dbb16d5a3dd61337c18ea"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3804643a8b556cd39d6b3ec5a181fdf36b642952d57f4c52bebd457d0ee0b1d"
 dependencies = [
  "bufstream",
  "byteorder",
