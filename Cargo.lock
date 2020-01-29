@@ -2662,9 +2662,9 @@ checksum = "7f3eb36b47e512f8f1c9e3d10c2c1965bc992bd9cdb024fa581e2194501c83d3"
 
 [[package]]
 name = "stream-cancel"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65851535511fa506e51dfa6f718f91ad2ea91f61a11392a093e0341f9730ebd5"
+checksum = "15c2f5be039aed0d08b3596461637480d35858ca4360c905b0e802b934fa8e48"
 dependencies = [
  "futures-core",
  "futures-util",
