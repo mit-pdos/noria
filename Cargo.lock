@@ -8,9 +8,9 @@ checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58fb5e95d83b38284460a5fda7d6470aa0b8844d283a0b614b8535e880800d2d"
+checksum = "5f56c476256dc249def911d6f7580b5fc7e875895b5d7ee88f5d602208035744"
 dependencies = [
  "memchr",
 ]
@@ -625,9 +625,9 @@ dependencies = [
 
 [[package]]
 name = "dtoa"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
+checksum = "4358a9e11b9a09cf52383b451b49a169e8d797b68aa02301ff586d70d9661ea3"
 
 [[package]]
 name = "either"
@@ -655,7 +655,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5589ce096bbfc5465cc2f3f6de6605803d6b4ef741ad6d38172dc30bfeea5f95"
 dependencies = [
  "indexmap",
- "smallvec 1.1.0",
+ "smallvec 1.2.0",
 ]
 
 [[package]]
@@ -766,7 +766,7 @@ dependencies = [
 [[package]]
 name = "futures-core"
 version = "0.3.1"
-source = "git+https://github.com/rust-lang/futures-rs.git#e76780341234cda6e77edec7ece83559bbcd0162"
+source = "git+https://github.com/rust-lang/futures-rs.git#fb61ef563b27374a48375eb2934f411f92469ae4"
 
 [[package]]
 name = "futures-cpupool"
@@ -792,7 +792,7 @@ dependencies = [
 [[package]]
 name = "futures-macro"
 version = "0.3.1"
-source = "git+https://github.com/rust-lang/futures-rs.git#e76780341234cda6e77edec7ece83559bbcd0162"
+source = "git+https://github.com/rust-lang/futures-rs.git#fb61ef563b27374a48375eb2934f411f92469ae4"
 dependencies = [
  "proc-macro-hack",
  "proc-macro2 1.0.8",
@@ -803,12 +803,12 @@ dependencies = [
 [[package]]
 name = "futures-sink"
 version = "0.3.1"
-source = "git+https://github.com/rust-lang/futures-rs.git#e76780341234cda6e77edec7ece83559bbcd0162"
+source = "git+https://github.com/rust-lang/futures-rs.git#fb61ef563b27374a48375eb2934f411f92469ae4"
 
 [[package]]
 name = "futures-task"
 version = "0.3.1"
-source = "git+https://github.com/rust-lang/futures-rs.git#e76780341234cda6e77edec7ece83559bbcd0162"
+source = "git+https://github.com/rust-lang/futures-rs.git#fb61ef563b27374a48375eb2934f411f92469ae4"
 
 [[package]]
 name = "futures-task"
@@ -819,7 +819,7 @@ checksum = "0bae52d6b29cf440e298856fec3965ee6fa71b06aa7495178615953fd669e5f9"
 [[package]]
 name = "futures-util"
 version = "0.3.1"
-source = "git+https://github.com/rust-lang/futures-rs.git#e76780341234cda6e77edec7ece83559bbcd0162"
+source = "git+https://github.com/rust-lang/futures-rs.git#fb61ef563b27374a48375eb2934f411f92469ae4"
 dependencies = [
  "futures-core",
  "futures-macro",
@@ -1067,9 +1067,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bf49cfb32edee45d890537d9057d1b02ed55f53b7b6a30bae83a38c9231749e"
+checksum = "fa1c527bbc634be72aa7ba31e4e4def9bbb020f5416916279b7c705cd838893e"
 dependencies = [
  "bytes 0.5.4",
  "futures-channel",
@@ -1211,12 +1211,12 @@ checksum = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
 
 [[package]]
 name = "lexical"
-version = "4.1.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "075d3db49f15fff397a35d66e6b294363d3f50517be6e77d44d39d698ebce5be"
+checksum = "eaad0ee8120fc0cf7df7e8fdbe79bf9d6189351404feb88f4e4a4bb5307bc594"
 dependencies = [
  "cfg-if",
- "lexical-core 0.6.6",
+ "lexical-core 0.6.7",
  "rustc_version",
 ]
 
@@ -1235,9 +1235,9 @@ dependencies = [
 
 [[package]]
 name = "lexical-core"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7600fb178d60708acd70dbac78c90733679656ff3a62ed47c5b3aaf6d79dcc0"
+checksum = "f86d66d380c9c5a685aaac7a11818bdfa1f733198dfd9ec09c70b762cd12ad6f"
 dependencies = [
  "arrayvec 0.4.12",
  "bitflags",
@@ -1710,7 +1710,7 @@ dependencies = [
  "failure",
  "fnv",
  "futures-util",
- "hyper 0.13.1",
+ "hyper 0.13.2",
  "net2",
  "nom-sql",
  "petgraph",
@@ -1790,7 +1790,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "hostname",
- "hyper 0.13.1",
+ "hyper 0.13.2",
  "mio",
  "mir",
  "mysql",
@@ -2002,7 +2002,7 @@ dependencies = [
  "cloudabi",
  "libc",
  "redox_syscall",
- "smallvec 1.1.0",
+ "smallvec 1.2.0",
  "winapi 0.3.8",
 ]
 
@@ -2587,8 +2587,9 @@ checksum = "1cc9c640a4adbfbcc11ffb95efe5aa7af7309e002adab54b185507dbf2377b99"
 
 [[package]]
 name = "slog-term"
-version = "2.4.2"
-source = "git+https://github.com/slog-rs/term.git#5207038750c697549a2ee3eb6bdde3a61d190da6"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "124501187c410b6a46fe8a47a48435ae462fae4e02d03c558d358f40b17308cb"
 dependencies = [
  "atty",
  "chrono",
@@ -2608,9 +2609,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44e59e0c9fa00817912ae6e4e6e3c4fe04455e75699d06eedc7d85917ed8e8f4"
+checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
 
 [[package]]
 name = "snowflake"
@@ -2674,9 +2675,9 @@ dependencies = [
 
 [[package]]
 name = "streamunordered"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e314c131f1019b8e3ce306f45d20dbbc1fa1de9806d0541a0a99f9d46118e81"
+checksum = "f9394ee1338fee8370bee649f8a7170b3a56917903a0956467ad192dcf8699ca"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -2862,7 +2863,7 @@ dependencies = [
 [[package]]
 name = "tokio"
 version = "0.2.11"
-source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#7c131462f5692a928a86e3692dd7a003f00b64a5"
+source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#6ea6821a0111b99ef4883279d7134960f37fa679"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -2949,7 +2950,7 @@ dependencies = [
 [[package]]
 name = "tokio-macros"
 version = "0.2.4"
-source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#7c131462f5692a928a86e3692dd7a003f00b64a5"
+source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#6ea6821a0111b99ef4883279d7134960f37fa679"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -3087,8 +3088,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-tower"
-version = "0.3.2"
-source = "git+https://github.com/tower-rs/tokio-tower.git?branch=no-box#cb1df166589f0dc3b4cbf3181956954b092497ca"
+version = "0.3.3"
+source = "git+https://github.com/tower-rs/tokio-tower.git?branch=no-box#61973026742a644f613fa13d62f2f135a84db90f"
 dependencies = [
  "crossbeam",
  "futures-core",
@@ -3408,7 +3409,7 @@ dependencies = [
  "hdrhistogram 6.3.4",
  "histogram-sampler",
  "http 0.2.0",
- "hyper 0.13.1",
+ "hyper 0.13.2",
  "lazy_static",
  "libc",
  "rand",
@@ -3496,7 +3497,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5479532badd04e128284890390c1e876ef7a993d0570b3597ae43dfa1d59afa4"
 dependencies = [
- "smallvec 1.1.0",
+ "smallvec 1.2.0",
 ]
 
 [[package]]
