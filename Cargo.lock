@@ -142,15 +142,6 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b25d992356d2eb0ed82172f5248873db5560c4721f564b13cb5193bda5e668e"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
-name = "base64"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
@@ -321,7 +312,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
- "time",
+ "time 0.1.42",
 ]
 
 [[package]]
@@ -389,11 +380,11 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "cookie"
-version = "0.12.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "888604f00b3db336d2af898ec3c1d5d0ddf5e6d462220f2ededc33a87ac4bbd5"
+checksum = "9767b0ac42ec8164681434369716d2f3a5b1f83039701e4ec98b430f18174c69"
 dependencies = [
- "time",
+ "time 0.2.4",
 ]
 
 [[package]]
@@ -428,20 +419,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69323bff1fb41c635347b8ead484a5ca6c3f11914d784170b158d8449ab07f8e"
 dependencies = [
  "cfg-if",
- "crossbeam-channel 0.4.0",
+ "crossbeam-channel",
  "crossbeam-deque",
  "crossbeam-epoch",
  "crossbeam-queue 0.2.1",
  "crossbeam-utils 0.7.0",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8ec7fcd21571dc78f96cc96243cab8d8f035247c3efd16c687be154c3fa9efa"
-dependencies = [
- "crossbeam-utils 0.6.6",
 ]
 
 [[package]]
@@ -905,27 +887,13 @@ dependencies = [
 
 [[package]]
 name = "hdrhistogram"
-version = "6.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08d331ebcdbca4acbefe5da8c3299b2e246f198a8294cc5163354e743398b89d"
-dependencies = [
- "base64 0.10.1",
- "byteorder",
- "crossbeam-channel 0.3.9",
- "flate2",
- "nom 4.2.3",
- "num-traits",
-]
-
-[[package]]
-name = "hdrhistogram"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30473369d16f9df5aefc9708bd165e0dbaca7405179257678b549774d2af9f41"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "byteorder",
- "crossbeam-channel 0.4.0",
+ "crossbeam-channel",
  "flate2",
  "nom 5.1.0",
  "num-traits",
@@ -1053,7 +1021,7 @@ dependencies = [
  "log",
  "net2",
  "rustc_version",
- "time",
+ "time 0.1.42",
  "tokio 0.1.22",
  "tokio-buf",
  "tokio-executor",
@@ -1083,7 +1051,7 @@ dependencies = [
  "log",
  "net2",
  "pin-project",
- "time",
+ "time 0.1.42",
  "tokio 0.2.11",
  "tower-service",
  "want 0.3.0",
@@ -1540,7 +1508,7 @@ version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f3fa60743383c5e5719b68a134531074e83e550b97182e4a24ad5220a8e974"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "bigdecimal",
  "bitflags",
  "byteorder",
@@ -1559,7 +1527,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
- "time",
+ "time 0.1.42",
  "twox-hash",
  "uuid",
 ]
@@ -1570,7 +1538,7 @@ version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0289906e4d274efa71fd3d27c2db36de7b5518995286021dfb134faf259659de"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "bigdecimal",
  "bitflags",
  "byteorder",
@@ -1589,7 +1557,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
- "time",
+ "time 0.1.42",
  "twox-hash",
  "uuid",
 ]
@@ -1744,7 +1712,7 @@ dependencies = [
  "failure",
  "futures-core",
  "futures-util",
- "hdrhistogram 7.0.0",
+ "hdrhistogram",
  "itertools",
  "memcached-rs",
  "mio",
@@ -2289,7 +2257,7 @@ version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1d1ecfe8dac29878a713fbc4c36b0a84a48f7a6883541841cdff9fdd2ba7dfb"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "bytes 0.4.12",
  "futures",
  "http 0.1.21",
@@ -2303,7 +2271,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "time",
+ "time 0.1.42",
  "tokio 0.1.22",
  "tokio-timer",
  "xml-rs",
@@ -2348,7 +2316,7 @@ version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7063a70614eb4b36f49bcf4f6f6bb30cc765e3072b317d6afdfe51e7a9f482d1"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "bytes 0.4.12",
  "futures",
  "hex",
@@ -2362,7 +2330,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "sha2",
- "time",
+ "time 0.1.42",
  "tokio 0.1.22",
 ]
 
@@ -2386,7 +2354,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bc8af4bda8e1ff4932523b94d3dd20ee30a87232323eda55903ffd71d2fb017"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "blake2b_simd",
  "constant_time_eq",
  "crossbeam-utils 0.7.0",
@@ -2417,6 +2385,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
  "semver",
+]
+
+[[package]]
+name = "rustversion"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3bba175698996010c4f6dce5e7f173b6eb781fce25d2cfc45e27091ce0b79f6"
+dependencies = [
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn",
 ]
 
 [[package]]
@@ -2810,6 +2789,38 @@ dependencies = [
  "libc",
  "redox_syscall",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "time"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6892c6ec856165a7f6caf63366f9c85a6898ceddffd740e8ecbbcf596d4c2e7"
+dependencies = [
+ "rustversion",
+ "time-macros",
+]
+
+[[package]]
+name = "time-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae9b6e9f095bc105e183e3cd493d72579be3181ad4004fceb01adbe9eecab2d"
+dependencies = [
+ "proc-macro-hack",
+ "time-macros-impl",
+]
+
+[[package]]
+name = "time-macros-impl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e987cfe0537f575b5fc99909de6185f6c19c3ad8889e2275e686a873d0869ba1"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn",
 ]
 
 [[package]]
@@ -3397,17 +3408,17 @@ dependencies = [
 
 [[package]]
 name = "trawler"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "146f4bd02c13905973775643a43ab7be31f12a8c60bb69b9b8b08904fb178c9f"
+checksum = "adc1e818a84e8a5336b6c6db3f37ec926483c56cb36c73c8678495ba5227a955"
 dependencies = [
  "clap",
  "cookie",
- "crossbeam-channel 0.4.0",
+ "crossbeam-channel",
  "futures-core",
  "futures-util",
  "glob",
- "hdrhistogram 6.3.4",
+ "hdrhistogram",
  "histogram-sampler",
  "http 0.2.0",
  "hyper 0.13.2",
