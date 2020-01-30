@@ -3408,9 +3408,9 @@ dependencies = [
 
 [[package]]
 name = "trawler"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc1e818a84e8a5336b6c6db3f37ec926483c56cb36c73c8678495ba5227a955"
+checksum = "087fd4e1f482381fbf687027241f506ff100715584f551191b534b2a69415d70"
 dependencies = [
  "clap",
  "cookie",
