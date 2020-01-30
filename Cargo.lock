@@ -3746,9 +3746,9 @@ dependencies = [
 
 [[package]]
 name = "zookeeper"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d08452d695bc0713a47b0deabe7f4c5fe354de28b376c0551ee666c840ad4db1"
+checksum = "5a9f3b123797a72f87fc111a6947486787e561db1dd694e917bb8252203cd194"
 dependencies = [
  "byteorder",
  "bytes 0.5.4",
@@ -3762,8 +3762,9 @@ dependencies = [
 
 [[package]]
 name = "zookeeper_derive"
-version = "0.4.0"
-source = "git+https://github.com/bonifaido/rust-zookeeper.git#713b77a462a7446e9fb58846327b9b48abff0d4b"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42307291e3c8b2e4082e5647572da863f0470511d0ecb1618a4cd0a361549723"
 dependencies = [
  "quote 1.0.2",
  "syn",
