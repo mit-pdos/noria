@@ -1771,6 +1771,7 @@ dependencies = [
  "slab",
  "slog",
  "slog-term",
+ "strawpoll",
  "stream-cancel",
  "streamunordered",
  "tempfile",
@@ -2631,6 +2632,15 @@ name = "static_assertions"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f3eb36b47e512f8f1c9e3d10c2c1965bc992bd9cdb024fa581e2194501c83d3"
+
+[[package]]
+name = "strawpoll"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ae1cce582d7bd4fd693185bf313dcab010986a08f8cd4d7304581c7d18af631"
+dependencies = [
+ "futures-task",
+]
 
 [[package]]
 name = "stream-cancel"
