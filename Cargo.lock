@@ -8,9 +8,9 @@ checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f56c476256dc249def911d6f7580b5fc7e875895b5d7ee88f5d602208035744"
+checksum = "743ad5a418686aad3b87fd14c43badd828cf26e214a00f92a384291cf22e1811"
 dependencies = [
  "memchr",
 ]
@@ -2866,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "tokio"
 version = "0.2.11"
-source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#6ea6821a0111b99ef4883279d7134960f37fa679"
+source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#51f946a11f1f85196fbb9e82ac26eb7da656df94"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -2953,7 +2953,7 @@ dependencies = [
 [[package]]
 name = "tokio-macros"
 version = "0.2.4"
-source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#6ea6821a0111b99ef4883279d7134960f37fa679"
+source = "git+https://github.com/tokio-rs/tokio.git?branch=jonhoo/preempt#51f946a11f1f85196fbb9e82ac26eb7da656df94"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
