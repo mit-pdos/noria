@@ -650,7 +650,7 @@ impl Recipe {
         self.prior.as_ref().map(|p| &**p)
     }
 
-    fn remove_query(&mut self, qname: &str) -> bool {
+    crate fn remove_query(&mut self, qname: &str) -> bool {
         let qid = self.aliases.get(qname).cloned();
         if qid.is_none() {
             warn!(self.log, "Query {} not found in expressions", qname);

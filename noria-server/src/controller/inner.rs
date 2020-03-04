@@ -309,6 +309,12 @@ impl ControllerInner {
                     self.remove_nodes(vec![args].as_slice())
                         .map(|r| json::to_string(&r).unwrap())
                 }),
+            (Method::POST, "/remove_query") => json::from_slice(&body)
+                .map_err(|_| StatusCode::BAD_REQUEST)
+                .map(|args| {
+                    self.remove_query(authority, args)
+                        .map(|r| json::to_string(&r).unwrap())
+                }),
             _ => Err(StatusCode::NOT_FOUND),
         }
     }
@@ -1348,6 +1354,32 @@ impl ControllerInner {
                 acc
             })
         }
+    }
+    fn remove_query<A: Authority + 'static>(
+        &mut self,
+        authority: &Arc<A>,
+        qname: &str,
+    )  -> Result<(), String> {
+        let old = self.recipe.clone();
+        self.recipe.remove_query(qname);
+        let updated = self.recipe.clone();
+        let replaced = old.replace(updated).unwrap();
+
+        let activation_result = self.apply_recipe(replaced);
+        if authority
+            .read_modify_write(STATE_KEY, |state: Option<ControllerState>| match state {
+                None => unreachable!(),
+                Some(ref state) if state.epoch > self.epoch => Err(()),
+                Some(mut state) => {
+                    state.recipe_version = self.recipe.version();
+                    Ok(state)
+                }
+            })
+            .is_err()
+            {
+            return Err("Failed to persist recipe extension".to_owned());
+            }
+        Ok(())
     }
 }
 

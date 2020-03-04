@@ -447,6 +447,16 @@ impl<A: Authority + 'static> ControllerHandle<A> {
         self.rpc("remove_node", view, "failed to remove node")
     }
 
+    /// Remove the given query view from the graph.
+    ///
+    /// `Self::poll_ready` must have returned `Async::Ready` before you call this method.
+    pub fn remove_query(
+        &mut self,
+        view: &str,
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
+        self.rpc("remove_query", view, "failed to remove query")
+    }
+
     /// Construct a synchronous interface to this controller instance using the given executor to
     /// execute all operations.
     ///
@@ -634,6 +644,13 @@ where
     /// See [`ControllerHandle::remove_node`].
     pub fn remove_node(&mut self, view: NodeIndex) -> Result<(), failure::Error> {
         let fut = self.handle()?.remove_node(view);
+        self.run(fut)
+    }
+    /// Remove the given external view from the graph.
+    ///
+    /// See [`ControllerHandle::remove_node`].
+    pub fn remove_query(&mut self, view: &str) -> Result<(), failure::Error> {
+        let fut = self.handle()?.remove_query(view);
         self.run(fut)
     }
 }
