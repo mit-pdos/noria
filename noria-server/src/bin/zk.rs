@@ -57,26 +57,41 @@ fn main() {
                 .required_unless("clean")
                 .help("Print current configuration to stdout."),
         )
+        .arg(
+            Arg::with_name("skip-controller")
+                .long("--skip-controller")
+                .takes_value(false)
+                .help("Don't print current controller."),
+        )
         .get_matches();
 
     let deployment = matches.value_of("deployment").unwrap();
     let zookeeper_addr = format!("{}/{}", matches.value_of("zookeeper").unwrap(), deployment);
     let clean = matches.is_present("clean");
     let dump = matches.is_present("show");
+    let skip_controller = matches.is_present("skip-controller");
 
     let zk = ZooKeeper::connect(&zookeeper_addr, Duration::from_secs(1), EventWatcher).unwrap();
 
     if dump {
-        let (ref current_ctrl, ref _stat) = match zk.get_data(CONTROLLER_KEY, false) {
-            Ok(data) => data,
-            Err(e) => match e {
-                ZkError::NoNode => {
-                    println!("no current Soup controller in Zookeeper!");
-                    return;
-                }
-                _ => panic!("{:?}", e),
-            },
-        };
+        if !skip_controller {
+            let (ref current_ctrl, ref _stat) = match zk.get_data(CONTROLLER_KEY, false) {
+                Ok(data) => data,
+                Err(e) => match e {
+                    ZkError::NoNode => {
+                        println!("no current Soup controller in Zookeeper!");
+                        return;
+                    }
+                    _ => panic!("{:?}", e),
+                },
+            };
+
+            let controller: Value = serde_json::from_slice(current_ctrl).unwrap();
+            println!(
+                "Current Soup controller in Zookeeper:\n{}\n\n",
+                serde_json::to_string_pretty(&controller).unwrap()
+            );
+        }
 
         let (ref current_data, ref _stat) = match zk.get_data(STATE_KEY, false) {
             Ok(data) => data,
@@ -88,12 +103,6 @@ fn main() {
                 _ => panic!("{:?}", e),
             },
         };
-
-        let controller: Value = serde_json::from_slice(current_ctrl).unwrap();
-        println!(
-            "Current Soup controller in Zookeeper:\n{}\n\n",
-            serde_json::to_string_pretty(&controller).unwrap()
-        );
 
         let state: Value = serde_json::from_slice(current_data).unwrap();
         println!(
