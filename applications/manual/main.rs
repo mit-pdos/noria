@@ -2,7 +2,7 @@ extern crate csv;
 use csv::Writer;
 use clap::value_t_or_exit;
 use hdrhistogram::Histogram;
-use noria::{Builder, FrontierStrategy, ReuseConfigType};
+use noria::{FrontierStrategy, ReuseConfigType};
 use rand::seq::SliceRandom;
 use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
@@ -17,8 +17,10 @@ use noria::manual::ops::union::Union;
 use noria::manual::ops::rewrite::Rewrite;
 use noria::manual::ops::filter::{Filter, FilterCondition, Value};   
 use noria::manual::ops::grouped::aggregate::Aggregation;  
-// use noria::manual::ops::grouped::aggregate::Aggregate::COUNT;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
 use nom_sql::Operator;
+use noria::{Builder, Handle, LocalAuthority};
+use std::future::Future;
+
 
 const PAPERS_PER_REVIEWER: usize = 3;
 
@@ -47,6 +49,34 @@ struct Review {
     rating: usize,
     confidence: usize,
     
+}
+
+
+pub struct Backend {
+    g: Handle<LocalAuthority>,
+    done: Box<dyn Future<Output = ()> + Unpin>,
+}
+
+async fn make() -> Box<Backend> {
+    let mut b = Builder::default();
+  
+    b.set_sharding(None);
+
+    b.set_persistence(PersistenceParameters::new(
+        DurabilityMode::MemoryOnly,
+        Duration::from_millis(1),
+        Some(String::from("manual_policy_graph")),
+        1,
+    ));
+    
+    let (g, done) = b.start_local().await.unwrap();
+    
+    let reuse = true; 
+
+    Box::new(Backend {
+        g,
+        done: Box::new(done),
+    })
 }
 
 
@@ -162,7 +192,6 @@ async fn main() {
         )
     );
 
-
     println!("here3"); 
 
     debug!(log, "fetching list of accepted papers"; "url" => &url);
@@ -233,9 +262,6 @@ async fn main() {
             authors,
         });
 
-//    thread::sleep(time::Duration::from_millis(2000));
-//    let _ = backend.login(make_user(user)).is_ok();
-
         let url = format!(
             "https://openreview.net/notes?forum={}&invitation={}/-/Paper{}/Official_Review",
             url::percent_encoding::utf8_percent_encode(
@@ -295,10 +321,8 @@ async fn main() {
     drop(author_set);
     let nauthors = authors.len();
 
-    // let's compute the number of reviewers
-    // we know the number of reviews
-    // we have fixed the number of reviews per reviewer
-    // We assume the set of reviewers DOES NOT intersect the set of authors.
+    let mut backend = make().await; 
+ 
     let nreviewers = (reviews.len() + (PAPERS_PER_REVIEWER - 1)) / PAPERS_PER_REVIEWER;
     let mut rlogged = (loggedf * nreviewers as f64) as usize;
     let mut alogged = (loggedf * nauthors as f64) as usize;
@@ -314,8 +338,6 @@ async fn main() {
         args.value_of("materialization").unwrap()
     );
 
-    // let mut cold_stats = HashMap::new();
-    // let mut warm_stats = HashMap::new();
     let iter = value_t_or_exit!(args, "iter", usize);
     let npapers = value_t_or_exit!(args, "npapers", usize);
     let mut wtr = Writer::from_path(format!("no_fiter_res_n{}.csv", npapers)).unwrap();
@@ -333,50 +355,13 @@ async fn main() {
     println!("starting noria!"); 
     
     debug!(log, "configuring noria");
-    let mut g = Builder::default();
-    match args.value_of("reuse").unwrap() {
-        "finkelstein" => g.set_reuse(ReuseConfigType::Finkelstein),
-        "full" => g.set_reuse(ReuseConfigType::Full),
-        "no" => g.set_reuse(ReuseConfigType::NoReuse),
-        "relaxed" => g.set_reuse(ReuseConfigType::Relaxed),
-        _ => unreachable!(),
-    }
-
-    match args.value_of("materialization").unwrap() {
-        "full" => {
-            g.disable_partial();
-        }
-        "partial" => {}
-        "shallow-readers" => {
-            g.set_frontier_strategy(FrontierStrategy::Readers);
-        }
-        "shallow-all" => {
-            g.set_frontier_strategy(FrontierStrategy::AllPartial);
-        }
-        _ => unreachable!(),
-    }
-    g.set_sharding(None);
-    if verbose > 1 {
-        g.log_with(log.clone());
-    }
-    g.log_with(log.clone());
-    g.set_persistence(PersistenceParameters::new(
-        DurabilityMode::MemoryOnly,
-        Duration::from_millis(1),
-        Some(String::from("manual_policy_graph")),
-        1,
-    ));
-    
-    debug!(log, "spinning up");
-    let mut g = g.start_local().await.unwrap().0; 
-    debug!(log, "noria ready");
-    
+   
     println!("started local"); 
 
     let init = Instant::now();
     thread::sleep(Duration::from_millis(2000));
 
-    let (paper, paper_reviews, paper_conflict) = g.migrate(|mig| {
+    let (paper, paper_reviews, paper_conflict) = backend.g.migrate(|mig| {
         let paper = mig.add_base("Paper", &["paperId", "leadContactId", "authorInformation"], Base::default());
         let paper_reviews = mig.add_base("PaperReview", &["paperId", "reviewId", "contactId", "reviewSubmitted"], Base::default());
         let paper_conflict = mig.add_base("PaperConflict", &["paperId", "contactId"], Base::default());
@@ -386,7 +371,7 @@ async fn main() {
     
     let uid : usize = 4; // why not
     
-    let my_conflicts = g.migrate(move |mig| {
+    let my_conflicts = backend.g.migrate(move |mig| {
         let my_conflicts = mig.add_ingredient(
             "MyConflicts",
             &["paperId", "contactId"],
@@ -397,7 +382,7 @@ async fn main() {
     
     println!("mig1"); 
 
-    let (my_submitted_reviews0, my_submitted_reviews) = g.migrate(move |mig| {
+    let (my_submitted_reviews0, my_submitted_reviews) = backend.g.migrate(move |mig| {
         let my_submitted_reviews0 = mig.add_ingredient(
             "MySubmittedReviews0",
             &["paperId", "reviewId", "contactId", "reviewSubmitted"],
@@ -421,7 +406,7 @@ async fn main() {
     println!("mig2"); 
 
     let (unconflicted_papers, unconflicted_papers0, 
-        unconflicted_paper_reviews, unconflicted_paper_reviews0) = g.migrate(move |mig| {
+        unconflicted_paper_reviews, unconflicted_paper_reviews0) = backend.g.migrate(move |mig| {
         let unconflicted_papers0 = mig.add_ingredient(
             "UnconflictedPapers0",
             &["paperId", "leadContactId", "authorInformation", "contactId"],
@@ -456,7 +441,7 @@ async fn main() {
 
     println!("mig3"); 
     
-    let (visible_reviews, visible_reviews_anonymized) = g.migrate(move |mig| {
+    let (visible_reviews, visible_reviews_anonymized) = backend.g.migrate(move |mig| {
         let visible_reviews = mig.add_ingredient(
             "VisibleReviews",
             &["paperId", "reviewId", "contactId", "reviewSubmitted"],
@@ -476,7 +461,7 @@ async fn main() {
 
     println!("mig4"); 
 
-    let (paper_paper_review0, paper_paper_review) = g.migrate(move |mig| {
+    let (paper_paper_review0, paper_paper_review) = backend.g.migrate(move |mig| {
         let paper_paper_review0 = mig.add_ingredient(
             "Paper_PaperReview0",
             &["paperId", "leadContactId", "authorInformation", "reviewId", "contactId", "reviewSubmitted"],
@@ -497,11 +482,9 @@ async fn main() {
         (paper_paper_review0, paper_paper_review)
     }).await; 
 
-
     println!("mig5"); 
-
     
-    let (r_submitted, final_node) = g.migrate(move |mig| {
+    let (r_submitted, final_node) = backend.g.migrate(move |mig| {
         let r_submitted = mig.add_ingredient(
             "R_submitted", 
             &["paperId"], 
@@ -518,504 +501,117 @@ async fn main() {
         (r_submitted, final_node)
     }).await; 
 
+    // Mem stats 
 
-//     // Graph construction complete; Collect memory stats
-//     let mut memstats = |g: &mut noria::SyncHandle<_>, at| {
-//         if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
-//             debug!(log, "extracing process memory stats"; "at" => at);
-//             let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
-//             let data = mem.split_whitespace().nth(6 - 1).unwrap();
-//             println!("# VmRSS @ {}: {} ", at, vmrss);
-//             println!("# VmData @ {}: {} ", at, data);
-//         }
+    // let mut memstats = async |g: &mut noria::Handle<_>, at| {
+    //     if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
+    //         debug!(log, "extracing process memory stats"; "at" => at);
+    //         let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
+    //         let data = mem.split_whitespace().nth(6 - 1).unwrap();
+    //         println!("# VmRSS @ {}: {} ", at, vmrss);
+    //         println!("# VmData @ {}: {} ", at, data);
+    //     }
 
-//         debug!(log, "extracing materialization memory stats"; "at" => at);
-//         let mut reader_mem = 0;
-//         let mut base_mem = 0;
-//         let mut mem = 0;
-//         let stats = g.statistics().unwrap();
-//         let mut filter_mem = 0;
-//         for (_, nstats) in stats.values() {
-//             for nstat in nstats.values() {
-//                 println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
-//                 if nstat.desc == "B" {
-//                     base_mem += nstat.mem_size;
-//                 } else if nstat.desc == "reader node" {
-//                     reader_mem += nstat.mem_size;
-//                 } else {
-//                     //                        println!("{}", nstat.desc);
-//                     mem += nstat.mem_size;
-                    
-//                     if nstat.desc.contains("f0") {
-// //                            println!("counting");
-//                         filter_mem += nstat.mem_size;
-//                     }
-// //                        println!("---");
-//                 }
-//             }
-//         }
-//         wtr.write_record(&[format!("{}", loggedf),
-//                             format!("{}", npapers),
-//                             format!("{}", nauthors),
-//                             format!("{}", nreviewers),
-//                             format!("{}", at),
-//                             format!("{}", base_mem),
-//                             format!("{}", reader_mem),
-//                             format!("{}", mem)]);
-//         println!("# base memory @ {}: {}", at, base_mem);
-//         println!("# reader memory @ {}: {}", at, reader_mem);
-//         println!("# materialization memory @ {}: {} (filters: {})", at, mem, filter_mem);
-//     };
-
-//     info!(log, "starting db population");
-//     debug!(log, "getting handles to tables");
-// //        let mut user_profile = g.table("UserProfile").unwrap().into_sync();
-// //        let mut paper = g.table("Paper").unwrap().into_sync();
-// //        let mut coauthor = g.table("PaperCoauthor").unwrap().into_sync();
-// //        let mut version = g.table("PaperVersion").unwrap().into_sync();
-//     let mut review_assignment = g.table("ReviewAssignment").unwrap().into_sync();
-//     let mut review = g.table("Review").unwrap().into_sync();
-// /*        debug!(log, "creating users"; "n" => nusers);
-//     user_profile
-//         .perform_all(authors.iter().enumerate().map(|(i, &email)| {
-//             vec![
-//                 format!("{}", i + 1).into(),
-//                 email.into(),
-//                 email.into(),
-//                 "university".into(),
-//                 "0".into(),
-//                 if i == 0 {
-//                     "chair".into()
-//                 } else if i < nreviewers {
-//                     "pc".into()
-//                 } else {
-//                     "normal".into()
-//                 },
-//             ]
-//         }))
-//         .unwrap();
-//         */
-// /*        debug!(log, "logging in authors"; "n" => alogged);
-//     let mut printi = 0;
-//     let stripe = alogged / 10;
-//     let mut alogin_times = Vec::with_capacity(alogged);
-//     // TODO: Switch to specifying number of logged in authors and reviewers.
-//     for (i, &uid) in authors.iter().take(alogged).enumerate() {
-//         trace!(log, "logging in author"; "uid" => uid, "i" => i);
-//         let user_context: std::collections::HashMap<std::string::String, std::string::String> =
-//             std::iter::once(("id".to_string(), format!("{}", i + 1).into())).collect();
-//         // TODO also have to add info to user profile table??
-//         let start = Instant::now();
-//         // Add user-view nodes to graph (substitute for call to create_universe)
-//         // TODO implication: logging in two users may not be equally expensive.
-//         let _ = g.migrate(move |mig| {
-//             // Author views of PaperList
-//             let papers_ai = mig.add_ingredient(
-//                 format!("PaperList_a{}", i + 1),
-//                 &["author", "paper", "accepted"], // another way to specify col? 
-//                 Filter::new(papers_for_authors,
-//                             &[Some(FilterCondition::Comparison(Operator::Equal, Value::Constant(format!("a{}", i+1).into())))]));
-//             mig.maintain_anonymous(papers_ai, &[0]);
-//         });
-//         let took = start.elapsed();
-//         alogin_times.push(took);
-
-//         if i == printi {
-// //                println!("# login sample[{}]: {:?}", i, alogin_times[i]);
-//             if i == 0 {
-//                 // we want to include both 0 and 1
-//                 printi += 1;
-//             } else if i == 1 {
-//                 // and then go back to every stripe'th sample
-//                 printi = stripe;
-//             } else {
-//                 printi += stripe;
-//             }
-//         }
-//     }
-// */
-//     debug!(log, "logging in reviewers"; "n" => rlogged);
-//     let mut printj = 0;
-//     let stripe = rlogged / 10;
-//     let mut rlogin_times = Vec::with_capacity(rlogged);
-//     for j in 0..rlogged {
-//         let i = j + nauthors;
-//         trace!(log, "logging in reviewer"; "id" => i);
-//         let start = Instant::now();
-
-//         // Construct subgraph for each logged-in reviewer
-//         // TODO: Specify that none of these nodes is materialized.
-//         // USER-SPECIFIC POLICY NODES: 3 filters, 2 projections, union
-//         let (papers_ri_didnt_review, papers_ri_reviewed, ri_filter_for_count) = g.migrate(move |mig| {
-//             let papers_ri_didnt_review = mig.add_ingredient(
-//                 format!("papers_r{}_didn't_review", i + 1),
-//                 &["paper_id", "title", "author", "contact_id", "conflictType",
-//                     "review_id", "reviewer", "reviewer_plaintext", "score"],
-//                 Filter::new(
-//                     p_pc_rw_join,
-//                     &[Some(FilterCondition::Comparison(
-//                         Operator::NotEqual,
-//                         Value::Constant(format!("r{}", i + 1)).into()),
-//                     )]
-//                 ));
-
-//             let papers_ri_reviewed = mig.add_ingredient(
-//                 format!("papers_r{}_reviewed", i + 1),
-//                 &["paper_id", "title", "author", "contact_id", "conflictType",
-//                     "review_id", "reviewer", "reviewer_plaintext", "score"],
-//                 Filter::new(
-//                     p_pc_rw_join,
-//                     &[Some(FilterCondition::Comparison(
-//                         Operator::Equal,
-//                         Value::Constant(format!("r{}", i + 1)).into()),
-//                     )]
-//                 ));
-
-//             let ri_filter_for_count = mig.add_ingredient(
-//                 format!("r{}_filter_for_count", i + 1),
-//                 &["paper_id", "review_id", "reviewer", "score"],
-//                 Filter::new(
-//                     paper_review,
-//                     &[Some(FilterCondition::Comparison(
-//                         Operator::Equal,
-//                         Value::Constant(format!("r{}", i + 1)).into()),
-//                     )]
-//                 ));
-//             (papers_ri_didnt_review, papers_ri_reviewed, ri_filter_for_count)
-//         });
-
-//         let (no_plaintext_ri, no_rewrite_ri) = g.migrate(move |mig| {
-//             let no_plaintext_ri = mig.add_ingredient(
-//                 format!("remove_plaintext_r{}", i + 1),
-//                 &["paper_id", "title", "author", "contact_id", "conflictType",
-//                     "review_id", "reviewer", "score"],
-//                 Project::new(
-//                     papers_ri_didnt_review,
-//                     &[0, 1, 2, 3, 4, 5, 6, 8], // emit
-//                     None, // additional
-//                     None, // expressions
-//                 ));
-            
-//             let no_rewrite_ri = mig.add_ingredient(
-//                 format!("remove_rewritten_r{}", i + 1),
-//                 &["paper_id", "title", "author", "contact_id", "conflictType",
-//                     "review_id", "reviewer_plaintext", "score"],
-//                 Project::new(
-//                     papers_ri_didnt_review,
-//                     &[0, 1, 2, 3, 4, 5, 7, 8], // emit
-//                     None, // additional
-//                     None, // expressions
-//                 ));
-
-//             (no_plaintext_ri, no_rewrite_ri)
-//         });
-
-//         // Union and USER-SPECIFIC QUERY NODES: Count, Join
-//         let (count_ri, union_ri) = g.migrate(move |mig| {
-//             let count_ri = mig.add_ingredient(
-//                 format!("count_r{}", i + 1),
-//                 &["paper_id", "count"],
-//                 Aggregation::COUNT.over(
-//                     ri_filter_for_count,
-//                     0,
-//                     &[1]
-//                 ));
-
-//             let mut emits = HashMap::new();
-//             emits.insert(no_plaintext_ri, vec![0, 1, 2, 3, 4, 5, 6, 7]); // TODO
-//             emits.insert(no_rewrite_ri, vec![0, 1, 2, 3, 4, 5, 6, 7]); // TODO
-//             let union_ri = mig.add_ingredient(
-//                 format!("union_r{}", i + 1),
-//                 &["paper_id", "title", "author", "contact_id",
-//                     "conflictType", "review_id", "reviewer",
-//                     "reviewer_plaintext", "score"], // TODO
-//                 Union::new(emits));
-//             (count_ri, union_ri)
-//         });
-
-//         let join_ri = g.migrate(move |mig| {
-//             let join_ri = mig.add_ingredient(
-//                 format!("join_r{}", i + 1),
-//                 &["paper_id", "title", "author", "contact_id",
-//                     "conflictType", "review_id", "reviewer",
-//                     "reviewer_plaintext", "score", "count"],
-//                 Join::new(
-//                     union_ri,
-//                     count_ri,
-//                     JoinType::Left,
-//                     vec![B(0), L(1), L(2), L(3), L(4), L(5),
-//                             L(6), L(7), R(1)],
-//                 ));
-//             mig.maintain_anonymous(join_ri, &[0]);
-//             join_ri
-//         });
-        
-//         let took = start.elapsed();
-//         rlogin_times.push(took);
-
-//         if j == printj {
-// //                println!("# rlogin sample[{}]: {:?} (id: {})", j, rlogin_times[j], i);
-//             if j == 0 {
-//                 // we want to include both 0 and 1
-//                 printj += 1;
-//             } else if j == 1 {
-//                 // and then go back to every stripe'th sample
-//                 printj = stripe;
-//             } else {
-//                 printj += stripe;
-//             }
-//         }
-//     }
-
-//         // For debugging: print graph
-//     println!("{}", g.graphviz().unwrap());
-
-// /*        
-//     debug!(log, "registering papers");
-//     let start = Instant::now();
-// //        println!("author fmt for paper: {}", papers[0].authors[0] + 1);
-//     // Paper cols: ["paper","author","accepted"]
-//     paper
-//         .perform_all(papers.iter().enumerate().map(|(i, p)| {
-//             vec![
-//                 (i + 1).into(),
-//                 format!("a{}", p.authors[0] + 1).into(),
-//                 if p.accepted { 1 } else { 0 }.into(),
-//             ]
-//         }))
-//         .unwrap();
-//     println!(
-//         "# paper registration: {} in {:?}",
-//         papers.len(),
-//         start.elapsed()
-//     );
-//     debug!(log, "registering paper authors");
-//     let start = Instant::now();
-//     let mut npauthors = 0;
-//     // PaperCoauthor cols: ["paper","author", "paper,author"]
-// /*        let coauth_rows: Vec<Vec<DataType>> = papers.iter().enumerate().flat_map(|(i, p)| {
-//             // XXX: should first author be repeated here? Yes!
-//             // TODO: there may be a mismatch between using author names vs ids?
-//             npauthors += p.authors.len();
-//             p.authors
-//                 .iter()
-//                 .map(move |&a| vec![(i+1).into(), format!("a{}", a + 1).into(),
-//                                     format!("{},{}", i + 1, a + 1).into()])}).collect();
-//     println!("coauth rows: {:?}", coauth_rows);*/
-//     coauthor
-//         .perform_all(papers.iter().enumerate().flat_map(|(i, p)| {
-//             // XXX: should first author be repeated here? Yes!
-//             // TODO: there may be a mismatch between using author names vs ids?
-//             npauthors += p.authors.len();
-//             p.authors
-//                 .iter()
-//                 .map(move |&a| vec![(i + 1).into(), format!("a{}", a + 1).into(),
-//                 format!("{},{}", i + 1, a + 1).into()])
-//         }))
-//         .unwrap();
-//     println!("# paper authors: {} in {:?}", npauthors, start.elapsed());
-// */
-//     debug!(log, "registering reviews");
-//     reviews.shuffle(&mut rng);
-// //        println!("reviews: {:?}", reviews);
-
-//     // assume all reviews have been submitted
-//     trace!(log, "register assignments");
-//     let start = Instant::now();
-//     // ReviewAssignment cols: ["paper", "reviewer", "paper,reviewer"]
-// /*        let reva_rows: Vec<Vec<std::string::String>> = reviews
-//                 .chunks(PAPERS_PER_REVIEWER)
-//                 .enumerate()
-//                 .flat_map(|(i, rs)| {
-//                     // Reviewer user IDs start after author user IDs
-//                     rs.iter().map(move |r| {
-//                         vec![format!("{}", r.paper),
-//                                 format!("r{}", i + nauthors + 1),
-//                                 format!("{},{}", r.paper, i + nauthors + 1)]
-//                     })
-//                 }).collect();
-//     println!("reva_rows: {:?}", reva_rows);*/
-//     review_assignment
-//         .perform_all(
-//             reviews
-//                 .chunks(PAPERS_PER_REVIEWER)
-//                 .enumerate()
-//                 .flat_map(|(i, rs)| {
-//                     // Reviewer user IDs start after author user IDs
-//                     rs.iter().map(move |r| {
-//                         vec![r.paper.into(), format!("r{}", i + nauthors + 1).into(),
-//                         format!("{},{}", r.paper, i + nauthors + 1).into()]
-//                     })
-//                 }),
-//         )
-//         .unwrap();
-//     println!(
-//         "# review assignments: {} in {:?}",
-//         reviews.len(),
-//         start.elapsed()
-//     );
-//     trace!(log, "register the actual reviews");
-//     let start = Instant::now();
-//     // Review cols: ["paper", "reviewer", "contents", "paper,reviewer"],
-//     // TODO: first and last paper assigned to a reviewer are the same?
-// /*        let reviews_rows: Vec<Vec<std::string::String>> = reviews
-//                 .chunks(PAPERS_PER_REVIEWER)
-//                 .enumerate()
-//                 .flat_map(|(i, rs)| {
-//                     rs.iter().map(move |r| {
-//                         vec![
-//                             format!("{}", r.paper),
-//                             format!("r{}", i + nauthors + 1),
-//                             format!("{}", "review text"),
-//                             format!("{},{}", r.paper, i + nauthors + 1),
-//                         ]
-//                     })
-//                 }).collect();
-//     println!("Reviews: {:?}", reviews_rows);*/
-//     review
-//         .perform_all(
-//             reviews
-//                 .chunks(PAPERS_PER_REVIEWER)
-//                 .enumerate()
-//                 .flat_map(|(i, rs)| {
-//                     rs.iter().map(move |r| {
-//                         vec![
-//                             r.paper.into(),
-//                             format!("r{}", i + nauthors + 1).into(),
-//                             "review text".into(),
-//                             format!("{},{}", r.paper, i + nauthors + 1).into(),
-//                             5.into(),
-//                             5.into(),
-//                             5.into(),
-//                             7.into(),
-//                         ]
-//                     })
-//                 }),
-//         )
-//         .unwrap();
-//     println!("# reviews: {} in {:?}", reviews.len(), start.elapsed());
-//     debug!(log, "population completed");
-//     memstats(&mut g, "populated");
-
-//     if let Some(gloc) = args.value_of("graph") {
-//         debug!(log, "extracing query graph");
-//         let gv = g.graphviz().expect("failed to read graphviz");
-//         std::fs::write(gloc, gv).expect("failed to save graphviz output");
-//     }
-
-//     info!(log, "creating api handles");
-//     debug!(log, "creating view handles for paper list");
-//     let mut paper_list: HashMap<_, _> = (nauthors..(nauthors+rlogged))
-//         .map(|uid| {
-//             trace!(log, "creating ReviewList handle for user"; "uid" => uid);
-//             (
-//                 uid,
-//                 g.view(format!("ReviewList_r{}", uid + 1))
-//                     .unwrap()
-//                     .into_sync(),
-//             )
-//         })
-//         .collect();
-//     debug!(log, "all api handles created");
-
-//     println!("# setup time: {:?}", init.elapsed());
-
-//     // now time to measure the cost of different operations
-//     // TODO: Also time ReviewList reads.
-//     info!(log, "starting cold read benchmarks");
-//     debug!(log, "cold reads of paper list");
-//     let mut requests = Vec::new();
-//     'pl_outer: for uid in nauthors..(nauthors+rlogged) {
-//         trace!(log, "reading paper list"; "uid" => uid);
-//         requests.push((Operation::ReadPaperList, uid));
-//         let begin = Instant::now();
-//         paper_list
-//             .get_mut(&uid)
-//             .unwrap()
-//             .lookup(&[format!("r{}", uid + 1).into()], true)
-//             .unwrap();
-//         // TODO set up tables to make this a bogokey lookup
-// //            println!("PaperList_a{} lookup on a{}: {:?}", uid + 1, uid + 1, result);
-//         let took = begin.elapsed();
-
-//         // NOTE: do we want a warm-up period/drop first sample per uid?
-//         // trace!(log, "dropping sample during warm-up"; "at" => ?start.elapsed(), "took" => ?took);
-
-//         trace!(log, "recording sample"; "took" => ?took);
-//         cold_stats
-//             .entry(Operation::ReadPaperList)
-//             .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-//             .saturating_record(took.as_micros() as u64);
-//     }
-
-//     info!(log, "starting warm read benchmarks");
-//     for (op, uid) in requests {
-//         match op {
-//             Operation::ReadPaperList => {
-//                 trace!(log, "reading paper list"; "uid" => uid);
-//             }
-//         }
-
-//         let begin = Instant::now();
-//         match op {
-//             Operation::ReadPaperList => {
-//                 paper_list
-//                     .get_mut(&uid)
-//                     .unwrap()
-//                     .lookup(&[0.into(/* bogokey */)], true)
-//                     .unwrap();
-//             }
-//         }
-//         let took = begin.elapsed();
-
-//         // NOTE: no warm-up for "warm" reads
-
-//         trace!(log, "recording sample"; "took" => ?took);
-//         warm_stats
-//             .entry(op)
-//             .or_insert_with(|| Histogram::<u64>::new_with_bounds(10, 1_000_000, 4).unwrap())
-//             .saturating_record(took.as_micros() as u64);
-//     }
-
-//     info!(log, "measuring space overhead");
-//     // NOTE: we have already done all possible reads, so no need to do "filling" reads
-//     memstats(&mut g, "end");
-//     wtr.flush();
-//     thread::sleep(Duration::from_millis(1000));        
-
-
-
-
-
-
-
-
-
-    // println!("# op\tphase\tpct\ttime");
-    // for &q in &[50, 95, 99, 100] {
-    //     for &heat in &["cold", "warm"] {
-    //         let stats = match heat {
-    //             "cold" => &cold_stats,
-    //             "warm" => &warm_stats,
-    //             _ => unreachable!(),
-    //         };
-    //         let mut keys: Vec<_> = stats.keys().collect();
-    //         keys.sort();
-    //         for op in keys {
-    //             let stats = &stats[op];
-    //             if q == 100 {
-    //                 println!("{}\t{}\t100\t{:.2}\tµs", op, heat, stats.max());
+    //     let mut reader_mem = 0;
+    //     let mut base_mem = 0;
+    //     let mut mem = 0;
+    //     let stats = g.statistics().await.unwrap();
+    //     let mut filter_mem = 0;
+    //     for (_, nstats) in stats.values() {
+    //         for nstat in nstats.values() {
+    //             println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
+    //             if nstat.desc == "B" {
+    //                 base_mem += nstat.mem_size;
+    //             } else if nstat.desc == "reader node" {
+    //                 reader_mem += nstat.mem_size;
     //             } else {
-    //                 println!(
-    //                     "{}\t{}\t{}\t{:.2}\tµs",
-    //                     op,
-    //                     heat,
-    //                     q,
-    //                     stats.value_at_quantile(q as f64 / 100.0)
-    //                 );
+    //                 mem += nstat.mem_size;
+    //                 if nstat.desc.contains("f0") {
+    //                     filter_mem += nstat.mem_size;
+    //                 }
     //             }
     //         }
     //     }
-    // }
-    // thread::sleep(Duration::from_millis(1000));
+    //     wtr.write_record(&[format!("{}", loggedf),
+    //                         format!("{}", npapers),
+    //                         format!("{}", nauthors),
+    //                         format!("{}", nreviewers),
+    //                         format!("{}", at),
+    //                         format!("{}", base_mem),
+    //                         format!("{}", reader_mem),
+    //                         format!("{}", mem)]);
+    //     println!("# base memory @ {}: {}", at, base_mem);
+    //     println!("# reader memory @ {}: {}", at, reader_mem);
+    //     println!("# materialization memory @ {}: {} (filters: {})", at, mem, filter_mem);
+    // };
+    
+    // let mut user_profile = backend.g.table("UserProfile").await.unwrap();
+    let mut paper = backend.g.table("Paper").await.unwrap();
+    // let mut review_assignment = backend.g.table("ReviewAssignment").await.unwrap();
+    let mut review = backend.g.table("PaperReview").await.unwrap();
+
+    reviews.shuffle(&mut rng);
+
+    let start = Instant::now();
+
+    // review_assignment.perform_all(
+    //     reviews
+    //         .chunks(PAPERS_PER_REVIEWER)
+    //         .enumerate()
+    //         .flat_map(|(i, rs)| {
+    //             // Reviewer user IDs start after author user IDs
+    //             rs.iter().map(move |r| {
+    //                 vec![r.paper.into(), format!("r{}", i + nauthors + 1).into(),
+    //                 format!("{},{}", r.paper, i + nauthors + 1).into()]
+    //             })
+    //         }),
+    // ).await
+    // .unwrap();
+
+    // println!(
+    //     "# review assignments: {} in {:?}",
+    //     reviews.len(),
+    //     start.elapsed()
+    //     );
+    
+    let start = Instant::now();
+    
+    review
+        .perform_all(
+            reviews
+                .chunks(PAPERS_PER_REVIEWER)
+                .enumerate()
+                .flat_map(|(i, rs)| {
+                    rs.iter().map(move |r| {
+                        vec![
+                            r.paper.into(),
+                            format!("r{}", i + nauthors + 1).into(),
+                            "review text".into(),
+                            format!("{},{}", r.paper, i + nauthors + 1).into(),
+                            5.into(),
+                            5.into(),
+                            5.into(),
+                            7.into(),
+                        ]
+                    })
+                }),
+        )
+        .await.unwrap();
+    
+    println!("# reviews: {} in {:?}", reviews.len(), start.elapsed());
+
+    // memstats(&mut backend.g, "populated");
+
+    let mut paper_list: HashMap<_, _> = (nauthors..(nauthors+rlogged))
+        .map(|uid| {
+            trace!(log, "creating ReviewList handle for user"; "uid" => uid);
+            (
+                uid,
+                backend.g.view(&format!("ReviewList_r{}", uid + 1)),
+            )
+        }).collect();
+    debug!(log, "all api handles created");
+
+    println!("# setup time: {:?}", init.elapsed());
+
 }
