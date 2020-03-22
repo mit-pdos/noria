@@ -8,14 +8,16 @@ use slog::{crit, debug, error, info, o, trace, warn, Logger};
 use std::collections::{HashMap, HashSet};
 use std::time::{Instant, Duration};
 use std::thread;
+use std::error::Error;
 use noria::{DurabilityMode, PersistenceParameters, DataType};
 use noria::manual::Base;
 use noria::manual::ops::join::JoinSource::*;
 use noria::manual::ops::join::{Join, JoinType};
 use noria::manual::ops::union::Union;
 use noria::manual::ops::rewrite::Rewrite;
-use noria::manual::ops::filter::{Filter, FilterCondition, Value};    
-use noria::manual::ops::grouped::aggregate::Aggregate::COUNT;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+use noria::manual::ops::filter::{Filter, FilterCondition, Value};   
+use noria::manual::ops::grouped::aggregate::Aggregation;  
+// use noria::manual::ops::grouped::aggregate::Aggregate::COUNT;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
 use nom_sql::Operator;
 
 const PAPERS_PER_REVIEWER: usize = 3;
@@ -47,7 +49,10 @@ struct Review {
     
 }
 
-fn main() {
+
+#[tokio::main]
+async fn main() {
+    println!("here1");
     use clap::{App, Arg};
     let args = App::new("manualgraph")
         .version("0.1")
@@ -120,6 +125,8 @@ fn main() {
     };
     let mut rng = rand::thread_rng();
 
+    println!("here2");
+
     let conf = source
         .query_pairs()
         .find(|(arg, _)| arg == "id")
@@ -154,6 +161,10 @@ fn main() {
             url::percent_encoding::DEFAULT_ENCODE_SET
         )
     );
+
+
+    println!("here3"); 
+
     debug!(log, "fetching list of accepted papers"; "url" => &url);
     let accept = reqwest::get(&url)
         .expect("failed to fetch accepted list")
@@ -183,6 +194,9 @@ fn main() {
             accepted.insert(id);
         }
     }
+
+    println!("here4"); 
+
     let mut author_set = HashMap::new();
     let mut authors = Vec::new();
     let mut papers = Vec::new();
@@ -274,6 +288,8 @@ fn main() {
             trace!(log, "adding review"; "rating" => r.rating, "confidence" => r.confidence);
             reviews.push(r);
         }
+        println!("breaking out of loop"); 
+        break; 
     }
 
     drop(author_set);
@@ -314,6 +330,7 @@ fn main() {
    
 
     info!(log, "starting up noria"; "loggedf" => loggedf);
+    println!("starting noria!"); 
     
     debug!(log, "configuring noria");
     let mut g = Builder::default();
@@ -351,226 +368,157 @@ fn main() {
     ));
     
     debug!(log, "spinning up");
-    // let mut g = g.start_local().await.unwrap(); 
-    // debug!(log, "noria ready");
+    let mut g = g.start_local().await.unwrap().0; 
+    debug!(log, "noria ready");
+    
+    println!("started local"); 
 
-    // let init = Instant::now();
-    // thread::sleep(Duration::from_millis(2000));
+    let init = Instant::now();
+    thread::sleep(Duration::from_millis(2000));
 
-    // let (paper, paper_reviews, paper_conflict) = g.migrate(|mig| {
-    //     let paper = mig.add_base("Paper", &["paperId", "leadContactId", "authorInformation"], Base::default());
-    //     let paper_reviews = mig.add_base("PaperReview", &["paperId", "reviewId", "contactId", "reviewSubmitted"], Base::default());
-    //     let paper_conflict = mig.add_base("PaperConflict", &["paperId", "contactId"], Base::default());
+    let (paper, paper_reviews, paper_conflict) = g.migrate(|mig| {
+        let paper = mig.add_base("Paper", &["paperId", "leadContactId", "authorInformation"], Base::default());
+        let paper_reviews = mig.add_base("PaperReview", &["paperId", "reviewId", "contactId", "reviewSubmitted"], Base::default());
+        let paper_conflict = mig.add_base("PaperConflict", &["paperId", "contactId"], Base::default());
     
-    //     (paper, paper_reviews, paper_conflict)
-    // }).wait().unwrap();
+        (paper, paper_reviews, paper_conflict)
+    }).await;
     
-    // let uid = 4; // why not
+    let uid : usize = 4; // why not
     
-    // let my_conflicts = g.migrate(move |mig| {
-    //     let my_conflicts = mig.add_ingredient(
-    //         "MyConflicts",
-    //         &["paperId", "contactId"],
-    //         Filter::new(paper_conflict,
-    //                     &[None, 
-    //                       Some(FilterCondition::Comparison(
-    //                            Operator::Equal,
-    //                            Value::Constant(uid.into())))]
-    //         ));
-    //     my_conflicts 
-    // }).wait().unwrap();
+    let my_conflicts = g.migrate(move |mig| {
+        let my_conflicts = mig.add_ingredient(
+            "MyConflicts",
+            &["paperId", "contactId"],
+            Filter::new(paper_conflict,
+                        &[(1, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))]));
+        my_conflicts 
+    }).await;
     
-    // let (my_submitted_reviews0, my_submitted_reviews) = g.migrate(move |mig| {
-    //     let my_submitted_reviews0 = mig.add_ingredient(
-    //         "MySubmittedReviews0",
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"],
-    //         Filter::new(paper_reviews, 
-    //                     &[None, None, Some(FilterCondition::Comparison(
-    //                     Operator::Equal,
-    //                     Value::Constant(uid.into()))), None]
-    //         ));
+    println!("mig1"); 
+
+    let (my_submitted_reviews0, my_submitted_reviews) = g.migrate(move |mig| {
+        let my_submitted_reviews0 = mig.add_ingredient(
+            "MySubmittedReviews0",
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"],
+            Filter::new(paper_reviews, 
+                        &[(2, FilterCondition::Comparison(
+                        Operator::Equal,
+                        Value::Constant(uid.into())))]
+            ));
     
-    //     let my_submitted_reviews = mig.add_ingredient(
-    //         "MySubmittedReviews",
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"],
-    //         Filter::new(my_submitted_reviews0, 
-    //                     &[None, None, None, 
-    //                     Some(FilterCondition::Comparison(
-    //                     Operator::Equal,
-    //                     Value::Constant(true.into())))]
-    //         ));
+        let my_submitted_reviews = mig.add_ingredient(
+            "MySubmittedReviews",
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"],
+            Filter::new(my_submitted_reviews0, 
+                        &[(3, FilterCondition::Comparison(
+                        Operator::Equal,
+                        Value::Constant(1.into())))])); // TODO this should be true 
             
-    //     (my_submitted_reviews0, my_submitted_reviews)
-    // }).wait().unwrap();
+        (my_submitted_reviews0, my_submitted_reviews)
+    }).await; 
+
+    println!("mig2"); 
+
+    let (unconflicted_papers, unconflicted_papers0, 
+        unconflicted_paper_reviews, unconflicted_paper_reviews0) = g.migrate(move |mig| {
+        let unconflicted_papers0 = mig.add_ingredient(
+            "UnconflictedPapers0",
+            &["paperId", "leadContactId", "authorInformation", "contactId"],
+            Join::new(paper, my_conflicts, JoinType::Left, vec![B(0, 0), L(1), L(2), R(1)])
+        ); 
     
-    // let (unconflicted_papers, unconflicted_papers0, 
-    //     unconflicted_paper_reviews, unconflicted_paper_reviews0) = g.migrate(move |mig| {
-    //     let unconflicted_papers0 = mig.add_ingredient(
-    //         "UnconflictedPapers0",
-    //         &["paperId", "leadContactId", "authorInformation", "contactId"],
-    //         Join::new(paper, my_conflicts, JoinType::Left, vec![B(0, 0), L(0), R(0)])
-    //     );
+        let unconflicted_papers = mig.add_ingredient(
+            "UnconflictedPapers", 
+            &["paperId", "leadContactId", "authorInformation", "contactId"], 
+            Filter::new(unconflicted_papers0, 
+                &[(3, FilterCondition::Comparison(
+                Operator::NotEqual,
+                Value::Constant(0.into())))]));  // TODO this should be None
     
-    //     let unconflicted_papers = mig.add_ingredient(
-    //         "UnconflictedPapers", 
-    //         &["paperId", "leadContactId", "authorInformation", "contactId"], 
-    //         Filter::new(unconflicted_papers0, 
-    //             &[None, None, None, Some(FilterCondition::Comparison(
-    //             Operator::NotEqual,
-    //             Value::Constant(None.into())))]
-    //     )); 
+        let unconflicted_paper_reviews0 = mig.add_ingredient(
+            "UnconflictedPaperReviews0",
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"],
+            Join::new(paper_reviews, my_conflicts, JoinType::Left, vec![B(0, 0), L(1), L(2), L(3)])
+        );
     
-    //     let unconflicted_paper_reviews0 = mig.add_ingredient(
-    //         "UnconflictedPaperReviews0",
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"],
-    //         Join::new(paper_reviews, my_conflicts, JoinType::Left, vec![B(0, 0), L(0), R(0)])
-    //     );
+        let unconflicted_paper_reviews = mig.add_ingredient(
+            "UnconflictedPaperReviews", 
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
+            Filter::new(unconflicted_paper_reviews0, 
+                &[(3, FilterCondition::Comparison(
+                Operator::NotEqual,
+                Value::Constant(0.into())))] // TODO this should be None
+        )); 
     
-    //     let unconflicted_paper_reviews = mig.add_ingredient(
-    //         "UnconflictedPaperReviews", 
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
-    //         Filter::new(unconflicted_paper_reviews0, 
-    //             &[None, None, None, Some(FilterCondition::Comparison(
-    //             Operator::NotEqual,
-    //             Value::Constant(None.into())))]
-    //     )); 
+        (unconflicted_papers, unconflicted_papers0, unconflicted_paper_reviews, unconflicted_paper_reviews0) 
+    }).await; 
+
+    println!("mig3"); 
     
-    //     (unconflicted_papers, unconflicted_papers0, unconflicted_paper_reviews, unconflicted_paper_reviews0) 
-    // }).wait().unwrap(); 
+    let (visible_reviews, visible_reviews_anonymized) = g.migrate(move |mig| {
+        let visible_reviews = mig.add_ingredient(
+            "VisibleReviews",
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"],
+            Join::new(unconflicted_paper_reviews, 
+                      my_submitted_reviews, 
+                      JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3)])
+        );
     
+        let visible_reviews_anonymized = mig.add_ingredient(
+            "VisibleReviewsAnonymized", 
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
+            Rewrite::new(visible_reviews, visible_reviews, 3, "Anonymous".into(), 0) // TODO ensure signal key is correct. 
+        ); 
     
-    // let (visible_reviews, visible_reviews_anonymized) = g.migrate(move |mig| {
-    //     let visible_reviews = mig.add_ingredient(
-    //         "VisibleReviews",
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"],
-    //         Join::new(unconflicted_paper_reviews, 
-    //                   my_submitted_reviews, 
-    //                   JoinType::Inner, vec![B(0, 0), L(0), R(0)])
-    //     );
+        (visible_reviews, visible_reviews_anonymized)
+    }).await; 
+
+    println!("mig4"); 
+
+    let (paper_paper_review0, paper_paper_review) = g.migrate(move |mig| {
+        let paper_paper_review0 = mig.add_ingredient(
+            "Paper_PaperReview0",
+            &["paperId", "leadContactId", "authorInformation", "reviewId", "contactId", "reviewSubmitted"],
+            Join::new(unconflicted_papers, 
+                      visible_reviews_anonymized, 
+                      JoinType::Left, vec![B(0, 0), L(1), L(2), R(1), R(2), R(3)])
+        );
     
-    //     let visible_reviews_anonymized = mig.add_ingredient(
-    //         "VisibleReviewsAnonymized", 
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
-    //         Rewrite::new(visible_reviews, visible_reviews, 3, "Anonymous".into(), 0) // TODO ensure signal key is correct. 
-    //     ); 
+        let paper_paper_review = mig.add_ingredient(
+            "Paper_PaperReview", 
+            &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
+            Filter::new(paper_paper_review0, 
+                &[(2, FilterCondition::Comparison(
+                Operator::Equal,
+                Value::Constant(uid.into())))]
+        )); 
     
-    //     (visible_reviews, visible_reviews_anonymized)
-    // }).wait().unwrap(); 
+        (paper_paper_review0, paper_paper_review)
+    }).await; 
+
+
+    println!("mig5"); 
+
     
-    // let (paper_paper_review0, paper_paper_review) = g.migrate(move |mig| {
-    //     let paper_paper_review0 = mig.add_ingredient(
-    //         "Paper_PaperReview0",
-    //         &["paperId", "leadContactId", "authorInformation", "reviewId", "contactId", "reviewSubmitted"],
-    //         Join::new(unconflicted_papers, 
-    //                   visible_reviews_anonymized, 
-    //                   JoinType::Left, vec![B(0, 0), L(0), R(0)])
-    //     );
+    let (r_submitted, final_node) = g.migrate(move |mig| {
+        let r_submitted = mig.add_ingredient(
+            "R_submitted", 
+            &["paperId"], 
+            Aggregation::COUNT.over(visible_reviews_anonymized, 3, &[0]) // TODO i think this is wrong 
+        ); 
     
-    //     let paper_paper_review = mig.add_ingredient(
-    //         "Paper_PaperReview", 
-    //         &["paperId", "reviewId", "contactId", "reviewSubmitted"], 
-    //         Filter::new(paper_paper_reviews0, 
-    //             &[None, None, Some(FilterCondition::Comparison(
-    //             Operator::Equal,
-    //             Value::Constant(uid.into()))), None]
-    //     )); 
-    
-    //     (paper_paper_review0, paper_paper_review)
-    // }).wait().unwrap(); 
-    
-    // let (r_submitted, final_node) = g.migrate(move |mig| {
-    //     let r_submitted = mig.add_ingredient(
-    //         "R_submitted", 
-    //         &["paperId"], 
-    //         Aggregation::COUNT.over(visible_reviews_anonymized, 3, &[0]) // TODO i think this is wrong 
-    //     ); 
-    
-    //     let final_node = mig.add_ingredient(
-    //         "Final",
-    //         &["paperId", "leadContactId", "authorInformation", "reviewId", "contactId", "reviewSubmitted"],
-    //         Join::new(paper_paper_review, 
-    //                   r_submitted, 
-    //                   JoinType::Left, vec![B(0, 0), L(0), R(0)])
-    //     );
-    //     (r_submitted, final_node)
-    // }).wait().unwrap(); 
+        let final_node = mig.add_ingredient(
+            "Final",
+            &["paperId", "authorInformation", "reviewId", "contactId", "reviewSubmitted"],
+            Join::new(paper_paper_review, 
+                      r_submitted, 
+                      JoinType::Left, vec![B(0, 0), L(2), L(3), L(4), L(5), R(1)])
+        );
+        (r_submitted, final_node)
+    }).await; 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // Manual Graph Construction
-    // BASE TABLES: Paper, PaperContext, PaperReview
-//     let (paper, paper_context, paper_reviews) = g.migrate(|mig| {
-//         let paper = mig.add_base(
-//             "Paper",
-//             &["paper_id", "title", "author"],
-//             Base::new(vec![]).with_key(vec![0]));
-//         let paper_context = mig.add_base(
-//             "PaperContext",
-//             &["paper_id", "contact_id", "conflict_type", "paper_id,contact_id"],
-//             Base::new(vec![]).with_key(vec![3]));
-//         let paper_review = mig.add_base(
-//             "PaperReview",
-//             &["paper_id", "review_id", "reviewer", "reviewer_plaintext",
-//                 "score", "paper_id,review_id"],
-//             Base::new(vec![]).with_key(vec![5]));
-//         (paper, paper_context, paper_review)
-//     });
-
-//     // GLOBAL POLICY NODES: Rw
-//     let rewrite = g.migrate(move |mig| {
-//         let rewrite = mig.add_ingredient(
-//             "reviewer_rewrite",
-//             &["paper_id", "review_id", "reviewer", "reviewer_plaintext",
-//                 "score", "paper_id,review_id"],
-//             Rewrite::new(
-//                 paper_review,
-//                 paper_review,
-//                 2 as usize,
-//                 "anonymous".into(),
-//                 0 as usize));
-//         rewrite
-//     });
-
-//     // GLOBAL QUERY NODES: Join_Paper_PaperConflict (JPPC), Join_JPPC_Rw
-//     let p_pc_join = g.migrate(move |mig| {
-//         let p_pc_join = mig.add_ingredient(
-//             "Join_Paper_PaperConflict",
-//             &["paper_id", "title", "author", "contact_id", "conflictType"],
-//             Join::new(
-//                 paper,
-//                 paper_conflict,
-//                 JoinType::Left,
-//                 vec![B(0), L(1), L(2), R(1), R(2)],
-//             ));
-//         p_pc_join
-//     });
-
-//     let p_pc_rw_join = g.migrate(move |mig| {
-//         let p_pc_rw_join = mig.add_ingredient(
-//             "Join_Paper_PaperConflict_PaperReviewRw",
-//             &["paper_id", "title", "author", "contact_id", "conflictType",
-//                 "review_id", "reviewer", "reviewer_plaintext", "score"],
-//             Join::new(
-//                 p_pc_join,
-//                 rewrite,
-//                 JoinType::Left, 
-//                 vec![B(0), L(1), L(2), L(3), L(4), R(1), R(2), R(3), R(4)],
-//             ));
-//         p_pc_rw_join
-//     });
-    
 //     // Graph construction complete; Collect memory stats
 //     let mut memstats = |g: &mut noria::SyncHandle<_>, at| {
 //         if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
@@ -1034,33 +982,40 @@ fn main() {
 //     memstats(&mut g, "end");
 //     wtr.flush();
 //     thread::sleep(Duration::from_millis(1000));        
-// }
 
-// println!("# op\tphase\tpct\ttime");
-// for &q in &[50, 95, 99, 100] {
-//     for &heat in &["cold", "warm"] {
-//         let stats = match heat {
-//             "cold" => &cold_stats,
-//             "warm" => &warm_stats,
-//             _ => unreachable!(),
-//         };
-//         let mut keys: Vec<_> = stats.keys().collect();
-//         keys.sort();
-//         for op in keys {
-//             let stats = &stats[op];
-//             if q == 100 {
-//                 println!("{}\t{}\t100\t{:.2}\tµs", op, heat, stats.max());
-//             } else {
-//                 println!(
-//                     "{}\t{}\t{}\t{:.2}\tµs",
-//                     op,
-//                     heat,
-//                     q,
-//                     stats.value_at_quantile(q as f64 / 100.0)
-//                 );
-//             }
-//         }
-//     }
-// }
-// thread::sleep(Duration::from_millis(1000));
+
+
+
+
+
+
+
+
+    // println!("# op\tphase\tpct\ttime");
+    // for &q in &[50, 95, 99, 100] {
+    //     for &heat in &["cold", "warm"] {
+    //         let stats = match heat {
+    //             "cold" => &cold_stats,
+    //             "warm" => &warm_stats,
+    //             _ => unreachable!(),
+    //         };
+    //         let mut keys: Vec<_> = stats.keys().collect();
+    //         keys.sort();
+    //         for op in keys {
+    //             let stats = &stats[op];
+    //             if q == 100 {
+    //                 println!("{}\t{}\t100\t{:.2}\tµs", op, heat, stats.max());
+    //             } else {
+    //                 println!(
+    //                     "{}\t{}\t{}\t{:.2}\tµs",
+    //                     op,
+    //                     heat,
+    //                     q,
+    //                     stats.value_at_quantile(q as f64 / 100.0)
+    //                 );
+    //             }
+    //         }
+    //     }
+    // }
+    // thread::sleep(Duration::from_millis(1000));
 }
