@@ -20,6 +20,7 @@ use noria::manual::ops::grouped::aggregate::Aggregation;
 use nom_sql::Operator;
 use noria::{Builder, Handle, LocalAuthority};
 use std::future::Future;
+use rand::prelude::*;
 
 
 const PAPERS_PER_REVIEWER: usize = 3;
@@ -57,26 +58,37 @@ pub struct Backend {
     done: Box<dyn Future<Output = ()> + Unpin>,
 }
 
-async fn make() -> Box<Backend> {
-    let mut b = Builder::default();
-  
-    b.set_sharding(None);
 
-    b.set_persistence(PersistenceParameters::new(
-        DurabilityMode::MemoryOnly,
-        Duration::from_millis(1),
-        Some(String::from("manual_policy_graph")),
-        1,
-    ));
+impl Backend {
+    async fn make() -> Box<Backend> {
+        let mut b = Builder::default();
+      
+        b.set_sharding(None);
     
-    let (g, done) = b.start_local().await.unwrap();
+        b.set_persistence(PersistenceParameters::new(
+            DurabilityMode::MemoryOnly,
+            Duration::from_millis(1),
+            Some(String::from("manual_policy_graph")),
+            1,
+        ));
+        
+        let (g, done) = b.start_local().await.unwrap();
+        
+        let reuse = true; 
     
-    let reuse = true; 
+        Box::new(Backend {
+            g,
+            done: Box::new(done),
+        })
+    }
 
-    Box::new(Backend {
-        g,
-        done: Box::new(done),
-    })
+    pub async fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
+        let mut mutator = self.g.table(name).await.unwrap();
+
+        let i = records.len();
+        mutator.perform_all(records).await.unwrap();
+        i
+    }
 }
 
 
@@ -125,9 +137,8 @@ async fn make() -> Box<Backend> {
 
 #[tokio::main]
 async fn main() {
-    println!("here1");
     use clap::{App, Arg};
-    let args = App::new("manualgraph")
+    let args = App::new("manual-graph")
         .version("0.1")
         .about("Benchmarks HotCRP-like application with security policies.")
         .arg(
@@ -198,7 +209,6 @@ async fn main() {
     };
     let mut rng = rand::thread_rng();
 
-    println!("here2");
 
     let conf = source
         .query_pairs()
@@ -235,7 +245,6 @@ async fn main() {
         )
     );
 
-    println!("here3"); 
 
     debug!(log, "fetching list of accepted papers"; "url" => &url);
     let accept = reqwest::get(&url)
@@ -266,8 +275,6 @@ async fn main() {
             accepted.insert(id);
         }
     }
-
-    println!("here4"); 
 
     let mut author_set = HashMap::new();
     let mut authors = Vec::new();
@@ -357,14 +364,13 @@ async fn main() {
             trace!(log, "adding review"; "rating" => r.rating, "confidence" => r.confidence);
             reviews.push(r);
         }
-        println!("breaking out of loop"); 
         break; 
     }
 
     drop(author_set);
     let nauthors = authors.len();
 
-    let mut backend = make().await; 
+    let mut backend = Backend::make().await; 
  
     let nreviewers = (reviews.len() + (PAPERS_PER_REVIEWER - 1)) / PAPERS_PER_REVIEWER;
     let mut rlogged = (loggedf * nreviewers as f64) as usize;
@@ -393,12 +399,7 @@ async fn main() {
                        "reader".into(),
                        "mem".into()]);    
 
-    info!(log, "starting up noria"; "loggedf" => loggedf);
-    println!("starting noria!"); 
-    
-    debug!(log, "configuring noria");
-   
-    println!("started local"); 
+    println!("starting noria!");        
 
     let init = Instant::now();
     thread::sleep(Duration::from_millis(2000));
@@ -422,7 +423,6 @@ async fn main() {
         my_conflicts 
     }).await;
     
-    println!("mig1"); 
 
     let (my_submitted_reviews0, my_submitted_reviews) = backend.g.migrate(move |mig| {
         let my_submitted_reviews0 = mig.add_ingredient(
@@ -445,7 +445,6 @@ async fn main() {
         (my_submitted_reviews0, my_submitted_reviews)
     }).await; 
 
-    println!("mig2"); 
 
     let (unconflicted_papers, unconflicted_papers0, 
         unconflicted_paper_reviews, unconflicted_paper_reviews0) = backend.g.migrate(move |mig| {
@@ -481,7 +480,6 @@ async fn main() {
         (unconflicted_papers, unconflicted_papers0, unconflicted_paper_reviews, unconflicted_paper_reviews0) 
     }).await; 
 
-    println!("mig3"); 
     
     let (visible_reviews, visible_reviews_anonymized) = backend.g.migrate(move |mig| {
         let visible_reviews = mig.add_ingredient(
@@ -501,7 +499,6 @@ async fn main() {
         (visible_reviews, visible_reviews_anonymized)
     }).await; 
 
-    println!("mig4"); 
 
     let (paper_paper_review0, paper_paper_review) = backend.g.migrate(move |mig| {
         let paper_paper_review0 = mig.add_ingredient(
@@ -523,8 +520,6 @@ async fn main() {
     
         (paper_paper_review0, paper_paper_review)
     }).await; 
-
-    println!("mig5"); 
     
     let (r_submitted, final_node) = backend.g.migrate(move |mig| {
         let r_submitted = mig.add_ingredient(
@@ -543,50 +538,26 @@ async fn main() {
         (r_submitted, final_node)
     }).await; 
 
+    // let paper = mig.add_base("Paper", &["paperId", "leadContactId", "authorInformation"], Base::default());
+    // let paper_reviews = mig.add_base("PaperReview", &["paperId", "reviewId", "contactId", "reviewSubmitted"], Base::default());
+    // let paper_conflict = mig.add_base("PaperConflict", &["paperId", "contactId"], Base::default());
     
-    let mut paper = backend.g.table("Paper").await.unwrap();
-    let mut review = backend.g.table("PaperReview").await.unwrap();
+    let mut review_records = Vec::new(); 
+    let mut i = 0; 
+    for r in reviews.iter() {
+        let mut submitted : usize = 1; 
+        let mut new_record : Vec<DataType> = vec![
+            r.paper.into(),
+            format!("r{}", i + nauthors + 1).into(),
+            format!("{},{}", r.paper, i + nauthors + 1).into(),
+            submitted.into()]; 
+        review_records.push(new_record.clone()); 
+        i += 1; 
+    }
 
-    reviews.shuffle(&mut rng);
-
-    let start = Instant::now();
-
-    review
-        .perform_all(
-            reviews
-                .chunks(PAPERS_PER_REVIEWER)
-                .enumerate()
-                .flat_map(|(i, rs)| {
-                    rs.iter().map(move |r| {
-                        vec![
-                            r.paper.into(),
-                            format!("r{}", i + nauthors + 1).into(),
-                            "review text".into(),
-                            format!("{},{}", r.paper, i + nauthors + 1).into(),
-                            5.into(),
-                            5.into(),
-                            5.into(),
-                            7.into(),
-                        ]
-                    })
-                }),
-        )
-        .await.unwrap();
-    
-    println!("# reviews: {} in {:?}", reviews.len(), start.elapsed());
-
+    backend.populate("PaperReview", review_records).await;  
+        
     memstats(&mut backend.g, "populated", wtr, loggedf, npapers, nauthors, nreviewers).await;
 
-    let mut paper_list: HashMap<_, _> = (nauthors..(nauthors+rlogged))
-        .map(|uid| {
-            trace!(log, "creating ReviewList handle for user"; "uid" => uid);
-            (
-                uid,
-                backend.g.view(&format!("ReviewList_r{}", uid + 1)),
-            )
-        }).collect();
-    debug!(log, "all api handles created");
-
-    println!("# setup time: {:?}", init.elapsed());
 
 }
