@@ -80,6 +80,49 @@ async fn make() -> Box<Backend> {
 }
 
 
+ // Mem stats 
+ async fn memstats(g: &mut noria::Handle<LocalAuthority>, at: &str, mut wtr: Writer<std::fs::File>, loggedf: f64, npapers: usize, nauthors: usize, nreviewers: usize) {
+    if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
+        let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
+        let data = mem.split_whitespace().nth(6 - 1).unwrap();
+        println!("# VmRSS @ {}: {} ", at, vmrss);
+        println!("# VmData @ {}: {} ", at, data);
+    }
+
+    let mut reader_mem : u64 = 0;
+    let mut base_mem : u64 = 0;
+    let mut mem : u64 = 0;
+    let stats = g.statistics().await.unwrap();
+    let mut filter_mem : u64 = 0;
+    for (_, nstats) in stats.values() {
+        for nstat in nstats.values() {
+            // println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
+            if nstat.desc == "B" {
+                base_mem += nstat.mem_size;
+            } else if nstat.desc == "reader node" {
+                reader_mem += nstat.mem_size;
+            } else {
+                mem += nstat.mem_size;
+                if nstat.desc.contains("f0") {
+                    filter_mem += nstat.mem_size;
+                }
+            }
+        }
+    }
+    wtr.write_record(&[format!("{}", loggedf),
+                        format!("{}", npapers),
+                        format!("{}", nauthors),
+                        format!("{}", nreviewers),
+                        format!("{}", at),
+                        format!("{}", base_mem),
+                        format!("{}", reader_mem),
+                        format!("{}", mem)]);
+    println!("# base memory @ {}: {}", at, base_mem);
+    println!("# reader memory @ {}: {}", at, reader_mem);
+    println!("# materialization memory @ {}: {} (filters: {})", at, mem, filter_mem);
+}
+
+
 #[tokio::main]
 async fn main() {
     println!("here1");
@@ -348,8 +391,7 @@ async fn main() {
                        "at".into(),
                        "base".into(),
                        "reader".into(),
-                       "mem".into()]);
-   
+                       "mem".into()]);    
 
     info!(log, "starting up noria"; "loggedf" => loggedf);
     println!("starting noria!"); 
@@ -501,81 +543,14 @@ async fn main() {
         (r_submitted, final_node)
     }).await; 
 
-    // Mem stats 
-
-    // let mut memstats = async |g: &mut noria::Handle<_>, at| {
-    //     if let Ok(mem) = std::fs::read_to_string("/proc/self/statm") {
-    //         debug!(log, "extracing process memory stats"; "at" => at);
-    //         let vmrss = mem.split_whitespace().nth(2 - 1).unwrap();
-    //         let data = mem.split_whitespace().nth(6 - 1).unwrap();
-    //         println!("# VmRSS @ {}: {} ", at, vmrss);
-    //         println!("# VmData @ {}: {} ", at, data);
-    //     }
-
-    //     let mut reader_mem = 0;
-    //     let mut base_mem = 0;
-    //     let mut mem = 0;
-    //     let stats = g.statistics().await.unwrap();
-    //     let mut filter_mem = 0;
-    //     for (_, nstats) in stats.values() {
-    //         for nstat in nstats.values() {
-    //             println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
-    //             if nstat.desc == "B" {
-    //                 base_mem += nstat.mem_size;
-    //             } else if nstat.desc == "reader node" {
-    //                 reader_mem += nstat.mem_size;
-    //             } else {
-    //                 mem += nstat.mem_size;
-    //                 if nstat.desc.contains("f0") {
-    //                     filter_mem += nstat.mem_size;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     wtr.write_record(&[format!("{}", loggedf),
-    //                         format!("{}", npapers),
-    //                         format!("{}", nauthors),
-    //                         format!("{}", nreviewers),
-    //                         format!("{}", at),
-    //                         format!("{}", base_mem),
-    //                         format!("{}", reader_mem),
-    //                         format!("{}", mem)]);
-    //     println!("# base memory @ {}: {}", at, base_mem);
-    //     println!("# reader memory @ {}: {}", at, reader_mem);
-    //     println!("# materialization memory @ {}: {} (filters: {})", at, mem, filter_mem);
-    // };
     
-    // let mut user_profile = backend.g.table("UserProfile").await.unwrap();
     let mut paper = backend.g.table("Paper").await.unwrap();
-    // let mut review_assignment = backend.g.table("ReviewAssignment").await.unwrap();
     let mut review = backend.g.table("PaperReview").await.unwrap();
 
     reviews.shuffle(&mut rng);
 
     let start = Instant::now();
 
-    // review_assignment.perform_all(
-    //     reviews
-    //         .chunks(PAPERS_PER_REVIEWER)
-    //         .enumerate()
-    //         .flat_map(|(i, rs)| {
-    //             // Reviewer user IDs start after author user IDs
-    //             rs.iter().map(move |r| {
-    //                 vec![r.paper.into(), format!("r{}", i + nauthors + 1).into(),
-    //                 format!("{},{}", r.paper, i + nauthors + 1).into()]
-    //             })
-    //         }),
-    // ).await
-    // .unwrap();
-
-    // println!(
-    //     "# review assignments: {} in {:?}",
-    //     reviews.len(),
-    //     start.elapsed()
-    //     );
-    
-    let start = Instant::now();
-    
     review
         .perform_all(
             reviews
@@ -600,7 +575,7 @@ async fn main() {
     
     println!("# reviews: {} in {:?}", reviews.len(), start.elapsed());
 
-    // memstats(&mut backend.g, "populated");
+    memstats(&mut backend.g, "populated", wtr, loggedf, npapers, nauthors, nreviewers).await;
 
     let mut paper_list: HashMap<_, _> = (nauthors..(nauthors+rlogged))
         .map(|uid| {
