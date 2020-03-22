@@ -364,7 +364,7 @@ async fn main() {
             trace!(log, "adding review"; "rating" => r.rating, "confidence" => r.confidence);
             reviews.push(r);
         }
-        break; 
+        // break; 
     }
 
     drop(author_set);
@@ -556,6 +556,22 @@ async fn main() {
     }
 
     backend.populate("PaperReview", review_records).await;  
+
+
+    let mut paper_records = Vec::new(); 
+    let mut i = 0; 
+    for r in papers.iter() {
+        let mut submitted : usize = 1; 
+        let mut new_record : Vec<DataType> = vec![
+            i.into(),
+            format!("{},{}", i, i + nauthors + 1).into(),
+            submitted.into()]; 
+        paper_records.push(new_record.clone()); 
+        i += 1; 
+    }
+
+    backend.populate("Paper", paper_records).await;  
+
         
     memstats(&mut backend.g, "populated", wtr, loggedf, npapers, nauthors, nreviewers).await;
 
