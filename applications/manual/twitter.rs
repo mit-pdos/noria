@@ -171,7 +171,7 @@ async fn main() {
     thread::sleep(Duration::from_millis(2000));
 
     let uid : usize = 1; 
-    let (tweets, users, blocked, follows) = backend.g.migrate(|mig| { 
+    let (tweets, users, blocked, follows) = backend.g.migrate(move |mig| { 
         let tweets = mig.add_base("Tweets", &["userId", "id", "content", "time", "retweetId"], Base::default()); 
         let users = mig.add_base("Users", &["userId", "name", "isPrivate", 
                                             "birthdayMonth", "birthdayDay", 
@@ -183,7 +183,7 @@ async fn main() {
     }).await; 
 
 
-    let (tweets_with_user_info, retweets, all_tweets) = backend.g.migrate(|mig| {
+    let (tweets_with_user_info, retweets, all_tweets) = backend.g.migrate(move |mig| {
         let tweets_with_user_info = mig.add_ingredient("TweetsWithUserInfo", 
                                                         &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                         Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2)])); 
@@ -206,7 +206,7 @@ async fn main() {
     }).await; 
 
 
-    let (blocked_accounts, blocked_by_accounts) = backend.g.migrate(|mig| {
+    let (blocked_accounts, blocked_by_accounts) = backend.g.migrate(move |mig| {
         let blocked_accounts = mig.add_ingredient("BlockedAccounts", 
                                                   &["userId", "blockedId"], 
                                                 Filter::new(blocked, 
@@ -220,7 +220,7 @@ async fn main() {
         (blocked_accounts, blocked_by_accounts) 
     }).await; 
 
-    let (users_you_follow, private_users) = backend.g.migrate(|mig| {
+    let (users_you_follow, private_users) = backend.g.migrate(move |mig| {
         let users_you_follow = mig.add_ingredient("UsersYouFollow", 
                                                   &["userId", "followedId"], 
                                                   Filter::new(follows, 
@@ -234,7 +234,8 @@ async fn main() {
         (users_you_follow, private_users)
     }).await; 
 
-    let (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5) = backend.g.migrate(|mig| {
+
+    let (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5) = backend.g.migrate(move |mig| {
         let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))]));   
     
@@ -266,8 +267,7 @@ async fn main() {
                                                  Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(0.into())))]));  
     
         (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5)
-    }).await; 
-
+    }).await;
     
 
     let mut p = Populate::new(nusers, ntweets, private); 
