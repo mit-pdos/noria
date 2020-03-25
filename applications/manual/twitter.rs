@@ -17,6 +17,10 @@ use noria::{Builder, Handle, LocalAuthority};
 use std::future::Future;
 use rand::prelude::*;
 
+#[macro_use]
+mod populate;
+use crate::populate::Populate;
+
 
 pub struct Backend {
     g: Handle<LocalAuthority>,
@@ -124,7 +128,7 @@ async fn main() {
             Arg::with_name("nusers")
                 .short("u")
                 .takes_value(true)
-                .default_value(10000)
+                .default_value("10000")
         )
         .arg(
             Arg::with_name("logged-in")
@@ -132,8 +136,8 @@ async fn main() {
                 .default_value("1.0")
                 .help("Fraction of users that are logged in."),
         )
-        .args(
-            Args::with_name("percent-private")
+        .arg(
+            Arg::with_name("percent-private")
                 .short("p")
                 .default_value("0.2")
                 .help("Percentage of private users")
@@ -157,6 +161,7 @@ async fn main() {
     let loggedf = value_t_or_exit!(args, "logged-in", f64);
     let nusers = value_t_or_exit!(args, "nusers", usize); 
     let ntweets = value_t_or_exit!(args, "ntweets", usize); 
+    let private = value_t_or_exit!(args, "percent-private", f64); 
 
     println!("starting noria!");        
 
@@ -165,21 +170,17 @@ async fn main() {
     let init = Instant::now();
     thread::sleep(Duration::from_millis(2000));
 
-    let uid = 1; 
+    let uid : usize = 1; 
     let (tweets, users, blocked, follows) = backend.g.migrate(|mig| { 
         let tweets = mig.add_base("Tweets", &["userId", "id", "content", "time", "retweetId"], Base::default()); 
         let users = mig.add_base("Users", &["userId", "name", "isPrivate", 
                                             "birthdayMonth", "birthdayDay", 
                                             "birthdayYear", "email", "password"], Base::default()); 
         let blocked = mig.add_base("BlockedAccounts", &["userId", "blockedId"], Base::default()); 
-        let follows = mig.add_bse("Follows", &["userId", "followedId"], Base::default()); 
+        let follows = mig.add_base("Follows", &["userId", "followedId"], Base::default()); 
 
         (tweets, users, blocked, follows)
     }).await; 
-
-    tweets_with_user_info = Filter("TweetsWithUserInfo", ["Tweets", "Users"], ["Tweets.user_id IN Users.id"], policy=False)
-    retweets = Filter("Retweets", ["TweetsWithUserInfo"], ["TweetsWithUserInfo.retweet_id IN TweetsWithUserInfo.rt_id"], policy=False) 
-    all_tweets = Filter("AllTweets", ["TweetsWithUserInfo", "Retweets"], [], policy=False)
 
 
     let (tweets_with_user_info, retweets, all_tweets) = backend.g.migrate(|mig| {
@@ -193,9 +194,9 @@ async fn main() {
                                                     JoinType::Inner, 
                                                     vec![L(0), B(1, 4), L(2), L(3), L(5), L(6)])); 
 
-        let emits = HashMap::new(); 
+        let mut emits = HashMap::new(); 
         emits.insert(tweets_with_user_info, vec![0, 1, 2, 3, 4, 5, 6]); 
-        emits.insert(reweets, vec![0, 1, 2, 3, 4, 5, 6]); 
+        emits.insert(retweets, vec![0, 1, 2, 3, 4, 5, 6]); 
 
         let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo", 
                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
@@ -235,7 +236,7 @@ async fn main() {
 
     let (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5) = backend.g.migrate(|mig| {
         let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into()))])));  
+                                                 Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))]));   
     
         let visible_tweets2 = mig.add_ingredient("FollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Join::new(users_you_follow, all_tweets, 
