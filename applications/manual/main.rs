@@ -64,7 +64,7 @@ impl Backend {
         let mut b = Builder::default();
       
         b.set_sharding(None);
-    
+        b.disable_partial(); 
         b.set_persistence(PersistenceParameters::new(
             DurabilityMode::MemoryOnly,
             Duration::from_millis(1),
@@ -108,7 +108,7 @@ impl Backend {
     let mut filter_mem : u64 = 0;
     for (_, nstats) in stats.values() {
         for nstat in nstats.values() {
-            // println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
+            println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
             if nstat.desc == "B" {
                 base_mem += nstat.mem_size;
             } else if nstat.desc == "reader node" {
@@ -364,7 +364,7 @@ async fn main() {
             trace!(log, "adding review"; "rating" => r.rating, "confidence" => r.confidence);
             reviews.push(r);
         }
-        // break; 
+        break; 
     }
 
     drop(author_set);
@@ -571,7 +571,6 @@ async fn main() {
     }
 
     backend.populate("Paper", paper_records).await;  
-
         
     memstats(&mut backend.g, "populated", wtr, loggedf, npapers, nauthors, nreviewers).await;
 
