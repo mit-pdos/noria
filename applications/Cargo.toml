@@ -93,5 +93,9 @@ path = "lobsters/mysql/main.rs"
 #path = "piazza/mysql.rs"
 
 [[bin]]
-name = "manual"
+name = "manual-hotcrp"
 path = "manual/main.rs"
+
+[[bin]]
+name = "manual-twitter"
+path = "manual/twitter.rs"

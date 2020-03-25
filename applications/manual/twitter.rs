@@ -280,7 +280,7 @@ async fn main() {
     backend.populate("Users", users.clone()).await;
     backend.populate("Follows", follows.clone()).await; 
     backend.populate("Tweets", tweets.clone()).await; 
-    backend.populate("Blocks", blocks.clone()).await; 
+    backend.populate("BlockedAccounts", blocks.clone()).await; 
         
     memstats(&mut backend.g).await;
 
