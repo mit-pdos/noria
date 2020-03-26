@@ -35,6 +35,8 @@ impl Populate {
     }
 
     pub fn get_users(&mut self) -> Vec<Vec<DataType>> {
+        // ["userId", "name", "isPrivate", "birthdayMonth", "birthdayDay", "birthdayYear", "email", "password"]
+
         let mut user_records = Vec::new(); 
         for i in 0..self.nusers {
             let mut name : String = thread_rng()
@@ -64,12 +66,12 @@ impl Populate {
             let mut new_record : Vec<DataType> = vec![
                 i.into(),
                 name.into(), 
+                0.into(), 
                 bday_month.into(), 
                 bday_day.into(), 
                 bday_year.into(), 
-                handle.into(), 
-                password.into(), 
                 email.into(), 
+                password.into(), 
                 ]; 
 
             self.users.insert(i, new_record.clone()); 
@@ -84,7 +86,7 @@ impl Populate {
         let mut all_follows = Vec::new(); 
         for i in 0..self.nusers {
 
-            let mut num_to_follow: usize = thread_rng().gen_range(0, 1000);
+            let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
             let mut following : Vec<usize> = Vec::new(); 
             for j in 0..num_to_follow {
                 let mut follow: usize = thread_rng().gen_range(0, self.nusers);
@@ -125,6 +127,7 @@ impl Populate {
     }
 
     pub fn get_tweets(&mut self) -> Vec<Vec<DataType>> {
+        // ["userId", "id", "content", "time", "retweetId"]
         let mut tweets = Vec::new(); 
         for i in 0..self.ntweets {
             let mut user_who_tweeted = thread_rng().gen_range(0, self.nusers);
@@ -132,11 +135,21 @@ impl Populate {
                             .sample_iter(&Alphanumeric)
                             .take(50)
                             .collect();
+            let mut rt : usize = thread_rng().gen_range(0, self.ntweets*2);
+            let mut retweet_id : usize; 
+
+            if rt > self.ntweets {
+                retweet_id = i; 
+            } else {
+                retweet_id = rt; 
+            }
             let mut new_record : Vec<DataType> = vec![
-                i.into(),
                 user_who_tweeted.into(), 
-                content.into(), 
-                ]; 
+                i.into(),
+                content.into(),
+                0.into(), 
+                retweet_id.into()
+            ]; 
             tweets.push(new_record.clone()); 
         }
         self.tweets = tweets.clone(); 
