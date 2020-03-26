@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Instant, Duration};
 use std::thread;
 use std::error::Error;
-use noria::{DurabilityMode, PersistenceParameters, DataType};
+use noria::{logger_pls, DurabilityMode, PersistenceParameters, DataType};
 use noria::manual::Base;
 use noria::manual::ops::join::JoinSource::*;
 use noria::manual::ops::join::{Join, JoinType};
@@ -29,7 +29,7 @@ pub struct Backend {
 
 
 impl Backend {
-    async fn make() -> Box<Backend> {
+    async fn make(verbose: bool) -> Box<Backend> {
         let mut b = Builder::default();
       
         b.set_sharding(None);
@@ -40,7 +40,10 @@ impl Backend {
             Some(String::from("manual_policy_graph")),
             1,
         ));
-        
+        if verbose {
+            b.log_with(logger_pls());
+        }
+
         let (g, done) = b.start_local().await.unwrap();
         
         let reuse = true; 
@@ -165,7 +168,7 @@ async fn main() {
 
     println!("starting noria!");        
 
-    let mut backend = Backend::make().await; 
+    let mut backend = Backend::make(verbose).await;
 
     let init = Instant::now();
     thread::sleep(Duration::from_millis(2000));
