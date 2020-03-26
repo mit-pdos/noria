@@ -158,9 +158,9 @@ async fn main() {
                 .help("Enable verbose output"),
         )
         .get_matches();
-    
-    
-    let verbose = args.occurrences_of("verbose");
+
+
+    let verbose = args.is_present("verbose");
     let loggedf = value_t_or_exit!(args, "logged-in", f64);
     let nusers = value_t_or_exit!(args, "nusers", usize); 
     let ntweets = value_t_or_exit!(args, "ntweets", usize); 
