@@ -191,11 +191,11 @@ async fn main() {
                                                         &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                         Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2)])); 
         let retweets = mig.add_ingredient("RetweetsWithUserInfo",
-                                          &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                          Join::new(tweets_with_user_info, 
-                                                    tweets_with_user_info, 
-                                                    JoinType::Inner, 
-                                                    vec![L(0), B(1, 4), L(2), L(3), L(5), L(6)])); 
+                                          &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
+                                          Join::new(tweets_with_user_info,
+                                                    tweets_with_user_info,
+                                                    JoinType::Inner,
+                                                    vec![L(0), B(1, 4), L(2), L(3), L(4), L(5), L(6)]));
 
         let mut emits = HashMap::new(); 
         emits.insert(tweets_with_user_info, vec![0, 1, 2, 3, 4, 5, 6]); 
