@@ -79,9 +79,9 @@ async fn memstats(g: &mut noria::Handle<LocalAuthority>) {
     let mut mem : u64 = 0;
     let stats = g.statistics().await.unwrap();
     let mut filter_mem : u64 = 0;
-    for (_, nstats) in stats.values() {
-        for nstat in nstats.values() {
-            println!("[{}] {}: {:?}", at, nstat.desc, nstat.mem_size);
+    for (nid, nstats) in stats.values() {
+        for (nid, nstat) in nstats {
+            println!("[{}] node {:?} ({}): {:?}", at, nid, nstat.desc, nstat.mem_size);
             if nstat.desc == "B" {
                 base_mem += nstat.mem_size;
             } else if nstat.desc == "reader node" {
