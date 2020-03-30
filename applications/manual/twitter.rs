@@ -287,4 +287,5 @@ async fn main() {
         
     memstats(&mut backend.g).await;
 
+    println!("{}", backend.g.graphviz().await.unwrap());
 }
