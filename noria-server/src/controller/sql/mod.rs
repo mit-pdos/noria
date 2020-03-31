@@ -65,6 +65,8 @@ crate struct SqlIncorporator {
     /// Active universes mapped to the group they belong to.
     /// If an user universe, mapped to None.
     universes: HashMap<Option<DataType>, Vec<UniverseId>>,
+
+    compound_mir_queries: HashMap<String, MirQuery>,
 }
 
 impl Default for SqlIncorporator {
@@ -87,6 +89,7 @@ impl Default for SqlIncorporator {
 
             reuse_type: ReuseConfigType::Finkelstein,
             universes: HashMap::default(),
+            compound_mir_queries: HashMap::default(),
         }
     }
 }
@@ -451,10 +454,17 @@ impl SqlIncorporator {
             .iter()
             .enumerate()
             .map(|(i, sq)| {
-                Ok(self
-                    .add_select_query(&format!("{}_csq_{}", query_name, i), &sq.1, false, mig)?
-                    .1
-                    .unwrap())
+                let q_name = &format!("{}_csq_{}", query_name, i);
+                let res = self.add_select_query(q_name, &sq.1, false, mig)?.1;
+                if res.is_none() {
+                    let hash = self.named_queries[q_name].clone();
+                    let query = self.mir_queries[&(hash, mig.universe())].clone();
+                    debug!(self.log, "Fetched a mir_query from before {:?}", query);
+                    Ok(query)
+                } else {
+                    Ok(res.unwrap())
+                }
+
             })
             .collect();
 
@@ -468,6 +478,7 @@ impl SqlIncorporator {
         );
 
         let qfp = mir_query_to_flow_parts(&mut combined_mir_query, &mut mig, None);
+        self.compound_mir_queries.insert(query_name.to_owned(), combined_mir_query.clone());
 
         self.register_query(query_name, None, &combined_mir_query, mig.universe());
 
@@ -562,11 +573,20 @@ impl SqlIncorporator {
         Ok((qfp, mir))
     }
 
-    pub(super) fn remove_query(&mut self, query_name: &str, mig: &Migration) -> Option<NodeIndex> {
+    pub(super) fn remove_query(&mut self, query_name: &str, mig: &Migration) -> Option<Vec<NodeIndex>> {
         let nodeid = self
             .leaf_addresses
             .remove(query_name)
             .expect("tried to remove unknown query");
+
+        if self.compound_mir_queries.contains_key(query_name) {
+            let mir_query = self.compound_mir_queries.get(query_name).unwrap().clone();
+            self.compound_mir_queries.remove_entry(query_name);
+            self.view_schemas.remove(query_name).unwrap();
+            // potentially would need to remove subqueries from named_queries
+            self.mir_converter.remove_query(query_name, &mir_query);
+            return Some(vec![nodeid])
+        }
 
         let qg_hash = self
             .named_queries
@@ -594,8 +614,8 @@ impl SqlIncorporator {
             self.query_graphs.remove(&qg_hash).unwrap();
             self.view_schemas.remove(query_name).unwrap();
 
-            // trigger reader node removal
-            Some(nodeid)
+            // the node has been removed
+            Some(vec![nodeid])
         } else {
             // more than one query uses this leaf
             // don't remove node yet!
@@ -660,8 +680,11 @@ impl SqlIncorporator {
                 self.named_queries.insert(query_name.to_owned(), qg_hash);
             }
             None => {
-                self.base_mir_queries
-                    .insert(query_name.to_owned(), mir.clone());
+                if self.compound_mir_queries.contains_key(query_name) {
+                    debug!(self.log, "Dealing with a compound query {:?}", query_name.to_owned());
+                } else {
+                    self.base_mir_queries.insert(query_name.to_owned(), mir.clone());
+                }
             }
         }
     }

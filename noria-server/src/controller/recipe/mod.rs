@@ -462,7 +462,7 @@ impl Recipe {
                         // them twice.
                         self.inc.as_mut().unwrap().remove_base(&ctq.table.name);
                         match self.prior.as_ref().unwrap().node_addr_for(&ctq.table.name) {
-                            Ok(ni) => Some(ni),
+                            Ok(ni) => Some(vec![ni]),
                             Err(e) => {
                                 crit!(
                                     self.log,
@@ -473,15 +473,17 @@ impl Recipe {
                             }
                         }
                     }
-                    _ => self
-                        .inc
-                        .as_mut()
-                        .unwrap()
-                        .remove_query(n.as_ref().unwrap(), mig),
+                    _ => {
+                        self
+                            .inc
+                            .as_mut()
+                            .unwrap()
+                            .remove_query(n.as_ref().unwrap(), mig)
+                    }
                 }
             })
+            .flatten()
             .collect();
-
         Ok(result)
     }
 

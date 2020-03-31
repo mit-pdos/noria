@@ -2514,3 +2514,38 @@ fn correct_nested_view_schema() {
     ];
     assert_eq!(q.schema(), Some(&expected_schema[..]));
 }
+
+#[test]
+fn remove_compound_query() {
+    let mut g = start_simple("remove_compound_query");
+    let sql = "
+        CREATE TABLE answers_a (email_key int, lec int, answer text, PRIMARY KEY (email_key));\
+        CREATE TABLE answers_b (email_key int, lec int, answer text, PRIMARY KEY (email_key));\
+        QUERY answers: SELECT email_key, answer FROM answers_a WHERE lec=? UNION SELECT email_key, answer FROM answers_b WHERE lec=?;
+    ";
+    g.install_recipe(sql).unwrap();
+    let mut write = g.table("answers_a").unwrap().into_sync();
+    let mut write2 = g.table("answers_b").unwrap().into_sync();
+    // insert a new record
+    write.insert(vec![1.into(), 3.into(), "hello".into()]).unwrap();
+    write2.insert(vec![2.into(), 3.into(), "goodbye".into()]).unwrap();
+    
+    g.remove_query("answers");
+    assert_eq!(g.outputs().unwrap().len(), 0);
+
+    let r1_txt = "\
+    CREATE TABLE answers_c (email_key int, lec int, answer text, PRIMARY KEY (lec));\
+    QUERY answers: SELECT email_key, answer FROM answers_a WHERE lec=? UNION SELECT email_key, answer FROM answers_b WHERE lec=? UNION SELECT email_key, answer FROM answers_c WHERE lec=?;\
+    ";
+    g.extend_recipe(r1_txt).unwrap();
+    assert_eq!(g.outputs().unwrap().len(), 1);
+    g.remove_query("answers");
+
+    let r2_txt = "\
+    CREATE TABLE answers_d (email_key int, lec int, answer text, PRIMARY KEY (lec));\
+    QUERY answers: SELECT email_key, answer FROM answers_a WHERE lec=? UNION SELECT email_key, answer FROM answers_b WHERE lec=? UNION SELECT email_key, answer FROM answers_c WHERE lec=? UNION SELECT email_key, answer FROM answers_d WHERE lec=?;\
+    ";
+    g.extend_recipe(r2_txt).unwrap();
+    assert_eq!(g.outputs().unwrap().len(), 1);
+
+}

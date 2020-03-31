@@ -1185,6 +1185,7 @@ impl ControllerInner {
             // This query leaf node has children -- typically, these are readers, but they can also
             // include egress nodes or other, dependent queries.
             let mut has_non_reader_children = false;
+            let mut non_readers = Vec::default();
             let readers: Vec<_> = self
                 .ingredients
                 .neighbors_directed(leaf, petgraph::EdgeDirection::Outgoing)
@@ -1192,6 +1193,7 @@ impl ControllerInner {
                     if self.ingredients[*ni].is_reader() {
                         true
                     } else {
+                        non_readers.push(*ni);
                         has_non_reader_children = true;
                         false
                     }
@@ -1204,8 +1206,22 @@ impl ControllerInner {
                     "not removing node {} yet, as it still has non-reader children",
                     leaf.index()
                 );
-                unreachable!();
+                // deleting non-reader and its children
+                for nr in non_readers {
+                    if !self.ingredients[nr].is_base() {
+                        let mut children = Vec::default();
+                        self.ingredients
+                            .neighbors_directed(nr, petgraph::EdgeDirection::Outgoing)
+                            .for_each(|ni| children.push(ni));
+                        for child in children {
+                            self.remove_leaf(child);
+                        }
+                        self.remove_leaf(nr);
+                    }
+                }
+                //unreachable;
             }
+
             // nodes can have only one reader attached
             assert!(readers.len() <= 1);
             debug!(
@@ -1217,7 +1233,8 @@ impl ControllerInner {
                 removals.push(readers[0]);
                 leaf = readers[0];
             } else {
-                unreachable!();
+                //unreachable!();
+                //
             }
         }
 
@@ -1248,7 +1265,7 @@ impl ControllerInner {
                         .neighbors_directed(parent, petgraph::EdgeDirection::Outgoing)
                         .count() == 0
                 {
-                    nodes.push(parent);
+                   // nodes.push(parent);
                 }
             }
 
@@ -1372,6 +1389,7 @@ impl ControllerInner {
                 Some(ref state) if state.epoch > self.epoch => Err(()),
                 Some(mut state) => {
                     state.recipe_version = self.recipe.version();
+                   // state.recipes.push(updated_recipe.clone());
                     Ok(state)
                 }
             })
