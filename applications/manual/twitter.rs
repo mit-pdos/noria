@@ -125,13 +125,13 @@ async fn main() {
             Arg::with_name("ntweets")
                 .short("n")
                 .takes_value(true)
-                .default_value("10000")
+                .default_value("15")
         )
         .arg(
             Arg::with_name("nusers")
                 .short("u")
                 .takes_value(true)
-                .default_value("10000")
+                .default_value("10")
         )
         .arg(
             Arg::with_name("logged-in")
@@ -210,13 +210,13 @@ async fn main() {
 
 
     let (blocked_accounts, blocked_by_accounts) = backend.g.migrate(move |mig| {
-        let blocked_accounts = mig.add_ingredient("BlockedAccounts", 
-                                                  &["userId", "blockedId"], 
+        let blocked_accounts = mig.add_ingredient("UsersBlockedAccounts", 
+                                                  &["Id", "blockedId"], 
                                                 Filter::new(blocked, 
                                                 &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
 
-        let blocked_by_accounts = mig.add_ingredient("BlockedByAccounts", 
-                                                &["userId", "blockedId"], 
+        let blocked_by_accounts = mig.add_ingredient("UsersBlockedByAccounts", 
+                                                &["Id", "blockedId"], 
                                                 Filter::new(blocked, 
                                                 &[(1, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
         
@@ -238,7 +238,7 @@ async fn main() {
     }).await; 
 
 
-    let (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5) = backend.g.migrate(move |mig| {
+    let (visible_tweets1, visible_tweets2, visible_tweets3) = backend.g.migrate(move |mig| {
         let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))]));   
     
@@ -252,26 +252,26 @@ async fn main() {
 
         let visible_tweets3 = mig.add_ingredient("PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                  Union::new(emits)); 
+
+        // let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+        //                                          Join::new(visible_tweets3, blocked_accounts,
+        //                                          JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
+
         
-        let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Join::new(visible_tweets3, blocked_accounts,
-                                                 JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
-        
-        // TODO how are NULLs represented? Almost certainly incorrect below
-        let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(0.into())))]));  
+        // let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
+        //                                          Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
     
-        let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Join::new(visible_tweets3, blocked_by_accounts,
-                                                 JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
+        // let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
+        //                                          Join::new(visible_tweets4, blocked_by_accounts,
+        //                                          JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
         
-        // TODO how are NULLs represented? Almost certainly incorrect below
-        let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(0.into())))]));  
+        // let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
+        //                                          Filter::new(visible_tweets5a, &[(0, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
     
-        (visible_tweets1, visible_tweets2, visible_tweets3, visible_tweets4, visible_tweets5)
+        let ri = mig.maintain_anonymous(visible_tweets3, &[0]);
+        
+        (visible_tweets1, visible_tweets2, visible_tweets3)
     }).await;
-    
 
     let mut p = Populate::new(nusers, ntweets, private); 
         
@@ -283,8 +283,16 @@ async fn main() {
     backend.populate("Users", users.clone()).await;
     backend.populate("Follows", follows.clone()).await; 
     backend.populate("Tweets", tweets.clone()).await; 
-    backend.populate("BlockedAccounts", blocks.clone()).await; 
-        
+    // backend.populate("BlockedAccounts", blocks.clone()).await; 
+
+
+    let leaf = format!("PublicAndFollowedTweets");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+   
+    let mut res = getter.len().await.unwrap();
+    
+    println!("res: {:?}", res); 
+
     memstats(&mut backend.g).await;
 
     println!("{}", backend.g.graphviz().await.unwrap());
