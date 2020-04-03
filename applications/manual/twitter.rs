@@ -253,22 +253,22 @@ async fn main() {
         let visible_tweets3 = mig.add_ingredient("PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                  Union::new(emits)); 
 
-        // let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
-        //                                          Join::new(visible_tweets3, blocked_accounts,
-        //                                          JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
+        let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+                                                 Join::new(visible_tweets3, blocked_accounts,
+                                                 JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
 
         
-        // let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-        //                                          Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
+        let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+                                                 Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
     
-        // let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-        //                                          Join::new(visible_tweets4, blocked_by_accounts,
-        //                                          JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
+        let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+                                                 Join::new(visible_tweets4, blocked_by_accounts,
+                                                 JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
         
-        // let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-        //                                          Filter::new(visible_tweets5a, &[(0, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
+        let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+                                                 Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
     
-        let ri = mig.maintain_anonymous(visible_tweets3, &[0]);
+        let ri = mig.maintain_anonymous(visible_tweets5, &[0]);
         
         (visible_tweets1, visible_tweets2, visible_tweets3)
     }).await;
@@ -286,7 +286,7 @@ async fn main() {
     // backend.populate("BlockedAccounts", blocks.clone()).await; 
 
 
-    let leaf = format!("PublicAndFollowedTweets");
+    let leaf = format!("AllExcludingBlockedByFinal");
     let mut getter = backend.g.view(&leaf).await.unwrap();
    
     let mut res = getter.len().await.unwrap();
