@@ -11,6 +11,7 @@ use std::thread;
 use std::error::Error;
 use noria::{DurabilityMode, PersistenceParameters, DataType};
 use noria::manual::Base;
+use noria::manual::Reader;
 use noria::manual::ops::join::JoinSource::*;
 use noria::manual::ops::join::{Join, JoinType};
 use noria::manual::ops::union::Union;

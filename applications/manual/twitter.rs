@@ -128,24 +128,18 @@ async fn main() {
             Arg::with_name("ntweets")
                 .short("n")
                 .takes_value(true)
-                .default_value("15")
+                .default_value("10000")
         )
         .arg(
             Arg::with_name("nusers")
                 .short("u")
                 .takes_value(true)
-                .default_value("10")
-        )
-        .arg(
-            Arg::with_name("logged-in")
-                .short("l")
-                .default_value("1.0")
-                .help("Fraction of users that are logged in."),
+                .default_value("1000")
         )
         .arg(
             Arg::with_name("percent-private")
                 .short("p")
-                .default_value("0.2")
+                .default_value("0.3")
                 .help("Percentage of private users")
             )
         .arg(
@@ -164,7 +158,6 @@ async fn main() {
 
 
     let verbose = args.is_present("verbose");
-    let loggedf = value_t_or_exit!(args, "logged-in", f64);
     let nusers = value_t_or_exit!(args, "nusers", usize); 
     let ntweets = value_t_or_exit!(args, "ntweets", usize); 
     let private = value_t_or_exit!(args, "percent-private", f64); 
@@ -243,8 +236,7 @@ async fn main() {
     }).await; 
 
 
-    let visible_tweets1 = backend.g.migrate(move |mig| {
-    // let (visible_tweets1, visible_tweets2, visible_tweets3) = backend.g.migrate(move |mig| {
+    let (visible_tweets1, visible_tweets2, visible_tweets3) = backend.g.migrate(move |mig| {
         let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));   
         
@@ -260,12 +252,11 @@ async fn main() {
 
         let visible_tweets3 = mig.add_ingredient("PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                  Union::new(emits)); 
-        
+    
 
         let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Join::new(visible_tweets3, blocked_accounts,
                                                  JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
-
 
 
         let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
@@ -281,8 +272,7 @@ async fn main() {
     
         let ri = mig.maintain_anonymous(visible_tweets5, &[0]);
        
-        (visible_tweets1)
-    //     (visible_tweets1, visible_tweets2, visible_tweets3)
+        (visible_tweets1, visible_tweets2, visible_tweets3)
     }).await;
 
     let mut p = Populate::new(nusers, ntweets, private); 
@@ -295,7 +285,15 @@ async fn main() {
     backend.populate("Users", users.clone()).await;
     backend.populate("Follows", follows.clone()).await; 
     backend.populate("Tweets", tweets.clone()).await; 
-    // backend.populate("BlockedAccounts", blocks.clone()).await; 
+    backend.populate("BlockedAccounts", blocks.clone()).await; 
+
+    use std::{thread, time};
+
+    let ten_millis = time::Duration::from_millis(100000);
+    let now = time::Instant::now();
+
+    thread::sleep(ten_millis);
+
 
     let leaf = format!("AllExcludingBlockedByFinal");
     let mut getter = backend.g.view(&leaf).await.unwrap();

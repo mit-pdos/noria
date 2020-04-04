@@ -83,38 +83,14 @@ impl Populate {
     }
 
     pub fn get_follows(&mut self) -> Vec<Vec<DataType>> {
-        let mut all_follows = Vec::new(); 
-        // for i in 0..self.nusers {
+        let mut all_follows = Vec::new();
 
-        //     let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
-        //     let mut following : Vec<usize> = Vec::new(); 
-        //     for j in 0..num_to_follow {
-        //         let mut follow: usize = thread_rng().gen_range(0, self.nusers);
-        //         following.push(follow.into()); 
-        //     }
-        //     for fllw in following.iter() {
-        //         let mut rec = Vec::new(); 
-        //         rec.push(i.into()); 
-        //         rec.push(fllw.clone().into()); 
-        //         all_follows.push(rec.clone()); 
-        //     }
- 
-        //     self.follows.insert(i, following.clone()); 
-        // }
-        
-        let mut follow = Vec::new();
-        follow.push(0.into()); 
-        follow.push(0.into()); 
-        all_follows.push(follow); 
-
-        return all_follows; 
-    }
-
-    pub fn get_blocks(&mut self) -> Vec<Vec<DataType>> {
-        let mut all_blocks = Vec::new(); 
         for i in 0..self.nusers {
-            let mut num_to_follow: usize = thread_rng().gen_range(0, 10);
+            // let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
+            let mut num_to_follow: usize = 100; 
+
             let mut following : Vec<usize> = Vec::new(); 
+            
             for j in 0..num_to_follow {
                 let mut follow: usize = thread_rng().gen_range(0, self.nusers);
                 following.push(follow.into()); 
@@ -122,14 +98,42 @@ impl Populate {
 
             for fllw in following.iter() {
                 let mut rec = Vec::new(); 
-                rec.push(i.into()); 
-                rec.push(fllw.clone().into()); 
-                all_blocks.push(rec.clone()); 
+                rec.push((i as i32).into()); 
+                rec.push((fllw.clone() as i32).into()); 
+                all_follows.push(rec.clone()); 
+            }
+ 
+            self.follows.insert(i, following.clone()); 
+        }
+    
+        return all_follows; 
+    }
+
+    pub fn get_blocks(&mut self) -> Vec<Vec<DataType>> {
+        let mut all_follows = Vec::new();
+
+        for i in 0..self.nusers {
+            // let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
+            let mut num_to_follow: usize = 2; 
+
+            let mut following : Vec<usize> = Vec::new(); 
+            
+            for j in 0..num_to_follow {
+                let mut follow: usize = thread_rng().gen_range(0, self.nusers);
+                following.push(follow.into()); 
             }
 
+            for fllw in following.iter() {
+                let mut rec = Vec::new(); 
+                rec.push((i as i32).into()); 
+                rec.push((fllw.clone() as i32).into()); 
+                all_follows.push(rec.clone()); 
+            }
+ 
             self.blocks.insert(i, following.clone()); 
         }
-        return all_blocks; 
+    
+        return all_follows; 
     }
 
     pub fn get_tweets(&mut self) -> Vec<Vec<DataType>> {
