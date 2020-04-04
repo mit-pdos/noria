@@ -84,23 +84,29 @@ impl Populate {
 
     pub fn get_follows(&mut self) -> Vec<Vec<DataType>> {
         let mut all_follows = Vec::new(); 
-        for i in 0..self.nusers {
+        // for i in 0..self.nusers {
 
-            let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
-            let mut following : Vec<usize> = Vec::new(); 
-            for j in 0..num_to_follow {
-                let mut follow: usize = thread_rng().gen_range(0, self.nusers);
-                following.push(follow.into()); 
-            }
-            for fllw in following.iter() {
-                let mut rec = Vec::new(); 
-                rec.push(i.into()); 
-                rec.push(fllw.clone().into()); 
-                all_follows.push(rec.clone()); 
-            }
+        //     let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
+        //     let mut following : Vec<usize> = Vec::new(); 
+        //     for j in 0..num_to_follow {
+        //         let mut follow: usize = thread_rng().gen_range(0, self.nusers);
+        //         following.push(follow.into()); 
+        //     }
+        //     for fllw in following.iter() {
+        //         let mut rec = Vec::new(); 
+        //         rec.push(i.into()); 
+        //         rec.push(fllw.clone().into()); 
+        //         all_follows.push(rec.clone()); 
+        //     }
  
-            self.follows.insert(i, following.clone()); 
-        }
+        //     self.follows.insert(i, following.clone()); 
+        // }
+        
+        let mut follow = Vec::new();
+        follow.push(0.into()); 
+        follow.push(0.into()); 
+        all_follows.push(follow); 
+
         return all_follows; 
     }
 
@@ -144,11 +150,11 @@ impl Populate {
                 retweet_id = rt; 
             }
             let mut new_record : Vec<DataType> = vec![
-                user_who_tweeted.into(), 
+                0.into(), 
                 i.into(),
                 content.into(),
                 0.into(), 
-                retweet_id.into()
+                0.into()
             ]; 
             tweets.push(new_record.clone()); 
         }

@@ -56,8 +56,11 @@ impl Backend {
 
     pub async fn populate(&mut self, name: &'static str, records: Vec<Vec<DataType>>) -> usize {
         let mut mutator = self.g.table(name).await.unwrap();
-
+        println!("inserting {:?} recs into {:?}\n", records.len(), name); 
         let i = records.len();
+        for rec in records.iter() {
+            println!("{:?}\n", rec); 
+        }
         mutator.perform_all(records).await.unwrap();
         i
     }
@@ -185,18 +188,19 @@ async fn main() {
         (tweets, users, blocked, follows)
     }).await; 
 
-
     let (tweets_with_user_info, retweets, all_tweets) = backend.g.migrate(move |mig| {
         let tweets_with_user_info = mig.add_ingredient("TweetsWithUserInfo", 
                                                         &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                         Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2)])); 
+       
+
         let retweets = mig.add_ingredient("RetweetsWithUserInfo",
                                           &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                           Join::new(tweets_with_user_info,
                                                     tweets_with_user_info,
                                                     JoinType::Inner,
                                                     vec![L(0), B(1, 4), L(2), L(3), L(4), L(5), L(6)]));
-
+                               
         let mut emits = HashMap::new(); 
         emits.insert(tweets_with_user_info, vec![0, 1, 2, 3, 4, 5, 6]); 
         emits.insert(retweets, vec![0, 1, 2, 3, 4, 5, 6]); 
@@ -204,6 +208,7 @@ async fn main() {
         let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo", 
                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                             Union::new(emits)); 
+        // let ri = mig.maintain_anonymous(retweets, &[0]);
         
         (tweets_with_user_info, retweets, all_tweets)
     }).await; 
@@ -238,39 +243,46 @@ async fn main() {
     }).await; 
 
 
-    let (visible_tweets1, visible_tweets2, visible_tweets3) = backend.g.migrate(move |mig| {
+    let visible_tweets1 = backend.g.migrate(move |mig| {
+    // let (visible_tweets1, visible_tweets2, visible_tweets3) = backend.g.migrate(move |mig| {
         let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
-                                                 Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))]));   
-    
+                                                 Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));   
+        
+        
         let visible_tweets2 = mig.add_ingredient("FollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Join::new(users_you_follow, all_tweets, 
                                                  JoinType::Inner, vec![B(1, 0), R(1), R(2), R(3), R(4), R(5), R(6)])); 
-        
+    
+
         let mut emits = HashMap::new(); 
         emits.insert(visible_tweets1, vec![0, 1, 2, 3, 4, 5, 6]);
         emits.insert(visible_tweets2, vec![0, 1, 2, 3, 4, 5, 6]);
 
         let visible_tweets3 = mig.add_ingredient("PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                  Union::new(emits)); 
+        
 
         let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Join::new(visible_tweets3, blocked_accounts,
                                                  JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
 
-        
+
+
         let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
-                                                 Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
+                                                 Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
     
+       
         let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Join::new(visible_tweets4, blocked_by_accounts,
                                                  JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
         
         let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
-                                                 Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::NotEqual, Value::Constant(DataType::None)))]));  
+                                                 Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
     
         let ri = mig.maintain_anonymous(visible_tweets5, &[0]);
-        
-        (visible_tweets1, visible_tweets2, visible_tweets3)
+       
+        (visible_tweets1)
+    //     (visible_tweets1, visible_tweets2, visible_tweets3)
     }).await;
 
     let mut p = Populate::new(nusers, ntweets, private); 
@@ -285,13 +297,12 @@ async fn main() {
     backend.populate("Tweets", tweets.clone()).await; 
     // backend.populate("BlockedAccounts", blocks.clone()).await; 
 
-
     let leaf = format!("AllExcludingBlockedByFinal");
     let mut getter = backend.g.view(&leaf).await.unwrap();
    
-    let mut res = getter.len().await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
     
-    println!("res: {:?}", res); 
+    println!("res: {:?}, example: {:?}", res.len(), res[0]); 
 
     memstats(&mut backend.g).await;
 
