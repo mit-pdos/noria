@@ -33,7 +33,7 @@ impl Backend {
         let mut b = Builder::default();
       
         b.set_sharding(None);
-        b.disable_partial(); 
+        // b.disable_partial(); 
         b.set_persistence(PersistenceParameters::new(
             DurabilityMode::MemoryOnly,
             Duration::from_millis(1),
@@ -120,7 +120,7 @@ async fn main() {
             Arg::with_name("materialization")
                 .long("materialization")
                 .short("m")
-                .default_value("full")
+                .default_value("shallow-all")
                 .possible_values(&["full", "partial", "shallow-readers", "shallow-all"])
                 .help("Set materialization strategy for the benchmark"),
         )
@@ -208,12 +208,12 @@ async fn main() {
 
 
     let (blocked_accounts, blocked_by_accounts) = backend.g.migrate(move |mig| {
-        let blocked_accounts = mig.add_ingredient("UsersBlockedAccounts", 
+        let blocked_accounts = mig.add_ingredient("SHALLOW_UsersBlockedAccounts", 
                                                   &["Id", "blockedId"], 
                                                 Filter::new(blocked, 
                                                 &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
 
-        let blocked_by_accounts = mig.add_ingredient("UsersBlockedByAccounts", 
+        let blocked_by_accounts = mig.add_ingredient("SHALLOW_UsersBlockedByAccounts", 
                                                 &["Id", "blockedId"], 
                                                 Filter::new(blocked, 
                                                 &[(1, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
@@ -222,7 +222,7 @@ async fn main() {
     }).await; 
 
     let (users_you_follow, private_users) = backend.g.migrate(move |mig| {
-        let users_you_follow = mig.add_ingredient("UsersYouFollow", 
+        let users_you_follow = mig.add_ingredient("SHALLOW_UsersYouFollow", 
                                                   &["userId", "followedId"], 
                                                   Filter::new(follows, 
                                                   &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
@@ -241,7 +241,7 @@ async fn main() {
                                                  Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));   
         
         
-        let visible_tweets2 = mig.add_ingredient("FollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
+        let visible_tweets2 = mig.add_ingredient("SHALLOW_FollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"], 
                                                  Join::new(users_you_follow, all_tweets, 
                                                  JoinType::Inner, vec![B(1, 0), R(1), R(2), R(3), R(4), R(5), R(6)])); 
     
@@ -250,24 +250,24 @@ async fn main() {
         emits.insert(visible_tweets1, vec![0, 1, 2, 3, 4, 5, 6]);
         emits.insert(visible_tweets2, vec![0, 1, 2, 3, 4, 5, 6]);
 
-        let visible_tweets3 = mig.add_ingredient("PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
+        let visible_tweets3 = mig.add_ingredient("SHALLOW_PublicAndFollowedTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                  Union::new(emits)); 
     
 
-        let visible_tweets4a = mig.add_ingredient("AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+        let visible_tweets4a = mig.add_ingredient("SHALLOW_AllExcludingBlocked", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Join::new(visible_tweets3, blocked_accounts,
                                                  JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
 
 
-        let visible_tweets4 = mig.add_ingredient("AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+        let visible_tweets4 = mig.add_ingredient("SHALLOW_AllExcludingBlockedFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
     
        
-        let visible_tweets5a = mig.add_ingredient("AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+        let visible_tweets5a = mig.add_ingredient("SHALLOW_AllExcludingBlockedBy", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Join::new(visible_tweets4, blocked_by_accounts,
                                                  JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0)])); 
         
-        let visible_tweets5 = mig.add_ingredient("AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
+        let visible_tweets5 = mig.add_ingredient("SHALLOW_AllExcludingBlockedByFinal", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id"], 
                                                  Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
     
         let ri = mig.maintain_anonymous(visible_tweets5, &[0]);
@@ -294,15 +294,27 @@ async fn main() {
 
     thread::sleep(ten_millis);
 
-
-    let leaf = format!("AllExcludingBlockedByFinal");
-    let mut getter = backend.g.view(&leaf).await.unwrap();
-   
-    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-    
-    println!("res: {:?}, example: {:?}", res.len(), res[0]); 
-
     memstats(&mut backend.g).await;
 
     println!("{}", backend.g.graphviz().await.unwrap());
+
+    let mut dur = time::Duration::from_millis(0); 
+    let leaf = format!("SHALLOW_AllExcludingBlockedByFinal");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let start = time::Instant::now();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    dur += start.elapsed();
+
+    let dur = dur.as_secs_f64();
+
+    println!(
+        "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+        res.len(),
+        dur,
+        (res.len() as f64) / dur,
+    );
+
+    memstats(&mut backend.g).await;
+
+
 }
