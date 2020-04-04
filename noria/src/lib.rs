@@ -97,14 +97,6 @@
 //! similar operations as SQL tables, such as [`Table::insert`], [`Table::update`],
 //! [`Table::delete`], and also more esoteric operations like [`Table::insert_or_update`].
 //!
-//! # Synchronous and asynchronous operation
-//!
-//! By default, the Noria client operates with an asynchronous API based on futures. While this
-//! allows great flexibility for clients as to how they schedule concurrent requests, it can be
-//! awkward to work with when writing less performance-sensitive code. Most of the Noria API types
-//! also have a synchronous version with a `Sync` prefix in the name that you can get at by calling
-//! `into_sync` on the asynchronous handle.
-//!
 //! # Alternatives
 //!
 //! Noria provides a [MySQL adapter](https://github.com/mit-pdos/noria-mysql) that implements the
@@ -113,6 +105,10 @@
 #![feature(type_alias_impl_trait)]
 #![deny(missing_docs)]
 #![deny(unused_extern_crates)]
+#![deny(unreachable_pub)]
+#![warn(rust_2018_idioms)]
+// https://github.com/rust-lang/rust-clippy/issues/5188
+#![allow(clippy::needless_doctest_main)]
 
 #[macro_use]
 extern crate failure;
@@ -120,6 +116,65 @@ extern crate failure;
 extern crate serde_derive;
 #[macro_use]
 extern crate slog;
+
+/// Maximum number of requests that may be in-flight _to_ the connection pool at a time.
+///
+/// We want this to be > 1 so that multiple threads can enqueue requests at the same time without
+/// immediately blocking one another. The exact value is somewhat arbitrary.
+///
+/// The value isn't higher, because it wouldn't improve performance, just increase latency.
+///
+/// The value isn't lower, because it would mean fewer concurrent enqueues.
+///
+/// NOTE: This value also places a soft-ish limit on the number of instances you can have of
+/// `View`s or `Table`s that include a particular endpoint address when sharding is enabled. The
+/// reason for this is kind of subtle: when you `poll_ready` a `View` or `Table`, we internally
+/// `poll_ready` all the shards of that `View` or `Table`, each of which is a `tower-buffer`. When
+/// you `poll_ready` a `tower-buffer`, it reserves a "slot" in its buffer for the coming request,
+/// effectively reducing the capacity of the channel by 1 until the send happens. But, with
+/// sharding, it may be that no request then goes to a particular shard. So, you may end up with
+/// *all* the slots to a given resource taken up by `poll_ready`s that haven't been used yet. A
+/// similar issue arises if you ever do:
+///
+/// ```ignore
+/// view.ready().await;
+/// let req = reqs.next().await;
+/// view.call(req).await;
+/// ```
+///
+/// When `ready` resolves, it will be holding up a slot in the buffer to `view`. It will continue
+/// to hold that up all the way until the next request arrives from `reqs`, which may be a very
+/// long time!
+///
+/// This problem is also described inhttps://github.com/tower-rs/tower/pull/425 and
+/// https://github.com/tower-rs/tower/issues/408#issuecomment-593678194. Ultimately, we need
+/// something like https://github.com/tower-rs/tower/issues/408, but for the time being, just make
+/// sure this value is high enough.
+pub(crate) const BUFFER_TO_POOL: usize = 256;
+
+/// The maximum number of concurrent connections to a given backend resource.
+///
+/// Since Noria connections are multiplexing, having this value > 1 _only_ allows us to do
+/// serialization/deserialization in parallel on multiple threads. Nothing else really.
+///
+/// The value isn't higher, because we only have so many cores. And keep in mind that this value is
+/// used per view/table _address_, so unless _all_ your requests are going to a single address,
+/// you'll be fine.
+///
+/// The value isn't lower, because we want _some_ concurrency in serialization.
+pub(crate) const MAX_POOL_SIZE: usize = 8;
+
+/// Number of requests that can be pending on any _single_ connection.
+///
+/// We need to limit this since `AsyncBincode` has unlimited buffering, and so will never apply
+/// back-pressure otherwise.
+///
+/// The value isn't higher, because it would inflate latency, and also prevent us from taking
+/// advantage of concurrent serialization/deserialization as much.
+///
+/// The value isn't lower, because lowering it would mean the server has less work at a time, which
+/// means it can batch less work, which means lower overall efficiency.
+pub(crate) const PENDING_PER_CONN: usize = 128;
 
 use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
@@ -131,11 +186,18 @@ mod table;
 mod view;
 
 #[doc(hidden)]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub mod channel;
 #[doc(hidden)]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub mod consensus;
 #[doc(hidden)]
+#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub mod internal;
+
+// for the row! macro
+#[doc(hidden)]
+pub use nom_sql::ColumnConstraint;
 
 pub use crate::consensus::ZookeeperAuthority;
 use crate::internal::*;
@@ -146,8 +208,13 @@ use std::pin::Pin;
 pub mod prelude {
     pub use super::ActivationResult;
     pub use super::ControllerHandle;
-    pub use super::{SyncTable, Table};
-    pub use super::{SyncView, View};
+    pub use super::Table;
+    pub use super::View;
+}
+
+/// Wrapper types for Noria query results.
+pub mod results {
+    pub use super::view::results::{ResultRow, Results, Row};
 }
 
 /// Noria errors.
@@ -210,8 +277,8 @@ impl<T> From<T> for Tagged<T> {
 
 pub use crate::controller::{ControllerDescriptor, ControllerHandle};
 pub use crate::data::{DataType, Modification, Operation, TableOperation};
-pub use crate::table::{SyncTable, Table};
-pub use crate::view::{SyncView, View};
+pub use crate::table::Table;
+pub use crate::view::View;
 
 #[doc(hidden)]
 pub use crate::table::Input;
@@ -253,7 +320,7 @@ pub fn shard_by(dt: &DataType, shards: usize) -> usize {
             use std::borrow::Cow;
             use std::hash::Hasher;
             let mut hasher = fnv::FnvHasher::default();
-            let s: Cow<str> = dt.into();
+            let s: Cow<'_, str> = dt.into();
             hasher.write(s.as_bytes());
             hasher.finish() as usize % shards
         }

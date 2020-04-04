@@ -44,11 +44,11 @@ pub enum DataType {
 }
 
 impl fmt::Display for DataType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             DataType::None => write!(f, "*"),
             DataType::Text(..) | DataType::TinyText(..) => {
-                let text: Cow<str> = self.into();
+                let text: Cow<'_, str> = self.into();
                 // TODO: do we really want to produce quoted strings?
                 write!(f, "\"{}\"", text)
             }
@@ -70,15 +70,15 @@ impl fmt::Display for DataType {
 }
 
 impl fmt::Debug for DataType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             DataType::None => write!(f, "None"),
             DataType::Text(..) => {
-                let text: Cow<str> = self.into();
+                let text: Cow<'_, str> = self.into();
                 write!(f, "Text({:?})", text)
             }
             DataType::TinyText(..) => {
-                let text: Cow<str> = self.into();
+                let text: Cow<'_, str> = self.into();
                 write!(f, "TinyText({:?})", text)
             }
             DataType::Timestamp(ts) => write!(f, "Timestamp({:?})", ts),
@@ -164,8 +164,8 @@ impl PartialEq for DataType {
             (&DataType::TinyText(ref a), &DataType::TinyText(ref b)) => a == b,
             (&DataType::Text(..), &DataType::TinyText(..))
             | (&DataType::TinyText(..), &DataType::Text(..)) => {
-                let a: Cow<str> = self.into();
-                let b: Cow<str> = other.into();
+                let a: Cow<'_, str> = self.into();
+                let b: Cow<'_, str> = other.into();
                 a == b
             }
             (&DataType::BigInt(a), &DataType::BigInt(b)) => a == b,
@@ -211,8 +211,8 @@ impl Ord for DataType {
             (&DataType::TinyText(ref a), &DataType::TinyText(ref b)) => a.cmp(b),
             (&DataType::Text(..), &DataType::TinyText(..))
             | (&DataType::TinyText(..), &DataType::Text(..)) => {
-                let a: Cow<str> = self.into();
-                let b: Cow<str> = other.into();
+                let a: Cow<'_, str> = self.into();
+                let b: Cow<'_, str> = other.into();
                 a.cmp(&b)
             }
             (&DataType::BigInt(a), &DataType::BigInt(ref b)) => a.cmp(b),
@@ -274,10 +274,22 @@ impl Hash for DataType {
                 f.hash(state);
             }
             DataType::Text(..) | DataType::TinyText(..) => {
-                let t: Cow<str> = self.into();
+                let t: Cow<'_, str> = self.into();
                 t.hash(state)
             }
             DataType::Timestamp(ts) => ts.hash(state),
+        }
+    }
+}
+
+impl<T> From<Option<T>> for DataType
+where
+    DataType: From<T>,
+{
+    fn from(opt: Option<T>) -> Self {
+        match opt {
+            Some(t) => DataType::from(t),
+            None => DataType::None,
         }
     }
 }
@@ -342,6 +354,12 @@ impl From<f64> for DataType {
     }
 }
 
+impl<'a> From<&'a DataType> for DataType {
+    fn from(dt: &'a DataType) -> Self {
+        dt.clone()
+    }
+}
+
 impl<'a> From<&'a Literal> for DataType {
     fn from(l: &'a Literal) -> Self {
         match *l {
@@ -376,6 +394,27 @@ impl From<Literal> for DataType {
     }
 }
 
+impl From<NaiveDateTime> for DataType {
+    fn from(dt: NaiveDateTime) -> Self {
+        DataType::Timestamp(dt)
+    }
+}
+
+/*
+impl<'a, T> Into<Option<T>> for &'a DataType
+where
+    T: From<&'a DataType>,
+{
+    fn into(self) -> Option<T> {
+        if let DataType::None = self {
+            None
+        } else {
+            Some(T::from(self))
+        }
+    }
+}
+*/
+
 use std::borrow::Cow;
 impl<'a> Into<Cow<'a, str>> for &'a DataType {
     fn into(self) -> Cow<'a, str> {
@@ -394,14 +433,14 @@ impl<'a> Into<Cow<'a, str>> for &'a DataType {
                     String::from_utf8_lossy(&bts[..])
                 }
             }
-            _ => unreachable!(),
+            _ => panic!("attempted to convert a {:?} to a string", self),
         }
     }
 }
 
-impl<'a> Into<String> for &'a DataType {
+impl Into<String> for &'_ DataType {
     fn into(self) -> String {
-        let cow: Cow<str> = self.into();
+        let cow: Cow<'_, str> = self.into();
         cow.to_string()
     }
 }
@@ -419,7 +458,7 @@ impl Into<i128> for DataType {
             DataType::UnsignedBigInt(s) => i128::from(s),
             DataType::Int(s) => i128::from(s),
             DataType::UnsignedInt(s) => i128::from(s),
-            _ => unreachable!(),
+            _ => panic!("attempted to convert a {:?} to an i128", self),
         }
     }
 }
@@ -429,70 +468,72 @@ impl Into<i64> for DataType {
         match self {
             DataType::BigInt(s) => s,
             DataType::Int(s) => i64::from(s),
-            _ => unreachable!(),
+            DataType::UnsignedInt(s) => i64::from(s),
+            _ => panic!("attempted to convert a {:?} to an i64", self),
         }
     }
 }
 
-impl Into<u64> for DataType {
-    fn into(self) -> u64 {
-        match self {
-            DataType::UnsignedBigInt(s) => s,
-            DataType::UnsignedInt(s) => u64::from(s),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl<'a> Into<i128> for &'a DataType {
+impl Into<i128> for &'_ DataType {
     fn into(self) -> i128 {
         match *self {
             DataType::BigInt(s) => i128::from(s),
             DataType::UnsignedBigInt(s) => i128::from(s),
             DataType::Int(s) => i128::from(s),
             DataType::UnsignedInt(s) => i128::from(s),
-            _ => unreachable!(),
+            _ => panic!("attempted to convert a {:?} to an i128", self),
         }
     }
 }
 
-impl<'a> Into<i64> for &'a DataType {
+impl Into<i64> for &'_ DataType {
     fn into(self) -> i64 {
         match *self {
             DataType::BigInt(s) => s,
             DataType::Int(s) => i64::from(s),
-            _ => unreachable!(),
+            DataType::UnsignedInt(s) => i64::from(s),
+            _ => panic!("attempted to convert a {:?} to an i64", self),
         }
     }
 }
 
-impl<'a> Into<u64> for &'a DataType {
+impl Into<u64> for &'_ DataType {
     fn into(self) -> u64 {
         match *self {
             DataType::UnsignedBigInt(s) => s,
             DataType::UnsignedInt(s) => u64::from(s),
-            _ => unreachable!(),
+            _ => panic!("attempted to convert a {:?} to a u64", self),
         }
     }
 }
 
-impl Into<i32> for DataType {
+impl Into<i32> for &'_ DataType {
     fn into(self) -> i32 {
-        if let DataType::Int(s) = self {
+        if let DataType::Int(s) = *self {
             s
         } else {
-            unreachable!();
+            panic!("attempted to convert a {:?} to a i32", self)
         }
     }
 }
 
-impl<'a> Into<f64> for &'a DataType {
+impl Into<u32> for &'_ DataType {
+    fn into(self) -> u32 {
+        if let DataType::UnsignedInt(s) = *self {
+            s
+        } else {
+            panic!("attempted to convert a {:?} to a u32", self)
+        }
+    }
+}
+
+impl Into<f64> for &'_ DataType {
     fn into(self) -> f64 {
         match *self {
             DataType::Real(i, f) => i as f64 + f64::from(f) / FLOAT_PRECISION,
             DataType::Int(i) => f64::from(i),
             DataType::BigInt(i) => i as f64,
-            _ => unreachable!(),
+            _ => panic!("attempted to convert a {:?} to an f64", self),
         }
     }
 }
@@ -617,6 +658,15 @@ pub enum Modification {
     None,
 }
 
+impl<T> From<T> for Modification
+where
+    T: Into<DataType>,
+{
+    fn from(t: T) -> Modification {
+        Modification::Set(t.into())
+    }
+}
+
 /// An operation to apply to a base table.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TableOperation {
@@ -660,9 +710,6 @@ impl From<Vec<DataType>> for TableOperation {
         TableOperation::Insert(other)
     }
 }
-
-/// Represents a set of records returned from a query.
-pub type Datas = Vec<Vec<DataType>>;
 
 #[cfg(test)]
 mod tests {

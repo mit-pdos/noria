@@ -1,16 +1,18 @@
 [workspace]
 members = [
 	"noria",
-	"noria-server",
-	"noria-benchmarks",
-	"noria-benchmarks/lobsters",
+	"server",
+	"applications",
+	"orchestration",
 ]
 
 [profile.release]
 debug=true
 
 [patch.crates-io]
+# https://github.com/tower-rs/tokio-tower/pull/6
+# optional -- just a perf optimization
 tokio-tower = { git = "https://github.com/tower-rs/tokio-tower.git", branch = "no-box" }
-tokio-macros = { git = "https://github.com/tokio-rs/tokio.git" }
-# https://github.com/hyperium/hyper/pull/2001
-hyper = { git = "https://github.com/hyperium/hyper.git", rev = "e6027bc02db92d1137c54a26eef2e1cb4d810e25" }
+# https://github.com/tokio-rs/tokio/pull/2160
+# optional -- just saves us from busy future loops
+tokio = { git = "https://github.com/tokio-rs/tokio.git" }

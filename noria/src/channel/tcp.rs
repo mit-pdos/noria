@@ -1,4 +1,3 @@
-use std;
 use std::convert::TryFrom;
 use std::io::{self, Write};
 use std::marker::PhantomData;
@@ -9,14 +8,14 @@ use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use bufstream::BufStream;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use futures_util::ready;
-use net2;
+use futures_util::{sink::Sink, stream::Stream};
 use pin_project::{pin_project, project};
 use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::prelude::*;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 #[derive(Debug, Fail)]
 pub enum SendError {
@@ -180,7 +179,7 @@ where
     type Error = bincode::Error;
 
     #[project]
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         #[project]
         match self.project() {
             DualTcpStream::Passthrough(abs) => abs.poll_ready(cx),
@@ -198,7 +197,7 @@ where
     }
 
     #[project]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         #[project]
         match self.project() {
             DualTcpStream::Passthrough(abs) => abs.poll_flush(cx),
@@ -207,7 +206,7 @@ where
     }
 
     #[project]
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         #[project]
         match self.project() {
             DualTcpStream::Passthrough(abs) => abs.poll_close(cx),

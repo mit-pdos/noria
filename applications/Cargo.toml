@@ -1,0 +1,96 @@
+[package]
+name = "noria-applications"
+version = "0.3.0"
+authors = ["The Noria developers <noria@pdos.csail.mit.edu>"]
+edition = '2018'
+publish = false
+
+[dependencies]
+chrono = { version = "0.4.0", features = ["serde"] }
+clap = "2.25.0"
+failure = "0.1"
+flurry = "0.2"
+futures-core = "0.3.0"
+futures-util = "0.3.0"
+hdrhistogram = "7"
+itertools = "0.9"
+memcached-rs = "0.4.2"
+mysql_async = "0.22.0"
+nom-sql = "0.0.11"
+noria = { path = "../server", package = "noria-server" }
+rand = "0.7"
+rand_distr = "0.2"
+regex = "1.0.0"
+slog = "2.4.0"
+#slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_debug"] }
+slog-term = "2.4.0"
+tokio = { version = "0.2.0", features = ["full"] }
+tokio-test = "0.2.0"
+tower-service = "0.3.0"
+# need 0.3.1 for https://github.com/tower-rs/tower/pull/427
+tower-util = "0.3.1"
+trawler = "0.9.0"
+vec_map = { version = "0.8.0" }
+zipf = "6"
+zookeeper = "0.5.3"
+
+# mssql
+# disabled due to lack of async/await support
+# futures-state-stream = "0.1"
+# tiberius = "0.3.1"
+
+[[bin]]
+name = "vote"
+path = "vote/main.rs"
+
+[[bin]]
+name = "tpc_w"
+path = "tpc_w/tpc_w.rs"
+
+[[bin]]
+name = "hotsoup"
+path = "hotsoup/hotsoup.rs"
+
+[[bin]]
+name = "extract_hotcrp_queries"
+path = "hotsoup/extract_queries.rs"
+
+[[bin]]
+name = "securecrp"
+path = "securecrp/main.rs"
+
+[[bin]]
+name = "piazza"
+path = "piazza/piazza.rs"
+
+[[bin]]
+name = "evict-o-rama"
+path = "evict-o-rama/main.rs"
+
+[[bin]]
+name = "vote-migration"
+path = "vote-migration/main.rs"
+
+[[bin]]
+name = "vote-dbtoaster-style"
+path = "vote-dbtoaster-style/main.rs"
+
+[[bin]]
+name = "vote-purge-stress"
+path = "vote-purge-stress/main.rs"
+
+[[bin]]
+name = "replay"
+path = "replay/main.rs"
+
+[[bin]]
+name = "lobsters-mysql"
+path = "lobsters/mysql/main.rs"
+
+[[bin]]
+name = "lobsters-noria"
+path = "lobsters/noria/main.rs"
+
+#[[bin]]
+#name = "security-mysql"
+#path = "piazza/mysql.rs"
