@@ -87,7 +87,7 @@ impl Populate {
 
         for i in 0..self.nusers {
             // let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
-            let mut num_to_follow: usize = 100; 
+            let mut num_to_follow: usize = 2; 
 
             let mut following : Vec<usize> = Vec::new(); 
             

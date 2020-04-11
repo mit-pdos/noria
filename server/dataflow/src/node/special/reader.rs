@@ -115,9 +115,10 @@ impl Reader {
 
     pub fn set_key(&mut self, key: &[usize]) {
         if let Some(ref skey) = self.state {
+            println!("skey: {:?} key: {:?}", &skey[..], key);
             assert_eq!(&skey[..], key);
         } else {
-            self.state = Some(Vec::from(key));
+             self.state = Some(Vec::from(key));
         }
     }
 
