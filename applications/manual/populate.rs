@@ -83,14 +83,58 @@ impl Populate {
     }
 
     pub fn get_follows(&mut self) -> Vec<Vec<DataType>> {
+        // let mut follower_stats = Vec::new(); 
+        // let total = 500 + 1000 + 5000 + 10000 + 20000; 
+        // follower_stats.push(((((500 as f64) / (total as f64) * (self.nusers as f64)) as usize), (0.9584 as f64)));
+        // follower_stats.push(((((1000 as f64) / (total as f64) * (self.nusers as f64)) as usize), (0.0214 as f64))); 
+        // follower_stats.push(((((5000 as f64) / (total as f64) * (self.nusers as f64)) as usize), (0.0172 as f64))); 
+        // follower_stats.push(((((10000 as f64) / (total as f64) * (self.nusers as f64)) as usize), (0.0016 as f64))); 
+        // follower_stats.push(((((20000 as f64) / (total as f64) * (self.nusers as f64)) as usize), (0.0005 as f64))); 
+    
+        // println!("scaled follower stats: {:?}", follower_stats);
+
+        // let mut barriers = Vec::new(); 
+        // let mut prior_barrier = 0.0;
+        // for (follower_count, percentage) in follower_stats.iter() {
+        //     let barrier = (self.nusers as f64) * (percentage.clone() as f64); 
+        //     let interval = follower_count; 
+        //     barriers.push(((prior_barrier, barrier + prior_barrier), interval)); 
+        //     prior_barrier = barrier; 
+        // }
+        
+        // println!("barriers: {:?}", barriers);
         let mut all_follows = Vec::new();
 
+        let mut ind = 0;
+        let mut lower_bound = 0;
         for i in 0..self.nusers {
-            // let mut num_to_follow: usize = thread_rng().gen_range(0, self.nusers);
-            let mut num_to_follow: usize = 2; 
-
-            let mut following : Vec<usize> = Vec::new(); 
+            // let (mut proposed_interval, mut upper_bound) = barriers[ind]; 
+            // let (mut proposed_start, mut proposed_end) = proposed_interval; 
             
+            // if (i as f64) > proposed_end {
+            //     ind += 1; 
+            //     lower_bound = *upper_bound; 
+            //     proposed_interval = barriers[ind].0; 
+            //     upper_bound = barriers[ind].1; 
+            //     proposed_start = proposed_interval.0; 
+            //     proposed_end = proposed_interval.1; 
+            // }
+
+            let mut rng = rand::thread_rng();
+            let mut n1 = rng.gen::<f64>(); 
+            let mut upper_bound; 
+
+            if n1 > 0.95 {
+                upper_bound = 2000; 
+            } else {
+                upper_bound = 200; 
+            }
+
+            let mut num_to_follow: usize = thread_rng().gen_range(lower_bound, upper_bound) as usize;
+            let mut following: Vec<usize> = Vec::new(); 
+
+            println!("user {} follows {} others", i, num_to_follow);
+
             for j in 0..num_to_follow {
                 let mut follow: usize = thread_rng().gen_range(0, self.nusers);
                 following.push(follow.into()); 
@@ -138,7 +182,8 @@ impl Populate {
 
     pub fn get_tweets(&mut self) -> Vec<Vec<DataType>> {
         // ["userId", "id", "content", "time", "retweetId"]
-        let mut tweets = Vec::new(); 
+        let mut tweets = Vec::new();
+        println!("num tweets: {:?}", self.ntweets); 
         for i in 0..self.ntweets {
             let mut user_who_tweeted = thread_rng().gen_range(0, self.nusers);
             let mut content : String = thread_rng()
@@ -157,6 +202,7 @@ impl Populate {
                 0.into(), 
                 i.into(),
                 content.into(),
+                0.into(), 
                 0.into(), 
                 0.into()
             ]; 
