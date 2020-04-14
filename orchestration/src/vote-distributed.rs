@@ -433,9 +433,9 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 tail_cmd
             )?;
             let mut stderr = String::new();
-            c.stderr().read_to_string(&mut stderr)?;
-            c.wait_eof()?;
-            if c.exit_status()? != 0 {
+            c.stderr().take().unwrap().read_to_string(&mut stderr)?;
+            let status = c.wait()?;
+            if !status.success() {
                 bail!("failed to populate:\n{}", stderr);
             }
         }
@@ -505,13 +505,13 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
         eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
         for (i, mut chan) in voters.into_iter().enumerate() {
             let mut stdout = String::new();
-            chan.read_to_string(&mut stdout)?;
+            chan.stdout().take().unwrap().read_to_string(&mut stdout)?;
             let mut stderr = String::new();
-            chan.stderr().read_to_string(&mut stderr)?;
+            chan.stderr().take().unwrap().read_to_string(&mut stderr)?;
 
-            chan.wait_eof()?;
+            let status = chan.wait()?;
 
-            if chan.exit_status()? != 0 {
+            if !status.success() {
                 eprintln!("{} failed to run benchmark client:", clients[i].public_dns);
                 eprintln!("{}", stderr);
             } else if !stderr.is_empty() {
@@ -539,8 +539,16 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
 
             let mut stdout = String::new();
             let mut stderr = String::new();
-            souplet.stderr().read_to_string(&mut stderr)?;
-            souplet.read_to_string(&mut stdout)?;
+            souplet
+                .stderr()
+                .take()
+                .unwrap()
+                .read_to_string(&mut stderr)?;
+            souplet
+                .stdout()
+                .take()
+                .unwrap()
+                .read_to_string(&mut stdout)?;
             let stdout = stdout.trim_end();
             if !stdout.is_empty() {
                 println!("{}", stdout.replace('\n', "\n >> "));
@@ -550,7 +558,7 @@ fn run_one(args: &clap::ArgMatches, first: bool, nservers: u32, nclients: u32) {
                 println!("{}", stderr.replace('\n', "\n !> "));
             }
 
-            souplet.wait_eof()?;
+            souplet.wait()?;
         }
 
         // also stop zookeeper
@@ -580,11 +588,12 @@ fn ec2_instance_type_cores(it: &str) -> Option<u16> {
 }
 
 impl ConvenientSession for tsunami::Session {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error> {
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
-                "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                "&" | "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
             })
             .collect();
@@ -592,29 +601,27 @@ impl ConvenientSession for tsunami::Session {
         eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
-        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
-
-        let mut c = self.channel_session()?;
-        c.exec(&cmd)?;
+        let c = self
+            .command("bash")
+            .arg("-c")
+            .arg(shellwords::escape(&cmd))
+            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
         Ok(c)
     }
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error> {
-        let mut c = self.exec(cmd)?;
+        let output = self.exec(cmd)?.wait_with_output()?;
+        let stdout = String::from_utf8(output.stdout)?;
 
-        let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        let mut stderr = String::new();
-        c.stderr().read_to_string(&mut stderr)?;
-        c.wait_eof()?;
-
-        if c.exit_status()? != 0 {
-            return Ok(Err(stderr));
+        if !output.status.success() {
+            return Ok(Err(stdout));
         }
         Ok(Ok(stdout))
     }
 }
 
 trait ConvenientSession {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error>;
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error>;
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error>;
 }

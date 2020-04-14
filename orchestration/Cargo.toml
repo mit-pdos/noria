@@ -21,7 +21,7 @@ shellwords = "1"
 slog = "2.4.0"
 #slog = { version = "2.4.0", features = ["max_level_trace", "release_max_level_debug"] }
 slog-term = "2.4.0"
-ssh2 = "0.8"
+openssh = "0.4"
 timeout-readwrite = "0.3"
 tokio = { version = "0.2.0", features = ["full"] }
 tower-service = "0.3.0"

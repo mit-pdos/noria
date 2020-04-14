@@ -195,8 +195,9 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
             .join("\n");
         for s in &servers {
             let mut c = s.ssh.as_ref().unwrap().exec(&["cat", ">", "hosts"])?;
-            c.write_all(hosts_file.as_bytes())?;
-            c.flush()?;
+            let mut stdin = c.stdin().take().unwrap();
+            stdin.write_all(hosts_file.as_bytes())?;
+            stdin.flush()?;
         }
 
         let eintopfs: Result<Vec<_>, _> = servers
@@ -241,14 +242,13 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
         eprintln!(" .. benchmark running @ {}", chrono::Local::now().time());
         for (i, mut chan) in eintopfs.into_iter().enumerate() {
             let mut stdout = String::new();
-            chan.read_to_string(&mut stdout)?;
+            chan.stdout().take().unwrap().read_to_string(&mut stdout)?;
             let mut stderr = String::new();
-            chan.stderr().read_to_string(&mut stderr)?;
+            chan.stderr().take().unwrap().read_to_string(&mut stderr)?;
 
-            chan.wait_eof()?;
-            chan.wait_close()?;
+            let status = chan.wait()?;
 
-            if chan.exit_status()? != 0 {
+            if !status.success() {
                 eprintln!("{} failed to run benchmark client:", servers[i].public_dns);
                 eprintln!("{}", stderr);
             } else if !stderr.is_empty() {
@@ -261,11 +261,11 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
         }
 
         // gather server load
-        let load = servers[0]
-            .ssh
-            .as_ref()
-            .unwrap()
-            .cmd("awk '{print $1\" \"$2}' /proc/loadavg")?;
+        let load = servers[0].ssh.as_ref().unwrap().cmd(&[
+            "awk",
+            "'{print $1\" \"$2}'",
+            "/proc/loadavg",
+        ])?;
         // stop iterating through scales for this backend if it's not keeping up
         let load: f64 = load
             .trim_end()
@@ -279,11 +279,12 @@ fn run_one(args: &clap::ArgMatches, nservers: u32) -> Result<f64, failure::Error
 }
 
 impl ConvenientSession for tsunami::Session {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error> {
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
-                "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                "&" | "&&" | "<" | ">" | "2>" | "2>&1" | "|" => arg.to_string(),
+                arg if arg.starts_with(">(") => arg.to_string(),
                 _ => shellwords::escape(arg),
             })
             .collect();
@@ -291,29 +292,30 @@ impl ConvenientSession for tsunami::Session {
         eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
-        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
-
-        let mut c = self.channel_session()?;
-        c.exec(&cmd)?;
+        let c = self
+            .command("bash")
+            .arg("-c")
+            .arg(shellwords::escape(&cmd))
+            .stdin(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
         Ok(c)
     }
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error> {
-        let mut c = self.exec(cmd)?;
+        let mut cmd = self.exec(cmd)?;
+        drop(cmd.stdin().take());
+        let output = cmd.wait_with_output()?;
+        let stdout = String::from_utf8(output.stdout)?;
 
-        let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        let mut stderr = String::new();
-        c.stderr().read_to_string(&mut stderr)?;
-        c.wait_eof()?;
-
-        if c.exit_status()? != 0 {
-            return Ok(Err(stderr));
+        if !output.status.success() {
+            return Ok(Err(stdout));
         }
         Ok(Ok(stdout))
     }
 }
 
 trait ConvenientSession {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error>;
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error>;
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<String, String>, Error>;
 }

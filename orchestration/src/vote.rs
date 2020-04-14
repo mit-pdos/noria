@@ -1007,7 +1007,7 @@ where
 }
 
 impl ConvenientSession for tsunami::Session {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error> {
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, failure::Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
@@ -1020,20 +1020,20 @@ impl ConvenientSession for tsunami::Session {
         eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
-        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
-
-        let mut c = self.channel_session()?;
-        c.exec(&cmd)?;
+        let c = self
+            .command("bash")
+            .arg("-c")
+            .arg(shellwords::escape(&cmd))
+            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
         Ok(c)
     }
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error> {
-        let mut c = self.exec(cmd)?;
+        let output = self.exec(cmd)?.wait_with_output()?;
+        let stdout = String::from_utf8(output.stdout)?;
 
-        let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        c.wait_eof()?;
-
-        if c.exit_status()? != 0 {
+        if !output.status.success() {
             return Ok(Err(stdout));
         }
         Ok(Ok(()))
@@ -1047,7 +1047,7 @@ impl ConvenientSession for tsunami::Session {
 }
 
 trait ConvenientSession {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error>;
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error>;
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error>;
     fn in_noria(&self, cmd: &[&str]) -> Result<Result<(), String>, Error>;
 }

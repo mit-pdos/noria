@@ -1,20 +1,19 @@
 use super::{Backend, ConvenientSession};
 use failure::Error;
-use ssh2;
 use std::borrow::Cow;
 use std::io;
 use std::io::prelude::*;
 use std::{thread, time};
 use tsunami::Session;
 
-pub(crate) enum ServerHandle {
-    Netsoup(ssh2::Channel),
+pub(crate) enum ServerHandle<'s> {
+    Netsoup(openssh::RemoteChild<'s>),
     HandledBySystemd,
     Hybrid,
 }
 
-impl ServerHandle {
-    fn end(self, server: &Session, backend: &Backend) -> Result<(), Error> {
+impl<'s> ServerHandle<'s> {
+    fn end(self, server: &'s Session, backend: &Backend) -> Result<(), Error> {
         match self {
             ServerHandle::Netsoup(mut w) => {
                 // assert_eq!(backend, &Backend::Netsoup);
@@ -27,7 +26,7 @@ impl ServerHandle {
                 //  - https://www.libssh2.org/mail/libssh2-devel-archive-2009-09/0079.shtml
                 //
                 // so, instead we have to hack around it by finding the pid and killing it
-                if w.eof() {
+                if w.try_wait()?.is_some() {
                     // terminated prematurely!
                     unimplemented!();
                 }
@@ -36,9 +35,9 @@ impl ServerHandle {
 
                 let mut stdout = String::new();
                 let mut stderr = String::new();
-                w.stderr().read_to_string(&mut stderr)?;
-                w.read_to_string(&mut stdout)?;
-                w.wait_eof()?;
+                w.stderr().take().unwrap().read_to_string(&mut stderr)?;
+                w.stdout().take().unwrap().read_to_string(&mut stdout)?;
+                w.wait()?;
 
                 if !stderr.is_empty() {
                     println!("noria-server stdout");
@@ -96,7 +95,7 @@ pub(crate) struct Server<'a> {
     pub(crate) server: &'a Session,
     listen_addr: &'a str,
 
-    handle: ServerHandle,
+    handle: ServerHandle<'a>,
 }
 
 impl<'a> Server<'a> {
@@ -134,21 +133,23 @@ impl<'a> Server<'a> {
         }
 
         let start = time::Instant::now();
-        client.set_timeout(10000);
+        // client.set_timeout(10000);
         // sql server can be *really* slow to start b/c EBS is slow
         while start.elapsed() < time::Duration::from_secs(5 * 60) {
-            let e: Result<(), ssh2::Error> = try {
-                let mut c = client.channel_direct_tcpip(self.listen_addr, backend.port(), None)?;
-                c.send_eof()?;
-                c.wait_eof()?;
-            };
+            let test = client
+                .command("bash")
+                .arg("-c")
+                .arg("exec")
+                .arg(&format!(
+                    "6<>/dev/tcp/{}/{}",
+                    self.listen_addr,
+                    backend.port()
+                ))
+                .status()?;
 
-            if let Err(e) = e {
-                if e.code() == -21 {
-                    // "connect failed"
-                    continue;
-                }
-                Err(e)?;
+            if !test.success() {
+                // connection failed
+                continue;
             } else {
                 return Ok(());
             }
@@ -159,8 +160,8 @@ impl<'a> Server<'a> {
     fn get_pid(&mut self, pgrep: &str) -> Result<Option<usize>, Error> {
         let mut c = self.server.exec(&["pgrep", pgrep])?;
         let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        c.wait_eof()?;
+        c.stdout().take().unwrap().read_to_string(&mut stdout)?;
+        c.wait()?;
 
         Ok(stdout.lines().next().and_then(|line| line.parse().ok()))
     }
@@ -173,8 +174,8 @@ impl<'a> Server<'a> {
         let mut c = self.server.exec(&["grep", "VmRSS", &f])?;
 
         let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        c.wait_eof()?;
+        c.stdout().take().unwrap().read_to_string(&mut stdout)?;
+        c.wait()?;
 
         Ok(stdout
             .lines()
@@ -191,8 +192,8 @@ impl<'a> Server<'a> {
         // first, get uptime (for load avgs)
         let mut c = self.server.exec(&["uptime"])?;
         w.write_all(b"uptime:\n")?;
-        io::copy(&mut c, w)?;
-        c.wait_eof()?;
+        io::copy(c.stdout().as_mut().unwrap(), w)?;
+        c.wait()?;
 
         match *backend {
             Backend::Memcached => {
@@ -219,8 +220,8 @@ impl<'a> Server<'a> {
                 ])?;
 
                 w.write_all(b"tables:\n")?;
-                io::copy(&mut c, w)?;
-                c.wait_eof()?;
+                io::copy(c.stdout().as_mut().unwrap(), w)?;
+                c.wait()?;
             }
             Backend::Netsoup { .. } => {
                 let mem = self
@@ -241,16 +242,16 @@ impl<'a> Server<'a> {
                 ])?;
 
                 w.write_all(b"tables:\n")?;
-                io::copy(&mut c, w)?;
-                c.wait_eof()?;
+                io::copy(c.stdout().as_mut().unwrap(), w)?;
+                c.wait()?;
             }
             Backend::Mssql => {
                 let mut c = self
                     .server
                     .exec(&["du", "-s", "/opt/mssql-ramdisk/data/"])?;
                 w.write_all(b"disk:\n")?;
-                io::copy(&mut c, w)?;
-                c.wait_eof()?;
+                io::copy(c.stdout().as_mut().unwrap(), w)?;
+                c.wait()?;
 
                 let mut c = self.server.exec(&[
                     "/opt/mssql-tools/bin/sqlcmd",
@@ -268,8 +269,8 @@ impl<'a> Server<'a> {
                     "-1",
                 ])?;
                 w.write_all(b"tables:\n")?;
-                io::copy(&mut c, w)?;
-                c.wait_eof()?;
+                io::copy(c.stdout().as_mut().unwrap(), w)?;
+                c.wait()?;
             }
         }
         Ok(())

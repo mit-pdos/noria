@@ -632,7 +632,7 @@ fn run_clients(
 ) -> bool {
     // first, we need to prime from some host -- doesn't really matter which
     {
-        clients[0].ssh.as_ref().unwrap().set_timeout(0);
+        // TODO: clients[0].ssh.as_ref().unwrap().set_timeout(0);
         eprintln!(" .. prepopulating on {}", clients[0].public_dns);
 
         let mut prime_params = params.clone();
@@ -730,11 +730,11 @@ fn run_clients(
         None
     } else if let Backend::Netsoup { .. } = params.backend {
         let r: Result<_, failure::Error> = try {
-            server.server.set_compress(true);
+            // server.server.set_compress(true);
             let mut c = server.server.exec(&["pgrep", "noria-server"])?;
             let mut stdout = String::new();
-            c.read_to_string(&mut stdout)?;
-            c.wait_eof()?;
+            c.stdout().take().unwrap().read_to_string(&mut stdout)?;
+            c.wait()?;
 
             // set up
 
@@ -787,8 +787,8 @@ fn run_clients(
                                 .server
                                 .exec(&["ps", "H", "-o", "tid comm", &pid, "|", "awk", &search])?;
                             let mut stdout = String::new();
-                            c.read_to_string(&mut stdout)?;
-                            c.wait_eof()?;
+                            c.stdout().take().unwrap().read_to_string(&mut stdout)?;
+                            c.wait()?;
                             let tid = stdout
                                 .lines()
                                 .next()
@@ -859,7 +859,11 @@ fn run_clients(
             // TODO: should we get histogram files here instead and merge them?
 
             let mut stdout = String::new();
-            chan.read_to_string(&mut stdout).unwrap();
+            chan.stdout()
+                .take()
+                .unwrap()
+                .read_to_string(&mut stdout)
+                .unwrap();
             f.write_all(stdout.as_bytes()).unwrap();
 
             got_lines = false;
@@ -893,11 +897,14 @@ fn run_clients(
         }
 
         let mut stderr = String::new();
-        chan.stderr().read_to_string(&mut stderr).unwrap();
-        chan.wait_eof().unwrap();
-        chan.wait_close().unwrap();
+        chan.stderr()
+            .take()
+            .unwrap()
+            .read_to_string(&mut stderr)
+            .unwrap();
+        let status = chan.wait().unwrap();
 
-        if !got_lines || chan.exit_status().unwrap() != 0 {
+        if !got_lines || status.code().unwrap() != 0 {
             eprintln!("{} failed to run benchmark client:", host);
             eprintln!("{}", stderr);
             eprintln!("");
@@ -924,11 +931,11 @@ fn run_clients(
         // make perf exit
         if let Perf::Hot = do_perf {
             let mut k = server.server.exec(&["pkill", "perf"]).unwrap();
-            k.wait_eof().unwrap();
+            k.wait().unwrap();
         }
 
         // wait for perf to exit, and then fetch top entries from the report
-        c.wait_eof().unwrap();
+        c.wait().unwrap();
 
         let fname = params.name(target, do_perf.extension());
         if let Ok(mut f) = File::create(&fname) {
@@ -948,8 +955,8 @@ fn run_clients(
 
             match k {
                 Ok(mut c) => {
-                    io::copy(&mut c, &mut f).unwrap();
-                    c.wait_eof().unwrap();
+                    io::copy(c.stdout().as_mut().unwrap(), &mut f).unwrap();
+                    c.wait().unwrap();
                 }
                 Err(e) => {
                     eprintln!("failed to parse perf report");
@@ -1007,7 +1014,7 @@ where
 }
 
 impl ConvenientSession for tsunami::Session {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error> {
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
@@ -1020,20 +1027,20 @@ impl ConvenientSession for tsunami::Session {
         eprintln!("    :> {}", cmd);
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
-        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
-
-        let mut c = self.channel_session()?;
-        c.exec(&cmd)?;
+        let c = self
+            .command("bash")
+            .arg("-c")
+            .arg(shellwords::escape(&cmd))
+            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
         Ok(c)
     }
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error> {
-        let mut c = self.exec(cmd)?;
+        let output = self.exec(cmd)?.wait_with_output()?;
+        let stdout = String::from_utf8(output.stdout)?;
 
-        let mut stdout = String::new();
-        c.read_to_string(&mut stdout)?;
-        c.wait_eof()?;
-
-        if c.exit_status()? != 0 {
+        if !output.status.success() {
             return Ok(Err(stdout));
         }
         Ok(Ok(()))
@@ -1047,7 +1054,7 @@ impl ConvenientSession for tsunami::Session {
 }
 
 trait ConvenientSession {
-    fn exec(&self, cmd: &[&str]) -> Result<ssh2::Channel, Error>;
+    fn exec(&self, cmd: &[&str]) -> Result<openssh::RemoteChild<'_>, Error>;
     fn just_exec(&self, cmd: &[&str]) -> Result<Result<(), String>, Error>;
     fn in_noria(&self, cmd: &[&str]) -> Result<Result<(), String>, Error>;
 }

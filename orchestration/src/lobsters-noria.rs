@@ -10,7 +10,7 @@ use std::{thread, time};
 use tsunami::*;
 use yansi::Paint;
 
-const AMI: &str = "ami-089ff13f1c92f991e";
+const AMI: &str = "ami-06babf6029120d781";
 
 fn git_and_cargo(
     ssh: &mut Session,
@@ -151,7 +151,7 @@ fn main() {
                 "server",
             )?;
             // we'll need zookeeper running
-            ssh.cmd("sudo systemctl start zookeeper")?;
+            ssh.cmd(&["sudo", "systemctl", "start zookeeper"])?;
 
             Ok(())
         })
@@ -476,16 +476,16 @@ fn main() {
                     load.write_all(b"\n")?;
 
                     let mut hist = File::create(format!("{}.hist", prefix))?;
-                    let hist_cmd = if let Some(memlimit) = memlimit {
-                        format!("cat lobsters-{}-r{}-l{}.hist", backend, scale, memlimit)
+                    let hist_arg = if let Some(memlimit) = memlimit {
+                        format!("lobsters-{}-r{}-l{}.hist", backend, scale, memlimit)
                     } else {
-                        format!("cat lobsters-{}-r{}-unlimited.hist", backend, scale)
+                        format!("lobsters-{}-r{}-unlimited.hist", backend, scale)
                     };
                     trawler
                         .ssh
                         .as_ref()
                         .unwrap()
-                        .cmd_raw(&hist_cmd)
+                        .cmd_raw(&["cat", &hist_arg])
                         .and_then(|out| Ok(hist.write_all(&out[..]).map(|_| ())?))?;
 
                     let sload: f64 = sload
@@ -539,11 +539,11 @@ fn main() {
                         .ssh
                         .as_ref()
                         .unwrap()
-                        .cmd_raw(&format!(
-                            "wget http://{}:9000/get_statistics",
-                            server.private_ip
-                        ))
-                        .and_then(|out| Ok(sizefile.write_all(&out[..]).map(|_| ())?))?;
+                        .cmd(&[
+                            "wget",
+                            &format!("http://{}:9000/get_statistics", server.private_ip),
+                        ])
+                        .and_then(|out| Ok(sizefile.write_all(out.as_bytes()).map(|_| ())?))?;
 
                     // stop the server
                     let _ = server
@@ -551,8 +551,8 @@ fn main() {
                         .as_ref()
                         .unwrap()
                         .just_exec(&["pkill", "-f", "noria-server", "2>&1"], "server")?;
-                    if let Some(mut server_chan) = server_chan {
-                        let server_stdout = finalize(&mut server_chan)?;
+                    if let Some(server_chan) = server_chan {
+                        let server_stdout = finalize(server_chan)?;
                         if erred {
                             let erred = server_stdout.is_err();
                             let server_stdout = server_stdout.unwrap_or_else(|e| e);
@@ -643,26 +643,18 @@ fn main() {
     .unwrap();
 }
 
-fn finalize(c: &mut ssh2::Channel) -> Result<Result<String, String>, failure::Error> {
-    // sending EOF may fail if the remote command has failed
-    // that's okay
-    let _ = c.send_eof();
+fn finalize(c: openssh::RemoteChild<'_>) -> Result<Result<String, String>, failure::Error> {
+    let output = c.wait_with_output()?;
+    let stdout = String::from_utf8(output.stdout)?;
 
-    let mut stdout = Vec::new();
-    while !c.eof() {
-        c.read_to_end(&mut stdout)?;
-    }
-    c.wait_close()?;
-    let stdout = String::from_utf8(stdout)?;
-
-    if c.exit_status()? != 0 {
+    if !output.status.success() {
         return Ok(Err(stdout));
     }
     Ok(Ok(stdout))
 }
 
 impl ConvenientSession for tsunami::Session {
-    fn exec(&self, cmd: &[&str], on: &str) -> Result<ssh2::Channel, failure::Error> {
+    fn exec(&self, cmd: &[&str], on: &str) -> Result<openssh::RemoteChild<'_>, failure::Error> {
         let cmd: Vec<_> = cmd
             .iter()
             .map(|&arg| match arg {
@@ -676,15 +668,17 @@ impl ConvenientSession for tsunami::Session {
         eprintln!("{}", Paint::blue(format!("{} $ {}", on, cmd)));
 
         // ensure we're using a Bourne shell (that's what shellwords supports too)
-        let cmd = format!("bash -c {}", shellwords::escape(&cmd));
-
-        let mut c = self.channel_session()?;
-        c.exec(&cmd)?;
+        let c = self
+            .command("bash")
+            .arg("-c")
+            .arg(shellwords::escape(&cmd))
+            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
         Ok(c)
     }
     fn just_exec(&self, cmd: &[&str], on: &str) -> Result<Result<String, String>, failure::Error> {
-        let mut c = self.exec(cmd, on)?;
-        finalize(&mut c)
+        finalize(self.exec(cmd, on)?)
     }
     fn exec_print_nonempty(&self, cmd: &[&str], on: &str) -> Result<(), failure::Error> {
         let r = self.just_exec(cmd, on)?;
@@ -719,7 +713,7 @@ impl ConvenientSession for tsunami::Session {
 }
 
 trait ConvenientSession {
-    fn exec(&self, cmd: &[&str], on: &str) -> Result<ssh2::Channel, failure::Error>;
+    fn exec(&self, cmd: &[&str], on: &str) -> Result<openssh::RemoteChild<'_>, failure::Error>;
     fn just_exec(&self, cmd: &[&str], on: &str) -> Result<Result<String, String>, failure::Error>;
     fn exec_print_nonempty(&self, cmd: &[&str], on: &str) -> Result<(), failure::Error>;
 }
