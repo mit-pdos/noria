@@ -109,7 +109,7 @@ async fn memstats(g: &mut noria::Handle<LocalAuthority>, materialization: String
     println!("{}", reader); 
     println!("{}", mat); 
     println!("{}", mult); 
-    
+
     let exp_summary = format!("{}\n{}\n{}\n{:?}\n{:?}\n", base, reader, mat, mult, read_latencies); 
     let mut file = File::create(format!("exp-{}mat-{}nusers-{}ntweets.txt", materialization, nusers, ntweets)).unwrap();
     file.write_all(exp_summary.as_bytes());
@@ -140,74 +140,60 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
     if materialization == "client".to_string() {
         let uid = 0; 
         let leaf = format!("Blocked");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+        let mut blocked_user = HashSet::new(); 
+        let mut users_followed = HashSet::new();
+        let mut visible_tweets = Vec::new(); 
+
+        let mut getter1 = backend.g.view(&leaf).await.unwrap();
+
+        let leaf = format!("Follows");
+        let mut getter2 = backend.g.view(&leaf).await.unwrap();
+
+        let leaf = format!("AllTweetsWithUserInfo");
+        let mut getter3 = backend.g.view(&leaf).await.unwrap();
+
+        let leaf = format!("PublicTweets");
+        let mut getter4 = backend.g.view(&leaf).await.unwrap();
+
+        let start = time::Instant::now();
+       
+        let mut res1 = getter1.lookup(&[0.into()], true).await.unwrap();
         
         // Blocked accounts and blocked by accounts: 
-        let mut blocked_user = HashSet::new(); 
-        for record in res.iter() {
-            // println!("record: {:?} uid: {:?}", record, uid.into()); 
+        for record in res1.iter() {
             if record[0] == uid.into() {
                 blocked_user.insert(record[1].clone()); 
             }
         }
 
-        // let mut all = Vec::new(); 
-        // for i in 0..nusers {
-        //     all.push(i.into()); 
-        // }
-        // let mut res2 = getter.lookup(&all, true).await.unwrap();
-        // for record in res2.iter() {
-        //     println!("record: {:?} uid: {:?}", record, uid); 
-        //     if record[1] == uid.into() {
-        //         blocked_user.insert(record[0].clone()); 
-        //     }
-        // }
-
         // Followed 
-        let leaf = format!("Follows");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        let mut users_followed = HashSet::new();
+        let mut res2 = getter2.lookup(&[0.into()], true).await.unwrap();
 
-        println!("follows: {:?}", res[0]);
-        for record in res.iter() {
-            println!("follows {:?}", record); 
+        for record in res2.iter() {
             if record[0] == uid.into() {
-                println!("adding to follows");
                 users_followed.insert(record[1].clone()); 
             }
         }
 
         // User-specific timeline
-        let leaf = format!("AllTweetsWithUserInfo");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        let mut visible_tweets = Vec::new(); 
-
-        for record in res.iter() {
-            if users_followed.contains(&record[0]) {
+       
+        let mut res3 = getter3.lookup(&[0.into()], true).await.unwrap();
+        for record in res3.iter() {
+            if users_followed.contains(&record[3]) || record[3] == 0.into(){
                 visible_tweets.push(record); 
             }
         }
 
         // Remove blocked tweets from all public tweets, union with followed tweets 
-        let leaf = format!("PublicTweets");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut dur = time::Duration::from_millis(0); 
-        let start = time::Instant::now();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        dur += start.elapsed();
-
-        for record in res.iter() {
+     
+        let mut res4 = getter4.lookup(&[0.into()], true).await.unwrap();
+        for record in res4.iter() {
             if !blocked_user.contains(&record[0]) {
                 visible_tweets.push(record); 
             }
         }
 
-        println!("visible tweets: {:?}", visible_tweets[0]);
-        
-        let dur = dur.as_secs_f64();
+        let dur = start.elapsed().as_secs_f64();
 
         println!(
             "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
@@ -215,7 +201,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
             dur,
             (visible_tweets.len() as f64) / dur,
         );
-        
+         
         println!("len visible: {:?}", visible_tweets.len()); 
         
     } else if materialization == "full".to_string() || materialization == "partial".to_string() {
@@ -249,7 +235,7 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
     println!("constructing graph: materialization: {}, partial: {}, nusers: {}, ntweets: {} percent private: {}", materialization, partial, nusers, ntweets, private); 
 
     if materialization == "client".to_string() {
-
+        println!("CLIENT SIDE"); 
         let init = Instant::now();
         thread::sleep(Duration::from_millis(2000));
 
@@ -264,33 +250,34 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
 
             let ri = mig.maintain("Blocked".to_string(), blocked, &[0]);
             let r2 = mig.maintain_anonymous(follows, &[0]); 
+            let r3 = mig.maintain_anonymous(tweets, &[5]); 
             (tweets, users, blocked, follows)
         }).await; 
 
 
-        let (tweets_with_user_info, retweets, all_tweets) = backend.g.migrate(move |mig| {
+        let (all_tweets) = backend.g.migrate(move |mig| {
             let tweets_with_user_info = mig.add_ingredient("TweetsWithUserInfo", 
                                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
                                                             Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
+            
+            let tweets_with_user_info2 = mig.add_ingredient("TweetsWithUserInfo2", 
+                                                            &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                                                            Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
+            
+            let prelim = mig.maintain_anonymous(tweets_with_user_info, &[7]); 
 
-            let retweets = mig.add_ingredient("RetweetsWithUserInfo",
-                                            &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"],
+            let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo",
+                                            &["id", "time", "content", "userId", "name", 
+                                              "retweetId", "retweetTime", "retweetContent", 
+                                              "retweetUserId", "retweetName", "isPrivate", "bogo"],
                                             Join::new(tweets_with_user_info,
-                                                        tweets_with_user_info,
-                                                        JoinType::Inner,
-                                                        vec![L(0), B(1, 4), L(2), L(3), L(4), L(5), L(6), L(7)]));
-                                
-            let mut emits = HashMap::new(); 
-            emits.insert(tweets_with_user_info, vec![0, 1, 2, 3, 4, 5, 6, 7]); 
-            emits.insert(retweets, vec![0, 1, 2, 3, 4, 5, 6, 7]); 
+                                                      tweets_with_user_info2,
+                                                      JoinType::Left,
+                                                      vec![L(1), L(3), L(2), L(0), L(5), B(4, 1), R(3), R(2), R(0), R(5), R(6), L(7)])); 
 
-            let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo", 
-                                                &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"],
-                                                Union::new(emits)); 
-            
-            let mut ri = mig.maintain_anonymous(all_tweets, &[7]);          
-            
-            (tweets_with_user_info, retweets, all_tweets)
+            let mut ri = mig.maintain_anonymous(all_tweets, &[11]);    
+
+            (all_tweets) 
         }).await; 
 
         let public_tweets = backend.g.migrate(move |mig| {
@@ -415,6 +402,170 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
 }
 
 
+async fn it_works_client_side() {
+    let verbose = false; 
+    let partial = false; 
+    let nusers = 3 as usize; 
+    let ntweets = 4 as usize; 
+    let private = 0.0 as f64;
+    let materialization = "client".to_string(); 
+
+    // Construct client side graph
+    let mut backend = Backend::make(verbose, partial).await;
+    construct_graph(&mut backend, verbose, partial, nusers, ntweets, private, materialization).await; 
+
+    // Populate tables 
+    let nusers = 3; 
+    let mut users = Vec::new(); 
+    let mut tweets = Vec::new(); 
+    let mut follows = Vec::new(); 
+    let mut blocks = Vec::new(); 
+
+    // Add users to the system
+    for i in 0..nusers {
+        let mut name = "name".to_string(); 
+        let mut handle : String = format!("user{}", i); 
+        let mut bday_month: usize = 0;
+        let mut bday_day: usize = 1; 
+        let mut bday_year: usize = 2; 
+        let mut password: String = "password".to_string(); 
+        let mut email: String = "email".to_string(); 
+                
+        let mut new_record : Vec<DataType> = vec![
+                                                i.into(),
+                                                name.into(), 
+                                                0.into(), 
+                                                bday_month.into(), 
+                                                bday_day.into(), 
+                                                bday_year.into(), 
+                                                email.into(), 
+                                                password.into(), 
+                                                ]; 
+        users.push(new_record); 
+    }
+
+    // Add follows/blocks --- user 0 follows user 2 
+    let mut rec = Vec::new(); 
+    rec.push((0 as i32).into()); 
+    rec.push((2 as i32).into()); 
+    follows.push(rec.clone()); 
+    
+    // Add follows/blocks --- user 0 blocks user 1
+    let mut rec = Vec::new(); 
+    rec.push((0 as i32).into()); 
+    rec.push((1 as i32).into()); 
+    blocks.push(rec.clone()); 
+
+    // "userId", "id", "content", "time", "retweetId", "bogo"
+
+    // Add tweets --- user 2 tweets twice, user 1 tweets once, user 0 tweets once 
+    let mut new_record: Vec<DataType> = vec![
+        2.into(), 
+        1.into(),
+        "x".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+
+    let mut new_record2: Vec<DataType> = vec![
+        2.into(), 
+        2.into(),
+        "x2".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+
+    let mut new_record3: Vec<DataType> = vec![
+        1.into(), 
+        3.into(),
+        "y".into(),
+        0.into(), 
+        1.into(), 
+        0.into()
+    ]; 
+
+    let mut new_record4: Vec<DataType> = vec![
+        0.into(), 
+        4.into(),
+        "z".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+    
+    tweets.push(new_record);
+    tweets.push(new_record2); 
+    tweets.push(new_record3); 
+    tweets.push(new_record4); 
+
+    backend.populate("Users", users.clone()).await;
+    backend.populate("Follows", follows.clone()).await; 
+    backend.populate("BlockedAccounts", blocks.clone()).await; 
+    backend.populate("Tweets", tweets.clone()).await; 
+
+    thread::sleep(Duration::from_millis(10000));
+
+    let uid = 0; 
+
+    // Do client side reads from user 0's perspective  
+    let leaf = format!("Blocked");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    
+    // Blocked accounts and blocked by accounts: 
+    let mut blocked_user = HashSet::new(); 
+    for record in res.iter() {
+        if record[0] == uid.into() {
+            blocked_user.insert(record[1].clone()); 
+        }
+    }
+
+    // Followed 
+    let leaf = format!("Follows");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    let mut users_followed = HashSet::new();
+
+    println!("follows: {:?}", res);
+    for record in res.iter() {
+        println!("follows {:?}", record); 
+        if record[0] == uid.into() {
+            println!("adding to follows");
+            users_followed.insert(record[1].clone()); 
+        }
+    }
+
+    // User-specific timeline
+    let leaf = format!("AllTweetsWithUserInfo");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    let mut visible_tweets = Vec::new(); 
+
+    assert!(res.len() == 4); 
+
+    for record in res.iter() {
+        if users_followed.contains(&record[3]) || record[3] == 0.into(){
+            visible_tweets.push(record); 
+        }
+    }
+
+    // Remove blocked tweets from all public tweets, union with followed tweets 
+    let leaf = format!("PublicTweets");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+
+    for record in res.iter() {
+        if !blocked_user.contains(&record[0]) {
+            visible_tweets.push(record); 
+        }
+    }
+
+    assert!(visible_tweets.len() == 3); 
+}
+
+
 #[tokio::main]
 async fn main() {
     use clap::{App, Arg};
@@ -474,7 +625,6 @@ async fn main() {
         )
         .get_matches();
 
-
     let verbose = args.is_present("verbose");
     let full_suite = args.is_present("full-suite");
 
@@ -511,165 +661,4 @@ async fn main() {
         }                   
     }
 
-}
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works_client_side() {
-        let verbose = false; 
-        let partial = false; 
-        let nusers = 3; 
-        let ntweets = 4; 
-        let private = 0;
-        let materialization = "client".to_string(); 
-
-        // Construct client side graph
-        construct_graph(verbose, partial, nusers, ntweets, private, materialization).await; 
-
-        // Populate tables 
-        let nusers = 3; 
-        let mut users = Vec::new(); 
-        let mut tweets = Vec::new(); 
-        let mut follows = Vec::new(); 
-        let mut blocks = Vec::new(); 
-
-        // Add users to the system
-        for i in 0..nusers {
-            let mut name = "name".to_string(); 
-            let mut handle : String = format!("user{}", i); 
-            let mut bday_month: usize = 0;
-            let mut bday_day: usize = 1; 
-            let mut bday_year: usize = 2; 
-            let mut password: String = "password".to_string(); 
-            let mut email: String = "email".to_string(); 
-                    
-            let mut new_record : Vec<DataType> = vec![
-                                                    i.into(),
-                                                    name.into(), 
-                                                    0.into(), 
-                                                    bday_month.into(), 
-                                                    bday_day.into(), 
-                                                    bday_year.into(), 
-                                                    email.into(), 
-                                                    password.into(), 
-                                                    ]; 
-            users.push(new_record); 
-        }
-
-        // Add follows/blocks --- user 0 follows user 2 
-        let mut rec = Vec::new(); 
-        rec.push((0 as i32).into()); 
-        rec.push((2 as i32).into()); 
-        follows.push(rec.clone()); 
-        
-        // Add follows/blocks --- user 0 blocks user 1
-        let mut rec = Vec::new(); 
-        rec.push((0 as i32).into()); 
-        rec.push((1 as i32).into()); 
-        blocks.push(rec.clone()); 
-
-        // Add tweets --- user 2 tweets twice, user 1 tweets once, user 0 tweets once 
-        let mut new_record: Vec<DataType> = vec![
-            2.into(), 
-            0.into(),
-            "x".into(),
-            0.into(), 
-            0.into(), 
-            0.into()
-        ]; 
-
-        let mut new_record2: Vec<DataType> = vec![
-            2.into(), 
-            1.into(),
-            "x2".into(),
-            0.into(), 
-            0.into(), 
-            0.into()
-        ]; 
-
-        let mut new_record3: Vec<DataType> = vec![
-            1.into(), 
-            2.into(),
-            "y".into(),
-            0.into(), 
-            0.into(), 
-            0.into()
-        ]; 
-
-        let mut new_record4: Vec<DataType> = vec![
-            0.into(), 
-            3.into(),
-            "z".into(),
-            0.into(), 
-            0.into(), 
-            0.into()
-        ]; 
-       
-        tweets.push(new_record);
-        tweets.push(new_record2); 
-        tweets.push(new_record3); 
-        tweets.push(new_record4); 
-
-        backend.populate("Users", users.clone()).await;
-        backend.populate("Follows", follows.clone()).await; 
-        backend.populate("Tweets", tweets.clone()).await; 
-        backend.populate("BlockedAccounts", blocks.clone()).await; 
-
-        // Do client side reads from user 0's perspective  
-        let leaf = format!("Blocked");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        
-        // Blocked accounts and blocked by accounts: 
-        let mut blocked_user = HashSet::new(); 
-        for record in res.iter() {
-            // println!("record: {:?} uid: {:?}", record, uid.into()); 
-            if record[0] == uid.into() {
-                blocked_user.insert(record[1].clone()); 
-            }
-        }
-
-        // Followed 
-        let leaf = format!("Follows");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        let mut users_followed = HashSet::new();
-
-        println!("follows: {:?}", res[0]);
-        for record in res.iter() {
-            println!("follows {:?}", record); 
-            if record[0] == uid.into() {
-                println!("adding to follows");
-                users_followed.insert(record[1].clone()); 
-            }
-        }
-
-        // User-specific timeline
-        let leaf = format!("AllTweetsWithUserInfo");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-        let mut visible_tweets = Vec::new(); 
-
-        for record in res.iter() {
-            if users_followed.contains(&record[0]) {
-                visible_tweets.push(record); 
-            }
-        }
-
-        // Remove blocked tweets from all public tweets, union with followed tweets 
-        let leaf = format!("PublicTweets");
-        let mut getter = backend.g.view(&leaf).await.unwrap();
-        let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-
-        for record in res.iter() {
-            if !blocked_user.contains(&record[0]) {
-                visible_tweets.push(record); 
-            }
-        }
-
-        println!("len visible: {:?}", visible_tweets.len()); 
-        return assert!(visible_tweets.len() == 3); 
-    }
 }
