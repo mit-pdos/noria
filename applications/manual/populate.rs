@@ -181,7 +181,7 @@ impl Populate {
     }
 
     pub fn get_tweets(&mut self) -> Vec<Vec<DataType>> {
-        // ["userId", "id", "content", "time", "retweetId"]
+        // &["userId", "id", "content", "time", "retweetId", "bogo"]
         let mut tweets = Vec::new();
         println!("num tweets: {:?}", self.ntweets); 
         for i in 0..self.ntweets {
@@ -199,11 +199,11 @@ impl Populate {
                 retweet_id = rt; 
             }
             let mut new_record : Vec<DataType> = vec![
-                0.into(), 
+                user_who_tweeted.into(), 
                 i.into(),
                 content.into(),
                 0.into(), 
-                0.into(), 
+                retweet_id.into(), 
                 0.into()
             ]; 
             tweets.push(new_record.clone()); 

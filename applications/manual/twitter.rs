@@ -456,7 +456,6 @@ async fn it_works_client_side() {
     rec.push((1 as i32).into()); 
     blocks.push(rec.clone()); 
 
-    // "userId", "id", "content", "time", "retweetId", "bogo"
 
     // Add tweets --- user 2 tweets twice, user 1 tweets once, user 0 tweets once 
     let mut new_record: Vec<DataType> = vec![
@@ -552,15 +551,15 @@ async fn it_works_client_side() {
     }
 
     // Remove blocked tweets from all public tweets, union with followed tweets 
-    let leaf = format!("PublicTweets");
-    let mut getter = backend.g.view(&leaf).await.unwrap();
-    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    // let leaf = format!("PublicTweets");
+    // let mut getter = backend.g.view(&leaf).await.unwrap();
+    // let mut res = getter.lookup(&[0.into()], true).await.unwrap();
 
-    for record in res.iter() {
-        if !blocked_user.contains(&record[0]) {
-            visible_tweets.push(record); 
-        }
-    }
+    // for record in res.iter() {
+    //     if !blocked_user.contains(&record[0]) {
+    //         visible_tweets.push(record); 
+    //     }
+    // }
 
     assert!(visible_tweets.len() == 3); 
 }
