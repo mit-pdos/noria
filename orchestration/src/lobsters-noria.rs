@@ -10,7 +10,7 @@ use std::{thread, time};
 use tsunami::*;
 use yansi::Paint;
 
-const AMI: &str = "ami-06babf6029120d781";
+const AMI: &str = "ami-06274789bfb99f4c8";
 
 fn git_and_cargo(
     ssh: &mut Session,
@@ -230,415 +230,436 @@ fn main() {
             eprintln!("failed to write out host files: {:?}", e);
         }
 
-        let shards = [0, 1, 2];
+        // try block so we can make sure to clean up ssh connections after
+        let r = try {
+            trawler.ssh.as_ref().unwrap().check()?;
+            server.ssh.as_ref().unwrap().check()?;
 
-        // allow reuse of time-wait ports
-        trawler
-            .ssh
-            .as_ref()
-            .unwrap()
-            .just_exec(
-                &[
-                    "echo",
-                    "1",
-                    "|",
-                    "sudo",
-                    "tee",
-                    "/proc/sys/net/ipv4/tcp_tw_reuse",
-                ],
-                "client",
-            )?
-            .map_err(failure::err_msg)?;
+            let shards = [0, 1, 2];
 
-        for &nshard in &shards {
-            let mut survived_last = true;
-            for &scale in &scales {
-                if !survived_last {
-                    break;
-                }
-
-                let backend = if nshard == 0 {
-                    "direct".to_owned()
-                } else {
-                    format!("direct_{}", nshard)
-                };
-
-                eprintln!(
-                    "{}",
-                    Paint::green(format!("==> benchmark {} at {}x scale", backend, scale)).bold()
-                );
-
-                let prefix = format!("lobsters-{}-{}", backend, scale);
-                let mut server_chan = None;
-
-                let run: Result<_, failure::Error> = try {
-                    // just to make totally sure
-                    server.ssh.as_ref().unwrap().exec_print_nonempty(
-                        &["pkill", "-9", "-f", "noria-server", "2>&1"],
-                        "server",
-                    )?;
-
-                    // XXX: also delete log files if we later run with RocksDB?
-                    server.ssh.as_ref().unwrap().exec_print_nonempty(
-                        &[
-                            "target/release/noria-zk",
-                            "--clean",
-                            "--deployment",
-                            "trawler",
-                        ],
-                        "server",
-                    )?;
-
-                    // Don't hit Noria listening timeout think
-                    thread::sleep(time::Duration::from_secs(10));
-
-                    // start server again
-                    let shards = format!("{}", nshard);
-                    let mut cmd = vec![
-                        "env",
-                        "RUST_BACKTRACE=1",
-                        "target/release/noria-server",
-                        "--deployment",
-                        "trawler",
-                        "--durability",
-                        "memory",
-                        "--no-reuse",
-                        "--address",
-                        &server.private_ip,
-                        "--shards",
-                        &shards,
-                        "-v",
-                        "2>&1",
+            // allow reuse of time-wait ports
+            trawler
+                .ssh
+                .as_ref()
+                .unwrap()
+                .just_exec(
+                    &[
+                        "echo",
+                        "1",
                         "|",
+                        "sudo",
                         "tee",
-                        "server.log",
-                    ];
-                    if let Some(memlimit) = memlimit {
-                        cmd.extend(&["--memory", memlimit]);
+                        "/proc/sys/net/ipv4/tcp_tw_reuse",
+                    ],
+                    "client",
+                )?
+                .map_err(failure::err_msg)?;
+
+            for &nshard in &shards {
+                let mut survived_last = true;
+                for &scale in &scales {
+                    if !survived_last {
+                        break;
                     }
 
-                    server_chan = Some(server.ssh.as_ref().unwrap().exec(&cmd[..], "server")?);
-
-                    // give noria a chance to start
-                    thread::sleep(time::Duration::from_secs(5));
-
-                    // run priming
-                    eprintln!(
-                        "{}",
-                        Paint::new(format!(
-                            "--> priming at {}",
-                            Local::now().time().format("%H:%M:%S")
-                        ))
-                        .bold()
-                    );
-                    let in_flight = format!("{}", in_flight);
-
-                    let zk = format!("{}:2181", server.private_ip);
-                    let scale = format!("{}", scale);
-                    trawler.ssh.as_ref().unwrap().exec_print_nonempty(
-                        &[
-                            "env",
-                            "RUST_BACKTRACE=1",
-                            "target/release/lobsters-noria",
-                            "--scale",
-                            &scale,
-                            "--warmup",
-                            "0",
-                            "--runtime",
-                            "0",
-                            "--prime",
-                            "--in-flight",
-                            &in_flight,
-                            "-z",
-                            &zk,
-                            "--deployment",
-                            "trawler",
-                            "2>&1",
-                            "|",
-                            "tee",
-                            "client.log",
-                        ],
-                        "client",
-                    )?;
-
-                    eprintln!(
-                        "{}",
-                        Paint::new(format!(
-                            "--> warming at {}",
-                            Local::now().time().format("%H:%M:%S")
-                        ))
-                        .bold()
-                    );
-
-                    trawler.ssh.as_ref().unwrap().exec_print_nonempty(
-                        &[
-                            "env",
-                            "RUST_BACKTRACE=1",
-                            "target/release/lobsters-noria",
-                            "--scale",
-                            &scale,
-                            "--warmup",
-                            "30",
-                            "--runtime",
-                            "0",
-                            "--in-flight",
-                            &in_flight,
-                            "-z",
-                            &zk,
-                            "--deployment",
-                            "trawler",
-                            "2>&1",
-                            "|",
-                            "tee",
-                            "client.log",
-                        ],
-                        "client",
-                    )?;
-
-                    eprintln!(
-                        "{}",
-                        Paint::new(format!(
-                            "--> started at {}",
-                            Local::now().time().format("%H:%M:%S")
-                        ))
-                        .bold()
-                    );
-
-                    let mut output = File::create(format!("{}.log", prefix))?;
-                    let hist_output = if let Some(memlimit) = memlimit {
-                        format!(
-                            "--histogram=lobsters-{}-r{}-l{}.hist ",
-                            backend, scale, memlimit
-                        )
+                    let backend = if nshard == 0 {
+                        "direct".to_owned()
                     } else {
-                        format!(
-                            "--histogram=lobsters-{}-r{}-unlimited.hist ",
-                            backend, scale
-                        )
+                        format!("direct_{}", nshard)
                     };
-                    let res = trawler.ssh.as_ref().unwrap().just_exec(
-                        &[
+
+                    eprintln!(
+                        "{}",
+                        Paint::green(format!("==> benchmark {} at {}x scale", backend, scale))
+                            .bold()
+                    );
+
+                    let prefix = format!("lobsters-{}-{}", backend, scale);
+                    let mut server_chan = None;
+
+                    let run: Result<_, failure::Error> = try {
+                        // just to make totally sure
+                        let _ = server
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .just_exec(&["pkill", "-9", "noria-server", "2>&1"], "server")?;
+
+                        // XXX: also delete log files if we later run with RocksDB?
+                        server.ssh.as_ref().unwrap().exec_print_nonempty(
+                            &[
+                                "target/release/noria-zk",
+                                "--clean",
+                                "--deployment",
+                                "trawler",
+                            ],
+                            "server",
+                        )?;
+
+                        // Don't hit Noria listening timeout think
+                        thread::sleep(time::Duration::from_secs(10));
+
+                        // start server again
+                        let shards = format!("{}", nshard);
+                        let mut cmd = vec![
                             "env",
                             "RUST_BACKTRACE=1",
-                            "target/release/lobsters-noria",
-                            "--scale",
-                            &scale,
-                            "--warmup",
-                            "15",
-                            "--runtime",
-                            "30",
-                            "--in-flight",
-                            &in_flight,
-                            "-z",
-                            &zk,
+                            "target/release/noria-server",
                             "--deployment",
                             "trawler",
-                            &hist_output,
+                            "--durability",
+                            "memory",
+                            "--no-reuse",
+                            "--address",
+                            &server.private_ip,
+                            "--shards",
+                            &shards,
+                            "-v",
                             "2>&1",
                             "|",
                             "tee",
-                            "client.log",
-                        ],
-                        "client",
-                    )?;
-
-                    match res {
-                        Ok(ref result) | Err(ref result) => {
-                            output.write_all(result.as_bytes())?;
+                            "server.log",
+                        ];
+                        if let Some(memlimit) = memlimit {
+                            cmd.extend(&["--memory", memlimit]);
                         }
-                    }
-                    drop(output);
 
-                    let _ = res.map_err(|_| failure::err_msg("client failed"))?;
+                        server_chan = Some(server.ssh.as_ref().unwrap().exec(&cmd[..], "server")?);
 
-                    // gather server load
-                    let sload = server
-                        .ssh
-                        .as_ref()
-                        .unwrap()
-                        .just_exec(&["awk", "{print $1\" \"$2}", "/proc/loadavg"], "server")?
-                        .map_err(failure::err_msg)?;
-                    let sload = sload.trim_end();
+                        // give noria a chance to start
+                        thread::sleep(time::Duration::from_secs(5));
 
-                    // gather client load
-                    let cload = trawler
-                        .ssh
-                        .as_ref()
-                        .unwrap()
-                        .just_exec(&["awk", "{print $1\" \"$2}", "/proc/loadavg"], "client")?
-                        .map_err(failure::err_msg)?;
-                    let cload = cload.trim_end();
+                        // run priming
+                        eprintln!(
+                            "{}",
+                            Paint::new(format!(
+                                "--> priming at {}",
+                                Local::now().time().format("%H:%M:%S")
+                            ))
+                            .bold()
+                        );
+                        let in_flight = format!("{}", in_flight);
 
-                    load.write_all(format!("{} {} ", scale, backend).as_bytes())?;
-                    load.write_all(sload.as_bytes())?;
-                    load.write_all(b" ")?;
-                    load.write_all(cload.as_bytes())?;
-                    load.write_all(b"\n")?;
+                        let zk = format!("{}:2181", server.private_ip);
+                        let scale = format!("{}", scale);
+                        trawler.ssh.as_ref().unwrap().exec_print_nonempty(
+                            &[
+                                "env",
+                                "RUST_BACKTRACE=1",
+                                "target/release/lobsters-noria",
+                                "--scale",
+                                &scale,
+                                "--warmup",
+                                "0",
+                                "--runtime",
+                                "0",
+                                "--prime",
+                                "--in-flight",
+                                &in_flight,
+                                "-z",
+                                &zk,
+                                "--deployment",
+                                "trawler",
+                                "2>&1",
+                                "|",
+                                "tee",
+                                "client.log",
+                            ],
+                            "client",
+                        )?;
 
-                    let mut hist = File::create(format!("{}.hist", prefix))?;
-                    let hist_arg = if let Some(memlimit) = memlimit {
-                        format!("lobsters-{}-r{}-l{}.hist", backend, scale, memlimit)
-                    } else {
-                        format!("lobsters-{}-r{}-unlimited.hist", backend, scale)
-                    };
-                    trawler
-                        .ssh
-                        .as_ref()
-                        .unwrap()
-                        .cmd_raw(&["cat", &hist_arg])
-                        .and_then(|out| Ok(hist.write_all(&out[..]).map(|_| ())?))?;
+                        eprintln!(
+                            "{}",
+                            Paint::new(format!(
+                                "--> warming at {}",
+                                Local::now().time().format("%H:%M:%S")
+                            ))
+                            .bold()
+                        );
 
-                    let sload: f64 = sload
-                        .split_whitespace()
-                        .next()
-                        .and_then(|l| l.parse().ok())
-                        .unwrap_or(0.0);
-                    let cload: f64 = cload
-                        .split_whitespace()
-                        .next()
-                        .and_then(|l| l.parse().ok())
-                        .unwrap_or(0.0);
-                    (sload, cload)
-                };
+                        trawler.ssh.as_ref().unwrap().exec_print_nonempty(
+                            &[
+                                "env",
+                                "RUST_BACKTRACE=1",
+                                "target/release/lobsters-noria",
+                                "--scale",
+                                &scale,
+                                "--warmup",
+                                "30",
+                                "--runtime",
+                                "0",
+                                "--in-flight",
+                                &in_flight,
+                                "-z",
+                                &zk,
+                                "--deployment",
+                                "trawler",
+                                "2>&1",
+                                "|",
+                                "tee",
+                                "client.log",
+                            ],
+                            "client",
+                        )?;
 
-                let erred = run.is_err();
-                if erred {
-                    eprintln!(
-                        "{}",
-                        Paint::red(format!(
-                            "--> errored at {}",
-                            Local::now().time().format("%H:%M:%S")
-                        ))
-                        .bold()
-                    );
-                } else {
-                    eprintln!(
-                        "{}",
-                        Paint::new(format!(
-                            "--> finished at {}",
-                            Local::now().time().format("%H:%M:%S")
-                        ))
-                        .bold()
-                    );
-                }
+                        eprintln!(
+                            "{}",
+                            Paint::new(format!(
+                                "--> started at {}",
+                                Local::now().time().format("%H:%M:%S")
+                            ))
+                            .bold()
+                        );
 
-                // attempt cleanup
-                let cleanup: Result<(), failure::Error> = try {
-                    // stop old server
-                    // gather state size
-                    let mem_limit = if let Some(limit) = memlimit {
-                        format!("l{}", limit)
-                    } else {
-                        "unlimited".to_owned()
-                    };
-                    let mut sizefile = File::create(format!(
-                        "lobsters-{}-r{}-{}.json",
-                        backend, scale, mem_limit
-                    ))?;
-                    trawler
-                        .ssh
-                        .as_ref()
-                        .unwrap()
-                        .cmd(&[
-                            "wget",
-                            &format!("http://{}:9000/get_statistics", server.private_ip),
-                        ])
-                        .and_then(|out| Ok(sizefile.write_all(out.as_bytes()).map(|_| ())?))?;
+                        let mut output = File::create(format!("{}.log", prefix))?;
+                        let hist_output = if let Some(memlimit) = memlimit {
+                            format!(
+                                "--histogram=lobsters-{}-r{}-l{}.hist ",
+                                backend, scale, memlimit
+                            )
+                        } else {
+                            format!(
+                                "--histogram=lobsters-{}-r{}-unlimited.hist ",
+                                backend, scale
+                            )
+                        };
+                        let res = trawler.ssh.as_ref().unwrap().just_exec(
+                            &[
+                                "env",
+                                "RUST_BACKTRACE=1",
+                                "target/release/lobsters-noria",
+                                "--scale",
+                                &scale,
+                                "--warmup",
+                                "15",
+                                "--runtime",
+                                "30",
+                                "--in-flight",
+                                &in_flight,
+                                "-z",
+                                &zk,
+                                "--deployment",
+                                "trawler",
+                                &hist_output,
+                                "2>&1",
+                                "|",
+                                "tee",
+                                "client.log",
+                            ],
+                            "client",
+                        )?;
 
-                    // stop the server
-                    let _ = server
-                        .ssh
-                        .as_ref()
-                        .unwrap()
-                        .just_exec(&["pkill", "-f", "noria-server", "2>&1"], "server")?;
-                    if let Some(server_chan) = server_chan {
-                        let server_stdout = finalize(server_chan)?;
-                        if erred {
-                            let erred = server_stdout.is_err();
-                            let server_stdout = server_stdout.unwrap_or_else(|e| e);
-                            for line in server_stdout.lines() {
-                                let mut paint = Paint::new("server").dimmed();
-                                if erred {
-                                    paint = paint.fg(yansi::Color::Red);
-                                }
-                                eprintln!(
-                                    "{:6} {}",
-                                    paint,
-                                    Paint::new(format!("| {}", line)).dimmed()
-                                );
+                        match res {
+                            Ok(ref result) | Err(ref result) => {
+                                output.write_all(result.as_bytes())?;
                             }
                         }
-                    }
-                };
+                        drop(output);
 
-                // also parse achived ops/s to check that we're *really* keeping up
-                if let Ok(log) = File::open(format!("{}.log", prefix)) {
-                    let log = BufReader::new(log);
-                    let mut target = None;
-                    let mut actual = None;
-                    for line in log.lines() {
-                        let line = line?;
-                        if line.starts_with("# target ops/s") {
-                            target = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
-                        } else if line.starts_with("# generated ops/s") {
-                            actual = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
+                        let _ = res.map_err(|_| failure::err_msg("client failed"))?;
+
+                        // gather server load
+                        let sload = server
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .just_exec(&["awk", "{print $1\" \"$2}", "/proc/loadavg"], "server")?
+                            .map_err(failure::err_msg)?;
+                        let sload = sload.trim_end();
+
+                        // gather client load
+                        let cload = trawler
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .just_exec(&["awk", "{print $1\" \"$2}", "/proc/loadavg"], "client")?
+                            .map_err(failure::err_msg)?;
+                        let cload = cload.trim_end();
+
+                        load.write_all(format!("{} {} ", scale, backend).as_bytes())?;
+                        load.write_all(sload.as_bytes())?;
+                        load.write_all(b" ")?;
+                        load.write_all(cload.as_bytes())?;
+                        load.write_all(b"\n")?;
+
+                        let mut hist = File::create(format!("{}.hist", prefix))?;
+                        let hist_arg = if let Some(memlimit) = memlimit {
+                            format!("lobsters-{}-r{}-l{}.hist", backend, scale, memlimit)
+                        } else {
+                            format!("lobsters-{}-r{}-unlimited.hist", backend, scale)
+                        };
+                        trawler
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .cmd_raw(&["cat", &hist_arg])
+                            .and_then(|out| Ok(hist.write_all(&out[..]).map(|_| ())?))?;
+
+                        let sload: f64 = sload
+                            .split_whitespace()
+                            .next()
+                            .and_then(|l| l.parse().ok())
+                            .unwrap_or(0.0);
+                        let cload: f64 = cload
+                            .split_whitespace()
+                            .next()
+                            .and_then(|l| l.parse().ok())
+                            .unwrap_or(0.0);
+                        (sload, cload)
+                    };
+
+                    let erred = run.is_err();
+                    if erred {
+                        eprintln!(
+                            "{}",
+                            Paint::red(format!(
+                                "--> errored at {}",
+                                Local::now().time().format("%H:%M:%S")
+                            ))
+                            .bold()
+                        );
+                    } else {
+                        eprintln!(
+                            "{}",
+                            Paint::new(format!(
+                                "--> finished at {}",
+                                Local::now().time().format("%H:%M:%S")
+                            ))
+                            .bold()
+                        );
+                    }
+
+                    // attempt cleanup
+                    let cleanup: Result<(), failure::Error> = try {
+                        // stop old server
+                        // gather state size
+                        let mem_limit = if let Some(limit) = memlimit {
+                            format!("l{}", limit)
+                        } else {
+                            "unlimited".to_owned()
+                        };
+                        let mut sizefile = File::create(format!(
+                            "lobsters-{}-r{}-{}.json",
+                            backend, scale, mem_limit
+                        ))?;
+                        trawler
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .cmd(&[
+                                "wget",
+                                &format!("http://{}:9000/get_statistics", server.private_ip),
+                            ])
+                            .and_then(|out| {
+                                Ok(sizefile.write_all(out.as_bytes()).map(|_| ())?)
+                            })?;
+
+                        // stop the server
+                        let _ = server
+                            .ssh
+                            .as_ref()
+                            .unwrap()
+                            .just_exec(&["pkill", "noria-server", "2>&1"], "server")?;
+                        if let Some(server_chan) = server_chan {
+                            let server_stdout = finalize(server_chan)?;
+                            if erred {
+                                let erred = server_stdout.is_err();
+                                let server_stdout = server_stdout.unwrap_or_else(|e| e);
+                                for line in server_stdout.lines() {
+                                    let mut paint = Paint::new("server").dimmed();
+                                    if erred {
+                                        paint = paint.fg(yansi::Color::Red);
+                                    }
+                                    eprintln!(
+                                        "{:6} {}",
+                                        paint,
+                                        Paint::new(format!("| {}", line)).dimmed()
+                                    );
+                                }
+                            }
                         }
-                        match (target, actual) {
-                            (Some(target), Some(actual)) => {
-                                eprintln!(
-                                    "{}",
-                                    Paint::cyan(format!(
-                                        " -> generated {} ops/s (target: {})",
-                                        actual, target
-                                    ))
-                                );
-                                if actual < target * 4.0 / 5.0 {
+                    };
+
+                    // also parse achived ops/s to check that we're *really* keeping up
+                    if let Ok(log) = File::open(format!("{}.log", prefix)) {
+                        let log = BufReader::new(log);
+                        let mut target = None;
+                        let mut actual = None;
+                        for line in log.lines() {
+                            let line = line?;
+                            if line.starts_with("# target ops/s") {
+                                target = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
+                            } else if line.starts_with("# generated ops/s") {
+                                actual = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
+                            }
+                            match (target, actual) {
+                                (Some(target), Some(actual)) => {
                                     eprintln!(
                                         "{}",
-                                        Paint::red(" -> backend is really not keeping up").bold()
+                                        Paint::cyan(format!(
+                                            " -> generated {} ops/s (target: {})",
+                                            actual, target
+                                        ))
                                     );
-                                    survived_last = false;
+                                    if actual < target * 4.0 / 5.0 {
+                                        eprintln!(
+                                            "{}",
+                                            Paint::red(" -> backend is really not keeping up")
+                                                .bold()
+                                        );
+                                        survived_last = false;
+                                    }
+                                    break;
                                 }
-                                break;
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
-                }
 
-                // stop iterating through scales for this backend if it's not keeping up
-                let (sload, cload) = run?;
+                    // stop iterating through scales for this backend if it's not keeping up
+                    let (sload, cload) = run?;
 
-                eprintln!(
-                    "{}",
-                    Paint::cyan(format!(
-                        " -> backend load: s: {}/16, c: {}/48",
-                        sload, cload
-                    ))
-                );
-
-                if sload > 16.5 {
                     eprintln!(
                         "{}",
-                        Paint::yellow(" -> backend is probably not keeping up").bold()
+                        Paint::cyan(format!(
+                            " -> backend load: s: {}/16, c: {}/48",
+                            sload, cload
+                        ))
                     );
-                }
 
-                let _ = cleanup?;
+                    if sload > 16.5 {
+                        eprintln!(
+                            "{}",
+                            Paint::yellow(" -> backend is probably not keeping up").bold()
+                        );
+                    }
+
+                    let _ = cleanup?;
+
+                    if !running.load(Ordering::SeqCst) {
+                        // user pressed ^C
+                        break;
+                    }
+                }
 
                 if !running.load(Ordering::SeqCst) {
                     // user pressed ^C
                     break;
                 }
             }
+        };
 
-            if !running.load(Ordering::SeqCst) {
-                // user pressed ^C
-                break;
-            }
+        eprintln!("{}", Paint::new("==> shutting down connections").bold());
+
+        if let Err(e) = server.ssh.unwrap().close() {
+            eprintln!("server ssh connection failed: {:?}", e);
         }
 
-        Ok(())
+        if let Err(e) = trawler.ssh.unwrap().close() {
+            eprintln!("server ssh connection failed: {:?}", e);
+        }
+
+        r
     })
     .unwrap();
 }

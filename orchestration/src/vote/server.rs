@@ -31,7 +31,7 @@ impl<'s> ServerHandle<'s> {
                     unimplemented!();
                 }
 
-                let _ = server.just_exec(&["pkill", "-f", "noria-server"])?;
+                let _ = server.just_exec(&["pkill", "noria-server"])?;
 
                 let mut stdout = String::new();
                 let mut stderr = String::new();

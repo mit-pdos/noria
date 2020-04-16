@@ -328,11 +328,11 @@ fn main() {
                         Backend::Noria(_) | Backend::Natural(_) => {
                             // just to make totally sure
                             server.ssh.as_ref().unwrap().exec_print_nonempty(
-                                &["pkill", "-9", "-f", "noria-server", "2>&1"],
+                                &["pkill", "-9", "noria-server", "2>&1"],
                                 "server",
                             )?;
                             trawler.ssh.as_ref().unwrap().exec_print_nonempty(
-                                &["pkill", "-9", "-f", "noria-mysql", "2>&1"],
+                                &["pkill", "-9", "noria-mysql", "2>&1"],
                                 "client",
                             )?;
 
@@ -659,7 +659,7 @@ fn main() {
                                 .ssh
                                 .as_ref()
                                 .unwrap()
-                                .just_exec(&["pkill", "-f", "noria-mysql", "2>&1"], "client")?;
+                                .just_exec(&["pkill", "noria-mysql", "2>&1"], "client")?;
                             if let Some(shim_chan) = shim_chan {
                                 let shim_stdout = finalize(shim_chan)?;
                                 if erred {
@@ -683,7 +683,7 @@ fn main() {
                                 .ssh
                                 .as_ref()
                                 .unwrap()
-                                .just_exec(&["pkill", "-f", "noria-server", "2>&1"], "server")?;
+                                .just_exec(&["pkill", "noria-server", "2>&1"], "server")?;
                             if let Some(server_chan) = server_chan {
                                 let server_stdout = finalize(server_chan)?;
                                 if erred {
