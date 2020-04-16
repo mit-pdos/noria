@@ -110,7 +110,8 @@ async fn memstats(g: &mut noria::Handle<LocalAuthority>, materialization: String
     println!("{}", mat); 
     println!("{}", mult); 
 
-    let exp_summary = format!("{}\n{}\n{}\n{:?}\n{:?}\n", base, reader, mat, mult, read_latencies); 
+
+    let exp_summary = format!("{}\n{}\n{}\n{:?}\n{:?}\n", base, reader, mat, mult, read_latencies.unwrap()); 
     let mut file = File::create(format!("exp-{}mat-{}nusers-{}ntweets.txt", materialization, nusers, ntweets)).unwrap();
     file.write_all(exp_summary.as_bytes());
 
@@ -132,7 +133,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
 
     use std::{thread, time};
 
-    let ten_millis = time::Duration::from_millis(8000);
+    let ten_millis = time::Duration::from_millis(10000);
     let now = time::Instant::now();
 
     thread::sleep(ten_millis);
@@ -152,8 +153,8 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
         let leaf = format!("AllTweetsWithUserInfo");
         let mut getter3 = backend.g.view(&leaf).await.unwrap();
 
-        let leaf = format!("PublicTweets");
-        let mut getter4 = backend.g.view(&leaf).await.unwrap();
+        // let leaf = format!("PublicTweets");
+        // let mut getter4 = backend.g.view(&leaf).await.unwrap();
 
         let start = time::Instant::now();
        
@@ -178,7 +179,17 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
         // User-specific timeline
        
         let mut res3 = getter3.lookup(&[0.into()], true).await.unwrap();
+        // println!("all tweets len: {:?}", res3.len()); 
+
+        if res3.len() == 0 {
+            let ten_millis = time::Duration::from_millis(20000);
+            thread::sleep(ten_millis);
+            assert!(res3.len() > 0); 
+        }
+
         for record in res3.iter() {
+            // println!("followed: {:?}", users_followed); 
+            // println!("checking if {:?} is in followed or is self", record[3]); 
             if users_followed.contains(&record[3]) || record[3] == 0.into(){
                 visible_tweets.push(record); 
             }
@@ -186,47 +197,52 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
 
         // Remove blocked tweets from all public tweets, union with followed tweets 
      
-        let mut res4 = getter4.lookup(&[0.into()], true).await.unwrap();
-        for record in res4.iter() {
-            if !blocked_user.contains(&record[0]) {
-                visible_tweets.push(record); 
-            }
-        }
+        // let mut res4 = getter4.lookup(&[0.into()], true).await.unwrap();
+        // for record in res4.iter() {
+        //     if !blocked_user.contains(&record[0]) {
+        //         visible_tweets.push(record); 
+        //     }
+        // }
 
         let dur = start.elapsed().as_secs_f64();
 
-        println!(
-            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-            visible_tweets.len(),
-            dur,
-            (visible_tweets.len() as f64) / dur,
-        );
+        // let read_lat_str = format!(
+        //     "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+        //     visible_tweets.len(),
+        //     dur,
+        //     (visible_tweets.len() as f64) / dur,
+        // );
+
+        let read_lat_str = format!("{:?}", dur); 
          
-        println!("len visible: {:?}", visible_tweets.len()); 
+        // println!("len visible: {:?}", visible_tweets.len()); 
+
+        memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
         
     } else if materialization == "full".to_string() || materialization == "partial".to_string() {
         
+        let mut dur = time::Duration::from_millis(0); 
+        let mut total_num_keys_read = 0; 
         for user in 0..nusers {
-            let mut dur = time::Duration::from_millis(0); 
             let leaf = format!("AllExcludingBlockedByFinal_{:?}", user);
             let mut getter = backend.g.view(&leaf).await.unwrap();
             let start = time::Instant::now();
             let mut res = getter.lookup(&[0.into()], true).await.unwrap();
             dur += start.elapsed();
+            total_num_keys_read += res.len(); 
         }   
-    
-    }
-    
-    // let dur = dur.as_secs_f64();
 
-    // println!(
-    //     "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
-    //     res.len(),
-    //     dur,
-    //     (res.len() as f64) / dur,
-    // );
-    let mut read_latencies = None; 
-    memstats(&mut backend.g, materialization, nusers, ntweets, read_latencies).await;
+        let dur = dur.as_secs_f64(); 
+
+        let read_lat_str = format!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            total_num_keys_read,
+            dur,
+            (total_num_keys_read as f64) / dur,
+        );
+    
+        memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+    }
 
 }
 
@@ -264,7 +280,7 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
                                                             Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
             
-            let prelim = mig.maintain_anonymous(tweets_with_user_info, &[7]); 
+            // let prelim = mig.maintain_anonymous(tweets_with_user_info, &[7]); 
 
             let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo",
                                             &["id", "time", "content", "userId", "name", 
@@ -280,20 +296,20 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
             (all_tweets) 
         }).await; 
 
-        let public_tweets = backend.g.migrate(move |mig| {
-            let public_tweets = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
-                                                Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));  
-            let mut ri = mig.maintain_anonymous(public_tweets, &[7]); 
-        }).await; 
+        // let public_tweets = backend.g.migrate(move |mig| {
+        //     let public_tweets = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+        //                                         Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));  
+        //     let mut ri = mig.maintain_anonymous(public_tweets, &[7]); 
+        // }).await; 
 
-        let private_users = backend.g.migrate(move |mig| {
-            let private_users = mig.add_ingredient("PrivateUsers", 
-                                                    &["userId", "name", "isPrivate", 
-                                                    "birthdayMonth", "birthdayDay", 
-                                                    "birthdayYear", "email", "password"], 
-                                                    Filter::new(users, &[(2, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))])); 
-            (private_users)
-        }).await; 
+        // let private_users = backend.g.migrate(move |mig| {
+        //     let private_users = mig.add_ingredient("PrivateUsers", 
+        //                                             &["userId", "name", "isPrivate", 
+        //                                             "birthdayMonth", "birthdayDay", 
+        //                                             "birthdayYear", "email", "password"], 
+        //                                             Filter::new(users, &[(2, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))])); 
+        //     (private_users)
+        // }).await; 
 
     } else if materialization == "full".to_string() || materialization == "partial".to_string() {
 
@@ -639,24 +655,26 @@ async fn main() {
     } 
    
     let mut experiment_materialization_config = Vec::new(); 
-    let mut experiment_nuser_config = Vec::new(); 
+    let mut experiment_ntweets_nusers_config = Vec::new(); 
     
     if full_suite {
-        experiment_materialization_config.push("full".to_string()); 
+        // experiment_materialization_config.push("full".to_string()); 
         experiment_materialization_config.push("client".to_string());     
-        experiment_nuser_config.push(1000); 
-        experiment_nuser_config.push(10000); 
-        experiment_nuser_config.push(20000);  
+        experiment_ntweets_nusers_config.push((1000 as usize, 100 as usize)); 
+        experiment_ntweets_nusers_config.push((10000 as usize, 1000 as usize));
+        experiment_ntweets_nusers_config.push((100000 as usize, 10000 as usize)); 
+        experiment_ntweets_nusers_config.push((10000 as usize, 10000 as usize)); 
+        experiment_ntweets_nusers_config.push((10000 as usize, 100 as usize)); 
     } else {
         experiment_materialization_config.push(materialization.clone()); 
-        experiment_nuser_config.push(nusers); 
+        experiment_ntweets_nusers_config.push((ntweets, nusers)); 
     } 
     
     let mut backend = Backend::make(verbose, partial).await;
-    for nuse in experiment_nuser_config.iter() {
+    for (ntweets, nuse) in  experiment_ntweets_nusers_config.iter() {
         for mat in experiment_materialization_config.iter() {
-            construct_graph(&mut backend, verbose, partial, nusers, ntweets, private, materialization.clone()).await; 
-            run_experiment(&mut backend, verbose, partial, nusers, ntweets, private, materialization.clone()).await;
+            construct_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
+            run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
         }                   
     }
 

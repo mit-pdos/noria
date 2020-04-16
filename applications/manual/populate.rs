@@ -133,7 +133,7 @@ impl Populate {
             let mut num_to_follow: usize = thread_rng().gen_range(lower_bound, upper_bound) as usize;
             let mut following: Vec<usize> = Vec::new(); 
 
-            println!("user {} follows {} others", i, num_to_follow);
+            // println!("user {} follows {} others", i, num_to_follow);
 
             for j in 0..num_to_follow {
                 let mut follow: usize = thread_rng().gen_range(0, self.nusers);
