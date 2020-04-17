@@ -10,7 +10,7 @@ use std::{thread, time};
 use tsunami::*;
 use yansi::Paint;
 
-const AMI: &str = "ami-08e9f8fcb302445fc";
+const AMI: &str = "ami-0d072f3b7a0ebddb4";
 
 fn git_and_cargo(
     ssh: &mut Session,
