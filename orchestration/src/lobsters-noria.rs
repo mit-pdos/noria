@@ -616,25 +616,44 @@ fn main() {
                         }
                     }
 
-                    // stop iterating through scales for this backend if it's not keeping up
-                    let (sload, cload) = run?;
+                    match run {
+                        Err(ref e) => {
+                            // the benchmark crashed... now what do we do?
+                            // it _could_ have crashed due to the server not keeping up (though in
+                            // theory that shouldn't cause a _crash_), in which case we want to
+                            // just switch to the next backend. we use whether cleanup succeeded as
+                            // a proxy to determine which case we're in.
+                            if cleanup.is_err() {
+                                eprintln!("{}", Paint::red(" -> backend crashed and cleanup failed -- exiting").bold());
+                                let _ = run?;
+                            } else {
+                                eprintln!("{}", Paint::red(" -> backend crashed, but cleanup succeeded -- next backend").bold());
+                                eprintln!("{:?}", e);
+                                survived_last = false;
+                            }
+                        }
+                        Ok((sload, cload)) => {
+                            eprintln!(
+                                "{}",
+                                Paint::cyan(format!(
+                                    " -> backend load: s: {}/16, c: {}/96",
+                                    sload, cload
+                                ))
+                            );
 
-                    eprintln!(
-                        "{}",
-                        Paint::cyan(format!(
-                            " -> backend load: s: {}/16, c: {}/48",
-                            sload, cload
-                        ))
-                    );
+                            if sload > 16.5 {
+                                eprintln!(
+                                    "{}",
+                                    Paint::yellow(" -> backend is probably not keeping up").bold()
+                                );
+                            }
 
-                    if sload > 16.5 {
-                        eprintln!(
-                            "{}",
-                            Paint::yellow(" -> backend is probably not keeping up").bold()
-                        );
+                            if cleanup.is_err() {
+                                eprintln!("{}", Paint::red(" -> cleanup failed -- exiting").bold());
+                                let _ = cleanup?;
+                            }
+                        }
                     }
-
-                    let _ = cleanup?;
 
                     if !running.load(Ordering::SeqCst) {
                         // user pressed ^C
