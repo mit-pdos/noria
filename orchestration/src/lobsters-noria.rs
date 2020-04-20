@@ -171,7 +171,7 @@ fn main() {
         None,
     );
 
-    b.set_max_duration(3);
+    b.set_max_duration(6);
     b.wait_limit(time::Duration::from_secs(2 * 60));
 
     // if the user wants us to terminate, finish whatever we're currently doing first
@@ -190,8 +190,7 @@ fn main() {
         .map(|it| it.map(|s| s.parse().unwrap()).collect())
         .unwrap_or_else(|| {
             vec![
-                100usize, 500, 1000, 1250, 1500, 1750, 2000, 2500, 2750, 3000, 3500, 4500, 5500,
-                6500, 7000, 7500, 8000, 8500, 9000, 9500, 10_000,
+                100usize, 1000, 2000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000,
             ]
         });
 
