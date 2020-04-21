@@ -409,12 +409,12 @@ fn main() {
                         let mut output = File::create(format!("{}.log", prefix))?;
                         let hist_output = if let Some(memlimit) = memlimit {
                             format!(
-                                "--histogram=lobsters-{}-r{}-l{}.hist ",
+                                "--histogram=lobsters-{}-r{}-l{}.hist",
                                 backend, scale, memlimit
                             )
                         } else {
                             format!(
-                                "--histogram=lobsters-{}-r{}-unlimited.hist ",
+                                "--histogram=lobsters-{}-r{}-unlimited.hist",
                                 backend, scale
                             )
                         };
