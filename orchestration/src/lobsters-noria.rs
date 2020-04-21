@@ -185,14 +185,9 @@ fn main() {
         eprintln!("==> failed to set ^C handler: {}", e);
     }
 
-    let scales = args
+    let scales: Option<Vec<usize>> = args
         .values_of("SCALE")
-        .map(|it| it.map(|s| s.parse().unwrap()).collect())
-        .unwrap_or_else(|| {
-            vec![
-                100usize, 1000, 2000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000,
-            ]
-        });
+        .map(|it| it.map(|s| s.parse().unwrap()).collect());
 
     let memlimit = args.value_of("memory_limit");
 
@@ -234,7 +229,7 @@ fn main() {
             trawler.ssh.as_ref().unwrap().check()?;
             server.ssh.as_ref().unwrap().check()?;
 
-            let shards = [0, 1, 2];
+            let shards = [0, 1, 2, 4, 8];
 
             // allow reuse of time-wait ports
             trawler
@@ -255,12 +250,13 @@ fn main() {
                 .map_err(failure::err_msg)?;
 
             for &nshard in &shards {
-                let mut survived_last = true;
-                for &scale in &scales {
-                    if !survived_last {
-                        break;
-                    }
+                let mut scales = if let Some(ref scales) = scales {
+                    ScaleIterator::Defined(scales.iter())
+                } else {
+                    ScaleIterator::search_from(1000)
+                };
 
+                while let Some(scale) = scales.next() {
                     let backend = if nshard == 0 {
                         "direct".to_owned()
                     } else {
@@ -606,7 +602,7 @@ fn main() {
                                             Paint::red(" -> backend is really not keeping up")
                                                 .bold()
                                         );
-                                        survived_last = false;
+                                        scales.failed();
                                     }
                                     break;
                                 }
@@ -628,7 +624,7 @@ fn main() {
                             } else {
                                 eprintln!("{}", Paint::red(" -> backend crashed, but cleanup succeeded -- next backend").bold());
                                 eprintln!("{:?}", e);
-                                survived_last = false;
+                                scales.failed();
                             }
                         }
                         Ok((sload, cload)) => {
@@ -680,6 +676,116 @@ fn main() {
         r
     })
     .unwrap();
+}
+
+enum ScaleIterator<'a> {
+    Defined(std::slice::Iter<'a, usize>),
+    Search {
+        max_in: std::ops::Range<usize>,
+        last: Option<usize>,
+        failed: bool,
+    },
+    Done,
+}
+
+impl ScaleIterator<'_> {
+    fn search_from(start: usize) -> Self {
+        ScaleIterator::Search {
+            max_in: start..usize::max_value(),
+            last: None,
+            failed: false,
+        }
+    }
+
+    fn failed(&mut self) {
+        match *self {
+            ScaleIterator::Defined(_) => {
+                *self = ScaleIterator::Done;
+            }
+            ScaleIterator::Search { ref mut failed, .. } => {
+                *failed = true;
+            }
+            ScaleIterator::Done => unreachable!("kept iterating after done?"),
+        }
+    }
+}
+
+impl Iterator for ScaleIterator<'_> {
+    type Item = usize;
+    fn next(&mut self) -> Option<Self::Item> {
+        match *self {
+            ScaleIterator::Defined(ref mut iter) => iter.next().copied(),
+            ScaleIterator::Search {
+                ref mut max_in,
+                ref mut failed,
+                ref mut last,
+            } => {
+                if let Some(ref mut last) = *last {
+                    if *failed {
+                        // the last thing we tried failed, so it sets an upper limit for max load
+                        max_in.end = *last;
+                        *failed = false;
+                    } else {
+                        // the last thing succeeded, so that increases the lower limit
+                        max_in.start = *last;
+                    }
+
+                    let next = if max_in.end == usize::max_value() {
+                        // no upper limit, so exponential search
+                        2 * max_in.start
+                    } else {
+                        // bisect the range
+                        max_in.start + (max_in.end - max_in.start) / 2
+                    };
+
+                    // we only care about the max down to the nearest 500 factor (!)
+                    if max_in.end - max_in.start > 500 {
+                        *last = next;
+                        Some(next)
+                    } else {
+                        *self = ScaleIterator::Done;
+                        None
+                    }
+                } else {
+                    *last = Some(max_in.start);
+                    return *last;
+                }
+            }
+            ScaleIterator::Done => None,
+        }
+    }
+}
+
+#[test]
+fn scale_iter() {
+    let mut scale = ScaleIterator::Defined([1, 2, 3, 4].iter());
+    assert_eq!(scale.next(), Some(1));
+    assert_eq!(scale.next(), Some(2));
+    assert_eq!(scale.next(), Some(3));
+    assert_eq!(scale.next(), Some(4));
+    assert_eq!(scale.next(), None);
+
+    let mut scale = ScaleIterator::search_from(500);
+    assert_eq!(scale.next(), Some(500));
+    assert_eq!(scale.next(), Some(1000));
+    assert_eq!(scale.next(), Some(2000));
+    assert_eq!(scale.next(), Some(4000));
+    scale.failed();
+    assert_eq!(scale.next(), Some(3000));
+    assert_eq!(scale.next(), Some(3500));
+    assert_eq!(scale.next(), None);
+
+    let mut scale = ScaleIterator::search_from(500);
+    assert_eq!(scale.next(), Some(500));
+    assert_eq!(scale.next(), Some(1000));
+    assert_eq!(scale.next(), Some(2000));
+    assert_eq!(scale.next(), Some(4000));
+    scale.failed();
+    assert_eq!(scale.next(), Some(3000));
+    scale.failed();
+    assert_eq!(scale.next(), Some(2500));
+    scale.failed();
+    assert_eq!(scale.next(), None);
 }
 
 fn finalize(c: openssh::RemoteChild<'_>) -> Result<Result<String, String>, failure::Error> {
