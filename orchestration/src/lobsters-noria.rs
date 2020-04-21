@@ -575,38 +575,76 @@ fn main() {
                         }
                     };
 
-                    // also parse achived ops/s to check that we're *really* keeping up
+                    // also check achived ops/s and latency to make sure we're *really* keeping up
                     if let Ok(log) = File::open(format!("{}.log", prefix)) {
                         let log = BufReader::new(log);
                         let mut target = None;
                         let mut actual = None;
                         for line in log.lines() {
                             let line = line?;
-                            if line.starts_with("# target ops/s") {
-                                target = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
-                            } else if line.starts_with("# generated ops/s") {
-                                actual = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
-                            }
-                            match (target, actual) {
-                                (Some(target), Some(actual)) => {
-                                    eprintln!(
-                                        "{}",
-                                        Paint::cyan(format!(
-                                            " -> generated {} ops/s (target: {})",
-                                            actual, target
-                                        ))
-                                    );
-                                    if actual < target * 4.0 / 5.0 {
+                            if target.is_none() || actual.is_none() {
+                                if line.starts_with("# target ops/s") {
+                                    target = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
+                                } else if line.starts_with("# generated ops/s") {
+                                    actual = Some(line.rsplitn(2, ' ').next().unwrap().parse::<f64>()?);
+                                }
+                                match (target, actual) {
+                                    (Some(target), Some(actual)) => {
                                         eprintln!(
                                             "{}",
-                                            Paint::red(" -> backend is really not keeping up")
-                                                .bold()
+                                            Paint::cyan(format!(
+                                                " -> generated {} ops/s (target: {})",
+                                                actual, target
+                                            ))
                                         );
-                                        scales.failed();
+                                        if actual < target * 4.0 / 5.0 {
+                                            eprintln!(
+                                                "{}",
+                                                Paint::red(" -> backend is really not keeping up")
+                                                    .bold()
+                                            );
+                                            scales.failed();
+                                            break;
+                                        }
                                     }
-                                    break;
+                                    _ => {}
                                 }
-                                _ => {}
+                            }
+
+                            // Submit          sojourn         95      4484
+                            if line.contains("sojourn") {
+                                let mut fields = line.trim().split_whitespace();
+                                let field = fields.next().unwrap();
+                                if let "Login" | "Logout" = field {
+                                    // ignore not-that-interesting endpoints
+                                    continue;
+                                }
+
+                                let metric = fields.next().unwrap();
+                                if metric != "sojourn" {
+                                    assert_eq!(metric, "processing");
+                                    continue;
+                                }
+
+                                let pct = fields.next().unwrap();
+                                if pct != "95" {
+                                    assert!(pct == "50" || pct == "99" || pct == "100", "{}", pct);
+                                    continue;
+                                }
+
+                                let ms = fields.next().unwrap();
+                                let ms: usize = ms.parse().unwrap();
+                                if ms > 200 /* ms */ {
+                                    eprintln!("{}", Paint::red(format!(" -> {} %95 latency {}ms > 200ms", field, ms)).bold());
+                                    scales.failed();
+
+                                    // ok to break here, since target/generated are
+                                    // always at the top, so they must already have
+                                    // been printed.
+                                    break;
+                                } else {
+                                    eprintln!("{}", Paint::new(format!(" -> {} %95 latency {}ms <= 200ms", field, ms)).dimmed());
+                                }
                             }
                         }
                     }
