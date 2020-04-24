@@ -1,3 +1,4 @@
+use slog::Logger;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
@@ -79,11 +80,13 @@ pub(crate) enum RawProcessingResult {
 }
 
 #[derive(Debug)]
-pub(crate) enum ReplayContext {
+pub(crate) enum ReplayContext<'a> {
     None,
     Partial {
-        key_cols: Vec<usize>,
-        keys: HashSet<Vec<DataType>>,
+        key_cols: &'a [usize],
+        keys: &'a HashSet<Vec<DataType>>,
+        requesting_shard: usize,
+        tag: Tag,
         unishard: bool,
     },
     Full {
@@ -91,10 +94,10 @@ pub(crate) enum ReplayContext {
     },
 }
 
-impl ReplayContext {
-    fn key(&self) -> Option<&[usize]> {
-        if let ReplayContext::Partial { ref key_cols, .. } = *self {
-            Some(&key_cols[..])
+impl<'a> ReplayContext<'a> {
+    fn key(&self) -> Option<&'a [usize]> {
+        if let ReplayContext::Partial { key_cols, .. } = *self {
+            Some(key_cols)
         } else {
             None
         }
@@ -192,9 +195,10 @@ where
         executor: &mut dyn Executor,
         from: LocalNodeIndex,
         data: Records,
-        replay: &ReplayContext,
+        replay: ReplayContext,
         domain: &DomainNodes,
         states: &StateMap,
+        _: &Logger,
     ) -> RawProcessingResult {
         RawProcessingResult::Regular(self.on_input(
             executor,
@@ -208,13 +212,7 @@ where
 
     /// Triggered whenever a replay occurs, to allow the operator to react evict from any auxillary
     /// state other than what is stored in its materialization.
-    fn on_eviction(
-        &mut self,
-        _from: LocalNodeIndex,
-        _key_columns: &[usize],
-        _keys: &mut Vec<Vec<DataType>>,
-    ) {
-    }
+    fn on_eviction(&mut self, _from: LocalNodeIndex, _tag: Tag, _keys: &[Vec<DataType>]) {}
 
     fn can_query_through(&self) -> bool {
         false

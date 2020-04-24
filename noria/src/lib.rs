@@ -107,8 +107,6 @@
 #![deny(unused_extern_crates)]
 #![deny(unreachable_pub)]
 #![warn(rust_2018_idioms)]
-// https://github.com/rust-lang/rust-clippy/issues/5188
-#![allow(clippy::needless_doctest_main)]
 
 #[macro_use]
 extern crate failure;
@@ -122,7 +120,7 @@ extern crate slog;
 /// We want this to be > 1 so that multiple threads can enqueue requests at the same time without
 /// immediately blocking one another. The exact value is somewhat arbitrary.
 ///
-/// The value isn't higher, because it wouldn't improve performance, just increase latency.
+/// The value isn't higher, because it would unnecessarily consume memory.
 ///
 /// The value isn't lower, because it would mean fewer concurrent enqueues.
 ///
@@ -150,31 +148,57 @@ extern crate slog;
 /// https://github.com/tower-rs/tower/issues/408#issuecomment-593678194. Ultimately, we need
 /// something like https://github.com/tower-rs/tower/issues/408, but for the time being, just make
 /// sure this value is high enough.
-pub(crate) const BUFFER_TO_POOL: usize = 256;
+pub(crate) const BUFFER_TO_POOL: usize = 2048;
 
-/// The maximum number of concurrent connections to a given backend resource.
+/// The maximum number of concurrent connections to a given backend table.
 ///
 /// Since Noria connections are multiplexing, having this value > 1 _only_ allows us to do
 /// serialization/deserialization in parallel on multiple threads. Nothing else really.
 ///
-/// The value isn't higher, because we only have so many cores. And keep in mind that this value is
-/// used per view/table _address_, so unless _all_ your requests are going to a single address,
-/// you'll be fine.
+/// The value isn't higher for a couple of reasons:
+///
+///  - It is per table, which means it is per shard of a domain. Unless _all_ of your requests go
+///    to a single shard of one table, you should be fine.
+///  - Table operations are generally not bottlenecked on serialization, but on committing.
 ///
 /// The value isn't lower, because we want _some_ concurrency in serialization.
-pub(crate) const MAX_POOL_SIZE: usize = 8;
+pub(crate) const MAX_TABLE_POOL_SIZE: usize = 2;
+
+/// The maximum number of concurrent connections to a given backend view.
+///
+/// Since Noria connections are multiplexing, having this value > 1 _only_ allows us to do
+/// serialization/deserialization in parallel on multiple threads. Nothing else really.
+///
+/// This value is set higher than the max pool size for tables for a couple of reasons:
+///
+///  - View connections are made per _host_. So, if you query multiple views that happen to be
+///    hosted by a single machine (such as if there is only one Noria worker), this is the total
+///    amount of serialization concurrency you will get.
+///  - Reads are generally bottlenecked on serialization, so devoting more resources to it seems
+///    reasonable.
+///
+/// The value isn't higher because we, _and the server_ only have so many cores.
+pub(crate) const MAX_VIEW_POOL_SIZE: usize = 16;
 
 /// Number of requests that can be pending on any _single_ connection.
 ///
+/// Keep in mind that this is really the number of requests that can be pending to any given shard
+/// of a domain (for tables) or to any given Noria host (for views). The value should arguably be
+/// higher for views than for tables, since views are more likely to share a connection than
+/// tables, but since this is really just a measure for "are we falling over", it can sort of be
+/// arbitrarily high. If the system isn't keeping up, then it will fill up regardless, it'll just
+/// take longer.
+///
 /// We need to limit this since `AsyncBincode` has unlimited buffering, and so will never apply
-/// back-pressure otherwise.
+/// back-pressure otherwise. The backpressure is necessary so that the pool will eventually know
+/// that another connection should be established to help with serialization/deserialization.
 ///
-/// The value isn't higher, because it would inflate latency, and also prevent us from taking
-/// advantage of concurrent serialization/deserialization as much.
+/// The value isn't higher, because it would mean we just allow more data to be buffered internally
+/// in the system before we exhert backpressure.
 ///
-/// The value isn't lower, because lowering it would mean the server has less work at a time, which
-/// means it can batch less work, which means lower overall efficiency.
-pub(crate) const PENDING_PER_CONN: usize = 128;
+/// The value isn't lower, because that give the server less work at a time, which means it can
+/// batch less work, which means lower overall efficiency.
+pub(crate) const PENDING_PER_CONN: usize = 2048;
 
 use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
@@ -186,7 +210,6 @@ mod table;
 mod view;
 
 #[doc(hidden)]
-#[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub mod channel;
 #[doc(hidden)]
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
@@ -319,7 +342,7 @@ pub fn shard_by(dt: &DataType, shards: usize) -> usize {
         DataType::Text(..) | DataType::TinyText(..) => {
             use std::borrow::Cow;
             use std::hash::Hasher;
-            let mut hasher = fnv::FnvHasher::default();
+            let mut hasher = ahash::AHasher::new_with_keys(0x3306, 0x6033);
             let s: Cow<'_, str> = dt.into();
             hasher.write(s.as_bytes());
             hasher.finish() as usize % shards

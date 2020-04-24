@@ -38,7 +38,13 @@ where
         .multi_lookup(stories_multi.clone(), true)
         .await?
         .into_iter()
-        .map(|story| story.into_iter().last().unwrap().take("user_id").unwrap())
+        .filter_map(|story| {
+            // frontpage_2 filters out some stories with particularly low scores
+            story
+                .into_iter()
+                .last()
+                .map(|mut s| s.take("user_id").unwrap())
+        })
         .collect();
 
     if let Some(uid) = acting_as {
@@ -105,32 +111,31 @@ where
 
     // also load things that we need to highlight
     if let Some(uid) = acting_as {
-        let mut view = c.view("frontpage_10").await?;
-        // TODO: multi-lookup
-        for story in &stories {
-            view.ready_and()
-                .await?
-                .lookup(&[uid.into(), story.clone()], true)
-                .await?;
-        }
+        let keys: Vec<_> = stories
+            .iter()
+            .map(|sid| vec![uid.into(), sid.clone()])
+            .collect();
 
-        let mut view = c.view("frontpage_11").await?;
-        // TODO: multi-lookup
-        for story in &stories {
-            view.ready_and()
-                .await?
-                .lookup(&[uid.into(), story.clone()], true)
-                .await?;
-        }
+        c.view("frontpage_10")
+            .await?
+            .ready_and()
+            .await?
+            .multi_lookup(keys.clone(), true)
+            .await?;
 
-        let mut view = c.view("frontpage_12").await?;
-        // TODO: multi-lookup
-        for story in &stories {
-            view.ready_and()
-                .await?
-                .lookup(&[uid.into(), story.clone()], true)
-                .await?;
-        }
+        c.view("frontpage_11")
+            .await?
+            .ready_and()
+            .await?
+            .multi_lookup(keys.clone(), true)
+            .await?;
+
+        c.view("frontpage_12")
+            .await?
+            .ready_and()
+            .await?
+            .multi_lookup(keys, true)
+            .await?;
     }
 
     Ok((c, true))

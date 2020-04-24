@@ -10,7 +10,6 @@ mod process;
 pub(crate) use self::process::materialize;
 
 pub mod special;
-pub use self::special::StreamUpdate;
 
 mod ntype;
 pub use self::ntype::NodeType; // crate viz for tests
@@ -460,6 +459,14 @@ impl Node {
 
     pub fn is_base(&self) -> bool {
         if let NodeType::Base(..) = self.inner {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_union(&self) -> bool {
+        if let NodeType::Internal(NodeOperator::Union(_)) = self.inner {
             true
         } else {
             false
