@@ -807,7 +807,7 @@ mod tests {
         let a = Value::Float(initial_float);
         let a_dt = DataType::try_from(a);
         assert!(a_dt.is_ok());
-        let converted_float: f64 = a_dt.as_ref().unwrap().into();
+        let converted_float: f64 = a_dt.unwrap().into();
         assert_approx_eq!(converted_float, initial_float as f64);
 
         // Test Value::Date.
