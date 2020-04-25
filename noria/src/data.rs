@@ -430,16 +430,25 @@ impl<'a> From<&'a DataType> for Cow<'a, str> {
     }
 }
 
-impl From<&'_ DataType> for String {
-    fn from(data: &'_ DataType) -> Self {
-        let cow: Cow<'_, str> = data.into();
-        cow.to_string()
-    }
-}
-
 impl From<DataType> for String {
     fn from(data: DataType) -> Self {
-        (&data).into()
+        match data {
+            DataType::Text(ref s) => s.to_str().unwrap().to_string(),
+            DataType::TinyText(ref bts) => {
+                if bts[TINYTEXT_WIDTH - 1] == 0 {
+                    use std::ffi::CStr;
+                    let null = bts.iter().position(|&i| i == 0).unwrap() + 1;
+                    CStr::from_bytes_with_nul(&bts[0..null])
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                } else {
+                    String::from_utf8(bts.to_vec()).unwrap()
+                }
+            }
+            _ => panic!("attempted to convert a {:?} to a string", data),
+        }
     }
 }
 
