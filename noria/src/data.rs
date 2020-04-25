@@ -4,6 +4,7 @@ use chrono::{self, NaiveDate, NaiveDateTime};
 
 use nom_sql::Literal;
 
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -407,25 +408,9 @@ impl From<NaiveDateTime> for DataType {
     }
 }
 
-/*
-impl<'a, T> Into<Option<T>> for &'a DataType
-where
-    T: From<&'a DataType>,
-{
-    fn into(self) -> Option<T> {
-        if let DataType::None = self {
-            None
-        } else {
-            Some(T::from(self))
-        }
-    }
-}
-*/
-
-use std::borrow::Cow;
-impl<'a> Into<Cow<'a, str>> for &'a DataType {
-    fn into(self) -> Cow<'a, str> {
-        match *self {
+impl<'a> From<&'a DataType> for Cow<'a, str> {
+    fn from(data: &'a DataType) -> Self {
+        match *data {
             DataType::Text(ref s) => s.to_string_lossy(),
             DataType::TinyText(ref bts) => {
                 if bts[TINYTEXT_WIDTH - 1] == 0 {
@@ -440,107 +425,120 @@ impl<'a> Into<Cow<'a, str>> for &'a DataType {
                     String::from_utf8_lossy(&bts[..])
                 }
             }
-            _ => panic!("attempted to convert a {:?} to a string", self),
+            _ => panic!("attempted to convert a {:?} to a string", data),
         }
     }
 }
 
-impl Into<String> for &'_ DataType {
-    fn into(self) -> String {
-        let cow: Cow<'_, str> = self.into();
+impl From<&'_ DataType> for String {
+    fn from(data: &'_ DataType) -> Self {
+        let cow: Cow<'_, str> = data.into();
         cow.to_string()
     }
 }
 
-impl Into<String> for DataType {
-    fn into(self) -> String {
-        (&self).into()
+impl From<DataType> for String {
+    fn from(data: DataType) -> Self {
+        (&data).into()
     }
 }
 
-impl Into<i128> for DataType {
-    fn into(self) -> i128 {
-        match self {
+impl From<DataType> for i128 {
+    fn from(data: DataType) -> Self {
+        (&data).into()
+    }
+}
+
+impl From<DataType> for i64 {
+    fn from(data: DataType) -> i64 {
+        (&data).into()
+    }
+}
+
+impl From<&'_ DataType> for i128 {
+    fn from(data: &'_ DataType) -> Self {
+        match *data {
             DataType::BigInt(s) => i128::from(s),
             DataType::UnsignedBigInt(s) => i128::from(s),
             DataType::Int(s) => i128::from(s),
             DataType::UnsignedInt(s) => i128::from(s),
-            _ => panic!("attempted to convert a {:?} to an i128", self),
+            _ => panic!("attempted to convert a {:?} to an i128", data),
         }
     }
 }
 
-impl Into<i64> for DataType {
-    fn into(self) -> i64 {
-        match self {
+impl From<&'_ DataType> for i64 {
+    fn from(data: &'_ DataType) -> Self {
+        match *data {
             DataType::BigInt(s) => s,
             DataType::Int(s) => i64::from(s),
             DataType::UnsignedInt(s) => i64::from(s),
-            _ => panic!("attempted to convert a {:?} to an i64", self),
+            _ => panic!("attempted to convert a {:?} to an i64", data),
         }
     }
 }
 
-impl Into<i128> for &'_ DataType {
-    fn into(self) -> i128 {
-        match *self {
-            DataType::BigInt(s) => i128::from(s),
-            DataType::UnsignedBigInt(s) => i128::from(s),
-            DataType::Int(s) => i128::from(s),
-            DataType::UnsignedInt(s) => i128::from(s),
-            _ => panic!("attempted to convert a {:?} to an i128", self),
-        }
+impl From<DataType> for u64 {
+    fn from(data: DataType) -> Self {
+        (&data).into()
     }
 }
 
-impl Into<i64> for &'_ DataType {
-    fn into(self) -> i64 {
-        match *self {
-            DataType::BigInt(s) => s,
-            DataType::Int(s) => i64::from(s),
-            DataType::UnsignedInt(s) => i64::from(s),
-            _ => panic!("attempted to convert a {:?} to an i64", self),
-        }
-    }
-}
-
-impl Into<u64> for &'_ DataType {
-    fn into(self) -> u64 {
-        match *self {
+impl From<&'_ DataType> for u64 {
+    fn from(data: &'_ DataType) -> Self {
+        match *data {
             DataType::UnsignedBigInt(s) => s,
             DataType::UnsignedInt(s) => u64::from(s),
-            _ => panic!("attempted to convert a {:?} to a u64", self),
+            _ => panic!("attempted to convert a {:?} to a u64", data),
         }
     }
 }
 
-impl Into<i32> for &'_ DataType {
-    fn into(self) -> i32 {
-        if let DataType::Int(s) = *self {
+impl From<DataType> for i32 {
+    fn from(data: DataType) -> Self {
+        (&data).into()
+    }
+}
+
+impl From<&'_ DataType> for i32 {
+    fn from(data: &'_ DataType) -> Self {
+        if let DataType::Int(s) = *data {
             s
         } else {
-            panic!("attempted to convert a {:?} to a i32", self)
+            panic!("attempted to convert a {:?} to a i32", data)
         }
     }
 }
 
-impl Into<u32> for &'_ DataType {
-    fn into(self) -> u32 {
-        if let DataType::UnsignedInt(s) = *self {
+impl From<DataType> for u32 {
+    fn from(data: DataType) -> Self {
+        (&data).into()
+    }
+}
+
+impl From<&'_ DataType> for u32 {
+    fn from(data: &'_ DataType) -> Self {
+        if let DataType::UnsignedInt(s) = *data {
             s
         } else {
-            panic!("attempted to convert a {:?} to a u32", self)
+            panic!("attempted to convert a {:?} to a u32", data)
         }
     }
 }
 
-impl Into<f64> for &'_ DataType {
-    fn into(self) -> f64 {
-        match *self {
+impl From<DataType> for f64 {
+    fn from(data: DataType) -> Self {
+        (&data).into()
+    }
+}
+
+impl From<&'_ DataType> for f64 {
+    fn from(data: &'_ DataType) -> Self {
+        match *data {
             DataType::Real(i, f) => i as f64 + f64::from(f) / FLOAT_PRECISION,
             DataType::Int(i) => f64::from(i),
             DataType::BigInt(i) => i as f64,
-            _ => panic!("attempted to convert a {:?} to an f64", self),
+            _ => panic!("attempted to convert a {:?} to an f64", data),
         }
     }
 }
