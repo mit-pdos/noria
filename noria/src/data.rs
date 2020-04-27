@@ -4,7 +4,6 @@ use chrono::{self, NaiveDate, NaiveDateTime};
 
 use nom_sql::Literal;
 
-use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -50,7 +49,7 @@ impl fmt::Display for DataType {
         match *self {
             DataType::None => write!(f, "*"),
             DataType::Text(..) | DataType::TinyText(..) => {
-                let text: Cow<'_, str> = self.into();
+                let text: &str = self.into();
                 // TODO: do we really want to produce quoted strings?
                 write!(f, "\"{}\"", text)
             }
@@ -76,11 +75,11 @@ impl fmt::Debug for DataType {
         match *self {
             DataType::None => write!(f, "None"),
             DataType::Text(..) => {
-                let text: Cow<'_, str> = self.into();
+                let text: &str = self.into();
                 write!(f, "Text({:?})", text)
             }
             DataType::TinyText(..) => {
-                let text: Cow<'_, str> = self.into();
+                let text: &str = self.into();
                 write!(f, "TinyText({:?})", text)
             }
             DataType::Timestamp(ts) => write!(f, "Timestamp({:?})", ts),
@@ -166,8 +165,8 @@ impl PartialEq for DataType {
             (&DataType::TinyText(ref a), &DataType::TinyText(ref b)) => a == b,
             (&DataType::Text(..), &DataType::TinyText(..))
             | (&DataType::TinyText(..), &DataType::Text(..)) => {
-                let a: Cow<'_, str> = self.into();
-                let b: Cow<'_, str> = other.into();
+                let a: &str = self.into();
+                let b: &str = other.into();
                 a == b
             }
             (&DataType::BigInt(a), &DataType::BigInt(b)) => a == b,
@@ -213,8 +212,8 @@ impl Ord for DataType {
             (&DataType::TinyText(ref a), &DataType::TinyText(ref b)) => a.cmp(b),
             (&DataType::Text(..), &DataType::TinyText(..))
             | (&DataType::TinyText(..), &DataType::Text(..)) => {
-                let a: Cow<'_, str> = self.into();
-                let b: Cow<'_, str> = other.into();
+                let a: &str = self.into();
+                let b: &str = other.into();
                 a.cmp(&b)
             }
             (&DataType::BigInt(a), &DataType::BigInt(ref b)) => a.cmp(b),
@@ -276,7 +275,7 @@ impl Hash for DataType {
                 f.hash(state);
             }
             DataType::Text(..) | DataType::TinyText(..) => {
-                let t: Cow<'_, str> = self.into();
+                let t: &str = self.into();
                 t.hash(state)
             }
             DataType::Timestamp(ts) => ts.hash(state),
@@ -405,28 +404,6 @@ impl From<Literal> for DataType {
 impl From<NaiveDateTime> for DataType {
     fn from(dt: NaiveDateTime) -> Self {
         DataType::Timestamp(dt)
-    }
-}
-
-impl<'a> From<&'a DataType> for Cow<'a, str> {
-    fn from(data: &'a DataType) -> Self {
-        match *data {
-            DataType::Text(ref s) => s.to_string_lossy(),
-            DataType::TinyText(ref bts) => {
-                if bts[TINYTEXT_WIDTH - 1] == 0 {
-                    // NULL terminated CStr
-                    use std::ffi::CStr;
-                    let null = bts.iter().position(|&i| i == 0).unwrap() + 1;
-                    CStr::from_bytes_with_nul(&bts[0..null])
-                        .unwrap()
-                        .to_string_lossy()
-                } else {
-                    // String is exactly eight bytes
-                    String::from_utf8_lossy(&bts[..])
-                }
-            }
-            _ => panic!("attempted to convert a {:?} to a string", data),
-        }
     }
 }
 
