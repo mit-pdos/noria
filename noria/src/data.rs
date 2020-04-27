@@ -430,23 +430,22 @@ impl<'a> From<&'a DataType> for Cow<'a, str> {
     }
 }
 
-impl From<DataType> for String {
-    fn from(data: DataType) -> Self {
-        match data {
-            DataType::Text(s) => String::from_utf8(s.to_bytes().to_vec()).unwrap(),
-            DataType::TinyText(bts) => {
+impl<'a> From<&'a DataType> for &'a str {
+    fn from(data: &'a DataType) -> Self {
+        match *data {
+            DataType::Text(ref s) => s.to_str().unwrap(),
+            DataType::TinyText(ref bts) => {
                 if bts[TINYTEXT_WIDTH - 1] == 0 {
+                    // NULL terminated CStr
                     use std::ffi::CStr;
                     let null = bts.iter().position(|&i| i == 0).unwrap() + 1;
-                    String::from_utf8(
-                        CStr::from_bytes_with_nul(&bts[0..null])
-                            .unwrap()
-                            .to_bytes()
-                            .to_vec(),
-                    )
-                    .unwrap()
+                    CStr::from_bytes_with_nul(&bts[0..null])
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
                 } else {
-                    String::from_utf8(bts.to_vec()).unwrap()
+                    // String is exactly eight bytes
+                    std::str::from_utf8(bts).unwrap()
                 }
             }
             _ => panic!("attempted to convert a {:?} to a string", data),
