@@ -433,16 +433,18 @@ impl<'a> From<&'a DataType> for Cow<'a, str> {
 impl From<DataType> for String {
     fn from(data: DataType) -> Self {
         match data {
-            DataType::Text(ref s) => s.to_str().unwrap().to_string(),
-            DataType::TinyText(ref bts) => {
+            DataType::Text(s) => String::from_utf8(s.to_bytes().to_vec()).unwrap(),
+            DataType::TinyText(bts) => {
                 if bts[TINYTEXT_WIDTH - 1] == 0 {
                     use std::ffi::CStr;
                     let null = bts.iter().position(|&i| i == 0).unwrap() + 1;
-                    CStr::from_bytes_with_nul(&bts[0..null])
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string()
+                    String::from_utf8(
+                        CStr::from_bytes_with_nul(&bts[0..null])
+                            .unwrap()
+                            .to_bytes()
+                            .to_vec(),
+                    )
+                    .unwrap()
                 } else {
                     String::from_utf8(bts.to_vec()).unwrap()
                 }
