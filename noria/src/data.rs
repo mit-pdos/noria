@@ -397,6 +397,10 @@ impl From<NaiveDateTime> for DataType {
     }
 }
 
+// This conversion has many unwraps, but all of them are expected to be safe,
+// because DataType variants (i.e. `Text` and `TinyText`) constructors are all
+// generated from valid UTF-8 strings, or the constructor fails (e.g. TryFrom &[u8]).
+// Thus, we can safely generate a &str from a DataType.
 impl<'a> From<&'a DataType> for &'a str {
     fn from(data: &'a DataType) -> Self {
         match *data {
