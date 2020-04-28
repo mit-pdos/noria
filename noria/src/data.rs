@@ -387,17 +387,7 @@ impl<'a> From<&'a Literal> for DataType {
 
 impl From<Literal> for DataType {
     fn from(l: Literal) -> Self {
-        match l {
-            Literal::Null => DataType::None,
-            Literal::Integer(i) => (i as i64).into(),
-            Literal::String(s) => s.as_str().into(),
-            Literal::CurrentTimestamp => {
-                let ts = chrono::Local::now().naive_local();
-                DataType::Timestamp(ts)
-            }
-            Literal::FixedPoint(r) => DataType::Real(i64::from(r.integral), r.fractional as i32),
-            _ => unimplemented!(),
-        }
+        (&l).into()
     }
 }
 
