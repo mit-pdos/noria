@@ -117,6 +117,78 @@ async fn memstats(g: &mut noria::Handle<LocalAuthority>, materialization: String
 
 }
 
+async fn construct_baseline_graph(backend: &mut Box<Backend>, verbose: bool, partial: bool, nusers: usize, ntweets: usize, private: f64, materialization: String) {
+    let init = Instant::now();
+    thread::sleep(Duration::from_millis(2000));
+    println!("constructing baseline graph: materialization: {}, partial: {}, nusers: {}, ntweets: {} percent private: {}", materialization, partial, nusers, ntweets, private);
+
+    let (tweets, users, blocked, follows) = backend.g.migrate(move |mig| { 
+        let tweets = mig.add_base("Tweets", &["userId", "id", "content", "time", "retweetId", "bogo"], Base::default()); 
+        let users = mig.add_base("Users", &["userId", "name", "isPrivate", 
+                                            "birthdayMonth", "birthdayDay", 
+                                            "birthdayYear", "email", "password"], Base::default()); 
+        let blocked = mig.add_base("BlockedAccounts", &["userId", "blockedId"], Base::default()); 
+        let follows = mig.add_base("Follows", &["userId", "followedId"], Base::default()); 
+
+        let ri = mig.maintain("Blocked".to_string(), blocked, &[0]);
+        let r2 = mig.maintain_anonymous(follows, &[0]); 
+        let r3 = mig.maintain_anonymous(tweets, &[5]); 
+        (tweets, users, blocked, follows)
+    }).await; 
+
+    let (all_tweets) = backend.g.migrate(move |mig| {
+        let tweets_with_user_info = mig.add_ingredient("TweetsWithUserInfo", 
+                                                        &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                                                        Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
+        
+        let tweets_with_user_info2 = mig.add_ingredient("TweetsWithUserInfo2", 
+                                                        &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                                                        Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
+        
+        let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo",
+                                        &["id", "time", "content", "userId", "name", 
+                                          "retweetId", "retweetTime", "retweetContent", 
+                                          "retweetUserId", "retweetName", "isPrivate", "bogo"],
+                                        Join::new(tweets_with_user_info,
+                                                  tweets_with_user_info2,
+                                                  JoinType::Left,
+                                                  vec![L(1), L(3), L(2), L(0), L(5), B(4, 1), R(3), R(2), R(0), R(5), R(6), L(7)])); 
+
+        let mut ri = mig.maintain_anonymous(all_tweets, &[11]);    
+
+        (all_tweets) 
+    }).await; 
+
+    for user in 0..nusers {
+        backend.g.migrate(move |mig| {
+           
+            let users_you_follow = mig.add_ingredient(format!("UsersYouFollow_{:?}", user), 
+                                                    &["userId", "followedId"], 
+                                                    Filter::new(follows, 
+                                                    &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(user.into())))]));  
+            
+            
+            let visible_tweets2 = mig.add_ingredient(format!("FollowedTweets_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                                                    Join::new(users_you_follow, all_tweets, 
+                                                    JoinType::Inner, vec![B(1, 0), R(1), R(2), R(3), R(4), R(5), R(6), R(7)])); 
+        
+    
+            // let mut emits = HashMap::new(); 
+            // emits.insert(visible_tweets1, vec![0, 1, 2, 3, 4, 5, 6]);
+            // emits.insert(visible_tweets2, vec![0, 1, 2, 3, 4, 5, 6]);
+    
+            // let visible_tweets3 = mig.add_ingredient(format!("PublicAndFollowedTweets_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"],
+            //                                         Union::new(emits)); 
+        
+            let ri = mig.maintain_anonymous(visible_tweets2, &[7]);
+        }).await;
+
+    }
+    
+    let mut file = File::create(format!("baseline-{}mat-{}nusers.dot", materialization, nusers)).unwrap();
+    file.write_all(backend.g.graphviz().await.unwrap().as_bytes());
+}
+
 
 async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool, nusers: usize, ntweets: usize, private: f64, materialization: String) {
     let mut p = Populate::new(nusers, ntweets, private); 
@@ -242,6 +314,29 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
         );
     
         memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+    } else {
+        println!("baselines!");
+        let mut dur = time::Duration::from_millis(0); 
+        let mut total_num_keys_read = 0; 
+        for user in 0..nusers {
+            let leaf = format!("FollowedTweets_{:?}", user);
+            let mut getter = backend.g.view(&leaf).await.unwrap();
+            let start = time::Instant::now();
+            let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+            dur += start.elapsed();
+            total_num_keys_read += res.len(); 
+        }   
+
+        let dur = dur.as_secs_f64(); 
+
+        let read_lat_str = format!(
+            "Read {} keys in {:.2}s ({:.2} GETs/sec)!",
+            total_num_keys_read,
+            dur,
+            (total_num_keys_read as f64) / dur,
+        );
+    
+        memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
     }
 
 }
@@ -316,7 +411,6 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
         let init = Instant::now();
         thread::sleep(Duration::from_millis(2000));
 
-        let uid : usize = 1; 
         let (tweets, users, blocked, follows) = backend.g.migrate(move |mig| { 
             let tweets = mig.add_base("Tweets", &["userId", "id", "content", "time", "retweetId", "bogo"], Base::default()); 
             let users = mig.add_base("Users", &["userId", "name", "isPrivate", 
@@ -328,7 +422,7 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
             (tweets, users, blocked, follows)
         }).await; 
 
-        let (tweets_with_user_info, retweets, all_tweets, private_users, visible_tweets1) = backend.g.migrate(move |mig| {
+        let (tweets_with_user_info, retweets, all_tweets, visible_tweets1) = backend.g.migrate(move |mig| {
             let tweets_with_user_info = mig.add_ingredient("TweetsWithUserInfo", 
                                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
                                                             Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
@@ -348,17 +442,17 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                                                 &["userId", "id", "content", "time", "retweetId", "name", "isPrivate"],
                                                 Union::new(emits)); 
 
-            let private_users = mig.add_ingredient("PrivateUsers", 
-                                                &["userId", "name", "isPrivate", 
-                                                "birthdayMonth", "birthdayDay", 
-                                                "birthdayYear", "email", "password"], 
-                                                Filter::new(users, &[(2, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))])); 
+            // let private_users = mig.add_ingredient("PrivateUsers", 
+            //                                     &["userId", "name", "isPrivate", 
+            //                                     "birthdayMonth", "birthdayDay", 
+            //                                     "birthdayYear", "email", "password"], 
+            //                                     Filter::new(users, &[(2, FilterCondition::Comparison(Operator::Equal, Value::Constant(1.into())))])); 
     
 
             let visible_tweets1 = mig.add_ingredient("PublicTweets", &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
                                                 Filter::new(all_tweets, &[(6, FilterCondition::Comparison(Operator::Equal, Value::Constant(0.into())))]));  
             
-            (tweets_with_user_info, retweets, all_tweets, private_users, visible_tweets1)
+            (tweets_with_user_info, retweets, all_tweets, visible_tweets1)
         }).await; 
 
         for user in 0..nusers {
@@ -366,17 +460,17 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                 let blocked_accounts = mig.add_ingredient(format!("UsersBlockedAccounts_{:?}", user), 
                                                         &["Id", "blockedId"], 
                                                         Filter::new(blocked, 
-                                                        &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
+                                                        &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(user.into())))])); 
         
                 let blocked_by_accounts = mig.add_ingredient(format!("UsersBlockedByAccounts_{:?}", user), 
                                                         &["Id", "blockedId"], 
                                                         Filter::new(blocked, 
-                                                        &[(1, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))])); 
+                                                        &[(1, FilterCondition::Comparison(Operator::Equal, Value::Constant(user.into())))])); 
                 
                 let users_you_follow = mig.add_ingredient(format!("UsersYouFollow_{:?}", user), 
                                                         &["userId", "followedId"], 
                                                         Filter::new(follows, 
-                                                        &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(uid.into())))]));  
+                                                        &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(user.into())))]));  
                 
                 
                 let visible_tweets2 = mig.add_ingredient(format!("FollowedTweets_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
@@ -638,6 +732,12 @@ async fn main() {
                 .multiple(true)
                 .help("Run full experimental suite"),
         )
+        .arg(
+            Arg::with_name("baselines")
+                .short("b")
+                .multiple(true)
+                .help("Baseline method for Twitter (all timelines materialized, no policies)"),
+        )
         .get_matches();
 
     let verbose = args.is_present("verbose");
@@ -646,7 +746,7 @@ async fn main() {
     let nusers = value_t_or_exit!(args, "nusers", usize); 
     let ntweets = value_t_or_exit!(args, "ntweets", usize); 
     let private = value_t_or_exit!(args, "percent-private", f64); 
-
+    let baselines = args.is_present("baselines");
     let materialization = args.value_of("materialization").unwrap_or("full").to_string();
 
     let mut partial = false; 
@@ -669,13 +769,24 @@ async fn main() {
         experiment_materialization_config.push(materialization.clone()); 
         experiment_ntweets_nusers_config.push((ntweets, nusers)); 
     } 
-    
-    let mut backend = Backend::make(verbose, partial).await;
-    for (ntweets, nuse) in  experiment_ntweets_nusers_config.iter() {
-        for mat in experiment_materialization_config.iter() {
-            construct_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
-            run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
-        }                   
+
+    if baselines { 
+        let partial = false; 
+        let mut backend = Backend::make(verbose, partial).await;
+        for (ntweets, nuse) in  experiment_ntweets_nusers_config.iter() {
+            for mat in experiment_materialization_config.iter() {
+                construct_baseline_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
+                run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
+            }                   
+        }
+    } else {
+        let mut backend = Backend::make(verbose, partial).await;
+        for (ntweets, nuse) in  experiment_ntweets_nusers_config.iter() {
+            for mat in experiment_materialization_config.iter() {
+                construct_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
+                run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
+            }                   
+        }
     }
 
 }
