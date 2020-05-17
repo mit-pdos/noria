@@ -5,6 +5,7 @@ use crate::prelude::*;
 
 pub mod distinct;
 pub mod filter;
+pub mod filternot;
 pub mod grouped;
 pub mod identity;
 pub mod join;
@@ -28,6 +29,7 @@ pub enum NodeOperator {
     Union(union::Union),
     Identity(identity::Identity),
     Filter(filter::Filter),
+    FilterNot(filternot::FilterNot),
     TopK(topk::TopK),
     Trigger(trigger::Trigger),
     Rewrite(rewrite::Rewrite),
@@ -66,6 +68,7 @@ nodeop_from_impl!(NodeOperator::Project, project::Project);
 nodeop_from_impl!(NodeOperator::Union, union::Union);
 nodeop_from_impl!(NodeOperator::Identity, identity::Identity);
 nodeop_from_impl!(NodeOperator::Filter, filter::Filter);
+nodeop_from_impl!(NodeOperator::FilterNot, filternot::FilterNot);
 nodeop_from_impl!(NodeOperator::TopK, topk::TopK);
 nodeop_from_impl!(NodeOperator::Trigger, trigger::Trigger);
 nodeop_from_impl!(NodeOperator::Rewrite, rewrite::Rewrite);
@@ -84,6 +87,7 @@ macro_rules! impl_ingredient_fn_mut {
             NodeOperator::Union(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Identity(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Filter(ref mut i) => i.$fn($($arg),*),
+            NodeOperator::FilterNot(ref mut i) => i.$fn($($arg),*),
             NodeOperator::TopK(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Trigger(ref mut i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref mut i) => i.$fn($($arg),*),
@@ -105,6 +109,7 @@ macro_rules! impl_ingredient_fn_ref {
             NodeOperator::Union(ref i) => i.$fn($($arg),*),
             NodeOperator::Identity(ref i) => i.$fn($($arg),*),
             NodeOperator::Filter(ref i) => i.$fn($($arg),*),
+            NodeOperator::FilterNot(ref i) => i.$fn($($arg),*),
             NodeOperator::TopK(ref i) => i.$fn($($arg),*),
             NodeOperator::Trigger(ref i) => i.$fn($($arg),*),
             NodeOperator::Rewrite(ref i) => i.$fn($($arg),*),
