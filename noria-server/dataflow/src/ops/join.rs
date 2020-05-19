@@ -11,6 +11,8 @@ pub enum JoinType {
     Left,
     /// Inner join between two views
     Inner,
+    /// Anti join between two views
+    Anti,
 }
 
 /// Where to source a join column
@@ -215,6 +217,7 @@ impl Ingredient for Join {
                     .into_iter()
                     .collect(),
             ),
+            JoinType::Anti => Some(Some(self.left.as_global()).into_iter().collect()), // TODO is this right? I'm not sure what this does. -jamb
         }
     }
 
@@ -293,7 +296,7 @@ impl Ingredient for Join {
             let mut new_right_count = None;
             let prev_join_key = rs[at][from_key].clone();
 
-            if from == *self.right && self.kind == JoinType::Left {
+            if from == *self.right && (self.kind == JoinType::Left || self.kind == JoinType::Anti) {
                 let rc = self
                     .lookup(
                         *self.right,
@@ -375,7 +378,7 @@ impl Ingredient for Join {
 
             let start = at;
             let mut make_null = None;
-            if self.kind == JoinType::Left && from == *self.right {
+            if (self.kind == JoinType::Left || self.kind == JoinType::Anti) && from == *self.right {
                 // If records are being received from the right, we need to find the number of
                 // records that existed *before* this batch of records was processed so we know
                 // whether or not to generate +/- NULL rows.
@@ -393,10 +396,14 @@ impl Ingredient for Join {
                     let new_rc = new_right_count.unwrap();
                     if new_rc == 0 && old_rc != 0 {
                         // all lefts for this key must emit + NULLs
+                        //println!("+ NULLs; new_rc={:?}, old_rc={:?}", new_rc, old_rc);
                         make_null = Some(true);
                     } else if new_rc != 0 && old_rc == 0 {
                         // all lefts for this key must emit - NULLs
+                        //println!("- NULLs; new_rc={:?}, old_rc={:?}", new_rc, old_rc);
                         make_null = Some(false);
+                    } else {
+                        //println!("neither; new_rc={:?}, old_rc={:?}", new_rc, old_rc);
                     }
                 } else {
                     // we got a right, but missed in right; clearly, a replay is needed
@@ -437,7 +444,7 @@ impl Ingredient for Join {
                     // we have yet to iterate through other_rows
                     let mut other_rows = other_rows.peekable();
                     if other_rows.peek().is_none() {
-                        if self.kind == JoinType::Left && from == *self.left {
+                        if (self.kind == JoinType::Left || self.kind == JoinType::Anti) && from == *self.left {
                             // left join, got a thing from left, no rows in right == NULL
                             ret.push((self.generate_null(&row), positive).into());
                         }
@@ -454,22 +461,24 @@ impl Ingredient for Join {
                             // we need to generate a -NULL for all these lefts
                             ret.push((self.generate_null(&other), false).into());
                         }
-                        if from == *self.left {
-                            ret.push(
-                                (
-                                    self.generate_row(&row, &other, Preprocessed::Neither),
-                                    positive,
-                                )
-                                    .into(),
-                            );
-                        } else {
-                            ret.push(
-                                (
-                                    self.generate_row(&other, &row, Preprocessed::Neither),
-                                    positive,
-                                )
-                                    .into(),
-                            );
+                        if self.kind != JoinType::Anti {
+                            if from == *self.left {
+                                ret.push(
+                                    (
+                                        self.generate_row(&row, &other, Preprocessed::Neither),
+                                        positive,
+                                    )
+                                        .into(),
+                                );
+                            } else {
+                                ret.push(
+                                    (
+                                        self.generate_row(&other, &row, Preprocessed::Neither),
+                                        positive,
+                                    )
+                                        .into(),
+                                );
+                            }
                         }
                         if let Some(true) = make_null {
                             // we need to generate a +NULL for all these lefts
@@ -483,23 +492,25 @@ impl Ingredient for Join {
                         // we need to generate a -NULL for the last left too
                         ret.push((self.generate_null(&other), false).into());
                     }
-                    ret.push(
-                        (
-                            self.regenerate_row(row, &other, from == *self.left, false),
-                            positive,
-                        )
-                            .into(),
-                    );
+                    if self.kind != JoinType::Anti {
+                        ret.push(
+                            (
+                                self.regenerate_row(row, &other, from == *self.left, false),
+                                positive,
+                            )
+                                .into(),
+                        );
+                    }
                     if let Some(true) = make_null {
                         // we need to generate a +NULL for the last left too
                         ret.push((self.generate_null(&other), true).into());
                     }
                 } else if other_rows_count == 0 {
-                    if self.kind == JoinType::Left && from == *self.left {
+                    if (self.kind == JoinType::Left || self.kind == JoinType::Anti) && from == *self.left {
                         // left join, got a thing from left, no rows in right == NULL
                         ret.push((self.generate_null(&row), positive).into());
                     }
-                } else {
+                } else if self.kind != JoinType::Anti {
                     // we no longer have access to `other_rows`
                     // *but* the values are all in ret[-other_rows_count:]!
                     let start = ret.len() - other_rows_count;
@@ -562,6 +573,7 @@ impl Ingredient for Join {
             return String::from(match self.kind {
                 JoinType::Left => "⋉",
                 JoinType::Inner => "⋈",
+                JoinType::Anti => "▷",
             });
         }
 
@@ -578,6 +590,7 @@ impl Ingredient for Join {
         let op = match self.kind {
             JoinType::Left => "⋉",
             JoinType::Inner => "⋈",
+            JoinType::Anti => "▷",
         };
 
         format!(
@@ -628,6 +641,23 @@ mod tests {
         );
 
         g.set_op("join", &["j0", "j1", "j2"], j, false);
+        (g, l, r)
+    }
+
+    fn anti_setup() -> (ops::test::MockGraph, IndexPair, IndexPair) {
+        let mut g = ops::test::MockGraph::new();
+        let l = g.add_base("left", &["l0", "l1"]);
+        let r = g.add_base("right", &["r0", "r1"]);
+
+        use self::JoinSource::*;
+        let j = Join::new(
+            l.as_global(),
+            r.as_global(),
+            JoinType::Anti,
+            vec![B(0, 0), L(1)],
+        );
+
+        g.set_op("join", &["j0", "j1"], j, false);
         (g, l, r)
     }
 
@@ -741,6 +771,101 @@ mod tests {
         j.seed(r, r_v4.clone());
         let rs = j.one_row(r, r_v4.clone(), false);
         assert_eq!(rs.len(), 0);
+    }
+
+    #[test]
+    fn antijoin_works() {
+        let (mut j, l, r) = anti_setup();
+        let l_a1 = vec![1.into(), "a".into()];
+        let l_b2 = vec![2.into(), "b".into()];
+        let l_c3 = vec![3.into(), "c".into()];
+        let l_d1 = vec![1.into(), "d".into()];
+
+        let r_x1 = vec![1.into(), "x".into()];
+        let r_y1 = vec![1.into(), "y".into()];
+        let r_z2 = vec![2.into(), "z".into()];
+        let r_w3 = vec![3.into(), "w".into()];
+        let r_v4 = vec![4.into(), "w".into()];
+
+        let r_nop: Vec<Record> = vec![
+            (vec![3.into(), "w".into()], false).into(),
+            (vec![3.into(), "w".into()], true).into(),
+        ];
+
+        j.seed(r, r_x1.clone());
+        j.seed(r, r_y1.clone());
+        j.seed(r, r_z2.clone());
+
+        j.one_row(r, r_x1.clone(), false);
+        j.one_row(r, r_y1.clone(), false);
+        j.one_row(r, r_z2.clone(), false);
+
+        // forward c3 from left; should produce c3 since no records in right are 3
+        let null = vec![(vec![3.into(), "c".into()], true)].into();
+        j.seed(l, l_c3.clone());
+        let rs = j.one_row(l, l_c3.clone(), false);
+        assert_eq!(rs, null);
+
+        // doing it again should produce the same result
+        j.seed(l, l_c3.clone());
+        let rs = j.one_row(l, l_c3.clone(), false);
+        assert_eq!(rs, null);
+
+        // record from the right should revoke c3
+        j.seed(r, r_w3.clone());
+        let rs = j.one_row(r, r_w3.clone(), false);
+        assert_eq!(
+            rs,
+            vec![
+                (vec![3.into(), "c".into()], false),
+                (vec![3.into(), "c".into()], false),
+            ]
+            .into()
+        );
+
+        // Negative followed by positive should not trigger nulls.
+        // It shouldn't trigger any updates at all...
+        let rs = j.one(r, r_nop, false);
+        assert_eq!(rs.len(), 0);
+
+        // forward from left with single matching record on right
+        j.seed(l, l_b2.clone());
+        let rs = j.one_row(l, l_b2.clone(), false);
+        assert_eq!(rs.len(), 0);
+
+        // forward from left with two matching records on right
+        j.seed(l, l_a1.clone());
+        let rs = j.one_row(l, l_a1.clone(), false);
+        assert_eq!(rs.len(), 0);
+
+        // forward from right with two matching records on left (and one more on right)
+        j.seed(r, r_w3.clone());
+        let rs = j.one_row(r, r_w3.clone(), false);
+        assert_eq!(rs.len(), 0);
+
+        // unmatched forward from right should have no effect
+        j.seed(r, r_v4.clone());
+        let rs = j.one_row(r, r_v4.clone(), false);
+        assert_eq!(rs.len(), 0);
+
+        // removing the entries on the right for 1 should make a1 visible
+        let r_remove: Vec<Record> = vec![
+            (vec![1.into(), "x".into()], true).into(),
+            (vec![1.into(), "y".into()], true).into(),
+        ];
+        let rs = j.one(r, r_remove, false);
+        assert_eq!(
+            rs,
+            vec![(vec![1.into(), "a".into()], true),].into()
+        );
+
+        // forward second for 1 and it's also visible
+        j.seed(l, l_d1.clone());
+        let rs = j.one_row(l, l_d1.clone(), false);
+        assert_eq!(
+            rs,
+            vec![(vec![1.into(), "d".into()], true),].into()
+        );
     }
 
     #[test]
