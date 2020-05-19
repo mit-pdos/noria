@@ -9,7 +9,6 @@ def main():
     for nuser in nusers: 
         for ntweet in ntweets: 
             fname = 'exp-clientmat-{}nusers-{}ntweets.txt'.format(nuser, ntweet)
-            # fname = 'exp-clientmat-1000nusers-1000ntweets.txt'
             try: 
                 f = open(fname, 'r+')
                 lines = f.readlines() 
