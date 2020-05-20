@@ -771,6 +771,21 @@ mod tests {
         j.seed(r, r_v4.clone());
         let rs = j.one_row(r, r_v4.clone(), false);
         assert_eq!(rs.len(), 0);
+
+        // removing the entries on the right for 1 should make a1 have null matches
+        let r_remove: Vec<Record> = vec![
+            (vec![1.into(), "x".into()], true).into(),
+            (vec![1.into(), "y".into()], true).into(),
+        ];
+        let rs = j.one(r, r_remove, false);
+        assert_eq!(
+            rs,
+            vec![
+                (vec![1.into(), "a".into(), "x".into()], false),
+                (vec![1.into(), "a".into(), "y".into()], false),
+                (vec![1.into(), "a".into(), DataType::None], true),
+            ].into()
+        );
     }
 
     #[test]
