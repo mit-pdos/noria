@@ -1304,6 +1304,7 @@ impl SqlToMirConverter {
                 on_right: right_join_columns,
                 project: fields.clone(),
             },
+            JoinType::Anti => unimplemented!(),
         };
         trace!(self.log, "Added join node {:?}", inner);
         MirNode::new(

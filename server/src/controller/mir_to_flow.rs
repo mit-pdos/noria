@@ -734,6 +734,7 @@ fn make_join_node(
     let j = match kind {
         JoinType::Inner => Join::new(left_na, right_na, JoinType::Inner, join_config),
         JoinType::Left => Join::new(left_na, right_na, JoinType::Left, join_config),
+        JoinType::Anti => Join::new(left_na, right_na, JoinType::Anti, join_config),
     };
     let n = mig.add_ingredient(String::from(name), column_names.as_slice(), j);
 
