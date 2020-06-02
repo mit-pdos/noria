@@ -15,8 +15,10 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use tokio_tower::multiplex;
-use tower_balance::pool::{self, Pool};
+use tower_balance::p2c::Balance;
 use tower_buffer::Buffer;
+use tower_discover::ServiceStream;
+use tower_limit::concurrency::ConcurrencyLimit;
 use tower_service::Service;
 
 type Transport = AsyncBincodeStream<
@@ -27,17 +29,18 @@ type Transport = AsyncBincodeStream<
 >;
 
 #[derive(Debug)]
-#[doc(hidden)]
-// only pub because we use it to figure out the error type for ViewError
-pub struct ViewEndpoint(SocketAddr);
+struct Endpoint(SocketAddr);
 
-impl Service<()> for ViewEndpoint {
-    type Response = multiplex::MultiplexTransport<Transport, Tagger>;
+type InnerService = multiplex::Client<
+    multiplex::MultiplexTransport<Transport, Tagger>,
+    tokio_tower::Error<multiplex::MultiplexTransport<Transport, Tagger>, Tagged<ReadQuery>>,
+    Tagged<ReadQuery>,
+>;
+
+impl Service<()> for Endpoint {
+    type Response = InnerService;
     type Error = tokio::io::Error;
-    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
-    type Future = impl Future<
-        Output = Result<multiplex::MultiplexTransport<Transport, Tagger>, tokio::io::Error>,
-    >;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -49,15 +52,41 @@ impl Service<()> for ViewEndpoint {
             let s = f.await?;
             s.set_nodelay(true)?;
             let s = AsyncBincodeStream::from(s).for_async();
-            Ok(multiplex::MultiplexTransport::new(s, Tagger::default()))
+            let t = multiplex::MultiplexTransport::new(s, Tagger::default());
+            Ok(multiplex::Client::with_error_handler(t, |e| {
+                eprintln!("view server went away: {}", e)
+            }))
         }
     }
 }
 
-pub(crate) type ViewRpc = Buffer<
-    Pool<multiplex::client::Maker<ViewEndpoint, Tagged<ReadQuery>>, (), Tagged<ReadQuery>>,
-    Tagged<ReadQuery>,
->;
+fn make_views_stream(
+    addr: SocketAddr,
+) -> impl futures_util::stream::TryStream<
+    Ok = tower_discover::Change<usize, InnerService>,
+    Error = tokio::io::Error,
+> {
+    // TODO: use whatever comes out of https://github.com/tower-rs/tower/issues/456 instead of
+    // creating _all_ the connections every time.
+    (0..crate::VIEW_POOL_SIZE)
+        .map(|i| async move {
+            let svc = Endpoint(addr).call(()).await?;
+            Ok(tower_discover::Change::Insert(i, svc))
+        })
+        .collect::<futures_util::stream::FuturesUnordered<_>>()
+}
+
+fn make_views_discover(addr: SocketAddr) -> Discover {
+    ServiceStream::new(make_views_stream(addr))
+}
+
+// Unpin + Send bounds are needed due to https://github.com/rust-lang/rust/issues/55997
+type Discover = impl tower_discover::Discover<Key = usize, Service = InnerService, Error = tokio::io::Error>
+    + Unpin
+    + Send;
+
+pub(crate) type ViewRpc =
+    Buffer<ConcurrencyLimit<Balance<Discover, Tagged<ReadQuery>>>, Tagged<ReadQuery>>;
 
 /// A failed [`SyncView`] operation.
 #[derive(Debug, Fail)]
@@ -99,7 +128,7 @@ pub enum ReadQuery {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ReadReply {
     /// Errors if view isn't ready yet.
-    Normal(Result<Vec<Datas>, ()>),
+    Normal(Result<Vec<Vec<Vec<DataType>>>, ()>),
     /// Read size of view
     Size(usize),
 }
@@ -140,15 +169,19 @@ impl ViewBuilder {
                 Entry::Occupied(e) => e.get().clone(),
                 Entry::Vacant(h) => {
                     // TODO: maybe always use the same local port?
-                    let c = Buffer::new(
-                        pool::Builder::new()
-                            .urgency(0.03)
-                            .loaded_above(0.2)
-                            .underutilized_below(0.000000001)
-                            .max_services(Some(32))
-                            .build(multiplex::client::Maker::new(ViewEndpoint(addr)), ()),
-                        50,
+                    let (c, w) = Buffer::pair(
+                        ConcurrencyLimit::new(
+                            Balance::from_entropy(make_views_discover(addr)),
+                            crate::PENDING_LIMIT,
+                        ),
+                        crate::BUFFER_TO_POOL,
                     );
+                    use tracing_futures::Instrument;
+                    tokio::spawn(w.instrument(tracing::debug_span!(
+                        "view_worker",
+                        addr = %addr,
+                        shard = shardi
+                    )));
                     h.insert(c.clone());
                     c
                 }
@@ -160,7 +193,7 @@ impl ViewBuilder {
         Ok(View {
             node,
             schema,
-            columns,
+            columns: Arc::from(columns),
             shard_addrs: addrs,
             shards: conns,
             tracer,
@@ -175,7 +208,7 @@ impl ViewBuilder {
 #[derive(Clone)]
 pub struct View {
     node: NodeIndex,
-    columns: Vec<String>,
+    columns: Arc<[String]>,
     schema: Option<Vec<ColumnSpecification>>,
 
     shards: Vec<ViewRpc>,
@@ -185,7 +218,7 @@ pub struct View {
 }
 
 impl fmt::Debug for View {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("View")
             .field("node", &self.node)
             .field("columns", &self.columns)
@@ -194,11 +227,13 @@ impl fmt::Debug for View {
     }
 }
 
+pub(crate) mod results;
+use self::results::{Results, Row};
+
 impl Service<(Vec<Vec<DataType>>, bool)> for View {
-    type Response = Vec<Datas>;
+    type Response = Vec<Results>;
     type Error = ViewError;
-    // have to repeat types because https://github.com/rust-lang/rust/issues/57807
-    type Future = impl Future<Output = Result<Vec<Datas>, ViewError>> + Send;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>> + Send;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         for s in &mut self.shards {
@@ -218,6 +253,7 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
             None
         };
 
+        let columns = Arc::clone(&self.columns);
         if self.shards.len() == 1 {
             let request = Tagged::from(ReadQuery::Normal {
                 target: (self.node, 0),
@@ -232,9 +268,12 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                 self.shards[0]
                     .call(request)
                     .map_err(ViewError::from)
-                    .and_then(|reply| async move {
+                    .and_then(move |reply| async move {
                         match reply.v {
-                            ReadReply::Normal(Ok(rows)) => Ok(rows),
+                            ReadReply::Normal(Ok(rows)) => Ok(rows
+                                .into_iter()
+                                .map(|rows| Results::new(rows, Arc::clone(&columns)))
+                                .collect()),
                             ReadReply::Normal(Err(())) => Err(ViewError::NotYetAvailable),
                             _ => unreachable!(),
                         }
@@ -298,7 +337,12 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
                         })
                 })
                 .collect::<FuturesUnordered<_>>()
-                .try_concat(),
+                .try_concat()
+                .map_ok(move |rows| {
+                    rows.into_iter()
+                        .map(|rows| Results::new(rows, Arc::clone(&columns)))
+                        .collect()
+                }),
         )
     }
 }
@@ -307,12 +351,12 @@ impl Service<(Vec<Vec<DataType>>, bool)> for View {
 impl View {
     /// Get the list of columns in this view.
     pub fn columns(&self) -> &[String] {
-        self.columns.as_slice()
+        &*self.columns
     }
 
     /// Get the schema definition of this view.
     pub fn schema(&self) -> Option<&[ColumnSpecification]> {
-        self.schema.as_ref().map(Vec::as_slice)
+        self.schema.as_deref()
     }
 
     /// Get the current size of this view.
@@ -327,12 +371,9 @@ impl View {
             .iter_mut()
             .enumerate()
             .map(|(shardi, shard)| {
-                shard.call(
-                    Tagged::from(ReadQuery::Size {
-                        target: (node, shardi),
-                    })
-                    .into(),
-                )
+                shard.call(Tagged::from(ReadQuery::Size {
+                    target: (node, shardi),
+                }))
             })
             .collect::<FuturesUnordered<_>>();
 
@@ -357,7 +398,7 @@ impl View {
         &mut self,
         keys: Vec<Vec<DataType>>,
         block: bool,
-    ) -> Result<Vec<Datas>, ViewError> {
+    ) -> Result<Vec<Results>, ViewError> {
         future::poll_fn(|cx| self.poll_ready(cx)).await?;
         self.call((keys, block)).await
     }
@@ -365,9 +406,22 @@ impl View {
     /// Retrieve the query results for the given parameter value.
     ///
     /// The method will block if the results are not yet available only when `block` is `true`.
-    pub async fn lookup(&mut self, key: &[DataType], block: bool) -> Result<Datas, ViewError> {
+    pub async fn lookup(&mut self, key: &[DataType], block: bool) -> Result<Results, ViewError> {
         // TODO: Optimized version of this function?
         let rs = self.multi_lookup(vec![Vec::from(key)], block).await?;
         Ok(rs.into_iter().next().unwrap())
+    }
+
+    /// Retrieve the first query result for the given parameter value.
+    ///
+    /// The method will block if the results are not yet available only when `block` is `true`.
+    pub async fn lookup_first(
+        &mut self,
+        key: &[DataType],
+        block: bool,
+    ) -> Result<Option<Row>, ViewError> {
+        // TODO: Optimized version of this function?
+        let rs = self.multi_lookup(vec![Vec::from(key)], block).await?;
+        Ok(rs.into_iter().next().unwrap().into_iter().next())
     }
 }

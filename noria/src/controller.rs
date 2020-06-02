@@ -3,14 +3,10 @@ use crate::debug::stats;
 use crate::table::{Table, TableBuilder, TableRpc};
 use crate::view::{View, ViewBuilder, ViewRpc};
 use crate::ActivationResult;
-#[cfg(debug_assertions)]
-use assert_infrequent;
 use failure::{self, ResultExt};
 use futures_util::future;
-use hyper;
 use petgraph::graph::NodeIndex;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -174,6 +170,8 @@ impl ControllerHandle<consensus::ZookeeperAuthority> {
     }
 }
 
+// this alias is needed to work around -> impl Trait capturing _all_ lifetimes by default
+// the A parameter is needed so it gets captured into the impl Trait
 type RpcFuture<A, R> = impl Future<Output = Result<R, failure::Error>>;
 
 // Needed b/c of https://github.com/rust-lang/rust/issues/65442
