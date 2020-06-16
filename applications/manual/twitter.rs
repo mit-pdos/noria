@@ -118,7 +118,6 @@ async fn memstats(g: &mut noria::Handle<LocalAuthority>, materialization: String
 }
 
 
-
 async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: bool, nusers: usize, ntweets: usize, private: f64, materialization: String) {
     println!("constructing graph: materialization: {}, partial: {}, nusers: {}, ntweets: {} percent private: {}", materialization, partial, nusers, ntweets, private); 
 
@@ -202,24 +201,25 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                                                             &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
                                                             Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
             
-            let tweets_with_user_info2 = mig.add_ingredient("TweetsWithUserInfo2", 
-                                                            &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
-                                                            Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
+            // let tweets_with_user_info2 = mig.add_ingredient("TweetsWithUserInfo2", 
+            //                                                 &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+            //                                                 Join::new(tweets, users, JoinType::Inner, vec![B(0, 0), L(1), L(2), L(3), L(4), R(1), R(2), L(5)])); 
             
             // let prelim = mig.maintain_anonymous(tweets_with_user_info, &[7]); 
 
-            let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo",
-                                            &["id", "time", "content", "userId", "name", 
-                                              "retweetId", "retweetTime", "retweetContent", 
-                                              "retweetUserId", "retweetName", "isPrivate", "bogo"],
-                                            Join::new(tweets_with_user_info,
-                                                      tweets_with_user_info2,
-                                                      JoinType::Left,
-                                                      vec![L(1), L(3), L(2), L(0), L(5), B(4, 1), R(3), R(2), R(0), R(5), R(6), L(7)])); 
+            // let all_tweets = mig.add_ingredient("AllTweetsWithUserInfo",
+            //                                 &["id", "time", "content", "userId", "name", 
+            //                                   "retweetId", "retweetTime", "retweetContent", 
+            //                                   "retweetUserId", "retweetName", "isPrivate", "bogo"],
+            //                                 Join::new(tweets_with_user_info,
+            //                                           tweets_with_user_info2,
+            //                                           JoinType::Left,
+            //                                           vec![L(1), L(3), L(2), L(0), L(5), B(4, 1), R(3), R(2), R(0), R(5), R(6), L(7)])); 
 
-            let mut ri = mig.maintain_anonymous(all_tweets, &[11]);    
-
-            (all_tweets) 
+            let mut ri = mig.maintain_anonymous(tweets_with_user_info, &[7]);    
+// 
+            // (all_tweets)
+            (tweets_with_user_info) 
         }).await; 
 
 
@@ -240,12 +240,19 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                                                         Filter::new(follows, 
                                                         &[(0, FilterCondition::Comparison(Operator::Equal, Value::Constant(user.into())))]));  
                 
+
+                                                        // &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"],
                 
-                let visible_tweets2 = mig.add_ingredient(format!("FollowedTweets_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                let visible_tweets2 = mig.add_ingredient(format!("FollowedTweets_{:?}", user), &["userId", "id", "content", "time",
+                                                        "retweetId", "name", "isPrivate", "bogo"], 
                                                         Join::new(users_you_follow, all_tweets, 
                                                         JoinType::Inner, vec![B(1, 0), R(1), R(2), R(3), R(4), R(5), R(6), R(7)])); 
+
+                let r2 = mig.maintain_anonymous(users_you_follow, &[0]);
+                // let visible_tweets2 = mig.add_ingredient(format!("FollowedTweets_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "bogo"], 
+                //                                         Join::new(users_you_follow, all_tweets, 
+                //                                         JoinType::Inner, vec![B(0, 3), R(1), R(2), R(3), R(4), R(5), R(6), R(7)])); 
            
-        
                 // let mut emits = HashMap::new(); 
                 // emits.insert(visible_tweets1, vec![0, 1, 2, 3, 4, 5, 6]);
                 // emits.insert(visible_tweets2, vec![0, 1, 2, 3, 4, 5, 6]);
@@ -254,21 +261,21 @@ async fn construct_graph(backend: &mut Box<Backend>, verbose: bool, partial: boo
                 //                                         Union::new(emits)); 
         
         
-                let visible_tweets4a = mig.add_ingredient(format!("AllExcludingBlocked_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
-                                                        Join::new(visible_tweets2, blocked_accounts,
-                                                        JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0), L(7)])); 
+                // let visible_tweets4a = mig.add_ingredient(format!("AllExcludingBlocked_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
+                //                                         Join::new(visible_tweets2, blocked_accounts,
+                //                                         JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0), L(7)])); 
                                                     
         
-                let visible_tweets4 = mig.add_ingredient(format!("AllExcludingBlockedFinal_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
-                                                        Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
+                // let visible_tweets4 = mig.add_ingredient(format!("AllExcludingBlockedFinal_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
+                //                                         Filter::new(visible_tweets4a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
             
             
-                let visible_tweets5a = mig.add_ingredient(format!("AllExcludingBlockedBy_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
-                                                        Join::new(visible_tweets4, blocked_by_accounts,
-                                                        JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0), L(7)])); 
+                // let visible_tweets5a = mig.add_ingredient(format!("AllExcludingBlockedBy_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
+                //                                         Join::new(visible_tweets4, blocked_by_accounts,
+                //                                         JoinType::Left, vec![B(0, 1), L(1), L(2), L(3), L(4), L(5), L(6), R(0), L(7)])); 
                 
-                let visible_tweets5 = mig.add_ingredient(format!("AllExcludingBlockedByFinal_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
-                                                        Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
+                // let visible_tweets5 = mig.add_ingredient(format!("AllExcludingBlockedByFinal_{:?}", user), &["userId", "id", "content", "time", "retweetId", "name", "isPrivate", "Id", "bogo"], 
+                //                                         Filter::new(visible_tweets5a, &[(7, FilterCondition::Comparison(Operator::Equal, Value::Constant(DataType::None)))]));  
             
                 let ri = mig.maintain_anonymous(visible_tweets5, &[7]);
             }).await;
@@ -411,7 +418,8 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
             thread::sleep(ten_millis);
             assert!(res3.len() > 0); 
         }
-
+        
+        println!("read {:?} keys", res3.len());  
         for record in res3.iter() { // Get all followed tweets 
             // println!("followed: {:?}", users_followed); 
             // println!("checking if {:?} is in followed or is self", record[3]); 
@@ -442,7 +450,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
          
         // println!("len visible: {:?}", visible_tweets.len()); 
 
-        memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+        // memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
         
     } else if materialization == "full".to_string() || materialization == "partial".to_string() {
         
@@ -453,6 +461,12 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
             let mut getter = backend.g.view(&leaf).await.unwrap();
             let start = time::Instant::now();
             let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+            if res.len() == 0 {
+                let ten_millis = time::Duration::from_millis(20000);
+                thread::sleep(ten_millis);
+                assert!(res.len() > 0); 
+            }
+            println!("read {:?} keys", res.len());  
             dur += start.elapsed();
             total_num_keys_read += res.len(); 
         }   
@@ -466,7 +480,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
             (total_num_keys_read as f64) / dur,
         );
     
-        memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+        // memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
     } else {
         if materialization == "baseline" {
             println!("baselines!");
@@ -477,6 +491,12 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
                 let mut getter = backend.g.view(&leaf).await.unwrap();
                 let start = time::Instant::now();
                 let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+                if res.len() == 0 {
+                    let ten_millis = time::Duration::from_millis(20000);
+                    thread::sleep(ten_millis);
+                    assert!(res.len() > 0); 
+                }
+                println!("read {:?} keys", res.len());  
                 dur += start.elapsed();
                 total_num_keys_read += res.len(); 
             }   
@@ -490,7 +510,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
                 (total_num_keys_read as f64) / dur,
             );
         
-            memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+            // memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
         } else { 
             // Shallow server. Same as baseline, but compute policies (blocked/blocked by) on the fly. 
             let mut dur = time::Duration::from_millis(0); 
@@ -515,6 +535,7 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
                 let mut visible_tweets = Vec::new(); 
                 let start = time::Instant::now();
                 let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+                println!("read {:?} keys", res.len()); 
                 for record in res.iter() {
                     if !blocked_user.contains(&record[0]) {
                         visible_tweets.push(record); 
@@ -534,10 +555,136 @@ async fn run_experiment(backend: &mut Box<Backend>, verbose: bool, partial: bool
                 (total_num_keys_read as f64) / dur,
             );
         
-            memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
+            // memstats(&mut backend.g, materialization.clone(), nusers, ntweets, Some(read_lat_str)).await;
         } 
     }
 
+}
+
+async fn it_works_full_mat() { 
+    let verbose = false; 
+    let partial = false; 
+    let nusers = 3 as usize; 
+    let ntweets = 4 as usize; 
+    let private = 0.0 as f64;
+    let materialization = "full".to_string(); 
+
+    // Construct graph 
+    let mut backend = Backend::make(verbose, partial).await;
+    construct_graph(&mut backend, verbose, partial, nusers, ntweets, private, materialization).await; 
+    
+    // Populate tables 
+    let nusers = 3; 
+    let mut users = Vec::new(); 
+    let mut tweets = Vec::new(); 
+    let mut follows = Vec::new(); 
+    let mut blocks = Vec::new(); 
+  
+    // Add users to the system
+    for i in 0..nusers {
+        let mut name = "name".to_string(); 
+        let mut handle : String = format!("user{}", i); 
+        let mut bday_month: usize = 0;
+        let mut bday_day: usize = 1; 
+        let mut bday_year: usize = 2; 
+        let mut password: String = "password".to_string(); 
+        let mut email: String = "email".to_string(); 
+                
+        let mut new_record : Vec<DataType> = vec![
+                                                i.into(),
+                                                name.into(), 
+                                                0.into(), 
+                                                bday_month.into(), 
+                                                bday_day.into(), 
+                                                bday_year.into(), 
+                                                email.into(), 
+                                                password.into(), 
+                                                ]; 
+        users.push(new_record); 
+    }
+  
+    // Add follows/blocks --- user 0 follows user 2 
+    let mut rec = Vec::new(); 
+    rec.push((0 as i32).into()); 
+    rec.push((2 as i32).into()); 
+    follows.push(rec.clone()); 
+    
+    // Add follows/blocks --- user 0 blocks user 1
+    let mut rec = Vec::new(); 
+    rec.push((0 as i32).into()); 
+    rec.push((1 as i32).into()); 
+    blocks.push(rec.clone()); 
+  
+  
+    // Add tweets --- user 2 tweets twice, user 1 tweets once, user 0 tweets once 
+    let mut new_record: Vec<DataType> = vec![
+        2.into(), 
+        1.into(),
+        "x".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+
+    let mut new_record2: Vec<DataType> = vec![
+        2.into(), 
+        2.into(),
+        "x2".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+
+    let mut new_record3: Vec<DataType> = vec![
+        1.into(), 
+        3.into(),
+        "y".into(),
+        0.into(), 
+        1.into(), 
+        0.into()
+    ]; 
+  
+    let mut new_record4: Vec<DataType> = vec![
+        0.into(), 
+        4.into(),
+        "z".into(),
+        0.into(), 
+        0.into(), 
+        0.into()
+    ]; 
+    
+    tweets.push(new_record);
+    tweets.push(new_record2); 
+    tweets.push(new_record3); 
+    tweets.push(new_record4); 
+
+    backend.populate("Users", users.clone()).await;
+    backend.populate("Follows", follows.clone()).await; 
+    backend.populate("BlockedAccounts", blocks.clone()).await; 
+    backend.populate("Tweets", tweets.clone()).await; 
+
+    thread::sleep(Duration::from_millis(20000));
+
+    let uid = 0; 
+
+    let leaf = format!("UsersYouFollow_0");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    println!("Users that user 0 follows: {:?}", res); 
+
+    let leaf = format!("TweetsWithUserInfo");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    println!("All tweets: {:?}", res); 
+
+    let leaf = format!("AllExcludingBlockedByFinal_0");
+    let mut getter = backend.g.view(&leaf).await.unwrap();
+    let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    println!("Followed tweets: {:?}", res); 
+    // let mut visible_tweets = Vec::new(); 
+
+    // assert!(res.len() == 4); 
+  
 }
 
 
@@ -651,7 +798,6 @@ async fn it_works_client_side() {
     let leaf = format!("Blocked");
     let mut getter = backend.g.view(&leaf).await.unwrap();
     let mut res = getter.lookup(&[0.into()], true).await.unwrap();
-    
     // Blocked accounts and blocked by accounts: 
     let mut blocked_user = HashSet::new(); 
     for record in res.iter() {
@@ -679,6 +825,7 @@ async fn it_works_client_side() {
     let leaf = format!("AllTweetsWithUserInfo");
     let mut getter = backend.g.view(&leaf).await.unwrap();
     let mut res = getter.lookup(&[0.into()], true).await.unwrap();
+    println!("read {:?} keys", res.len()); 
     let mut visible_tweets = Vec::new(); 
 
     assert!(res.len() == 4); 
@@ -805,8 +952,9 @@ async fn main() {
         let mut backend = Backend::make(verbose, partial).await;
         for (ntweets, nuse) in  experiment_ntweets_nusers_config.iter() {
             for mat in experiment_materialization_config.iter() {
-                construct_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
-                run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
+                // construct_graph(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await; 
+                it_works_full_mat().await; 
+                // run_experiment(&mut backend, verbose, partial, *nuse, *ntweets, private, mat.clone()).await;
             }                   
         }
     }
