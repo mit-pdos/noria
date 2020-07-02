@@ -13,3 +13,5 @@ debug=true
 # optional -- just a perf optimization
 # comment this out if you want cargo doc to work!
 tokio-tower = { git = "https://github.com/tower-rs/tokio-tower.git", branch = "no-box" }
+indexmap = { git = "https://github.com/jonhoo/indexmap.git", branch = "griddle-into-iter" }
+hashbrown = { git = "https://github.com/jonhoo/hashbrown.git", branch = "raw-into-iter-versatility" }
