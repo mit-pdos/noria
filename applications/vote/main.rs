@@ -658,12 +658,12 @@ fn main() {
         .subcommand(
             SubCommand::with_name("hybrid")
                 .arg(
-                    Arg::with_name("memcached-address")
-                        .long("memcached-address")
+                    Arg::with_name("redis-address")
+                        .long("redis-address")
                         .takes_value(true)
                         .required(true)
-                        .default_value("127.0.0.1:11211")
-                        .help("Address of memcached"),
+                        .default_value("127.0.0.1")
+                        .help("Address of redis server"),
                 )
                 .arg(
                     Arg::with_name("mysql-address")
@@ -760,7 +760,7 @@ fn main() {
         //("mssql", Some(largs)) => run::<clients::mssql::Conf>(&args, largs),
         ("mysql", Some(largs)) => run::<clients::mysql::Conn>(&args, largs),
         ("redis", Some(largs)) => run::<clients::redis::Conn>(&args, largs),
-        //("hybrid", Some(largs)) => run::<clients::hybrid::Conf>(&args, largs),
+        ("hybrid", Some(largs)) => run::<clients::hybrid::Conn>(&args, largs),
         //("null", Some(largs)) => run::<()>(&args, largs),
         (name, _) => eprintln!("unrecognized backend type '{}'", name),
     }

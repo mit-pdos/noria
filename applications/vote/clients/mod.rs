@@ -7,7 +7,10 @@ pub(crate) struct Parameters {
     pub(crate) articles: usize,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct WriteRequest(pub Vec<i32>);
+
+#[derive(Clone, Debug)]
 pub(crate) struct ReadRequest(pub Vec<i32>);
 
 pub(crate) trait VoteClient
@@ -18,7 +21,7 @@ where
     fn new(params: Parameters, args: clap::ArgMatches) -> <Self as VoteClient>::Future;
 }
 
-//pub(crate) mod hybrid;
+pub(crate) mod hybrid;
 pub(crate) mod localsoup;
 pub(crate) mod memcached;
 //pub(crate) mod mssql;
