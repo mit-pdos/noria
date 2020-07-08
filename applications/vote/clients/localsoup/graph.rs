@@ -14,8 +14,8 @@ pub(crate) const RECIPE: &str =
             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
 pub(crate) const RECIPE_NO_JOIN: &str =
-    "QUERY ArticleWithVoteCount: SELECT VoteCount.id, VoteCount.votes AS votes \
-            FROM VoteCount WHERE VoteCount.id = ?;";
+    "QUERY ArticleWithVoteCount: SELECT VoteCount.article_id as id, VoteCount.votes AS votes \
+            FROM VoteCount WHERE VoteCount.article_id = ?;";
 
 pub struct Graph {
     stupid: bool,
