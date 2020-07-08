@@ -37,9 +37,9 @@ impl VoteClient for Conn {
             }
 
             // we need to provide _some_ backpressure, otherwise the load generator won't start to
-            // batch (which we want to improve throughput). the choice of 2048 is semi-random. it's
+            // batch (which we want to improve throughput). the choice of 8192 is semi-random. it's
             // the same as noria is using at time of writing.
-            let svc = tower_limit::ConcurrencyLimit::new(ActualConn { c: conn }, 2048);
+            let svc = tower_limit::ConcurrencyLimit::new(ActualConn { c: conn }, 8192);
             Ok(Conn { svc })
         }
     }
