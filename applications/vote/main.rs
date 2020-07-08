@@ -257,10 +257,7 @@ where
     let mut r_capacity = 128;
 
     let mut rng = rand::thread_rng();
-    let mut rt = tokio::runtime::Builder::new()
-        .basic_scheduler()
-        .build()
-        .unwrap();
+    let ex = &ex;
 
     let start = time::Instant::now();
     let end = start + runtime;
@@ -399,7 +396,7 @@ where
 
         // try to send batches
         if !queued_w.is_empty() {
-            if let Poll::Ready(r) = rt.block_on(async {
+            if let Poll::Ready(r) = ex.block_on(async {
                 futures_util::poll!(futures_util::future::poll_fn(|cx| {
                     Service::<WriteRequest>::poll_ready(&mut handle, cx)
                 }))
@@ -414,7 +411,7 @@ where
         }
 
         if !queued_r.is_empty() {
-            if let Poll::Ready(r) = rt.block_on(async {
+            if let Poll::Ready(r) = ex.block_on(async {
                 futures_util::poll!(futures_util::future::poll_fn(|cx| {
                     Service::<ReadRequest>::poll_ready(&mut handle, cx)
                 }))
@@ -442,7 +439,7 @@ where
     );
 
     // force the client to also complete their queue
-    rt.block_on(async {
+    ex.block_on(async {
         // both poll_ready calls need &mut C, so the borrow checker will get mad. but since we're
         // single-threaded, we know that only one mutable borrow happens _at a time_, so a RefCell
         // takes care of that.
