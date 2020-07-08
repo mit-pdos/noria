@@ -1,21 +1,25 @@
 use noria::{self, FrontierStrategy, Handle, LocalAuthority, NodeIndex, PersistenceParameters};
 use std::future::Future;
 
-pub(crate) const RECIPE: &str = "# base tables
+pub(crate) const RECIPE_BASE: &str = "
 CREATE TABLE Article (id int, title varchar(255), PRIMARY KEY(id));
 CREATE TABLE Vote (article_id int, user int);
-
-# read queries
 CREATE VIEW VoteCount AS \
-  SELECT Vote.article_id, COUNT(user) AS votes FROM Vote GROUP BY Vote.article_id;
+  SELECT Vote.article_id, COUNT(user) AS votes FROM Vote GROUP BY Vote.article_id;";
 
-QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
+pub(crate) const RECIPE: &str =
+    "QUERY ArticleWithVoteCount: SELECT Article.id, title, VoteCount.votes AS votes \
             FROM Article \
             LEFT JOIN VoteCount \
             ON (Article.id = VoteCount.article_id) WHERE Article.id = ?;";
 
+pub(crate) const RECIPE_NO_JOIN: &str =
+    "QUERY ArticleWithVoteCount: SELECT VoteCount.id, VoteCount.votes AS votes \
+            FROM VoteCount WHERE VoteCount.id = ?;";
+
 pub struct Graph {
     stupid: bool,
+    join: bool,
     pub vote: NodeIndex,
     pub article: NodeIndex,
     pub end: NodeIndex,
@@ -30,6 +34,7 @@ pub struct Builder {
     pub logging: bool,
     pub threads: Option<usize>,
     pub purge: String,
+    pub join: bool,
 }
 
 impl Default for Builder {
@@ -41,6 +46,7 @@ impl Default for Builder {
             logging: false,
             threads: None,
             purge: "none".to_string(),
+            join: true,
         }
     }
 }
@@ -77,9 +83,16 @@ impl Builder {
 
         let logging = self.logging;
         let stupid = self.stupid;
+        let join = self.join;
         let (mut wh, done) = g.start_local().await?;
         wh.ready().await?;
-        wh.install_recipe(RECIPE).await?;
+        if join {
+            wh.install_recipe(&format!("{}\n{}", RECIPE_BASE, RECIPE))
+                .await?;
+        } else {
+            wh.install_recipe(&format!("{}\n{}", RECIPE_BASE, RECIPE_NO_JOIN))
+                .await?;
+        }
         wh.ready().await?;
         let inputs = wh.inputs().await?;
         wh.ready().await?;
@@ -95,6 +108,7 @@ impl Builder {
             article: inputs["Article"],
             end: outputs["ArticleWithVoteCount"],
             stupid,
+            join,
             graph: wh,
             done: Box::new(done),
         })
@@ -104,6 +118,7 @@ impl Builder {
 impl Graph {
     #[allow(dead_code)]
     pub async fn transition(&mut self) {
+        assert!(self.join, "non-join transition not defined");
         let stupid_recipe = "# base tables
                CREATE TABLE Rating (article_id int, user int, stars int);
 

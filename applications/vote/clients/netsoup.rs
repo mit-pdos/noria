@@ -1,4 +1,4 @@
-use crate::clients::localsoup::graph::RECIPE;
+use crate::clients::localsoup::graph::{RECIPE, RECIPE_BASE, RECIPE_NO_JOIN};
 use crate::clients::{Parameters, ReadRequest, VoteClient, WriteRequest};
 use clap;
 use failure::ResultExt;
@@ -12,6 +12,7 @@ pub(crate) struct Conn {
     ch: ControllerHandle<ZookeeperAuthority>,
     r: Option<noria::View>,
     w: Option<noria::Table>,
+    join: bool,
 }
 
 impl VoteClient for Conn {
@@ -22,20 +23,29 @@ impl VoteClient for Conn {
             args.value_of("zookeeper").unwrap(),
             args.value_of("deployment").unwrap()
         );
+        let join = !args.is_present("no-join");
 
         async move {
             let zk = ZookeeperAuthority::new(&zk)?;
             let mut c = ControllerHandle::new(zk).await?;
             if params.prime {
-                // for prepop, we need a mutator
-                c.install_recipe(RECIPE).await?;
-                let mut a = c.table("Article").await?;
-                a.perform_all(
-                    (0..params.articles)
-                        .map(|i| vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]),
-                )
-                .await
-                .context("failed to do article prepopulation")?;
+                if join {
+                    c.install_recipe(&format!("{}\n{}", RECIPE_BASE, RECIPE))
+                        .await?;
+
+                    // if we're doing the join, article must be filled
+                    let mut a = c.table("Article").await?;
+                    a.perform_all(
+                        (0..params.articles).map(|i| {
+                            vec![((i + 1) as i32).into(), format!("Article #{}", i).into()]
+                        }),
+                    )
+                    .await
+                    .context("failed to do article prepopulation")?;
+                } else {
+                    c.install_recipe(&format!("{}\n{}", RECIPE_BASE, RECIPE_NO_JOIN))
+                        .await?;
+                }
             }
 
             let v = c.table("Vote").await?;
@@ -44,6 +54,7 @@ impl VoteClient for Conn {
                 ch: c,
                 r: Some(awvc),
                 w: Some(v),
+                join,
             })
         }
     }
@@ -70,12 +81,15 @@ impl Service<ReadRequest> for Conn {
             .map(|article_id| vec![(article_id as i32).into()])
             .collect();
 
+        let join = self.join;
         let fut = self.r.as_mut().unwrap().call((arg, true));
         async move {
             let rows = fut.await?;
             assert_eq!(rows.len(), len);
-            for row in rows {
-                assert_eq!(row.len(), 1);
+            if join {
+                for row in rows {
+                    assert_eq!(row.len(), 1);
+                }
             }
             Ok(())
         }

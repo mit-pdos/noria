@@ -580,7 +580,12 @@ fn main() {
                         .required(true)
                         .takes_value(true)
                         .help("Soup deployment ID."),
-                ),
+                )
+                .arg(
+                    Arg::with_name("no-join")
+                        .long("no-join")
+                        .help("Run vote without the article join"),
+                )
         )
         .subcommand(
             SubCommand::with_name("memcached")
