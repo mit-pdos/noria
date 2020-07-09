@@ -151,6 +151,12 @@ impl VoteClient for Conn {
             // semi-random. it's the same as noria is using at time of writing.
             let redis = tower_limit::ConcurrencyLimit::new(RedisConn { c: r_conn }, 8192);
 
+            // for mysql, fix the size of the pool so it does not keep dropping and re-starting
+            // connections.
+            my_opts.pool_options(mysql_async::PoolOptions::with_constraints(
+                mysql_async::PoolConstraints::new(100, 100).unwrap(),
+            ));
+
             Ok(Conn {
                 pool: mysql_async::Pool::new(my_opts),
                 next: None,
