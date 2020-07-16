@@ -398,7 +398,7 @@ impl BlockingRead {
             if !self.keys.is_empty() {
                 let waited = now - self.first;
                 self.first = now;
-                if waited > time::Duration::from_secs(7) {
+                if waited > time::Duration::from_secs(30) {
                     eprintln!(
                         "warning: read has been stuck waiting on {:?} for {:?}",
                         self.keys, waited
