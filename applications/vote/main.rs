@@ -671,6 +671,7 @@ fn main() {
                         .help("Address of MySQL server"),
                 )
                 .arg(
+                    /* TODO: remove in favor of giving dbname in db url */
                     Arg::with_name("database")
                         .long("database")
                         .takes_value(true)
