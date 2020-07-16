@@ -15,7 +15,7 @@ keywords = ["internal"]
 maintenance = { status = "experimental" }
 
 [target.'cfg(not(target_env="msvc"))'.dependencies]
-jemallocator = "0.3"
+jemallocator = { version = "0.3", features = ["background_threads"] }
 
 [dependencies]
 bincode = "1.0.0"
