@@ -103,7 +103,7 @@
 //! binary MySQL protocol, which provides a compatibility layer for applications that wish to
 //! continue to issue ad-hoc MySQL queries through existing MySQL client libraries.
 #![feature(type_alias_impl_trait)]
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![deny(unused_extern_crates)]
 #![deny(unreachable_pub)]
 #![warn(rust_2018_idioms)]

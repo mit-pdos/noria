@@ -89,6 +89,11 @@ impl<'a> ResultRow<'a> {
         let index = self.columns.iter().position(|col| col == field)?;
         Some((&self.result[index]).into())
     }
+
+    pub fn get_all(&self) -> Vec<DataType>
+    {
+       return self.result.clone(); 
+    }
 }
 
 impl PartialEq<[DataType]> for ResultRow<'_> {
