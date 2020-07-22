@@ -178,7 +178,7 @@ pub(crate) const TABLE_POOL_SIZE: usize = 2;
 ///    reasonable.
 ///
 /// The value isn't higher because we, _and the server_ only have so many cores.
-pub(crate) const VIEW_POOL_SIZE: usize = 16;
+pub(crate) const VIEW_POOL_SIZE: usize = 4;
 
 /// Number of requests that can be pending to any particular target.
 ///
