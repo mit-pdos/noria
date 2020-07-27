@@ -14,4 +14,3 @@ debug=true
 # comment this out if you want cargo doc to work!
 tokio-tower = { git = "https://github.com/tower-rs/tokio-tower.git", branch = "no-box" }
 evmap = { git = "https://github.com/jonhoo/rust-evmap.git", branch = "griddle" }
-indexmap = { git = "https://github.com/jonhoo/indexmap.git", branch = "griddle" }

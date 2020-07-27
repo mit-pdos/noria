@@ -1,5 +1,5 @@
 use ahash::RandomState;
-use indexmap::IndexMap;
+use indexmap_amortized::IndexMap;
 use std::rc::Rc;
 
 use super::mk_key::MakeKey;
