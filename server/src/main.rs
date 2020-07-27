@@ -17,6 +17,11 @@ fn main() {
                 .help("IP address to listen on"),
         )
         .arg(
+            Arg::with_name("context")
+                .short("C")
+                .help("Change into this directory first."),
+        )
+        .arg(
             Arg::with_name("deployment")
                 .long("deployment")
                 .required(true)
@@ -125,6 +130,10 @@ fn main() {
     };
     let verbose = matches.is_present("verbose");
     let deployment_name = matches.value_of("deployment").unwrap();
+
+    if let Some(p) = matches.value_of("context") {
+        std::env::set_current_dir(p).unwrap();
+    }
 
     let mut authority =
         ZookeeperAuthority::new(&format!("{}/{}", zookeeper_addr, deployment_name)).unwrap();
