@@ -11,6 +11,10 @@ debug=true
 [patch.crates-io]
 # https://github.com/tower-rs/tokio-tower/pull/6
 # optional -- just a perf optimization
-# comment this out if you want cargo doc to work!
 tokio-tower = { git = "https://github.com/tower-rs/tokio-tower.git", branch = "no-box" }
+# necessary to get the "amortize" feature
+# the amortize feature isn't technically necessary though
 evmap = { git = "https://github.com/jonhoo/rust-evmap.git", branch = "griddle" }
+# necessary to avoid hangs (mostly on ec2)
+# https://github.com/tokio-rs/tokio/pull/2711
+tokio = { git = "https://github.com/tokio-rs/tokio.git", branch = "master" }
