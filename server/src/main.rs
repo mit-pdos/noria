@@ -17,8 +17,9 @@ fn main() {
                 .help("IP address to listen on"),
         )
         .arg(
-            Arg::with_name("context")
+            Arg::with_name("changedir")
                 .short("C")
+                .takes_value(true)
                 .help("Change into this directory first."),
         )
         .arg(
@@ -131,7 +132,7 @@ fn main() {
     let verbose = matches.is_present("verbose");
     let deployment_name = matches.value_of("deployment").unwrap();
 
-    if let Some(p) = matches.value_of("context") {
+    if let Some(p) = matches.value_of("changedir") {
         std::env::set_current_dir(p).unwrap();
     }
 
