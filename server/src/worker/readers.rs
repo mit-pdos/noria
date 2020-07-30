@@ -395,16 +395,24 @@ impl BlockingRead {
                 self.next_trigger = now + self.trigger_timeout;
             }
 
+            // This warning is disabled because it means that when things fall over, the server
+            // then starts printing this warning _tons_ of times, which makes it fall even further
+            // behind, to the point where the benchmark won't actually finish in any reasonable
+            // amount of time.
+            //
+            // It's handy for debugging though, so I've left the code here.
+            /*
             if !self.keys.is_empty() {
                 let waited = now - self.first;
                 self.first = now;
-                if waited > time::Duration::from_secs(30) {
+                if waited > time::Duration::from_secs(60) {
                     eprintln!(
                         "warning: read has been stuck waiting on {:?} for {:?}",
                         self.keys, waited
                     );
                 }
             }
+            */
 
             Ok(())
         })?;
