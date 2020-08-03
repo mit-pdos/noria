@@ -197,6 +197,11 @@ where
             sjrn_w_t.max(),
             rmt_w_t.max()
         );
+        println!(
+            "write\t00\t{:.2}\t{:.2}\t(all µs)",
+            sjrn_w_t.mean(),
+            rmt_w_t.mean()
+        );
     }
     if let Some((rmt_r_t, sjrn_r_t)) = read_t.last() {
         println!(
@@ -218,6 +223,11 @@ where
             "read\t100\t{:.2}\t{:.2}\t(all µs)",
             sjrn_r_t.max(),
             rmt_r_t.max()
+        );
+        println!(
+            "read\t00\t{:.2}\t{:.2}\t(all µs)",
+            sjrn_r_t.mean(),
+            rmt_r_t.mean()
         );
     }
 }
