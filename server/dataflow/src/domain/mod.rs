@@ -856,7 +856,7 @@ impl Domain {
                         });
                     }
                     Packet::StateSizeProbe { node } => {
-                        let row_count = self.state.get(node).map(|r| r.rows()).unwrap_or(0);
+                        let row_count = self.state.get(node).map(|r| r.len()).unwrap_or(0);
                         let mem_size = self.state.get(node).map(|s| s.deep_size_of()).unwrap_or(0);
                         self.control_reply_tx
                             .send(ControlReplyPacket::StateSize(row_count, mem_size))
@@ -2798,16 +2798,29 @@ impl Domain {
                 };
 
                 for (node, num_bytes) in nodes {
-                    let mut freed = 0u64;
+                    let mut freed = 0;
                     let mut n = self.nodes[node].borrow_mut();
-                    while freed < num_bytes as u64 {
-                        // TODO: use (num_bytes - freed) / SOMETHING to compute # keys to evict
+                    let mut si = 0;
+                    while freed < num_bytes {
+                        let to_free = num_bytes - freed;
                         if n.is_dropped() {
                             break; // Node was dropped. Give up.
                         } else if n.is_reader() {
-                            let freed_now = n.with_reader_mut(|r| r.evict_random_keys(16)).unwrap();
+                            let freed_now = n
+                                .with_reader_mut(|r| {
+                                    let w = r.writer_mut().unwrap();
+                                    // Evict an equal proportion of keys as the
+                                    // fraction of bytes we're asked to evict.
+                                    let num = (w.len() as f64 * to_free as f64
+                                        / w.deep_size_of() as f64)
+                                        .ceil()
+                                        as usize;
+                                    let num = num.min(w.len());
+                                    r.evict_random_keys(num)
+                                })
+                                .unwrap();
 
-                            freed += freed_now;
+                            freed += freed_now as usize;
                             if n.with_reader(|r| r.is_empty()).unwrap() {
                                 trace!(
                                     self.log,
@@ -2818,10 +2831,11 @@ impl Domain {
                             }
                         } else {
                             let (key_columns, keys, bytes) = {
-                                let k = self.state[node].evict_random_keys(16);
+                                let k = self.state[node].evict_random_keys(to_free, si);
+                                si += 1;
                                 (k.0.to_vec(), k.1, k.2)
                             };
-                            freed += bytes;
+                            freed += bytes as usize;
 
                             if !keys.is_empty() {
                                 trigger_downstream_evictions(

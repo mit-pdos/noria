@@ -261,7 +261,7 @@ impl SingleState {
     pub(super) fn partial(&self) -> bool {
         self.partial
     }
-    pub(super) fn rows(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.rows
     }
     pub(super) fn is_empty(&self) -> bool {

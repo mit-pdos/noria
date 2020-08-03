@@ -37,16 +37,31 @@ pub(crate) trait State: SizeOf + Send {
 
     fn lookup<'a>(&'a self, columns: &[usize], key: &KeyType) -> LookupResult<'a>;
 
-    fn rows(&self) -> usize;
+    /// The number of rows stored in this state.
+    ///
+    /// Note that this is not necessarily the number of _keys_, and may bear little or no
+    /// connection to the number of entries in the state's in-memory storage. For example, if the
+    /// state's index is over a column that all rows share a single value for, the number of
+    /// entries in the state may be 1 even though it holds a thousand rows. In this case, `len`
+    /// would return `1000`.
+    fn len(&self) -> usize;
 
     fn keys(&self) -> Vec<Vec<usize>>;
 
     /// Return a copy of all records. Panics if the state is only partially materialized.
     fn cloned_records(&self) -> Vec<Vec<DataType>>;
 
-    /// Evict `count` randomly selected keys, returning key colunms of the index chosen to evict
-    /// from along with the keys evicted and the number of bytes evicted.
-    fn evict_random_keys(&mut self, count: usize) -> (&[usize], Vec<Vec<DataType>>, u64);
+    /// Evict `bytes` bytes of state by randomly evicting keys, returning key colunms of the index
+    /// chosen to evict from along with the keys evicted and the number of bytes evicted.
+    ///
+    /// The `spread` argument is used to spread multiple calls to eviction across different indices
+    /// if possible. If you increment `spread` before each call to `evict_random_keys`, successive
+    /// calls will go to distinct indices.
+    fn evict_random_keys(
+        &mut self,
+        bytes: usize,
+        spread: usize,
+    ) -> (&[usize], Vec<Vec<DataType>>, u64);
 
     /// Evict the listed keys from the materialization targeted by `tag`, returning the key columns
     /// of the index that was evicted from and the number of bytes evicted.

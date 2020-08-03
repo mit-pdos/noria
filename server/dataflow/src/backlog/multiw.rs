@@ -18,6 +18,14 @@ impl Handle {
         }
     }
 
+    pub fn len(&self) -> usize {
+        match *self {
+            Handle::Single(ref h) => h.len(),
+            Handle::Double(ref h) => h.len(),
+            Handle::Many(ref h) => h.len(),
+        }
+    }
+
     pub fn clear(&mut self, k: Key) {
         match *self {
             Handle::Single(ref mut h) => {

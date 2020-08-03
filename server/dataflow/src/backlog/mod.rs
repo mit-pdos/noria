@@ -254,6 +254,10 @@ impl WriteHandle {
         self.partial
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.handle.len()
+    }
+
     /// Evict `count` randomly selected keys from state and return them along with the number of
     /// bytes that will be freed once the underlying `evmap` applies the operation.
     pub(crate) fn evict_random_keys(&mut self, rng: &mut ThreadRng, mut n: usize) -> u64 {

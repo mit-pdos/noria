@@ -175,7 +175,7 @@ impl State for PersistentState {
     }
 
     // Returns a row count estimate from RocksDB.
-    fn rows(&self) -> usize {
+    fn len(&self) -> usize {
         tokio::task::block_in_place(|| {
             let db = self.db.as_ref().unwrap();
             let cf = db.cf_handle("0").unwrap();
@@ -204,7 +204,7 @@ impl State for PersistentState {
         unreachable!("PersistentState can't be partial")
     }
 
-    fn evict_random_keys(&mut self, _: usize) -> (&[usize], Vec<Vec<DataType>>, u64) {
+    fn evict_random_keys(&mut self, _: usize, _: usize) -> (&[usize], Vec<Vec<DataType>>, u64) {
         unreachable!("can't evict keys from PersistentState")
     }
 

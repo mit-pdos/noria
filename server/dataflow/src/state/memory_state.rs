@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use rand::{self, Rng};
-
 use crate::prelude::*;
 use crate::state::single_state::SingleState;
 use common::SizeOf;
@@ -114,8 +112,8 @@ impl State for MemoryState {
         }
     }
 
-    fn rows(&self) -> usize {
-        self.state.iter().map(SingleState::rows).sum()
+    fn len(&self) -> usize {
+        self.state.iter().map(SingleState::len).sum::<usize>() / self.state.len()
     }
 
     fn mark_filled(&mut self, key: Vec<DataType>, tag: Tag) {
@@ -153,12 +151,33 @@ impl State for MemoryState {
         self.state[0].values().flat_map(fix).collect()
     }
 
-    fn evict_random_keys(&mut self, count: usize) -> (&[usize], Vec<Vec<DataType>>, u64) {
-        let mut rng = rand::thread_rng();
-        let index = rng.gen_range(0, self.state.len());
-        let (bytes_freed, keys) = self.state[index].evict_random_keys(count, &mut rng);
-        self.mem_size = self.mem_size.saturating_sub(bytes_freed);
-        (self.state[index].key(), keys, bytes_freed)
+    fn evict_random_keys(
+        &mut self,
+        bytes: usize,
+        mut spread: usize,
+    ) -> (&[usize], Vec<Vec<DataType>>, u64) {
+        for _ in 0..self.state.len() {
+            let index = spread % self.state.len();
+            let s = &mut self.state[index];
+
+            if s.is_empty() {
+                spread += 1;
+                continue;
+            }
+
+            // evict the desired fraction of the index's size
+            // if we do this for each index (controlled by `spread`)
+            // we should evict as much data as is needed.
+            let frac = bytes as f64 / self.mem_size as f64;
+            let count = (s.len() as f64 * frac).ceil() as usize;
+            let count = count.min(s.len());
+
+            let mut rng = rand::thread_rng();
+            let (bytes_freed, keys) = s.evict_random_keys(count, &mut rng);
+            self.mem_size = self.mem_size.saturating_sub(bytes_freed);
+            return (self.state[index].key(), keys, bytes_freed);
+        }
+        panic!("asked to evict keys from empty state")
     }
 
     fn evict_keys(&mut self, tag: Tag, keys: &[Vec<DataType>]) -> Option<(&[usize], u64)> {
