@@ -95,7 +95,7 @@ CREATE VIEW `comment_with_votes` AS
 SELECT comments.*,
        FULL_comment_upvotes.votes AS upvotes,
        FULL_comment_downvotes.votes AS downvotes,
-       FULL_comment_upvotes.votes - FULL_comment_downvotes.votes AS score,
+       FULL_comment_upvotes.votes - FULL_comment_downvotes.votes AS score
 FROM comments
 LEFT JOIN FULL_comment_upvotes ON (comments.id = FULL_comment_upvotes.id)
 LEFT JOIN FULL_comment_downvotes ON (comments.id = FULL_comment_downvotes.id);
@@ -104,7 +104,7 @@ CREATE VIEW `story_with_votes` AS
 SELECT stories.*,
        FULL_story_upvotes.votes AS upvotes,
        FULL_story_downvotes.votes AS downvotes,
-       FULL_story_upvotes.votes - FULL_story_downvotes.votes AS score,
+       FULL_story_upvotes.votes - FULL_story_downvotes.votes AS score
 FROM stories
 LEFT JOIN FULL_story_upvotes ON (stories.id = FULL_story_upvotes.id)
 LEFT JOIN FULL_story_downvotes ON (stories.id = FULL_story_downvotes.id);
@@ -198,7 +198,7 @@ LEFT JOIN user_story_karma ON (users.id = user_story_karma.id);
 CREATE VIEW `good_comments` AS
 SELECT comments.id, comments.created_at, comments.story_id,
        comments.user_id, comments.parent_comment_id,
-       FULL_comment_upvotes.votes - FULL_comment_downvotes.votes AS score,
+       FULL_comment_upvotes.votes - FULL_comment_downvotes.votes AS score
 FROM comments
 LEFT JOIN FULL_comment_upvotes ON (comments.id = FULL_comment_upvotes.id)
 LEFT JOIN FULL_comment_downvotes ON (comments.id = FULL_comment_downvotes.id)
@@ -224,7 +224,7 @@ WHERE `read_ribbons`.`is_following` = 1 AND
       `tails`.`created_at` > `read_ribbons`.`updated_at`;
 
 CREATE VIEW BOUNDARY_notifications AS
-SELECT BOUNDARY_replying_comments_for_count.user_id, COUNT(*) AS notifications,
+SELECT BOUNDARY_replying_comments_for_count.user_id, COUNT(*) AS notifications
 FROM `BOUNDARY_replying_comments_for_count`
 GROUP BY `BOUNDARY_replying_comments_for_count`.`user_id`;
 
