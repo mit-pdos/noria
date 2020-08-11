@@ -82,6 +82,7 @@ where
         .map(|id| format!("{}", id))
         .collect::<Vec<_>>()
         .join(",");
+    assert!(!users.is_empty());
     c = c
         .drop_query(&format!(
             "SELECT `users`.* FROM `users` WHERE `users`.`id` IN ({})",
@@ -127,12 +128,14 @@ where
         .map(|id| format!("{}", id))
         .collect::<Vec<_>>()
         .join(",");
-    c = c
-        .drop_query(&format!(
-            "SELECT `tags`.* FROM `tags` WHERE `tags`.`id` IN ({})",
-            tags
-        ))
-        .await?;
+    if !tags.is_empty() {
+        c = c
+            .drop_query(&format!(
+                "SELECT `tags`.* FROM `tags` WHERE `tags`.`id` IN ({})",
+                tags
+            ))
+            .await?;
+    }
 
     // also load things that we need to highlight
     if let Some(uid) = acting_as {

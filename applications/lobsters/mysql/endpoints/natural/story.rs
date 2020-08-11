@@ -109,29 +109,33 @@ where
         .map(|id| format!("{}", id))
         .collect::<Vec<_>>()
         .join(", ");
-    c = c
-        .drop_query(&format!(
-            "SELECT `users`.* FROM `users` WHERE `users`.`id` IN ({})",
-            users
-        ))
-        .await?;
+    if !users.is_empty() {
+        c = c
+            .drop_query(&format!(
+                "SELECT `users`.* FROM `users` WHERE `users`.`id` IN ({})",
+                users
+            ))
+            .await?;
+    }
 
     if let Some(uid) = acting_as {
         let params = comments.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let values: Vec<_> = iter::once(&uid as &_)
             .chain(comments.iter().map(|s| s as &_))
             .collect();
-        c = c
-            .drop_exec(
-                &format!(
-                    "SELECT `votes`.* FROM `votes` \
+        if !comments.is_empty() {
+            c = c
+                .drop_exec(
+                    &format!(
+                        "SELECT `votes`.* FROM `votes` \
                      WHERE `votes`.`user_id` = ? \
                      AND `votes`.`comment_id` IN ({})",
-                    params
-                ),
-                values,
-            )
-            .await?;
+                        params
+                    ),
+                    values,
+                )
+                .await?;
+        }
     }
 
     // NOTE: lobste.rs here fetches the user list again. unclear why?
@@ -175,7 +179,7 @@ where
         )
         .await?;
 
-    let (c, tags) = taggings
+    let (mut c, tags) = taggings
         .reduce_and_drop(HashSet::new(), |mut tags, tagging| {
             tags.insert(tagging.get::<u32, _>("tag_id").unwrap());
             tags
@@ -187,12 +191,15 @@ where
         .map(|id| format!("{}", id))
         .collect::<Vec<_>>()
         .join(", ");
-    let c = c
-        .drop_query(&format!(
-            "SELECT `tags`.* FROM `tags` WHERE `tags`.`id` IN ({})",
-            tags
-        ))
-        .await?;
+
+    if !tags.is_empty() {
+        c = c
+            .drop_query(&format!(
+                "SELECT `tags`.* FROM `tags` WHERE `tags`.`id` IN ({})",
+                tags
+            ))
+            .await?;
+    }
 
     Ok((c, true))
 }
