@@ -75,13 +75,15 @@ where
         .map(|id| format!("{}", id))
         .collect::<Vec<_>>()
         .join(",");
-    assert!(!users.is_empty());
-    c = c
-        .drop_query(&format!(
-            "SELECT `users`.* FROM `users` WHERE `users`.`id` IN ({})",
-            users,
-        ))
-        .await?;
+
+    if !users.is_empty() {
+        c = c
+            .drop_query(&format!(
+                "SELECT `users`.* FROM `users` WHERE `users`.`id` IN ({})",
+                users,
+            ))
+            .await?;
+    }
 
     c = c
         .drop_query(&format!(
