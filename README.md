@@ -141,7 +141,7 @@ The sub-crates each serve a distinct role:
    arguments/return types, as well as code for discovering Noria workers
    through ZooKeeper, establishing a connection to Noria through
    ZooKeeper, and invoking the various RPC exposed by the Noria
-   controller ([`src/controller.rs`](noria/src/controller.rs)).
+   controller ([`src/controller.rs`](server/src/controller/inner.rs)).
    The `noria` sub-crate also contains a number of internal
    data-structures that must be shared between the client and the
    server like [`DataType`](noria/src/data.rs) (Noria's "value"
