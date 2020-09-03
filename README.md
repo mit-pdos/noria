@@ -144,7 +144,7 @@ The sub-crates each serve a distinct role:
    controller ([`src/controller.rs`](noria/src/controller.rs)).
    The `noria` sub-crate also contains a number of internal
    data-structures that must be shared between the client and the
-   server like [`DataType`](basics/src/data.rs) (Noria's "value"
+   server like [`DataType`](noria/src/data.rs) (Noria's "value"
    type). These are annotated with `#[doc(hidden)]`, and should be easy
    to spot in `noria/src/lib.rs`.
  - [`applications/`](applications/): a collection of various
