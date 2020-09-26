@@ -980,7 +980,7 @@ mod tests {
             insert(&mut state, row);
         }
 
-        let count = state.rows();
+        let count = state.len();
         // rows() is estimated, but we want to make sure we at least don't return
         // self.indices.len() * rows.len() here.
         assert!(count > 0 && count < rows.len() * 2);
