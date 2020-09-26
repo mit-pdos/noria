@@ -227,13 +227,23 @@ impl SingleState {
         count: usize,
         rng: &mut ThreadRng,
     ) -> (u64, Vec<Vec<DataType>>) {
+        assert_ne!(self.rows, 0, "asked to evict from empty state");
+
         let mut bytes_freed = 0;
-        let mut keys = Vec::with_capacity(count);
+        let mut keys = Vec::new();
         for _ in 0..count {
-            if let Some((n, key)) = self.state.evict_with_seed(rng.gen()) {
+            if let Some((rows, n, key)) = self.state.evict_with_seed(rng.gen()) {
+                if keys.is_empty() {
+                    keys = Vec::with_capacity(count);
+                }
+                self.rows -= rows;
                 bytes_freed += n;
                 keys.push(key);
             } else {
+                assert_eq!(
+                    self.rows, 0,
+                    "could not evict from supposedly non-empty state"
+                );
                 break;
             }
         }
@@ -242,7 +252,13 @@ impl SingleState {
 
     /// Evicts a specified key from this state, returning the number of bytes freed.
     pub(super) fn evict_keys(&mut self, keys: &[Vec<DataType>]) -> u64 {
-        keys.iter().map(|k| self.state.evict(k)).sum()
+        let mut sum = 0;
+        for k in keys {
+            let (bytes, rows) = self.state.evict(k);
+            sum += bytes;
+            self.rows -= rows;
+        }
+        sum
     }
 
     pub(super) fn values<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rows> + 'a> {

@@ -33,7 +33,7 @@ impl KeyedState {
 
     /// Remove all rows for a randomly chosen key seeded by `seed`, returning that key along with
     /// the number of bytes freed. Returns `None` if map is empty.
-    pub(super) fn evict_with_seed(&mut self, seed: usize) -> Option<(u64, Vec<DataType>)> {
+    pub(super) fn evict_with_seed(&mut self, seed: usize) -> Option<(usize, u64, Vec<DataType>)> {
         let (rs, key) = match *self {
             KeyedState::Single(ref mut m) if !m.is_empty() => {
                 let index = seed % m.len();
@@ -69,7 +69,9 @@ impl KeyedState {
                 return None;
             }
         }?;
+        let rows = rs.len();
         Some((
+            rows,
             rs.iter()
                 .filter(|r| Rc::strong_count(&r.0) == 1)
                 .map(SizeOf::deep_size_of)
@@ -78,8 +80,8 @@ impl KeyedState {
         ))
     }
 
-    /// Remove all rows for the given key, returning the number of bytes freed.
-    pub(super) fn evict(&mut self, key: &[DataType]) -> u64 {
+    /// Remove all rows for the given key, returning the number of bytes and rows freed.
+    pub(super) fn evict(&mut self, key: &[DataType]) -> (u64, usize) {
         match *self {
             KeyedState::Single(ref mut m) => m.swap_remove(&(key[0])),
             KeyedState::Double(ref mut m) => {
@@ -99,12 +101,16 @@ impl KeyedState {
             }
         }
         .map(|rows| {
-            rows.iter()
-                .filter(|r| Rc::strong_count(&r.0) == 1)
-                .map(SizeOf::deep_size_of)
-                .sum()
+            let n = rows.len();
+            (
+                rows.iter()
+                    .filter(|r| Rc::strong_count(&r.0) == 1)
+                    .map(SizeOf::deep_size_of)
+                    .sum(),
+                n,
+            )
         })
-        .unwrap_or(0)
+        .unwrap_or((0, 0))
     }
 }
 
