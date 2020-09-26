@@ -54,12 +54,16 @@ pub(crate) trait State: SizeOf + Send {
     /// Evict `bytes` bytes of state by randomly evicting keys, returning key colunms of the index
     /// chosen to evict from along with the keys evicted and the number of bytes evicted.
     ///
+    /// The `fraction` argument allows the implementation of `evict_random_keys` to evict evenly
+    /// from all underlying indices.
+    ///
     /// The `spread` argument is used to spread multiple calls to eviction across different indices
     /// if possible. If you increment `spread` before each call to `evict_random_keys`, successive
     /// calls will go to distinct indices.
     fn evict_random_keys(
         &mut self,
         bytes: usize,
+        fraction: &mut f64,
         spread: usize,
     ) -> (&[usize], Vec<Vec<DataType>>, u64);
 

@@ -154,8 +154,36 @@ impl State for MemoryState {
     fn evict_random_keys(
         &mut self,
         bytes: usize,
+        fraction: &mut f64,
         mut spread: usize,
     ) -> (&[usize], Vec<Vec<DataType>>, u64) {
+        // ensure that the same fraction of each index is evicted despite happening in different
+        // calls. if we instead computed the fraction separately for each call, we'd run into
+        // trouble.
+        //
+        // imagine we want to evict n bytes of N bytes total. we instead evict n/N of the rows
+        // from the current index i. this evicts e < n bytes assuming there is more than one
+        // index. the next time around the loop of the _caller_ (not the loop in here), we're
+        // told to evict n - e bytes, which we evict from index i + 1, etc.
+        //
+        // the issue comes in computing the fraction of rows to evict from index i + 1. we're
+        // now asked to evict n - e bytes, but the total size has also decreased by e. which
+        // means we're now evicting (n-e)/(N-e) of the rows. this is a (slightly) smaller
+        // fraction than we evicted for index i. this continues to be the case for later
+        // indexes too, such that by the time we get around, we still haven't evicted quite n
+        // bytes. and in fact, we keep going round and round and round, never _quite_ evicting
+        // enough rows to get us to n. essentially, each index is being "greedy", and not
+        // evicting quite as much as necessary in the hopes that another index will also evict.
+        // since we started with index i, we'll also end up evicting more from i than any other
+        // index!
+        //
+        // so, we only compute the fraction "at the start". since eviction isn't _quite_ exact, we
+        // may end up having to do a second pass, hence the modulo.
+        if spread % self.state.len() == 0 {
+            *fraction = bytes as f64 / self.mem_size as f64;
+        }
+
+        // loop over indexes in case a given index is empty
         for _ in 0..self.state.len() {
             let index = spread % self.state.len();
             let s = &mut self.state[index];
@@ -168,8 +196,7 @@ impl State for MemoryState {
             // evict the desired fraction of the index's size
             // if we do this for each index (controlled by `spread`)
             // we should evict as much data as is needed.
-            let frac = bytes as f64 / self.mem_size as f64;
-            let count = (s.len() as f64 * frac).ceil() as usize;
+            let count = (s.len() as f64 * *fraction).ceil() as usize;
             let count = count.min(s.len());
 
             let mut rng = rand::thread_rng();

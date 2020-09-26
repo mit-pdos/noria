@@ -2800,12 +2800,11 @@ impl Domain {
                 for (node, num_bytes) in nodes {
                     let mut freed = 0;
                     let mut n = self.nodes[node].borrow_mut();
-                    let mut si = 0;
-                    while freed < num_bytes {
-                        let to_free = num_bytes - freed;
-                        if n.is_dropped() {
-                            break; // Node was dropped. Give up.
-                        } else if n.is_reader() {
+                    if n.is_dropped() {
+                        break; // Node was dropped. Give up.
+                    } else if n.is_reader() {
+                        while freed < num_bytes {
+                            let to_free = num_bytes - freed;
                             let freed_now = n
                                 .with_reader_mut(|r| {
                                     let w = r.writer_mut().unwrap();
@@ -2829,9 +2828,19 @@ impl Domain {
                                 );
                                 break;
                             }
-                        } else {
+                        }
+                    } else {
+                        let mut si = 0;
+                        let mut evict_fraction = 0.0;
+
+                        while freed < num_bytes {
+                            let to_free = num_bytes - freed;
                             let (key_columns, keys, bytes) = {
-                                let k = self.state[node].evict_random_keys(to_free, si);
+                                let k = self.state[node].evict_random_keys(
+                                    to_free,
+                                    &mut evict_fraction,
+                                    si,
+                                );
                                 si += 1;
                                 (k.0.to_vec(), k.1, k.2)
                             };

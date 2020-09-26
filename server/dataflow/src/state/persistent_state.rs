@@ -204,7 +204,12 @@ impl State for PersistentState {
         unreachable!("PersistentState can't be partial")
     }
 
-    fn evict_random_keys(&mut self, _: usize, _: usize) -> (&[usize], Vec<Vec<DataType>>, u64) {
+    fn evict_random_keys(
+        &mut self,
+        _: usize,
+        _: &mut f64,
+        _: usize,
+    ) -> (&[usize], Vec<Vec<DataType>>, u64) {
         unreachable!("can't evict keys from PersistentState")
     }
 
