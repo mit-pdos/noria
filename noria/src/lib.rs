@@ -21,8 +21,7 @@
 //!
 //! # Quickstart example
 //!
-//! If you just want to get up and running quickly, here's some code to dig into. Note that this
-//! requires a nightly release of Rust to run for the time being.
+//! If you just want to get up and running quickly, here's some code to dig into.
 //!
 //! ```no_run
 //! # use noria::*;

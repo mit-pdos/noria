@@ -48,12 +48,6 @@ clients can connect. Noria also uses [Apache
 ZooKeeper](https://zookeeper.apache.org/) to announce the location of
 its servers, so ZooKeeper must be running.
 
-You (currently) need nightly Rust to build `noria-server`. This will be
-arranged for
-[automatically](https://github.com/rust-lang-nursery/rustup.rs#the-toolchain-file)
-if you're using [`rustup.rs`](https://rustup.rs/). To build
-`noria-server`, run
-
 ```console
 $ cargo build --release --bin noria-server
 ```

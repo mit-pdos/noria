@@ -12,7 +12,7 @@ jobs:
    steps:
      - template: install-rust.yml@templates
        parameters:
-         rust: nightly
+         rust: stable
          components:
            - rustfmt
      - bash: |
