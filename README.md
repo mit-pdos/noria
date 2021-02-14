@@ -7,8 +7,9 @@
 [![Azure Status](https://dev.azure.com/mit-pdos/mit-pdos/_apis/build/status/noria?branchName=master)](https://dev.azure.com/mit-pdos/mit-pdos/_build/latest?definitionId=1&branchName=master)
 
 Noria is a new streaming data-flow system designed to act as a fast
-storage backend for read-heavy web applications based on [this
-paper](https://jon.tsp.io/papers/osdi18-noria.pdf) from
+storage backend for read-heavy web applications based on [Jon Gjenget's
+Phd Thesis](https://jon.thesquareplanet.com/papers/phd-thesis.pdf), as
+well as [this paper](https://jon.tsp.io/papers/osdi18-noria.pdf) from
 [OSDI'18](https://www.usenix.org/conference/osdi18/presentation/gjengset).
 It acts like a database, but precomputes and caches relational query
 results so that reads are blazingly fast. Noria automatically keeps cached
