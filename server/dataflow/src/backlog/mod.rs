@@ -45,12 +45,12 @@ fn new_inner(
     };
 
     macro_rules! make {
-        ($variant:tt) => {{
+        ($variant:tt) => {unsafe {
             use evmap;
-            let (r, w) = evmap::Options::default()
+            let (w, r) = evmap::Options::default()
                 .with_meta(-1)
                 .with_hasher(RandomState::default())
-                .construct();
+                .assert_stable();
 
             (multir::Handle::$variant(r), multiw::Handle::$variant(w))
         }};
@@ -153,7 +153,7 @@ impl<'a> MutWriteHandleEntry<'a> {
 impl<'a> WriteHandleEntry<'a> {
     pub(crate) fn try_find_and<F, T>(self, mut then: F) -> Result<(Option<T>, i64), ()>
     where
-        F: FnMut(&evmap::Values<Vec<DataType>, RandomState>) -> T,
+        F: FnMut(&evmap::refs::Values<Vec<DataType>, RandomState>) -> T,
     {
         self.handle
             .handle
@@ -339,14 +339,14 @@ impl SingleReadHandle {
     /// Holes in partially materialized state are returned as `Ok((None, _))`.
     pub fn try_find_and<F, T>(&self, key: &[DataType], mut then: F) -> Result<(Option<T>, i64), ()>
     where
-        F: FnMut(&evmap::Values<Vec<DataType>, RandomState>) -> T,
+        F: FnMut(&evmap::refs::Values<Vec<DataType>, RandomState>) -> T,
     {
         self.handle
             .meta_get_and(key, &mut then)
             .ok_or(())
             .map(|(mut records, meta)| {
                 if records.is_none() && self.trigger.is_none() {
-                    records = Some(then(&evmap::Values::default()));
+                    records = Some(then(&evmap::refs::Values::default()));
                 }
                 (records, meta)
             })
