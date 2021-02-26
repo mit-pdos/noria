@@ -221,7 +221,7 @@ impl Ingredient for TopK {
                     }));
                 }
             }};
-        };
+        }
 
         for r in rs {
             if grp.iter().cmp(group_by.iter().map(|&col| &r[col])) != Ordering::Equal {
