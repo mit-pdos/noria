@@ -173,13 +173,26 @@ impl Ingredient for Project {
                                 vec![]
                             };
 
-                            new_r.extend(
-                                r.into_owned()
-                                    .into_iter()
-                                    .enumerate()
-                                    .filter(|(i, _)| emit.iter().any(|e| e == i))
-                                    .map(|(_, c)| c),
-                            );
+                            // new_r.extend(
+                            //     r.into_owned()
+                            //         .into_iter()
+                            //         .enumerate()
+                            //         .filter(|(i, _)| emit.iter().any(|e| e == i))
+                            //         .map(|(_, c)| c),
+                            // );
+
+                            {
+                                let o = r.into_owned();
+                                let l = new_r.len();
+                                debug_assert!(emit.iter().all(|e| e < &o.len()));
+                                unsafe { new_r.set_len(l + emit.len()); }
+                                for (i, c) in o.into_iter().enumerate() {
+                                    match emit.iter().enumerate().find(|(_, it)| **it == i) {
+                                        Some((idx, _)) => new_r[idx + l] = c,
+                                        None => ()
+                                    }
+                                }
+                            }
 
                             new_r.append(&mut expr);
                             if let Some(ref a) = additional {
