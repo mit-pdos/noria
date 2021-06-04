@@ -173,19 +173,38 @@ impl Ingredient for Project {
                                 vec![]
                             };
 
-                            // new_r.extend(
-                            //     r.into_owned()
-                            //         .into_iter()
-                            //         .enumerate()
-                            //         .filter(|(i, _)| emit.iter().any(|e| e == i))
-                            //         .map(|(_, c)| c),
-                            // );
-
+                            // This block of code is ugly, but the most
+                            // efficient way I could think of for appending to
+                            // the vector while also respecting the ordering of
+                            // columns and without allocating some special
+                            // intermediate structure to map indices. Basic
+                            // issue is that the order of columns in `emit` is
+                            // not necessarily monotonically increasing, so we
+                            // have to either arbitrary retrieve from `r`, but
+                            // then we can't *move* items and need to copy.
+                            // Instead we arbitrarily insert.
                             {
-                                let o = r.into_owned();
+                                let o : Vec<DataType> = r.into_owned();
                                 let l = new_r.len();
+                                // Make sure none of the `emit` indices are out
+                                // of bounds, because the loop does not check
+                                // it.
                                 debug_assert!(emit.iter().all(|e| e < &o.len()));
-                                unsafe { new_r.set_len(l + emit.len()); }
+                                // Asserts `emit` has no duplicate elements (and
+                                // invariant of using `find` later in the loop)
+                                debug_assert_eq!(emit.len(), {
+                                    let mut v = emit.iter().collect::<Vec<_>>();
+                                    v.dedup();
+                                    v.len()
+                                }, "Invariant broken, duplicate column in `emit`: {:?}", emit);
+                                let target_len = l + emit.len();
+                                // Just to be sure we have enough space (in
+                                // theory has been checked earlier, but since
+                                // this is cheap we do it again )
+                                new_r.reserve(target_len);
+                                // Safe because we guarantee to insert
+                                // `emit.len()`elements in the following loop
+                                unsafe { new_r.set_len(target_len); }
                                 for (i, c) in o.into_iter().enumerate() {
                                     match emit.iter().enumerate().find(|(_, it)| **it == i) {
                                         Some((idx, _)) => new_r[idx + l] = c,
@@ -560,6 +579,14 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(expected, iter.next().unwrap().into_owned());
+    }
+
+    #[test]
+    fn it_queries_trough_respecting_column_order() {
+        let state = box RowMemoryState::default();
+        let (p, states) = setup_query_through(state, &[0, 2, 1], None, None);
+        let expected: Vec<DataType> = vec![1.into(), 3.into(), 2.into()];
+        assert_query_through(p, 0, 1.into(), states, expected);
     }
 
     #[test]
