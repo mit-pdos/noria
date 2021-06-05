@@ -197,14 +197,13 @@ impl Ingredient for Project {
                                     v.dedup();
                                     v.len()
                                 }, "Invariant broken, duplicate column in `emit`: {:?}", emit);
-                                let target_len = l + emit.len();
                                 // Just to be sure we have enough space (in
                                 // theory has been checked earlier, but since
                                 // this is cheap we do it again )
-                                new_r.reserve(target_len);
+                                new_r.reserve(emit.len());
                                 // Safe because we guarantee to insert
                                 // `emit.len()`elements in the following loop
-                                unsafe { new_r.set_len(target_len); }
+                                unsafe { new_r.set_len(l + emit.len()); }
                                 for (i, c) in o.into_iter().enumerate() {
                                     match emit.iter().enumerate().find(|(_, it)| **it == i) {
                                         Some((idx, _)) => new_r[idx + l] = c,
