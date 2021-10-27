@@ -532,7 +532,10 @@ mod tests {
         ]);
         w.swap();
 
-        assert_eq!(r.try_find_and(&a[0..1], |rs: _| rs.len()).unwrap().0, Some(2));
+        assert_eq!(
+            r.try_find_and(&a[0..1], |rs: _| rs.len()).unwrap().0,
+            Some(2)
+        );
         assert!(r
             .try_find_and(&a[0..1], |rs| rs
                 .iter()
