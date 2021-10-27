@@ -88,8 +88,8 @@ impl CountStarRewrite for SqlQuery {
                 }
                 for field in sq.fields.iter_mut() {
                     match *field {
-                        FieldDefinitionExpression::All => panic!(err),
-                        FieldDefinitionExpression::AllInTable(_) => panic!(err),
+                        FieldDefinitionExpression::All => panic!("{}", err),
+                        FieldDefinitionExpression::AllInTable(_) => panic!("{}", err),
                         FieldDefinitionExpression::Value(_) => (),
                         FieldDefinitionExpression::Col(ref mut c) => {
                             rewrite_count_star(c, &tables, &avoid_cols)

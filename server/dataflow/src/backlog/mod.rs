@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn store_works() {
-        let a = vec![1.into(), "a".into()];
+        let a = vec![1u64.into(), "a".into()];
 
         let (r, mut w) = new(2, &[0]);
 
@@ -405,7 +405,7 @@ mod tests {
         let (r, mut w) = new(1, &[0]);
         let jh = thread::spawn(move || {
             for i in 0..n {
-                w.add(vec![Record::Positive(vec![i.into()])]);
+                w.add(vec![Record::Positive(vec![(i as usize).into()])]);
                 w.swap();
             }
             // important that we don't drop w here, or the loop below never exits
@@ -413,7 +413,7 @@ mod tests {
         });
 
         for i in 0..n {
-            let i = &[i.into()];
+            let i = &[(i as usize).into()];
             loop {
                 match r.try_find_and(i, |rs| rs.len()) {
                     Ok((None, _)) => continue,
@@ -429,8 +429,8 @@ mod tests {
 
     #[test]
     fn minimal_query() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
+        let a = vec![1u64.into(), "a".into()];
+        let b = vec![1u64.into(), "b".into()];
 
         let (r, mut w) = new(2, &[0]);
         w.add(vec![Record::Positive(a.clone())]);
@@ -449,9 +449,9 @@ mod tests {
 
     #[test]
     fn non_minimal_query() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-        let c = vec![1.into(), "c".into()];
+        let a = vec![1u64.into(), "a".into()];
+        let b = vec![1u64.into(), "b".into()];
+        let c = vec![1u64.into(), "c".into()];
 
         let (r, mut w) = new(2, &[0]);
         w.add(vec![Record::Positive(a.clone())]);
@@ -478,8 +478,8 @@ mod tests {
 
     #[test]
     fn absorb_negative_immediate() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
+        let a = vec![1u64.into(), "a".into()];
+        let b = vec![1u64.into(), "b".into()];
 
         let (r, mut w) = new(2, &[0]);
         w.add(vec![Record::Positive(a.clone())]);
@@ -499,8 +499,8 @@ mod tests {
 
     #[test]
     fn absorb_negative_later() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
+        let a = vec![1u64.into(), "a".into()];
+        let b = vec![1u64.into(), "b".into()];
 
         let (r, mut w) = new(2, &[0]);
         w.add(vec![Record::Positive(a.clone())]);
@@ -521,9 +521,9 @@ mod tests {
 
     #[test]
     fn absorb_multi() {
-        let a = vec![1.into(), "a".into()];
-        let b = vec![1.into(), "b".into()];
-        let c = vec![1.into(), "c".into()];
+        let a = vec![1u64.into(), "a".into()];
+        let b = vec![1u64.into(), "b".into()];
+        let c = vec![1u64.into(), "c".into()];
 
         let (r, mut w) = new(2, &[0]);
         w.add(vec![
@@ -532,7 +532,7 @@ mod tests {
         ]);
         w.swap();
 
-        assert_eq!(r.try_find_and(&a[0..1], |rs| rs.len()).unwrap().0, Some(2));
+        assert_eq!(r.try_find_and(&a[0..1], |rs: _| rs.len()).unwrap().0, Some(2));
         assert!(r
             .try_find_and(&a[0..1], |rs| rs
                 .iter()

@@ -644,10 +644,8 @@ impl Recipe {
                         // should have consumed all input
                         assert!(
                             remainder.is_empty(),
-                            format!(
                                 "failed to parse the complete recipe; left with: {}",
                                 remainder
-                            )
                         );
                         acc.extend(parsed.into_iter().map(|p| Ok(p)).collect::<Vec<_>>());
                     }

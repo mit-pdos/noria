@@ -288,7 +288,7 @@ async fn main() {
             let graph_fname = format!("{}/failed_hotcrp_{}.gv", gloc.unwrap(), schema_version);
             let mut gf = File::create(graph_fname).unwrap();
             assert!(write!(gf, "{}", backend.g.graphviz().await.unwrap()).is_ok());
-            panic!(e)
+            panic!("{}", e)
         }
 
         if gloc.is_some() {

@@ -541,11 +541,9 @@ fn make_grouped_node(
     assert!(!group_by.is_empty());
     assert!(
         group_by.len() <= 6,
-        format!(
             "can't have >6 group columns due to compound key restrictions, {} needs {}",
             name,
             group_by.len()
-        )
     );
     assert!(match kind {
         GroupedNodeType::FilterAggregation(_) => true,
