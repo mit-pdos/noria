@@ -196,7 +196,7 @@ impl SqlIncorporator {
 
         let mut qg = match to_query_graph(st) {
             Ok(qg) => qg,
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         };
 
         trace!(self.log, "QG for \"{}\": {:#?}", query_name, qg);

@@ -188,8 +188,8 @@ fn rewrite_selection(
     // Expand within field list
     for field in sq.fields.iter_mut() {
         match *field {
-            FieldDefinitionExpression::All => panic!(err),
-            FieldDefinitionExpression::AllInTable(_) => panic!(err),
+            FieldDefinitionExpression::All => panic!("{}", err),
+            FieldDefinitionExpression::AllInTable(_) => panic!("{}", err),
             FieldDefinitionExpression::Value(FieldValueExpression::Literal(_)) => (),
             FieldDefinitionExpression::Value(FieldValueExpression::Arithmetic(ref mut e)) => {
                 if let ArithmeticBase::Column(ref mut c) = e.left {

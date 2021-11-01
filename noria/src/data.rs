@@ -620,12 +620,10 @@ macro_rules! arithmetic_operation (
                 (a $op b).into()
             }
             (first, second) => panic!(
-                format!(
                     "can't {} a {:?} and {:?}",
                     stringify!($op),
                     first,
                     second,
-                )
             ),
         }
     );
@@ -879,13 +877,13 @@ mod tests {
     #[test]
     fn data_type_debug() {
         let tiny_text: DataType = "hi".into();
-        let text: DataType = "I contain ' and \"".into();
+        let text: DataType = "I contain \' and \"".into();
         let real: DataType = (-0.05).into();
         let timestamp = DataType::Timestamp(NaiveDateTime::from_timestamp(0, 42_000_000));
         let int = DataType::Int(5);
         let big_int = DataType::BigInt(5);
         assert_eq!(format!("{:?}", tiny_text), "TinyText(\"hi\")");
-        assert_eq!(format!("{:?}", text), "Text(\"I contain \\' and \\\"\")");
+        assert_eq!(format!("{:?}", text), "Text(\"I contain \' and \\\"\")");
         assert_eq!(format!("{:?}", real), "Real(-0.050000000)");
         assert_eq!(
             format!("{:?}", timestamp),
