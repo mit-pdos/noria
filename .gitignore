@@ -2,6 +2,7 @@ run.sh
 *.hist
 .*.rustfmt
 *.json
+!.devcontainer/devcontainer.json
 *.png
 *.log
 *.svg
